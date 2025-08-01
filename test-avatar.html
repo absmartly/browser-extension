@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Avatar URL</title>
+    <style>
+        body { padding: 20px; font-family: Arial, sans-serif; }
+        .test { margin: 20px 0; padding: 20px; border: 1px solid #ddd; }
+        img { width: 100px; height: 100px; object-fit: cover; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <h1>Avatar URL Test</h1>
+    
+    <div class="test">
+        <h2>Test 1: Direct URL</h2>
+        <p>URL: https://dev-1.absmartly.com/files/avatars/f7bd44c4acd4/crop/original.png</p>
+        <img src="https://dev-1.absmartly.com/files/avatars/f7bd44c4acd4/crop/original.png" alt="Test 1" />
+    </div>
+    
+    <script>
+        // Test the URL construction logic
+        const userData = {
+            "id": 3,
+            "email": "jonas@absmartly.com",
+            "picture": {
+                "id": 357,
+                "file_usage_id": 1,
+                "width": 1200,
+                "height": 1200,
+                "file_size": 41836,
+                "file_name": "01_Color_Logo-square.png",
+                "content_type": "image/png",
+                "base_url": "/files/avatars/f7bd44c4acd4",
+                "crop_left": 119.99999999999999,
+                "crop_top": 120,
+                "crop_width": 960.0000000000001,
+                "crop_height": 960.0000000000001,
+                "created_at": "2025-03-31T13:44:22.922Z",
+                "created_by_user_id": 3
+            }
+        };
+        
+        const endpoint = "https://dev-1.absmartly.com/";
+        const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+        
+        let pictureUrl = null;
+        if (userData.picture && typeof userData.picture === 'object' && userData.picture.base_url) {
+            pictureUrl = `${cleanEndpoint}${userData.picture.base_url}/crop/original.png`;
+        }
+        
+        console.log('Constructed URL:', pictureUrl);
+        
+        // Add another test with the constructed URL
+        const testDiv = document.createElement('div');
+        testDiv.className = 'test';
+        testDiv.innerHTML = `
+            <h2>Test 2: Constructed URL</h2>
+            <p>URL: ${pictureUrl}</p>
+            <img src="${pictureUrl}" alt="Test 2" onerror="console.error('Failed to load:', this.src)" onload="console.log('Successfully loaded:', this.src)" />
+        `;
+        document.body.appendChild(testDiv);
+    </script>
+</body>
+</html>

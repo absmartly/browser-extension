@@ -1,0 +1,131 @@
+import axios, { AxiosInstance } from 'axios'
+import type { Experiment, ABSmartlyConfig } from '~src/types/absmartly'
+
+export class ABSmartlyClient {
+  private client: AxiosInstance
+  private config: ABSmartlyConfig
+
+  constructor(config: ABSmartlyConfig) {
+    this.config = config
+    
+    const headers: any = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+    
+    // Only add Authorization header if API key is provided
+    if (config.apiKey) {
+      // Determine auth header based on API key format
+      const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+        ? `JWT ${config.apiKey}`
+        : `Api-Key ${config.apiKey}`
+      headers['Authorization'] = authHeader
+    }
+    
+    this.client = axios.create({
+      baseURL: config.apiEndpoint.endsWith('/v1') ? config.apiEndpoint : `${config.apiEndpoint}/v1`,
+      headers,
+      withCredentials: !config.apiKey // Use cookies if no API key
+    })
+  }
+
+  async getExperiments(params?: any): Promise<Experiment[]> {
+    try {
+      const response = await this.client.get('/experiments', { params })
+      return response.data.experiments || []
+    } catch (error) {
+      console.error('Failed to fetch experiments:', error)
+      throw error
+    }
+  }
+
+  async getExperiment(id: number): Promise<Experiment> {
+    try {
+      const response = await this.client.get(`/experiments/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Failed to fetch experiment ${id}:`, error)
+      throw error
+    }
+  }
+
+  async createExperiment(data: any): Promise<Experiment> {
+    try {
+      const response = await this.client.post('/experiments', data)
+      return response.data
+    } catch (error) {
+      console.error('Failed to create experiment:', error)
+      throw error
+    }
+  }
+
+  async updateExperiment(id: number, data: any): Promise<Experiment> {
+    try {
+      const response = await this.client.put(`/experiments/${id}`, data)
+      return response.data
+    } catch (error) {
+      console.error(`Failed to update experiment ${id}:`, error)
+      throw error
+    }
+  }
+
+  async startExperiment(id: number): Promise<Experiment> {
+    try {
+      const response = await this.client.put(`/experiments/${id}/start`)
+      return response.data
+    } catch (error) {
+      console.error(`Failed to start experiment ${id}:`, error)
+      throw error
+    }
+  }
+
+  async stopExperiment(id: number): Promise<Experiment> {
+    try {
+      const response = await this.client.put(`/experiments/${id}/stop`)
+      return response.data
+    } catch (error) {
+      console.error(`Failed to stop experiment ${id}:`, error)
+      throw error
+    }
+  }
+
+  async getApplications(): Promise<any[]> {
+    try {
+      const response = await this.client.get('/applications')
+      return response.data.applications || []
+    } catch (error) {
+      console.error('Failed to fetch applications:', error)
+      throw error
+    }
+  }
+
+  async getUnitTypes(): Promise<any[]> {
+    try {
+      const response = await this.client.get('/unit_types')
+      return response.data.unit_types || []
+    } catch (error) {
+      console.error('Failed to fetch unit types:', error)
+      throw error
+    }
+  }
+
+  async getMetrics(): Promise<any[]> {
+    try {
+      const response = await this.client.get('/metrics')
+      return response.data.metrics || []
+    } catch (error) {
+      console.error('Failed to fetch metrics:', error)
+      throw error
+    }
+  }
+
+  async getExperimentTags(): Promise<any[]> {
+    try {
+      const response = await this.client.get('/experiment_tags')
+      return response.data.experiment_tags || []
+    } catch (error) {
+      console.error('Failed to fetch experiment tags:', error)
+      throw error
+    }
+  }
+}

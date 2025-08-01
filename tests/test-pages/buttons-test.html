@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Button Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .button-section {
+            margin-bottom: 30px;
+        }
+        .button-section h2 {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background-color: #f0f0f0;
+        }
+        .primary {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .primary:hover {
+            background-color: #0056b3;
+        }
+        .secondary {
+            background-color: #6c757d;
+            color: white;
+            border-color: #6c757d;
+        }
+        .secondary:hover {
+            background-color: #545b62;
+        }
+        .success {
+            background-color: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+        .success:hover {
+            background-color: #218838;
+        }
+        .danger {
+            background-color: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+        .danger:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Button Test Page for ABSmartly</h1>
+        
+        <div class="button-section">
+            <h2>Default Buttons</h2>
+            <button id="btn-default-1">Default Button 1</button>
+            <button id="btn-default-2">Default Button 2</button>
+            <button id="btn-default-3">Default Button 3</button>
+        </div>
+
+        <div class="button-section">
+            <h2>Primary Actions</h2>
+            <button id="btn-primary-1" class="primary">Submit Form</button>
+            <button id="btn-primary-2" class="primary">Save Changes</button>
+            <button id="btn-primary-3" class="primary">Continue</button>
+        </div>
+
+        <div class="button-section">
+            <h2>Secondary Actions</h2>
+            <button id="btn-secondary-1" class="secondary">Cancel</button>
+            <button id="btn-secondary-2" class="secondary">Reset</button>
+            <button id="btn-secondary-3" class="secondary">Go Back</button>
+        </div>
+
+        <div class="button-section">
+            <h2>Status Actions</h2>
+            <button id="btn-success-1" class="success">Approve</button>
+            <button id="btn-success-2" class="success">Confirm</button>
+            <button id="btn-danger-1" class="danger">Delete</button>
+            <button id="btn-danger-2" class="danger">Reject</button>
+        </div>
+
+        <div class="button-section">
+            <h2>Form Buttons</h2>
+            <form id="test-form">
+                <button type="submit" id="btn-form-submit">Submit Form</button>
+                <button type="button" id="btn-form-action">Form Action</button>
+                <button type="reset" id="btn-form-reset">Reset Form</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Add click handlers for testing
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', function(e) {
+                if (e.target.type !== 'submit') {
+                    e.preventDefault();
+                }
+                console.log('Button clicked:', e.target.id || e.target.textContent);
+            });
+        });
+
+        // Prevent form submission for testing
+        document.getElementById('test-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Form submitted');
+        });
+    </script>
+</body>
+</html>

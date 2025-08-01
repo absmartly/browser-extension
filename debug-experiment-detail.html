@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug ExperimentDetail Bug</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .experiment-detail { border: 1px solid #ccc; padding: 20px; margin: 10px; }
+        .variant { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
+        .variables { margin: 10px 0; }
+        button { margin: 5px; padding: 8px 16px; }
+        input { margin: 2px; padding: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Debug ExperimentDetail Variables Bug</h1>
+    <div id="root"></div>
+
+    <script>
+        // Mock experiment data that matches the real structure
+        const mockExperiment = {
+            id: 1,
+            name: "test_experiment",
+            display_name: "Test Experiment", 
+            state: "created",
+            variants: [
+                {
+                    id: 1,
+                    variant: 0,
+                    name: "Control",
+                    is_control: true,
+                    config: JSON.stringify({
+                        button_color: "blue",
+                        button_text: "Click Me",
+                        dom_changes: [
+                            { selector: ".btn", type: "style", value: { color: "blue" }, enabled: true }
+                        ]
+                    })
+                },
+                {
+                    id: 2,
+                    variant: 1,
+                    name: "Variant A",
+                    config: JSON.stringify({
+                        button_color: "red", 
+                        button_text: "Try Now",
+                        dom_changes: [
+                            { selector: ".btn", type: "style", value: { color: "red" }, enabled: true }
+                        ]
+                    })
+                }
+            ]
+        };
+
+        // Mock ExperimentDetail component behavior
+        function ExperimentDetail() {
+            const [isEditing, setIsEditing] = React.useState(false); // Should start in view mode
+            const [variantData, setVariantData] = React.useState({});
+            const [experiment, setExperiment] = React.useState(mockExperiment);
+
+            console.log('🔍 ExperimentDetail render - isEditing:', isEditing);
+            console.log('🔍 ExperimentDetail render - variantData:', variantData);
+            console.log('🔍 ExperimentDetail render - experiment.variants:', experiment?.variants?.length);
+
+            React.useEffect(() => {
+                // Parse variant configs (simulating real logic)
+                console.log('🔍 Processing variants in useEffect...');
+                const data = {};
+                
+                experiment.variants?.forEach((variant) => {
+                    const variantKey = variant.name || `Variant ${variant.variant}`;
+                    try {
+                        if (variant.config) {
+                            const config = JSON.parse(variant.config);
+                            const { dom_changes, ...variables } = config;
+                            
+                            data[variantKey] = {
+                                variables: variables || {},
+                                dom_changes: dom_changes || []
+                            };
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse variant config:', e);
+                        data[variantKey] = { variables: {}, dom_changes: [] };
+                    }
+                });
+                
+                console.log('🔍 Setting variant data:', data);
+                setVariantData(data);
+            }, [experiment]);
+
+            const handleEditClick = () => {
+                console.log('🔍 Edit button clicked, switching to edit mode');
+                setIsEditing(true);
+            };
+
+            const handleCancelClick = () => {
+                console.log('🔍 Cancel button clicked, switching to view mode');
+                setIsEditing(false);
+            };
+
+            const hasVariants = experiment.variants && experiment.variants.length > 0;
+            console.log('🔍 Should show variants section:', hasVariants);
+
+            return React.createElement('div', { className: 'experiment-detail' }, [
+                React.createElement('h2', { key: 'title' }, experiment.display_name),
+                React.createElement('p', { key: 'info' }, `ID: ${experiment.id} | State: ${experiment.state}`),
+                
+                // Variants Section - this should always be visible when variants exist
+                hasVariants && React.createElement('div', { key: 'variants', className: 'variants-section' }, [
+                    React.createElement('div', { key: 'header', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+                        React.createElement('h3', { key: 'h3' }, 'Variants'),
+                        !isEditing && React.createElement('button', { key: 'edit-btn', onClick: handleEditClick }, 'Edit Variables')
+                    ]),
+                    
+                    // Map through variants - this should always render when hasVariants is true
+                    ...experiment.variants.map((variant, index) => {
+                        const variantKey = variant.name || `Variant ${variant.variant}`;
+                        const data = variantData[variantKey] || { variables: {}, dom_changes: [] };
+                        
+                        console.log('🔍 Rendering variant:', {
+                            variantKey,
+                            hasData: !!data,
+                            variablesCount: Object.keys(data.variables).length,
+                            domChangesCount: data.dom_changes.length,
+                            isEditing
+                        });
+
+                        return React.createElement('div', { 
+                            key: `variant-${index}`, 
+                            className: 'variant',
+                            style: { border: '2px solid ' + (Object.keys(data.variables).length > 0 ? 'green' : 'red') }
+                        }, [
+                            React.createElement('h4', { key: 'variant-title' }, variantKey),
+                            
+                            // Variables Section - should always be visible
+                            React.createElement('div', { key: 'variables', className: 'variables' }, [
+                                React.createElement('h5', { key: 'vars-title' }, 'Variables'),
+                                React.createElement('div', { key: 'vars-count' }, `Count: ${Object.keys(data.variables).length}`),
+                                ...Object.entries(data.variables).map(([key, value]) => 
+                                    React.createElement('div', { key }, [
+                                        React.createElement('input', { value: key, readOnly: true }),
+                                        React.createElement('input', { value: value, readOnly: !isEditing })
+                                    ])
+                                )
+                            ]),
+                            
+                            // DOM Changes Section - should always be visible  
+                            React.createElement('div', { key: 'dom-changes' }, [
+                                React.createElement('h5', {}, 'DOM Changes'),
+                                React.createElement('div', {}, `Count: ${data.dom_changes.length}`)
+                            ])
+                        ]);
+                    })
+                ]),
+
+                // Action buttons
+                isEditing && React.createElement('div', { key: 'buttons' }, [
+                    React.createElement('button', { key: 'save', onClick: () => setIsEditing(false) }, 'Save Changes'),
+                    React.createElement('button', { key: 'cancel', onClick: handleCancelClick }, 'Cancel')
+                ])
+            ]);
+        }
+
+        // Render the component
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(ExperimentDetail));
+
+        // Test scenarios
+        setTimeout(() => {
+            console.log('\n🧪 TEST: Simulating click on experiment (initial load)');
+            console.log('Variables should be visible initially...');
+        }, 1000);
+
+        setTimeout(() => {
+            console.log('\n🧪 TEST: Simulating bug - what if experiment data changes?');
+            // This might simulate what happens when switching between experiments
+        }, 3000);
+    </script>
+</body>
+</html>
