@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Element Picker Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .test-button:hover {
+            background: #2563eb;
+        }
+        
+        #unique-id {
+            background: #f3f4f6;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .test-class {
+            background: #fef3c7;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        [data-test="custom-element"] {
+            background: #d1fae5;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .nested-container {
+            background: #e0e7ff;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        
+        .nested-item {
+            background: #c7d2fe;
+            padding: 10px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Element Picker Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Test Elements</h2>
+        
+        <p>Click the 🎯 icon in the ABSmartly extension DOM change modal to start picking elements.</p>
+        
+        <div id="unique-id">
+            Element with unique ID - should generate: #unique-id
+        </div>
+        
+        <div class="test-class">
+            Element with class - should generate selector with class
+        </div>
+        
+        <div data-test="custom-element">
+            Element with data attribute - should generate: [data-test="custom-element"]
+        </div>
+        
+        <button class="test-button">
+            Button element - test interactive elements
+        </button>
+        
+        <div class="nested-container">
+            <h3>Nested Elements</h3>
+            <div class="nested-item">Nested Item 1</div>
+            <div class="nested-item">Nested Item 2</div>
+            <div class="nested-item">Nested Item 3</div>
+        </div>
+        
+        <p>Regular paragraph without special attributes</p>
+        
+        <ul>
+            <li>List item 1</li>
+            <li>List item 2</li>
+            <li>List item 3</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Open the ABSmartly extension</li>
+            <li>Navigate to an experiment and click Edit</li>
+            <li>Click "Add DOM Change" for any variant</li>
+            <li>In the modal, click the 🎯 (target) icon</li>
+            <li>Hover over elements on this page - they should highlight in blue</li>
+            <li>Click an element to select it</li>
+            <li>The selector should appear in the extension modal</li>
+        </ol>
+    </div>
+    
+    <script>
+        // Log when element picker is active
+        document.addEventListener('mouseover', (e) => {
+            if (document.querySelector('.absmartly-element-highlight')) {
+                console.log('Element picker is active, hovering:', e.target);
+            }
+        });
+    </script>
+</body>
+</html>

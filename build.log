@@ -1,0 +1,11 @@
+
+> absmartly-browser-extension@0.0.1 build /Users/joalves/git_tree/absmartly-ext/absmartly-browser-extension
+> plasmo build
+
+🟣 Plasmo v0.90.5
+🔴 The Browser Extension Framework
+🔵 INFO   | Prepare to bundle the extension...
+🔵 INFO   | Building for target: chrome-mv3
+🟠 WARN   | Unable to find any entry files. The extension might be empty
+🔵 INFO   | Loaded environment variables from: []
+🟢 DONE   | Finished in 370ms!

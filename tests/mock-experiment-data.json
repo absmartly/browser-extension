@@ -1,0 +1,40 @@
+{
+  "name": "test_rounded_buttons_1753907990266",
+  "domChanges": [
+    {
+      "selector": "button",
+      "action": "style",
+      "property": "borderRadius",
+      "value": "8px"
+    }
+  ],
+  "fullPayload": {
+    "name": "test_rounded_buttons_1753907990266",
+    "display_name": "Rounded Buttons Test",
+    "state": "ready",
+    "percentage_of_traffic": 100,
+    "nr_variants": 2,
+    "percentages": "50/50",
+    "unit_type": {
+      "unit_type_id": 1
+    },
+    "applications": [
+      {
+        "application_id": 1,
+        "application_version": "0"
+      }
+    ],
+    "variants": [
+      {
+        "variant": 0,
+        "name": "Control",
+        "config": "{}"
+      },
+      {
+        "variant": 1,
+        "name": "Variant 1",
+        "config": "{\"dom_changes\":[{\"selector\":\"button\",\"action\":\"style\",\"property\":\"borderRadius\",\"value\":\"8px\"}]}"
+      }
+    ]
+  }
+}
