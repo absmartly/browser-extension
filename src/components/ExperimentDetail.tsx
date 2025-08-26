@@ -362,7 +362,7 @@ export function ExperimentDetail({
         const data = variantData[variantKey]
         
         // Find the existing experiment variant
-        const existingVariant = experiment.variants?.find(v => {
+        const existingVariant = fullExperiment.variants?.find((v: any) => {
           const expVariantKey = v.name || `Variant ${v.variant}`
           return expVariantKey === variantKey
         })
@@ -371,44 +371,99 @@ export function ExperimentDetail({
         
         // Add DOM changes to variant config if using variable storage
         if (storageType === 'variable') {
-          config[fieldName] = data.dom_changes
+          config[fieldName] = data.dom_changes || []
         }
         
+        // Return clean variant object without nested data
         return {
-          ...existingVariant,
-          name: variantKey.startsWith('Variant ') ? undefined : variantKey,
-          variant: index,
+          variant: existingVariant?.variant ?? index,
+          name: variantKey,
           config: JSON.stringify(config)
         }
       })
       
-      // Prepare full update payload
-      let updatePayload: any = {
-        ...fullExperiment,
-        display_name: displayName,
-        variants: updatedVariants
-      }
-      
-      // Add DOM changes to custom field if using custom_field storage
-      if (storageType === 'custom_field') {
-        // Find the custom field and update its value
-        const customFieldValues = { ...fullExperiment.custom_section_field_values }
-        const fieldEntry = Object.entries(customFieldValues).find(([_, field]: [string, any]) => 
-          field.custom_section_field?.sdk_field_name === fieldName
-        )
-        
-        if (fieldEntry) {
-          const [fieldId, fieldData] = fieldEntry
-          customFieldValues[fieldId] = {
-            ...fieldData,
-            value: JSON.stringify(domChangesPayload)
-          }
-          updatePayload.custom_section_field_values = customFieldValues
+      // Create PUT payload with correct structure: id, version, data at root level
+      const putPayload: any = {
+        id: fullExperiment.id,
+        version: fullExperiment.version || 0,
+        data: {
+          state: fullExperiment.state,
+          name: fullExperiment.name,
+          display_name: displayName,
+          iteration: fullExperiment.iteration,
+          percentage_of_traffic: fullExperiment.percentage_of_traffic,
+          unit_type: fullExperiment.unit_type ? { unit_type_id: fullExperiment.unit_type.unit_type_id || fullExperiment.unit_type.id } : undefined,
+          nr_variants: updatedVariants.length,
+          percentages: fullExperiment.percentages,
+          audience: fullExperiment.audience,
+          audience_strict: fullExperiment.audience_strict,
+          owners: fullExperiment.owners?.map((o: any) => ({ user_id: o.user_id || o.user?.id || o.id })) || [],
+          teams: fullExperiment.teams?.map((t: any) => ({ team_id: t.team_id || t.id })) || [],
+          experiment_tags: fullExperiment.experiment_tags || [],
+          applications: fullExperiment.applications?.map((app: any) => ({
+            application_id: app.application_id || app.id,
+            application_version: app.application_version || "0"
+          })) || [],
+          primary_metric: fullExperiment.primary_metric ? { metric_id: fullExperiment.primary_metric.metric_id || fullExperiment.primary_metric.id } : undefined,
+          secondary_metrics: fullExperiment.secondary_metrics?.map((m: any) => ({
+            metric_id: m.metric_id || m.metric?.id || m.id,
+            type: "secondary",
+            order_index: m.order_index || 0
+          })) || [],
+          variants: updatedVariants,
+          variant_screenshots: fullExperiment.variant_screenshots || [],
+          custom_section_field_values: [],
+          parent_experiment: fullExperiment.parent_experiment || null,
+          template_permission: fullExperiment.template_permission || {},
+          template_name: fullExperiment.template_name || fullExperiment.name,
+          template_description: fullExperiment.template_description || "",
+          type: fullExperiment.type || "test",
+          analysis_type: fullExperiment.analysis_type || "group_sequential",
+          baseline_participants_per_day: fullExperiment.baseline_participants_per_day,
+          required_alpha: fullExperiment.required_alpha,
+          required_power: fullExperiment.required_power,
+          group_sequential_futility_type: fullExperiment.group_sequential_futility_type,
+          group_sequential_analysis_count: fullExperiment.group_sequential_analysis_count,
+          group_sequential_min_analysis_interval: fullExperiment.group_sequential_min_analysis_interval,
+          group_sequential_first_analysis_interval: fullExperiment.group_sequential_first_analysis_interval,
+          minimum_detectable_effect: fullExperiment.minimum_detectable_effect,
+          group_sequential_max_duration_interval: fullExperiment.group_sequential_max_duration_interval
         }
       }
       
-      // Send the full update
-      onUpdate(experiment.id, updatePayload)
+      // Convert custom_section_field_values to array format for PUT request
+      if (fullExperiment.custom_section_field_values) {
+        const customFieldsArray: any[] = []
+        
+        // Handle both object and array formats from GET response
+        const fieldsArray = Array.isArray(fullExperiment.custom_section_field_values) 
+          ? fullExperiment.custom_section_field_values
+          : Object.values(fullExperiment.custom_section_field_values)
+        
+        fieldsArray.forEach((field: any) => {
+          const fieldId = field.experiment_custom_section_field_id || field.custom_section_field?.id || field.id
+          
+          // Update DOM changes field if using custom_field storage
+          if (storageType === 'custom_field' && 
+              field.custom_section_field?.sdk_field_name === fieldName) {
+            customFieldsArray.push({
+              experiment_custom_section_field_id: fieldId,
+              value: JSON.stringify(domChangesPayload)
+            })
+          } else {
+            // Keep other fields with simplified format (only id and value)
+            customFieldsArray.push({
+              experiment_custom_section_field_id: fieldId,
+              value: field.value
+            })
+          }
+        })
+        
+        putPayload.data.custom_section_field_values = customFieldsArray
+      }
+      
+      // Send the complete PUT payload (including id, version, data at root level)
+      onUpdate(experiment.id, putPayload)
       
     } catch (error) {
       console.error('Failed to save changes:', error)
