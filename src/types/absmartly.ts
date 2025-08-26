@@ -58,6 +58,8 @@ export interface ABSmartlyConfig {
   apiKey?: string
   apiEndpoint: string
   applicationId?: number
+  domChangesStorageType?: 'variable' | 'custom_field'
+  domChangesFieldName?: string
 }
 
 export interface ABSmartlyUser {

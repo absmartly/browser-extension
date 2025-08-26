@@ -3,10 +3,11 @@ import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
-import type { Experiment } from '~src/types/absmartly'
+import type { Experiment, ABSmartlyConfig } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
+import { getConfig } from '~src/utils/storage'
 
 const storage = new Storage({ area: "local" })
 
@@ -310,36 +311,109 @@ export function ExperimentDetail({
     })
   }
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (!onUpdate) return
-
-    // Create updated variants from variantData (single source of truth)
-    const updatedVariants = Object.keys(variantData).map((variantKey, index) => {
-      const data = variantData[variantKey]
+    
+    try {
+      // Get the configuration to check storage settings
+      const config = await getConfig()
+      const storageType = config?.domChangesStorageType || 'variable'
+      const fieldName = config?.domChangesFieldName || 'dom_changes'
       
-      // Find the existing experiment variant or create a new one
-      const existingVariant = experiment.variants?.find(v => {
-        const expVariantKey = v.name || `Variant ${v.variant}`
-        return expVariantKey === variantKey
+      // Fetch full experiment data first
+      const fullExperimentResponse = await chrome.runtime.sendMessage({
+        type: 'API_REQUEST',
+        method: 'GET',
+        path: `/experiments/${experiment.id}`
       })
       
-      const config = {
-        ...data.variables,
-        dom_changes: data.dom_changes
+      if (!fullExperimentResponse.success) {
+        alert('Failed to fetch experiment data: ' + fullExperimentResponse.error)
+        return
       }
-
-      return {
-        ...existingVariant,
-        name: variantKey.startsWith('Variant ') ? undefined : variantKey,
-        variant: index,
-        config: JSON.stringify(config)
+      
+      const fullExperiment = fullExperimentResponse.data
+      
+      // Check if custom field exists when using custom_field storage
+      if (storageType === 'custom_field') {
+        const hasCustomField = fullExperiment.custom_section_field_values && 
+          Object.values(fullExperiment.custom_section_field_values).some((field: any) => 
+            field.custom_section_field?.sdk_field_name === fieldName &&
+            field.custom_section_field?.available_in_sdk === true
+          )
+        
+        if (!hasCustomField) {
+          alert(`Error: Custom field with SDK name "${fieldName}" not found or not available in SDK. Please check your experiment configuration.`)
+          return
+        }
       }
-    })
-
-    onUpdate(experiment.id, { 
-      display_name: displayName,
-      variants: updatedVariants 
-    })
+      
+      // Prepare DOM changes payload
+      const domChangesPayload: Record<string, DOMChange[]> = {}
+      Object.keys(variantData).forEach((variantKey) => {
+        const data = variantData[variantKey]
+        if (data.dom_changes && data.dom_changes.length > 0) {
+          domChangesPayload[variantKey] = data.dom_changes
+        }
+      })
+      
+      // Create updated variants
+      const updatedVariants = Object.keys(variantData).map((variantKey, index) => {
+        const data = variantData[variantKey]
+        
+        // Find the existing experiment variant
+        const existingVariant = experiment.variants?.find(v => {
+          const expVariantKey = v.name || `Variant ${v.variant}`
+          return expVariantKey === variantKey
+        })
+        
+        let config = { ...data.variables }
+        
+        // Add DOM changes to variant config if using variable storage
+        if (storageType === 'variable') {
+          config[fieldName] = data.dom_changes
+        }
+        
+        return {
+          ...existingVariant,
+          name: variantKey.startsWith('Variant ') ? undefined : variantKey,
+          variant: index,
+          config: JSON.stringify(config)
+        }
+      })
+      
+      // Prepare full update payload
+      let updatePayload: any = {
+        ...fullExperiment,
+        display_name: displayName,
+        variants: updatedVariants
+      }
+      
+      // Add DOM changes to custom field if using custom_field storage
+      if (storageType === 'custom_field') {
+        // Find the custom field and update its value
+        const customFieldValues = { ...fullExperiment.custom_section_field_values }
+        const fieldEntry = Object.entries(customFieldValues).find(([_, field]: [string, any]) => 
+          field.custom_section_field?.sdk_field_name === fieldName
+        )
+        
+        if (fieldEntry) {
+          const [fieldId, fieldData] = fieldEntry
+          customFieldValues[fieldId] = {
+            ...fieldData,
+            value: JSON.stringify(domChangesPayload)
+          }
+          updatePayload.custom_section_field_values = customFieldValues
+        }
+      }
+      
+      // Send the full update
+      onUpdate(experiment.id, updatePayload)
+      
+    } catch (error) {
+      console.error('Failed to save changes:', error)
+      alert('Failed to save changes: ' + error.message)
+    }
   }
 
   const handlePreviewToggle = (enabled: boolean) => {

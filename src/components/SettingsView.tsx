@@ -15,6 +15,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [apiKey, setApiKey] = useState('')
   const [apiEndpoint, setApiEndpoint] = useState('')
   const [applicationId, setApplicationId] = useState('')
+  const [domChangesStorageType, setDomChangesStorageType] = useState<'variable' | 'custom_field'>('variable')
+  const [domChangesFieldName, setDomChangesFieldName] = useState('dom_changes')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABSmartlyUser | null>(null)
@@ -33,6 +35,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedApiKey = config?.apiKey || ''
       let loadedApiEndpoint = config?.apiEndpoint || ''
       let loadedApplicationId = config?.applicationId?.toString() || ''
+      let loadedDomChangesStorageType = config?.domChangesStorageType || 'variable'
+      let loadedDomChangesFieldName = config?.domChangesFieldName || 'dom_changes'
       
       
       // In development, auto-load from environment variables if fields are empty
@@ -58,6 +62,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setApiKey(loadedApiKey)
       setApiEndpoint(loadedApiEndpoint)
       setApplicationId(loadedApplicationId)
+      setDomChangesStorageType(loadedDomChangesStorageType)
+      setDomChangesFieldName(loadedDomChangesFieldName)
       
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
@@ -172,7 +178,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     const config: ABSmartlyConfig = {
       apiKey: apiKey.trim() || undefined,
       apiEndpoint,
-      applicationId: applicationId ? parseInt(applicationId) : undefined
+      applicationId: applicationId ? parseInt(applicationId) : undefined,
+      domChangesStorageType,
+      domChangesFieldName: domChangesFieldName.trim() || 'dom_changes'
     }
 
     try {
@@ -322,6 +330,52 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         placeholder="Enter application ID"
         error={errors.applicationId}
       />
+      
+      {/* DOM Changes Storage Settings */}
+      <div className="space-y-3 border-t pt-4 mt-4">
+        <h3 className="text-sm font-medium text-gray-700">DOM Changes Storage</h3>
+        
+        <div className="space-y-2">
+          <label className="text-sm text-gray-600">Storage Type</label>
+          <div className="flex gap-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                value="variable"
+                checked={domChangesStorageType === 'variable'}
+                onChange={(e) => setDomChangesStorageType(e.target.value as 'variable')}
+                className="mr-2"
+              />
+              <span className="text-sm">Variable (Default)</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                value="custom_field"
+                checked={domChangesStorageType === 'custom_field'}
+                onChange={(e) => setDomChangesStorageType(e.target.value as 'custom_field')}
+                className="mr-2"
+              />
+              <span className="text-sm">Custom Field</span>
+            </label>
+          </div>
+        </div>
+        
+        <div>
+          <Input
+            label={domChangesStorageType === 'variable' ? 'Variable Name' : 'Custom Field Name'}
+            type="text"
+            value={domChangesFieldName}
+            onChange={(e) => setDomChangesFieldName(e.target.value)}
+            placeholder="dom_changes"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            {domChangesStorageType === 'variable' 
+              ? 'The name of the variable that will store DOM changes in each variant'
+              : 'The SDK field name of the custom field. Must exist in the experiment.'}
+          </p>
+        </div>
+      </div>
       
       <div className="flex gap-2 pt-2">
         <Button onClick={handleSave} variant="primary">
