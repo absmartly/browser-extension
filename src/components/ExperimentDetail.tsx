@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
@@ -6,6 +7,8 @@ import type { Experiment } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
 import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
+
+const storage = new Storage({ area: "local" })
 
 interface ExperimentDetailProps {
   experiment: Experiment
@@ -46,6 +49,23 @@ export function ExperimentDetail({
   console.log('🔍 ExperimentDetail state - displayName:', displayName)
   console.log('🔍 ExperimentDetail state - variants length:', experiment?.variants?.length)
   console.log('🔍 ExperimentDetail state - should show variants section:', experiment.variants && experiment.variants.length > 0)
+
+  // Effect to restore saved variant data on mount
+  useEffect(() => {
+    const restoreData = async () => {
+      const storageKey = `experiment-${experiment.id}-variants`
+      try {
+        const savedData = await storage.get(storageKey)
+        if (savedData) {
+          console.log('📦 Restoring saved variant data for experiment', experiment.id)
+          setVariantData(savedData)
+        }
+      } catch (error) {
+        console.error('Failed to restore variant data:', error)
+      }
+    }
+    restoreData()
+  }, [experiment.id])
 
   // Effect to handle experiment data changes and variant parsing
   useEffect(() => {
@@ -226,26 +246,46 @@ export function ExperimentDetail({
   }
 
   const handleDOMChangesUpdate = (variantName: string, changes: DOMChange[]) => {
-    setVariantData(prev => ({
-      ...prev,
-      [variantName]: {
-        ...prev[variantName],
-        dom_changes: changes
+    setVariantData(prev => {
+      const updated = {
+        ...prev,
+        [variantName]: {
+          ...prev[variantName],
+          dom_changes: changes
+        }
       }
-    }))
+      
+      // Save to storage
+      const storageKey = `experiment-${experiment.id}-variants`
+      storage.set(storageKey, updated).catch(error => {
+        console.error('Failed to save variant data:', error)
+      })
+      
+      return updated
+    })
   }
 
   const handleVariableUpdate = (variantName: string, key: string, value: string) => {
-    setVariantData(prev => ({
-      ...prev,
-      [variantName]: {
-        ...prev[variantName],
-        variables: {
-          ...prev[variantName].variables,
-          [key]: value
+    setVariantData(prev => {
+      const updated = {
+        ...prev,
+        [variantName]: {
+          ...prev[variantName],
+          variables: {
+            ...prev[variantName].variables,
+            [key]: value
+          }
         }
       }
-    }))
+      
+      // Save to storage
+      const storageKey = `experiment-${experiment.id}-variants`
+      storage.set(storageKey, updated).catch(error => {
+        console.error('Failed to save variant data:', error)
+      })
+      
+      return updated
+    })
   }
 
   const handleAddVariable = (variantName: string) => {
@@ -259,6 +299,13 @@ export function ExperimentDetail({
     setVariantData(prev => {
       const newData = { ...prev }
       delete newData[variantName].variables[key]
+      
+      // Save to storage
+      const storageKey = `experiment-${experiment.id}-variants`
+      storage.set(storageKey, newData).catch(error => {
+        console.error('Failed to save variant data:', error)
+      })
+      
       return newData
     })
   }
