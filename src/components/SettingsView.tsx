@@ -236,7 +236,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="text-lg font-semibold">ABSmartly Settings</h2>
+      <div className="flex items-center gap-2">
+        <img 
+          src="icon128.png" 
+          alt="ABSmartly" 
+          className="w-6 h-6"
+        />
+        <h2 className="text-lg font-semibold">ABSmartly Settings</h2>
+      </div>
       
       {errors.general && (
         <div role="alert" className="bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">

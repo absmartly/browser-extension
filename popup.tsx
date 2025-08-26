@@ -50,10 +50,27 @@ function IndexPopupContent() {
 
   useEffect(() => {
     if (config && view === 'list' && experiments.length === 0) {
-      // Only load if we don't have experiments already
-      loadExperiments(false) // Don't force refresh on initial load
+      // Load cached experiments first
+      loadCachedExperiments()
     }
   }, [config, view])
+  
+  const loadCachedExperiments = async () => {
+    try {
+      const cache = await getExperimentsCache()
+      if (cache && cache.experiments.length > 0) {
+        setExperiments(cache.experiments)
+        setFilteredExperiments(cache.experiments)
+        setExperimentsLoading(false)
+      } else {
+        // Only fetch if no cache exists
+        loadExperiments(false)
+      }
+    } catch (error) {
+      console.warn('Failed to load cache:', error)
+      loadExperiments(false)
+    }
+  }
 
   // Restore popup state when component mounts
   useEffect(() => {
@@ -96,28 +113,8 @@ function IndexPopupContent() {
     setError(null)
     
     try {
-      // Check cache first unless forcing refresh (only for first page)
-      if (!forceRefresh && page === 1) {
-        try {
-          const cache = await getExperimentsCache()
-          if (cache && cache.experiments.length > 0) {
-            // Use cached data if it's less than 5 minutes old
-            const cacheAge = Date.now() - cache.timestamp
-            if (cacheAge < 5 * 60 * 1000) { // 5 minutes
-              setExperiments(cache.experiments)
-              setFilteredExperiments(cache.experiments)
-              setCurrentPage(1)
-              setExperimentsLoading(false)
-              return
-            }
-          }
-        } catch (cacheError) {
-          console.warn('Failed to read cache, fetching fresh data:', cacheError)
-          // Continue to fetch fresh data
-        }
-      }
-      
-      // Start with basic parameters from the working example
+      // Always fetch fresh data when this function is called
+      // Cache is handled separately in loadCachedExperiments
       const params: any = {
         page: page,
         items: size,
@@ -347,7 +344,14 @@ function IndexPopupContent() {
         <>
           <div className="border-b px-4 py-3">
             <div className="flex items-center justify-between mb-3">
-              <h1 className="text-lg font-semibold">ABSmartly Experiments</h1>
+              <div className="flex items-center gap-2">
+                <img 
+                  src="icon128.png" 
+                  alt="ABSmartly" 
+                  className="w-6 h-6"
+                />
+                <h1 className="text-lg font-semibold">ABSmartly Experiments</h1>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => loadExperiments(true, 1, pageSize)}

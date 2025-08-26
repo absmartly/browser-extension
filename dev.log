@@ -1,0 +1,26 @@
+
+> absmartly-browser-extension@0.0.1 dev
+> plasmo dev --src-path=.
+
+🟣 Plasmo v0.90.5
+🔴 The Browser Extension Framework
+🔵 INFO   | Starting the extension development server...
+🔵 INFO   | Building for target: chrome-mv3
+🔵 INFO   | Loaded environment variables from: [ '.env.local' ]
+🔄 Building🔄 Building.🔄 Building..                    🟢 DONE   | Extension re-packaged in 1188ms! 🚀
+🔵 INFO   | Assets directory changed, update dynamic assets
+🔄 Building                    🟢 DONE   | Extension re-packaged in 79ms! 🚀
+🔄 Building                    🔴 ERROR  | Build failed. To debug, run plasmo dev --verbose.
+🔴 ERROR  | ENOENT: no such file or directory, open '/Users/joalves/git\_tree/absmartly-browser-extension/.plasmo/chrome-mv3.plasmo.manifest.json'
+🔄 Building                    🔴 ERROR  | Build failed. To debug, run plasmo dev --verbose.
+🔴 ERROR  | Entry /Users/joalves/git\_tree/absmartly-browser-extension/.plasmo/chrome-mv3.plasmo.manifest.json does not exist
+🔄 Building🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 1531ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 48ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 602ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 309ms! 🚀
+🔄 Building🔄 Building.                    🔴 ERROR  | Build failed. To debug, run plasmo dev --verbose.
+🔴 ERROR  | 'import', and 'export' cannot be used outside of module code
+🔄 Building🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 931ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 293ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 274ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 316ms! 🚀
