@@ -242,6 +242,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return
       }
       
+      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+      
       try {
         // Try multiple auth endpoints to check authentication status
         // First, try the experiments endpoint which we know works if auth is valid
@@ -264,15 +266,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               headers['Authorization'] = authHeader
             }
             
-            // Clean endpoint and ensure no /v1 prefix for auth endpoints
-            const cleanEndpoint = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-            const userResponse = await axios.get(`${cleanEndpoint}/auth/current-user`, {
+            const userResponse = await axios.get(`${baseUrl}/auth/current-user`, {
               withCredentials: !config.apiKey,
               headers
             })
             
             console.log('Auth response from /auth/current-user:', userResponse.data)
-            sendResponse({ success: true, data: userResponse.data })
+            
+            // If we have a user but no avatar object, fetch full user details
+            let finalUserData = userResponse.data
+            if (userResponse.data.user && userResponse.data.user.avatar_file_upload_id && !userResponse.data.user.avatar) {
+              try {
+                console.log('Fetching full user details to get avatar...')
+                const fullUserResponse = await makeAPIRequest('GET', `/users/${userResponse.data.user.id}`)
+                console.log('Full user response:', fullUserResponse)
+                if (fullUserResponse && fullUserResponse.user && fullUserResponse.user.avatar) {
+                  finalUserData.user.avatar = fullUserResponse.user.avatar
+                  console.log('Successfully fetched avatar data:', fullUserResponse.user.avatar)
+                } else {
+                  console.log('No avatar found in user response')
+                }
+              } catch (avatarError) {
+                console.log('Could not fetch full user details for avatar:', avatarError)
+              }
+            }
+            
+            sendResponse({ success: true, data: finalUserData })
           } catch (userError) {
             // If current-user fails but experiments work, create a basic authenticated response
             console.log('Could not get user info, but experiments work - user is authenticated')
