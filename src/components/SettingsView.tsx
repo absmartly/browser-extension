@@ -113,16 +113,19 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         let pictureUrl = null
         console.log('Full response.data:', JSON.stringify(response.data, null, 2))
         console.log('userData:', JSON.stringify(userData, null, 2))
-        console.log('userData.picture:', userData.picture)
+        console.log('userData.avatar:', userData.avatar)
         console.log('endpoint:', endpoint)
         
-        // Ensure endpoint doesn't have trailing slash
-        const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint
+        // Ensure endpoint doesn't have trailing slash or /v1 suffix for avatar URLs
+        const baseEndpoint = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
         
-        // The user object has an 'avatar' property with base_url
-        if (userData.avatar && typeof userData.avatar === 'object' && userData.avatar.base_url) {
-          // Construct the full avatar URL: endpoint + base_url + /crop/original.png
-          pictureUrl = `${cleanEndpoint}${userData.avatar.base_url}/crop/original.png`
+        // Check for avatar object
+        const userAvatar = userData.avatar
+        console.log('Found avatar object:', userAvatar)
+        
+        if (userAvatar && typeof userAvatar === 'object' && userAvatar.base_url) {
+          // Construct the full avatar URL: endpoint + base_url + /crop/64x64.webp
+          pictureUrl = `${baseEndpoint}${userAvatar.base_url}/crop/64x64.webp`
           console.log('Constructed picture URL from avatar.base_url:', pictureUrl)
         }
         
