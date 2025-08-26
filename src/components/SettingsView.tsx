@@ -61,6 +61,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
+        // Store endpoint in localStorage for avatar URLs
+        localStorage.setItem('absmartly-endpoint', loadedApiEndpoint)
         checkAuthStatus(loadedApiEndpoint)
       }
     } catch (error) {
@@ -175,8 +177,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
     try {
       await setConfig(config)
-      // Check auth status after saving
+      // Store endpoint in localStorage for avatar URLs
       if (apiEndpoint) {
+        localStorage.setItem('absmartly-endpoint', apiEndpoint)
         checkAuthStatus(apiEndpoint)
       }
       onSave(config)
