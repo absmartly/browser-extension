@@ -49,17 +49,24 @@ function IndexPopupContent() {
     updateExperiment
   } = useABSmartly()
 
+  // Track if we've initialized experiments for this session
+  const [hasInitialized, setHasInitialized] = useState(false)
+  
   // Load experiments when switching to list view
   useEffect(() => {
-    if (config && view === 'list' && experiments.length === 0 && !experimentsLoading) {
+    if (config && view === 'list' && !hasInitialized && !experimentsLoading) {
+      console.log('Initializing experiments for this session')
+      setHasInitialized(true)
       loadCachedExperiments()
     }
-  }, [config, view])
+  }, [config, view, hasInitialized])
   
   const loadCachedExperiments = async () => {
+    console.log('loadCachedExperiments called')
     try {
       const cache = await getExperimentsCache()
-      if (cache && cache.experiments.length > 0) {
+      console.log('Cache result:', cache)
+      if (cache && cache.experiments && cache.experiments.length > 0) {
         console.log('Loading experiments from cache:', cache.experiments.length)
         setExperiments(cache.experiments)
         setFilteredExperiments(cache.experiments)
@@ -70,21 +77,19 @@ function IndexPopupContent() {
       // Check if this is truly the first time (no cache at all)
       const storage = new Storage({ area: "local" })
       const hasLoadedBefore = await storage.get('hasLoadedExperiments')
+      console.log('hasLoadedBefore:', hasLoadedBefore)
       
       if (!hasLoadedBefore) {
         console.log('First time loading, fetching initial data')
         await storage.set('hasLoadedExperiments', true)
         loadExperiments(false)
       } else {
-        console.log('No cache but has loaded before, showing empty state')
-        setExperiments([])
-        setFilteredExperiments([])
+        console.log('No cache but has loaded before, not fetching')
+        // Don't set empty arrays - just leave whatever is there
         setExperimentsLoading(false)
       }
     } catch (error) {
       console.warn('Failed to load cache:', error)
-      setExperiments([])
-      setFilteredExperiments([])
       setExperimentsLoading(false)
     }
   }
@@ -292,11 +297,17 @@ function IndexPopupContent() {
   }
 
   const handleFilterChange = (filterState: any) => {
+    const hasActualChange = JSON.stringify(filterState) !== JSON.stringify(filters)
     setFilters(filterState)
-    // Reset to first page when filters change
-    setCurrentPage(1)
-    // Reload experiments with new filters
-    loadExperiments(true, 1, pageSize)
+    
+    // Only reload if there's an actual change and we have experiments
+    if (hasActualChange && experiments.length > 0) {
+      console.log('Filter changed, reloading experiments')
+      // Reset to first page when filters change
+      setCurrentPage(1)
+      // Reload experiments with new filters
+      loadExperiments(true, 1, pageSize)
+    }
   }
 
   const handleOpenVisualEditor = () => {
