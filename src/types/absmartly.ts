@@ -19,6 +19,14 @@ export interface Experiment {
   primary_metric?: { metric_id: number; name?: string }
   experiment_tags?: { experiment_tag_id: number; experiment_tag?: { id: number; tag: string } }[]
   context_ids?: string[]
+  owner?: ExperimentOwner
+  team?: string
+  created_by?: ExperimentUser
+  updated_by?: ExperimentUser
+  exposures?: number
+  started_at?: string
+  stopped_at?: string
+  type?: 'group_sequential' | 'fixed_horizon'
 }
 
 export interface Variant {
@@ -58,4 +66,21 @@ export interface ABSmartlyUser {
   name: string
   picture?: string
   authenticated: boolean
+}
+
+export interface ExperimentOwner {
+  user_id: number
+  email?: string
+  first_name?: string
+  last_name?: string
+  avatar?: {
+    base_url: string
+  }
+}
+
+export interface ExperimentUser {
+  user_id: number
+  email?: string
+  first_name?: string
+  last_name?: string
 }
