@@ -12,6 +12,7 @@ import { useABSmartly } from "~src/hooks/useABSmartly"
 import type { Experiment } from "~src/types/absmartly"
 import { CogIcon, PaintBrushIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
+import logoUrl from "data-base64:~assets/logo.png"
 import "~style.css"
 
 type View = 'list' | 'detail' | 'settings' | 'create' | 'edit'
@@ -25,6 +26,7 @@ function IndexPopupContent() {
   const [experimentDetailLoading, setExperimentDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isAuthExpired, setIsAuthExpired] = useState(false)
+  const [hasLoadedInitially, setHasLoadedInitially] = useState(false)
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -48,26 +50,31 @@ function IndexPopupContent() {
     updateExperiment
   } = useABSmartly()
 
+  // Load cached experiments on mount, only once
   useEffect(() => {
-    if (config && view === 'list' && experiments.length === 0) {
-      // Load cached experiments first
+    if (config && view === 'list' && !hasLoadedInitially) {
+      setHasLoadedInitially(true)
       loadCachedExperiments()
     }
-  }, [config, view])
+  }, [config, view, hasLoadedInitially])
   
   const loadCachedExperiments = async () => {
     try {
       const cache = await getExperimentsCache()
       if (cache && cache.experiments.length > 0) {
+        console.log('Loading experiments from cache:', cache.experiments.length)
         setExperiments(cache.experiments)
         setFilteredExperiments(cache.experiments)
         setExperimentsLoading(false)
+        // Don't fetch new data - user must click refresh
       } else {
-        // Only fetch if no cache exists
+        console.log('No cache found, fetching fresh data')
+        // Only fetch if no cache exists at all
         loadExperiments(false)
       }
     } catch (error) {
       console.warn('Failed to load cache:', error)
+      // On error, fetch fresh data
       loadExperiments(false)
     }
   }
@@ -346,7 +353,7 @@ function IndexPopupContent() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <img 
-                  src="icon128.png" 
+                  src={logoUrl} 
                   alt="ABSmartly" 
                   className="w-6 h-6"
                 />

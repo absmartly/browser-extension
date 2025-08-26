@@ -3,6 +3,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import type { ABSmartlyConfig, ABSmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
+import logoUrl from "data-base64:~assets/logo.png"
 import axios from 'axios'
 
 interface SettingsViewProps {
@@ -125,14 +126,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           console.log('Constructed picture URL from avatar.base_url:', pictureUrl)
         }
         
+        // Create user object - handle both full user data and basic authenticated status
         const userObject = {
-          id: userData.id || userData.user_id,
-          email: userData.email,
+          id: userData.id || userData.user_id || 'authenticated',
+          email: userData.email || 'Authenticated User',
           name: userData.first_name && userData.last_name 
             ? `${userData.first_name} ${userData.last_name}`
-            : userData.first_name || userData.last_name || userData.email,
+            : userData.first_name || userData.last_name || userData.email || 'Authenticated User',
           picture: pictureUrl,
-          authenticated: true
+          authenticated: userData.authenticated !== false // Default to true if not explicitly false
         }
         console.log('Setting user object:', userObject)
         setUser(userObject)
@@ -238,7 +240,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-2">
         <img 
-          src="icon128.png" 
+          src={logoUrl} 
           alt="ABSmartly" 
           className="w-6 h-6"
         />
@@ -253,7 +255,19 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
       {/* Authentication Status */}
       <div className="bg-gray-50 p-3 rounded-md">
-        <div className="text-sm font-medium text-gray-700 mb-2">Authentication Status</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-medium text-gray-700">Authentication Status</div>
+          {apiEndpoint && !checkingAuth && (
+            <Button
+              onClick={() => checkAuthStatus(apiEndpoint)}
+              size="sm"
+              variant="secondary"
+              className="text-xs"
+            >
+              Refresh
+            </Button>
+          )}
+        </div>
         {checkingAuth ? (
           <div className="flex items-center text-sm text-gray-600">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
@@ -281,13 +295,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
                 <div className="text-xs text-gray-600">{user.email || 'No email'}</div>
               </div>
             </div>
-            {/* Debug info */}
-            <details className="mt-2">
-              <summary className="text-xs text-gray-500 cursor-pointer">Debug info</summary>
-              <pre className="text-xs mt-1 p-2 bg-gray-100 rounded overflow-auto">
+            {/* Debug info - only show in development */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mt-2">
+                <summary className="text-xs text-gray-500 cursor-pointer">Debug info</summary>
+                <pre className="text-xs mt-1 p-2 bg-gray-100 rounded overflow-auto">
 {JSON.stringify(user, null, 2)}
-              </pre>
-            </details>
+                </pre>
+              </details>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
