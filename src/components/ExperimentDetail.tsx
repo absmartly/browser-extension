@@ -492,7 +492,7 @@ export function ExperimentDetail({
                   </div>
                 </div>
               )
-            })}}
+            })}
           </div>
         )}
 
