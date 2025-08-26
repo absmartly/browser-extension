@@ -42,6 +42,7 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
     if (!metadata) {
       // Try to get non-chunked data
       const data = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE)
+      console.log('Cache retrieved (non-chunked):', data ? 'exists' : 'null')
       return data
     }
     
@@ -63,12 +64,11 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
         throw new Error('Empty cache data')
       }
       
-      const experiments = JSON.parse(fullData)
+      const cacheData = JSON.parse(fullData)
+      console.log('Cache retrieved (chunked):', cacheData.experiments?.length || 0, 'experiments')
       
-      return {
-        experiments,
-        timestamp: metadata.timestamp
-      }
+      // The cached data already has experiments and timestamp
+      return cacheData
     } else {
       // Data wasn't chunked, get it directly
       const data = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE)
