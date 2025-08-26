@@ -5,7 +5,20 @@ import { Input } from './ui/Input'
 import { Checkbox } from './ui/Checkbox'
 import { MultiSelectTags } from './ui/MultiSelectTags'
 import type { DOMChange, DOMChangeType } from '~src/types/dom-changes'
-import { PencilIcon, TrashIcon, PlusIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline'
+import { 
+  PencilIcon, 
+  TrashIcon, 
+  PlusIcon, 
+  XMarkIcon, 
+  CheckIcon,
+  CodeBracketIcon,
+  CursorArrowRaysIcon,
+  PaintBrushIcon,
+  DocumentTextIcon,
+  HashtagIcon,
+  CubeIcon,
+  CommandLineIcon
+} from '@heroicons/react/24/outline'
 
 interface DOMChangesInlineEditorProps {
   variantName: string
@@ -298,25 +311,106 @@ export function DOMChangesInlineEditor({
     storage.remove('domChangesInlineState')
   }
 
-  const getChangeDescription = (change: DOMChange): string => {
+  const getChangeIcon = (type: DOMChangeType) => {
+    switch (type) {
+      case 'text':
+        return DocumentTextIcon
+      case 'style':
+        return PaintBrushIcon
+      case 'class':
+        return HashtagIcon
+      case 'attribute':
+        return CubeIcon
+      case 'html':
+        return CodeBracketIcon
+      case 'javascript':
+        return CommandLineIcon
+      default:
+        return CursorArrowRaysIcon
+    }
+  }
+
+  const getChangeTypeLabel = (type: DOMChangeType): string => {
+    switch (type) {
+      case 'text': return 'Text'
+      case 'style': return 'Style'
+      case 'class': return 'Class'
+      case 'attribute': return 'Attribute'
+      case 'html': return 'HTML'
+      case 'javascript': return 'JavaScript'
+      default: return type
+    }
+  }
+
+  const getChangeDescription = (change: DOMChange): React.ReactNode => {
     switch (change.type) {
       case 'text':
-        return `"${change.value}"`
+        return (
+          <span className="text-gray-600">
+            <span className="text-gray-500">Set text to:</span> <span className="font-medium text-gray-800">"{change.value}"</span>
+          </span>
+        )
       case 'style':
-        return Object.entries(change.value).map(([k, v]) => `${k}: ${v}`).join(', ')
+        const styles = Object.entries(change.value)
+        return (
+          <div className="flex flex-wrap gap-2">
+            {styles.map(([key, value], i) => (
+              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-xs">
+                <span className="text-blue-700 font-medium">{key}:</span>
+                <span className="ml-1 text-blue-600">{value}</span>
+              </span>
+            ))}
+          </div>
+        )
       case 'class':
-        const parts = []
-        if (change.add?.length) parts.push(`+${change.add.join(', ')}`)
-        if (change.remove?.length) parts.push(`-${change.remove.join(', ')}`)
-        return parts.join(' ')
+        return (
+          <div className="flex flex-wrap gap-2">
+            {change.add?.map((cls, i) => (
+              <span key={`add-${i}`} className="inline-flex items-center px-2 py-0.5 rounded bg-green-50 text-xs">
+                <span className="text-green-600">+</span>
+                <span className="ml-1 text-green-700">{cls}</span>
+              </span>
+            ))}
+            {change.remove?.map((cls, i) => (
+              <span key={`remove-${i}`} className="inline-flex items-center px-2 py-0.5 rounded bg-red-50 text-xs">
+                <span className="text-red-600">−</span>
+                <span className="ml-1 text-red-700">{cls}</span>
+              </span>
+            ))}
+          </div>
+        )
       case 'attribute':
-        return Object.entries(change.value).map(([k, v]) => `${k}="${v}"`).join(', ')
+        const attrs = Object.entries(change.value)
+        return (
+          <div className="flex flex-wrap gap-2">
+            {attrs.map(([key, value], i) => (
+              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 text-xs">
+                <span className="text-purple-700 font-medium">{key}=</span>
+                <span className="text-purple-600">"{value}"</span>
+              </span>
+            ))}
+          </div>
+        )
       case 'html':
-        return 'HTML content'
+        return (
+          <span className="text-gray-600">
+            <span className="text-gray-500">Replace inner HTML</span>
+            {change.value && change.value.length > 50 && (
+              <span className="ml-1 text-xs text-gray-400">({change.value.length} chars)</span>
+            )}
+          </span>
+        )
       case 'javascript':
-        return 'JavaScript code'
+        return (
+          <span className="text-gray-600">
+            <span className="text-gray-500">Execute JavaScript</span>
+            {change.value && change.value.length > 50 && (
+              <span className="ml-1 text-xs text-gray-400">({change.value.length} chars)</span>
+            )}
+          </span>
+        )
       default:
-        return 'Unknown change'
+        return <span className="text-gray-500">Unknown change type</span>
     }
   }
 
@@ -344,47 +438,110 @@ export function DOMChangesInlineEditor({
         </div>
       </div>
 
-      {/* Existing changes list */}
-      <div className="border border-gray-200 rounded-md divide-y divide-gray-200">
+      {/* Existing changes list with improved design */}
+      <div className="space-y-2">
         {changes.length === 0 && !editingChange ? (
-          <div className="p-4 text-center text-sm text-gray-500">
-            No DOM changes configured
+          <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+            <CursorArrowRaysIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500 mb-3">No DOM changes configured</p>
+            <Button
+              onClick={handleAddChange}
+              size="sm"
+              variant="secondary"
+              className="inline-flex items-center gap-1"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add DOM Change
+            </Button>
           </div>
         ) : (
           <>
-            {changes.map((change, index) => (
-              <div key={index} className="p-3 flex items-center gap-3">
-                <Checkbox
-                  checked={change.enabled !== false}
-                  onChange={() => handleToggleChange(index)}
-                />
-                <div className="flex-1 text-sm">
-                  <span className="font-mono text-gray-900">{change.selector}</span>
-                  <span className="mx-2 text-gray-400">|</span>
-                  <span className="text-gray-700">{change.type}</span>
-                  <span className="mx-2 text-gray-400">|</span>
-                  <span className="text-gray-600">{getChangeDescription(change)}</span>
+            {changes.map((change, index) => {
+              const Icon = getChangeIcon(change.type)
+              const isDisabled = change.enabled === false
+              
+              return (
+                <div 
+                  key={index} 
+                  className={`
+                    relative border rounded-lg transition-all
+                    ${isDisabled 
+                      ? 'border-gray-200 bg-gray-50 opacity-60' 
+                      : 'border-gray-300 bg-white hover:border-blue-300 hover:shadow-sm'
+                    }
+                  `}
+                >
+                  <div className="p-4">
+                    {/* Header Row */}
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
+                      <div className="pt-0.5">
+                        <Checkbox
+                          checked={change.enabled !== false}
+                          onChange={() => handleToggleChange(index)}
+                        />
+                      </div>
+                      
+                      {/* Icon and Type Badge */}
+                      <div className="flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <div className={`
+                            p-1.5 rounded-md
+                            ${isDisabled ? 'bg-gray-100' : 'bg-blue-50'}
+                          `}>
+                            <Icon className={`h-4 w-4 ${isDisabled ? 'text-gray-400' : 'text-blue-600'}`} />
+                          </div>
+                          <span className={`
+                            text-xs font-medium px-2 py-0.5 rounded-full
+                            ${isDisabled 
+                              ? 'bg-gray-100 text-gray-500' 
+                              : 'bg-blue-100 text-blue-700'
+                            }
+                          `}>
+                            {getChangeTypeLabel(change.type)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Selector */}
+                        <div className="mb-2">
+                          <code className="text-sm font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                            {change.selector}
+                          </code>
+                        </div>
+                        
+                        {/* Change Description */}
+                        <div className="text-sm">
+                          {getChangeDescription(change)}
+                        </div>
+                      </div>
+                      
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleEditChange(index)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteChange(index)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleEditChange(index)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                    title="Edit"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteChange(index)}
-                    className="p-1 text-gray-400 hover:text-red-600"
-                    title="Delete"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </>
         )}
       </div>
@@ -623,8 +780,8 @@ export function DOMChangesInlineEditor({
         </div>
       )}
 
-      {/* Add button */}
-      {!editingChange && (
+      {/* Add button - only show if we have existing changes and not editing */}
+      {changes.length > 0 && !editingChange && (
         <Button
           type="button"
           onClick={handleAddChange}
