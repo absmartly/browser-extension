@@ -236,32 +236,67 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
     // Special handler for auth check
-    getConfig().then(config => {
+    getConfig().then(async config => {
       if (!config?.apiEndpoint) {
         sendResponse({ success: false, error: 'No endpoint configured' })
         return
       }
       
-      // For auth check, we don't use the /v1 prefix
-      axios.get(`${config.apiEndpoint}/auth/current-user`, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json'
+      try {
+        // Try multiple auth endpoints to check authentication status
+        // First, try the experiments endpoint which we know works if auth is valid
+        const experimentsResponse = await makeAPIRequest('GET', '/experiments', { limit: 1 })
+        
+        if (experimentsResponse) {
+          // If we can get experiments, we're authenticated
+          // Try to get user info from /auth/current-user endpoint
+          try {
+            const headers: any = {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+            
+            // Add authorization if API key exists
+            if (config.apiKey) {
+              const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+                ? `JWT ${config.apiKey}`
+                : `Api-Key ${config.apiKey}`
+              headers['Authorization'] = authHeader
+            }
+            
+            // Clean endpoint and ensure no /v1 prefix for auth endpoints
+            const cleanEndpoint = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+            const userResponse = await axios.get(`${cleanEndpoint}/auth/current-user`, {
+              withCredentials: !config.apiKey,
+              headers
+            })
+            
+            console.log('Auth response from /auth/current-user:', userResponse.data)
+            sendResponse({ success: true, data: userResponse.data })
+          } catch (userError) {
+            // If current-user fails but experiments work, create a basic authenticated response
+            console.log('Could not get user info, but experiments work - user is authenticated')
+            sendResponse({ 
+              success: true, 
+              data: {
+                authenticated: true,
+                email: 'Authenticated User',
+                id: 'authenticated'
+              }
+            })
+          }
+        } else {
+          sendResponse({ success: false, error: 'Not authenticated' })
         }
-      })
-      .then(response => {
-        console.log('Auth response:', response.data)
-        sendResponse({ success: true, data: response.data })
-      })
-      .catch(error => {
+      } catch (error) {
         console.error('Auth check error:', error)
-        const isAuth = isAuthError(error)
+        const isAuth = error.message === 'AUTH_EXPIRED' || isAuthError(error)
         sendResponse({ 
           success: false, 
           error: error.message,
           isAuthError: isAuth
         })
-      })
+      }
     })
     return true // Will respond asynchronously
   } else if (message.type === "FETCH_AVATAR") {
