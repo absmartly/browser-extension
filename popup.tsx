@@ -26,7 +26,6 @@ function IndexPopupContent() {
   const [experimentDetailLoading, setExperimentDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isAuthExpired, setIsAuthExpired] = useState(false)
-  const [hasLoadedInitially, setHasLoadedInitially] = useState(false)
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -50,13 +49,12 @@ function IndexPopupContent() {
     updateExperiment
   } = useABSmartly()
 
-  // Load cached experiments on mount, only once
+  // Load experiments when switching to list view
   useEffect(() => {
-    if (config && view === 'list' && !hasLoadedInitially) {
-      setHasLoadedInitially(true)
+    if (config && view === 'list' && experiments.length === 0 && !experimentsLoading) {
       loadCachedExperiments()
     }
-  }, [config, view, hasLoadedInitially])
+  }, [config, view])
   
   const loadCachedExperiments = async () => {
     try {
@@ -66,46 +64,55 @@ function IndexPopupContent() {
         setExperiments(cache.experiments)
         setFilteredExperiments(cache.experiments)
         setExperimentsLoading(false)
-        // Don't fetch new data - user must click refresh
-      } else {
-        console.log('No cache found, fetching fresh data')
-        // Only fetch if no cache exists at all
+        return
+      }
+      
+      // Check if this is truly the first time (no cache at all)
+      const storage = new Storage({ area: "local" })
+      const hasLoadedBefore = await storage.get('hasLoadedExperiments')
+      
+      if (!hasLoadedBefore) {
+        console.log('First time loading, fetching initial data')
+        await storage.set('hasLoadedExperiments', true)
         loadExperiments(false)
+      } else {
+        console.log('No cache but has loaded before, showing empty state')
+        setExperiments([])
+        setFilteredExperiments([])
+        setExperimentsLoading(false)
       }
     } catch (error) {
       console.warn('Failed to load cache:', error)
-      // On error, fetch fresh data
-      loadExperiments(false)
+      setExperiments([])
+      setFilteredExperiments([])
+      setExperimentsLoading(false)
     }
   }
 
   // Restore popup state when component mounts
   useEffect(() => {
-    const storage = new Storage({ area: "session" })
+    const storage = new Storage({ area: "local" })
     storage.get('popupState').then(result => {
       if (result) {
         console.log('Restoring popup state:', result)
         const state = result
         if (state.view) setView(state.view)
         if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment)
-        // Clear the state after using it
-        storage.remove('popupState')
+        // Don't clear the state - keep it for next time
       }
     })
   }, [])
 
   // Save popup state whenever view or selectedExperiment changes
   useEffect(() => {
-    const storage = new Storage({ area: "session" })
-    if (view !== 'list' || selectedExperiment) {
-      const state = {
-        view,
-        selectedExperiment,
-        timestamp: Date.now()
-      }
-      storage.set('popupState', state)
-      console.log('Saved popup state:', state)
+    const storage = new Storage({ area: "local" })
+    const state = {
+      view,
+      selectedExperiment,
+      timestamp: Date.now()
     }
+    storage.set('popupState', state)
+    console.log('Saved popup state:', state)
   }, [view, selectedExperiment])
 
   // Reset to first page when switching to list view
