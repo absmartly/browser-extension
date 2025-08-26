@@ -27,21 +27,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   const loadConfig = async () => {
     try {
-      console.log('[SettingsView] Loading config...')
       const config = await getConfig()
-      console.log('[SettingsView] Config from storage:', config)
       
       // Load from config first
       let loadedApiKey = config?.apiKey || ''
       let loadedApiEndpoint = config?.apiEndpoint || ''
       let loadedApplicationId = config?.applicationId?.toString() || ''
       
-      console.log('[SettingsView] Initial values from storage:', {
-        hasApiKey: !!loadedApiKey,
-        apiKeyLength: loadedApiKey.length,
-        apiEndpoint: loadedApiEndpoint,
-        applicationId: loadedApplicationId
-      })
       
       // In development, auto-load from environment variables if fields are empty
       // Plasmo replaces process.env.PLASMO_PUBLIC_* at build time
@@ -49,33 +41,18 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
       const envApplicationId = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
       
-      console.log('[SettingsView] Environment variables:', {
-        hasApiKey: !!envApiKey,
-        apiKeyLength: envApiKey?.length || 0,
-        apiEndpoint: envApiEndpoint,
-        applicationId: envApplicationId
-      })
       
       // Only use env vars if the loaded values are empty
       if (!loadedApiKey && envApiKey) {
         loadedApiKey = envApiKey
-        console.log('[SettingsView] Using API key from environment')
       }
       if (!loadedApiEndpoint && envApiEndpoint) {
         loadedApiEndpoint = envApiEndpoint
-        console.log('[SettingsView] Using API endpoint from environment:', envApiEndpoint)
       }
       if (!loadedApplicationId && envApplicationId) {
         loadedApplicationId = envApplicationId
-        console.log('[SettingsView] Using application ID from environment')
       }
       
-      console.log('[SettingsView] Final values:', {
-        hasApiKey: !!loadedApiKey,
-        apiKeyLength: loadedApiKey.length,
-        apiEndpoint: loadedApiEndpoint,
-        applicationId: loadedApplicationId
-      })
       
       // Set the final values
       setApiKey(loadedApiKey)
@@ -102,31 +79,22 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       })
       
       if (response.success && response.data) {
-        console.log('Auth response in settings:', response.data)
-        console.log('Auth response type:', typeof response.data)
-        console.log('Auth response keys:', Object.keys(response.data))
         
         // Check if user data is nested
         const userData = response.data.user || response.data
         
         // Handle picture URL - construct it from base_url
         let pictureUrl = null
-        console.log('Full response.data:', JSON.stringify(response.data, null, 2))
-        console.log('userData:', JSON.stringify(userData, null, 2))
-        console.log('userData.avatar:', userData.avatar)
-        console.log('endpoint:', endpoint)
         
         // Ensure endpoint doesn't have trailing slash or /v1 suffix for avatar URLs
         const baseEndpoint = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
         
         // Check for avatar object
         const userAvatar = userData.avatar
-        console.log('Found avatar object:', userAvatar)
         
         if (userAvatar && typeof userAvatar === 'object' && userAvatar.base_url) {
           // Construct the full avatar URL: endpoint + base_url + /crop/64x64.webp
           pictureUrl = `${baseEndpoint}${userAvatar.base_url}/crop/64x64.webp`
-          console.log('Constructed picture URL from avatar.base_url:', pictureUrl)
         }
         
         // Create user object - handle both full user data and basic authenticated status
@@ -139,7 +107,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           picture: pictureUrl,
           authenticated: userData.authenticated !== false // Default to true if not explicitly false
         }
-        console.log('Setting user object:', userObject)
         setUser(userObject)
         
         // Fetch avatar image through background worker if URL exists
@@ -150,7 +117,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           }).then(avatarResponse => {
             if (avatarResponse.success && avatarResponse.dataUrl) {
               setAvatarDataUrl(avatarResponse.dataUrl)
-              console.log('Avatar fetched successfully')
             } else {
               console.error('Failed to fetch avatar:', avatarResponse.error)
             }
@@ -159,12 +125,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           })
         }
       } else {
-        console.log('Auth failed or no data:', response)
         setUser(null)
         setAvatarDataUrl(null)
       }
     } catch (error) {
-      console.log('Not authenticated or error checking auth:', error)
       setUser(null)
       setAvatarDataUrl(null)
     } finally {
@@ -289,7 +253,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
                     e.currentTarget.style.display = 'none'
                   }}
                   onLoad={() => {
-                    console.log('Avatar loaded successfully')
                   }}
                 />
               )}
