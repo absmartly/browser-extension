@@ -271,20 +271,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               headers
             })
             
-            console.log('Auth response from /auth/current-user:', userResponse.data)
+            // Auth response received from /auth/current-user
             
             // If we have a user but no avatar object, fetch full user details
             let finalUserData = userResponse.data
             if (userResponse.data.user && userResponse.data.user.avatar_file_upload_id && !userResponse.data.user.avatar) {
               try {
-                console.log('Fetching full user details to get avatar...')
+                // Fetching full user details to get avatar
                 const fullUserResponse = await makeAPIRequest('GET', `/users/${userResponse.data.user.id}`)
-                console.log('Full user response:', fullUserResponse)
                 if (fullUserResponse && fullUserResponse.user && fullUserResponse.user.avatar) {
                   finalUserData.user.avatar = fullUserResponse.user.avatar
-                  console.log('Successfully fetched avatar data:', fullUserResponse.user.avatar)
+                  // Successfully fetched avatar data
                 } else {
-                  console.log('No avatar found in user response')
+                  // No avatar found in user response
                 }
               } catch (avatarError) {
                 console.log('Could not fetch full user details for avatar:', avatarError)
