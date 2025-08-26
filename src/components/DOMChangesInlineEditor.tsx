@@ -353,28 +353,28 @@ export function DOMChangesInlineEditor({
       case 'style':
         const styles = Object.entries(change.value)
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {styles.map(([key, value], i) => (
-              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-xs">
+              <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-xs">
                 <span className="text-blue-700 font-medium">{key}:</span>
-                <span className="ml-1 text-blue-600">{value}</span>
+                <span className="ml-0.5 text-blue-600">{value}</span>
               </span>
             ))}
           </div>
         )
       case 'class':
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {change.add?.map((cls, i) => (
-              <span key={`add-${i}`} className="inline-flex items-center px-2 py-0.5 rounded bg-green-50 text-xs">
+              <span key={`add-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-xs">
                 <span className="text-green-600">+</span>
-                <span className="ml-1 text-green-700">{cls}</span>
+                <span className="ml-0.5 text-green-700">{cls}</span>
               </span>
             ))}
             {change.remove?.map((cls, i) => (
-              <span key={`remove-${i}`} className="inline-flex items-center px-2 py-0.5 rounded bg-red-50 text-xs">
+              <span key={`remove-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-50 text-xs">
                 <span className="text-red-600">−</span>
-                <span className="ml-1 text-red-700">{cls}</span>
+                <span className="ml-0.5 text-red-700">{cls}</span>
               </span>
             ))}
           </div>
@@ -382,9 +382,9 @@ export function DOMChangesInlineEditor({
       case 'attribute':
         const attrs = Object.entries(change.value)
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {attrs.map(([key, value], i) => (
-              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 text-xs">
+              <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-50 text-xs">
                 <span className="text-purple-700 font-medium">{key}=</span>
                 <span className="text-purple-600">"{value}"</span>
               </span>
@@ -471,43 +471,47 @@ export function DOMChangesInlineEditor({
                     }
                   `}
                 >
-                  <div className="p-4">
-                    {/* Header Row */}
-                    <div className="flex items-start gap-3">
-                      {/* Checkbox */}
-                      <div className="pt-0.5">
+                  <div className="p-3">
+                    {/* Compact Layout */}
+                    <div className="flex items-start gap-2">
+                      {/* Left side: Checkbox, Icon, and Actions stacked */}
+                      <div className="flex flex-col items-center gap-1">
+                        {/* Checkbox */}
                         <Checkbox
                           checked={change.enabled !== false}
                           onChange={() => handleToggleChange(index)}
                         />
-                      </div>
-                      
-                      {/* Icon and Type Badge */}
-                      <div className="flex-shrink-0">
-                        <div className="flex items-center gap-2">
+                        
+                        {/* Icon with hover tooltip */}
+                        <div className="group relative">
                           <div className={`
-                            p-1.5 rounded-md
+                            p-1 rounded
                             ${isDisabled ? 'bg-gray-100' : 'bg-blue-50'}
                           `}>
                             <Icon className={`h-4 w-4 ${isDisabled ? 'text-gray-400' : 'text-blue-600'}`} />
                           </div>
-                          <span className={`
-                            text-xs font-medium px-2 py-0.5 rounded-full
-                            ${isDisabled 
-                              ? 'bg-gray-100 text-gray-500' 
-                              : 'bg-blue-100 text-blue-700'
-                            }
-                          `}>
+                          {/* Tooltip */}
+                          <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                             {getChangeTypeLabel(change.type)}
                           </span>
                         </div>
+                        
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteChange(index)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                       
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        {/* Selector */}
-                        <div className="mb-2">
-                          <code className="text-sm font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                        {/* Selector with smaller font */}
+                        <div className="mb-1.5">
+                          <code className="text-xs font-mono text-gray-700">
                             {change.selector}
                           </code>
                         </div>
@@ -518,25 +522,15 @@ export function DOMChangesInlineEditor({
                         </div>
                       </div>
                       
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleEditChange(index)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteChange(index)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {/* Edit button on the right */}
+                      <button
+                        type="button"
+                        onClick={() => handleEditChange(index)}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors flex-shrink-0"
+                        title="Edit"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
