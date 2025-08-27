@@ -19,11 +19,11 @@ const bridgeScript = `
   const originalVariants = new Map();
   const appliedChanges = new Map();
   
-  // Helper to get ABSmartly context
-  function getABSmartlyContext() {
+  // Helper to get ABsmartly context
+  function getABsmartlyContext() {
     // Try different possible locations
     if (window.absmartly?.context) return window.absmartly.context;
-    if (window.ABSmartly?.context) return window.ABSmartly.context;
+    if (window.ABsmartly?.context) return window.ABsmartly.context;
     if (window.absmartlyContext) return window.absmartlyContext;
     
     // Try to find it in global scope
@@ -182,7 +182,7 @@ const bridgeScript = `
         break;
         
       case 'GET_VARIANT':
-        const context = getABSmartlyContext();
+        const context = getABsmartlyContext();
         if (context) {
           // Get current variant info
           const experiments = context.experiments || [];

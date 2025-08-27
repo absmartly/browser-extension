@@ -54,7 +54,7 @@ export interface DOMChange {
   script?: string
 }
 
-export interface ABSmartlyConfig {
+export interface ABsmartlyConfig {
   apiKey?: string
   apiEndpoint: string
   applicationId?: number
@@ -62,7 +62,7 @@ export interface ABSmartlyConfig {
   domChangesFieldName?: string
 }
 
-export interface ABSmartlyUser {
+export interface ABsmartlyUser {
   id: number
   email: string
   name: string
