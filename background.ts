@@ -93,23 +93,53 @@ async function getJWTCookie(domain: string): Promise<string | null> {
   try {
     // Remove protocol and path from domain
     const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    console.log('Looking for JWT cookie for domain:', cleanDomain)
     
-    // Try to get cookies for the domain
+    // Try to get ALL cookies for the URL to see what's available
+    const url = domain.startsWith('http') ? domain : `https://${domain}`
+    const allCookiesForUrl = await chrome.cookies.getAll({ 
+      url: url 
+    })
+    
+    console.log(`Found ${allCookiesForUrl.length} cookies for URL ${url}:`)
+    allCookiesForUrl.forEach(cookie => {
+      console.log(`  - ${cookie.name}: ${cookie.value.substring(0, 20)}...`)
+    })
+    
+    // Look for JWT cookie - check common ABsmartly cookie names first
+    const jwtCookie = allCookiesForUrl.find(cookie => 
+      cookie.name === 'jwt' || // ABsmartly uses 'jwt' cookie name
+      cookie.name === 'JWT' ||
+      cookie.name.toLowerCase().includes('jwt') ||
+      cookie.name.toLowerCase().includes('token') ||
+      cookie.name.toLowerCase() === 'auth' ||
+      cookie.name === 'absmartly_jwt' ||
+      cookie.name === 'session' // Sometimes session cookies contain JWT
+    )
+    
+    if (jwtCookie) {
+      console.log('Found JWT cookie:', jwtCookie.name, 'value length:', jwtCookie.value.length)
+      return jwtCookie.value
+    }
+    
+    // Try domain-based search as fallback
     const cookies = await chrome.cookies.getAll({ 
       domain: cleanDomain 
     })
     
-    // Look for JWT cookie (commonly named 'jwt', 'token', 'auth-token', etc.)
-    const jwtCookie = cookies.find(cookie => 
+    console.log(`Found ${cookies.length} cookies for domain ${cleanDomain}`)
+    
+    const domainJwtCookie = cookies.find(cookie => 
+      cookie.name === 'jwt' ||
+      cookie.name === 'JWT' ||
       cookie.name.toLowerCase().includes('jwt') ||
       cookie.name.toLowerCase().includes('token') ||
-      cookie.name.toLowerCase() === 'auth' ||
-      cookie.name === 'absmartly_jwt' // ABsmartly specific
+      cookie.name.toLowerCase() === 'auth'
     )
     
-    if (jwtCookie) {
-      console.log('Found JWT cookie:', jwtCookie.name)
-      return jwtCookie.value
+    if (domainJwtCookie) {
+      console.log('Found JWT cookie from domain search:', domainJwtCookie.name)
+      return domainJwtCookie.value
     }
     
     // Also try with base domain (remove subdomains)
@@ -119,11 +149,14 @@ async function getJWTCookie(domain: string): Promise<string | null> {
         domain: `.${baseDomain}` // Leading dot for domain cookies
       })
       
+      console.log(`Found ${baseCookies.length} cookies for base domain .${baseDomain}`)
+      
       const baseJwtCookie = baseCookies.find(cookie => 
+        cookie.name === 'jwt' ||
+        cookie.name === 'JWT' ||
         cookie.name.toLowerCase().includes('jwt') ||
         cookie.name.toLowerCase().includes('token') ||
-        cookie.name.toLowerCase() === 'auth' ||
-        cookie.name === 'absmartly_jwt'
+        cookie.name.toLowerCase() === 'auth'
       )
       
       if (baseJwtCookie) {
@@ -133,6 +166,7 @@ async function getJWTCookie(domain: string): Promise<string | null> {
     }
     
     console.log('No JWT cookie found for domain:', cleanDomain)
+    console.log('Available cookie names:', allCookiesForUrl.map(c => c.name).join(', '))
     return null
   } catch (error) {
     console.error('Error getting JWT cookie:', error)
@@ -202,7 +236,13 @@ async function makeAPIRequest(method: string, path: string, data?: any) {
     requestData = data
   }
 
-  console.log('Making axios request:', { method, url, requestData, headers })
+  console.log('Making axios request:', { 
+    method, 
+    url, 
+    requestData, 
+    authorization: headers.Authorization || 'None',
+    allHeaders: headers 
+  })
 
   try {
     const response = await axios({
