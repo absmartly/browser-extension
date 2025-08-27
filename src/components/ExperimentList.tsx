@@ -1,7 +1,7 @@
 import React from 'react'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
-import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, BeakerIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, BeakerIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline'
 
 interface ExperimentListProps {
   experiments: Experiment[]
@@ -136,12 +136,14 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
         const status = experiment.state || experiment.status || 'created'
         
         return (
-          <button
+          <div
             key={experiment.id}
-            onClick={() => onExperimentClick(experiment)}
-            className="w-full px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between text-left border-b border-gray-100"
+            className="px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100"
           >
-            <div className="flex items-start gap-3 flex-1 min-w-0">
+            <button
+              onClick={() => onExperimentClick(experiment)}
+              className="flex items-start gap-3 flex-1 min-w-0 text-left"
+            >
               {/* Experiment Icon */}
               <div className="flex-shrink-0">
                 <BeakerIcon className="h-5 w-5 text-gray-400" />
@@ -219,10 +221,25 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
                   )}
                 </div>
               </div>
-            </div>
+              
+              <ChevronRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0 ml-2" />
+            </button>
             
-            <ChevronRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0 ml-2" />
-          </button>
+            {/* Open in ABsmartly button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const endpoint = localStorage.getItem('absmartly-endpoint') || ''
+                const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                const url = `${baseUrl}/experiments/${experiment.id}`
+                chrome.tabs.create({ url })
+              }}
+              className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+              title="Open in ABsmartly"
+            >
+              <ArrowTopRightOnSquareIcon className="h-5 w-5" />
+            </button>
+          </div>
         )
       })}
     </div>
