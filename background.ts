@@ -101,10 +101,12 @@ async function getJWTCookie(domain: string): Promise<string | null> {
       url: url 
     })
     
-    console.log(`Found ${allCookiesForUrl.length} cookies for URL ${url}:`)
-    allCookiesForUrl.forEach(cookie => {
-      console.log(`  - ${cookie.name}: ${cookie.value.substring(0, 20)}...`)
-    })
+    console.log(`Found ${allCookiesForUrl.length} cookies for URL ${url}`)
+    // Only log JWT cookie if found
+    const jwtPreview = allCookiesForUrl.find(c => c.name.toLowerCase() === 'jwt')
+    if (jwtPreview) {
+      console.log(`  - jwt cookie found (length: ${jwtPreview.value.length})`)
+    }
     
     // Look for JWT cookie - check common ABsmartly cookie names first
     const jwtCookie = allCookiesForUrl.find(cookie => 
@@ -166,7 +168,6 @@ async function getJWTCookie(domain: string): Promise<string | null> {
     }
     
     console.log('No JWT cookie found for domain:', cleanDomain)
-    console.log('Available cookie names:', allCookiesForUrl.map(c => c.name).join(', '))
     return null
   } catch (error) {
     console.error('Error getting JWT cookie:', error)
