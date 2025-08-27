@@ -174,39 +174,59 @@ async function getJWTCookie(domain: string): Promise<string | null> {
   }
 }
 
-// Helper function to make API requests
-async function makeAPIRequest(method: string, path: string, data?: any) {
+// Helper function to make API requests with automatic JWT fallback
+async function makeAPIRequest(method: string, path: string, data?: any, retryWithJWT: boolean = true) {
+  console.log('=== makeAPIRequest called ===', { method, path, data })
+  
   const config = await getConfig()
+  console.log('Config loaded:', { 
+    hasApiKey: !!config?.apiKey, 
+    apiEndpoint: config?.apiEndpoint,
+    apiKeyLength: config?.apiKey?.length || 0
+  })
+  
   if (!config?.apiEndpoint) {
     throw new Error('No API endpoint configured')
   }
 
-  const headers: any = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
+  // Helper to build headers
+  const buildHeaders = async (useApiKey: boolean = true) => {
+    const headers: any = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+
+    // Try API key first if available and we haven't disabled it
+    if (config.apiKey && useApiKey) {
+      console.log('Using API key for auth')
+      const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+        ? `JWT ${config.apiKey}`
+        : `Api-Key ${config.apiKey}`
+      headers['Authorization'] = authHeader
+    } else {
+      // Try to get JWT from cookies
+      console.log('Attempting to get JWT from cookies...')
+      const jwtToken = await getJWTCookie(config.apiEndpoint)
+      console.log('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length})` : 'Not found')
+      
+      if (jwtToken) {
+        // Determine if it's already a full JWT or just the token
+        if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
+          headers['Authorization'] = `JWT ${jwtToken}`
+        } else {
+          headers['Authorization'] = `Bearer ${jwtToken}`
+        }
+        console.log('Using JWT from cookie for authentication')
+      } else {
+        console.log('No JWT cookie available')
+      }
+    }
+    
+    return headers
   }
 
-  // Add Authorization header if API key is provided
-  if (config.apiKey) {
-    const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-      ? `JWT ${config.apiKey}`
-      : `Api-Key ${config.apiKey}`
-    headers['Authorization'] = authHeader
-  } else {
-    // If no API key, try to get JWT from cookies
-    const jwtToken = await getJWTCookie(config.apiEndpoint)
-    if (jwtToken) {
-      // Determine if it's already a full JWT or just the token
-      if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
-        headers['Authorization'] = `JWT ${jwtToken}`
-      } else {
-        headers['Authorization'] = `Bearer ${jwtToken}`
-      }
-      console.log('Using JWT from cookie for authentication')
-    } else {
-      console.log('No API key or JWT cookie available')
-    }
-  }
+  // Build initial headers (will use API key if available)
+  const headers = await buildHeaders()
 
   // Clean up the API endpoint - remove trailing slashes
   const cleanEndpoint = config.apiEndpoint.replace(/\/+$/, '')
@@ -240,8 +260,7 @@ async function makeAPIRequest(method: string, path: string, data?: any) {
     method, 
     url, 
     requestData, 
-    authorization: headers.Authorization || 'None',
-    allHeaders: headers 
+    authorization: headers.Authorization || 'None'
   })
 
   try {
@@ -255,12 +274,24 @@ async function makeAPIRequest(method: string, path: string, data?: any) {
 
     return response.data
   } catch (error) {
-    console.error('Axios request failed:', error)
-    console.error('Request details:', { method, url, requestData, headers })
-    if (error.response) {
-      console.error('Response status:', error.response.status)
-      console.error('Response data:', error.response.data)
+    console.error('Request failed:', error.response?.status, error.response?.data)
+    
+    // If we got a 401 and we were using an API key, retry with JWT from cookies
+    if (isAuthError(error) && config.apiKey && retryWithJWT && headers.Authorization?.startsWith('Api-Key')) {
+      console.log('API key auth failed (401), retrying with JWT cookie...')
+      
+      // Rebuild headers without API key (will use JWT from cookies)
+      const jwtHeaders = await buildHeaders(false)
+      
+      if (jwtHeaders.Authorization) {
+        console.log('Retrying with JWT authorization...')
+        // Recursive call but with retryWithJWT=false to prevent infinite loop
+        return makeAPIRequest(method, path, data, false)
+      } else {
+        console.log('No JWT cookie available for retry')
+      }
     }
+    
     // Check if this is an authentication error
     if (isAuthError(error)) {
       throw new Error('AUTH_EXPIRED')
@@ -357,36 +388,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         if (experimentsResponse) {
           // If we can get experiments, we're authenticated
-          // Try to get user info from /auth/current-user endpoint
+          // Try to get user info using our makeAPIRequest which handles auth properly
           try {
-            const headers: any = {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-            
-            // Add authorization if API key exists
-            if (config.apiKey) {
-              const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-                ? `JWT ${config.apiKey}`
-                : `Api-Key ${config.apiKey}`
-              headers['Authorization'] = authHeader
-            } else {
-              // If no API key, try to get JWT from cookies
-              const jwtToken = await getJWTCookie(config.apiEndpoint)
-              if (jwtToken) {
-                // Determine if it's already a full JWT or just the token
-                if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
-                  headers['Authorization'] = `JWT ${jwtToken}`
-                } else {
-                  headers['Authorization'] = `Bearer ${jwtToken}`
-                }
-                console.log('Using JWT from cookie for /auth/current-user')
-              }
-            }
-            
-            const userResponse = await axios.get(`${baseUrl}/auth/current-user`, {
+            // Use a custom path that goes directly to the auth endpoint
+            const fullAuthUrl = `${baseUrl}/auth/current-user`
+            const userResponse = await axios.get(fullAuthUrl, {
               withCredentials: false,
-              headers
+              headers: await (async () => {
+                const h: any = {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                }
+                // This duplicates auth logic, but we need it for non-v1 endpoint
+                // TODO: Refactor this to share auth logic
+                if (config.apiKey) {
+                  const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+                    ? `JWT ${config.apiKey}`
+                    : `Api-Key ${config.apiKey}`
+                  h['Authorization'] = authHeader
+                } else {
+                  const jwtToken = await getJWTCookie(config.apiEndpoint)
+                  if (jwtToken) {
+                    if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
+                      h['Authorization'] = `JWT ${jwtToken}`
+                    } else {
+                      h['Authorization'] = `Bearer ${jwtToken}`
+                    }
+                  }
+                }
+                return h
+              })()
             })
             
             // Auth response received from /auth/current-user
