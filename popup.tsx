@@ -463,8 +463,16 @@ function IndexPopupContent() {
             onStop={handleStopExperiment}
             onUpdate={async (id, updates) => {
             try {
-              const updated = await updateExperiment(id, updates)
-              setSelectedExperiment(updated)
+              // Send the update
+              await updateExperiment(id, updates)
+              
+              // Fetch the full experiment data after successful update
+              const fullExperiment = await getExperiment(id)
+              setSelectedExperiment(fullExperiment)
+              
+              // Update the experiments list as well
+              setExperiments(prev => prev.map(exp => exp.id === id ? fullExperiment : exp))
+              setFilteredExperiments(prev => prev.map(exp => exp.id === id ? fullExperiment : exp))
             } catch (err: any) {
               if (err.isAuthError || err.message === 'AUTH_EXPIRED') {
                 setIsAuthExpired(true)
