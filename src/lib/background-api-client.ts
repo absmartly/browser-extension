@@ -56,7 +56,10 @@ export class BackgroundAPIClient {
 
   async getExperiment(id: number): Promise<Experiment> {
     try {
-      return await this.makeRequest('GET', `/experiments/${id}`)
+      const response = await this.makeRequest('GET', `/experiments/${id}`)
+      // GET /experiments/:id returns {experiment: {...}, ...}
+      // Extract just the experiment object
+      return response.experiment || response
     } catch (error) {
       console.error(`Failed to fetch experiment ${id}:`, error)
       throw error
@@ -83,7 +86,9 @@ export class BackgroundAPIClient {
 
   async startExperiment(id: number): Promise<Experiment> {
     try {
-      return await this.makeRequest('PUT', `/experiments/${id}/start`)
+      const response = await this.makeRequest('PUT', `/experiments/${id}/start`)
+      // Extract experiment if response is nested
+      return response.experiment || response
     } catch (error) {
       console.error(`Failed to start experiment ${id}:`, error)
       throw error
@@ -92,7 +97,9 @@ export class BackgroundAPIClient {
 
   async stopExperiment(id: number): Promise<Experiment> {
     try {
-      return await this.makeRequest('PUT', `/experiments/${id}/stop`)
+      const response = await this.makeRequest('PUT', `/experiments/${id}/stop`)
+      // Extract experiment if response is nested
+      return response.experiment || response
     } catch (error) {
       console.error(`Failed to stop experiment ${id}:`, error)
       throw error
