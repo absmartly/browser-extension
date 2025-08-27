@@ -1,6 +1,6 @@
 /**
  * SDK Communication Module
- * Handles communication between the ABSmartly Extension and the SDK Plugin
+ * Handles communication between the ABsmartly Extension and the SDK Plugin
  */
 
 import type { DOMChange } from '../types/dom-changes'

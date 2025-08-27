@@ -1,4 +1,4 @@
-import type { Experiment, ABSmartlyConfig } from '~src/types/absmartly'
+import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 
 /**
  * API client that communicates through the background service worker
