@@ -55,6 +55,14 @@ export function useABsmartly() {
     return client.updateExperiment(id, experimentData)
   }, [client])
 
+  const getFavorites = useCallback(async (): Promise<number[]> => {
+    return client.getFavorites()
+  }, [client])
+
+  const setExperimentFavorite = useCallback(async (id: number, favorite: boolean): Promise<void> => {
+    return client.setExperimentFavorite(id, favorite)
+  }, [client])
+
   return {
     client,
     config,
@@ -66,6 +74,8 @@ export function useABsmartly() {
     startExperiment,
     stopExperiment,
     createExperiment,
-    updateExperiment
+    updateExperiment,
+    getFavorites,
+    setExperimentFavorite
   }
 }
