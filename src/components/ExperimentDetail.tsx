@@ -540,41 +540,52 @@ export function ExperimentDetail({
       <div className="space-y-4">
         {/* Header Section */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2">
             {editingName ? (
-              <div className="flex items-center gap-2 flex-1">
-                <Input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="text-lg font-semibold"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveDisplayName}
-                  className="p-1 text-green-600 hover:text-green-800"
-                >
-                  <CheckIcon className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setDisplayName(experiment.display_name || experiment.name)
-                    setEditingName(false)
-                  }}
-                  className="p-1 text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
+              <div>
+                <div className="flex items-center gap-0.5">
+                  <input
+                    className="flex-1 text-lg font-semibold rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    autoFocus
+                    title={`ID: ${experiment.id}`}
+                  />
+                  <button
+                    onClick={handleSaveDisplayName}
+                    className="p-0.5 text-green-600 hover:text-green-800"
+                  >
+                    <CheckIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDisplayName(experiment.display_name || experiment.name)
+                      setEditingName(false)
+                    }}
+                    className="p-0.5 text-gray-400 hover:text-gray-600"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                {displayName !== experiment.name && (
+                  <p className="text-sm text-gray-500 mt-1">{experiment.name}</p>
+                )}
               </div>
             ) : (
-              <>
-                <h2 className="text-lg font-semibold text-gray-900">{displayName}</h2>
+              <div className="flex items-center gap-2 flex-1">
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900" title={`ID: ${experiment.id}`}>{displayName}</h2>
+                  {displayName !== experiment.name && (
+                    <p className="text-sm text-gray-500" title={`ID: ${experiment.id}`}>{experiment.name}</p>
+                  )}
+                </div>
                 <button
                   onClick={() => setEditingName(true)}
                   className="p-1 text-gray-400 hover:text-gray-600"
                 >
                   <PencilIcon className="h-4 w-4" />
                 </button>
-              </>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -587,7 +598,6 @@ export function ExperimentDetail({
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-600 mt-1">ID: {experiment.id} | Name: {experiment.name}</p>
         </div>
 
         {/* Variants Section - Show if we have any variant data to display */}
@@ -615,9 +625,8 @@ export function ExperimentDetail({
               
               return (
                 <div key={variantKey} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 flex-1">
-                      <Input
+                  <div className="mb-3">
+                    <Input
                         value={variantKey}
                         onChange={(e) => {
                           const newName = e.target.value
@@ -641,12 +650,8 @@ export function ExperimentDetail({
                           }
                         }}
                         placeholder="Variant name"
-                        className="font-medium"
+                        className="font-medium w-full"
                       />
-                      {(experimentVariant?.is_control || experimentVariant?.variant === 0 || index === 0) && (
-                        <span className="text-xs text-gray-500">(Control)</span>
-                      )}
-                    </div>
                   </div>
 
                   {/* Variables Section */}
@@ -709,9 +714,13 @@ export function ExperimentDetail({
             <h3 className="text-sm font-medium text-gray-700">Applications</h3>
             <div className="flex flex-wrap gap-2">
               {experiment.applications.map((app) => (
-                <Badge key={app.application_id ?? app.id} variant="info">
-                  {app.name || `App ID: ${app.application_id || app.id}`}
-                </Badge>
+                <span 
+                  key={app.application_id ?? app.id} 
+                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 cursor-default"
+                  title={app.application?.description || app.description || ''}
+                >
+                  {app.application?.name || app.name || `App ${app.application_id || app.id}`}
+                </span>
               ))}
             </div>
           </div>
