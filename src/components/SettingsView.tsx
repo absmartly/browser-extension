@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
-import type { ABSmartlyConfig, ABSmartlyUser } from '~src/types/absmartly'
+import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import logoUrl from "data-base64:~assets/logo.png"
 import axios from 'axios'
 
 interface SettingsViewProps {
-  onSave: (config: ABSmartlyConfig) => void
+  onSave: (config: ABsmartlyConfig) => void
   onCancel: () => void
 }
 
@@ -19,7 +19,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [domChangesFieldName, setDomChangesFieldName] = useState('dom_changes')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<ABSmartlyUser | null>(null)
+  const [user, setUser] = useState<ABsmartlyUser | null>(null)
   const [checkingAuth, setCheckingAuth] = useState(false)
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
 
@@ -150,7 +150,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     // API Key is now optional
     
     if (!apiEndpoint.trim()) {
-      newErrors.apiEndpoint = 'ABSmartly Endpoint is required'
+      newErrors.apiEndpoint = 'ABsmartly Endpoint is required'
     } else if (!isValidUrl(apiEndpoint)) {
       newErrors.apiEndpoint = 'Please enter a valid URL'
     }
@@ -175,7 +175,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const handleSave = async () => {
     if (!validateForm()) return
 
-    const config: ABSmartlyConfig = {
+    const config: ABsmartlyConfig = {
       apiKey: apiKey.trim() || undefined,
       apiEndpoint,
       applicationId: applicationId ? parseInt(applicationId) : undefined,
@@ -199,7 +199,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   const handleAuthenticate = () => {
     if (apiEndpoint) {
-      chrome.tabs.create({ url: `${apiEndpoint}/login` })
+      // Remove trailing slash and /v1 suffix if present
+      const baseUrl = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+      chrome.tabs.create({ url: baseUrl })
     }
   }
 
@@ -217,12 +219,31 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <img 
-          src={logoUrl} 
-          alt="ABSmartly" 
-          className="w-6 h-6"
-        />
-        <h2 className="text-lg font-semibold">ABSmartly Settings</h2>
+        {apiEndpoint ? (
+          <a 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              const baseUrl = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+              chrome.tabs.create({ url: baseUrl })
+            }}
+            className="cursor-pointer"
+            title="Open ABsmartly"
+          >
+            <img 
+              src={logoUrl} 
+              alt="ABsmartly" 
+              className="w-6 h-6 hover:opacity-80 transition-opacity"
+            />
+          </a>
+        ) : (
+          <img 
+            src={logoUrl} 
+            alt="ABsmartly" 
+            className="w-6 h-6"
+          />
+        )}
+        <h2 className="text-lg font-semibold">ABsmartly Settings</h2>
       </div>
       
       {errors.general && (
@@ -291,7 +312,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
                 size="sm"
                 variant="secondary"
               >
-                Authenticate in ABSmartly
+                Authenticate in ABsmartly
               </Button>
             )}
           </div>
@@ -299,7 +320,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       </div>
       
       <Input
-        label="ABSmartly Endpoint"
+        label="ABsmartly Endpoint"
         type="url"
         value={apiEndpoint}
         onChange={(e) => setApiEndpoint(e.target.value)}
@@ -318,7 +339,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           showPasswordToggle={true}
         />
         <p className="mt-1 text-xs text-gray-500">
-          If not provided, will use JWT from browser cookies. Please authenticate into ABSmartly if no API key is set.
+          If not provided, will use JWT from browser cookies. Please authenticate into ABsmartly if no API key is set.
         </p>
       </div>
       

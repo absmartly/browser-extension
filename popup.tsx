@@ -9,7 +9,7 @@ import { Pagination } from "~src/components/Pagination"
 import { Button } from "~src/components/ui/Button"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
 import { Toast } from "~src/components/Toast"
-import { useABSmartly } from "~src/hooks/useABSmartly"
+import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment } from "~src/types/absmartly"
 import { CogIcon, PaintBrushIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
@@ -52,7 +52,7 @@ function IndexPopupContent() {
     stopExperiment,
     createExperiment,
     updateExperiment
-  } = useABSmartly()
+  } = useABsmartly()
 
   // Track if we've initialized experiments for this session
   const [hasInitialized, setHasInitialized] = useState(false)

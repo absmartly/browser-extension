@@ -1,6 +1,6 @@
-# ABSmartly Browser Extension
+# ABsmartly Browser Extension
 
-A powerful browser extension for ABSmartly that enables visual editing of A/B test experiments. Create and manage DOM-based experiments without writing code.
+A powerful browser extension for ABsmartly that enables visual editing of A/B test experiments. Create and manage DOM-based experiments without writing code.
 
 ## Features
 
@@ -8,7 +8,7 @@ A powerful browser extension for ABSmartly that enables visual editing of A/B te
 - 🧪 **Experiment Management**: Create, edit, start, and stop experiments directly from the extension
 - 🔍 **Advanced Filtering**: Filter experiments by state, significance, owners, tags, and more
 - 💾 **DOM Changes**: Apply text, HTML, style, attribute, class, and JavaScript changes
-- 🚀 **SDK Integration**: Works seamlessly with the ABSmartly JavaScript SDK
+- 🚀 **SDK Integration**: Works seamlessly with the ABsmartly JavaScript SDK
 - 🌐 **Multi-browser Support**: Built with Plasmo framework for Chrome, Firefox, Edge, and Safari
 
 ## Installation
@@ -53,18 +53,18 @@ This creates production builds for all supported browsers in the `build/` direct
 
 ## Configuration
 
-1. Click the ABSmartly extension icon in your browser toolbar
+1. Click the ABsmartly extension icon in your browser toolbar
 2. Click the settings icon (⚙️)
-3. Enter your ABSmartly API credentials:
-   - **API Key**: Your ABSmartly API key (JWT or API key format)
-   - **API Endpoint**: Your ABSmartly API endpoint (e.g., `https://demo.absmartly.com`)
+3. Enter your ABsmartly API credentials:
+   - **API Key**: Your ABsmartly API key (JWT or API key format)
+   - **API Endpoint**: Your ABsmartly API endpoint (e.g., `https://demo.absmartly.com`)
 
 ## Usage
 
 ### Visual Editor
 
 1. Navigate to any webpage where you want to create an experiment
-2. Click the ABSmartly extension icon
+2. Click the ABsmartly extension icon
 3. Click the paint brush icon (🎨) to open the visual editor
 4. Click "Start Selection" to begin selecting elements
 5. Click on any element on the page to select it
@@ -77,7 +77,7 @@ This creates production builds for all supported browsers in the `build/` direct
 
 ### Creating Experiments
 
-1. Click the ABSmartly extension icon
+1. Click the ABsmartly extension icon
 2. Click the plus icon (➕) to create a new experiment
 3. Fill in the experiment details:
    - Experiment name and display name
@@ -107,7 +107,7 @@ The extension includes a companion SDK plugin for applying DOM changes on your w
 import { SDK } from '@absmartly/javascript-sdk';
 import { createDOMChangesPlugin } from '@absmartly/dom-changes-plugin';
 
-// Initialize ABSmartly SDK
+// Initialize ABsmartly SDK
 const sdk = new SDK({
   endpoint: 'https://your-endpoint.absmartly.com',
   apiKey: 'your-api-key',
@@ -224,5 +224,5 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- [ABSmartly Documentation](https://docs.absmartly.com)
+- [ABsmartly Documentation](https://docs.absmartly.com)
 - [Report Issues](https://github.com/absmartly/browser-extension/issues)

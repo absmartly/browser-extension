@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BackgroundAPIClient } from '~src/lib/background-api-client'
 import { getConfig } from '~src/utils/storage'
-import type { ABSmartlyConfig, Experiment } from '~src/types/absmartly'
+import type { ABsmartlyConfig, Experiment } from '~src/types/absmartly'
 
-export function useABSmartly() {
+export function useABsmartly() {
   const [client] = useState(() => new BackgroundAPIClient())
-  const [config, setConfig] = useState<ABSmartlyConfig | null>(null)
+  const [config, setConfig] = useState<ABsmartlyConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,7 +27,7 @@ export function useABSmartly() {
     }
   }
 
-  const updateConfig = useCallback((newConfig: ABSmartlyConfig) => {
+  const updateConfig = useCallback((newConfig: ABsmartlyConfig) => {
     setConfig(newConfig)
   }, [])
 

@@ -421,7 +421,7 @@ function VisualEditor() {
       {/* Editor Panel */}
       <div className="absmartly-editor-panel">
         <div className="absmartly-editor-header">
-          <h3>ABSmartly Visual Editor</h3>
+          <h3>ABsmartly Visual Editor</h3>
           <button
             onClick={() => setShowPanel(false)}
             className="absmartly-close-btn"

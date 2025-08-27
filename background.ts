@@ -1,6 +1,6 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
-import type { ABSmartlyConfig } from '~src/types/absmartly'
+import type { ABsmartlyConfig } from '~src/types/absmartly'
 
 // Storage instance
 const storage = new Storage()
@@ -10,7 +10,7 @@ async function initializeConfig() {
   console.log('[Background] Initializing config...')
   
   // Get current config from storage
-  const storedConfig = await storage.get("absmartly-config") as ABSmartlyConfig | null
+  const storedConfig = await storage.get("absmartly-config") as ABsmartlyConfig | null
   console.log('[Background] Stored config:', storedConfig)
   
   // Check if we have environment variables
@@ -26,7 +26,7 @@ async function initializeConfig() {
   
   // Only update if we have env vars and stored values are empty
   let updated = false
-  const newConfig: ABSmartlyConfig = {
+  const newConfig: ABsmartlyConfig = {
     apiKey: storedConfig?.apiKey || '',
     apiEndpoint: storedConfig?.apiEndpoint || '',
     applicationId: storedConfig?.applicationId
@@ -63,7 +63,7 @@ async function initializeConfig() {
 initializeConfig().catch(console.error)
 
 // Helper function to get config
-async function getConfig(): Promise<ABSmartlyConfig | null> {
+async function getConfig(): Promise<ABsmartlyConfig | null> {
   const config = await storage.get("absmartly-config")
   return config
 }

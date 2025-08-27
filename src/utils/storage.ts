@@ -1,5 +1,5 @@
 import { Storage } from '@plasmohq/storage'
-import type { ABSmartlyConfig } from '~src/types/absmartly'
+import type { ABsmartlyConfig } from '~src/types/absmartly'
 
 const storage = new Storage()
 
@@ -9,11 +9,11 @@ export const STORAGE_KEYS = {
   EXPERIMENTS_CACHE: 'experiments-cache'
 } as const
 
-export async function getConfig(): Promise<ABSmartlyConfig | null> {
+export async function getConfig(): Promise<ABsmartlyConfig | null> {
   return await storage.get(STORAGE_KEYS.CONFIG)
 }
 
-export async function setConfig(config: ABSmartlyConfig): Promise<void> {
+export async function setConfig(config: ABsmartlyConfig): Promise<void> {
   await storage.set(STORAGE_KEYS.CONFIG, config)
 }
 

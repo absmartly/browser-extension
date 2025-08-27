@@ -1,11 +1,11 @@
 import axios, { AxiosInstance } from 'axios'
-import type { Experiment, ABSmartlyConfig } from '~src/types/absmartly'
+import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 
-export class ABSmartlyClient {
+export class ABsmartlyClient {
   private client: AxiosInstance
-  private config: ABSmartlyConfig
+  private config: ABsmartlyConfig
 
-  constructor(config: ABSmartlyConfig) {
+  constructor(config: ABsmartlyConfig) {
     this.config = config
     
     const headers: any = {
