@@ -27,6 +27,7 @@ export interface Experiment {
   started_at?: string
   stopped_at?: string
   type?: 'group_sequential' | 'fixed_horizon'
+  favorite?: boolean
 }
 
 export interface Variant {
