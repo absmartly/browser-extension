@@ -316,39 +316,61 @@ function VisualEditor() {
   }
 
   const applyPreviewChanges = (changes: any[]) => {
+    if (!changes || !Array.isArray(changes)) return
+    
     changes.forEach(change => {
       try {
+        if (!change || !change.selector) return
+        
         const elements = document.querySelectorAll(change.selector)
         elements.forEach(element => {
           if (element instanceof HTMLElement) {
             switch (change.type) {
               case 'text':
-                element.textContent = change.value
+                if (change.value != null) {
+                  element.textContent = String(change.value)
+                }
                 break
               case 'html':
-                element.innerHTML = change.value
+                if (change.value != null) {
+                  element.innerHTML = String(change.value)
+                }
                 break
               case 'style':
-                Object.entries(change.value).forEach(([property, value]) => {
-                  element.style.setProperty(property, value as string)
-                })
+                if (change.value && typeof change.value === 'object') {
+                  Object.entries(change.value).forEach(([property, value]) => {
+                    if (property && value != null) {
+                      element.style.setProperty(property, String(value))
+                    }
+                  })
+                }
                 break
               case 'class':
-                if (change.add) {
-                  element.classList.add(...change.add)
+                if (change.add && Array.isArray(change.add)) {
+                  element.classList.add(...change.add.filter(c => c))
                 }
-                if (change.remove) {
-                  element.classList.remove(...change.remove)
+                if (change.remove && Array.isArray(change.remove)) {
+                  element.classList.remove(...change.remove.filter(c => c))
                 }
                 break
               case 'attribute':
-                Object.entries(change.value).forEach(([attr, value]) => {
-                  element.setAttribute(attr, value as string)
-                })
+                if (change.value && typeof change.value === 'object') {
+                  Object.entries(change.value).forEach(([attr, value]) => {
+                    if (attr && value != null) {
+                      element.setAttribute(attr, String(value))
+                    }
+                  })
+                }
                 break
               case 'javascript':
                 // Execute JavaScript in the context of the element
-                new Function('element', change.value)(element)
+                if (change.value && typeof change.value === 'string') {
+                  try {
+                    new Function('element', change.value)(element)
+                  } catch (jsError) {
+                    console.error('Error executing JavaScript:', jsError)
+                  }
+                }
                 break
             }
             // Mark element as previewed
