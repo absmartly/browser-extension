@@ -26,6 +26,7 @@ interface FilterState {
 
 interface ExperimentFilterProps {
   onFilterChange: (filters: FilterState) => void
+  initialFilters?: FilterState
   users?: any[]
   teams?: any[]
   tags?: any[]
@@ -54,6 +55,7 @@ const significanceOptions = [
 
 export function ExperimentFilter({
   onFilterChange,
+  initialFilters,
   users = [],
   teams = [],
   tags = [],
@@ -61,8 +63,21 @@ export function ExperimentFilter({
   unitTypes = []
 }: ExperimentFilterProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [filters, setFilters] = useState<FilterState>({})
-  const [searchDebounce, setSearchDebounce] = useState('')
+  const [filters, setFilters] = useState<FilterState>(
+    initialFilters || {
+      state: ['created', 'ready']  // Default to Draft and Ready
+    }
+  )
+  const [searchDebounce, setSearchDebounce] = useState(initialFilters?.search || '')
+
+  // Call onFilterChange with initial filters on mount
+  useEffect(() => {
+    if (initialFilters) {
+      setFilters(initialFilters)
+      setSearchDebounce(initialFilters.search || '')
+    }
+    onFilterChange(filters)
+  }, []) // Only run once on mount
 
   // Debounce search
   useEffect(() => {
@@ -92,12 +107,36 @@ export function ExperimentFilter({
   }
 
   const clearFilters = () => {
-    setFilters({})
+    const defaultFilters = { state: ['created', 'ready'] }
+    setFilters(defaultFilters)
     setSearchDebounce('')
-    onFilterChange({})
+    onFilterChange(defaultFilters)
+    // Also clear from storage
+    if ((window as any).chrome?.storage?.local) {
+      (window as any).chrome.storage.local.remove('experimentFilters')
+    }
   }
 
-  const activeFilterCount = Object.keys(filters).length
+  // Calculate active filter count (excluding default state filter)
+  const activeFilterCount = Object.keys(filters).reduce((count, key) => {
+    // Skip if it's the default state filter
+    if (key === 'state') {
+      const stateFilters = filters.state || []
+      // Check if it's exactly the default filters
+      if (stateFilters.length === 2 && 
+          stateFilters.includes('created') && 
+          stateFilters.includes('ready')) {
+        return count  // Don't count default state filter
+      }
+    }
+    // Skip empty values
+    const value = filters[key as keyof FilterState]
+    if (value === undefined || value === '' || 
+        (Array.isArray(value) && value.length === 0)) {
+      return count
+    }
+    return count + 1
+  }, 0)
 
   return (
     <div className="border-b">
@@ -111,11 +150,17 @@ export function ExperimentFilter({
           />
           <div className="relative">
             <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className={`p-2 rounded-md transition-colors ${
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsExpanded(!isExpanded)
+              }}
+              className={`p-2 rounded-md transition-colors cursor-pointer ${
                 isExpanded ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
               }`}
               aria-label="Toggle filters"
+              data-testid="filter-toggle"
             >
               <FunnelIcon className="h-5 w-5" />
             </button>
@@ -141,8 +186,13 @@ export function ExperimentFilter({
               {experimentStates.map(state => (
                 <button
                   key={state.value}
-                  onClick={() => toggleArrayFilter('state', state.value)}
-                  className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    toggleArrayFilter('state', state.value)
+                  }}
+                  className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                     filters.state?.includes(state.value)
                       ? 'bg-blue-100 text-blue-700'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -163,8 +213,13 @@ export function ExperimentFilter({
               {significanceOptions.map(sig => (
                 <button
                   key={sig.value}
-                  onClick={() => toggleArrayFilter('significance', sig.value)}
-                  className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    toggleArrayFilter('significance', sig.value)
+                  }}
+                  className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                     filters.significance?.includes(sig.value)
                       ? 'bg-blue-100 text-blue-700'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -210,8 +265,13 @@ export function ExperimentFilter({
                 {tags.map(tag => (
                   <button
                     key={tag.id}
-                    onClick={() => toggleArrayFilter('tags', tag.id)}
-                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      toggleArrayFilter('tags', tag.id)
+                    }}
+                    className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                       filters.tags?.includes(tag.id)
                         ? 'bg-blue-100 text-blue-700'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -234,8 +294,13 @@ export function ExperimentFilter({
                 {applications.map(app => (
                   <button
                     key={app.id}
-                    onClick={() => toggleArrayFilter('applications', app.id)}
-                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      toggleArrayFilter('applications', app.id)
+                    }}
+                    className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                       filters.applications?.includes(app.id)
                         ? 'bg-blue-100 text-blue-700'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
