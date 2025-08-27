@@ -8,6 +8,7 @@ import { SettingsView } from "~src/components/SettingsView"
 import { Pagination } from "~src/components/Pagination"
 import { Button } from "~src/components/ui/Button"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
+import { Toast } from "~src/components/Toast"
 import { useABSmartly } from "~src/hooks/useABSmartly"
 import type { Experiment } from "~src/types/absmartly"
 import { CogIcon, PaintBrushIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
@@ -26,6 +27,7 @@ function IndexPopupContent() {
   const [experimentDetailLoading, setExperimentDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isAuthExpired, setIsAuthExpired] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -473,12 +475,16 @@ function IndexPopupContent() {
               // Update the experiments list as well
               setExperiments(prev => prev.map(exp => exp.id === id ? fullExperiment : exp))
               setFilteredExperiments(prev => prev.map(exp => exp.id === id ? fullExperiment : exp))
+              
+              // Show success toast
+              setToast({ message: 'Experiment saved successfully!', type: 'success' })
             } catch (err: any) {
               if (err.isAuthError || err.message === 'AUTH_EXPIRED') {
                 setIsAuthExpired(true)
                 setError('Your session has expired. Please log in again.')
               } else {
                 setError('Failed to update experiment')
+                setToast({ message: 'Failed to save experiment', type: 'error' })
               }
               console.error('Failed to update experiment:', err)
             }
@@ -507,6 +513,15 @@ function IndexPopupContent() {
           experiment={selectedExperiment}
           onSave={handleSaveExperiment}
           onCancel={() => setView('list')}
+        />
+      )}
+      
+      {/* Toast notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </div>
