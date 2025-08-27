@@ -114,7 +114,13 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       // Get base endpoint from storage or use a default
       const baseUrl = localStorage.getItem('absmartly-endpoint') || ''
       const cleanEndpoint = baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')
-      return `${cleanEndpoint}${experiment.owner.avatar.base_url}/crop/32x32.webp`
+      
+      // The avatar.base_url is like /files/avatars/... 
+      // We need to construct the full URL for the browser extension
+      const avatarPath = experiment.owner.avatar.base_url
+      
+      // Construct the full URL - the API serves these files directly
+      return `${cleanEndpoint}${avatarPath}/crop/32x32.webp`
     }
     
     return null
