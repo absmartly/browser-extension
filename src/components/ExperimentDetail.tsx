@@ -384,9 +384,10 @@ export function ExperimentDetail({
       })
       
       // Create PUT payload with correct structure: id, version, data at root level
+      // Version should be the updated_at timestamp
       const putPayload: any = {
         id: fullExperiment.id,
-        version: fullExperiment.version || 0,
+        version: fullExperiment.updated_at,
         data: {
           state: fullExperiment.state,
           name: fullExperiment.name,
