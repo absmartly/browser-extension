@@ -34,7 +34,7 @@ interface ExperimentFilterProps {
 }
 
 const experimentStates = [
-  { value: 'created', label: 'Created' },
+  { value: 'created', label: 'Draft' },  // Match ABsmartly UI - "created" state shows as "Draft"
   { value: 'ready', label: 'Ready' },
   { value: 'running', label: 'Running' },
   { value: 'development', label: 'Development' },

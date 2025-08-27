@@ -33,21 +33,22 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
     switch (status) {
       case 'running':
       case 'running_not_full_on':
-        return 'bg-orange-500 text-white'
+        return 'bg-orange-500 text-white'  // warning color
       case 'full_on':
-        return 'bg-green-500 text-white'
+        return 'bg-green-500 text-white'  // success color
       case 'stopped':
-        return 'bg-gray-500 text-white'
+        return 'bg-gray-400 text-white'  // muted color
       case 'scheduled':
-        return 'bg-blue-500 text-white'
+        return 'bg-indigo-500 text-white'  // unknown color
       case 'archived':
-        return 'bg-red-500 text-white'
+        return 'bg-slate-200 text-gray-900'
       case 'development':
-        return 'bg-purple-500 text-white'
+        return 'bg-white text-cyan-600 border border-cyan-600'
+      case 'ready':
+        return 'bg-green-800 text-white'  // moss-green-800
       case 'draft':
       case 'created':
-      case 'ready':
-        return 'bg-gray-300 text-gray-700'
+        return 'bg-white text-slate-700 border border-slate-700'
       default:
         return 'bg-gray-300 text-gray-700'
     }
@@ -72,7 +73,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
       case 'draft':
         return 'Draft'
       case 'created':
-        return 'Created'
+        return 'Draft'  // Match ABsmartly UI - "created" state shows as "Draft"
       case 'ready':
         return 'Ready'
       default:
