@@ -134,9 +134,15 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       })
     }
     
-    // Add owners if they exist and are different from created_by
+    // Add owners if they exist - handle nested structure with owner.user
     if ((experiment as any).owners && Array.isArray((experiment as any).owners)) {
-      (experiment as any).owners.forEach((owner: ExperimentUser) => {
+      (experiment as any).owners.forEach((ownerWrapper: any) => {
+        // Extract the actual user from the wrapper object
+        const owner = ownerWrapper.user || ownerWrapper
+        
+        // Skip if no user data
+        if (!owner) return
+        
         // Skip if this owner is the same as created_by
         if (experiment.created_by && 
             ((owner.id && owner.id === experiment.created_by.id) || 
@@ -241,7 +247,10 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                     {/* Stacked Avatars with Tooltips */}
                     <div className="flex items-center">
                       {allAvatars.slice(0, 3).map((avatarData, idx) => (
-                        <div key={idx} className={`relative group ${idx > 0 ? '-ml-2' : ''} z-${10 - idx}`}>
+                        <div 
+                          key={idx} 
+                          className={`relative group ${idx > 0 ? '-ml-2' : ''}`}
+                          style={{ zIndex: allAvatars.length - idx }}>
                           <div className="relative">
                             {avatarData.avatar ? (
                               <>
@@ -279,7 +288,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                         </div>
                       ))}
                       {allAvatars.length > 3 && (
-                        <div className="relative group -ml-2 z-0">
+                        <div className="relative group -ml-2" style={{ zIndex: 0 }}>
                           <div className="flex h-6 w-6 rounded-full bg-gray-200 items-center justify-center text-[10px] text-gray-600 font-semibold border-2 border-white shadow-sm">
                             +{allAvatars.length - 3}
                           </div>
