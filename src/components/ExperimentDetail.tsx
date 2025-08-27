@@ -616,12 +616,37 @@ export function ExperimentDetail({
               return (
                 <div key={variantKey} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">
-                      {variantKey}
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        value={variantKey}
+                        onChange={(e) => {
+                          const newName = e.target.value
+                          if (newName && newName !== variantKey) {
+                            // Update the variant name in variantData
+                            setVariantData(prev => {
+                              const newData = { ...prev }
+                              // Copy data from old key to new key
+                              newData[newName] = { ...prev[variantKey] }
+                              // Delete old key
+                              delete newData[variantKey]
+                              
+                              // Save to storage
+                              const storageKey = `experiment-${experiment.id}-variants`
+                              storage.set(storageKey, newData).catch(error => {
+                                console.error('Failed to save variant data:', error)
+                              })
+                              
+                              return newData
+                            })
+                          }
+                        }}
+                        placeholder="Variant name"
+                        className="font-medium"
+                      />
                       {(experimentVariant?.is_control || experimentVariant?.variant === 0 || index === 0) && (
-                        <span className="ml-2 text-xs text-gray-500">(Control)</span>
+                        <span className="text-xs text-gray-500">(Control)</span>
                       )}
-                    </h4>
+                    </div>
                   </div>
 
                   {/* Variables Section */}
@@ -685,7 +710,7 @@ export function ExperimentDetail({
             <div className="flex flex-wrap gap-2">
               {experiment.applications.map((app) => (
                 <Badge key={app.application_id ?? app.id} variant="info">
-                  {app.name}
+                  {app.name || `App ID: ${app.application_id || app.id}`}
                 </Badge>
               ))}
             </div>
