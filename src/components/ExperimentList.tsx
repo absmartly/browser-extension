@@ -105,59 +105,89 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     return parts.length > 0 ? parts.join(', ') : 'Just started'
   }
 
-  const getOwnerAvatar = (experiment: Experiment) => {
-    const owner = experiment.owner || experiment.created_by
-    if (!owner) return null
+  const getAllAvatars = (experiment: Experiment) => {
+    const avatars: Array<{
+      user: ExperimentUser | undefined
+      avatar?: string
+      name: string
+      initials: string
+    }> = []
     
-    // Check if we have avatar data - it can be in owner.avatar or created_by.avatar
-    const avatar = (owner as any).avatar || owner.avatar
-    if (avatar?.base_url) {
-      // Get base endpoint from storage or use a default
-      const baseUrl = localStorage.getItem('absmartly-endpoint') || ''
-      const cleanEndpoint = baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')
+    // Add created_by as the first avatar
+    if (experiment.created_by) {
+      const user = experiment.created_by
+      const avatar = user.avatar?.base_url ? 
+        `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${user.avatar.base_url}/crop/32x32.webp` : 
+        null
+      const name = user.first_name || user.last_name ? 
+        `${user.first_name || ''} ${user.last_name || ''}`.trim() : 
+        user.email || 'Unknown'
+      const initials = user.first_name || user.last_name ?
+        ((user.first_name?.[0] || '') + (user.last_name?.[0] || '')).toUpperCase() || user.email?.[0]?.toUpperCase() || '?' :
+        user.email?.[0]?.toUpperCase() || '?'
       
-      // The avatar.base_url is like /files/avatars/... 
-      // We need to construct the full URL for the browser extension
-      const avatarPath = avatar.base_url
-      
-      // Construct the full URL - the API serves these files directly
-      const fullUrl = `${cleanEndpoint}${avatarPath}/crop/32x32.webp`
-      return fullUrl
+      avatars.push({
+        user,
+        avatar: avatar || undefined,
+        name,
+        initials
+      })
     }
     
-    return null
+    // Add owners if they exist and are different from created_by
+    if ((experiment as any).owners && Array.isArray((experiment as any).owners)) {
+      (experiment as any).owners.forEach((owner: ExperimentUser) => {
+        // Skip if this owner is the same as created_by
+        if (experiment.created_by && 
+            ((owner.id && owner.id === experiment.created_by.id) || 
+             (owner.user_id && owner.user_id === experiment.created_by.user_id))) {
+          return
+        }
+        
+        const avatar = owner.avatar?.base_url ? 
+          `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp` : 
+          null
+        const name = owner.first_name || owner.last_name ? 
+          `${owner.first_name || ''} ${owner.last_name || ''}`.trim() : 
+          owner.email || 'Unknown'
+        const initials = owner.first_name || owner.last_name ?
+          ((owner.first_name?.[0] || '') + (owner.last_name?.[0] || '')).toUpperCase() || owner.email?.[0]?.toUpperCase() || '?' :
+          owner.email?.[0]?.toUpperCase() || '?'
+        
+        avatars.push({
+          user: owner,
+          avatar: avatar || undefined,
+          name,
+          initials
+        })
+      })
+    }
+    
+    return avatars
+  }
+  const getOwnerAvatar = (experiment: Experiment) => {
+    const avatars = getAllAvatars(experiment)
+    return avatars[0]?.avatar || null
   }
 
   const getOwnerName = (experiment: Experiment) => {
-    const owner = experiment.owner || experiment.created_by
-    if (!owner) return 'Unknown'
-    
-    if (owner.first_name || owner.last_name) {
-      return `${owner.first_name || ''} ${owner.last_name || ''}`.trim()
-    }
-    
-    return owner.email || 'Unknown'
+    const avatars = getAllAvatars(experiment)
+    return avatars[0]?.name || 'Unknown'
   }
 
   const getOwnerInitials = (experiment: Experiment) => {
-    const owner = experiment.owner || experiment.created_by
-    if (!owner) return '?'
-    
-    if (owner.first_name || owner.last_name) {
-      const first = owner.first_name?.[0] || ''
-      const last = owner.last_name?.[0] || ''
-      return (first + last).toUpperCase() || owner.email?.[0]?.toUpperCase() || '?'
-    }
-    
-    return owner.email?.[0]?.toUpperCase() || '?'
+    const avatars = getAllAvatars(experiment)
+    return avatars[0]?.initials || '?'
   }
 
   return (
     <div className="divide-y divide-gray-200">
       {experiments.map((experiment) => {
-        const ownerAvatar = getOwnerAvatar(experiment)
-        const ownerName = getOwnerName(experiment)
-        const ownerInitials = getOwnerInitials(experiment)
+        // Debug: Check owners structure
+        if (experiment.name === 'larger_product_image_size') {
+          console.log('Experiment with owners:', experiment.name, 'Owners:', (experiment as any).owners, 'Created by:', experiment.created_by)
+        }
+        const allAvatars = getAllAvatars(experiment)
         const duration = formatDuration(experiment.started_at, experiment.stopped_at)
         const status = experiment.state || experiment.status || 'created'
         
@@ -208,42 +238,58 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                       </div>
                     )}
                     
-                    {/* Owner Avatar with Tooltip */}
-                    <div className="relative group">
-                      <div className="relative flex items-center">
-                        {ownerAvatar ? (
-                          <>
-                            <img 
-                              src={ownerAvatar} 
-                              alt={ownerName}
-                              className="h-6 w-6 rounded-full object-cover border border-gray-200 shadow-sm"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none'
-                                const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
-                                if (fallbackElement) {
-                                  fallbackElement.style.display = 'flex'
-                                }
-                              }}
-                            />
-                            <div 
-                              className="hidden h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border border-gray-200 shadow-sm"
-                              style={{ display: 'none' }}
-                            >
-                              {ownerInitials}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border border-gray-200 shadow-sm">
-                            {ownerInitials}
+                    {/* Stacked Avatars with Tooltips */}
+                    <div className="flex items-center">
+                      {allAvatars.slice(0, 3).map((avatarData, idx) => (
+                        <div key={idx} className={`relative group ${idx > 0 ? '-ml-2' : ''} z-${10 - idx}`}>
+                          <div className="relative">
+                            {avatarData.avatar ? (
+                              <>
+                                <img 
+                                  src={avatarData.avatar} 
+                                  alt={avatarData.name}
+                                  className="h-6 w-6 rounded-full object-cover border-2 border-white shadow-sm"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none'
+                                    const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
+                                    if (fallbackElement) {
+                                      fallbackElement.style.display = 'flex'
+                                    }
+                                  }}
+                                />
+                                <div 
+                                  className="hidden h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border-2 border-white shadow-sm"
+                                  style={{ display: 'none' }}
+                                >
+                                  {avatarData.initials}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border-2 border-white shadow-sm">
+                                {avatarData.initials}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {ownerName}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                      </div>
+                          
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                            {avatarData.name}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      ))}
+                      {allAvatars.length > 3 && (
+                        <div className="relative group -ml-2 z-0">
+                          <div className="flex h-6 w-6 rounded-full bg-gray-200 items-center justify-center text-[10px] text-gray-600 font-semibold border-2 border-white shadow-sm">
+                            +{allAvatars.length - 3}
+                          </div>
+                          {/* Tooltip showing remaining names */}
+                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                            {allAvatars.slice(3).map(a => a.name).join(', ')}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
