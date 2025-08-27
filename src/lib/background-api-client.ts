@@ -145,4 +145,23 @@ export class BackgroundAPIClient {
       throw error
     }
   }
+
+  async getFavorites(): Promise<number[]> {
+    try {
+      const data = await this.makeRequest('GET', '/favorites')
+      return data?.experiments || []
+    } catch (error) {
+      console.error('Failed to fetch favorites:', error)
+      throw error
+    }
+  }
+
+  async setExperimentFavorite(id: number, favorite: boolean): Promise<void> {
+    try {
+      await this.makeRequest('PUT', `/favorites/experiment?id=${id}&favorite=${favorite}`)
+    } catch (error) {
+      console.error(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
+      throw error
+    }
+  }
 }

@@ -128,4 +128,23 @@ export class ABsmartlyClient {
       throw error
     }
   }
+
+  async getFavorites(): Promise<number[]> {
+    try {
+      const response = await this.client.get('/favorites')
+      return response.data?.experiments || []
+    } catch (error) {
+      console.error('Failed to fetch favorites:', error)
+      throw error
+    }
+  }
+
+  async setExperimentFavorite(id: number, favorite: boolean): Promise<void> {
+    try {
+      await this.client.put(`/favorites/experiment?id=${id}&favorite=${favorite}`)
+    } catch (error) {
+      console.error(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
+      throw error
+    }
+  }
 }
