@@ -20,6 +20,7 @@ export interface Experiment {
   experiment_tags?: { experiment_tag_id: number; experiment_tag?: { id: number; tag: string } }[]
   context_ids?: string[]
   owner?: ExperimentOwner
+  owners?: ExperimentUser[]  // Array of experiment owners
   team?: string
   created_by?: ExperimentUser
   updated_by?: ExperimentUser
