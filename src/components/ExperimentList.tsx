@@ -131,11 +131,25 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     return owner.email || 'Unknown'
   }
 
+  const getOwnerInitials = (experiment: Experiment) => {
+    const owner = experiment.owner || experiment.created_by
+    if (!owner) return '?'
+    
+    if (owner.first_name || owner.last_name) {
+      const first = owner.first_name?.[0] || ''
+      const last = owner.last_name?.[0] || ''
+      return (first + last).toUpperCase() || owner.email?.[0]?.toUpperCase() || '?'
+    }
+    
+    return owner.email?.[0]?.toUpperCase() || '?'
+  }
+
   return (
     <div className="divide-y divide-gray-200">
       {experiments.map((experiment) => {
         const ownerAvatar = getOwnerAvatar(experiment)
         const ownerName = getOwnerName(experiment)
+        const ownerInitials = getOwnerInitials(experiment)
         const duration = formatDuration(experiment.started_at, experiment.stopped_at)
         const status = experiment.state || experiment.status || 'created'
         
@@ -186,21 +200,33 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                       </div>
                     )}
                     
-                    <div className="flex items-center" title={ownerName}>
+                    <div className="relative flex items-center" title={ownerName}>
                       {ownerAvatar ? (
-                        <img 
-                          src={ownerAvatar} 
-                          alt={ownerName}
-                          className="h-6 w-6 rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                          }}
-                        />
-                      ) : null}
-                      <UserCircleIcon 
-                        className={`h-6 w-6 text-gray-400 ${ownerAvatar ? 'hidden' : ''}`}
-                      />
+                        <>
+                          <img 
+                            src={ownerAvatar} 
+                            alt={ownerName}
+                            className="h-6 w-6 rounded-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                              const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
+                              if (fallbackElement) {
+                                fallbackElement.style.display = 'flex'
+                              }
+                            }}
+                          />
+                          <div 
+                            className="hidden h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold"
+                            style={{ display: 'none' }}
+                          >
+                            {ownerInitials}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold">
+                          {getOwnerInitials(experiment)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
