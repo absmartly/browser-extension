@@ -82,8 +82,17 @@ export interface ExperimentOwner {
 }
 
 export interface ExperimentUser {
-  user_id: number
+  user_id?: number
+  id?: number
   email?: string
   first_name?: string
   last_name?: string
+  avatar?: {
+    id: number
+    base_url: string
+    width?: number
+    height?: number
+    file_name?: string
+    content_type?: string
+  }
 }

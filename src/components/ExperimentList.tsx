@@ -109,18 +109,20 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     const owner = experiment.owner || experiment.created_by
     if (!owner) return null
     
-    // Check if we have avatar data
-    if (experiment.owner?.avatar?.base_url) {
+    // Check if we have avatar data - it can be in owner.avatar or created_by.avatar
+    const avatar = (owner as any).avatar || owner.avatar
+    if (avatar?.base_url) {
       // Get base endpoint from storage or use a default
       const baseUrl = localStorage.getItem('absmartly-endpoint') || ''
       const cleanEndpoint = baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')
       
       // The avatar.base_url is like /files/avatars/... 
       // We need to construct the full URL for the browser extension
-      const avatarPath = experiment.owner.avatar.base_url
+      const avatarPath = avatar.base_url
       
       // Construct the full URL - the API serves these files directly
-      return `${cleanEndpoint}${avatarPath}/crop/32x32.webp`
+      const fullUrl = `${cleanEndpoint}${avatarPath}/crop/32x32.webp`
+      return fullUrl
     }
     
     return null
@@ -164,9 +166,9 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
             key={experiment.id}
             className="px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100"
           >
-            <button
+            <div
               onClick={() => onExperimentClick(experiment)}
-              className="flex items-start gap-3 flex-1 min-w-0 text-left"
+              className="flex items-start gap-3 flex-1 min-w-0 text-left cursor-pointer"
             >
               {/* Favorite Star Icon */}
               <button
@@ -206,33 +208,42 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                       </div>
                     )}
                     
-                    <div className="relative flex items-center" title={ownerName}>
-                      {ownerAvatar ? (
-                        <>
-                          <img 
-                            src={ownerAvatar} 
-                            alt={ownerName}
-                            className="h-6 w-6 rounded-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none'
-                              const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
-                              if (fallbackElement) {
-                                fallbackElement.style.display = 'flex'
-                              }
-                            }}
-                          />
-                          <div 
-                            className="hidden h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold"
-                            style={{ display: 'none' }}
-                          >
+                    {/* Owner Avatar with Tooltip */}
+                    <div className="relative group">
+                      <div className="relative flex items-center">
+                        {ownerAvatar ? (
+                          <>
+                            <img 
+                              src={ownerAvatar} 
+                              alt={ownerName}
+                              className="h-6 w-6 rounded-full object-cover border border-gray-200 shadow-sm"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                                const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
+                                if (fallbackElement) {
+                                  fallbackElement.style.display = 'flex'
+                                }
+                              }}
+                            />
+                            <div 
+                              className="hidden h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border border-gray-200 shadow-sm"
+                              style={{ display: 'none' }}
+                            >
+                              {ownerInitials}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border border-gray-200 shadow-sm">
                             {ownerInitials}
                           </div>
-                        </>
-                      ) : (
-                        <div className="flex h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold">
-                          {getOwnerInitials(experiment)}
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        {ownerName}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -263,7 +274,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                   )}
                 </div>
               </div>
-            </button>
+            </div>
             
             {/* Action buttons stacked vertically, aligned to top */}
             <div className="flex flex-col items-center gap-0.5 ml-2 self-start">
