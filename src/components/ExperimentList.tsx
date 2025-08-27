@@ -226,19 +226,27 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
             </button>
             
             {/* Open in ABsmartly button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                const endpoint = localStorage.getItem('absmartly-endpoint') || ''
-                const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                const url = `${baseUrl}/experiments/${experiment.id}`
-                chrome.tabs.create({ url })
-              }}
-              className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-              title="Open in ABsmartly"
-            >
-              <ArrowTopRightOnSquareIcon className="h-5 w-5" />
-            </button>
+            <div className="relative group">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const endpoint = localStorage.getItem('absmartly-endpoint') || ''
+                  const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                  const url = `${baseUrl}/experiments/${experiment.id}`
+                  chrome.tabs.create({ url })
+                }}
+                className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                aria-label="Open in ABsmartly"
+              >
+                <ArrowTopRightOnSquareIcon className="h-5 w-5" />
+              </button>
+              
+              {/* Tooltip */}
+              <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                Open in ABsmartly
+                <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
           </div>
         )
       })}
