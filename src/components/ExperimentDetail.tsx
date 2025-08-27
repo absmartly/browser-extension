@@ -384,10 +384,10 @@ export function ExperimentDetail({
       })
       
       // Create PUT payload with correct structure: id, version, data at root level
-      // Version should be the updated_at timestamp
+      // Version should be the updated_at timestamp converted to milliseconds
       const putPayload: any = {
         id: fullExperiment.id,
-        version: fullExperiment.updated_at,
+        version: new Date(fullExperiment.updated_at).getTime(),
         data: {
           state: fullExperiment.state,
           name: fullExperiment.name,
@@ -414,7 +414,7 @@ export function ExperimentDetail({
           })) || [],
           variants: updatedVariants,
           variant_screenshots: fullExperiment.variant_screenshots || [],
-          custom_section_field_values: [],
+          custom_section_field_values: {},
           parent_experiment: fullExperiment.parent_experiment || null,
           template_permission: fullExperiment.template_permission || {},
           template_name: fullExperiment.template_name || fullExperiment.name,
@@ -422,8 +422,8 @@ export function ExperimentDetail({
           type: fullExperiment.type || "test",
           analysis_type: fullExperiment.analysis_type || "group_sequential",
           baseline_participants_per_day: fullExperiment.baseline_participants_per_day,
-          required_alpha: fullExperiment.required_alpha,
-          required_power: fullExperiment.required_power,
+          required_alpha: fullExperiment.required_alpha ? String(parseFloat(fullExperiment.required_alpha).toFixed(3)) : null,
+          required_power: fullExperiment.required_power ? String(parseFloat(fullExperiment.required_power).toFixed(3)) : null,
           group_sequential_futility_type: fullExperiment.group_sequential_futility_type,
           group_sequential_analysis_count: fullExperiment.group_sequential_analysis_count,
           group_sequential_min_analysis_interval: fullExperiment.group_sequential_min_analysis_interval,
@@ -433,9 +433,9 @@ export function ExperimentDetail({
         }
       }
       
-      // Convert custom_section_field_values to array format for PUT request
+      // Convert custom_section_field_values to object format for PUT request (like ABSmartly website)
       if (fullExperiment.custom_section_field_values) {
-        const customFieldsArray: any[] = []
+        const customFieldsObj: any = {}
         
         // Handle both object and array formats from GET response
         const fieldsArray = Array.isArray(fullExperiment.custom_section_field_values) 
@@ -445,23 +445,27 @@ export function ExperimentDetail({
         fieldsArray.forEach((field: any) => {
           const fieldId = field.experiment_custom_section_field_id || field.custom_section_field?.id || field.id
           
+          // Create the full field object structure like in the working request
+          customFieldsObj[fieldId] = {
+            experiment_id: fullExperiment.id,
+            experiment_custom_section_field_id: fieldId,
+            type: field.type,
+            value: field.value,
+            updated_at: field.updated_at,
+            updated_by_user_id: field.updated_by_user_id || fullExperiment.updated_by_user_id,
+            custom_section_field: field.custom_section_field,
+            id: fieldId,
+            default_value: field.default_value || field.value
+          }
+          
           // Update DOM changes field if using custom_field storage
           if (storageType === 'custom_field' && 
               field.custom_section_field?.sdk_field_name === fieldName) {
-            customFieldsArray.push({
-              experiment_custom_section_field_id: fieldId,
-              value: JSON.stringify(domChangesPayload)
-            })
-          } else {
-            // Keep other fields with simplified format (only id and value)
-            customFieldsArray.push({
-              experiment_custom_section_field_id: fieldId,
-              value: field.value
-            })
+            customFieldsObj[fieldId].value = JSON.stringify(domChangesPayload)
           }
         })
         
-        putPayload.data.custom_section_field_values = customFieldsArray
+        putPayload.data.custom_section_field_values = customFieldsObj
       }
       
       // Send the complete PUT payload (including id, version, data at root level)
