@@ -189,6 +189,10 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
     throw new Error('No API endpoint configured')
   }
 
+  // Check if we have a cached preference for auth method
+  const authPreference = await storage.get('auth-method-preference')
+  const shouldTryJwtFirst = authPreference === 'jwt' && !config.apiKey?.startsWith('new-') // Don't use JWT first if user just entered a new key
+  
   // Helper to build headers
   const buildHeaders = async (useApiKey: boolean = true) => {
     const headers: any = {
@@ -196,14 +200,30 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
       'Accept': 'application/json'
     }
 
-    // Try API key first if available and we haven't disabled it
-    if (config.apiKey && useApiKey) {
+    // If we know JWT works better, try it first
+    if (shouldTryJwtFirst && useApiKey) {
+      console.log('Preferring JWT based on previous success...')
+      const jwtToken = await getJWTCookie(config.apiEndpoint)
+      if (jwtToken) {
+        if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
+          headers['Authorization'] = `JWT ${jwtToken}`
+        } else {
+          headers['Authorization'] = `Bearer ${jwtToken}`
+        }
+        console.log('Using cached JWT preference')
+        return headers
+      }
+      console.log('JWT not available, falling back to API key')
+    }
+
+    // Try API key if available and we haven't disabled it
+    if (config.apiKey && useApiKey && !shouldTryJwtFirst) {
       console.log('Using API key for auth')
       const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
         ? `JWT ${config.apiKey}`
         : `Api-Key ${config.apiKey}`
       headers['Authorization'] = authHeader
-    } else {
+    } else if (!config.apiKey || !useApiKey) {
       // Try to get JWT from cookies
       console.log('Attempting to get JWT from cookies...')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
@@ -225,7 +245,7 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
     return headers
   }
 
-  // Build initial headers (will use API key if available)
+  // Build initial headers
   const headers = await buildHeaders()
 
   // Clean up the API endpoint - remove trailing slashes
@@ -280,13 +300,43 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
     if (isAuthError(error) && config.apiKey && retryWithJWT && headers.Authorization?.startsWith('Api-Key')) {
       console.log('API key auth failed (401), retrying with JWT cookie...')
       
-      // Rebuild headers without API key (will use JWT from cookies)
-      const jwtHeaders = await buildHeaders(false)
+      // Try to get JWT from cookies
+      const jwtToken = await getJWTCookie(config.apiEndpoint)
       
-      if (jwtHeaders.Authorization) {
-        console.log('Retrying with JWT authorization...')
-        // Recursive call but with retryWithJWT=false to prevent infinite loop
-        return makeAPIRequest(method, path, data, false)
+      if (jwtToken) {
+        // Build new headers with JWT instead of API key
+        const newHeaders: any = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+        
+        if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
+          newHeaders['Authorization'] = `JWT ${jwtToken}`
+        } else {
+          newHeaders['Authorization'] = `Bearer ${jwtToken}`
+        }
+        
+        console.log('Retrying with JWT authorization:', newHeaders.Authorization)
+        
+        // Make the request directly with new headers, don't recurse
+        try {
+          const response = await axios({
+            method,
+            url,
+            data: requestData,
+            headers: newHeaders,
+            withCredentials: false
+          })
+          
+          console.log('JWT fallback successful!')
+          // Cache that JWT works better than API key
+          await storage.set('auth-method-preference', 'jwt')
+          
+          return response.data
+        } catch (jwtError) {
+          console.error('JWT fallback also failed:', jwtError.response?.status)
+          throw new Error('AUTH_EXPIRED')
+        }
       } else {
         console.log('No JWT cookie available for retry')
       }
@@ -372,7 +422,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     openLoginPage()
     sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
-    // Special handler for auth check
+    // Special handler for auth check - directly check user authentication
     getConfig().then(async config => {
       if (!config?.apiEndpoint) {
         sendResponse({ success: false, error: 'No endpoint configured' })
@@ -382,43 +432,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
       
       try {
-        // Try multiple auth endpoints to check authentication status
-        // First, try the experiments endpoint which we know works if auth is valid
-        const experimentsResponse = await makeAPIRequest('GET', '/experiments', { limit: 1 })
+        // Try to get user info directly from /auth/current-user
+        const fullAuthUrl = `${baseUrl}/auth/current-user`
+        console.log('CHECK_AUTH: Fetching user from', fullAuthUrl)
         
-        if (experimentsResponse) {
-          // If we can get experiments, we're authenticated
-          // Try to get user info using our makeAPIRequest which handles auth properly
-          try {
-            // Use a custom path that goes directly to the auth endpoint
-            const fullAuthUrl = `${baseUrl}/auth/current-user`
-            const userResponse = await axios.get(fullAuthUrl, {
-              withCredentials: false,
-              headers: await (async () => {
-                const h: any = {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json'
-                }
-                // This duplicates auth logic, but we need it for non-v1 endpoint
-                // TODO: Refactor this to share auth logic
-                if (config.apiKey) {
-                  const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-                    ? `JWT ${config.apiKey}`
-                    : `Api-Key ${config.apiKey}`
-                  h['Authorization'] = authHeader
-                } else {
-                  const jwtToken = await getJWTCookie(config.apiEndpoint)
-                  if (jwtToken) {
-                    if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
-                      h['Authorization'] = `JWT ${jwtToken}`
-                    } else {
-                      h['Authorization'] = `Bearer ${jwtToken}`
-                    }
-                  }
-                }
-                return h
-              })()
-            })
+        // Build auth headers
+        const authHeaders: any = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+        
+        // Check cached auth preference
+        const authPreference = await storage.get('auth-method-preference')
+        const shouldTryJwtFirst = authPreference === 'jwt'
+        
+        if (shouldTryJwtFirst) {
+          // Try JWT first if we know it works
+          const jwtToken = await getJWTCookie(config.apiEndpoint)
+          if (jwtToken) {
+            authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
+              ? `JWT ${jwtToken}`
+              : `Bearer ${jwtToken}`
+            console.log('CHECK_AUTH: Using JWT from preference')
+          }
+        } else if (config.apiKey) {
+          // Try API key first
+          authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+            ? `JWT ${config.apiKey}`
+            : `Api-Key ${config.apiKey}`
+          console.log('CHECK_AUTH: Using API key')
+        } else {
+          // No API key, try JWT
+          const jwtToken = await getJWTCookie(config.apiEndpoint)
+          if (jwtToken) {
+            authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
+              ? `JWT ${jwtToken}`
+              : `Bearer ${jwtToken}`
+            console.log('CHECK_AUTH: Using JWT (no API key available)')
+          }
+        }
+        
+        try {
+          const userResponse = await axios.get(fullAuthUrl, {
+            withCredentials: false,
+            headers: authHeaders
+          })
             
             // Auth response received from /auth/current-user
             
@@ -440,30 +498,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             
             sendResponse({ success: true, data: finalUserData })
-          } catch (userError) {
-            // If current-user fails but experiments work, create a basic authenticated response
-            console.log('Could not get user info, but experiments work - user is authenticated')
-            sendResponse({ 
-              success: true, 
-              data: {
-                authenticated: true,
-                email: 'Authenticated User',
-                id: 'authenticated'
+        } catch (authError) {
+          // If first attempt failed with API key, try with JWT
+          if (authError.response?.status === 401 && config.apiKey && !shouldTryJwtFirst) {
+            console.log('CHECK_AUTH: API key failed, trying JWT fallback')
+            const jwtToken = await getJWTCookie(config.apiEndpoint)
+            
+            if (jwtToken) {
+              authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
+                ? `JWT ${jwtToken}`
+                : `Bearer ${jwtToken}`
+              
+              try {
+                const retryResponse = await axios.get(fullAuthUrl, {
+                  withCredentials: false,
+                  headers: authHeaders
+                })
+                
+                // Cache that JWT works better
+                await storage.set('auth-method-preference', 'jwt')
+                console.log('CHECK_AUTH: JWT fallback successful')
+                
+                sendResponse({ success: true, data: retryResponse.data })
+              } catch (retryError) {
+                console.log('CHECK_AUTH: JWT also failed')
+                sendResponse({ success: false, error: 'Not authenticated' })
               }
-            })
+            } else {
+              sendResponse({ success: false, error: 'Not authenticated' })
+            }
+          } else {
+            console.log('CHECK_AUTH: Authentication failed:', authError.response?.status)
+            sendResponse({ success: false, error: 'Not authenticated' })
           }
-        } else {
-          sendResponse({ success: false, error: 'Not authenticated' })
         }
       } catch (error) {
         console.error('Auth check error:', error)
-        const isAuth = error.message === 'AUTH_EXPIRED' || isAuthError(error)
-        sendResponse({ 
-          success: false, 
-          error: error.message,
-          isAuthError: isAuth
-        })
+        sendResponse({ success: false, error: error.message || 'Auth check failed' })
       }
+    }).catch(error => {
+      console.error('Config error:', error)
+      sendResponse({ success: false, error: 'Failed to get config' })
     })
     return true // Will respond asynchronously
   } else if (message.type === "FETCH_AVATAR") {
