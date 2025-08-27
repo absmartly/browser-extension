@@ -11,7 +11,7 @@ import { ErrorBoundary } from "~src/components/ErrorBoundary"
 import { Toast } from "~src/components/Toast"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment } from "~src/types/absmartly"
-import { CogIcon, PaintBrushIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
+import { CogIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
 import logoUrl from "data-base64:~assets/logo.png"
 import "~style.css"
@@ -35,8 +35,9 @@ function IndexPopupContent() {
   const [totalExperiments, setTotalExperiments] = useState<number | undefined>()
   const [hasMore, setHasMore] = useState(false)
   
-  // Filter state
-  const [filters, setFilters] = useState<any>({})
+  // Filter state - loaded from storage or default
+  const [filters, setFilters] = useState<any>(null)
+  const [filtersLoaded, setFiltersLoaded] = useState(false)
   
   // Favorite experiments state
   const [favoriteExperiments, setFavoriteExperiments] = useState<Set<number>>(new Set())
@@ -51,57 +52,30 @@ function IndexPopupContent() {
     startExperiment,
     stopExperiment,
     createExperiment,
-    updateExperiment
+    updateExperiment,
+    getFavorites,
+    setExperimentFavorite
   } = useABsmartly()
 
   // Track if we've initialized experiments for this session
   const [hasInitialized, setHasInitialized] = useState(false)
+  const [filtersInitialized, setFiltersInitialized] = useState(false)
   
-  // Load experiments when switching to list view
+  // Load experiments when switching to list view AND filters are loaded
   useEffect(() => {
-    if (config && view === 'list' && !hasInitialized && !experimentsLoading) {
-      console.log('Initializing experiments for this session')
+    if (config && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
+      console.log('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
-      loadCachedExperiments()
+      loadExperiments(false)
+      loadFavorites()
     }
-  }, [config, view, hasInitialized])
-  
-  const loadCachedExperiments = async () => {
-    console.log('loadCachedExperiments called')
-    try {
-      const cache = await getExperimentsCache()
-      console.log('Cache result:', cache)
-      if (cache && cache.experiments && cache.experiments.length > 0) {
-        console.log('Loading experiments from cache:', cache.experiments.length)
-        setExperiments(cache.experiments)
-        setFilteredExperiments(cache.experiments)
-        setExperimentsLoading(false)
-        return
-      }
-      
-      // Check if this is truly the first time (no cache at all)
-      const storage = new Storage({ area: "local" })
-      const hasLoadedBefore = await storage.get('hasLoadedExperiments')
-      console.log('hasLoadedBefore:', hasLoadedBefore)
-      
-      if (!hasLoadedBefore) {
-        console.log('First time loading, fetching initial data')
-        await storage.set('hasLoadedExperiments', true)
-        loadExperiments(false)
-      } else {
-        console.log('No cache but has loaded before, not fetching')
-        // Don't set empty arrays - just leave whatever is there
-        setExperimentsLoading(false)
-      }
-    } catch (error) {
-      console.warn('Failed to load cache:', error)
-      setExperimentsLoading(false)
-    }
-  }
+  }, [config, view, hasInitialized, filtersLoaded, filters])
 
-  // Restore popup state when component mounts
+  // Restore popup state and filters when component mounts
   useEffect(() => {
     const storage = new Storage({ area: "local" })
+    
+    // Restore popup state
     storage.get('popupState').then(result => {
       if (result) {
         console.log('Restoring popup state:', result)
@@ -112,12 +86,24 @@ function IndexPopupContent() {
       }
     })
     
-    // Load favorites
-    storage.get('favoriteExperiments').then(result => {
-      if (result && Array.isArray(result)) {
-        setFavoriteExperiments(new Set(result))
+    // Restore filters
+    storage.get('experimentFilters').then(result => {
+      console.log('Loading saved filters:', result)
+      if (result) {
+        setFilters(result)
+      } else {
+        // Use default filters if none saved
+        setFilters({
+          state: ['created', 'ready']  // 'created' maps to 'Draft' in the UI
+        })
       }
+      setFiltersLoaded(true)
     })
+    
+    // Load favorites from server
+    if (config) {
+      loadFavorites()
+    }
   }, [])
 
   // Save popup state whenever view or selectedExperiment changes
@@ -139,6 +125,16 @@ function IndexPopupContent() {
     }
   }, [view])
 
+  const loadFavorites = async () => {
+    try {
+      const favoriteIds = await getFavorites()
+      setFavoriteExperiments(new Set(favoriteIds))
+    } catch (error) {
+      console.error('Failed to load favorites:', error)
+      // Continue without favorites if the call fails
+    }
+  }
+
   const loadExperiments = async (forceRefresh = false, page = currentPage, size = pageSize) => {
     setExperimentsLoading(true)
     setError(null)
@@ -154,19 +150,49 @@ function IndexPopupContent() {
         type: 'test'
       }
       
-      // Add filter parameters (start simple to avoid 500 errors)
+      // Add all filter parameters
       if (filters.search && filters.search.trim()) {
         params.search = filters.search.trim()
       }
       
+      // State filter
       if (filters.state && filters.state.length > 0) {
         params.state = filters.state.join(',')
-      } else {
-        // Use the exact states from your example
-        params.state = 'ready,created'
       }
       
-      console.log('Fetching experiments with params:', params)
+      // Significance filter
+      if (filters.significance && filters.significance.length > 0) {
+        params.significance = filters.significance.join(',')
+      }
+      
+      // Owners filter
+      if (filters.owners && filters.owners.length > 0) {
+        params.owners = filters.owners.join(',')
+      }
+      
+      // Teams filter  
+      if (filters.teams && filters.teams.length > 0) {
+        params.teams = filters.teams.join(',')
+      }
+      
+      // Tags filter
+      if (filters.tags && filters.tags.length > 0) {
+        params.tags = filters.tags.join(',')
+      }
+      
+      // Applications filter
+      if (filters.applications && filters.applications.length > 0) {
+        params.applications = filters.applications.join(',')
+      }
+      
+      // Boolean filters
+      if (filters.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
+      if (filters.cleanup_needed === true) params.cleanup_needed = true
+      if (filters.audience_mismatch === true) params.audience_mismatch = true
+      if (filters.sample_size_reached === true) params.sample_size_reached = true
+      if (filters.experiments_interact === true) params.experiments_interact = true
+      if (filters.assignment_conflict === true) params.assignment_conflict = true
+      
       const response = await getExperiments(params)
       const experiments = response.experiments || []
       
@@ -205,17 +231,33 @@ function IndexPopupContent() {
   }
 
   const handleToggleFavorite = async (experimentId: number) => {
+    const isFavorite = favoriteExperiments.has(experimentId)
+    const newFavorite = !isFavorite
+    
+    // Optimistically update UI
     const newFavorites = new Set(favoriteExperiments)
-    if (newFavorites.has(experimentId)) {
-      newFavorites.delete(experimentId)
-    } else {
+    if (newFavorite) {
       newFavorites.add(experimentId)
+    } else {
+      newFavorites.delete(experimentId)
     }
     setFavoriteExperiments(newFavorites)
     
-    // Save to storage
-    const storage = new Storage({ area: "local" })
-    await storage.set('favoriteExperiments', Array.from(newFavorites))
+    try {
+      // Update on server
+      await setExperimentFavorite(experimentId, newFavorite)
+    } catch (error) {
+      console.error('Failed to update favorite:', error)
+      // Revert on error
+      const revertedFavorites = new Set(favoriteExperiments)
+      if (isFavorite) {
+        revertedFavorites.add(experimentId)
+      } else {
+        revertedFavorites.delete(experimentId)
+      }
+      setFavoriteExperiments(revertedFavorites)
+      setToast({ message: 'Failed to update favorite', type: 'error' })
+    }
   }
   
   const handleExperimentClick = async (experiment: Experiment) => {
@@ -323,22 +365,121 @@ function IndexPopupContent() {
   }
 
   const handleFilterChange = (filterState: any) => {
-    const hasActualChange = JSON.stringify(filterState) !== JSON.stringify(filters)
-    setFilters(filterState)
+    console.log('handleFilterChange called with:', filterState)
+    console.log('Current filters:', filters)
     
-    // Only reload if there's an actual change and we have experiments
-    if (hasActualChange && experiments.length > 0) {
+    // Mark filters as initialized on first call
+    if (!filtersInitialized) {
+      setFiltersInitialized(true)
+    }
+    
+    const hasActualChange = JSON.stringify(filterState) !== JSON.stringify(filters)
+    console.log('Has actual change:', hasActualChange)
+    
+    if (hasActualChange) {
+      setFilters(filterState)
+      // Save filters to storage
+      const storage = new Storage({ area: "local" })
+      storage.set('experimentFilters', filterState)
       console.log('Filter changed, reloading experiments')
       // Reset to first page when filters change
       setCurrentPage(1)
-      // Reload experiments with new filters
-      loadExperiments(true, 1, pageSize)
+      // Need to pass the new filter state directly since state update is async
+      loadExperimentsWithFilters(filterState, 1, pageSize)
+    } else {
+      console.log('No actual change detected, not reloading')
     }
   }
-
-  const handleOpenVisualEditor = () => {
-    chrome.runtime.sendMessage({ type: 'TOGGLE_VISUAL_EDITOR' })
-    window.close()
+  
+  // Helper function to load experiments with specific filters
+  const loadExperimentsWithFilters = async (filterState: any, page = currentPage, size = pageSize) => {
+    setExperimentsLoading(true)
+    setError(null)
+    
+    try {
+      const params: any = {
+        page: page,
+        items: size,
+        iterations: 1,
+        previews: 1,
+        type: 'test'
+      }
+      
+      // Add all filter parameters using the passed filterState
+      if (filterState.search && filterState.search.trim()) {
+        params.search = filterState.search.trim()
+      }
+      
+      // State filter
+      if (filterState.state && filterState.state.length > 0) {
+        params.state = filterState.state.join(',')
+      }
+      
+      // Significance filter
+      if (filterState.significance && filterState.significance.length > 0) {
+        params.significance = filterState.significance.join(',')
+      }
+      
+      // Owners filter
+      if (filterState.owners && filterState.owners.length > 0) {
+        params.owners = filterState.owners.join(',')
+      }
+      
+      // Teams filter  
+      if (filterState.teams && filterState.teams.length > 0) {
+        params.teams = filterState.teams.join(',')
+      }
+      
+      // Tags filter
+      if (filterState.tags && filterState.tags.length > 0) {
+        params.tags = filterState.tags.join(',')
+      }
+      
+      // Applications filter
+      if (filterState.applications && filterState.applications.length > 0) {
+        params.applications = filterState.applications.join(',')
+      }
+      
+      // Boolean filters
+      if (filterState.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
+      if (filterState.cleanup_needed === true) params.cleanup_needed = true
+      if (filterState.audience_mismatch === true) params.audience_mismatch = true
+      if (filterState.sample_size_reached === true) params.sample_size_reached = true
+      if (filterState.experiments_interact === true) params.experiments_interact = true
+      if (filterState.assignment_conflict === true) params.assignment_conflict = true
+      
+      const response = await getExperiments(params)
+      const experiments = response.experiments || []
+      
+      setExperiments(experiments)
+      setFilteredExperiments(experiments)
+      setTotalExperiments(response.total)
+      setHasMore(response.hasMore || false)
+      setCurrentPage(page)
+      setPageSize(size)
+      setIsAuthExpired(false)
+      
+      // Cache the results only for first page
+      if (page === 1) {
+        try {
+          await setExperimentsCache(experiments)
+        } catch (cacheError) {
+          console.warn('Failed to cache experiments:', cacheError)
+        }
+      }
+    } catch (err: any) {
+      if (err.isAuthError || err.message === 'AUTH_EXPIRED') {
+        setIsAuthExpired(true)
+        setError('Your session has expired. Please log in again.')
+      } else {
+        setError('Failed to load experiments. Please check your API settings.')
+      }
+      console.error('Failed to load experiments:', err)
+      setExperiments([])
+      setFilteredExperiments([])
+    } finally {
+      setExperimentsLoading(false)
+    }
   }
 
   const handleLoginRedirect = async () => {
@@ -424,21 +565,16 @@ function IndexPopupContent() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => loadExperiments(true, 1, pageSize)}
+                  onClick={() => {
+                    loadExperiments(true, 1, pageSize)
+                    loadFavorites()
+                  }}
                   className={`p-2 hover:bg-gray-100 rounded-md transition-colors ${experimentsLoading ? 'animate-spin' : ''}`}
                   aria-label="Refresh experiments"
                   title="Refresh experiments"
                   disabled={experimentsLoading}
                 >
                   <ArrowPathIcon className="h-5 w-5 text-gray-600" />
-                </button>
-                <button
-                  onClick={handleOpenVisualEditor}
-                  className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-                  aria-label="Visual Editor"
-                  title="Open Visual Editor"
-                >
-                  <PaintBrushIcon className="h-5 w-5 text-gray-600" />
                 </button>
                 <button
                   onClick={handleCreateExperiment}
@@ -458,9 +594,12 @@ function IndexPopupContent() {
                 </button>
               </div>
             </div>
-            <ExperimentFilter
-              onFilterChange={handleFilterChange}
-            />
+            {filters && (
+              <ExperimentFilter
+                onFilterChange={handleFilterChange}
+                initialFilters={filters}
+              />
+            )}
           </div>
           {error && (
             <div role="alert" className="bg-red-50 text-red-700 px-4 py-2 text-sm">
