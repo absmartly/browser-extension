@@ -257,7 +257,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                                 <img 
                                   src={avatarData.avatar} 
                                   alt={avatarData.name}
-                                  className="h-6 w-6 rounded-full object-cover border-2 border-white shadow-sm"
+                                  className="h-7 w-7 rounded-full object-cover border-2 border-white shadow-sm"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none'
                                     const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
@@ -267,14 +267,14 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                                   }}
                                 />
                                 <div 
-                                  className="hidden h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border-2 border-white shadow-sm"
+                                  className="hidden h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
                                   style={{ display: 'none' }}
                                 >
                                   {avatarData.initials}
                                 </div>
                               </>
                             ) : (
-                              <div className="flex h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[10px] text-white font-semibold border-2 border-white shadow-sm">
+                              <div className="flex h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm">
                                 {avatarData.initials}
                               </div>
                             )}
@@ -289,7 +289,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                       ))}
                       {allAvatars.length > 3 && (
                         <div className="relative group -ml-2" style={{ zIndex: 0 }}>
-                          <div className="flex h-6 w-6 rounded-full bg-gray-200 items-center justify-center text-[10px] text-gray-600 font-semibold border-2 border-white shadow-sm">
+                          <div className="flex h-7 w-7 rounded-full bg-gray-200 items-center justify-center text-[11px] text-gray-600 font-semibold border-2 border-white shadow-sm">
                             +{allAvatars.length - 3}
                           </div>
                           {/* Tooltip showing remaining names */}
