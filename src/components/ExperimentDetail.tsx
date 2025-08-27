@@ -332,7 +332,8 @@ export function ExperimentDetail({
         return
       }
       
-      const fullExperiment = fullExperimentResponse.data
+      // Extract experiment from response - GET returns {experiment: {...}}
+      const fullExperiment = fullExperimentResponse.data.experiment || fullExperimentResponse.data
       
       // Check if custom field exists when using custom_field storage
       if (storageType === 'custom_field') {
