@@ -38,6 +38,9 @@ function IndexPopupContent() {
   // Filter state
   const [filters, setFilters] = useState<any>({})
   
+  // Favorite experiments state
+  const [favoriteExperiments, setFavoriteExperiments] = useState<Set<number>>(new Set())
+  
   const {
     client,
     config,
@@ -106,6 +109,13 @@ function IndexPopupContent() {
         if (state.view) setView(state.view)
         if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment)
         // Don't clear the state - keep it for next time
+      }
+    })
+    
+    // Load favorites
+    storage.get('favoriteExperiments').then(result => {
+      if (result && Array.isArray(result)) {
+        setFavoriteExperiments(new Set(result))
       }
     })
   }, [])
@@ -194,6 +204,20 @@ function IndexPopupContent() {
     }
   }
 
+  const handleToggleFavorite = async (experimentId: number) => {
+    const newFavorites = new Set(favoriteExperiments)
+    if (newFavorites.has(experimentId)) {
+      newFavorites.delete(experimentId)
+    } else {
+      newFavorites.add(experimentId)
+    }
+    setFavoriteExperiments(newFavorites)
+    
+    // Save to storage
+    const storage = new Storage({ area: "local" })
+    await storage.set('favoriteExperiments', Array.from(newFavorites))
+  }
+  
   const handleExperimentClick = async (experiment: Experiment) => {
     // Don't set the partial experiment first to avoid re-renders
     setView('detail')
@@ -353,7 +377,7 @@ function IndexPopupContent() {
     return (
       <div className="w-96 h-[600px] p-4">
         <div className="flex flex-col items-center justify-center h-full space-y-4">
-          <h2 className="text-lg font-semibold">Welcome to ABSmartly</h2>
+          <h2 className="text-lg font-semibold">Welcome to ABsmartly</h2>
           <p className="text-sm text-gray-600 text-center">
             Please configure your API settings to get started
           </p>
@@ -372,12 +396,31 @@ function IndexPopupContent() {
           <div className="border-b px-4 py-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <img 
-                  src={logoUrl} 
-                  alt="ABSmartly" 
-                  className="w-6 h-6"
-                />
-                <h1 className="text-lg font-semibold">ABSmartly Experiments</h1>
+                {config?.apiEndpoint ? (
+                  <a 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                      chrome.tabs.create({ url: baseUrl })
+                    }}
+                    className="cursor-pointer"
+                    title="Open ABsmartly"
+                  >
+                    <img 
+                      src={logoUrl} 
+                      alt="ABsmartly" 
+                      className="w-6 h-6 hover:opacity-80 transition-opacity"
+                    />
+                  </a>
+                ) : (
+                  <img 
+                    src={logoUrl} 
+                    alt="ABsmartly" 
+                    className="w-6 h-6"
+                  />
+                )}
+                <h1 className="text-lg font-semibold">Experiments</h1>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -441,6 +484,8 @@ function IndexPopupContent() {
               experiments={filteredExperiments}
               onExperimentClick={handleExperimentClick}
               loading={experimentsLoading}
+              favoriteExperiments={favoriteExperiments}
+              onToggleFavorite={handleToggleFavorite}
             />
             <Pagination
               currentPage={currentPage}

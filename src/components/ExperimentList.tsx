@@ -1,15 +1,18 @@
 import React from 'react'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
-import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, BeakerIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, BeakerIcon, ArrowTopRightOnSquareIcon, StarIcon } from '@heroicons/react/24/outline'
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 
 interface ExperimentListProps {
   experiments: Experiment[]
   onExperimentClick: (experiment: Experiment) => void
   loading?: boolean
+  favoriteExperiments?: Set<number>
+  onToggleFavorite?: (experimentId: number) => void
 }
 
-export function ExperimentList({ experiments, onExperimentClick, loading }: ExperimentListProps) {
+export function ExperimentList({ experiments, onExperimentClick, loading, favoriteExperiments = new Set(), onToggleFavorite }: ExperimentListProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -192,7 +195,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
                 
                 {/* Status and Metrics Row */}
                 <div className="mt-2 flex items-center gap-3 flex-wrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-md ${getStatusColor(status)}`}>
+                  <span className={`inline-flex items-center h-[26px] px-3 text-xs font-medium rounded-full ${getStatusColor(status)}`}>
                     {getStatusLabel(status)}
                   </span>
                   
@@ -226,8 +229,24 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
               <ChevronRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0 ml-2" />
             </button>
             
-            {/* Open in ABsmartly button */}
-            <div className="relative group">
+            {/* Favorite and Open in ABsmartly buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleFavorite?.(experiment.id)
+                }}
+                className="p-1.5 text-gray-400 hover:text-yellow-500 rounded transition-colors"
+                aria-label={favoriteExperiments.has(experiment.id) ? "Remove from favorites" : "Add to favorites"}
+              >
+                {favoriteExperiments.has(experiment.id) ? (
+                  <StarIconSolid className="h-5 w-5 text-yellow-500" />
+                ) : (
+                  <StarIcon className="h-5 w-5" />
+                )}
+              </button>
+              
+              <div className="relative group">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -246,6 +265,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading }: Expe
               <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap">
                 Open in ABsmartly
                 <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+              </div>
               </div>
             </div>
           </div>
