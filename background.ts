@@ -614,90 +614,174 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               
               const injectionResult = await chrome.scripting.executeScript({
                 target: { tabId: tabId },
-                func: function() {
+                func: function(variantName, initialChanges) {
                   // This runs in the page context
-                  console.log('[ABSmartly] Inline visual editor script injected')
+                  console.log('[ABSmartly] Starting inline visual editor immediately')
                   
-                  // Check if we already have a listener
-                  if ((window as any).__absmartlyVisualEditorInjected) {
-                    console.log('[ABSmartly] Visual editor already injected')
+                  // Check if we already have the editor
+                  if ((window as any).__absmartlyVisualEditorActive) {
+                    console.log('[ABSmartly] Visual editor already active')
                     return { already: true }
                   }
                   
-                  (window as any).__absmartlyVisualEditorInjected = true
+                  (window as any).__absmartlyVisualEditorActive = true
                   
-                  // Create a simple message listener
-                  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-                    console.log('[ABSmartly Inline] Received message:', message.type)
+                  // Create visual editor banner
+                  const existingBanner = document.getElementById('absmartly-visual-editor-banner')
+                  if (existingBanner) existingBanner.remove()
+                  
+                  const banner = document.createElement('div')
+                  banner.id = 'absmartly-visual-editor-banner'
+                  banner.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    background: linear-gradient(90deg, #3b82f6, #10b981);
+                    color: white;
+                    padding: 10px;
+                    z-index: 2147483647;
+                    text-align: center;
+                    font-family: system-ui, -apple-system, sans-serif;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                  `
+                  banner.innerHTML = `
+                    <div>🎨 ABSmartly Visual Editor Active - Variant: ${variantName}</div>
+                    <div style="font-size: 12px; margin-top: 5px;">Click any element to edit • Press ESC to exit</div>
+                  `
+                  document.body.appendChild(banner)
+                  
+                  // Add visual editor styles
+                  const style = document.createElement('style')
+                  style.id = 'absmartly-visual-editor-styles'
+                  style.textContent = `
+                    .absmartly-hover {
+                      outline: 2px dashed #3b82f6 !important;
+                      cursor: pointer !important;
+                    }
+                    .absmartly-selected {
+                      outline: 3px solid #10b981 !important;
+                      position: relative !important;
+                    }
+                  `
+                  document.head.appendChild(style)
+                  
+                  // Track selected element
+                  let selectedElement = null
+                  let isEditing = false
+                  
+                  // Add hover effect
+                  const handleMouseOver = (e) => {
+                    if (isEditing) return
+                    const target = e.target
+                    if (target.id !== 'absmartly-visual-editor-banner' && !target.closest('#absmartly-visual-editor-banner')) {
+                      target.classList.add('absmartly-hover')
+                    }
+                  }
+                  
+                  const handleMouseOut = (e) => {
+                    if (isEditing) return
+                    e.target.classList.remove('absmartly-hover')
+                  }
+                  
+                  // Handle element click
+                  const handleClick = (e) => {
+                    const target = e.target
                     
-                    if (message.type === 'START_VISUAL_EDITOR') {
-                      console.log('[ABSmartly Inline] Starting visual editor with variant:', message.variantName)
-                      
-                      // Create a simple visual indicator
-                      const banner = document.createElement('div')
-                      banner.id = 'absmartly-visual-editor-banner'
-                      banner.style.cssText = `
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        background: linear-gradient(90deg, #3b82f6, #10b981);
-                        color: white;
-                        padding: 10px;
-                        z-index: 999999;
-                        text-align: center;
-                        font-family: system-ui, -apple-system, sans-serif;
-                      `
-                      banner.textContent = `🎨 ABSmartly Visual Editor Active - Variant: ${message.variantName}`
-                      document.body.appendChild(banner)
-                      
-                      // Make elements editable
-                      document.body.style.cursor = 'pointer'
-                      
-                      sendResponse({ success: true, message: 'Visual editor started (inline version)' })
+                    // Ignore clicks on our UI
+                    if (target.id === 'absmartly-visual-editor-banner' || target.closest('#absmartly-visual-editor-banner')) {
+                      return
                     }
                     
-                    if (message.type === 'GET_VISUAL_EDITOR_STATUS') {
-                      sendResponse({ active: true, inline: true })
+                    e.preventDefault()
+                    e.stopPropagation()
+                    
+                    // Remove previous selection
+                    if (selectedElement) {
+                      selectedElement.classList.remove('absmartly-selected')
                     }
                     
-                    return true
-                  })
+                    // Select new element
+                    selectedElement = target
+                    target.classList.remove('absmartly-hover')
+                    target.classList.add('absmartly-selected')
+                    
+                    // Make it editable
+                    if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+                      target.contentEditable = 'true'
+                      target.focus()
+                      isEditing = true
+                      
+                      // Listen for when editing ends
+                      const handleBlur = () => {
+                        target.contentEditable = 'false'
+                        isEditing = false
+                        target.removeEventListener('blur', handleBlur)
+                        
+                        // Log the change
+                        console.log('[ABSmartly] Element edited:', {
+                          selector: getSelector(target),
+                          newText: target.textContent
+                        })
+                      }
+                      
+                      target.addEventListener('blur', handleBlur)
+                    }
+                  }
                   
+                  // Handle ESC key
+                  const handleKeyDown = (e) => {
+                    if (e.key === 'Escape') {
+                      // Clean up
+                      document.removeEventListener('mouseover', handleMouseOver)
+                      document.removeEventListener('mouseout', handleMouseOut)
+                      document.removeEventListener('click', handleClick, true)
+                      document.removeEventListener('keydown', handleKeyDown)
+                      
+                      // Remove styles and banner
+                      document.getElementById('absmartly-visual-editor-banner')?.remove()
+                      document.getElementById('absmartly-visual-editor-styles')?.remove()
+                      
+                      // Remove classes
+                      document.querySelectorAll('.absmartly-hover').forEach(el => {
+                        el.classList.remove('absmartly-hover')
+                      })
+                      document.querySelectorAll('.absmartly-selected').forEach(el => {
+                        el.classList.remove('absmartly-selected')
+                      })
+                      
+                      (window as any).__absmartlyVisualEditorActive = false
+                      console.log('[ABSmartly] Visual editor stopped')
+                    }
+                  }
+                  
+                  // Helper function to get selector
+                  function getSelector(element) {
+                    if (element.id) return '#' + element.id
+                    if (element.className && typeof element.className === 'string') {
+                      const classes = element.className.split(' ').filter(c => !c.includes('absmartly'))
+                      if (classes.length) return '.' + classes.join('.')
+                    }
+                    return element.tagName.toLowerCase()
+                  }
+                  
+                  // Add event listeners
+                  document.addEventListener('mouseover', handleMouseOver)
+                  document.addEventListener('mouseout', handleMouseOut)
+                  document.addEventListener('click', handleClick, true)
+                  document.addEventListener('keydown', handleKeyDown)
+                  
+                  console.log('[ABSmartly] Visual editor is now active!')
                   return { success: true }
                 },
-                world: 'ISOLATED' // Run in isolated world to access chrome.runtime
+                args: [message.variantName, message.changes],
+                world: 'MAIN' // Run in main world to modify the page directly
               })
               
               console.log('Inline injection result:', injectionResult)
               
-              console.log('Visual editor script injected, waiting for initialization...')
-              
-              // Wait longer and retry a few times
-              let retries = 0
-              const maxRetries = 5
-              const tryToSendMessage = () => {
-                chrome.tabs.sendMessage(tabId, {
-                  type: 'START_VISUAL_EDITOR',
-                  variantName: message.variantName,
-                  changes: message.changes
-                }, (response) => {
-                  if (chrome.runtime.lastError && retries < maxRetries) {
-                    retries++
-                    console.log(`Retry ${retries}/${maxRetries}: Content script not ready yet...`)
-                    setTimeout(tryToSendMessage, 200)
-                  } else if (chrome.runtime.lastError) {
-                    console.error('Failed to start visual editor after retries:', chrome.runtime.lastError)
-                    sendResponse({ success: false, error: chrome.runtime.lastError.message })
-                  } else {
-                    console.log('Visual editor started successfully after injection')
-                    sendResponse({ success: true })
-                  }
-                })
-              }
-              
-              // Start trying after a short delay
-              setTimeout(tryToSendMessage, 300)
+              // The visual editor is now running inline, no need to send messages
+              sendResponse({ success: true, message: 'Visual editor started successfully' })
             } catch (error) {
               console.error('Failed to inject visual editor script:', error)
               sendResponse({ success: false, error: 'Failed to inject visual editor script' })
