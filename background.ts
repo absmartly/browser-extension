@@ -573,6 +573,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
+        const tabUrl = tabs[0].url
+        
+        console.log('Attempting to start visual editor on tab:', tabId, 'URL:', tabUrl)
+        
+        // Check if this is a restricted URL
+        if (tabUrl?.startsWith('chrome://') || 
+            tabUrl?.startsWith('chrome-extension://') || 
+            tabUrl?.startsWith('edge://') ||
+            tabUrl?.startsWith('about:')) {
+          console.error('Cannot inject content script on restricted URL:', tabUrl)
+          sendResponse({ success: false, error: 'Cannot use visual editor on browser pages' })
+          return
+        }
         
         // First, try to send message to see if content script is loaded
         chrome.tabs.sendMessage(tabId, {
