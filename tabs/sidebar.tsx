@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
-// @ts-ignore
-import IndexPopup from "../src/components/ExtensionUI"
-
-console.log('IndexPopup import:', IndexPopup)
+import SidebarWrapper from "./SidebarWrapper"
 import "../style.css"
 
 const storage = new Storage()
@@ -175,7 +172,7 @@ const ABSmartlySidebar = () => {
             height: 'calc(100% - 57px)', 
             overflow: 'auto',
           }}>
-            {IndexPopup ? <IndexPopup /> : <div>Loading extension...</div>}
+            <SidebarWrapper />
           </div>
         </>
       )}
