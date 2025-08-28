@@ -270,3 +270,6 @@ function mountSidebar() {
   
   console.log('🔵 ABSmartly Extension: Sidebar mounted successfully')
 }
+
+// Default export for Plasmo
+export default ABSmartlySidebar
