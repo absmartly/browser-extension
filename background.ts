@@ -712,7 +712,7 @@ chrome.action.onClicked.addListener(async (tab) => {
         type: "TOGGLE_SIDEBAR" 
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('[Background] Error toggling sidebar:', chrome.runtime.lastError)
+          console.error('[Background] Error toggling sidebar:', chrome.runtime.lastError?.message || chrome.runtime.lastError)
           // Tab might have been reloaded, remove from injected set
           injectedTabs.delete(tab.id)
         }
