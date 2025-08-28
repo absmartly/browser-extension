@@ -572,31 +572,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('===============================================')
     console.log('Background received START_VISUAL_EDITOR:', message)
     console.log('===============================================')
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (tabs[0]?.id) {
-        const tabId = tabs[0].id
-        const tabUrl = tabs[0].url
-        
-        console.log('Attempting to start visual editor on tab:', tabId, 'URL:', tabUrl)
-        
-        // Check if this is a restricted URL
-        if (tabUrl?.startsWith('chrome://') || 
-            tabUrl?.startsWith('chrome-extension://') || 
-            tabUrl?.startsWith('edge://') ||
-            tabUrl?.startsWith('about:')) {
-          console.error('Cannot inject content script on restricted URL:', tabUrl)
-          sendResponse({ success: false, error: 'Cannot use visual editor on browser pages' })
-          return
-        }
-        
-        // First, try to send message to see if content script is loaded
-        chrome.tabs.sendMessage(tabId, {
-          type: 'GET_VISUAL_EDITOR_STATUS'
-        }, async (statusResponse) => {
-          if (chrome.runtime.lastError) {
+    
+    // Handle async properly
+    ;(async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (tabs[0]?.id) {
+          const tabId = tabs[0].id
+          const tabUrl = tabs[0].url
+          
+          console.log('Attempting to start visual editor on tab:', tabId, 'URL:', tabUrl)
+          
+          // Check if this is a restricted URL
+          if (tabUrl?.startsWith('chrome://') || 
+              tabUrl?.startsWith('chrome-extension://') || 
+              tabUrl?.startsWith('edge://') ||
+              tabUrl?.startsWith('about:')) {
+            console.error('Cannot inject content script on restricted URL:', tabUrl)
+            sendResponse({ success: false, error: 'Cannot use visual editor on browser pages' })
+            return
+          }
+          
+          // First, try to send message to see if content script is loaded
+          let contentScriptReady = false
+          try {
+            await chrome.tabs.sendMessage(tabId, { type: 'GET_VISUAL_EDITOR_STATUS' })
+            contentScriptReady = true
+            console.log('Content script is already loaded')
+          } catch (error) {
+            console.log('Content script not loaded, will inject it')
+            console.log('Error was:', error)
+          }
+          
+          if (!contentScriptReady) {
             // Content script not loaded, inject it
-            console.log('Content script not loaded, injecting visual-editor script...')
-            console.log('Last error:', chrome.runtime.lastError)
+            console.log('Injecting visual-editor script...')
             
             try {
               // First, try injecting a simple inline script to set up the visual editor
@@ -695,26 +705,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           } else {
             // Content script already loaded, send the message directly
             console.log('Content script already loaded, starting visual editor...')
-            chrome.tabs.sendMessage(tabId, {
-              type: 'START_VISUAL_EDITOR',
-              variantName: message.variantName,
-              changes: message.changes
-            }, (response) => {
-              if (chrome.runtime.lastError) {
-                console.error('Error starting visual editor:', chrome.runtime.lastError)
-                sendResponse({ success: false, error: chrome.runtime.lastError.message })
-              } else {
-                console.log('Visual editor started successfully')
-                sendResponse({ success: true })
-              }
-            })
+            
+            try {
+              const response = await chrome.tabs.sendMessage(tabId, {
+                type: 'START_VISUAL_EDITOR',
+                variantName: message.variantName,
+                changes: message.changes
+              })
+              
+              console.log('Visual editor started successfully')
+              sendResponse({ success: true })
+            } catch (error) {
+              console.error('Error starting visual editor:', error)
+              sendResponse({ success: false, error: error.message || 'Failed to start visual editor' })
+            }
           }
-        })
-      } else {
-        console.error('No active tab found')
-        sendResponse({ success: false, error: 'No active tab found' })
+        } else {
+          console.error('No active tab found')
+          sendResponse({ success: false, error: 'No active tab found' })
+        }
+      } catch (error) {
+        console.error('Unexpected error in START_VISUAL_EDITOR handler:', error)
+        sendResponse({ success: false, error: error.message || 'Unexpected error' })
       }
-    })
+    })()
+    
     return true // Will respond asynchronously
   } else if (message.type === "FETCH_AVATAR") {
     // Fetch avatar image with authentication
