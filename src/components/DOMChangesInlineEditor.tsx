@@ -295,36 +295,27 @@ export function DOMChangesInlineEditor({
       active: true
     })
     
-    // Send message to content script to start visual editor
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (tabs[0]?.id) {
-        const tabId = tabs[0].id
-        const tabUrl = tabs[0].url || 'unknown'
-        
-        // Check if this is a restricted page
-        if (tabUrl.startsWith('chrome://') || 
-            tabUrl.startsWith('chrome-extension://') || 
-            tabUrl.startsWith('edge://') ||
-            tabUrl.includes('chrome.google.com/webstore')) {
-          console.error('Content scripts cannot run on this page.')
-          return
+    // Send message to background script to start visual editor
+    console.log('🚀 Sending START_VISUAL_EDITOR message to background')
+    console.log('Variant:', variantName)
+    console.log('Changes:', changes)
+    
+    chrome.runtime.sendMessage({ 
+      type: 'START_VISUAL_EDITOR',
+      variantName,
+      changes
+    }, (response) => {
+      console.log('📨 Response received from background:', response)
+      if (chrome.runtime.lastError) {
+        console.error('❌ Chrome runtime error:', chrome.runtime.lastError)
+      } else if (response?.error) {
+        console.error('❌ Error from background:', response.error)
+        // Show user-friendly error
+        if (response.error.includes('browser pages')) {
+          alert('Visual editor cannot run on browser pages. Please navigate to a regular website.')
         }
-        
-        // Send message to background script to start visual editor
-        chrome.runtime.sendMessage({ 
-          type: 'START_VISUAL_EDITOR',
-          variantName,
-          changes
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error('Error starting visual editor:', chrome.runtime.lastError)
-          } else if (response?.error) {
-            console.error('Error starting visual editor:', response.error)
-          } else {
-            console.log('Visual editor started successfully:', response)
-          }
-        })
-        
+      } else {
+        console.log('✅ Visual editor started successfully:', response)
         // Close popup after a short delay
         setTimeout(() => {
           window.close()

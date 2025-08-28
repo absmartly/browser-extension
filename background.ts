@@ -569,7 +569,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true // Will respond asynchronously
   } else if (message.type === "START_VISUAL_EDITOR") {
     // Forward visual editor command to content script in active tab
+    console.log('===============================================')
     console.log('Background received START_VISUAL_EDITOR:', message)
+    console.log('===============================================')
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
