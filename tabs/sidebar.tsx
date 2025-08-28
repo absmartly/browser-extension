@@ -266,18 +266,51 @@ function mountSidebar() {
   // Create shadow root for isolation
   const shadowRoot = container.attachShadow({ mode: 'closed' })
   
-  // Add CSS for spinner animation
+  // Load and inject the CSS into shadow DOM
+  // Try to load the sidebar CSS file (filename changes with each build)
+  fetch(chrome.runtime.getURL('manifest.json'))
+    .then(response => response.json())
+    .then(manifest => {
+      // Find the sidebar CSS file from web_accessible_resources
+      const resources = manifest.web_accessible_resources?.[0]?.resources || []
+      const cssFile = resources.find(r => r.startsWith('sidebar') && r.endsWith('.css'))
+      
+      if (cssFile) {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = chrome.runtime.getURL(cssFile)
+        shadowRoot.appendChild(link)
+      } else {
+        console.warn('Could not find sidebar CSS file in manifest')
+      }
+    })
+    .catch(err => {
+      console.error('Failed to load sidebar CSS:', err)
+    })
+  
+  // Add CSS for spinner animation and additional styles
   const style = document.createElement('style')
   style.textContent = `
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    
+    /* Base styles for shadow DOM */
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    }
   `
   shadowRoot.appendChild(style)
   
   // Create React root inside shadow DOM
   const reactContainer = document.createElement('div')
+  reactContainer.className = 'absmartly-extension-root'
   shadowRoot.appendChild(reactContainer)
   
   // Mount React app
