@@ -604,41 +604,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               
               if (contentScript && contentScript.js && contentScript.js[0]) {
                 // Inject the visual editor content script
-                await chrome.scripting.executeScript({
+                console.log('Injecting content script:', contentScript.js[0])
+                const results = await chrome.scripting.executeScript({
                   target: { tabId: tabId },
                   files: [contentScript.js[0]]
                 })
+                console.log('Content script injection results:', results)
               } else {
-                // Fallback: inject the script inline
-                await chrome.scripting.executeScript({
-                  target: { tabId: tabId },
-                  func: () => {
-                    console.log('[Visual Editor] Emergency injection - script will be limited')
-                    // This is a fallback - the full visual editor won't work without the proper script
-                  }
-                })
-                throw new Error('Visual editor content script not found in manifest')
+                console.error('Content script not found in manifest, trying direct injection...')
+                // Fallback: Try to inject the content.js directly
+                try {
+                  const results = await chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    files: ['content.ffb82774.js'] // This might change with builds
+                  })
+                  console.log('Direct injection results:', results)
+                } catch (e) {
+                  console.error('Direct injection failed:', e)
+                  sendResponse({ success: false, error: 'Failed to inject content script' })
+                  return
+                }
               }
               
-              console.log('Visual editor script injected, waiting a moment...')
+              console.log('Visual editor script injected, waiting for initialization...')
               
-              // Wait a moment for the script to initialize
-              setTimeout(() => {
-                // Now send the START_VISUAL_EDITOR message
+              // Wait longer and retry a few times
+              let retries = 0
+              const maxRetries = 5
+              const tryToSendMessage = () => {
                 chrome.tabs.sendMessage(tabId, {
                   type: 'START_VISUAL_EDITOR',
                   variantName: message.variantName,
                   changes: message.changes
                 }, (response) => {
-                  if (chrome.runtime.lastError) {
-                    console.error('Error starting visual editor after injection:', chrome.runtime.lastError)
+                  if (chrome.runtime.lastError && retries < maxRetries) {
+                    retries++
+                    console.log(`Retry ${retries}/${maxRetries}: Content script not ready yet...`)
+                    setTimeout(tryToSendMessage, 200)
+                  } else if (chrome.runtime.lastError) {
+                    console.error('Failed to start visual editor after retries:', chrome.runtime.lastError)
                     sendResponse({ success: false, error: chrome.runtime.lastError.message })
                   } else {
                     console.log('Visual editor started successfully after injection')
                     sendResponse({ success: true })
                   }
                 })
-              }, 100)
+              }
+              
+              // Start trying after a short delay
+              setTimeout(tryToSendMessage, 300)
             } catch (error) {
               console.error('Failed to inject visual editor script:', error)
               sendResponse({ success: false, error: 'Failed to inject visual editor script' })
