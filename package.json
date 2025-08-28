@@ -6,7 +6,7 @@
   "author": "Jonas Alves",
   "scripts": {
     "dev": "plasmo dev --src-path=.",
-    "build": "plasmo build --src-path=.",
+    "build": "plasmo build --src-path=. && node scripts/post-build.js",
     "package": "plasmo package --src-path=.",
     "test": "playwright test",
     "test:ui": "playwright test --ui"
@@ -53,7 +53,9 @@
           "assets/icon.png", 
           "assets/icon128.png", 
           "assets/absmartly-logo-white.svg",
-          "tabs/*"
+          "tabs/*",
+          "sidebar.*.js",
+          "sidebar.*.css"
         ],
         "matches": ["<all_urls>"]
       }

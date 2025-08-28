@@ -645,13 +645,13 @@ chrome.action.onClicked.addListener(async (tab) => {
         // Inject the sidebar CSS first
         await chrome.scripting.insertCSS({
           target: { tabId: tab.id },
-          files: ['tabs/sidebar.850787d0.css']
+          files: ['sidebar.850787d0.css']
         })
         
         // Then inject the sidebar script
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['tabs/sidebar.e865c912.js']
+          files: ['sidebar.e865c912.js']
         })
         
         // Mark this tab as having the sidebar injected
