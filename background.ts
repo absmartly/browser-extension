@@ -642,16 +642,41 @@ chrome.action.onClicked.addListener(async (tab) => {
       console.log('[Background] Injecting sidebar for first time in tab:', tab.id)
       
       try {
-        // Inject the sidebar CSS first
-        await chrome.scripting.insertCSS({
-          target: { tabId: tab.id },
-          files: ['sidebar.850787d0.css']
-        })
+        // Try to inject using chrome.runtime.getURL to get proper extension URLs
+        const cssUrl = chrome.runtime.getURL('sidebar.850787d0.css')
+        const jsUrl = chrome.runtime.getURL('sidebar.e865c912.js')
         
-        // Then inject the sidebar script
+        console.log('[Background] CSS URL:', cssUrl)
+        console.log('[Background] JS URL:', jsUrl)
+        
+        // Inject CSS by fetching and inserting it
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['sidebar.e865c912.js']
+          func: (cssUrl) => {
+            return fetch(cssUrl)
+              .then(response => response.text())
+              .then(css => {
+                const style = document.createElement('style')
+                style.textContent = css
+                document.head.appendChild(style)
+              })
+          },
+          args: [cssUrl]
+        })
+        
+        // Then inject the JavaScript
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: (jsUrl) => {
+            return fetch(jsUrl)
+              .then(response => response.text())
+              .then(js => {
+                const script = document.createElement('script')
+                script.textContent = js
+                document.body.appendChild(script)
+              })
+          },
+          args: [jsUrl]
         })
         
         // Mark this tab as having the sidebar injected
