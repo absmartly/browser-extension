@@ -5,6 +5,7 @@ import { Storage } from "@plasmohq/storage"
 import type { DOMChangeInstruction } from "./src/types/sdk-plugin"
 import { ElementPicker } from "./src/content/element-picker"
 import { DragDropPicker } from "./src/content/drag-drop-picker"
+import { VisualEditor } from "./src/content/visual-editor"
 import { injectSDKBridge } from "./src/content/sdk-bridge"
 
 // Debug logging - immediately when script loads
@@ -45,6 +46,8 @@ const storage = new Storage()
 const elementPicker = new ElementPicker()
 // Drag-drop picker instance
 const dragDropPicker = new DragDropPicker()
+// Visual editor instance
+let visualEditor: VisualEditor | null = null
 
 // Global message listener - set up immediately, not inside React component
 try {
@@ -149,6 +152,65 @@ try {
     console.log('Canceling drag-drop picker from global listener')
     dragDropPicker.stop()
     sendResponse({ success: true })
+  } else if (message.type === "START_VISUAL_EDITOR") {
+    console.log('Starting visual editor from global listener')
+    try {
+      // Clean up existing visual editor if any
+      if (visualEditor) {
+        visualEditor.destroy()
+      }
+      
+      // Create new visual editor instance
+      visualEditor = new VisualEditor((changes) => {
+        console.log('Visual editor changes:', changes)
+        
+        // Store the changes via background script
+        chrome.runtime.sendMessage({ 
+          type: 'STORAGE_SET', 
+          key: 'visualEditorChanges',
+          value: {
+            variantName: message.variantName,
+            changes: changes
+          }
+        }, (setResponse) => {
+          if (setResponse && setResponse.success) {
+            console.log('Visual editor changes stored')
+          } else {
+            console.error('Failed to store visual editor changes:', setResponse?.error)
+          }
+        })
+        
+        // Also send to popup if it's open
+        try {
+          chrome.runtime.sendMessage({
+            type: 'VISUAL_EDITOR_CHANGES',
+            variantName: message.variantName,
+            changes: changes
+          })
+        } catch (e) {
+          console.log('Popup not available to receive changes')
+        }
+      })
+      
+      // Start the visual editor with existing changes if any
+      visualEditor.start(message.changes || [])
+      sendResponse({ success: true, message: 'Visual editor started' })
+    } catch (error) {
+      console.error('Error starting visual editor:', error)
+      sendResponse({ success: false, error: error.message })
+    }
+    return true
+  } else if (message.type === "STOP_VISUAL_EDITOR") {
+    console.log('Stopping visual editor from global listener')
+    if (visualEditor) {
+      const finalChanges = visualEditor.getChanges()
+      visualEditor.destroy()
+      visualEditor = null
+      sendResponse({ success: true, changes: finalChanges })
+    } else {
+      sendResponse({ success: true, changes: [] })
+    }
+    return true
   }
   
   // Return false to allow other listeners to handle the message
