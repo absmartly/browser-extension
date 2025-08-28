@@ -34,7 +34,7 @@ export class VisualEditor {
     this.makeElementsEditable()
     
     // Show notification
-    this.showNotification('Visual Editor Active', 'Hold SHIFT and click to select elements')
+    this.showNotification('Visual Editor Active', 'Click any element to edit')
     console.log('Visual Editor: Started successfully')
   }
   
@@ -285,8 +285,8 @@ export class VisualEditor {
       </div>
       <div class="absmartly-toolbar-instructions">
         <strong>How to use:</strong><br>
-        • Hold <strong>SHIFT + Click</strong> to select element<br>
-        • <strong>Right Click</strong> any element for menu<br>
+        • <strong>Click</strong> any element to select & edit<br>
+        • Menu opens automatically on selection<br>
         • Selected elements have blue outline<br>
         • Press <strong>ESC</strong> to deselect
       </div>
@@ -362,23 +362,21 @@ export class VisualEditor {
     // If clicking outside context menu, close it
     if (this.contextMenu && !this.contextMenu.contains(target)) {
       this.removeContextMenu()
-      // Don't prevent default if just closing context menu
-      if (!e.shiftKey && !e.ctrlKey) {
-        return
-      }
     }
     
     // Don't select during certain operations
     if (target.contentEditable === 'true') return
     
-    // Only prevent default if shift or ctrl is held (for selection mode)
-    // or if we're actually going to select an element
-    if (e.shiftKey || e.ctrlKey || !this.contextMenu) {
-      e.preventDefault()
-      e.stopPropagation()
-      this.selectElement(target)
-      console.log('Visual Editor: Element selected', this.getSelector(target))
-    }
+    // Prevent default to stop link navigation and form submission
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Select the element on normal click
+    this.selectElement(target)
+    console.log('Visual Editor: Element selected', this.getSelector(target))
+    
+    // Show context menu on selection
+    this.showContextMenu(e.clientX, e.clientY)
   }
   
   private handleContextMenu = (e: MouseEvent) => {
@@ -920,17 +918,33 @@ export class VisualEditor {
       if (this.isInternalChange) return
       
       mutations.forEach(mutation => {
+        // Skip mutations caused by our own visual editor classes
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const target = mutation.target as HTMLElement
+          const className = typeof target.className === 'string' 
+            ? target.className 
+            : target.className?.baseVal || ''
+          
+          // Don't track changes caused by adding/removing our editor classes
+          if (className.includes('absmartly-')) {
+            return
+          }
+        }
+        
         if (mutation.type === 'characterData' || mutation.type === 'childList') {
           const target = mutation.target as HTMLElement
           if (!this.isExtensionElement(target) && target.nodeType === Node.ELEMENT_NODE) {
-            // Track the change
-            this.trackChange(target, 'modify')
+            // Only track if we're actively editing this element
+            if (target === this.selectedElement || target.contentEditable === 'true') {
+              this.trackChange(target, 'modify')
+            }
           }
         } else if (mutation.type === 'attributes') {
           const target = mutation.target as HTMLElement
           if (!this.isExtensionElement(target)) {
             const attrName = mutation.attributeName
-            if (attrName === 'style' || attrName === 'class') {
+            // Only track style changes made by user actions, not hover effects
+            if ((attrName === 'style' || attrName === 'class') && target === this.selectedElement) {
               this.trackChange(target, 'style')
             }
           }
