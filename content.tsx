@@ -87,3 +87,14 @@ document.documentElement.appendChild(debugDiv)
 
 // Expose a global function for testing
 ;(window as any).__absmartlyContentLoaded = true
+
+// Send a message to the page to confirm we're loaded
+window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '*')
+
+// Also listen for test events
+document.addEventListener('absmartly-test', (event: any) => {
+  console.log('[Visual Editor Content Script] Received test event:', event.detail)
+  document.dispatchEvent(new CustomEvent('absmartly-response', {
+    detail: { message: 'Content script received your message', originalMessage: event.detail }
+  }))
+})
