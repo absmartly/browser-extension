@@ -586,7 +586,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               // Get the manifest to find the correct content script filename
               const manifest = chrome.runtime.getManifest()
               const contentScript = manifest.content_scripts?.find(cs => 
-                cs.js?.some(file => file.includes('visual-editor'))
+                cs.js?.some(file => file.includes('content'))
               )
               
               if (contentScript && contentScript.js && contentScript.js[0]) {
