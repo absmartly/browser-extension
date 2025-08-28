@@ -17,7 +17,8 @@ import {
   DocumentTextIcon,
   HashtagIcon,
   CubeIcon,
-  CommandLineIcon
+  CommandLineIcon,
+  ArrowsUpDownIcon
 } from '@heroicons/react/24/outline'
 
 interface DOMChangesInlineEditorProps {
@@ -40,6 +41,8 @@ interface EditingDOMChange {
   attributeProperties?: Array<{ key: string; value: string }>
   htmlValue?: string
   jsValue?: string
+  targetSelector?: string
+  position?: 'before' | 'after' | 'firstChild' | 'lastChild'
 }
 
 const createEmptyChange = (): EditingDOMChange => ({
@@ -53,7 +56,9 @@ const createEmptyChange = (): EditingDOMChange => ({
   attributeProperties: [{ key: '', value: '' }],
   textValue: '',
   htmlValue: '',
-  jsValue: ''
+  jsValue: '',
+  targetSelector: '',
+  position: 'after'
 })
 
 export function DOMChangesInlineEditor({ 
@@ -85,6 +90,8 @@ export function DOMChangesInlineEditor({
           // Apply the selected element to the restored editing state
           if (pickerResult.fieldId === 'selector' && result.editingChange) {
             setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
+          } else if (pickerResult.fieldId === 'targetSelector' && result.editingChange) {
+            setEditingChange({ ...result.editingChange, targetSelector: pickerResult.selector })
           }
           
           // Clear the picker result
@@ -114,6 +121,8 @@ export function DOMChangesInlineEditor({
         // Update current state if we're still open
         if (pickingForField === 'selector' && editingChange) {
           setEditingChange({ ...editingChange, selector: message.selector })
+        } else if (pickingForField === 'targetSelector' && editingChange) {
+          setEditingChange({ ...editingChange, targetSelector: message.selector })
         }
         
         setPickingForField(null)
@@ -130,6 +139,7 @@ export function DOMChangesInlineEditor({
   }, [pickingForField, editingChange, variantName])
 
   const handleStartElementPicker = async (fieldId: string) => {
+    console.log('Starting element picker for field:', fieldId)
     setPickingForField(fieldId)
     
     // Save current state before picker starts
@@ -139,12 +149,14 @@ export function DOMChangesInlineEditor({
       editingChange,
       pickingForField: fieldId
     })
+    console.log('Saved state to storage')
     
     // Popup state will be handled by the parent component's effect
     // We just need to ensure our state is saved before closing
     
     // Start element picker
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      console.log('Found tabs:', tabs)
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
         const tabUrl = tabs[0].url || 'unknown'
@@ -188,8 +200,11 @@ export function DOMChangesInlineEditor({
         
         // Close the popup after a brief delay to ensure message is sent
         setTimeout(() => {
+          console.log('Closing popup window...')
           window.close()
         }, 100)
+      } else {
+        console.error('No active tab found!')
       }
     })
   }
@@ -235,7 +250,9 @@ export function DOMChangesInlineEditor({
         : [{ key: '', value: '' }],
       classAdd: change.type === 'class' ? (change.add || []) : [],
       classRemove: change.type === 'class' ? (change.remove || []) : [],
-      classesWithStatus
+      classesWithStatus,
+      targetSelector: change.type === 'move' ? change.targetSelector : '',
+      position: change.type === 'move' ? change.position : 'after'
     }
     setEditingChange(editing)
   }
@@ -306,6 +323,15 @@ export function DOMChangesInlineEditor({
           enabled: true 
         }
         break
+      case 'move':
+        domChange = {
+          selector: editingChange.selector,
+          type: 'move',
+          targetSelector: editingChange.targetSelector || '',
+          position: editingChange.position || 'after',
+          enabled: true
+        }
+        break
       default:
         return
     }
@@ -348,6 +374,8 @@ export function DOMChangesInlineEditor({
         return CodeBracketIcon
       case 'javascript':
         return CommandLineIcon
+      case 'move':
+        return ArrowsUpDownIcon
       default:
         return CursorArrowRaysIcon
     }
@@ -361,6 +389,7 @@ export function DOMChangesInlineEditor({
       case 'attribute': return 'Attribute'
       case 'html': return 'HTML'
       case 'javascript': return 'JavaScript'
+      case 'move': return 'Move/Reorder'
       default: return type
     }
   }
@@ -430,6 +459,18 @@ export function DOMChangesInlineEditor({
             {change.value && change.value.length > 50 && (
               <span className="ml-1 text-xs text-gray-400">({change.value.length} chars)</span>
             )}
+          </span>
+        )
+      case 'move':
+        const positionText = change.position === 'before' ? 'before' : 
+                           change.position === 'after' ? 'after' :
+                           change.position === 'firstChild' ? 'as first child of' :
+                           'as last child of'
+        return (
+          <span className="text-gray-600">
+            <span className="text-gray-500">Move</span>{' '}
+            <span className="text-gray-500">{positionText}</span>{' '}
+            <code className="text-xs font-mono text-blue-600">{change.targetSelector}</code>
           </span>
         )
       default:
@@ -634,6 +675,7 @@ export function DOMChangesInlineEditor({
               <option value="attribute">Attribute</option>
               <option value="html">HTML</option>
               <option value="javascript">JavaScript</option>
+              <option value="move">Move/Reorder</option>
             </select>
           </div>
 
@@ -793,6 +835,55 @@ export function DOMChangesInlineEditor({
                 rows={4}
               />
             </div>
+          )}
+
+          {editingChange.type === 'move' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Target Element
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    value={editingChange.targetSelector || ''}
+                    onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
+                    placeholder=".container, #section, [data-role='main']"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => handleStartElementPicker('targetSelector')}
+                    size="sm"
+                    variant="secondary"
+                    title="Pick target element"
+                  >
+                    🎯
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Select where to move the element
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Position
+                </label>
+                <select
+                  value={editingChange.position || 'after'}
+                  onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="before">Before target element</option>
+                  <option value="after">After target element</option>
+                  <option value="firstChild">As first child of target</option>
+                  <option value="lastChild">As last child of target</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Choose how to position relative to the target
+                </p>
+              </div>
+            </>
           )}
         </div>
       )}
