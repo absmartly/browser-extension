@@ -119,16 +119,7 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
         
-        // First, inject the content script if needed
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId },
-            files: ['content.js']
-          })
-        } catch (err) {
-          // Script might already be injected
-          console.log('Content script might already be injected:', err)
-        }
+        // Don't try to inject content.js - it doesn't exist and content script is already injected via manifest
         
         // Add a listener for the element selection
         const handleElementSelected = (message: any) => {

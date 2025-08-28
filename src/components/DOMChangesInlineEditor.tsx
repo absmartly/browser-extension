@@ -147,20 +147,43 @@ export function DOMChangesInlineEditor({
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
+        const tabUrl = tabs[0].url || 'unknown'
         
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId },
-            files: ['content.js']
-          })
-        } catch (err) {
-          console.log('Content script might already be injected:', err)
+        console.log('Current tab URL:', tabUrl)
+        
+        // Check if this is a restricted page
+        if (tabUrl.startsWith('chrome://') || 
+            tabUrl.startsWith('chrome-extension://') || 
+            tabUrl.startsWith('edge://') ||
+            tabUrl.includes('chrome.google.com/webstore')) {
+          console.error('Content scripts cannot run on this page. Please try on a regular website.')
+          return
         }
         
-        // Send message to start element picker
+        // Send a test message first to check if content script is responding
+        console.log('Sending test message to content script...')
         chrome.tabs.sendMessage(tabId, { 
-          type: 'START_ELEMENT_PICKER',
+          type: 'TEST_CONNECTION',
           fromPopup: true
+        }, (testResponse) => {
+          if (chrome.runtime.lastError) {
+            console.error('Content script not responding to test:', chrome.runtime.lastError)
+            console.log('Content script is not loaded. Please refresh the page and try again.')
+            return
+          }
+          console.log('Test connection successful:', testResponse)
+          
+          // Now send the actual element picker message
+          chrome.tabs.sendMessage(tabId, { 
+            type: 'START_ELEMENT_PICKER',
+            fromPopup: true
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('Error starting element picker:', chrome.runtime.lastError)
+            } else {
+              console.log('Element picker started successfully:', response)
+            }
+          })
         })
         
         // Close the popup after a brief delay to ensure message is sent
