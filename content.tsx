@@ -4,11 +4,11 @@ import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
 import type { DOMChangeInstruction } from "./src/types/sdk-plugin"
 import { ElementPicker } from "./src/content/element-picker"
+import { DragDropPicker } from "./src/content/drag-drop-picker"
 import { injectSDKBridge } from "./src/content/sdk-bridge"
 
 // Debug logging - immediately when script loads
 console.log('🔵 ABsmartly Extension: Content script loaded on', window.location.href)
-console.log('🔵 ABsmartly Extension: Setting up message listeners...')
 
 // Check if chrome.runtime is available
 if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -43,9 +43,10 @@ const storage = new Storage()
 
 // Element picker instance
 const elementPicker = new ElementPicker()
+// Drag-drop picker instance
+const dragDropPicker = new DragDropPicker()
 
 // Global message listener - set up immediately, not inside React component
-console.log('🔵 ABsmartly Extension: About to add message listener...')
 try {
   chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (response?: any) => void) => {
     console.log('📨 ABsmartly Extension: Received message (global listener):', message.type)
@@ -79,12 +80,80 @@ try {
     console.log('Canceling element picker from global listener')
     elementPicker.stop()
     sendResponse({ success: true })
+  } else if (message.type === "START_DRAG_DROP_PICKER") {
+    console.log('Starting drag-drop picker from global listener')
+    try {
+      dragDropPicker.start(async (result: { selector: string, targetSelector: string, position: string }) => {
+        console.log('Drag-drop complete:', result)
+        
+        // Use background script to access storage
+        try {
+          // First get the saved state to know which variant we're editing
+          chrome.runtime.sendMessage({ 
+            type: 'STORAGE_GET', 
+            key: 'domChangesInlineState' 
+          }, (response) => {
+            if (response && response.success) {
+              const savedState = response.value
+              console.log('Saved state for drag-drop:', savedState)
+              
+              if (savedState && savedState.variantName) {
+                const dragDropData = {
+                  variantName: savedState.variantName,
+                  selector: result.selector,
+                  targetSelector: result.targetSelector,
+                  position: result.position
+                }
+                console.log('Storing drag-drop result:', dragDropData)
+                
+                // Store the result via background script
+                chrome.runtime.sendMessage({ 
+                  type: 'STORAGE_SET', 
+                  key: 'dragDropResult',
+                  value: dragDropData
+                }, (setResponse) => {
+                  if (setResponse && setResponse.success) {
+                    console.log('Drag-drop result stored in session storage')
+                  } else {
+                    console.error('Failed to store drag-drop result:', setResponse?.error)
+                  }
+                })
+              } else {
+                console.warn('No saved state found, cannot store drag-drop result')
+              }
+            } else {
+              console.error('Failed to get saved state:', response?.error)
+            }
+          })
+        } catch (e) {
+          console.error('Error communicating with background script:', e)
+        }
+        
+        // Also try sending message in case popup is open
+        try {
+          chrome.runtime.sendMessage({
+            type: 'DRAG_DROP_COMPLETE',
+            ...result
+          })
+        } catch (e) {
+          console.log('Popup not available to receive message, result stored in storage')
+        }
+      })
+      sendResponse({ success: true, message: 'Drag-drop picker started' })
+    } catch (error) {
+      console.error('Error starting drag-drop picker:', error)
+      sendResponse({ success: false, error: error.message })
+    }
+    return true
+  } else if (message.type === "CANCEL_DRAG_DROP_PICKER") {
+    console.log('Canceling drag-drop picker from global listener')
+    dragDropPicker.stop()
+    sendResponse({ success: true })
   }
   
   // Return false to allow other listeners to handle the message
   return false
   })
-  console.log('✅ ABsmartly Extension: Message listener added successfully!')
 } catch (error) {
   console.error('❌ ABsmartly Extension: Failed to add message listener:', error)
 }

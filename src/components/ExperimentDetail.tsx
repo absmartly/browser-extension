@@ -100,8 +100,36 @@ export function ExperimentDetail({
           data[variantKey] = parseVariantConfig(variant, variantKey)
         })
         
-        console.log('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
-        setVariantData(data)
+        // Load saved DOM changes from storage
+        const storageKey = `experiment-${currentExperimentId}-variants`
+        console.log('🔍 Checking storage for key:', storageKey)
+        
+        storage.get(storageKey).then(savedData => {
+          console.log('🔍 Raw storage result:', savedData)
+          
+          if (savedData) {
+            console.log('📦 Found saved variant data in storage:', savedData)
+            // Merge saved DOM changes with parsed config
+            Object.keys(savedData).forEach(key => {
+              if (data[key] && savedData[key].dom_changes) {
+                // Use saved DOM changes as source of truth (they're the latest user edits)
+                data[key].dom_changes = savedData[key].dom_changes
+                console.log(`Applied saved DOM changes for variant ${key}:`, savedData[key].dom_changes)
+              }
+              // Also preserve variables if they were edited
+              if (data[key] && savedData[key].variables) {
+                // Merge variables, preferring saved ones
+                data[key].variables = { ...data[key].variables, ...savedData[key].variables }
+              }
+            })
+          }
+          console.log('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
+          setVariantData(data)
+        }).catch(error => {
+          console.error('Failed to load saved variant data:', error)
+          console.log('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
+          setVariantData(data)
+        })
       } else {
         console.log('⚠️ New experiment has no variants yet')
       }
@@ -116,8 +144,32 @@ export function ExperimentDetail({
           data[variantKey] = parseVariantConfig(variant, variantKey)
         })
         
-        console.log('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
-        setVariantData(data)
+        // Load saved DOM changes from storage
+        const storageKey = `experiment-${currentExperimentId}-variants`
+        storage.get(storageKey).then(savedData => {
+          if (savedData) {
+            console.log('📦 Found saved variant data in storage (same experiment):', savedData)
+            // Merge saved DOM changes with parsed config
+            Object.keys(savedData).forEach(key => {
+              if (data[key] && savedData[key].dom_changes) {
+                // Use saved DOM changes as source of truth (they're the latest user edits)
+                data[key].dom_changes = savedData[key].dom_changes
+                console.log(`Applied saved DOM changes for variant ${key}:`, savedData[key].dom_changes)
+              }
+              // Also preserve variables if they were edited
+              if (data[key] && savedData[key].variables) {
+                // Merge variables, preferring saved ones
+                data[key].variables = { ...data[key].variables, ...savedData[key].variables }
+              }
+            })
+          }
+          console.log('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
+          setVariantData(data)
+        }).catch(error => {
+          console.error('Failed to load saved variant data:', error)
+          console.log('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
+          setVariantData(data)
+        })
       } else if (currentVariants.length > 0) {
         // Update existing variant data while preserving user edits
         setVariantData(prev => {
@@ -128,8 +180,18 @@ export function ExperimentDetail({
             const variantKey = variant.name || `Variant ${variant.variant}`
             
             // Only update if we don't have this variant yet, or if the config has changed
-            if (!updated[variantKey] || shouldUpdateVariantConfig(variant, updated[variantKey])) {
+            if (!updated[variantKey]) {
+              // New variant, parse it
               updated[variantKey] = parseVariantConfig(variant, variantKey)
+              hasChanges = true
+            } else if (shouldUpdateVariantConfig(variant, updated[variantKey])) {
+              // Update variant but preserve DOM changes if any
+              const parsedConfig = parseVariantConfig(variant, variantKey)
+              // Keep existing DOM changes if we have any
+              if (updated[variantKey].dom_changes && updated[variantKey].dom_changes.length > 0) {
+                parsedConfig.dom_changes = updated[variantKey].dom_changes
+              }
+              updated[variantKey] = parsedConfig
               hasChanges = true
             }
           })
@@ -247,7 +309,12 @@ export function ExperimentDetail({
   }
 
   const handleDOMChangesUpdate = (variantName: string, changes: DOMChange[]) => {
+    console.log('🔄 handleDOMChangesUpdate called:', { variantName, changes })
+    console.log('🔄 Current experiment ID:', experiment.id)
+    
     setVariantData(prev => {
+      console.log('🔄 Previous variant data:', prev)
+      
       const updated = {
         ...prev,
         [variantName]: {
@@ -256,10 +323,16 @@ export function ExperimentDetail({
         }
       }
       
+      console.log('🔄 Updated variant data:', updated)
+      
       // Save to storage
       const storageKey = `experiment-${experiment.id}-variants`
-      storage.set(storageKey, updated).catch(error => {
-        console.error('Failed to save variant data:', error)
+      console.log('🔄 Saving to storage with key:', storageKey)
+      
+      storage.set(storageKey, updated).then(() => {
+        console.log('✅ Successfully saved variant data to storage')
+      }).catch(error => {
+        console.error('❌ Failed to save variant data:', error)
       })
       
       return updated

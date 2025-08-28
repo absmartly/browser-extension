@@ -71,14 +71,24 @@ export function DOMChangesInlineEditor({
   const [editingChange, setEditingChange] = useState<EditingDOMChange | null>(null)
   const [pickingForField, setPickingForField] = useState<string | null>(null)
 
+  // Debug editingChange state changes
+  useEffect(() => {
+    console.log('🔄 editingChange state updated:', editingChange)
+  }, [editingChange])
+
   // Restore state when component mounts
   useEffect(() => {
     const storage = new Storage({ area: "session" })
     
     // First restore the editing state
     storage.get('domChangesInlineState').then(async (result) => {
+      console.log('Checking for saved DOM Changes inline state, variantName:', variantName)
+      console.log('Retrieved state:', result)
+      
       if (result && result.variantName === variantName) {
         console.log('Restoring DOM Changes inline state:', result)
+        console.log('Was in dragDropMode?', result.dragDropMode)
+        
         setEditingChange(result.editingChange)
         setPickingForField(result.pickingForField)
         
@@ -98,8 +108,54 @@ export function DOMChangesInlineEditor({
           storage.remove('elementPickerResult')
         }
         
-        // Clear the inline state after using it
-        storage.remove('domChangesInlineState')
+        // Check for drag-drop result
+        const dragDropResult = await storage.get('dragDropResult')
+        console.log('Checking for drag-drop result:', dragDropResult)
+        console.log('Current editingChange from state:', result.editingChange)
+        
+        if (dragDropResult && dragDropResult.variantName === variantName) {
+          console.log('Applying drag-drop result:', dragDropResult)
+          console.log('Variant names match:', dragDropResult.variantName, '===', variantName)
+          
+          if (result.editingChange) {
+            const updatedChange = { 
+              ...result.editingChange, 
+              selector: dragDropResult.selector,  // Add the source selector
+              targetSelector: dragDropResult.targetSelector,
+              position: dragDropResult.position 
+            }
+            console.log('Updated editingChange with drag-drop result:', updatedChange)
+            console.log('Setting editingChange state to:', updatedChange)
+            setEditingChange(updatedChange)
+            
+            // Force a re-render by updating a dummy state
+            setTimeout(() => {
+              console.log('🔄 Force checking editingChange after setEditingChange:', editingChange)
+              setEditingChange(prev => {
+                console.log('🔄 Previous editingChange in setState:', prev)
+                return updatedChange
+              })
+            }, 100)
+          } else {
+            console.warn('No editingChange found in restored state, cannot apply drag-drop result')
+          }
+          
+          // Clear the drag-drop result
+          await storage.remove('dragDropResult')
+          console.log('Cleared dragDropResult from storage')
+        } else {
+          console.log('Drag-drop result not applicable:', 
+            'variantName match:', dragDropResult?.variantName === variantName,
+            'dragDropResult exists:', !!dragDropResult)
+        }
+        
+        // Only clear the inline state if we're not waiting for drag-drop
+        if (!result.dragDropMode || dragDropResult) {
+          console.log('Clearing domChangesInlineState')
+          storage.remove('domChangesInlineState')
+        } else {
+          console.log('Keeping domChangesInlineState for drag-drop completion')
+        }
       }
     })
   }, [variantName])
@@ -137,6 +193,100 @@ export function DOMChangesInlineEditor({
       }
     }
   }, [pickingForField, editingChange, variantName])
+
+  // Listen for drag-drop complete from content script
+  useEffect(() => {
+    console.log('📡 Setting up drag-drop listener for variant:', variantName)
+    
+    const handleDragDropComplete = async (message: any) => {
+      console.log('📡 Received message in DOMChangesInlineEditor:', message)
+      
+      if (message.type === 'DRAG_DROP_COMPLETE') {
+        console.log('Drag-drop complete message received:', message)
+        
+        // Store result in session storage
+        const storage = new Storage({ area: "session" })
+        const dragDropData = {
+          variantName,
+          selector: message.selector,
+          targetSelector: message.targetSelector,
+          position: message.position
+        }
+        console.log('Storing drag-drop result:', dragDropData)
+        
+        await storage.set('dragDropResult', dragDropData)
+        
+        // Verify it was stored
+        const verification = await storage.get('dragDropResult')
+        console.log('Verification - drag-drop result stored:', verification)
+      }
+    }
+    
+    chrome.runtime.onMessage.addListener(handleDragDropComplete)
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleDragDropComplete)
+    }
+  }, [variantName])
+
+  const handleStartDragDrop = async () => {
+    console.log('Starting drag-drop picker')
+    
+    // Ensure we have an editingChange for move type
+    const changeToSave = editingChange || {
+      type: 'move',
+      selector: '',
+      targetSelector: '',
+      position: 'after' as const,
+      index: null
+    }
+    
+    console.log('Saving state before drag-drop:', { variantName, editingChange: changeToSave })
+    
+    // Save current state before starting
+    const storage = new Storage({ area: "session" })
+    const stateToSave = {
+      variantName,
+      editingChange: changeToSave,
+      dragDropMode: true
+    }
+    
+    console.log('💾 Saving state for drag-drop:', stateToSave)
+    await storage.set('domChangesInlineState', stateToSave)
+    
+    // Start drag-drop picker
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      if (tabs[0]?.id) {
+        const tabId = tabs[0].id
+        const tabUrl = tabs[0].url || 'unknown'
+        
+        // Check if this is a restricted page
+        if (tabUrl.startsWith('chrome://') || 
+            tabUrl.startsWith('chrome-extension://') || 
+            tabUrl.startsWith('edge://') ||
+            tabUrl.includes('chrome.google.com/webstore')) {
+          console.error('Content scripts cannot run on this page.')
+          return
+        }
+        
+        // Send message to start drag-drop picker
+        chrome.tabs.sendMessage(tabId, { 
+          type: 'START_DRAG_DROP_PICKER',
+          fromPopup: true
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Error starting drag-drop picker:', chrome.runtime.lastError)
+          } else {
+            console.log('Drag-drop picker started successfully:', response)
+          }
+        })
+        
+        // Close popup to allow drag-drop interaction
+        setTimeout(() => {
+          window.close()
+        }, 100)
+      }
+    })
+  }
 
   const handleStartElementPicker = async (fieldId: string) => {
     console.log('Starting element picker for field:', fieldId)
@@ -221,7 +371,9 @@ export function DOMChangesInlineEditor({
   }
 
   const handleAddChange = () => {
-    setEditingChange(createEmptyChange())
+    const newChange = createEmptyChange()
+    console.log('🆕 Creating new DOM change:', newChange)
+    setEditingChange(newChange)
   }
 
   const handleEditChange = (index: number) => {
@@ -258,6 +410,9 @@ export function DOMChangesInlineEditor({
   }
 
   const handleSaveChange = () => {
+    console.log('💾 Saving change, editingChange:', editingChange)
+    console.log('💾 Current changes array:', changes)
+    
     if (!editingChange || !editingChange.selector) {
       alert('Please enter a selector')
       return
@@ -339,9 +494,12 @@ export function DOMChangesInlineEditor({
     if (editingChange.index !== null) {
       const newChanges = [...changes]
       newChanges[editingChange.index] = domChange
+      console.log('💾 Updating existing change at index', editingChange.index, 'newChanges:', newChanges)
       onChange(newChanges)
     } else {
-      onChange([...changes, domChange])
+      const newChanges = [...changes, domChange]
+      console.log('💾 Adding new change to array, newChanges:', newChanges)
+      onChange(newChanges)
     }
     
     setEditingChange(null)
@@ -666,7 +824,13 @@ export function DOMChangesInlineEditor({
             </label>
             <select
               value={editingChange.type}
-              onChange={(e) => setEditingChange({ ...editingChange, type: e.target.value as DOMChangeType })}
+              onChange={(e) => {
+                const newType = e.target.value as DOMChangeType
+                console.log('📝 Changing type to:', newType)
+                const updatedChange = { ...editingChange, type: newType }
+                console.log('📝 Updated editingChange:', updatedChange)
+                setEditingChange(updatedChange)
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             >
               <option value="text">Text</option>
@@ -838,52 +1002,91 @@ export function DOMChangesInlineEditor({
           )}
 
           {editingChange.type === 'move' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Element
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    value={editingChange.targetSelector || ''}
-                    onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
-                    placeholder=".container, #section, [data-role='main']"
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => handleStartElementPicker('targetSelector')}
-                    size="sm"
-                    variant="secondary"
-                    title="Pick target element"
-                  >
-                    🎯
-                  </Button>
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🎯</span>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 mb-1">Drag & Drop Mode</h4>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Click the button below to enter drag-and-drop mode. You'll be able to click and drag any element to a new position.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={handleStartDragDrop}
+                      size="sm"
+                      variant="primary"
+                      className="w-full"
+                    >
+                      🖱️ Start Drag & Drop
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select where to move the element
-                </p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Position
-                </label>
-                <select
-                  value={editingChange.position || 'after'}
-                  onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  <option value="before">Before target element</option>
-                  <option value="after">After target element</option>
-                  <option value="firstChild">As first child of target</option>
-                  <option value="lastChild">As last child of target</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Choose how to position relative to the target
-                </p>
-              </div>
-            </>
+              
+              {/* Show captured values if we have them */}
+              {(editingChange.selector || editingChange.targetSelector || editingChange.position) && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700">Element to Move:</span>{' '}
+                    <code className="text-xs bg-white px-1 py-0.5 rounded">
+                      {editingChange.selector || 'Not set'}
+                    </code>
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700">Target:</span>{' '}
+                    <code className="text-xs bg-white px-1 py-0.5 rounded">
+                      {editingChange.targetSelector || 'Not set'}
+                    </code>
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700">Position:</span>{' '}
+                    <span className="text-gray-600">
+                      {editingChange.position === 'before' ? 'Before element' :
+                       editingChange.position === 'after' ? 'After element' :
+                       editingChange.position === 'firstChild' ? 'As first child' :
+                       editingChange.position === 'lastChild' ? 'As last child' :
+                       'Not set'}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Manual input as fallback */}
+              <details className="text-sm">
+                <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                  Manual input (advanced)
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Target Selector
+                    </label>
+                    <Input
+                      value={editingChange.targetSelector || ''}
+                      onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
+                      placeholder=".container, #section, [data-role='main']"
+                      className="text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Position
+                    </label>
+                    <select
+                      value={editingChange.position || 'after'}
+                      onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="before">Before target element</option>
+                      <option value="after">After target element</option>
+                      <option value="firstChild">As first child of target</option>
+                      <option value="lastChild">As last child of target</option>
+                    </select>
+                  </div>
+                </div>
+              </details>
+            </div>
           )}
         </div>
       )}

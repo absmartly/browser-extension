@@ -5,6 +5,31 @@ import type { ABsmartlyConfig } from '~src/types/absmartly'
 // Storage instance
 const storage = new Storage()
 
+// Handle storage operations from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'STORAGE_GET') {
+    const sessionStorage = new Storage({ area: "session" })
+    sessionStorage.get(message.key).then(value => {
+      console.log('[Background] Storage GET:', message.key, '=', value)
+      sendResponse({ success: true, value })
+    }).catch(error => {
+      console.error('[Background] Storage GET error:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+    return true // Keep the message channel open for async response
+  } else if (message.type === 'STORAGE_SET') {
+    const sessionStorage = new Storage({ area: "session" })
+    sessionStorage.set(message.key, message.value).then(() => {
+      console.log('[Background] Storage SET:', message.key, '=', message.value)
+      sendResponse({ success: true })
+    }).catch(error => {
+      console.error('[Background] Storage SET error:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+    return true // Keep the message channel open for async response
+  }
+})
+
 // Initialize config with environment variables on startup
 async function initializeConfig() {
   console.log('[Background] Initializing config...')
