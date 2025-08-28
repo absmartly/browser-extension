@@ -224,8 +224,8 @@ try {
   console.error('❌ ABsmartly Extension: Failed to add message listener:', error)
 }
 
-// Visual Editor Component
-function VisualEditor() {
+// Visual Editor React Component (OLD - NOT USED)
+function VisualEditorReactComponent() {
   const [state, setState] = useState<EditorState>({
     isActive: false,
     selectedElement: null,
@@ -731,7 +731,7 @@ const mount = () => {
   document.body.appendChild(container)
   
   const root = createRoot(container)
-  root.render(<VisualEditor />)
+  root.render(<VisualEditorReactComponent />)
 }
 
 // Log to confirm content script is loaded
@@ -759,6 +759,6 @@ if (document.readyState === "loading") {
 }
 
 // Export for Plasmo
-export default VisualEditor
+export default VisualEditorReactComponent
 
 // The element picker is handled in the main message listener above
