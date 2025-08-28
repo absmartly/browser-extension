@@ -77,3 +77,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 console.log('[Visual Editor Content Script] Loaded and listening for messages')
+
+// Also log to the page directly to ensure we can see it
+const debugDiv = document.createElement('div')
+debugDiv.id = 'absmartly-debug-content-loaded'
+debugDiv.style.display = 'none'
+debugDiv.textContent = 'ABSmartly Content Script Loaded at ' + new Date().toISOString()
+document.documentElement.appendChild(debugDiv)
+
+// Expose a global function for testing
+;(window as any).__absmartlyContentLoaded = true

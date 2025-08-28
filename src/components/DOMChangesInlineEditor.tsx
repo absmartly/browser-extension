@@ -310,14 +310,16 @@ export function DOMChangesInlineEditor({
           return
         }
         
-        // Send message to start visual editor
-        chrome.tabs.sendMessage(tabId, { 
+        // Send message to background script to start visual editor
+        chrome.runtime.sendMessage({ 
           type: 'START_VISUAL_EDITOR',
           variantName,
           changes
         }, (response) => {
           if (chrome.runtime.lastError) {
             console.error('Error starting visual editor:', chrome.runtime.lastError)
+          } else if (response?.error) {
+            console.error('Error starting visual editor:', response.error)
           } else {
             console.log('Visual editor started successfully:', response)
           }
