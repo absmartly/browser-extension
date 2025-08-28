@@ -157,6 +157,36 @@ export function DOMChangesInlineEditor({
           console.log('Keeping domChangesInlineState for drag-drop completion')
         }
       }
+      
+      // Also check for visual editor changes
+      const visualEditorResult = await storage.get('visualEditorChanges')
+      console.log('💾 visualEditorChanges:', visualEditorResult)
+      if (visualEditorResult && visualEditorResult.variantName === variantName) {
+        console.log('Found visual editor changes for this variant!')
+        if (visualEditorResult.changes && visualEditorResult.changes.length > 0) {
+          // Merge visual editor changes with existing changes
+          setChanges(prevChanges => {
+            const merged = [...prevChanges]
+            for (const change of visualEditorResult.changes) {
+              // Check if this change already exists
+              const existingIndex = merged.findIndex(c => 
+                c.type === change.type && c.selector === change.selector
+              )
+              if (existingIndex >= 0) {
+                // Update existing change
+                merged[existingIndex] = change
+              } else {
+                // Add new change
+                merged.push(change)
+              }
+            }
+            return merged
+          })
+          
+          // Clear visual editor changes after using them
+          storage.remove('visualEditorChanges')
+        }
+      }
     })
   }, [variantName])
 
@@ -227,6 +257,79 @@ export function DOMChangesInlineEditor({
       chrome.runtime.onMessage.removeListener(handleDragDropComplete)
     }
   }, [variantName])
+
+  // Listen for visual editor changes
+  useEffect(() => {
+    const handleVisualEditorChanges = async (message: any) => {
+      if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
+        console.log('Visual editor changes received:', message.changes)
+        
+        // Update local changes state with visual editor changes
+        if (message.changes && message.changes.length > 0) {
+          setChanges(message.changes)
+          
+          // Store in session storage for persistence
+          const storage = new Storage({ area: "session" })
+          await storage.set('visualEditorChanges', {
+            variantName,
+            changes: message.changes
+          })
+        }
+      }
+    }
+    
+    chrome.runtime.onMessage.addListener(handleVisualEditorChanges)
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
+    }
+  }, [variantName])
+
+  const handleLaunchVisualEditor = async () => {
+    console.log('🎨 Launching Visual Editor')
+    
+    // Save current state
+    const storage = new Storage({ area: "session" })
+    await storage.set('visualEditorState', {
+      variantName,
+      changes,
+      active: true
+    })
+    
+    // Send message to content script to start visual editor
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      if (tabs[0]?.id) {
+        const tabId = tabs[0].id
+        const tabUrl = tabs[0].url || 'unknown'
+        
+        // Check if this is a restricted page
+        if (tabUrl.startsWith('chrome://') || 
+            tabUrl.startsWith('chrome-extension://') || 
+            tabUrl.startsWith('edge://') ||
+            tabUrl.includes('chrome.google.com/webstore')) {
+          console.error('Content scripts cannot run on this page.')
+          return
+        }
+        
+        // Send message to start visual editor
+        chrome.tabs.sendMessage(tabId, { 
+          type: 'START_VISUAL_EDITOR',
+          variantName,
+          changes
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Error starting visual editor:', chrome.runtime.lastError)
+          } else {
+            console.log('Visual editor started successfully:', response)
+          }
+        })
+        
+        // Close popup after a short delay
+        setTimeout(() => {
+          window.close()
+        }, 100)
+      }
+    })
+  }
 
   const handleStartDragDrop = async () => {
     console.log('Starting drag-drop picker')
@@ -666,15 +769,26 @@ export function DOMChangesInlineEditor({
           <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
             <CursorArrowRaysIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
             <p className="text-sm text-gray-500 mb-3">No DOM changes configured</p>
-            <Button
-              onClick={handleAddChange}
-              size="sm"
-              variant="secondary"
-              className="inline-flex items-center gap-1"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add DOM Change
-            </Button>
+            <div className="flex gap-2 justify-center">
+              <Button
+                onClick={handleAddChange}
+                size="sm"
+                variant="secondary"
+                className="inline-flex items-center gap-1"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add DOM Change
+              </Button>
+              <Button
+                onClick={handleLaunchVisualEditor}
+                size="sm"
+                variant="primary"
+                className="inline-flex items-center gap-1"
+              >
+                <PaintBrushIcon className="h-4 w-4" />
+                Visual Editor
+              </Button>
+            </div>
           </div>
         ) : (
           <>
