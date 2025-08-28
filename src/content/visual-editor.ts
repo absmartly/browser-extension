@@ -51,6 +51,14 @@ export class VisualEditor {
     this.options.onChangesUpdate(this.changes)
   }
   
+  destroy() {
+    this.stop()
+  }
+  
+  getChanges() {
+    return this.changes
+  }
+  
   private injectStyles() {
     const style = document.createElement('style')
     style.id = 'absmartly-visual-editor-styles'
@@ -844,5 +852,109 @@ export class VisualEditor {
            element.closest('.absmartly-context-menu') !== null ||
            element.closest('.absmartly-notification') !== null ||
            element.closest('.absmartly-color-picker') !== null
+  }
+  
+  private makeElementsEditable() {
+    // Add visual indicators to elements
+    const allElements = document.querySelectorAll('body *')
+    allElements.forEach(el => {
+      const element = el as HTMLElement
+      if (!this.isExtensionElement(element)) {
+        element.classList.add('absmartly-editable')
+      }
+    })
+  }
+  
+  private makeElementsNonEditable() {
+    // Remove visual indicators
+    document.querySelectorAll('.absmartly-editable').forEach(el => {
+      el.classList.remove('absmartly-editable')
+    })
+    document.querySelectorAll('.absmartly-selected').forEach(el => {
+      el.classList.remove('absmartly-selected')
+    })
+    document.querySelectorAll('.absmartly-editing').forEach(el => {
+      el.classList.remove('absmartly-editing')
+    })
+  }
+  
+  private startMutationObserver() {
+    this.mutationObserver = new MutationObserver((mutations) => {
+      if (this.isInternalChange) return
+      
+      mutations.forEach(mutation => {
+        if (mutation.type === 'characterData' || mutation.type === 'childList') {
+          const target = mutation.target as HTMLElement
+          if (!this.isExtensionElement(target) && target.nodeType === Node.ELEMENT_NODE) {
+            // Track the change
+            this.trackChange(target, 'modify')
+          }
+        } else if (mutation.type === 'attributes') {
+          const target = mutation.target as HTMLElement
+          if (!this.isExtensionElement(target)) {
+            const attrName = mutation.attributeName
+            if (attrName === 'style' || attrName === 'class') {
+              this.trackChange(target, 'style')
+            }
+          }
+        }
+      })
+    })
+    
+    this.mutationObserver.observe(document.body, {
+      childList: true,
+      attributes: true,
+      characterData: true,
+      subtree: true,
+      attributeOldValue: true,
+      characterDataOldValue: true
+    })
+  }
+  
+  private stopMutationObserver() {
+    this.mutationObserver?.disconnect()
+    this.mutationObserver = null
+  }
+  
+  private trackChange(element: HTMLElement, type: string) {
+    const selector = this.getSelector(element)
+    const existingIndex = this.changes.findIndex(c => c.selector === selector)
+    
+    const change: DOMChange = {
+      selector,
+      type: type as any,
+      value: this.getElementValue(element, type),
+      timestamp: Date.now()
+    }
+    
+    if (existingIndex >= 0) {
+      this.changes[existingIndex] = change
+    } else {
+      this.changes.push(change)
+    }
+    
+    this.updateToolbar()
+    this.options.onChangesUpdate(this.changes)
+  }
+  
+  private getElementValue(element: HTMLElement, type: string): any {
+    switch (type) {
+      case 'text':
+      case 'modify':
+        return element.textContent
+      case 'style':
+        return {
+          background: element.style.backgroundColor || window.getComputedStyle(element).backgroundColor,
+          color: element.style.color || window.getComputedStyle(element).color,
+          fontSize: element.style.fontSize || window.getComputedStyle(element).fontSize,
+          display: element.style.display || window.getComputedStyle(element).display
+        }
+      case 'hide':
+        return { display: 'none' }
+      case 'delete':
+        return null
+      default:
+        return element.outerHTML
+    }
   }
 }

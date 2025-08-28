@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Click Test for ABsmartly Extension Debug</title>
+    <style>
+        .test-button {
+            padding: 8px 16px;
+            margin: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #f5f5f5;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background: #e5e5e5;
+        }
+        .active {
+            background: #3b82f6;
+            color: white;
+        }
+        .container {
+            max-width: 400px;
+            margin: 20px auto;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>ABsmartly Extension Click Test</h2>
+        <p>This simulates the filter button structure to test if basic clicking works.</p>
+        
+        <div id="filter-toggle-container">
+            <h3>Filter Toggle Test:</h3>
+            <button id="toggle-btn" class="test-button">🔽 Toggle Filters</button>
+        </div>
+        
+        <div id="filters-container" style="display: none; margin-top: 20px;">
+            <h3>State Filters Test:</h3>
+            <div>
+                <button class="test-button filter-btn" data-value="created">Draft</button>
+                <button class="test-button filter-btn" data-value="ready">Ready</button>
+                <button class="test-button filter-btn" data-value="running">Running</button>
+                <button class="test-button filter-btn" data-value="development">Development</button>
+            </div>
+        </div>
+        
+        <div id="log-container" style="margin-top: 20px;">
+            <h3>Event Log:</h3>
+            <div id="log" style="background: #f0f0f0; padding: 10px; min-height: 100px; font-family: monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        // Toggle functionality
+        document.getElementById('toggle-btn').addEventListener('click', function(e) {
+            log('🟢 Toggle button clicked');
+            const filtersContainer = document.getElementById('filters-container');
+            const isVisible = filtersContainer.style.display !== 'none';
+            filtersContainer.style.display = isVisible ? 'none' : 'block';
+            this.textContent = isVisible ? '🔽 Toggle Filters' : '🔼 Hide Filters';
+        });
+        
+        // Filter button functionality
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const value = this.dataset.value;
+                log(`🟡 Filter button clicked: ${value}`);
+                this.classList.toggle('active');
+                
+                // Simulate the alert that should appear in the extension
+                alert(`🎯 Filter clicked: state = ${value}`);
+            });
+            
+            btn.addEventListener('mousedown', function(e) {
+                log(`🟡 Mouse down on: ${this.dataset.value}`);
+            });
+            
+            btn.addEventListener('mouseup', function(e) {
+                log(`🟡 Mouse up on: ${this.dataset.value}`);
+            });
+        });
+        
+        log('Click test page loaded. Try clicking the buttons above.');
+        log('This simulates the exact same structure as the ABsmartly extension filters.');
+    </script>
+</body>
+</html>

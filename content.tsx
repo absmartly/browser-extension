@@ -160,40 +160,44 @@ try {
         visualEditor.destroy()
       }
       
-      // Create new visual editor instance
-      visualEditor = new VisualEditor((changes) => {
-        console.log('Visual editor changes:', changes)
-        
-        // Store the changes via background script
-        chrome.runtime.sendMessage({ 
-          type: 'STORAGE_SET', 
-          key: 'visualEditorChanges',
-          value: {
-            variantName: message.variantName,
-            changes: changes
-          }
-        }, (setResponse) => {
-          if (setResponse && setResponse.success) {
-            console.log('Visual editor changes stored')
-          } else {
-            console.error('Failed to store visual editor changes:', setResponse?.error)
-          }
-        })
-        
-        // Also send to popup if it's open
-        try {
-          chrome.runtime.sendMessage({
-            type: 'VISUAL_EDITOR_CHANGES',
-            variantName: message.variantName,
-            changes: changes
+      // Create new visual editor instance with proper options
+      visualEditor = new VisualEditor({
+        variantName: message.variantName,
+        initialChanges: message.changes || [],
+        onChangesUpdate: (changes) => {
+          console.log('Visual editor changes:', changes)
+          
+          // Store the changes via background script
+          chrome.runtime.sendMessage({ 
+            type: 'STORAGE_SET', 
+            key: 'visualEditorChanges',
+            value: {
+              variantName: message.variantName,
+              changes: changes
+            }
+          }, (setResponse) => {
+            if (setResponse && setResponse.success) {
+              console.log('Visual editor changes stored')
+            } else {
+              console.error('Failed to store visual editor changes:', setResponse?.error)
+            }
           })
-        } catch (e) {
-          console.log('Popup not available to receive changes')
+          
+          // Also send to popup if it's open
+          try {
+            chrome.runtime.sendMessage({
+              type: 'VISUAL_EDITOR_CHANGES',
+              variantName: message.variantName,
+              changes: changes
+            })
+          } catch (e) {
+            console.log('Popup not available to receive changes')
+          }
         }
       })
       
-      // Start the visual editor with existing changes if any
-      visualEditor.start(message.changes || [])
+      // Start the visual editor
+      visualEditor.start()
       sendResponse({ success: true, message: 'Visual editor started' })
     } catch (error) {
       console.error('Error starting visual editor:', error)
