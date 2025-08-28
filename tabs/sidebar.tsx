@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react"
+import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
-
-const storage = new Storage()
 import ExtensionUI from "../src/components/ExtensionUI"
 import "../style.css"
+
+const storage = new Storage()
 
 // This script will be injected programmatically by the background script
 console.log('🔵 ABSmartly Extension: Sidebar script loaded')
@@ -213,13 +214,9 @@ function mountSidebar() {
   const reactContainer = document.createElement('div')
   shadowRoot.appendChild(reactContainer)
   
-  // Import React and ReactDOM
-  const React = require('react')
-  const ReactDOM = require('react-dom/client')
-  
   // Mount React app
-  const root = ReactDOM.createRoot(reactContainer)
-  root.render(React.createElement(ABSmartlySidebar))
+  const root = createRoot(reactContainer)
+  root.render(<ABSmartlySidebar />)
   
   console.log('🔵 ABSmartly Extension: Sidebar mounted successfully')
 }
