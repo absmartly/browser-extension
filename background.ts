@@ -620,34 +620,77 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 })
 
+// Track which tabs have the sidebar injected
+const injectedTabs = new Set<number>()
+
 // Handle extension icon clicks
 chrome.action.onClicked.addListener(async (tab) => {
   console.log('[Background] Extension icon clicked for tab:', tab.id)
   
-  if (tab.id) {
-    // Send message to content script to toggle sidebar
-    chrome.tabs.sendMessage(tab.id, { 
-      type: "TOGGLE_SIDEBAR" 
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('[Background] Error sending message:', chrome.runtime.lastError)
-        
-        // Content script might not be loaded yet, inject it
-        chrome.scripting.executeScript({
+  if (tab.id && tab.url) {
+    // Don't inject on chrome:// or other restricted URLs
+    if (tab.url.startsWith('chrome://') || 
+        tab.url.startsWith('edge://') || 
+        tab.url.startsWith('about:') ||
+        tab.url.startsWith('chrome-extension://')) {
+      console.log('[Background] Cannot inject sidebar on restricted URL:', tab.url)
+      return
+    }
+    
+    // Check if we've already injected the sidebar in this tab
+    if (!injectedTabs.has(tab.id)) {
+      console.log('[Background] Injecting sidebar for first time in tab:', tab.id)
+      
+      try {
+        // Inject the sidebar CSS first
+        await chrome.scripting.insertCSS({
           target: { tabId: tab.id },
-          files: ['content.js']
-        }).then(() => {
-          // Try sending message again after injection
-          setTimeout(() => {
-            chrome.tabs.sendMessage(tab.id, { 
-              type: "TOGGLE_SIDEBAR" 
-            })
-          }, 100)
-        }).catch(err => {
-          console.error('[Background] Failed to inject content script:', err)
+          files: ['tabs/sidebar.850787d0.css']
         })
+        
+        // Then inject the sidebar script
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['tabs/sidebar.e865c912.js']
+        })
+        
+        // Mark this tab as having the sidebar injected
+        injectedTabs.add(tab.id)
+        
+        // Wait a bit for the script to initialize
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tab.id!, { 
+            type: "TOGGLE_SIDEBAR" 
+          })
+        }, 100)
+      } catch (error) {
+        console.error('[Background] Failed to inject sidebar:', error)
       }
-    })
+    } else {
+      // Sidebar already injected, just toggle it
+      console.log('[Background] Toggling existing sidebar in tab:', tab.id)
+      chrome.tabs.sendMessage(tab.id, { 
+        type: "TOGGLE_SIDEBAR" 
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] Error toggling sidebar:', chrome.runtime.lastError)
+          // Tab might have been reloaded, remove from injected set
+          injectedTabs.delete(tab.id)
+        }
+      })
+    }
+  }
+})
+
+// Clean up when tabs are closed or navigated
+chrome.tabs.onRemoved.addListener((tabId) => {
+  injectedTabs.delete(tabId)
+})
+
+// Clean up when tab navigates to a new page
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'loading') {
+    injectedTabs.delete(tabId)
   }
 })
 

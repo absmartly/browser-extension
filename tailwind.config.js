@@ -4,7 +4,7 @@ module.exports = {
   darkMode: "class",
   content: [
     "./src/components/ExtensionUI.tsx",
-    "./content.tsx",
+    "./tabs/sidebar.tsx",
     "./src/**/*.{ts,tsx}"
   ],
   plugins: []
