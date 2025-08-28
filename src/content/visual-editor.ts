@@ -10,12 +10,14 @@ export class VisualEditor {
   private isActive = false
   private selectedElement: HTMLElement | null = null
   private contextMenu: HTMLElement | null = null
-  private toolbar: HTMLElement | null = null
+  private sidebar: HTMLElement | null = null
+  private sidebarToggle: HTMLElement | null = null
   private changes: DOMChange[] = []
   private originalValues = new Map<HTMLElement, any>()
   private options: VisualEditorOptions
   private mutationObserver: MutationObserver | null = null
   private isInternalChange = false
+  private sidebarVisible = true
   
   constructor(options: VisualEditorOptions) {
     this.options = options
