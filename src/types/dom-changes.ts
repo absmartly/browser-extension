@@ -1,4 +1,4 @@
-export type DOMChangeType = 'text' | 'style' | 'class' | 'attribute' | 'html' | 'javascript';
+export type DOMChangeType = 'text' | 'style' | 'class' | 'attribute' | 'html' | 'javascript' | 'move';
 
 export interface DOMChangeStyle {
   selector: string;
@@ -43,13 +43,22 @@ export interface DOMChangeJavaScript {
   enabled?: boolean;
 }
 
+export interface DOMChangeMove {
+  selector: string;
+  type: 'move';
+  targetSelector: string;
+  position: 'before' | 'after' | 'firstChild' | 'lastChild';
+  enabled?: boolean;
+}
+
 export type DOMChange = 
   | DOMChangeStyle 
   | DOMChangeText 
   | DOMChangeClass 
   | DOMChangeAttribute 
   | DOMChangeHTML 
-  | DOMChangeJavaScript;
+  | DOMChangeJavaScript
+  | DOMChangeMove;
 
 export interface DOMChangeTemplate {
   id: string;

@@ -92,6 +92,37 @@ const bridgeScript = `
             case 'javascript':
               new Function('element', change.value)(element);
               break;
+              
+            case 'move':
+              // Find target element
+              const target = document.querySelector(change.targetSelector);
+              if (target) {
+                switch (change.position) {
+                  case 'before':
+                    target.parentElement?.insertBefore(element, target);
+                    break;
+                  case 'after':
+                    if (target.nextSibling) {
+                      target.parentElement?.insertBefore(element, target.nextSibling);
+                    } else {
+                      target.parentElement?.appendChild(element);
+                    }
+                    break;
+                  case 'firstChild':
+                    if (target.firstChild) {
+                      target.insertBefore(element, target.firstChild);
+                    } else {
+                      target.appendChild(element);
+                    }
+                    break;
+                  case 'lastChild':
+                    target.appendChild(element);
+                    break;
+                }
+              } else {
+                console.warn('Move target not found:', change.targetSelector);
+              }
+              break;
           }
           
           // Mark as modified by extension
@@ -117,6 +148,12 @@ const bridgeScript = `
       case 'attribute':
         // This is simplified - in production, store all attributes
         return { attributes: {} };
+      case 'move':
+        // Store the original parent and next sibling for restoration
+        return {
+          parent: element.parentElement,
+          nextSibling: element.nextElementSibling
+        };
       default:
         return {};
     }
@@ -142,6 +179,17 @@ const bridgeScript = `
             case 'class':
               element.className = '';
               element.classList.add(...changeInfo.originalState.classList);
+              break;
+            case 'move':
+              // Restore element to original position
+              const { parent, nextSibling } = changeInfo.originalState;
+              if (parent) {
+                if (nextSibling) {
+                  parent.insertBefore(element, nextSibling);
+                } else {
+                  parent.appendChild(element);
+                }
+              }
               break;
           }
           
