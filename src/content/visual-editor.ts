@@ -26,6 +26,7 @@ export class VisualEditor {
     if (this.isActive) return
     
     this.isActive = true
+    console.log('Visual Editor: Starting...')
     this.injectStyles()
     this.createToolbar()
     this.setupEventListeners()
@@ -33,7 +34,8 @@ export class VisualEditor {
     this.makeElementsEditable()
     
     // Show notification
-    this.showNotification('Visual Editor Active', 'Click on any element to edit')
+    this.showNotification('Visual Editor Active', 'Hold SHIFT and click to select elements')
+    console.log('Visual Editor: Started successfully')
   }
   
   stop() {
@@ -122,17 +124,32 @@ export class VisualEditor {
         top: 20px !important;
         right: 20px !important;
         background: white !important;
-        border: 1px solid #e5e7eb !important;
+        border: 2px solid #3b82f6 !important;
         border-radius: 12px !important;
         padding: 12px !important;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
         z-index: 999998 !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 8px !important;
         font-family: system-ui, -apple-system, sans-serif !important;
         font-size: 14px !important;
-        max-width: 250px !important;
+        max-width: 320px !important;
+      }
+      
+      .absmartly-toolbar-instructions {
+        background: #eff6ff !important;
+        padding: 10px !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        line-height: 1.6 !important;
+        color: #1e40af !important;
+        border: 1px solid #93c5fd !important;
+      }
+      
+      .absmartly-toolbar-instructions strong {
+        color: #1e3a8a !important;
+        font-weight: 600 !important;
       }
       
       .absmartly-toolbar-header {
@@ -266,6 +283,13 @@ export class VisualEditor {
         <span>Visual Editor</span>
         <span class="absmartly-changes-count">${this.changes.length}</span>
       </div>
+      <div class="absmartly-toolbar-instructions">
+        <strong>How to use:</strong><br>
+        • Hold <strong>SHIFT + Click</strong> to select element<br>
+        • <strong>Right Click</strong> any element for menu<br>
+        • Selected elements have blue outline<br>
+        • Press <strong>ESC</strong> to deselect
+      </div>
       <button class="absmartly-toolbar-button" data-action="undo">↶ Undo Last Change</button>
       <button class="absmartly-toolbar-button" data-action="clear">Clear All Changes</button>
       <button class="absmartly-toolbar-button primary" data-action="save">Save Changes</button>
@@ -327,21 +351,34 @@ export class VisualEditor {
     
     const target = e.target as HTMLElement
     
+    console.log('Visual Editor: Click detected on', target)
+    
     // Ignore clicks on our own UI elements
-    if (this.isExtensionElement(target)) return
+    if (this.isExtensionElement(target)) {
+      console.log('Visual Editor: Ignoring click on extension element')
+      return
+    }
     
     // If clicking outside context menu, close it
     if (this.contextMenu && !this.contextMenu.contains(target)) {
       this.removeContextMenu()
+      // Don't prevent default if just closing context menu
+      if (!e.shiftKey && !e.ctrlKey) {
+        return
+      }
     }
     
     // Don't select during certain operations
     if (target.contentEditable === 'true') return
     
-    e.preventDefault()
-    e.stopPropagation()
-    
-    this.selectElement(target)
+    // Only prevent default if shift or ctrl is held (for selection mode)
+    // or if we're actually going to select an element
+    if (e.shiftKey || e.ctrlKey || !this.contextMenu) {
+      e.preventDefault()
+      e.stopPropagation()
+      this.selectElement(target)
+      console.log('Visual Editor: Element selected', this.getSelector(target))
+    }
   }
   
   private handleContextMenu = (e: MouseEvent) => {
