@@ -620,9 +620,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 })
 
-// Track which tabs have the sidebar injected
-const injectedTabs = new Set<number>()
-
 // Handle extension icon clicks
 chrome.action.onClicked.addListener(async (tab) => {
   console.log('[Background] Extension icon clicked for tab:', tab.id)
@@ -637,20 +634,30 @@ chrome.action.onClicked.addListener(async (tab) => {
       return
     }
     
-    // Check if we've already injected the sidebar in this tab
-    if (!injectedTabs.has(tab.id)) {
-      console.log('[Background] Injecting sidebar for first time in tab:', tab.id)
-      
-      try {
-        // Inject the sidebar using iframe approach
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => {
+    try {
+      // Always execute the script - it will handle toggling if already exists
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
             // Check if sidebar is already injected
-            if (document.getElementById('absmartly-sidebar-root')) {
+            const existingSidebar = document.getElementById('absmartly-sidebar-root') as HTMLElement
+            if (existingSidebar) {
               console.log('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
-              const sidebar = document.getElementById('absmartly-sidebar-root') as HTMLElement
-              sidebar.style.display = sidebar.style.display === 'none' ? 'block' : 'none'
+              // Get current transform to determine actual visibility
+              const currentTransform = existingSidebar.style.transform
+              console.log('Current transform:', currentTransform)
+              
+              // Check if sidebar is currently visible (showing)
+              const isCurrentlyVisible = !currentTransform || currentTransform === 'translateX(0px)' || currentTransform === 'translateX(0%)'
+              
+              // Toggle based on actual current state
+              if (isCurrentlyVisible) {
+                console.log('Hiding sidebar')
+                existingSidebar.style.transform = 'translateX(100%)'
+              } else {
+                console.log('Showing sidebar')
+                existingSidebar.style.transform = 'translateX(0)'
+              }
               return
             }
 
@@ -673,6 +680,8 @@ chrome.action.onClicked.addListener(async (tab) => {
               font-size: 14px;
               line-height: 1.5;
               color: #111827;
+              transform: translateX(0);
+              transition: transform 0.3s ease-in-out;
             `
             
             // Create the iframe for isolation
@@ -692,44 +701,9 @@ chrome.action.onClicked.addListener(async (tab) => {
             console.log('🔵 ABSmartly Extension: Sidebar injected successfully')
           }
         })
-        
-        // Mark this tab as having the sidebar injected
-        injectedTabs.add(tab.id)
-        
-        // Wait a bit for the script to initialize
-        setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id!, { 
-            type: "TOGGLE_SIDEBAR" 
-          })
-        }, 100)
-      } catch (error) {
-        console.error('[Background] Failed to inject sidebar:', error)
-      }
-    } else {
-      // Sidebar already injected, just toggle it
-      console.log('[Background] Toggling existing sidebar in tab:', tab.id)
-      chrome.tabs.sendMessage(tab.id, { 
-        type: "TOGGLE_SIDEBAR" 
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error('[Background] Error toggling sidebar:', chrome.runtime.lastError?.message || chrome.runtime.lastError)
-          // Tab might have been reloaded, remove from injected set
-          injectedTabs.delete(tab.id)
-        }
-      })
+    } catch (error) {
+      console.error('[Background] Failed to inject sidebar:', error)
     }
-  }
-})
-
-// Clean up when tabs are closed or navigated
-chrome.tabs.onRemoved.addListener((tabId) => {
-  injectedTabs.delete(tabId)
-})
-
-// Clean up when tab navigates to a new page
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.status === 'loading') {
-    injectedTabs.delete(tabId)
   }
 })
 
