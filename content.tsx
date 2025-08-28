@@ -2,6 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import { useState, useEffect, useRef } from "react"
 import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
+import { useStorage } from "@plasmohq/storage/hook"
 import type { DOMChangeInstruction } from "./src/types/sdk-plugin"
 import { ElementPicker } from "./src/content/element-picker"
 import { DragDropPicker } from "./src/content/drag-drop-picker"
@@ -222,6 +223,83 @@ try {
   })
 } catch (error) {
   console.error('❌ ABsmartly Extension: Failed to add message listener:', error)
+}
+
+// Import popup component for sidebar
+import IndexPopupContent from "./popup"
+
+// Sidebar Component
+function ABSmartlySidebar() {
+  const [isOpen, setIsOpen] = useStorage("absmartly-sidebar-open", false)
+  
+  useEffect(() => {
+    // Adjust page margin when sidebar opens/closes
+    if (isOpen) {
+      document.documentElement.style.marginRight = "450px"
+      document.documentElement.style.transition = "margin-right 0.3s ease"
+    } else {
+      document.documentElement.style.marginRight = "0"
+    }
+    
+    return () => {
+      document.documentElement.style.marginRight = ""
+      document.documentElement.style.transition = ""
+    }
+  }, [isOpen])
+  
+  return (
+    <>
+      {/* Toggle Button */}
+      <div 
+        style={{
+          position: "fixed",
+          top: "50%",
+          right: isOpen ? "450px" : "0",
+          transform: "translateY(-50%)",
+          width: "48px",
+          height: "48px",
+          backgroundColor: "#6366f1",
+          color: "white",
+          borderRadius: "8px 0 0 8px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          fontSize: "18px",
+          fontWeight: "bold",
+          boxShadow: "-2px 2px 8px rgba(0,0,0,0.15)",
+          transition: "right 0.3s ease",
+          zIndex: 2147483647
+        }}
+        onClick={() => setIsOpen(!isOpen)}
+        title={isOpen ? "Close ABsmartly" : "Open ABsmartly"}
+      >
+        {isOpen ? "×" : "AB"}
+      </div>
+      
+      {/* Sidebar Panel */}
+      <div 
+        style={{
+          position: "fixed",
+          top: 0,
+          right: isOpen ? 0 : "-450px",
+          width: "450px",
+          height: "100vh",
+          backgroundColor: "white",
+          boxShadow: "-2px 0 10px rgba(0,0,0,0.1)",
+          transition: "right 0.3s ease",
+          overflow: "auto",
+          zIndex: 2147483646
+        }}
+      >
+        {isOpen && (
+          <div style={{ width: "100%", height: "100%" }}>
+            <IndexPopupContent />
+          </div>
+        )}
+      </div>
+    </>
+  )
 }
 
 // Visual Editor React Component (OLD - NOT USED)
@@ -724,14 +802,14 @@ function VisualEditorReactComponent() {
   )
 }
 
-// Mount the visual editor
+// Mount the sidebar
 const mount = () => {
   const container = document.createElement("div")
-  container.id = "absmartly-visual-editor-root"
+  container.id = "absmartly-sidebar-root"
   document.body.appendChild(container)
   
   const root = createRoot(container)
-  root.render(<VisualEditorReactComponent />)
+  root.render(<ABSmartlySidebar />)
 }
 
 // Log to confirm content script is loaded
@@ -759,6 +837,6 @@ if (document.readyState === "loading") {
 }
 
 // Export for Plasmo
-export default VisualEditorReactComponent
+export default ABSmartlySidebar
 
 // The element picker is handled in the main message listener above
