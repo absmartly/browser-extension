@@ -144,7 +144,7 @@ export const injectSidebar = () => {
     .sidebar-body {
       flex: 1;
       overflow: auto;
-      padding: 20px;
+      padding: 0;
     }
   `
   shadowRoot.appendChild(shadowStyles)
