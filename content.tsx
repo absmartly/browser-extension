@@ -1,5 +1,5 @@
-import type { PlasmoCSConfig } from "plasmo"
-import { useState, useEffect, useRef } from "react"
+import type { PlasmoCSConfig, PlasmoGetRootContainer, PlasmoGetStyle } from "plasmo"
+import React, { useState, useEffect, useRef } from "react"
 import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
 import { useStorage } from "@plasmohq/storage/hook"
@@ -7,7 +7,8 @@ import type { DOMChangeInstruction } from "./src/types/sdk-plugin"
 import { ElementPicker } from "./src/content/element-picker"
 import { DragDropPicker } from "./src/content/drag-drop-picker"
 import { VisualEditor } from "./src/content/visual-editor"
-import { injectSDKBridge } from "./src/content/sdk-bridge"
+// Temporarily disabled due to CSP violations
+// import { injectSDKBridge } from "./src/content/sdk-bridge"
 
 // Debug logging - immediately when script loads
 console.log('🔵 ABsmartly Extension: Content script loaded on', window.location.href)
@@ -23,8 +24,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   css: ["style.css"],
-  run_at: "document_start"
+  run_at: "document_start",
+  all_frames: false
 }
+
+// Tell Plasmo not to auto-mount anything
+export const getInlineAnchor = () => undefined
+export const getShadowHostId = () => undefined
 
 // Types
 interface SelectedElement {
@@ -225,11 +231,16 @@ try {
   console.error('❌ ABsmartly Extension: Failed to add message listener:', error)
 }
 
-// Import popup component for sidebar
-import IndexPopupContent from "./popup"
+// Import extension UI component for sidebar
+import ExtensionUI from "./src/components/ExtensionUI"
 
 // Inject sidebar styles
 const injectSidebarStyles = () => {
+  if (!document.head) {
+    console.warn('ABSmartly Extension: document.head not ready yet')
+    return
+  }
+  
   if (document.getElementById('absmartly-sidebar-styles')) return
   
   const style = document.createElement('style')
@@ -254,11 +265,11 @@ const injectSidebarStyles = () => {
       transition: right 0.3s ease !important;
       z-index: 2147483647 !important;
       border: none !important;
-      font-family: system-ui, -apple-system, sans-serif !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }
     
     .absmartly-sidebar-toggle.open {
-      right: 450px !important;
+      right: 384px !important;
     }
     
     .absmartly-sidebar-toggle.closed {
@@ -272,13 +283,14 @@ const injectSidebarStyles = () => {
     .absmartly-sidebar-panel {
       position: fixed !important;
       top: 0 !important;
-      width: 450px !important;
+      width: 384px !important;
       height: 100vh !important;
       background-color: white !important;
       box-shadow: -2px 0 10px rgba(0,0,0,0.1) !important;
       transition: right 0.3s ease !important;
       overflow: auto !important;
       z-index: 2147483646 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }
     
     .absmartly-sidebar-panel.open {
@@ -286,17 +298,33 @@ const injectSidebarStyles = () => {
     }
     
     .absmartly-sidebar-panel.closed {
-      right: -450px !important;
+      right: -384px !important;
     }
     
     .absmartly-sidebar-content {
       width: 100% !important;
       height: 100% !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }
     
     body.absmartly-sidebar-open {
-      margin-right: 450px !important;
+      margin-right: 384px !important;
       transition: margin-right 0.3s ease !important;
+    }
+    
+    /* Ensure all content in sidebar uses correct font */
+    #absmartly-sidebar-root * {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    }
+    
+    /* Visual Editor Hover Overlay */
+    .absmartly-hover-overlay-active {
+      position: absolute !important;
+      pointer-events: none !important;
+      border: 2px dashed #3b82f6 !important;
+      background-color: rgba(59, 130, 246, 0.1) !important;
+      display: none !important;
+      z-index: 9998 !important;
     }
   `
   document.head.appendChild(style)
@@ -309,6 +337,12 @@ function ABSmartlySidebar() {
   useEffect(() => {
     injectSidebarStyles()
     
+    // Ensure document.body exists before manipulating it
+    if (!document.body) {
+      console.warn('ABSmartly Extension: document.body not ready yet')
+      return
+    }
+    
     // Adjust page margin when sidebar opens/closes
     if (isOpen) {
       document.body.classList.add('absmartly-sidebar-open')
@@ -317,7 +351,9 @@ function ABSmartlySidebar() {
     }
     
     return () => {
-      document.body.classList.remove('absmartly-sidebar-open')
+      if (document.body) {
+        document.body.classList.remove('absmartly-sidebar-open')
+      }
     }
   }, [isOpen])
   
@@ -329,14 +365,26 @@ function ABSmartlySidebar() {
         onClick={() => setIsOpen(!isOpen)}
         title={isOpen ? "Close ABsmartly" : "Open ABsmartly"}
       >
-        {isOpen ? "×" : "AB"}
+        {isOpen ? (
+          "×"
+        ) : (
+          <img 
+            src={chrome.runtime.getURL("assets/absmartly-logo-white.svg")} 
+            alt="ABsmartly"
+            style={{ 
+              width: '32px', 
+              height: '13px', 
+              objectFit: 'contain'
+            }}
+          />
+        )}
       </button>
       
       {/* Sidebar Panel */}
       <div className={`absmartly-sidebar-panel ${isOpen ? 'open' : 'closed'}`}>
         {isOpen && (
           <div className="absmartly-sidebar-content">
-            <IndexPopupContent />
+            <ExtensionUI />
           </div>
         )}
       </div>
@@ -648,14 +696,10 @@ function VisualEditorReactComponent() {
                 }
                 break
               case 'javascript':
-                // Execute JavaScript in the context of the element
-                if (change.value && typeof change.value === 'string') {
-                  try {
-                    new Function('element', change.value)(element)
-                  } catch (jsError) {
-                    console.error('Error executing JavaScript:', jsError)
-                  }
-                }
+                // JavaScript execution disabled due to CSP restrictions
+                // This would require a different approach, perhaps through
+                // chrome.scripting API or a dedicated content script
+                console.warn('JavaScript execution is disabled for CSP compliance')
                 break
             }
             // Mark element as previewed
@@ -691,15 +735,7 @@ function VisualEditorReactComponent() {
       {state.isActive && (
         <div
           ref={overlayRef}
-          className="absmartly-hover-overlay"
-          style={{
-            position: "absolute",
-            pointerEvents: "none",
-            border: "2px dashed #3b82f6",
-            backgroundColor: "rgba(59, 130, 246, 0.1)",
-            display: "none",
-            zIndex: 9998
-          }}
+          className="absmartly-hover-overlay absmartly-hover-overlay-active"
         />
       )}
       
@@ -844,41 +880,75 @@ function VisualEditorReactComponent() {
   )
 }
 
-// Mount the sidebar
-const mount = () => {
-  const container = document.createElement("div")
-  container.id = "absmartly-sidebar-root"
-  document.body.appendChild(container)
+// Plasmo will handle mounting the component automatically
+
+// Don't export the component by default - we'll mount it manually
+// export default ABSmartlySidebar
+
+// Manual sidebar management
+let sidebarMounted = false
+let sidebarRoot: any = null
+
+function mountSidebar() {
+  if (sidebarMounted || !document.body) return
   
-  const root = createRoot(container)
-  root.render(<ABSmartlySidebar />)
+  console.log('🔵 ABSmartly Extension: Mounting sidebar')
+  
+  // Check if container already exists
+  let container = document.getElementById("absmartly-sidebar-root")
+  if (!container) {
+    container = document.createElement("div")
+    container.id = "absmartly-sidebar-root"
+    container.style.cssText = "all: initial; z-index: 2147483647;"
+    document.body.appendChild(container)
+  }
+  
+  // Create root and render
+  sidebarRoot = createRoot(container)
+  sidebarRoot.render(React.createElement(ABSmartlySidebar))
+  sidebarMounted = true
+  console.log('✅ ABSmartly Extension: Sidebar mounted')
 }
 
-// Log to confirm content script is loaded
-console.log('🔵 ABsmartly Extension: Content script loaded on', window.location.href)
-console.log('🔵 ABsmartly Extension: Setting up message listeners...')
-
-// Test that chrome.runtime is available
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  console.log('✅ ABsmartly Extension: chrome.runtime is available')
-} else {
-  console.error('❌ ABsmartly Extension: chrome.runtime is NOT available!')
+function unmountSidebar() {
+  if (!sidebarMounted) return
+  
+  console.log('🔵 ABSmartly Extension: Unmounting sidebar')
+  
+  if (sidebarRoot) {
+    sidebarRoot.unmount()
+    sidebarRoot = null
+  }
+  
+  const container = document.getElementById("absmartly-sidebar-root")
+  if (container) {
+    container.remove()
+  }
+  
+  // Clean up body class
+  document.body.classList.remove('absmartly-sidebar-open')
+  
+  sidebarMounted = false
+  console.log('✅ ABSmartly Extension: Sidebar unmounted')
 }
 
-// Initialize when DOM is ready
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    console.log('ABsmartly Extension: DOM ready, mounting components')
-    injectSDKBridge()
-    mount()
-  })
-} else {
-  console.log('ABsmartly Extension: DOM already loaded, mounting components')
-  injectSDKBridge()
-  mount()
-}
-
-// Export for Plasmo
-export default ABSmartlySidebar
+// Listen for toggle message from background script
+chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (response?: any) => void) => {
+  if (message.type === "TOGGLE_SIDEBAR") {
+    console.log('📨 ABSmartly Extension: Received TOGGLE_SIDEBAR message')
+    
+    if (sidebarMounted) {
+      unmountSidebar()
+    } else {
+      mountSidebar()
+    }
+    
+    sendResponse({ success: true, mounted: !sidebarMounted })
+    return true
+  }
+  
+  // Let the existing listener handle other messages
+  return false
+})
 
 // The element picker is handled in the main message listener above
