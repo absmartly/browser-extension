@@ -620,4 +620,35 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 })
 
+// Handle extension icon clicks
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log('[Background] Extension icon clicked for tab:', tab.id)
+  
+  if (tab.id) {
+    // Send message to content script to toggle sidebar
+    chrome.tabs.sendMessage(tab.id, { 
+      type: "TOGGLE_SIDEBAR" 
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[Background] Error sending message:', chrome.runtime.lastError)
+        
+        // Content script might not be loaded yet, inject it
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }).then(() => {
+          // Try sending message again after injection
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { 
+              type: "TOGGLE_SIDEBAR" 
+            })
+          }, 100)
+        }).catch(err => {
+          console.error('[Background] Failed to inject content script:', err)
+        })
+      }
+    })
+  }
+})
+
 export {}

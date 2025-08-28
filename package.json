@@ -45,6 +45,12 @@
       "tabs",
       "scripting",
       "cookies"
+    ],
+    "web_accessible_resources": [
+      {
+        "resources": ["assets/logo.png", "assets/icon.png", "assets/icon128.png", "assets/absmartly-logo-white.svg"],
+        "matches": ["<all_urls>"]
+      }
     ]
   }
 }
