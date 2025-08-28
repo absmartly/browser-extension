@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Content Script Injection</title>
+    <style>
+        body { padding: 40px; font-family: Arial; }
+        .status { padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Content Script Debug Page</h1>
+    
+    <div class="status info">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Make sure you've reloaded the extension</li>
+            <li>Open this page in a new tab (not file://, use a local server or open from extension page)</li>
+            <li>Open Chrome DevTools Console (F12)</li>
+            <li>Look for console messages from the extension</li>
+        </ol>
+    </div>
+
+    <div id="status" class="status info">
+        Checking content script...
+    </div>
+
+    <h3>Console Output:</h3>
+    <pre id="console"></pre>
+
+    <button id="test-msg">Send Test Message</button>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const consoleDiv = document.getElementById('console');
+        
+        function log(msg, type = 'log') {
+            console[type](msg);
+            const timestamp = new Date().toLocaleTimeString();
+            consoleDiv.textContent += `[${timestamp}] ${type.toUpperCase()}: ${msg}\n`;
+        }
+
+        // Check if we're on a file:// URL
+        if (window.location.protocol === 'file:') {
+            log('⚠️ WARNING: This page is loaded via file:// protocol', 'warn');
+            log('Content scripts may not inject on file:// URLs by default', 'warn');
+            log('Try serving this file via HTTP or opening from the extension page', 'warn');
+            statusDiv.className = 'status error';
+            statusDiv.innerHTML = '<strong>Warning:</strong> file:// protocol detected. Content scripts may not work here.';
+        }
+
+        // Try to detect if content script injected
+        setTimeout(() => {
+            // Check for any signs of the content script
+            const plasmoRoot = document.querySelector('#plasmo-shadow-container');
+            const absmartlyRoot = document.querySelector('#absmartly-visual-editor-root');
+            
+            if (plasmoRoot || absmartlyRoot) {
+                log('✅ Found extension root element - content script is injected!', 'log');
+                statusDiv.className = 'status success';
+                statusDiv.textContent = 'Content script detected!';
+            } else {
+                log('❌ No extension root elements found', 'error');
+                statusDiv.className = 'status error';
+                statusDiv.textContent = 'Content script not detected';
+            }
+        }, 1000);
+
+        // Test sending message
+        document.getElementById('test-msg').addEventListener('click', () => {
+            log('Attempting to send message to content script...', 'log');
+            
+            // Try using window.postMessage to communicate
+            window.postMessage({ type: 'TEST_FROM_PAGE' }, '*');
+            
+            // Also log current URL for debugging
+            log(`Current URL: ${window.location.href}`, 'info');
+            log(`Protocol: ${window.location.protocol}`, 'info');
+            log(`Host: ${window.location.host}`, 'info');
+        });
+
+        // Listen for any messages
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type) {
+                log(`Received message: ${event.data.type}`, 'info');
+            }
+        });
+    </script>
+</body>
+</html>
