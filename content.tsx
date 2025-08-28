@@ -6,6 +6,17 @@ import type { DOMChangeInstruction } from "./src/types/sdk-plugin"
 import { ElementPicker } from "./src/content/element-picker"
 import { injectSDKBridge } from "./src/content/sdk-bridge"
 
+// Debug logging - immediately when script loads
+console.log('🔵 ABsmartly Extension: Content script loaded on', window.location.href)
+console.log('🔵 ABsmartly Extension: Setting up message listeners...')
+
+// Check if chrome.runtime is available
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+  console.log('✅ ABsmartly Extension: chrome.runtime is available')
+} else {
+  console.error('❌ ABsmartly Extension: chrome.runtime is NOT available')
+}
+
 // Configure content script
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -33,6 +44,51 @@ const storage = new Storage()
 // Element picker instance
 const elementPicker = new ElementPicker()
 
+// Global message listener - set up immediately, not inside React component
+console.log('🔵 ABsmartly Extension: About to add message listener...')
+try {
+  chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (response?: any) => void) => {
+    console.log('📨 ABsmartly Extension: Received message (global listener):', message.type)
+  
+  if (message.type === "TEST_CONNECTION") {
+    console.log('✅ Test connection message received!')
+    sendResponse({ success: true, message: 'Content script is loaded and listening!' })
+    return true
+  } else if (message.type === "START_ELEMENT_PICKER") {
+    console.log('Starting element picker from global listener')
+    try {
+      elementPicker.start((selector: string) => {
+        console.log('Element selected:', selector)
+        if (message.fromPopup) {
+          console.log('Sending to popup via runtime')
+          chrome.runtime.sendMessage({
+            type: 'ELEMENT_SELECTED',
+            selector: selector
+          })
+        } else {
+          sendResponse({ selector })
+        }
+      })
+      sendResponse({ success: true, message: 'Element picker started' })
+    } catch (error) {
+      console.error('Error starting element picker:', error)
+      sendResponse({ success: false, error: error.message })
+    }
+    return true // Keep channel open for async response
+  } else if (message.type === "CANCEL_ELEMENT_PICKER") {
+    console.log('Canceling element picker from global listener')
+    elementPicker.stop()
+    sendResponse({ success: true })
+  }
+  
+  // Return false to allow other listeners to handle the message
+  return false
+  })
+  console.log('✅ ABsmartly Extension: Message listener added successfully!')
+} catch (error) {
+  console.error('❌ ABsmartly Extension: Failed to add message listener:', error)
+}
+
 // Visual Editor Component
 function VisualEditor() {
   const [state, setState] = useState<EditorState>({
@@ -49,38 +105,12 @@ function VisualEditor() {
   useEffect(() => {
     // Listen for messages from popup/background
     const messageListener = (message: any, sender: any, sendResponse: (response?: any) => void) => {
+      console.log('ABsmartly Extension: Received message in content script:', message.type)
       if (message.type === "TOGGLE_VISUAL_EDITOR") {
         setState(prev => ({ ...prev, isActive: !prev.isActive }))
         setShowPanel(message.show ?? !showPanel)
       } else if (message.type === "GET_DOM_CHANGES") {
         sendResponse({ changes: state.changes })
-      } else if (message.type === "START_ELEMENT_PICKER") {
-        console.log('Starting element picker from content script')
-        // Start element picker
-        elementPicker.start((selector: string) => {
-          console.log('Element selected:', selector)
-          if (message.fromPopup) {
-            // Send directly to runtime (popup will receive it)
-            chrome.runtime.sendMessage({
-              type: 'ELEMENT_SELECTED',
-              selector: selector
-            })
-          } else if (message.fromExtension) {
-            // Legacy: Send to background script
-            chrome.runtime.sendMessage({
-              type: 'ELEMENT_SELECTED',
-              selector: selector
-            })
-          } else {
-            sendResponse({ selector })
-          }
-        })
-        // Return true to indicate we'll send a response asynchronously
-        return true
-      } else if (message.type === "CANCEL_ELEMENT_PICKER") {
-        console.log('Canceling element picker from content script')
-        elementPicker.stop()
-        sendResponse({ success: true })
       } else if (message.type === "ABSMARTLY_PREVIEW") {
         // Handle preview messages
         if (message.action === "apply") {
@@ -569,13 +599,26 @@ const mount = () => {
   root.render(<VisualEditor />)
 }
 
+// Log to confirm content script is loaded
+console.log('🔵 ABsmartly Extension: Content script loaded on', window.location.href)
+console.log('🔵 ABsmartly Extension: Setting up message listeners...')
+
+// Test that chrome.runtime is available
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+  console.log('✅ ABsmartly Extension: chrome.runtime is available')
+} else {
+  console.error('❌ ABsmartly Extension: chrome.runtime is NOT available!')
+}
+
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
+    console.log('ABsmartly Extension: DOM ready, mounting components')
     injectSDKBridge()
     mount()
   })
 } else {
+  console.log('ABsmartly Extension: DOM already loaded, mounting components')
   injectSDKBridge()
   mount()
 }
