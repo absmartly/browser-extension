@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
-import IndexPopup from "../src/components/ExtensionUI"
-import "../style.css"
+import IndexPopup from "~src/components/ExtensionUI"
+import "~style.css"
+
+console.log('IndexPopup import:', IndexPopup)
 
 const storage = new Storage()
 
