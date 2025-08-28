@@ -228,72 +228,114 @@ try {
 // Import popup component for sidebar
 import IndexPopupContent from "./popup"
 
+// Inject sidebar styles
+const injectSidebarStyles = () => {
+  if (document.getElementById('absmartly-sidebar-styles')) return
+  
+  const style = document.createElement('style')
+  style.id = 'absmartly-sidebar-styles'
+  style.textContent = `
+    .absmartly-sidebar-toggle {
+      position: fixed !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      width: 48px !important;
+      height: 48px !important;
+      background-color: #6366f1 !important;
+      color: white !important;
+      border-radius: 8px 0 0 8px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      cursor: pointer !important;
+      font-size: 18px !important;
+      font-weight: bold !important;
+      box-shadow: -2px 2px 8px rgba(0,0,0,0.15) !important;
+      transition: right 0.3s ease !important;
+      z-index: 2147483647 !important;
+      border: none !important;
+      font-family: system-ui, -apple-system, sans-serif !important;
+    }
+    
+    .absmartly-sidebar-toggle.open {
+      right: 450px !important;
+    }
+    
+    .absmartly-sidebar-toggle.closed {
+      right: 0 !important;
+    }
+    
+    .absmartly-sidebar-toggle:hover {
+      background-color: #4f46e5 !important;
+    }
+    
+    .absmartly-sidebar-panel {
+      position: fixed !important;
+      top: 0 !important;
+      width: 450px !important;
+      height: 100vh !important;
+      background-color: white !important;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.1) !important;
+      transition: right 0.3s ease !important;
+      overflow: auto !important;
+      z-index: 2147483646 !important;
+    }
+    
+    .absmartly-sidebar-panel.open {
+      right: 0 !important;
+    }
+    
+    .absmartly-sidebar-panel.closed {
+      right: -450px !important;
+    }
+    
+    .absmartly-sidebar-content {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    
+    body.absmartly-sidebar-open {
+      margin-right: 450px !important;
+      transition: margin-right 0.3s ease !important;
+    }
+  `
+  document.head.appendChild(style)
+}
+
 // Sidebar Component
 function ABSmartlySidebar() {
   const [isOpen, setIsOpen] = useStorage("absmartly-sidebar-open", false)
   
   useEffect(() => {
+    injectSidebarStyles()
+    
     // Adjust page margin when sidebar opens/closes
     if (isOpen) {
-      document.documentElement.style.marginRight = "450px"
-      document.documentElement.style.transition = "margin-right 0.3s ease"
+      document.body.classList.add('absmartly-sidebar-open')
     } else {
-      document.documentElement.style.marginRight = "0"
+      document.body.classList.remove('absmartly-sidebar-open')
     }
     
     return () => {
-      document.documentElement.style.marginRight = ""
-      document.documentElement.style.transition = ""
+      document.body.classList.remove('absmartly-sidebar-open')
     }
   }, [isOpen])
   
   return (
     <>
       {/* Toggle Button */}
-      <div 
-        style={{
-          position: "fixed",
-          top: "50%",
-          right: isOpen ? "450px" : "0",
-          transform: "translateY(-50%)",
-          width: "48px",
-          height: "48px",
-          backgroundColor: "#6366f1",
-          color: "white",
-          borderRadius: "8px 0 0 8px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          fontSize: "18px",
-          fontWeight: "bold",
-          boxShadow: "-2px 2px 8px rgba(0,0,0,0.15)",
-          transition: "right 0.3s ease",
-          zIndex: 2147483647
-        }}
+      <button 
+        className={`absmartly-sidebar-toggle ${isOpen ? 'open' : 'closed'}`}
         onClick={() => setIsOpen(!isOpen)}
         title={isOpen ? "Close ABsmartly" : "Open ABsmartly"}
       >
         {isOpen ? "×" : "AB"}
-      </div>
+      </button>
       
       {/* Sidebar Panel */}
-      <div 
-        style={{
-          position: "fixed",
-          top: 0,
-          right: isOpen ? 0 : "-450px",
-          width: "450px",
-          height: "100vh",
-          backgroundColor: "white",
-          boxShadow: "-2px 0 10px rgba(0,0,0,0.1)",
-          transition: "right 0.3s ease",
-          overflow: "auto",
-          zIndex: 2147483646
-        }}
-      >
+      <div className={`absmartly-sidebar-panel ${isOpen ? 'open' : 'closed'}`}>
         {isOpen && (
-          <div style={{ width: "100%", height: "100%" }}>
+          <div className="absmartly-sidebar-content">
             <IndexPopupContent />
           </div>
         )}
