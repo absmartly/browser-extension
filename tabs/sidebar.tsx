@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, lazy, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
 import "~style.css"
@@ -8,8 +8,11 @@ const storage = new Storage()
 // This script will be injected programmatically by the background script
 console.log('🔵 ABSmartly Extension: Sidebar script loaded')
 
-// Inline component to avoid import issues
-const SidebarContent = () => {
+// Lazy load the ExtensionUI to avoid bundling issues
+const ExtensionUI = lazy(() => import("~src/components/ExtensionUI"))
+
+// Fallback component while loading
+const LoadingContent = () => {
   return (
     <div style={{ padding: '20px' }}>
       <h2 style={{ 
@@ -32,30 +35,33 @@ const SidebarContent = () => {
           color: '#6b7280',
           marginBottom: '12px'
         }}>
-          Extension is loading...
+          Loading extension...
         </p>
-        <p style={{ 
-          fontSize: '12px',
-          color: '#9ca3af'
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '20px'
         }}>
-          The full interface will be available once the extension loads completely.
-        </p>
-      </div>
-      
-      <div style={{
-        padding: '12px',
-        backgroundColor: '#eff6ff',
-        borderRadius: '6px',
-        border: '1px solid #dbeafe'
-      }}>
-        <p style={{
-          fontSize: '12px',
-          color: '#1e40af'
-        }}>
-          💡 Tip: You can minimize this sidebar using the arrow button at the top.
-        </p>
+          <div style={{
+            border: '3px solid #f3f4f6',
+            borderTop: '3px solid #3b82f6',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            animation: 'spin 1s linear infinite'
+          }} />
+        </div>
       </div>
     </div>
+  )
+}
+
+// SidebarContent wrapper that uses Suspense for lazy loading
+const SidebarContent = () => {
+  return (
+    <Suspense fallback={<LoadingContent />}>
+      <ExtensionUI />
+    </Suspense>
   )
 }
 
@@ -259,6 +265,16 @@ function mountSidebar() {
   
   // Create shadow root for isolation
   const shadowRoot = container.attachShadow({ mode: 'closed' })
+  
+  // Add CSS for spinner animation
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `
+  shadowRoot.appendChild(style)
   
   // Create React root inside shadow DOM
   const reactContainer = document.createElement('div')
