@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 import { Storage } from "@plasmohq/storage"
-import SidebarWrapper from "./SidebarWrapper"
-
-console.log('SidebarWrapper import:', SidebarWrapper)
+import IndexPopup from "../src/components/ExtensionUI"
 import "../style.css"
 
 const storage = new Storage()
@@ -174,7 +172,7 @@ const ABSmartlySidebar = () => {
             height: 'calc(100% - 57px)', 
             overflow: 'auto',
           }}>
-            <SidebarWrapper />
+            <IndexPopup />
           </div>
         </>
       )}
