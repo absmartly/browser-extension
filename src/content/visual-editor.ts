@@ -10,6 +10,7 @@ export class VisualEditor {
   private isActive = false
   private selectedElement: HTMLElement | null = null
   private contextMenu: HTMLElement | null = null
+  private toolbar: HTMLElement | null = null
   private sidebar: HTMLElement | null = null
   private sidebarToggle: HTMLElement | null = null
   private changes: DOMChange[] = []
@@ -891,83 +892,6 @@ export class VisualEditor {
            element.closest('.absmartly-color-picker') !== null
   }
   
-  private makeElementsEditable() {
-    // Add visual indicators to elements
-    const allElements = document.querySelectorAll('body *')
-    allElements.forEach(el => {
-      const element = el as HTMLElement
-      if (!this.isExtensionElement(element)) {
-        element.classList.add('absmartly-editable')
-      }
-    })
-  }
-  
-  private makeElementsNonEditable() {
-    // Remove visual indicators
-    document.querySelectorAll('.absmartly-editable').forEach(el => {
-      el.classList.remove('absmartly-editable')
-    })
-    document.querySelectorAll('.absmartly-selected').forEach(el => {
-      el.classList.remove('absmartly-selected')
-    })
-    document.querySelectorAll('.absmartly-editing').forEach(el => {
-      el.classList.remove('absmartly-editing')
-    })
-  }
-  
-  private startMutationObserver() {
-    this.mutationObserver = new MutationObserver((mutations) => {
-      if (this.isInternalChange) return
-      
-      mutations.forEach(mutation => {
-        // Skip mutations caused by our own visual editor classes
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-          const target = mutation.target as HTMLElement
-          const className = typeof target.className === 'string' 
-            ? target.className 
-            : target.className?.baseVal || ''
-          
-          // Don't track changes caused by adding/removing our editor classes
-          if (className.includes('absmartly-')) {
-            return
-          }
-        }
-        
-        if (mutation.type === 'characterData' || mutation.type === 'childList') {
-          const target = mutation.target as HTMLElement
-          if (!this.isExtensionElement(target) && target.nodeType === Node.ELEMENT_NODE) {
-            // Only track if we're actively editing this element
-            if (target === this.selectedElement || target.contentEditable === 'true') {
-              this.trackChange(target, 'modify')
-            }
-          }
-        } else if (mutation.type === 'attributes') {
-          const target = mutation.target as HTMLElement
-          if (!this.isExtensionElement(target)) {
-            const attrName = mutation.attributeName
-            // Only track style changes made by user actions, not hover effects
-            if ((attrName === 'style' || attrName === 'class') && target === this.selectedElement) {
-              this.trackChange(target, 'style')
-            }
-          }
-        }
-      })
-    })
-    
-    this.mutationObserver.observe(document.body, {
-      childList: true,
-      attributes: true,
-      characterData: true,
-      subtree: true,
-      attributeOldValue: true,
-      characterDataOldValue: true
-    })
-  }
-  
-  private stopMutationObserver() {
-    this.mutationObserver?.disconnect()
-    this.mutationObserver = null
-  }
   
   private trackChange(element: HTMLElement, type: string) {
     const selector = this.getSelector(element)

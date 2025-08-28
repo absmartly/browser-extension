@@ -567,6 +567,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false, error: 'Failed to get config' })
     })
     return true // Will respond asynchronously
+  } else if (message.type === "START_VISUAL_EDITOR") {
+    // Forward visual editor command to content script in active tab
+    console.log('Background received START_VISUAL_EDITOR:', message)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'START_VISUAL_EDITOR',
+          variantName: message.variantName,
+          changes: message.changes
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Error forwarding to content script:', chrome.runtime.lastError)
+            sendResponse({ success: false, error: chrome.runtime.lastError.message })
+          } else {
+            console.log('Visual editor command forwarded successfully')
+            sendResponse({ success: true })
+          }
+        })
+      } else {
+        console.error('No active tab found')
+        sendResponse({ success: false, error: 'No active tab found' })
+      }
+    })
+    return true // Will respond asynchronously
   } else if (message.type === "FETCH_AVATAR") {
     // Fetch avatar image with authentication
     getConfig().then(config => {
