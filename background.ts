@@ -594,37 +594,70 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (chrome.runtime.lastError) {
             // Content script not loaded, inject it
             console.log('Content script not loaded, injecting visual-editor script...')
+            console.log('Last error:', chrome.runtime.lastError)
             
             try {
-              // Get the manifest to find the correct content script filename
-              const manifest = chrome.runtime.getManifest()
-              const contentScript = manifest.content_scripts?.find(cs => 
-                cs.js?.some(file => file.includes('content'))
-              )
+              // First, try injecting a simple inline script to set up the visual editor
+              console.log('Injecting inline visual editor script...')
               
-              if (contentScript && contentScript.js && contentScript.js[0]) {
-                // Inject the visual editor content script
-                console.log('Injecting content script:', contentScript.js[0])
-                const results = await chrome.scripting.executeScript({
-                  target: { tabId: tabId },
-                  files: [contentScript.js[0]]
-                })
-                console.log('Content script injection results:', results)
-              } else {
-                console.error('Content script not found in manifest, trying direct injection...')
-                // Fallback: Try to inject the content.js directly
-                try {
-                  const results = await chrome.scripting.executeScript({
-                    target: { tabId: tabId },
-                    files: ['content.ffb82774.js'] // This might change with builds
+              const injectionResult = await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                func: function() {
+                  // This runs in the page context
+                  console.log('[ABSmartly] Inline visual editor script injected')
+                  
+                  // Check if we already have a listener
+                  if ((window as any).__absmartlyVisualEditorInjected) {
+                    console.log('[ABSmartly] Visual editor already injected')
+                    return { already: true }
+                  }
+                  
+                  (window as any).__absmartlyVisualEditorInjected = true
+                  
+                  // Create a simple message listener
+                  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+                    console.log('[ABSmartly Inline] Received message:', message.type)
+                    
+                    if (message.type === 'START_VISUAL_EDITOR') {
+                      console.log('[ABSmartly Inline] Starting visual editor with variant:', message.variantName)
+                      
+                      // Create a simple visual indicator
+                      const banner = document.createElement('div')
+                      banner.id = 'absmartly-visual-editor-banner'
+                      banner.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        background: linear-gradient(90deg, #3b82f6, #10b981);
+                        color: white;
+                        padding: 10px;
+                        z-index: 999999;
+                        text-align: center;
+                        font-family: system-ui, -apple-system, sans-serif;
+                      `
+                      banner.textContent = `🎨 ABSmartly Visual Editor Active - Variant: ${message.variantName}`
+                      document.body.appendChild(banner)
+                      
+                      // Make elements editable
+                      document.body.style.cursor = 'pointer'
+                      
+                      sendResponse({ success: true, message: 'Visual editor started (inline version)' })
+                    }
+                    
+                    if (message.type === 'GET_VISUAL_EDITOR_STATUS') {
+                      sendResponse({ active: true, inline: true })
+                    }
+                    
+                    return true
                   })
-                  console.log('Direct injection results:', results)
-                } catch (e) {
-                  console.error('Direct injection failed:', e)
-                  sendResponse({ success: false, error: 'Failed to inject content script' })
-                  return
-                }
-              }
+                  
+                  return { success: true }
+                },
+                world: 'ISOLATED' // Run in isolated world to access chrome.runtime
+              })
+              
+              console.log('Inline injection result:', injectionResult)
               
               console.log('Visual editor script injected, waiting for initialization...')
               
