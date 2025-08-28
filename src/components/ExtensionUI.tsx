@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Storage } from "@plasmohq/storage"
 import { ExperimentList } from "~src/components/ExperimentList"
 import { ExperimentDetail } from "~src/components/ExperimentDetail"
