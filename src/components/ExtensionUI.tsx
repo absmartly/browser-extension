@@ -505,7 +505,7 @@ function IndexPopupContent() {
 
   if (configLoading) {
     return (
-      <div className="w-96 h-[600px] flex items-center justify-center">
+      <div className="w-full h-screen flex items-center justify-center">
         <div role="status" aria-label="Loading">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <span className="sr-only">Loading...</span>
@@ -516,7 +516,7 @@ function IndexPopupContent() {
 
   if (!config && view !== 'settings') {
     return (
-      <div className="w-96 h-[600px] p-4">
+      <div className="w-full h-screen p-4">
         <div className="flex flex-col items-center justify-center h-full space-y-4">
           <h2 className="text-lg font-semibold">Welcome to ABsmartly</h2>
           <p className="text-sm text-gray-600 text-center">
@@ -531,10 +531,10 @@ function IndexPopupContent() {
   }
 
   return (
-    <div className="w-96 h-[600px] bg-white">
+    <div className="w-full h-screen bg-white flex flex-col">
       {view === 'list' && (
         <>
-          <div className="border-b px-4 py-3">
+          <div className="border-b px-4 py-3 flex-shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 {config?.apiEndpoint ? (
