@@ -3,7 +3,7 @@ module.exports = {
   mode: "jit",
   darkMode: "class",
   content: [
-    "./popup.tsx",
+    "./src/components/ExtensionUI.tsx",
     "./content.tsx",
     "./src/**/*.{ts,tsx}"
   ],
