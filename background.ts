@@ -570,19 +570,82 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === "START_VISUAL_EDITOR") {
     // Forward visual editor command to content script in active tab
     console.log('Background received START_VISUAL_EDITOR:', message)
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'START_VISUAL_EDITOR',
-          variantName: message.variantName,
-          changes: message.changes
-        }, (response) => {
+        const tabId = tabs[0].id
+        
+        // First, try to send message to see if content script is loaded
+        chrome.tabs.sendMessage(tabId, {
+          type: 'GET_VISUAL_EDITOR_STATUS'
+        }, async (statusResponse) => {
           if (chrome.runtime.lastError) {
-            console.error('Error forwarding to content script:', chrome.runtime.lastError)
-            sendResponse({ success: false, error: chrome.runtime.lastError.message })
+            // Content script not loaded, inject it
+            console.log('Content script not loaded, injecting visual-editor script...')
+            
+            try {
+              // Get the manifest to find the correct content script filename
+              const manifest = chrome.runtime.getManifest()
+              const contentScript = manifest.content_scripts?.find(cs => 
+                cs.js?.some(file => file.includes('visual-editor'))
+              )
+              
+              if (contentScript && contentScript.js && contentScript.js[0]) {
+                // Inject the visual editor content script
+                await chrome.scripting.executeScript({
+                  target: { tabId: tabId },
+                  files: [contentScript.js[0]]
+                })
+              } else {
+                // Fallback: inject the script inline
+                await chrome.scripting.executeScript({
+                  target: { tabId: tabId },
+                  func: () => {
+                    console.log('[Visual Editor] Emergency injection - script will be limited')
+                    // This is a fallback - the full visual editor won't work without the proper script
+                  }
+                })
+                throw new Error('Visual editor content script not found in manifest')
+              }
+              
+              console.log('Visual editor script injected, waiting a moment...')
+              
+              // Wait a moment for the script to initialize
+              setTimeout(() => {
+                // Now send the START_VISUAL_EDITOR message
+                chrome.tabs.sendMessage(tabId, {
+                  type: 'START_VISUAL_EDITOR',
+                  variantName: message.variantName,
+                  changes: message.changes
+                }, (response) => {
+                  if (chrome.runtime.lastError) {
+                    console.error('Error starting visual editor after injection:', chrome.runtime.lastError)
+                    sendResponse({ success: false, error: chrome.runtime.lastError.message })
+                  } else {
+                    console.log('Visual editor started successfully after injection')
+                    sendResponse({ success: true })
+                  }
+                })
+              }, 100)
+            } catch (error) {
+              console.error('Failed to inject visual editor script:', error)
+              sendResponse({ success: false, error: 'Failed to inject visual editor script' })
+            }
           } else {
-            console.log('Visual editor command forwarded successfully')
-            sendResponse({ success: true })
+            // Content script already loaded, send the message directly
+            console.log('Content script already loaded, starting visual editor...')
+            chrome.tabs.sendMessage(tabId, {
+              type: 'START_VISUAL_EDITOR',
+              variantName: message.variantName,
+              changes: message.changes
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error('Error starting visual editor:', chrome.runtime.lastError)
+                sendResponse({ success: false, error: chrome.runtime.lastError.message })
+              } else {
+                console.log('Visual editor started successfully')
+                sendResponse({ success: true })
+              }
+            })
           }
         })
       } else {
