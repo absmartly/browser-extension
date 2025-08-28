@@ -713,9 +713,5 @@ function IndexPopupContent() {
 }
 
 export default function IndexPopup() {
-  return (
-    <ErrorBoundary>
-      <IndexPopupContent />
-    </ErrorBoundary>
-  )
+  return <IndexPopupContent />
 }
