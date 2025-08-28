@@ -1,0 +1,326 @@
+/* ABsmartly Sidebar Styles */
+
+/* Container */
+#absmartly-sidebar-root {
+  all: initial;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Toggle Button */
+.absmartly-sidebar-toggle {
+  position: fixed !important;
+  top: 50% !important;
+  right: 0 !important;
+  transform: translateY(-50%) !important;
+  width: 40px !important;
+  height: 40px !important;
+  background: #6366f1 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px 0 0 8px !important;
+  cursor: pointer !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: bold !important;
+  font-size: 16px !important;
+  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.2s ease !important;
+}
+
+.absmartly-sidebar-toggle:hover {
+  background: #4f46e5 !important;
+  box-shadow: -4px 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Main Sidebar */
+.absmartly-sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 450px !important;
+  height: 100vh !important;
+  background: white !important;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1) !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transition: transform 0.3s ease !important;
+  overflow: hidden !important;
+}
+
+.absmartly-sidebar.closed {
+  transform: translateX(100%) !important;
+}
+
+.absmartly-sidebar.open {
+  transform: translateX(0) !important;
+}
+
+/* Inner container for popup content */
+.absmartly-sidebar-inner {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Override popup styles for sidebar context */
+.absmartly-sidebar-inner .plasmo-csui {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.absmartly-sidebar-inner > div {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100vh !important;
+}
+
+/* Sidebar Header */
+.absmartly-sidebar-header {
+  display: flex !important;
+  align-items: center !important;
+  padding: 16px 20px !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  gap: 12px !important;
+}
+
+.absmartly-sidebar-header h1 {
+  flex: 1 !important;
+  margin: 0 !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  color: white !important;
+}
+
+.sidebar-logo {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 6px !important;
+  background: white !important;
+  padding: 4px !important;
+}
+
+.logout-btn {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+  padding: 6px 12px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  transition: all 0.2s !important;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Sidebar Content */
+.absmartly-sidebar-content {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 20px !important;
+  background: #f9fafb !important;
+}
+
+/* Loading and Error States */
+.absmartly-sidebar .loading,
+.absmartly-sidebar .error {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  height: 200px !important;
+  color: #6b7280 !important;
+  font-size: 14px !important;
+}
+
+.absmartly-sidebar .error {
+  color: #ef4444 !important;
+}
+
+/* Experiment List Styles */
+.absmartly-sidebar .experiment-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.absmartly-sidebar .experiment-card {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+}
+
+.absmartly-sidebar .experiment-card:hover {
+  border-color: #6366f1 !important;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1) !important;
+}
+
+.absmartly-sidebar .experiment-name {
+  font-weight: 600 !important;
+  font-size: 16px !important;
+  color: #1f2937 !important;
+  margin-bottom: 8px !important;
+}
+
+.absmartly-sidebar .experiment-info {
+  display: flex !important;
+  gap: 16px !important;
+  font-size: 13px !important;
+  color: #6b7280 !important;
+}
+
+.absmartly-sidebar .status-badge {
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.absmartly-sidebar .status-badge.active {
+  background: #10b981 !important;
+  color: white !important;
+}
+
+.absmartly-sidebar .status-badge.draft {
+  background: #f59e0b !important;
+  color: white !important;
+}
+
+.absmartly-sidebar .status-badge.stopped {
+  background: #6b7280 !important;
+  color: white !important;
+}
+
+/* Experiment Detail Styles */
+.absmartly-sidebar .back-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 16px !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  color: #4b5563 !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  margin-bottom: 20px !important;
+  transition: all 0.2s !important;
+}
+
+.absmartly-sidebar .back-button:hover {
+  background: #f3f4f6 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Form Styles */
+.absmartly-sidebar input,
+.absmartly-sidebar select,
+.absmartly-sidebar textarea {
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+  background: white !important;
+  transition: all 0.2s !important;
+}
+
+.absmartly-sidebar input:focus,
+.absmartly-sidebar select:focus,
+.absmartly-sidebar textarea:focus {
+  outline: none !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+.absmartly-sidebar label {
+  display: block !important;
+  margin-bottom: 4px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #374151 !important;
+}
+
+.absmartly-sidebar .form-group {
+  margin-bottom: 16px !important;
+}
+
+/* Button Styles */
+.absmartly-sidebar button {
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  border: 1px solid transparent !important;
+}
+
+.absmartly-sidebar .btn-primary {
+  background: #6366f1 !important;
+  color: white !important;
+}
+
+.absmartly-sidebar .btn-primary:hover {
+  background: #4f46e5 !important;
+}
+
+.absmartly-sidebar .btn-secondary {
+  background: white !important;
+  color: #4b5563 !important;
+  border-color: #e5e7eb !important;
+}
+
+.absmartly-sidebar .btn-secondary:hover {
+  background: #f9fafb !important;
+}
+
+/* Scrollbar Styles */
+.absmartly-sidebar-content::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.absmartly-sidebar-content::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+}
+
+.absmartly-sidebar-content::-webkit-scrollbar-thumb {
+  background: #9ca3af !important;
+  border-radius: 3px !important;
+}
+
+.absmartly-sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: #6b7280 !important;
+}
+
+/* Ensure sidebar is above all page content */
+#absmartly-sidebar-root * {
+  box-sizing: border-box !important;
+}
+
+/* Prevent page content from overlapping */
+body.absmartly-sidebar-open {
+  margin-right: 400px !important;
+  transition: margin-right 0.3s ease !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .absmartly-sidebar {
+    width: 100% !important;
+  }
+  
+  body.absmartly-sidebar-open {
+    margin-right: 0 !important;
+  }
+}
