@@ -642,41 +642,55 @@ chrome.action.onClicked.addListener(async (tab) => {
       console.log('[Background] Injecting sidebar for first time in tab:', tab.id)
       
       try {
-        // Try to inject using chrome.runtime.getURL to get proper extension URLs
-        const cssUrl = chrome.runtime.getURL('sidebar.850787d0.css')
-        const jsUrl = chrome.runtime.getURL('sidebar.e865c912.js')
-        
-        console.log('[Background] CSS URL:', cssUrl)
-        console.log('[Background] JS URL:', jsUrl)
-        
-        // Inject CSS by fetching and inserting it
+        // Inject the sidebar using iframe approach
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          func: (cssUrl) => {
-            return fetch(cssUrl)
-              .then(response => response.text())
-              .then(css => {
-                const style = document.createElement('style')
-                style.textContent = css
-                document.head.appendChild(style)
-              })
-          },
-          args: [cssUrl]
-        })
-        
-        // Then inject the JavaScript
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: (jsUrl) => {
-            return fetch(jsUrl)
-              .then(response => response.text())
-              .then(js => {
-                const script = document.createElement('script')
-                script.textContent = js
-                document.body.appendChild(script)
-              })
-          },
-          args: [jsUrl]
+          func: () => {
+            // Check if sidebar is already injected
+            if (document.getElementById('absmartly-sidebar-root')) {
+              console.log('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
+              const sidebar = document.getElementById('absmartly-sidebar-root') as HTMLElement
+              sidebar.style.display = sidebar.style.display === 'none' ? 'block' : 'none'
+              return
+            }
+
+            console.log('🔵 ABSmartly Extension: Injecting sidebar')
+
+            // Create the sidebar container
+            const container = document.createElement('div')
+            container.id = 'absmartly-sidebar-root'
+            container.style.cssText = `
+              position: fixed;
+              top: 0;
+              right: 0;
+              width: 384px;
+              height: 100vh;
+              background-color: white;
+              border-left: 1px solid #e5e7eb;
+              box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+              z-index: 2147483647;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+              font-size: 14px;
+              line-height: 1.5;
+              color: #111827;
+            `
+            
+            // Create the iframe for isolation
+            const iframe = document.createElement('iframe')
+            iframe.id = 'absmartly-sidebar-iframe'
+            iframe.style.cssText = `
+              width: 100%;
+              height: 100%;
+              border: none;
+            `
+            // Use the tabs page as the iframe source
+            iframe.src = chrome.runtime.getURL('tabs/sidebar.html')
+            
+            container.appendChild(iframe)
+            document.body.appendChild(container)
+            
+            console.log('🔵 ABSmartly Extension: Sidebar injected successfully')
+          }
         })
         
         // Mark this tab as having the sidebar injected
