@@ -1,4 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
+
+// This is the main content script that will be injected into all web pages
 import { VisualEditor } from '~src/content/visual-editor'
 import type { DOMChange } from '~src/types/dom-changes'
 
