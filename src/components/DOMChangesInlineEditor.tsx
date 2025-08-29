@@ -275,6 +275,42 @@ export function DOMChangesInlineEditor({
             changes: message.changes
           })
         }
+      } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
+        console.log('✅ Visual Editor Complete - Received changes:', message)
+        
+        if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
+          // Merge new changes with existing ones
+          const existingChanges = [...changes]
+          const newChanges = message.changes
+          
+          // Add new changes to the list
+          const mergedChanges = [...existingChanges, ...newChanges]
+          
+          console.log('📝 Merged changes:', mergedChanges)
+          
+          // Update our local changes
+          setChanges(mergedChanges)
+          
+          // Update the parent component
+          onChangesUpdate({
+            ...variant,
+            changes: mergedChanges
+          })
+          
+          // Store in session storage for persistence
+          const storage = new Storage({ area: "session" })
+          await storage.set('visualEditorChanges', {
+            variantName,
+            changes: mergedChanges
+          })
+          
+          // Show success toast
+          const toast = document.createElement('div')
+          toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50 animate-slide-in'
+          toast.textContent = `✅ Added ${message.totalChanges} changes from Visual Editor`
+          document.body.appendChild(toast)
+          setTimeout(() => toast.remove(), 3000)
+        }
       }
     }
     
@@ -282,7 +318,7 @@ export function DOMChangesInlineEditor({
     return () => {
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
     }
-  }, [variantName])
+  }, [variantName, changes, variant, onChangesUpdate])
 
   const handleLaunchVisualEditor = async () => {
     console.log('🎨 Launching Visual Editor')
@@ -299,6 +335,11 @@ export function DOMChangesInlineEditor({
     console.log('🚀 Sending START_VISUAL_EDITOR message to background')
     console.log('Variant:', variantName)
     console.log('Changes:', changes)
+    
+    // Test if we can send any message at all
+    chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
+      console.log('PING response:', response)
+    })
     
     chrome.runtime.sendMessage({ 
       type: 'START_VISUAL_EDITOR',
