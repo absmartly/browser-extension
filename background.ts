@@ -378,6 +378,15 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
 
 // Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('🔵 Background received message:', message.type, 'Full message:', message)
+  
+  // Test message
+  if (message.type === 'PING') {
+    console.log('🏓 PONG! Message system is working')
+    sendResponse({ pong: true })
+    return false
+  }
+  
   if (message.type === "TOGGLE_VISUAL_EDITOR") {
     // Forward to content script in active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -593,26 +602,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return
           }
           
-          // First, try to send message to see if content script is loaded
-          let contentScriptReady = false
-          try {
-            await chrome.tabs.sendMessage(tabId, { type: 'GET_VISUAL_EDITOR_STATUS' })
-            contentScriptReady = true
-            console.log('Content script is already loaded')
-          } catch (error) {
-            console.log('Content script not loaded, will inject it')
-            console.log('Error was:', error)
-          }
+          // Always inject the visual editor directly
+          console.log('Injecting visual editor directly into page...')
+          console.log('Tab ID:', tabId, 'Tab URL:', tabUrl)
           
-          if (!contentScriptReady) {
-            // Content script not loaded, inject it
-            console.log('Injecting visual-editor script...')
+          try {
+            // First, test with a simple alert to confirm injection works
+            console.log('Testing simple injection first...')
+            const testResult = await chrome.scripting.executeScript({
+              target: { tabId: tabId },
+              func: () => {
+                console.log('[ABSmartly Test] Script injected successfully!')
+                return { test: 'success' }
+              }
+            })
+            console.log('Test injection result:', testResult)
             
-            try {
-              // First, try injecting a simple inline script to set up the visual editor
-              console.log('Injecting inline visual editor script...')
-              
-              const injectionResult = await chrome.scripting.executeScript({
+            // Now inject the actual visual editor
+            const injectionResult = await chrome.scripting.executeScript({
                 target: { tabId: tabId },
                 func: function(variantName, initialChanges) {
                   // This runs in the page context
@@ -663,12 +670,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       outline: 3px solid #10b981 !important;
                       position: relative !important;
                     }
+                    @keyframes slideIn {
+                      from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                      }
+                      to {
+                        transform: translateX(0);
+                        opacity: 1;
+                      }
+                    }
                   `
                   document.head.appendChild(style)
                   
-                  // Track selected element
+                  // Track selected element and changes
                   let selectedElement = null
                   let isEditing = false
+                  const allChanges = []
                   
                   // Add hover effect
                   const handleMouseOver = (e) => {
@@ -689,49 +707,411 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const target = e.target
                     
                     // Ignore clicks on our UI
-                    if (target.id === 'absmartly-visual-editor-banner' || target.closest('#absmartly-visual-editor-banner')) {
+                    if (target.id === 'absmartly-visual-editor-banner' || 
+                        target.closest('#absmartly-visual-editor-banner') ||
+                        target.closest('#absmartly-context-menu')) {
                       return
                     }
                     
                     e.preventDefault()
                     e.stopPropagation()
                     
-                    // Remove previous selection
+                    // Remove previous selection and menu
                     if (selectedElement) {
                       selectedElement.classList.remove('absmartly-selected')
                     }
+                    const existingMenu = document.getElementById('absmartly-context-menu')
+                    if (existingMenu) existingMenu.remove()
                     
                     // Select new element
                     selectedElement = target
                     target.classList.remove('absmartly-hover')
                     target.classList.add('absmartly-selected')
                     
-                    // Make it editable
-                    if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-                      target.contentEditable = 'true'
-                      target.focus()
-                      isEditing = true
-                      
-                      // Listen for when editing ends
-                      const handleBlur = () => {
-                        target.contentEditable = 'false'
-                        isEditing = false
-                        target.removeEventListener('blur', handleBlur)
+                    // Show context menu
+                    showContextMenu(e.pageX, e.pageY, target)
+                  }
+                  
+                  // Show context menu function
+                  function showContextMenu(x, y, element) {
+                    const menu = document.createElement('div')
+                    menu.id = 'absmartly-context-menu'
+                    menu.style.cssText = `
+                      position: absolute;
+                      left: ${Math.min(x + 5, window.innerWidth - 220)}px;
+                      top: ${Math.min(y + 5, window.innerHeight - 300)}px;
+                      background: white;
+                      border: 1px solid #ddd;
+                      border-radius: 6px;
+                      box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 0 1px rgba(0,0,0,0.1);
+                      padding: 4px 0;
+                      min-width: 180px;
+                      z-index: 2147483647;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                      font-size: 13px;
+                      color: #333;
+                    `
+                    
+                    const menuItems = [
+                      { icon: '✏️', label: 'Edit Text', action: 'edit' },
+                      { icon: '</>', label: 'Edit HTML', action: 'editHtml', color: '#0066cc' },
+                      { divider: true },
+                      { icon: '↑', label: 'Move Up', action: 'moveUp' },
+                      { icon: '↓', label: 'Move Down', action: 'moveDown' },
+                      { divider: true },
+                      { icon: '⊕', label: 'Duplicate', action: 'duplicate' },
+                      { icon: '📋', label: 'Copy Style', action: 'copyStyle' },
+                      { divider: true },
+                      { icon: '👁', label: 'Hide Element', action: 'hide' },
+                      { icon: '🗑', label: 'Delete', action: 'delete', color: '#dc3545' }
+                    ]
+                    
+                    menuItems.forEach(item => {
+                      if (item.divider) {
+                        const divider = document.createElement('div')
+                        divider.style.cssText = 'height: 1px; background: #e5e5e5; margin: 4px 0;'
+                        menu.appendChild(divider)
+                      } else {
+                        const menuItem = document.createElement('div')
+                        menuItem.style.cssText = `
+                          padding: 8px 12px;
+                          cursor: pointer;
+                          display: flex;
+                          align-items: center;
+                          gap: 8px;
+                          transition: background-color 0.15s;
+                          color: ${item.color || '#333'};
+                        `
                         
-                        // Log the change
-                        console.log('[ABSmartly] Element edited:', {
-                          selector: getSelector(target),
-                          newText: target.textContent
-                        })
+                        const icon = document.createElement('span')
+                        icon.style.cssText = `
+                          width: 16px;
+                          text-align: center;
+                          opacity: 0.7;
+                          font-size: 12px;
+                        `
+                        icon.textContent = item.icon
+                        
+                        const label = document.createElement('span')
+                        label.textContent = item.label
+                        label.style.flex = '1'
+                        
+                        menuItem.appendChild(icon)
+                        menuItem.appendChild(label)
+                        
+                        menuItem.onmouseover = () => menuItem.style.backgroundColor = '#f0f0f0'
+                        menuItem.onmouseout = () => menuItem.style.backgroundColor = 'transparent'
+                        menuItem.onclick = (e) => {
+                          e.stopPropagation()
+                          handleMenuAction(item.action, element)
+                          menu.remove()
+                        }
+                        menu.appendChild(menuItem)
                       }
-                      
-                      target.addEventListener('blur', handleBlur)
+                    })
+                    
+                    document.body.appendChild(menu)
+                    
+                    // Close menu when clicking outside
+                    setTimeout(() => {
+                      const closeMenu = (e) => {
+                        if (!menu.contains(e.target)) {
+                          menu.remove()
+                          document.removeEventListener('click', closeMenu)
+                        }
+                      }
+                      document.addEventListener('click', closeMenu)
+                    }, 100)
+                  }
+                  
+                  // Handle menu actions
+                  function handleMenuAction(action, element) {
+                    const originalState = {
+                      html: element.outerHTML,
+                      parent: element.parentNode,
+                      nextSibling: element.nextSibling
                     }
+                    
+                    switch(action) {
+                      case 'edit':
+                        // Remove selection styling while editing
+                        element.classList.remove('absmartly-selected')
+                        element.contentEditable = 'true'
+                        element.focus()
+                        
+                        // Select all text for easy replacement
+                        const range = document.createRange()
+                        range.selectNodeContents(element)
+                        const selection = window.getSelection()
+                        selection.removeAllRanges()
+                        selection.addRange(range)
+                        
+                        isEditing = true
+                        
+                        const handleBlur = () => {
+                          element.contentEditable = 'false'
+                          element.classList.add('absmartly-selected')
+                          isEditing = false
+                          element.removeEventListener('blur', handleBlur)
+                          element.removeEventListener('keydown', handleKeyPress)
+                          
+                          // Track change
+                          trackChange('edit', element, { 
+                            oldText: originalState.html,
+                            newText: element.textContent 
+                          })
+                        }
+                        
+                        const handleKeyPress = (e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            element.blur()
+                          }
+                          if (e.key === 'Escape') {
+                            element.innerHTML = originalState.html
+                            element.blur()
+                          }
+                        }
+                        
+                        element.addEventListener('blur', handleBlur)
+                        element.addEventListener('keydown', handleKeyPress)
+                        break
+                        
+                      case 'editHtml':
+                        const currentHtml = element.outerHTML
+                        const editor = document.createElement('div')
+                        editor.style.cssText = `
+                          position: fixed;
+                          top: 50%;
+                          left: 50%;
+                          transform: translate(-50%, -50%);
+                          background: white;
+                          border: 1px solid #ddd;
+                          border-radius: 8px;
+                          box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                          padding: 20px;
+                          z-index: 2147483648;
+                          width: 80%;
+                          max-width: 600px;
+                        `
+                        
+                        const title = document.createElement('h3')
+                        title.textContent = 'Edit HTML'
+                        title.style.cssText = 'margin: 0 0 10px 0; font-family: system-ui;'
+                        
+                        const textarea = document.createElement('textarea')
+                        textarea.value = currentHtml
+                        textarea.style.cssText = `
+                          width: 100%;
+                          height: 300px;
+                          padding: 10px;
+                          border: 1px solid #ddd;
+                          border-radius: 4px;
+                          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                          font-size: 12px;
+                          resize: vertical;
+                        `
+                        
+                        const buttons = document.createElement('div')
+                        buttons.style.cssText = 'margin-top: 10px; text-align: right;'
+                        
+                        const cancelBtn = document.createElement('button')
+                        cancelBtn.textContent = 'Cancel'
+                        cancelBtn.style.cssText = `
+                          padding: 8px 16px;
+                          margin-right: 8px;
+                          border: 1px solid #ddd;
+                          border-radius: 4px;
+                          background: white;
+                          cursor: pointer;
+                        `
+                        
+                        const saveBtn = document.createElement('button')
+                        saveBtn.textContent = 'Save'
+                        saveBtn.style.cssText = `
+                          padding: 8px 16px;
+                          border: none;
+                          border-radius: 4px;
+                          background: #3b82f6;
+                          color: white;
+                          cursor: pointer;
+                        `
+                        
+                        cancelBtn.onclick = () => editor.remove()
+                        saveBtn.onclick = () => {
+                          const tempDiv = document.createElement('div')
+                          tempDiv.innerHTML = textarea.value
+                          const newElement = tempDiv.firstElementChild
+                          if (newElement) {
+                            element.replaceWith(newElement)
+                            trackChange('editHtml', newElement, { 
+                              oldHtml: currentHtml,
+                              newHtml: textarea.value 
+                            })
+                          }
+                          editor.remove()
+                        }
+                        
+                        buttons.appendChild(cancelBtn)
+                        buttons.appendChild(saveBtn)
+                        editor.appendChild(title)
+                        editor.appendChild(textarea)
+                        editor.appendChild(buttons)
+                        document.body.appendChild(editor)
+                        
+                        textarea.focus()
+                        textarea.select()
+                        break
+                        
+                      case 'hide':
+                        element.style.display = 'none'
+                        trackChange('hide', element, { display: 'none' })
+                        break
+                        
+                      case 'delete':
+                        element.remove()
+                        trackChange('delete', null, { 
+                          deletedHtml: originalState.html,
+                          parent: originalState.parent 
+                        })
+                        break
+                        
+                      case 'duplicate':
+                        const clone = element.cloneNode(true)
+                        clone.classList.remove('absmartly-selected', 'absmartly-hover')
+                        element.parentNode.insertBefore(clone, element.nextSibling)
+                        trackChange('duplicate', clone, { original: element })
+                        break
+                      
+                      case 'copyStyle':
+                        const computedStyle = window.getComputedStyle(element)
+                        const styles = Array.from(computedStyle).reduce((str, prop) => {
+                          return str + `${prop}:${computedStyle.getPropertyValue(prop)};`
+                        }, '')
+                        navigator.clipboard.writeText(styles)
+                        showNotification('Style copied to clipboard!')
+                        break
+                        
+                      case 'moveUp':
+                        if (element.previousElementSibling) {
+                          element.parentNode.insertBefore(element, element.previousElementSibling)
+                          trackChange('move', element, { direction: 'up' })
+                        }
+                        break
+                        
+                      case 'moveDown':
+                        if (element.nextElementSibling) {
+                          element.parentNode.insertBefore(element.nextElementSibling, element)
+                          trackChange('move', element, { direction: 'down' })
+                        }
+                        break
+                    }
+                  }
+                  
+                  // Track changes for saving
+                  function trackChange(type, element, data) {
+                    const change = {
+                      type,
+                      selector: element ? getSelector(element) : null,
+                      timestamp: Date.now(),
+                      ...data
+                    }
+                    
+                    console.log('[ABSmartly] Change tracked:', change)
+                    
+                    // Store change locally
+                    allChanges.push(change)
+                    
+                    // Also send individual change to extension for real-time updates
+                    if (window.chrome && chrome.runtime) {
+                      chrome.runtime.sendMessage({
+                        type: 'VISUAL_EDITOR_CHANGE',
+                        change
+                      })
+                    }
+                  }
+                  
+                  // Show notification
+                  function showNotification(message) {
+                    const notification = document.createElement('div')
+                    notification.textContent = message
+                    notification.style.cssText = `
+                      position: fixed;
+                      bottom: 20px;
+                      right: 20px;
+                      background: #10b981;
+                      color: white;
+                      padding: 12px 20px;
+                      border-radius: 6px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                      z-index: 2147483647;
+                      font-family: system-ui;
+                      font-size: 14px;
+                      animation: slideIn 0.3s ease;
+                    `
+                    document.body.appendChild(notification)
+                    setTimeout(() => notification.remove(), 3000)
                   }
                   
                   // Handle ESC key
                   const handleKeyDown = (e) => {
                     if (e.key === 'Escape') {
+                      // Send all changes to the sidebar before exiting
+                      if (allChanges.length > 0) {
+                        console.log('[ABSmartly] Sending all changes to sidebar:', allChanges)
+                        
+                        // Convert changes to DOM change format for the sidebar
+                        const domChanges = allChanges.map(change => {
+                          let domChange = {
+                            selector: change.selector,
+                            timestamp: change.timestamp
+                          }
+                          
+                          switch(change.type) {
+                            case 'edit':
+                              domChange.type = 'text'
+                              domChange.value = change.newText
+                              break
+                            case 'editHtml':
+                              domChange.type = 'html'
+                              domChange.value = change.newHtml
+                              break
+                            case 'hide':
+                              domChange.type = 'style'
+                              domChange.property = 'display'
+                              domChange.value = 'none'
+                              break
+                            case 'delete':
+                              domChange.type = 'remove'
+                              break
+                            case 'duplicate':
+                              domChange.type = 'duplicate'
+                              break
+                            case 'move':
+                              domChange.type = 'move'
+                              domChange.direction = change.direction
+                              break
+                            default:
+                              domChange.type = change.type
+                              domChange.data = change
+                          }
+                          
+                          return domChange
+                        })
+                        
+                        // Send all changes to extension
+                        if (window.chrome && chrome.runtime) {
+                          chrome.runtime.sendMessage({
+                            type: 'VISUAL_EDITOR_COMPLETE',
+                            variantName: variantName,
+                            changes: domChanges,
+                            totalChanges: allChanges.length
+                          }, (response) => {
+                            console.log('[ABSmartly] Changes sent to extension:', response)
+                          })
+                        }
+                      }
+                      
                       // Clean up
                       document.removeEventListener('mouseover', handleMouseOver)
                       document.removeEventListener('mouseout', handleMouseOut)
@@ -739,19 +1119,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       document.removeEventListener('keydown', handleKeyDown)
                       
                       // Remove styles and banner
-                      document.getElementById('absmartly-visual-editor-banner')?.remove()
-                      document.getElementById('absmartly-visual-editor-styles')?.remove()
+                      const banner = document.getElementById('absmartly-visual-editor-banner')
+                      if (banner) banner.remove()
                       
-                      // Remove classes
-                      document.querySelectorAll('.absmartly-hover').forEach(el => {
+                      const styles = document.getElementById('absmartly-visual-editor-styles')
+                      if (styles) styles.remove()
+                      
+                      // Remove context menu if open
+                      const menu = document.getElementById('absmartly-context-menu')
+                      if (menu) menu.remove()
+                      
+                      // Remove classes - use Array.from to ensure forEach is available
+                      const hoverElements = document.querySelectorAll('.absmartly-hover')
+                      Array.from(hoverElements).forEach(el => {
                         el.classList.remove('absmartly-hover')
                       })
-                      document.querySelectorAll('.absmartly-selected').forEach(el => {
+                      
+                      const selectedElements = document.querySelectorAll('.absmartly-selected')
+                      Array.from(selectedElements).forEach(el => {
                         el.classList.remove('absmartly-selected')
                       })
                       
-                      (window as any).__absmartlyVisualEditorActive = false
-                      console.log('[ABSmartly] Visual editor stopped')
+                      window.__absmartlyVisualEditorActive = false
+                      console.log('[ABSmartly] Visual editor stopped with ' + allChanges.length + ' changes')
                     }
                   }
                   
@@ -782,27 +1172,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               
               // The visual editor is now running inline, no need to send messages
               sendResponse({ success: true, message: 'Visual editor started successfully' })
-            } catch (error) {
-              console.error('Failed to inject visual editor script:', error)
-              sendResponse({ success: false, error: 'Failed to inject visual editor script' })
-            }
-          } else {
-            // Content script already loaded, send the message directly
-            console.log('Content script already loaded, starting visual editor...')
-            
-            try {
-              const response = await chrome.tabs.sendMessage(tabId, {
-                type: 'START_VISUAL_EDITOR',
-                variantName: message.variantName,
-                changes: message.changes
-              })
-              
-              console.log('Visual editor started successfully')
-              sendResponse({ success: true })
-            } catch (error) {
-              console.error('Error starting visual editor:', error)
-              sendResponse({ success: false, error: error.message || 'Failed to start visual editor' })
-            }
+          } catch (error) {
+            console.error('Failed to inject visual editor script:', error)
+            sendResponse({ success: false, error: error.message || 'Failed to inject visual editor script' })
           }
         } else {
           console.error('No active tab found')
@@ -813,6 +1185,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message || 'Unexpected error' })
       }
     })()
+    
+    return true // Will respond asynchronously
+  } else if (message.type === "VISUAL_EDITOR_CHANGE") {
+    console.log('[Background] Visual editor change received:', message.change)
+    
+    // Store the change
+    chrome.storage.local.get(['visualEditorChanges'], (result) => {
+      const changes = result.visualEditorChanges || []
+      changes.push(message.change)
+      
+      chrome.storage.local.set({ 
+        visualEditorChanges: changes 
+      }, () => {
+        console.log('[Background] Visual editor change saved')
+        sendResponse({ success: true })
+      })
+    })
+    
+    return true // Will respond asynchronously
+  } else if (message.type === "VISUAL_EDITOR_COMPLETE") {
+    console.log('[Background] Visual editor complete with changes:', message)
+    
+    // Forward all changes to the sidebar
+    chrome.runtime.sendMessage({
+      type: 'VISUAL_EDITOR_CHANGES_COMPLETE',
+      variantName: message.variantName,
+      changes: message.changes,
+      totalChanges: message.totalChanges
+    })
+    
+    // Also store in local storage for persistence
+    chrome.storage.local.set({ 
+      lastVisualEditorChanges: message.changes,
+      lastVisualEditorVariant: message.variantName
+    }, () => {
+      console.log('[Background] Visual editor complete changes saved')
+      sendResponse({ success: true, changesSaved: message.totalChanges })
+    })
     
     return true // Will respond asynchronously
   } else if (message.type === "FETCH_AVATAR") {
