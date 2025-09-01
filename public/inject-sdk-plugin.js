@@ -153,15 +153,12 @@
           newScript.src = script.src;
           newScript.async = script.async;
           newScript.defer = script.defer;
+          newScript.setAttribute('data-absmartly-injected', location);
           
           // Add to appropriate location
-          if (location.includes('head')) {
-            document.head.appendChild(newScript);
-          } else {
-            document.body.appendChild(newScript);
-          }
+          insertAtLocation(newScript, location);
         } else {
-          // Inline script - execute the code
+          // Inline script - execute the code immediately
           const code = script.textContent || script.innerText || '';
           if (code) {
             const fn = new Function(code);
@@ -173,6 +170,36 @@
         console.error(`[ABsmartly Extension] Failed to execute script from ${location}:`, error);
       }
     });
+  }
+
+  /**
+   * Inserts an element at the correct location based on the injection point
+   */
+  function insertAtLocation(element, location) {
+    switch(location) {
+      case 'headStart':
+        if (document.head.firstChild) {
+          document.head.insertBefore(element, document.head.firstChild);
+        } else {
+          document.head.appendChild(element);
+        }
+        break;
+      case 'headEnd':
+        document.head.appendChild(element);
+        break;
+      case 'bodyStart':
+        if (document.body.firstChild) {
+          document.body.insertBefore(element, document.body.firstChild);
+        } else {
+          document.body.appendChild(element);
+        }
+        break;
+      case 'bodyEnd':
+        document.body.appendChild(element);
+        break;
+      default:
+        console.warn(`[ABsmartly Extension] Unknown injection location: ${location}`);
+    }
   }
 
   /**
