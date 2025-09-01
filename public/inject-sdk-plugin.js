@@ -16,6 +16,7 @@
   // Track initialization state
   let isInitializing = false;
   let isInitialized = false;
+  let cachedContext = null; // Cache the context to avoid repeated detection
 
   // Capture the extension URL from the current script (must be done synchronously at script load)
   const scriptSrc = document.currentScript ? document.currentScript.src : null;
@@ -60,9 +61,14 @@
   }
 
   /**
-   * Detects ABsmartly SDK on the window object
+   * Detects ABsmartly SDK on the window object - uses cache if available
    */
   function detectABsmartlySDK() {
+    // Return cached context if we already found it
+    if (cachedContext) {
+      return { sdk: null, context: cachedContext };
+    }
+
     // Check common SDK locations
     const possibleLocations = [
       window.ABsmartlyContext,
@@ -81,7 +87,7 @@
     // First pass: Check if any location is directly a context (has treatment method)
     for (const location of possibleLocations) {
       if (location && typeof location.treatment === 'function') {
-        console.log('[ABsmartly Plugin] Found context directly with treatment method');
+        console.log('[ABsmartly Extension] Found context directly with treatment method');
         context = location;
         break;
       }
@@ -91,7 +97,7 @@
     if (!context) {
       for (const location of possibleLocations) {
         if (location && location.context && typeof location.context.treatment === 'function') {
-          console.log('[ABsmartly Plugin] Found context in container.context with treatment method');
+          console.log('[ABsmartly Extension] Found context in container.context with treatment method');
           context = location.context;
           break;
         }
@@ -105,7 +111,7 @@
           // Check each context in the array for treatment method
           for (const ctx of location.contexts) {
             if (ctx && typeof ctx.treatment === 'function') {
-              console.log('[ABsmartly Plugin] Found context in contexts array with treatment method');
+              console.log('[ABsmartly Extension] Found context in contexts array with treatment method');
               context = ctx;
               break;
             }
@@ -113,6 +119,11 @@
           if (context) break;
         }
       }
+    }
+
+    // Cache the context for future use
+    if (context) {
+      cachedContext = context;
     }
 
     return { sdk: null, context };
@@ -190,9 +201,15 @@
         // Check again if plugin is already loaded
         const existingPlugin = isPluginAlreadyLoaded();
         if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
-          if (customCode && typeof existingPlugin === 'object') {
-            console.log('[ABsmartly Extension] Injecting custom code into existing plugin');
-            existingPlugin.injectCode(customCode);
+          if (customCode) {
+            console.log('[ABsmartly Extension] Injecting custom code (existing plugin)');
+            try {
+              const codeFunction = new Function(customCode);
+              codeFunction();
+              console.log('[ABsmartly Extension] Custom code executed successfully');
+            } catch (error) {
+              console.error('[ABsmartly Extension] Failed to execute custom code:', error);
+            }
           }
           isInitialized = true;
           isInitializing = false;
@@ -305,7 +322,15 @@
 
               // Inject custom code if provided
               if (customCode) {
-                plugin.injectCode(customCode);
+                console.log('[ABsmartly Extension] Injecting custom code via eval');
+                try {
+                  // Execute the custom code directly since plugin.injectCode might not exist
+                  const codeFunction = new Function(customCode);
+                  codeFunction();
+                  console.log('[ABsmartly Extension] Custom code executed successfully');
+                } catch (error) {
+                  console.error('[ABsmartly Extension] Failed to execute custom code:', error);
+                }
               }
 
               // Notify extension
@@ -335,13 +360,18 @@
         initializePlugin(context);
       } else if (event.data.type === 'INJECT_CUSTOM_CODE') {
         const { customCode } = event.data.payload || {};
-        const plugin = window.__absmartlyExtensionPlugin || window.__absmartlyPlugin || window.__absmartlyDOMChangesPlugin;
         
-        if (plugin && customCode && typeof plugin === 'object') {
-          console.log('[ABsmartly Extension] Injecting custom code');
-          plugin.injectCode(customCode);
+        if (customCode) {
+          console.log('[ABsmartly Extension] Injecting custom code (INJECT_CUSTOM_CODE message)');
+          try {
+            const codeFunction = new Function(customCode);
+            codeFunction();
+            console.log('[ABsmartly Extension] Custom code executed successfully');
+          } catch (error) {
+            console.error('[ABsmartly Extension] Failed to execute custom code:', error);
+          }
         } else {
-          console.warn('[ABsmartly Extension] Cannot inject custom code - plugin not accessible');
+          console.warn('[ABsmartly Extension] No custom code provided');
         }
       }
     }
