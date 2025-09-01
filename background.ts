@@ -1,6 +1,6 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
-import type { ABsmartlyConfig } from '~src/types/absmartly'
+import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
 
 // Storage instance
 const storage = new Storage()
@@ -1263,6 +1263,57 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
     })
     return true // Will respond asynchronously
+  } else if (message.type === "REQUEST_INJECTION_CODE") {
+    // Handle request from SDK plugin for custom code injection
+    console.log('Background received REQUEST_INJECTION_CODE from SDK plugin')
+    
+    storage.get("absmartly-custom-code").then((customCode: CustomCode | null) => {
+      if (customCode) {
+        // Prepare injection data for SDK plugin
+        const injectionData = {
+          headStart: customCode.headStart || '',
+          headEnd: customCode.headEnd || '',
+          bodyStart: customCode.bodyStart || '',
+          bodyEnd: customCode.bodyEnd || '',
+          styleTag: customCode.styleTag || ''
+        }
+        
+        console.log('Sending custom code to SDK plugin:', injectionData)
+        sendResponse({ 
+          success: true, 
+          data: injectionData 
+        })
+      } else {
+        console.log('No custom code configured')
+        sendResponse({ 
+          success: true, 
+          data: {
+            headStart: '',
+            headEnd: '',
+            bodyStart: '',
+            bodyEnd: '',
+            styleTag: ''
+          }
+        })
+      }
+    }).catch(error => {
+      console.error('Error retrieving custom code:', error)
+      sendResponse({ 
+        success: false, 
+        error: error.message 
+      })
+    })
+    
+    return true // Will respond asynchronously
+  } else if (message.type === "CODE_EDITOR_SAVE" || message.type === "CODE_EDITOR_CLOSE") {
+    // Forward these messages from content script to popup
+    console.log('Background forwarding message to popup:', message.type)
+    
+    // Send to all extension views (including popup)
+    chrome.runtime.sendMessage(message)
+    sendResponse({ success: true })
+    
+    return false
   }
 })
 

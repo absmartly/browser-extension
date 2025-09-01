@@ -292,10 +292,7 @@ export function DOMChangesInlineEditor({
           setChanges(mergedChanges)
           
           // Update the parent component
-          onChangesUpdate({
-            ...variant,
-            changes: mergedChanges
-          })
+          onChange(mergedChanges)
           
           // Store in session storage for persistence
           const storage = new Storage({ area: "session" })
@@ -318,7 +315,7 @@ export function DOMChangesInlineEditor({
     return () => {
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
     }
-  }, [variantName, changes, variant, onChangesUpdate])
+  }, [variantName, changes, onChange])
 
   const handleLaunchVisualEditor = async () => {
     console.log('🎨 Launching Visual Editor')
