@@ -130,6 +130,52 @@
   }
 
   /**
+   * Executes script tags found in HTML content
+   * Scripts injected via innerHTML don't execute, so we need to recreate them
+   */
+  function executeScriptsInHTML(html, location) {
+    console.log(`[ABsmartly Extension] Processing scripts for ${location}`);
+    
+    // Create a temporary container
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Find all script tags
+    const scripts = temp.querySelectorAll('script');
+    
+    scripts.forEach((script, index) => {
+      console.log(`[ABsmartly Extension] Executing script ${index + 1} from ${location}`);
+      
+      try {
+        if (script.src) {
+          // External script - create a new script element
+          const newScript = document.createElement('script');
+          newScript.src = script.src;
+          newScript.async = script.async;
+          newScript.defer = script.defer;
+          
+          // Add to appropriate location
+          if (location.includes('head')) {
+            document.head.appendChild(newScript);
+          } else {
+            document.body.appendChild(newScript);
+          }
+        } else {
+          // Inline script - execute the code
+          const code = script.textContent || script.innerText || '';
+          if (code) {
+            const fn = new Function(code);
+            fn();
+            console.log(`[ABsmartly Extension] Successfully executed inline script from ${location}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[ABsmartly Extension] Failed to execute script from ${location}:`, error);
+      }
+    });
+  }
+
+  /**
    * Wait for SDK and custom code, then initialize
    */
   function waitForSDKAndInitialize() {
@@ -192,24 +238,14 @@
         // Handle injection code from the plugin's request
         const payload = event.data.payload || {};
         
-        // Execute headEnd script if present (this contains our custom code)
-        if (payload.headEnd) {
-          console.log('[ABsmartly Extension] Executing headEnd script:', payload.headEnd);
-          // Extract script content from <script> tags
-          const scriptMatch = payload.headEnd.match(/<script>([\s\S]*?)<\/script>/);
-          if (scriptMatch && scriptMatch[1]) {
-            try {
-              const codeFunction = new Function(scriptMatch[1]);
-              codeFunction();
-              console.log('[ABsmartly Extension] Custom code from headEnd executed successfully');
-            } catch (error) {
-              console.error('[ABsmartly Extension] Failed to execute headEnd script:', error);
-            }
+        // Process each location that might contain scripts
+        ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
+          if (payload[location]) {
+            executeScriptsInHTML(payload[location], location);
           }
-        }
+        });
         
-        // Note: The plugin will also inject this into the DOM, but we execute it directly
-        // to ensure it runs even with CSP restrictions
+        // The plugin will still inject the HTML/CSS, but we handle script execution
       } else if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
         if (isInitialized || isInitializing) {
