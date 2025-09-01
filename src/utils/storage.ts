@@ -1,12 +1,13 @@
 import { Storage } from '@plasmohq/storage'
-import type { ABsmartlyConfig } from '~src/types/absmartly'
+import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
 
 const storage = new Storage()
 
 export const STORAGE_KEYS = {
   CONFIG: 'absmartly-config',
   RECENT_EXPERIMENTS: 'recent-experiments',
-  EXPERIMENTS_CACHE: 'experiments-cache'
+  EXPERIMENTS_CACHE: 'experiments-cache',
+  CUSTOM_CODE: 'absmartly-custom-code'
 } as const
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
@@ -171,4 +172,12 @@ export async function clearExperimentsCache(): Promise<void> {
   } catch (error) {
     console.error('Error clearing experiments cache:', error)
   }
+}
+
+export async function getCustomCode(): Promise<CustomCode | null> {
+  return await storage.get(STORAGE_KEYS.CUSTOM_CODE)
+}
+
+export async function setCustomCode(customCode: CustomCode): Promise<void> {
+  await storage.set(STORAGE_KEYS.CUSTOM_CODE, customCode)
 }

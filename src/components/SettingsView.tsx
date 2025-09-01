@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { CustomCodeSettings } from './CustomCodeSettings'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import logoUrl from "data-base64:~assets/logo.png"
@@ -397,6 +398,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           </p>
         </div>
       </div>
+      
+      {/* Custom Code Settings */}
+      <CustomCodeSettings onSave={() => {
+        // Optionally trigger a refresh or notification
+        console.log('Custom code saved')
+      }} />
       
       <div className="flex gap-2 pt-2">
         <Button onClick={handleSave} variant="primary">
