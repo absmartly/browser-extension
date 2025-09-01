@@ -189,57 +189,107 @@
           return;
         }
 
-        // Note: The actual DOMChangesPlugin class needs to be available on the page
-        // This would typically be loaded by the website or we'd need to inject it
-        if (typeof window.DOMChangesPlugin === 'undefined') {
-          console.error('[ABsmartly Extension] DOMChangesPlugin class not available');
-          console.log('[ABsmartly Extension] The website needs to load the @absmartly/dom-changes-plugin');
-          return;
-        }
-
-        try {
-          // Initialize the plugin
-          const plugin = new window.DOMChangesPlugin({
-            context: context,
-            autoApply: true,
-            spa: true,
-            visibilityTracking: true,
-            extensionBridge: true,
-            dataSource: 'variable',
-            dataFieldName: '__dom_changes',
-            debug: true
-          });
-
-          plugin.initialize().then(() => {
-            // Store our plugin instance for fallback detection
-            window.__absmartlyExtensionPlugin = plugin;
+        // Check if DOMChangesPlugin is available, if not load it from extension
+        if (typeof window.DOMChangesPlugin === 'undefined' && typeof window.ABSmartlyDOMChanges === 'undefined') {
+          console.log('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
+          
+          // Try to get the extension ID from the current script src
+          const currentScript = document.currentScript;
+          if (currentScript && currentScript.src) {
+            const extensionUrl = new URL(currentScript.src);
+            const pluginUrl = extensionUrl.origin + extensionUrl.pathname.replace('inject-sdk-plugin.js', 'absmartly-dom-changes.min.js');
             
-            // The plugin now registers itself with context.__domPlugin
-            // We can verify it's registered
-            if (context.__domPlugin && context.__domPlugin.instance === plugin) {
-              console.log('[ABsmartly Extension] Plugin successfully registered with context');
-            }
-
-            // Inject custom code if provided
-            if (customCode) {
-              plugin.injectCode(customCode);
-            }
-
-            // Notify extension
-            window.postMessage({
-              source: 'absmartly-page',
-              type: 'PLUGIN_INITIALIZED',
-              payload: {
-                version: context.__domPlugin ? context.__domPlugin.version : '1.0.0',
-                capabilities: context.__domPlugin ? context.__domPlugin.capabilities : []
+            // Load the plugin script
+            const script = document.createElement('script');
+            script.src = pluginUrl;
+            script.onload = () => {
+              console.log('[ABsmartly Extension] DOM Changes plugin loaded successfully');
+              // The UMD bundle exposes ABSmartlyDOMChanges globally
+              if (window.ABSmartlyDOMChanges && window.ABSmartlyDOMChanges.DOMChangesPlugin) {
+                window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
+                // Continue with initialization after plugin loads
+                initializePlugin();
+              } else {
+                console.error('[ABsmartly Extension] Failed to load DOMChangesPlugin from bundle');
               }
-            }, '*');
-
-            console.log('[ABsmartly Extension] Plugin initialized successfully');
-          });
-        } catch (error) {
-          console.error('[ABsmartly Extension] Failed to initialize plugin:', error);
+            };
+            script.onerror = () => {
+              console.error('[ABsmartly Extension] Failed to load DOM Changes plugin from extension');
+            };
+            document.head.appendChild(script);
+            return; // Wait for script to load
+          } else {
+            console.error('[ABsmartly Extension] Cannot determine extension URL to load plugin');
+            return;
+          }
         }
+        
+        // If plugin is already available or was aliased from ABSmartlyDOMChanges
+        if (typeof window.DOMChangesPlugin === 'undefined' && window.ABSmartlyDOMChanges && window.ABSmartlyDOMChanges.DOMChangesPlugin) {
+          window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
+        }
+        
+        // Function to initialize the plugin
+        function initializePlugin() {
+          const { context } = detectABsmartlySDK();
+          
+          if (!context) {
+            console.error('[ABsmartly Extension] No context available for plugin initialization');
+            return;
+          }
+
+          if (typeof window.DOMChangesPlugin === 'undefined') {
+            console.error('[ABsmartly Extension] DOMChangesPlugin still not available');
+            return;
+          }
+
+          try {
+            // Initialize the plugin
+            const plugin = new window.DOMChangesPlugin({
+              context: context,
+              autoApply: true,
+              spa: true,
+              visibilityTracking: true,
+              extensionBridge: true,
+              dataSource: 'variable',
+              dataFieldName: '__dom_changes',
+              debug: true
+            });
+
+            plugin.initialize().then(() => {
+              // Store our plugin instance for fallback detection
+              window.__absmartlyExtensionPlugin = plugin;
+              
+              // The plugin now registers itself with context.__domPlugin
+              // We can verify it's registered
+              if (context.__domPlugin && context.__domPlugin.instance === plugin) {
+                console.log('[ABsmartly Extension] Plugin successfully registered with context');
+              }
+
+              // Inject custom code if provided
+              if (customCode) {
+                plugin.injectCode(customCode);
+              }
+
+              // Notify extension
+              window.postMessage({
+                source: 'absmartly-page',
+                type: 'PLUGIN_INITIALIZED',
+                payload: {
+                  version: context.__domPlugin ? context.__domPlugin.version : '1.0.0',
+                  capabilities: context.__domPlugin ? context.__domPlugin.capabilities : []
+                }
+              }, '*');
+
+              console.log('[ABsmartly Extension] Plugin initialized successfully');
+            });
+          } catch (error) {
+            console.error('[ABsmartly Extension] Failed to initialize plugin:', error);
+          }
+        }
+        
+        // Now initialize the plugin
+        initializePlugin();
       } else if (event.data.type === 'INJECT_CUSTOM_CODE') {
         const { customCode } = event.data.payload || {};
         const plugin = window.__absmartlyExtensionPlugin || window.__absmartlyPlugin || window.__absmartlyDOMChangesPlugin;
