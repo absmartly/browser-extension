@@ -12,6 +12,10 @@
     return;
   }
   window.__absmartlyExtensionInjected = true;
+  
+  // Track initialization state
+  let isInitializing = false;
+  let isInitialized = false;
 
   // Capture the extension URL from the current script (must be done synchronously at script load)
   const scriptSrc = document.currentScript ? document.currentScript.src : null;
@@ -174,6 +178,13 @@
       console.log('[ABsmartly Page] Received message from extension:', event.data);
 
       if (event.data.type === 'INITIALIZE_PLUGIN') {
+        // Prevent multiple initializations
+        if (isInitialized || isInitializing) {
+          console.log('[ABsmartly Extension] Already initialized or initializing, skipping');
+          return;
+        }
+        isInitializing = true;
+        
         const { customCode } = event.data.payload || {};
         
         // Check again if plugin is already loaded
@@ -183,6 +194,8 @@
             console.log('[ABsmartly Extension] Injecting custom code into existing plugin');
             existingPlugin.injectCode(customCode);
           }
+          isInitialized = true;
+          isInitializing = false;
           return;
         }
 
@@ -207,13 +220,34 @@
             script.src = pluginUrl;
             script.onload = () => {
               console.log('[ABsmartly Extension] DOM Changes plugin loaded successfully');
+              console.log('[ABsmartly Extension] ABSmartlyDOMChanges object:', window.ABSmartlyDOMChanges);
+              console.log('[ABsmartly Extension] Available properties:', Object.keys(window.ABSmartlyDOMChanges || {}));
+              
               // The UMD bundle exposes ABSmartlyDOMChanges globally
-              if (window.ABSmartlyDOMChanges && window.ABSmartlyDOMChanges.DOMChangesPlugin) {
-                window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
-                // Continue with initialization after plugin loads, pass the context
-                initializePlugin(context);
+              // Check different possible export patterns
+              if (window.ABSmartlyDOMChanges) {
+                // Try direct property
+                if (window.ABSmartlyDOMChanges.DOMChangesPlugin) {
+                  window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
+                }
+                // Try default export
+                else if (window.ABSmartlyDOMChanges.default) {
+                  window.DOMChangesPlugin = window.ABSmartlyDOMChanges.default;
+                }
+                // Try if ABSmartlyDOMChanges itself is the plugin class
+                else if (typeof window.ABSmartlyDOMChanges === 'function') {
+                  window.DOMChangesPlugin = window.ABSmartlyDOMChanges;
+                }
+                
+                if (window.DOMChangesPlugin) {
+                  console.log('[ABsmartly Extension] DOMChangesPlugin found and assigned');
+                  // Continue with initialization after plugin loads, pass the context
+                  initializePlugin(context);
+                } else {
+                  console.error('[ABsmartly Extension] Could not find DOMChangesPlugin in bundle');
+                }
               } else {
-                console.error('[ABsmartly Extension] Failed to load DOMChangesPlugin from bundle');
+                console.error('[ABsmartly Extension] ABSmartlyDOMChanges not found on window');
               }
             };
             script.onerror = () => {
@@ -285,9 +319,15 @@
               }, '*');
 
               console.log('[ABsmartly Extension] Plugin initialized successfully');
+              isInitialized = true;
+              isInitializing = false;
+            }).catch(error => {
+              console.error('[ABsmartly Extension] Failed to initialize plugin:', error);
+              isInitializing = false;
             });
           } catch (error) {
             console.error('[ABsmartly Extension] Failed to initialize plugin:', error);
+            isInitializing = false;
           }
         }
         
