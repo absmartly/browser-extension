@@ -188,7 +188,29 @@
     if (event.data && event.data.source === 'absmartly-extension') {
       console.log('[ABsmartly Page] Received message from extension:', event.data);
 
-      if (event.data.type === 'INITIALIZE_PLUGIN') {
+      if (event.data.type === 'INJECTION_CODE') {
+        // Handle injection code from the plugin's request
+        const payload = event.data.payload || {};
+        
+        // Execute headEnd script if present (this contains our custom code)
+        if (payload.headEnd) {
+          console.log('[ABsmartly Extension] Executing headEnd script:', payload.headEnd);
+          // Extract script content from <script> tags
+          const scriptMatch = payload.headEnd.match(/<script>([\s\S]*?)<\/script>/);
+          if (scriptMatch && scriptMatch[1]) {
+            try {
+              const codeFunction = new Function(scriptMatch[1]);
+              codeFunction();
+              console.log('[ABsmartly Extension] Custom code from headEnd executed successfully');
+            } catch (error) {
+              console.error('[ABsmartly Extension] Failed to execute headEnd script:', error);
+            }
+          }
+        }
+        
+        // Note: The plugin will also inject this into the DOM, but we execute it directly
+        // to ensure it runs even with CSP restrictions
+      } else if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
         if (isInitialized || isInitializing) {
           console.log('[ABsmartly Extension] Already initialized or initializing, skipping');
@@ -201,16 +223,7 @@
         // Check again if plugin is already loaded
         const existingPlugin = isPluginAlreadyLoaded();
         if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
-          if (customCode) {
-            console.log('[ABsmartly Extension] Injecting custom code (existing plugin)');
-            try {
-              const codeFunction = new Function(customCode);
-              codeFunction();
-              console.log('[ABsmartly Extension] Custom code executed successfully');
-            } catch (error) {
-              console.error('[ABsmartly Extension] Failed to execute custom code:', error);
-            }
-          }
+          // Custom code will be injected via INJECTION_CODE message from the plugin
           isInitialized = true;
           isInitializing = false;
           return;
@@ -320,18 +333,7 @@
                 console.log('[ABsmartly Extension] Plugin successfully registered with context');
               }
 
-              // Inject custom code if provided
-              if (customCode) {
-                console.log('[ABsmartly Extension] Injecting custom code via eval');
-                try {
-                  // Execute the custom code directly since plugin.injectCode might not exist
-                  const codeFunction = new Function(customCode);
-                  codeFunction();
-                  console.log('[ABsmartly Extension] Custom code executed successfully');
-                } catch (error) {
-                  console.error('[ABsmartly Extension] Failed to execute custom code:', error);
-                }
-              }
+              // Custom code will be injected via INJECTION_CODE message from the plugin
 
               // Notify extension
               window.postMessage({
@@ -359,20 +361,8 @@
         // Now initialize the plugin with the context we already have
         initializePlugin(context);
       } else if (event.data.type === 'INJECT_CUSTOM_CODE') {
-        const { customCode } = event.data.payload || {};
-        
-        if (customCode) {
-          console.log('[ABsmartly Extension] Injecting custom code (INJECT_CUSTOM_CODE message)');
-          try {
-            const codeFunction = new Function(customCode);
-            codeFunction();
-            console.log('[ABsmartly Extension] Custom code executed successfully');
-          } catch (error) {
-            console.error('[ABsmartly Extension] Failed to execute custom code:', error);
-          }
-        } else {
-          console.warn('[ABsmartly Extension] No custom code provided');
-        }
+        // This message type is not currently used - custom code comes via INJECTION_CODE
+        console.log('[ABsmartly Extension] INJECT_CUSTOM_CODE message received but not used');
       }
     }
   });
