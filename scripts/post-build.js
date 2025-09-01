@@ -56,3 +56,17 @@ if (fs.existsSync(devBuildDir)) {
     console.log('Copied inject-sdk-plugin.js to dev build directory');
   }
 }
+
+// Copy ABsmartly DOM Changes Plugin from node_modules
+const pluginSource = path.join(__dirname, '..', 'node_modules', '@absmartly', 'dom-changes-plugin', 'dist', 'absmartly-dom-changes.min.js');
+if (fs.existsSync(pluginSource)) {
+  const pluginDestProd = path.join(buildDir, 'absmartly-dom-changes.min.js');
+  fs.copyFileSync(pluginSource, pluginDestProd);
+  console.log('Copied absmartly-dom-changes.min.js to prod build directory');
+  
+  if (fs.existsSync(devBuildDir)) {
+    const pluginDestDev = path.join(devBuildDir, 'absmartly-dom-changes.min.js');
+    fs.copyFileSync(pluginSource, pluginDestDev);
+    console.log('Copied absmartly-dom-changes.min.js to dev build directory');
+  }
+}
