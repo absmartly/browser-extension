@@ -64,6 +64,16 @@ export interface ABsmartlyConfig {
   domChangesFieldName?: string
 }
 
+export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'
+
+export interface CustomCode {
+  headStart?: string
+  headEnd?: string
+  bodyStart?: string
+  bodyEnd?: string
+  styleTag?: string
+}
+
 export interface ABsmartlyUser {
   id: number
   email: string

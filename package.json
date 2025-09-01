@@ -53,7 +53,8 @@
           "assets/icon.png", 
           "assets/icon128.png", 
           "assets/absmartly-logo-white.svg",
-          "tabs/*"
+          "tabs/*",
+          "inject-sdk-plugin.js"
         ],
         "matches": ["<all_urls>"]
       }
