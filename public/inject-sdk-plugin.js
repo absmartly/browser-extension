@@ -26,8 +26,10 @@
    * Checks if the DOM Changes Plugin is already loaded on the page
    */
   function isPluginAlreadyLoaded() {
+    // Use cached context if available
+    const context = cachedContext || detectABsmartlySDK().context;
+    
     // Check if plugin is registered with the context (new detection method)
-    const { context } = detectABsmartlySDK();
     if (context && context.__domPlugin && context.__domPlugin.initialized) {
       console.log('[ABsmartly Extension] Plugin detected via context registration:', {
         version: context.__domPlugin.version,
@@ -87,7 +89,6 @@
     // First pass: Check if any location is directly a context (has treatment method)
     for (const location of possibleLocations) {
       if (location && typeof location.treatment === 'function') {
-        console.log('[ABsmartly Extension] Found context directly with treatment method');
         context = location;
         break;
       }
@@ -97,7 +98,6 @@
     if (!context) {
       for (const location of possibleLocations) {
         if (location && location.context && typeof location.context.treatment === 'function') {
-          console.log('[ABsmartly Extension] Found context in container.context with treatment method');
           context = location.context;
           break;
         }
@@ -111,7 +111,6 @@
           // Check each context in the array for treatment method
           for (const ctx of location.contexts) {
             if (ctx && typeof ctx.treatment === 'function') {
-              console.log('[ABsmartly Extension] Found context in contexts array with treatment method');
               context = ctx;
               break;
             }
@@ -122,8 +121,9 @@
     }
 
     // Cache the context for future use
-    if (context) {
+    if (context && !cachedContext) {
       cachedContext = context;
+      console.log('[ABsmartly Extension] Context found and cached');
     }
 
     return { sdk: null, context };
@@ -262,12 +262,15 @@
       console.log('[ABsmartly Page] Received message from extension:', event.data);
 
       if (event.data.type === 'INJECTION_CODE') {
+        console.log('[ABsmartly Extension] Received INJECTION_CODE, processing scripts...');
         // Handle injection code from the plugin's request
         const payload = event.data.payload || {};
+        console.log('[ABsmartly Extension] Payload:', payload);
         
         // Process each location that might contain scripts
         ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
           if (payload[location]) {
+            console.log(`[ABsmartly Extension] Found content for ${location}: ${payload[location]}`);
             executeScriptsInHTML(payload[location], location);
           }
         });
