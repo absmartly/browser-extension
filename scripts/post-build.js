@@ -4,6 +4,7 @@ const path = require('path');
 // Copy sidebar files from tabs folder to root for injection
 const buildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-prod');
 const tabsDir = path.join(buildDir, 'tabs');
+const publicDir = path.join(__dirname, '..', 'public');
 const manifestPath = path.join(buildDir, 'manifest.json');
 
 if (fs.existsSync(tabsDir)) {
@@ -35,5 +36,23 @@ if (fs.existsSync(tabsDir)) {
       fs.writeFileSync(manifestPath, JSON.stringify(manifest));
       console.log('Updated manifest with exact sidebar filenames');
     }
+  }
+}
+
+// Copy inject-sdk-plugin.js from public to build directory
+const injectScriptSource = path.join(publicDir, 'inject-sdk-plugin.js');
+const injectScriptDest = path.join(buildDir, 'inject-sdk-plugin.js');
+if (fs.existsSync(injectScriptSource)) {
+  fs.copyFileSync(injectScriptSource, injectScriptDest);
+  console.log('Copied inject-sdk-plugin.js to build directory');
+}
+
+// Also copy to dev build if it exists
+const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
+if (fs.existsSync(devBuildDir)) {
+  const devInjectScriptDest = path.join(devBuildDir, 'inject-sdk-plugin.js');
+  if (fs.existsSync(injectScriptSource)) {
+    fs.copyFileSync(injectScriptSource, devInjectScriptDest);
+    console.log('Copied inject-sdk-plugin.js to dev build directory');
   }
 }
