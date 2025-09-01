@@ -107,11 +107,12 @@ if (document.readyState === 'loading') {
   injectSDKPluginScript()
 }
 
-// Listen for messages from the injected script
+// Listen for messages from the injected script and SDK plugin
 window.addEventListener('message', async (event) => {
   // Only accept messages from the same origin
   if (event.origin !== window.location.origin) return
   
+  // Handle messages from the injected script (absmartly-page)
   if (event.data && event.data.source === 'absmartly-page') {
     console.log('[Content Script] Received message from page:', event.data)
     
@@ -138,23 +139,9 @@ window.addEventListener('message', async (event) => {
       })
     }
   }
-})
-
-// Also listen for test events
-document.addEventListener('absmartly-test', (event: any) => {
-  console.log('[Visual Editor Content Script] Received test event:', event.detail)
-  document.dispatchEvent(new CustomEvent('absmartly-response', {
-    detail: { message: 'Content script received your message', originalMessage: event.detail }
-  }))
-})
-
-// Listen for messages from SDK plugin
-window.addEventListener('message', async (event) => {
-  // Only accept messages from the same origin
-  if (event.origin !== window.location.origin) return
   
-  // Check if it's a message from the SDK plugin
-  if (event.data && event.data.source === 'absmartly-sdk') {
+  // Handle messages from the SDK plugin (absmartly-sdk)
+  else if (event.data && event.data.source === 'absmartly-sdk') {
     console.log('[Content Script] Received message from SDK plugin:', event.data)
     
     if (event.data.type === 'REQUEST_INJECTION_CODE') {
@@ -178,6 +165,14 @@ window.addEventListener('message', async (event) => {
       })
     }
   }
+})
+
+// Also listen for test events
+document.addEventListener('absmartly-test', (event: any) => {
+  console.log('[Visual Editor Content Script] Received test event:', event.detail)
+  document.dispatchEvent(new CustomEvent('absmartly-response', {
+    detail: { message: 'Content script received your message', originalMessage: event.detail }
+  }))
 })
 
 // Code editor functionality
