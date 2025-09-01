@@ -13,6 +13,10 @@
   }
   window.__absmartlyExtensionInjected = true;
 
+  // Capture the extension URL from the current script (must be done synchronously at script load)
+  const scriptSrc = document.currentScript ? document.currentScript.src : null;
+  const extensionBaseUrl = scriptSrc ? scriptSrc.replace('inject-sdk-plugin.js', '') : null;
+
   /**
    * Checks if the DOM Changes Plugin is already loaded on the page
    */
@@ -193,11 +197,10 @@
         if (typeof window.DOMChangesPlugin === 'undefined' && typeof window.ABSmartlyDOMChanges === 'undefined') {
           console.log('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
           
-          // Try to get the extension ID from the current script src
-          const currentScript = document.currentScript;
-          if (currentScript && currentScript.src) {
-            const extensionUrl = new URL(currentScript.src);
-            const pluginUrl = extensionUrl.origin + extensionUrl.pathname.replace('inject-sdk-plugin.js', 'absmartly-dom-changes.min.js');
+          // Use the captured extension URL
+          if (extensionBaseUrl) {
+            const pluginUrl = extensionBaseUrl + 'absmartly-dom-changes.min.js';
+            console.log('[ABsmartly Extension] Loading plugin from:', pluginUrl);
             
             // Load the plugin script
             const script = document.createElement('script');
@@ -207,8 +210,8 @@
               // The UMD bundle exposes ABSmartlyDOMChanges globally
               if (window.ABSmartlyDOMChanges && window.ABSmartlyDOMChanges.DOMChangesPlugin) {
                 window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
-                // Continue with initialization after plugin loads
-                initializePlugin();
+                // Continue with initialization after plugin loads, pass the context
+                initializePlugin(context);
               } else {
                 console.error('[ABsmartly Extension] Failed to load DOMChangesPlugin from bundle');
               }
@@ -230,8 +233,8 @@
         }
         
         // Function to initialize the plugin
-        function initializePlugin() {
-          const { context } = detectABsmartlySDK();
+        function initializePlugin(ctx) {
+          const context = ctx || detectABsmartlySDK().context;
           
           if (!context) {
             console.error('[ABsmartly Extension] No context available for plugin initialization');
@@ -288,8 +291,8 @@
           }
         }
         
-        // Now initialize the plugin
-        initializePlugin();
+        // Now initialize the plugin with the context we already have
+        initializePlugin(context);
       } else if (event.data.type === 'INJECT_CUSTOM_CODE') {
         const { customCode } = event.data.payload || {};
         const plugin = window.__absmartlyExtensionPlugin || window.__absmartlyPlugin || window.__absmartlyDOMChangesPlugin;
