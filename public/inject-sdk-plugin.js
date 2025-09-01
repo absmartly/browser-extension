@@ -56,51 +56,58 @@
    */
   function detectABsmartlySDK() {
     // Check common SDK locations
-    const possibleSDKs = [
+    const possibleLocations = [
+      window.ABsmartlyContext,
       window.absmartly,
       window.ABsmartly,
       window.__absmartly,
       window.sdk,
-      window.abSmartly
+      window.abSmartly,
+      window.context,
+      window.absmartlyContext,
+      window.__context
     ];
 
-    let sdk = null;
     let context = null;
 
-    // Find the SDK
-    for (const possibleSDK of possibleSDKs) {
-      if (possibleSDK && (possibleSDK.createContext || possibleSDK.context || possibleSDK.contexts)) {
-        sdk = possibleSDK;
+    // First pass: Check if any location is directly a context (has treatment method)
+    for (const location of possibleLocations) {
+      if (location && typeof location.treatment === 'function') {
+        console.log('[ABsmartly Plugin] Found context directly with treatment method');
+        context = location;
         break;
       }
     }
 
-    // Try to find an existing context
-    if (sdk) {
-      if (sdk.context) {
-        context = sdk.context;
-      } else if (sdk.contexts && sdk.contexts.length > 0) {
-        context = sdk.contexts[0]; // Use the first context
-      }
-    }
-
-    // Also check for standalone context variables
+    // Second pass: Check if any location has a context property with treatment method
     if (!context) {
-      const possibleContexts = [
-        window.context,
-        window.absmartlyContext,
-        window.__context
-      ];
-
-      for (const possibleContext of possibleContexts) {
-        if (possibleContext && typeof possibleContext.treatment === 'function') {
-          context = possibleContext;
+      for (const location of possibleLocations) {
+        if (location && location.context && typeof location.context.treatment === 'function') {
+          console.log('[ABsmartly Plugin] Found context in container.context with treatment method');
+          context = location.context;
           break;
         }
       }
     }
 
-    return { sdk, context };
+    // Third pass: Check for contexts array
+    if (!context) {
+      for (const location of possibleLocations) {
+        if (location && location.contexts && Array.isArray(location.contexts) && location.contexts.length > 0) {
+          // Check each context in the array for treatment method
+          for (const ctx of location.contexts) {
+            if (ctx && typeof ctx.treatment === 'function') {
+              console.log('[ABsmartly Plugin] Found context in contexts array with treatment method');
+              context = ctx;
+              break;
+            }
+          }
+          if (context) break;
+        }
+      }
+    }
+
+    return { sdk: null, context };
   }
 
   /**
