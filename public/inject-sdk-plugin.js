@@ -212,7 +212,12 @@
     const checkAndInit = () => {
       attempts++;
 
-      // Check if plugin is already loaded
+      // Detect context only once
+      if (!cachedContext) {
+        detectABsmartlySDK();
+      }
+
+      // Check if plugin is already loaded (uses cached context)
       const existingPlugin = isPluginAlreadyLoaded();
       if (existingPlugin) {
         if (existingPlugin === 'active-but-inaccessible') {
@@ -235,7 +240,7 @@
         return;
       }
 
-      const { context } = detectABsmartlySDK();
+      const context = cachedContext;
 
       if (context) {
         console.log('[ABsmartly Extension] SDK context found, requesting plugin initialization');
@@ -261,22 +266,7 @@
     if (event.data && event.data.source === 'absmartly-extension') {
       console.log('[ABsmartly Page] Received message from extension:', event.data);
 
-      if (event.data.type === 'INJECTION_CODE') {
-        console.log('[ABsmartly Extension] Received INJECTION_CODE, processing scripts...');
-        // Handle injection code from the plugin's request
-        const payload = event.data.payload || {};
-        console.log('[ABsmartly Extension] Payload:', payload);
-        
-        // Process each location that might contain scripts
-        ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
-          if (payload[location]) {
-            console.log(`[ABsmartly Extension] Found content for ${location}: ${payload[location]}`);
-            executeScriptsInHTML(payload[location], location);
-          }
-        });
-        
-        // The plugin will still inject the HTML/CSS, but we handle script execution
-      } else if (event.data.type === 'INITIALIZE_PLUGIN') {
+      if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
         if (isInitialized || isInitializing) {
           console.log('[ABsmartly Extension] Already initialized or initializing, skipping');
@@ -295,7 +285,8 @@
           return;
         }
 
-        const { context } = detectABsmartlySDK();
+        // Use cached context (should already be detected by waitForSDKAndInitialize)
+        const context = cachedContext;
         
         if (!context) {
           console.error('[ABsmartly Extension] No context available for plugin initialization');
@@ -364,7 +355,7 @@
         
         // Function to initialize the plugin
         function initializePlugin(ctx) {
-          const context = ctx || detectABsmartlySDK().context;
+          const context = ctx || cachedContext;
           
           if (!context) {
             console.error('[ABsmartly Extension] No context available for plugin initialization');
@@ -399,7 +390,30 @@
                 console.log('[ABsmartly Extension] Plugin successfully registered with context');
               }
 
-              // Custom code will be injected via INJECTION_CODE message from the plugin
+              // Inject custom code if provided
+              if (customCode) {
+                console.log('[ABsmartly Extension] Injecting custom code directly');
+                try {
+                  // Parse the custom code object
+                  const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
+                  
+                  // Call the plugin's injectCode method for HTML/CSS
+                  if (plugin.injectCode && typeof plugin.injectCode === 'function') {
+                    plugin.injectCode(codeData);
+                    console.log('[ABsmartly Extension] Custom code injected via plugin.injectCode');
+                  }
+                  
+                  // ALWAYS execute scripts manually since the plugin's injection doesn't execute them
+                  ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
+                    if (codeData[location]) {
+                      console.log(`[ABsmartly Extension] Executing scripts for ${location}`);
+                      executeScriptsInHTML(codeData[location], location);
+                    }
+                  });
+                } catch (error) {
+                  console.error('[ABsmartly Extension] Failed to inject custom code:', error);
+                }
+              }
 
               // Notify extension
               window.postMessage({

@@ -144,26 +144,9 @@ window.addEventListener('message', async (event) => {
   else if (event.data && event.data.source === 'absmartly-sdk') {
     console.log('[Content Script] Received message from SDK plugin:', event.data)
     
-    if (event.data.type === 'REQUEST_INJECTION_CODE') {
-      // Forward the request to the background script
-      chrome.runtime.sendMessage({
-        type: 'REQUEST_INJECTION_CODE',
-        source: 'sdk-plugin'
-      }, (response) => {
-        // Send the response back to the SDK plugin
-        window.postMessage({
-          source: 'absmartly-extension',
-          type: 'INJECTION_CODE',
-          payload: response?.data || {
-            headStart: '',
-            headEnd: '',
-            bodyStart: '',
-            bodyEnd: '',
-            styleTag: ''
-          }
-        }, window.location.origin)
-      })
-    }
+    // We can handle other plugin messages here if needed
+    // but we don't need to handle REQUEST_INJECTION_CODE anymore
+    // since we inject the code directly during plugin initialization
   }
 })
 
