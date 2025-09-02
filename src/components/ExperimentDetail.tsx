@@ -551,14 +551,23 @@ export function ExperimentDetail({
   }
 
   const handlePreviewToggle = (enabled: boolean) => {
+    console.log('🎯 handlePreviewToggle called:', { enabled, activePreviewVariant, hasExperiment: !!experiment })
     setPreviewEnabled(enabled)
     if (enabled && activePreviewVariant && experiment) {
       // Send preview message through content script to SDK
       const changes = variantData[activePreviewVariant]?.dom_changes || []
       const variantName = experiment.variants?.find(v => v.name === activePreviewVariant)?.name || activePreviewVariant
       
+      console.log('🎯 Sending preview message:', {
+        variantName,
+        changesCount: changes.length,
+        changes: changes,
+        enabledChanges: changes.filter(c => c.enabled !== false)
+      })
+      
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
+          console.log('🎯 Sending to tab:', tabs[0].id, tabs[0].url)
           // Content script is already injected by the manifest, just send the message
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'ABSMARTLY_PREVIEW',
@@ -568,18 +577,25 @@ export function ExperimentDetail({
             variantName: variantName
           }, (response) => {
             if (chrome.runtime.lastError) {
-              console.error('Error sending preview message:', chrome.runtime.lastError)
+              console.error('❌ Error sending preview message:', chrome.runtime.lastError)
+            } else {
+              console.log('✅ Preview message sent, response:', response)
             }
           })
+        } else {
+          console.error('❌ No active tab found')
         }
       })
     } else if (!enabled) {
+      console.log('🎯 Removing preview')
       // Remove preview
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'ABSMARTLY_PREVIEW',
             action: 'remove'
+          }, (response) => {
+            console.log('🎯 Remove preview response:', response)
           })
         }
       })
