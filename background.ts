@@ -2108,9 +2108,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   
                   // Show insert block dialog
                   function showInsertBlockDialog(element) {
+                    console.log('[ABSmartly] showInsertBlockDialog called')
+                    
                     // Remove existing dialog
                     const existingHost = document.getElementById('absmartly-insert-block-host')
-                    if (existingHost) existingHost.remove()
+                    if (existingHost) {
+                      console.log('[ABSmartly] Removing existing dialog')
+                      existingHost.remove()
+                    }
                     
                     // Create host for shadow DOM
                     const dialogHost = document.createElement('div')
@@ -2213,9 +2218,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     
                     // Handle insert
                     dialog.querySelector('#insertBtn').addEventListener('click', () => {
+                      console.log('[ABSmartly] Insert button clicked')
                       const position = dialog.querySelector('#position').value
                       const type = elementTypeSelect.value
                       const content = contentTextarea.value
+                      
+                      console.log('[ABSmartly] Creating new element:', { position, type, content })
                       
                       let newElement
                       if (type === 'custom') {
@@ -2236,37 +2244,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         }
                       }
                       
+                      console.log('[ABSmartly] Inserting element at position:', position)
+                      
                       // Insert the element
-                      switch(position) {
-                        case 'before':
-                          element.parentNode?.insertBefore(newElement, element)
-                          break
-                        case 'after':
-                          element.parentNode?.insertBefore(newElement, element.nextSibling)
-                          break
-                        case 'prepend':
-                          element.insertBefore(newElement, element.firstChild)
-                          break
-                        case 'append':
-                          element.appendChild(newElement)
-                          break
+                      try {
+                        switch(position) {
+                          case 'before':
+                            element.parentNode?.insertBefore(newElement, element)
+                            break
+                          case 'after':
+                            element.parentNode?.insertBefore(newElement, element.nextSibling)
+                            break
+                          case 'prepend':
+                            element.insertBefore(newElement, element.firstChild)
+                            break
+                          case 'append':
+                            element.appendChild(newElement)
+                            break
+                        }
+                        
+                        console.log('[ABSmartly] Element inserted successfully')
+                        
+                        // Track the change
+                        trackChange('insert', element, {
+                          html: newElement.outerHTML,
+                          position: position
+                        })
+                        
+                        // Select the new element
+                        selectedElement = newElement
+                        element.classList.remove('absmartly-selected')
+                        newElement.classList.add('absmartly-selected')
+                        
+                        showNotification('New block inserted!')
+                        
+                        // Remove the dialog
+                        console.log('[ABSmartly] Removing dialog')
+                        dialogHost.remove()
+                      } catch (error) {
+                        console.error('[ABSmartly] Error inserting element:', error)
+                        showNotification('Error inserting block: ' + error.message)
                       }
-                      
-                      // Track the change
-                      trackChange('insert', element, {
-                        html: newElement.outerHTML,
-                        position: position
-                      })
-                      
-                      // Remove the dialog
-                      dialogHost.remove()
-                      
-                      // Select the new element
-                      selectedElement = newElement
-                      element.classList.remove('absmartly-selected')
-                      newElement.classList.add('absmartly-selected')
-                      
-                      showNotification('New block inserted!')
                     })
                     
                     // Close on backdrop click
