@@ -266,6 +266,61 @@
     if (event.data && event.data.source === 'absmartly-extension') {
       console.log('[ABsmartly Page] Received message from extension:', event.data);
 
+      // Handle preview changes
+      if (event.data.type === 'PREVIEW_CHANGES') {
+        console.log('[ABsmartly Page] Handling PREVIEW_CHANGES message');
+        const { changes } = event.data.payload || {};
+        
+        // Try to get the plugin instance
+        let plugin = null;
+        
+        // First try from context
+        if (cachedContext && cachedContext.__domPlugin && cachedContext.__domPlugin.instance) {
+          plugin = cachedContext.__domPlugin.instance;
+          console.log('[ABsmartly Page] Got plugin from context.__domPlugin');
+        }
+        // Fallback to window reference
+        else if (window.__absmartlyExtensionPlugin) {
+          plugin = window.__absmartlyExtensionPlugin;
+          console.log('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
+        }
+        
+        if (plugin && typeof plugin.previewChanges === 'function') {
+          console.log('[ABsmartly Page] Calling plugin.previewChanges with changes:', changes);
+          plugin.previewChanges(changes || []);
+        } else {
+          console.error('[ABsmartly Page] Plugin not found or previewChanges method not available');
+        }
+        return;
+      }
+
+      // Handle remove preview
+      if (event.data.type === 'REMOVE_PREVIEW') {
+        console.log('[ABsmartly Page] Handling REMOVE_PREVIEW message');
+        
+        // Try to get the plugin instance
+        let plugin = null;
+        
+        // First try from context
+        if (cachedContext && cachedContext.__domPlugin && cachedContext.__domPlugin.instance) {
+          plugin = cachedContext.__domPlugin.instance;
+          console.log('[ABsmartly Page] Got plugin from context.__domPlugin');
+        }
+        // Fallback to window reference
+        else if (window.__absmartlyExtensionPlugin) {
+          plugin = window.__absmartlyExtensionPlugin;
+          console.log('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
+        }
+        
+        if (plugin && typeof plugin.removePreview === 'function') {
+          console.log('[ABsmartly Page] Calling plugin.removePreview');
+          plugin.removePreview();
+        } else {
+          console.error('[ABsmartly Page] Plugin not found or removePreview method not available');
+        }
+        return;
+      }
+
       if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
         if (isInitialized || isInitializing) {
