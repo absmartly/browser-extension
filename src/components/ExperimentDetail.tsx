@@ -550,13 +550,13 @@ export function ExperimentDetail({
     }
   }
 
-  const handlePreviewToggle = (enabled: boolean) => {
-    console.log('🎯 handlePreviewToggle called:', { enabled, activePreviewVariant, hasExperiment: !!experiment })
+  const handlePreviewToggleForVariant = (enabled: boolean, variantKey: string) => {
+    console.log('🎯 handlePreviewToggleForVariant called:', { enabled, variantKey, hasExperiment: !!experiment })
     setPreviewEnabled(enabled)
-    if (enabled && activePreviewVariant && experiment) {
+    if (enabled && variantKey && experiment) {
       // Send preview message through content script to SDK
-      const changes = variantData[activePreviewVariant]?.dom_changes || []
-      const variantName = experiment.variants?.find(v => v.name === activePreviewVariant)?.name || activePreviewVariant
+      const changes = variantData[variantKey]?.dom_changes || []
+      const variantName = experiment.variants?.find(v => v.name === variantKey)?.name || variantKey
       
       console.log('🎯 Sending preview message:', {
         variantName,
@@ -781,7 +781,8 @@ export function ExperimentDetail({
                       previewEnabled={previewEnabled && activePreviewVariant === variantKey}
                       onPreviewToggle={(enabled) => {
                         setActivePreviewVariant(variantKey)
-                        handlePreviewToggle(enabled)
+                        // Use the variantKey directly instead of waiting for state update
+                        handlePreviewToggleForVariant(enabled, variantKey)
                       }}
                     />
                   </div>
