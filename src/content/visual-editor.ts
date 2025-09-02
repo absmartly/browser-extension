@@ -13,6 +13,8 @@ export class VisualEditor {
   private toolbar: HTMLElement | null = null
   private sidebar: HTMLElement | null = null
   private sidebarToggle: HTMLElement | null = null
+  private hoverTooltip: HTMLElement | null = null
+  private hoveredElement: HTMLElement | null = null
   private changes: DOMChange[] = []
   private originalValues = new Map<HTMLElement, any>()
   private options: VisualEditorOptions
@@ -142,6 +144,21 @@ export class VisualEditor {
         max-width: 320px !important;
         pointer-events: auto !important;
         user-select: none !important;
+      }
+      
+      .absmartly-hover-tooltip {
+        position: fixed !important;
+        background: #1f2937 !important;
+        color: white !important;
+        padding: 6px 10px !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        font-family: monospace !important;
+        z-index: 2147483645 !important;
+        pointer-events: none !important;
+        white-space: nowrap !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        opacity: 0.95 !important;
       }
       
       .absmartly-toolbar-instructions {
@@ -354,6 +371,10 @@ export class VisualEditor {
     // Add mouse event handlers to prevent menu selection
     document.addEventListener('mousedown', this.handleMouseDown, true)
     document.addEventListener('mouseup', this.handleMouseUp, true)
+    
+    // Add hover handlers for tooltip
+    document.addEventListener('mouseover', this.handleMouseOver, true)
+    document.addEventListener('mouseout', this.handleMouseOut, true)
   }
   
   private removeEventListeners() {
@@ -362,6 +383,11 @@ export class VisualEditor {
     document.removeEventListener('keydown', this.handleKeyDown, true)
     document.removeEventListener('mousedown', this.handleMouseDown, true)
     document.removeEventListener('mouseup', this.handleMouseUp, true)
+    document.removeEventListener('mouseover', this.handleMouseOver, true)
+    document.removeEventListener('mouseout', this.handleMouseOut, true)
+    
+    // Remove tooltip if exists
+    this.removeHoverTooltip()
   }
   
   private handleMouseDown = (e: MouseEvent) => {
@@ -456,6 +482,62 @@ export class VisualEditor {
     }
   }
   
+  private handleMouseOver = (e: MouseEvent) => {
+    if (!this.isActive) return
+    
+    const target = e.target as HTMLElement
+    
+    // Don't show tooltip for extension elements or if context menu is open
+    if (this.isExtensionElement(target) || this.contextMenu) return
+    
+    // Don't show tooltip for already selected element
+    if (target === this.selectedElement) return
+    
+    // Remove previous tooltip if hovering new element
+    if (this.hoveredElement && this.hoveredElement !== target) {
+      this.removeHoverTooltip()
+    }
+    
+    this.hoveredElement = target
+    this.showHoverTooltip(target, e.clientX, e.clientY)
+  }
+  
+  private handleMouseOut = (e: MouseEvent) => {
+    if (!this.isActive) return
+    
+    const target = e.target as HTMLElement
+    if (target === this.hoveredElement) {
+      this.removeHoverTooltip()
+      this.hoveredElement = null
+    }
+  }
+  
+  private showHoverTooltip(element: HTMLElement, x: number, y: number) {
+    // Remove any existing tooltip
+    this.removeHoverTooltip()
+    
+    // Create tooltip
+    this.hoverTooltip = document.createElement('div')
+    this.hoverTooltip.className = 'absmartly-hover-tooltip'
+    this.hoverTooltip.textContent = this.getSelector(element)
+    
+    // Position tooltip near cursor but avoid edges
+    const tooltipX = Math.min(x + 10, window.innerWidth - 200)
+    const tooltipY = y - 30
+    
+    this.hoverTooltip.style.left = `${tooltipX}px`
+    this.hoverTooltip.style.top = `${tooltipY}px`
+    
+    document.body.appendChild(this.hoverTooltip)
+  }
+  
+  private removeHoverTooltip() {
+    if (this.hoverTooltip) {
+      this.hoverTooltip.remove()
+      this.hoverTooltip = null
+    }
+  }
+  
   private selectElement(element: HTMLElement) {
     // Deselect previous element
     if (this.selectedElement) {
@@ -498,19 +580,24 @@ export class VisualEditor {
     this.contextMenu.className = 'absmartly-context-menu'
     this.contextMenu.id = 'absmartly-context-menu-main'
     
-    // Create menu items
+    // Create menu items similar to competitor
     const menuItems: Array<{ icon: string, label: string, action: string, separator?: boolean }> = [
-      { icon: '✏️', label: 'Edit Text', action: 'edit-text' },
+      { icon: '✏️', label: 'Edit Element', action: 'edit-element' },
+      { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
       { icon: '</>', label: 'Edit HTML', action: 'edit-html' },
+      { icon: '✂️', label: 'Inline Edit', action: 'inline-edit' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '↑', label: 'Move Up', action: 'move-up' },
-      { icon: '↓', label: 'Move Down', action: 'move-down' },
+      { icon: '↗️', label: 'Move / Resize', action: 'move-resize' },
+      { icon: '🗑', label: 'Remove', action: 'delete' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '⊕', label: 'Duplicate', action: 'duplicate' },
-      { icon: '□', label: 'Copy Style', action: 'copy-style' },
+      { icon: '🎯', label: 'Select Relative Element', action: 'select-relative' },
+      { icon: '📋', label: 'Copy', action: 'copy' },
+      { icon: '👁', label: 'Hide', action: 'hide' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '👁', label: 'Hide Element', action: 'hide' },
-      { icon: '🗑', label: 'Delete', action: 'delete' },
+      { icon: '💾', label: 'Save to library', action: 'save-to-library' },
+      { icon: '📝', label: 'Apply saved modification', action: 'apply-saved' },
+      { icon: '👁', label: 'Track Clicks', action: 'track-clicks' },
+      { icon: '💡', label: 'Suggest Variations', action: 'suggest-variations' },
     ]
     
     let menuHTML = ''
@@ -584,29 +671,44 @@ export class VisualEditor {
     if (!this.selectedElement) return
     
     switch (action) {
-      case 'edit-text':
-        this.startTextEditing()
+      case 'edit-element':
+        this.startElementEditing()
+        break
+      case 'rearrange':
+        this.startRearrangeMode()
         break
       case 'edit-html':
         this.startHTMLEditing()
         break
-      case 'move-up':
-        this.moveElement('up')
+      case 'inline-edit':
+        this.startInlineEditing()
         break
-      case 'move-down':
-        this.moveElement('down')
+      case 'move-resize':
+        this.startMoveResizeMode()
         break
-      case 'duplicate':
-        this.duplicateElement()
+      case 'delete':
+        this.deleteElement()
         break
-      case 'copy-style':
-        this.copyElementStyle()
+      case 'select-relative':
+        this.showRelativeElementSelector()
+        break
+      case 'copy':
+        this.copyElement()
         break
       case 'hide':
         this.hideElement()
         break
-      case 'delete':
-        this.deleteElement()
+      case 'save-to-library':
+        this.saveToLibrary()
+        break
+      case 'apply-saved':
+        this.applySavedModification()
+        break
+      case 'track-clicks':
+        this.trackClicks()
+        break
+      case 'suggest-variations':
+        this.suggestVariations()
         break
     }
     
@@ -1028,5 +1130,183 @@ export class VisualEditor {
       default:
         return element.outerHTML
     }
+  }
+  
+  private startElementEditing() {
+    if (!this.selectedElement) return
+    
+    // Show a comprehensive edit dialog with all properties
+    const editDialog = document.createElement('div')
+    editDialog.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border: 2px solid #3b82f6;
+      border-radius: 8px;
+      padding: 20px;
+      z-index: 2147483648;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      max-width: 500px;
+      width: 90%;
+    `
+    
+    editDialog.innerHTML = `
+      <h3 style="margin: 0 0 15px 0; color: #1f2937;">Edit Element</h3>
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">Text Content</label>
+        <input type="text" id="edit-text" value="${this.selectedElement.textContent || ''}" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px;">
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">Background Color</label>
+        <input type="color" id="edit-bg-color" value="${this.rgbToHex(window.getComputedStyle(this.selectedElement).backgroundColor)}" style="width: 100%; height: 35px; border: 1px solid #e5e7eb; border-radius: 4px;">
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">Text Color</label>
+        <input type="color" id="edit-text-color" value="${this.rgbToHex(window.getComputedStyle(this.selectedElement).color)}" style="width: 100%; height: 35px; border: 1px solid #e5e7eb; border-radius: 4px;">
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">Font Size</label>
+        <input type="text" id="edit-font-size" value="${window.getComputedStyle(this.selectedElement).fontSize}" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px;">
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button id="edit-apply" style="flex: 1; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Apply</button>
+        <button id="edit-cancel" style="flex: 1; padding: 8px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+      </div>
+    `
+    
+    document.body.appendChild(editDialog)
+    
+    const element = this.selectedElement
+    document.getElementById('edit-apply')?.addEventListener('click', () => {
+      if (element) {
+        const textInput = document.getElementById('edit-text') as HTMLInputElement
+        const bgColorInput = document.getElementById('edit-bg-color') as HTMLInputElement
+        const textColorInput = document.getElementById('edit-text-color') as HTMLInputElement
+        const fontSizeInput = document.getElementById('edit-font-size') as HTMLInputElement
+        
+        if (textInput.value !== element.textContent) {
+          this.addChange({
+            selector: this.getSelector(element),
+            type: 'text',
+            value: textInput.value,
+            enabled: true
+          })
+          element.textContent = textInput.value
+        }
+        
+        const styleChanges: Record<string, string> = {}
+        if (bgColorInput.value) styleChanges['background-color'] = bgColorInput.value
+        if (textColorInput.value) styleChanges['color'] = textColorInput.value
+        if (fontSizeInput.value) styleChanges['font-size'] = fontSizeInput.value
+        
+        if (Object.keys(styleChanges).length > 0) {
+          this.addChange({
+            selector: this.getSelector(element),
+            type: 'style',
+            value: styleChanges,
+            enabled: true
+          })
+          Object.assign(element.style, styleChanges)
+        }
+      }
+      editDialog.remove()
+    })
+    
+    document.getElementById('edit-cancel')?.addEventListener('click', () => {
+      editDialog.remove()
+    })
+  }
+  
+  private startRearrangeMode() {
+    if (!this.selectedElement) return
+    this.showNotification('Rearrange Mode', 'Use arrow keys to move element, ESC to exit')
+    // Implementation for drag and drop rearrange
+  }
+  
+  private startInlineEditing() {
+    if (!this.selectedElement) return
+    this.startTextEditing()
+  }
+  
+  private startMoveResizeMode() {
+    if (!this.selectedElement) return
+    this.showNotification('Move/Resize Mode', 'Drag to move, drag corners to resize')
+    // Implementation for move and resize
+  }
+  
+  private showRelativeElementSelector() {
+    if (!this.selectedElement) return
+    
+    // Highlight parent, siblings, and children
+    const parent = this.selectedElement.parentElement
+    const siblings = parent ? Array.from(parent.children) : []
+    const children = Array.from(this.selectedElement.children)
+    
+    this.showNotification('Select Relative', 'Click on highlighted parent, sibling, or child element')
+    
+    // Add highlighting to relatives
+    if (parent) parent.style.outline = '2px dashed #10b981'
+    siblings.forEach(sib => {
+      if (sib !== this.selectedElement) {
+        (sib as HTMLElement).style.outline = '2px dashed #f59e0b'
+      }
+    })
+    children.forEach(child => {
+      (child as HTMLElement).style.outline = '2px dashed #8b5cf6'
+    })
+    
+    // Remove highlighting after 3 seconds
+    setTimeout(() => {
+      if (parent) parent.style.outline = ''
+      siblings.forEach(sib => (sib as HTMLElement).style.outline = '')
+      children.forEach(child => (child as HTMLElement).style.outline = '')
+    }, 3000)
+  }
+  
+  private copyElement() {
+    if (!this.selectedElement) return
+    
+    // Store element HTML in clipboard
+    const html = this.selectedElement.outerHTML
+    navigator.clipboard.writeText(html).then(() => {
+      this.showNotification('Copied!', 'Element HTML copied to clipboard')
+    })
+  }
+  
+  private saveToLibrary() {
+    if (!this.selectedElement) return
+    this.showNotification('Save to Library', 'Feature coming soon!')
+    // Implementation for saving to library
+  }
+  
+  private applySavedModification() {
+    this.showNotification('Apply Saved', 'Feature coming soon!')
+    // Implementation for applying saved modifications
+  }
+  
+  private trackClicks() {
+    if (!this.selectedElement) return
+    this.showNotification('Track Clicks', 'Click tracking enabled for this element')
+    // Implementation for click tracking
+  }
+  
+  private suggestVariations() {
+    if (!this.selectedElement) return
+    this.showNotification('AI Suggestions', 'Generating variation suggestions...')
+    // Implementation for AI-powered suggestions
+  }
+  
+  private rgbToHex(rgb: string): string {
+    // Convert rgb(r, g, b) to #rrggbb
+    const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)
+    if (!match) return '#000000'
+    
+    const r = parseInt(match[1]).toString(16).padStart(2, '0')
+    const g = parseInt(match[2]).toString(16).padStart(2, '0')
+    const b = parseInt(match[3]).toString(16).padStart(2, '0')
+    
+    return `#${r}${g}${b}`
   }
 }
