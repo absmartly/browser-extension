@@ -2117,24 +2117,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       existingHost.remove()
                     }
                     
-                    // Create host for shadow DOM
+                    // Create host for shadow DOM - but NOT using shadow DOM for dialog
                     const dialogHost = document.createElement('div')
                     dialogHost.id = 'absmartly-insert-block-host'
                     dialogHost.style.cssText = `
-                      position: fixed;
-                      top: 0;
-                      left: 0;
-                      width: 100%;
-                      height: 100%;
-                      z-index: 2147483647;
-                      background: rgba(0,0,0,0.5);
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      pointer-events: auto;
+                      position: fixed !important;
+                      top: 0 !important;
+                      left: 0 !important;
+                      width: 100vw !important;
+                      height: 100vh !important;
+                      z-index: 2147483647 !important;
+                      background: rgba(0,0,0,0.5) !important;
+                      display: flex !important;
+                      align-items: center !important;
+                      justify-content: center !important;
+                      pointer-events: auto !important;
                     `
-                    
-                    const shadow = dialogHost.attachShadow({ mode: 'closed' })
                     
                     // Create dialog
                     const dialog = document.createElement('div')
