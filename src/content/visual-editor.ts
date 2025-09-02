@@ -7,6 +7,7 @@ export interface VisualEditorOptions {
 }
 
 export class VisualEditor {
+  private readonly VERSION = '2.1-NEW-MENU'
   private isActive = false
   private selectedElement: HTMLElement | null = null
   private contextMenu: HTMLElement | null = null
@@ -28,7 +29,13 @@ export class VisualEditor {
   }
   
   start() {
-    if (this.isActive) return
+    console.log('[Visual Editor] Starting - Version:', this.VERSION)
+    console.log('[Visual Editor] Build timestamp:', new Date().toISOString())
+    
+    if (this.isActive) {
+      console.log('[Visual Editor] Already active, returning')
+      return
+    }
     
     this.isActive = true
     console.log('Visual Editor: Starting...')
@@ -557,9 +564,14 @@ export class VisualEditor {
   }
   
   private showContextMenu(x: number, y: number) {
+    console.log('[Visual Editor Debug] showContextMenu called - Version 2.1 with NEW menu items')
+    console.log('[Visual Editor Debug] Build timestamp:', new Date().toISOString())
     this.removeContextMenu()
     
-    if (!this.selectedElement) return
+    if (!this.selectedElement) {
+      console.log('[Visual Editor Debug] No selected element, returning')
+      return
+    }
     
     // Create a blocking overlay that covers the entire page
     const overlay = document.createElement('div')
@@ -598,6 +610,9 @@ export class VisualEditor {
       { icon: '👁', label: 'Hide Element', action: 'hide' },
       { icon: '🗑', label: 'Delete Element', action: 'delete', shortcut: 'Delete' },
     ]
+    
+    console.log('[Visual Editor Debug] Menu items defined:', menuItems.map(item => item.label || 'separator').join(', '))
+    console.log('[Visual Editor Debug] Total menu items:', menuItems.length)
     
     let menuHTML = ''
     menuItems.forEach(item => {
