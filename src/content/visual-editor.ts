@@ -94,10 +94,12 @@ export class VisualEditor {
         border-radius: 8px !important;
         box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
         padding: 8px !important;
-        z-index: 999999 !important;
+        z-index: 2147483647 !important;
         font-family: system-ui, -apple-system, sans-serif !important;
         font-size: 14px !important;
         min-width: 200px !important;
+        pointer-events: auto !important;
+        user-select: none !important;
       }
       
       .absmartly-menu-item {
@@ -131,13 +133,15 @@ export class VisualEditor {
         border-radius: 12px !important;
         padding: 12px !important;
         box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-        z-index: 999998 !important;
+        z-index: 2147483646 !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 8px !important;
         font-family: system-ui, -apple-system, sans-serif !important;
         font-size: 14px !important;
         max-width: 320px !important;
+        pointer-events: auto !important;
+        user-select: none !important;
       }
       
       .absmartly-toolbar-instructions {
@@ -318,6 +322,10 @@ export class VisualEditor {
   }
   
   private handleToolbarClick = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.stopImmediatePropagation()
+    
     const target = e.target as HTMLElement
     const action = target.getAttribute('data-action')
     
@@ -338,15 +346,53 @@ export class VisualEditor {
   }
   
   private setupEventListeners() {
+    // Use capture phase but check target first
     document.addEventListener('click', this.handleElementClick, true)
     document.addEventListener('contextmenu', this.handleContextMenu, true)
     document.addEventListener('keydown', this.handleKeyDown, true)
+    
+    // Add mouse event handlers to prevent menu selection
+    document.addEventListener('mousedown', this.handleMouseDown, true)
+    document.addEventListener('mouseup', this.handleMouseUp, true)
   }
   
   private removeEventListeners() {
     document.removeEventListener('click', this.handleElementClick, true)
     document.removeEventListener('contextmenu', this.handleContextMenu, true)
     document.removeEventListener('keydown', this.handleKeyDown, true)
+    document.removeEventListener('mousedown', this.handleMouseDown, true)
+    document.removeEventListener('mouseup', this.handleMouseUp, true)
+  }
+  
+  private handleMouseDown = (e: MouseEvent) => {
+    if (!this.isActive) return
+    
+    const target = e.target as HTMLElement
+    
+    // CRITICAL: Check extension element BEFORE doing anything else
+    if (this.isExtensionElement(target)) {
+      // Don't interfere with extension UI at all
+      return
+    }
+    
+    // Only prevent default for page elements
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  
+  private handleMouseUp = (e: MouseEvent) => {
+    if (!this.isActive) return
+    
+    const target = e.target as HTMLElement
+    
+    // CRITICAL: Check extension element BEFORE doing anything else
+    if (this.isExtensionElement(target)) {
+      // Don't interfere with extension UI at all
+      return
+    }
+    
+    e.preventDefault()
+    e.stopPropagation()
   }
   
   private handleElementClick = (e: MouseEvent) => {
@@ -354,25 +400,26 @@ export class VisualEditor {
     
     const target = e.target as HTMLElement
     
-    console.log('Visual Editor: Click detected on', target)
-    
-    // Ignore clicks on our own UI elements
+    // CRITICAL: Check if this is an extension element FIRST before any other processing
     if (this.isExtensionElement(target)) {
-      console.log('Visual Editor: Ignoring click on extension element')
+      console.log('Visual Editor: Click on extension UI - ignoring completely')
+      // Don't process this event at all
       return
     }
     
+    console.log('Visual Editor: Click detected on page element', target)
+    
+    // Now we know it's a page element, so prevent default and stop propagation
+    e.preventDefault()
+    e.stopPropagation()
+    
     // If clicking outside context menu, close it
-    if (this.contextMenu && !this.contextMenu.contains(target)) {
+    if (this.contextMenu) {
       this.removeContextMenu()
     }
     
     // Don't select during certain operations
     if (target.contentEditable === 'true') return
-    
-    // Prevent default to stop link navigation and form submission
-    e.preventDefault()
-    e.stopPropagation()
     
     // Select the element on normal click
     this.selectElement(target)
@@ -432,49 +479,104 @@ export class VisualEditor {
     
     if (!this.selectedElement) return
     
+    // Create a blocking overlay that covers the entire page
+    const overlay = document.createElement('div')
+    overlay.id = 'absmartly-menu-overlay'
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 2147483646 !important;
+      background: transparent !important;
+      pointer-events: auto !important;
+    `
+    
+    // Create the menu
     this.contextMenu = document.createElement('div')
     this.contextMenu.className = 'absmartly-context-menu'
+    this.contextMenu.id = 'absmartly-context-menu-main'
     
-    // Create menu items based on element type
+    // Create menu items
     const menuItems: Array<{ icon: string, label: string, action: string, separator?: boolean }> = [
       { icon: '✏️', label: 'Edit Text', action: 'edit-text' },
-      { icon: '🎨', label: 'Change Background Color', action: 'bg-color' },
-      { icon: '🔤', label: 'Change Text Color', action: 'text-color' },
-      { icon: '📐', label: 'Change Size', action: 'size' },
+      { icon: '</>', label: 'Edit HTML', action: 'edit-html' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '⬆️', label: 'Move Up', action: 'move-up' },
-      { icon: '⬇️', label: 'Move Down', action: 'move-down' },
-      { icon: '🔄', label: 'Drag to Reorder', action: 'drag-drop' },
+      { icon: '↑', label: 'Move Up', action: 'move-up' },
+      { icon: '↓', label: 'Move Down', action: 'move-down' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '📋', label: 'Copy Element', action: 'copy' },
-      { icon: '👁️', label: 'Hide Element', action: 'hide' },
-      { icon: '🗑️', label: 'Delete Element', action: 'delete' },
+      { icon: '⊕', label: 'Duplicate', action: 'duplicate' },
+      { icon: '□', label: 'Copy Style', action: 'copy-style' },
+      { separator: true, icon: '', label: '', action: '' },
+      { icon: '👁', label: 'Hide Element', action: 'hide' },
+      { icon: '🗑', label: 'Delete', action: 'delete' },
     ]
     
+    let menuHTML = ''
     menuItems.forEach(item => {
       if (item.separator) {
-        const separator = document.createElement('div')
-        separator.className = 'absmartly-menu-separator'
-        this.contextMenu!.appendChild(separator)
+        menuHTML += '<div class="absmartly-menu-separator"></div>'
       } else {
-        const menuItem = document.createElement('div')
-        menuItem.className = 'absmartly-menu-item'
-        menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`
-        menuItem.setAttribute('data-action', item.action)
-        menuItem.addEventListener('click', () => this.handleMenuAction(item.action))
-        this.contextMenu!.appendChild(menuItem)
+        menuHTML += `
+          <div class="absmartly-menu-item" data-action="${item.action}">
+            <span>${item.icon}</span>
+            <span>${item.label}</span>
+          </div>
+        `
       }
     })
+    this.contextMenu.innerHTML = menuHTML
     
     // Position the menu
-    this.contextMenu.style.left = `${Math.min(x, window.innerWidth - 220)}px`
-    this.contextMenu.style.top = `${Math.min(y, window.innerHeight - 400)}px`
+    this.contextMenu.style.cssText = `
+      position: fixed !important;
+      left: ${Math.min(x, window.innerWidth - 220)}px !important;
+      top: ${Math.min(y, window.innerHeight - 400)}px !important;
+      z-index: 2147483647 !important;
+      pointer-events: auto !important;
+    `
     
-    document.body.appendChild(this.contextMenu)
+    // Add the menu to the overlay
+    overlay.appendChild(this.contextMenu)
+    document.body.appendChild(overlay)
+    
+    // Handle clicks on the overlay (outside menu)
+    overlay.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      
+      // If clicking on menu item
+      const menuItem = target.closest('.absmartly-menu-item') as HTMLElement
+      if (menuItem) {
+        e.preventDefault()
+        e.stopPropagation()
+        const action = menuItem.getAttribute('data-action')
+        if (action) {
+          this.handleMenuAction(action)
+        }
+        return
+      }
+      
+      // If clicking outside menu (on overlay), close it
+      if (target === overlay) {
+        this.removeContextMenu()
+      }
+    }, true)
+    
+    // Prevent all propagation from overlay
+    overlay.addEventListener('mousedown', (e) => {
+      e.stopPropagation()
+    }, true)
+    
+    overlay.addEventListener('mouseup', (e) => {
+      e.stopPropagation()
+    }, true)
   }
   
   private removeContextMenu() {
-    this.contextMenu?.remove()
+    // Remove the overlay which includes the menu
+    document.getElementById('absmartly-menu-overlay')?.remove()
+    document.getElementById('absmartly-menu-container')?.remove()
     this.contextMenu = null
   }
   
@@ -485,14 +587,8 @@ export class VisualEditor {
       case 'edit-text':
         this.startTextEditing()
         break
-      case 'bg-color':
-        this.showColorPicker('background')
-        break
-      case 'text-color':
-        this.showColorPicker('text')
-        break
-      case 'size':
-        this.showSizeEditor()
+      case 'edit-html':
+        this.startHTMLEditing()
         break
       case 'move-up':
         this.moveElement('up')
@@ -500,11 +596,11 @@ export class VisualEditor {
       case 'move-down':
         this.moveElement('down')
         break
-      case 'drag-drop':
-        this.startDragDrop()
+      case 'duplicate':
+        this.duplicateElement()
         break
-      case 'copy':
-        this.copyElement()
+      case 'copy-style':
+        this.copyElementStyle()
         break
       case 'hide':
         this.hideElement()
@@ -564,104 +660,110 @@ export class VisualEditor {
     this.selectedElement.addEventListener('blur', handleBlur)
   }
   
-  private showColorPicker(type: 'background' | 'text') {
+  private startHTMLEditing() {
     if (!this.selectedElement) return
     
-    const picker = document.createElement('div')
-    picker.className = 'absmartly-color-picker'
+    const originalHTML = this.selectedElement.innerHTML
+    const editDialog = document.createElement('div')
+    editDialog.className = 'absmartly-html-editor'
+    editDialog.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border: 2px solid #3b82f6;
+      border-radius: 8px;
+      padding: 20px;
+      z-index: 2147483647;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+      width: 600px;
+      max-width: 90vw;
+    `
     
-    // Common colors
-    const colors = [
-      '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
-      '#808080', '#C0C0C0', '#800000', '#008000', '#000080', '#808000', '#800080', '#008080',
-      '#FFA500', '#A52A2A', '#8A2BE2', '#5F9EA0', '#D2691E', '#FF7F50', '#6495ED', '#DC143C',
-      '#00CED1', '#9400D3', '#FF1493', '#00BFFF', '#1E90FF', '#B22222', '#228B22', '#FFD700'
-    ]
+    editDialog.innerHTML = `
+      <h3 style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">Edit HTML</h3>
+      <textarea style="width: 100%; height: 300px; font-family: monospace; font-size: 13px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 4px;">${originalHTML.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+      <div style="margin-top: 10px; display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="absmartly-cancel-btn" style="padding: 8px 16px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">Cancel</button>
+        <button class="absmartly-save-btn" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+      </div>
+    `
     
-    const grid = document.createElement('div')
-    grid.className = 'absmartly-color-grid'
+    document.body.appendChild(editDialog)
     
-    colors.forEach(color => {
-      const swatch = document.createElement('div')
-      swatch.className = 'absmartly-color-swatch'
-      swatch.style.backgroundColor = color
-      swatch.addEventListener('click', () => {
-        this.applyColorChange(type, color)
-        picker.remove()
-      })
-      grid.appendChild(swatch)
+    const textarea = editDialog.querySelector('textarea') as HTMLTextAreaElement
+    const saveBtn = editDialog.querySelector('.absmartly-save-btn') as HTMLButtonElement
+    const cancelBtn = editDialog.querySelector('.absmartly-cancel-btn') as HTMLButtonElement
+    
+    textarea.focus()
+    
+    saveBtn.addEventListener('click', () => {
+      const newHTML = textarea.value
+      if (this.selectedElement && newHTML !== originalHTML) {
+        this.selectedElement.innerHTML = newHTML
+        this.addChange({
+          selector: this.getSelector(this.selectedElement),
+          type: 'html',
+          value: newHTML,
+          enabled: true
+        })
+      }
+      editDialog.remove()
     })
     
-    // Custom color input
-    const input = document.createElement('input')
-    input.className = 'absmartly-color-input'
-    input.type = 'text'
-    input.placeholder = '#000000 or rgb(0,0,0)'
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.applyColorChange(type, input.value)
-        picker.remove()
-      }
+    cancelBtn.addEventListener('click', () => {
+      editDialog.remove()
     })
-    
-    picker.appendChild(grid)
-    picker.appendChild(input)
-    
-    // Position near the element
-    const rect = this.selectedElement.getBoundingClientRect()
-    picker.style.left = `${rect.left}px`
-    picker.style.top = `${rect.bottom + 10}px`
-    
-    document.body.appendChild(picker)
-    
-    // Close on outside click
-    setTimeout(() => {
-      const handleOutsideClick = (e: MouseEvent) => {
-        if (!picker.contains(e.target as Node)) {
-          picker.remove()
-          document.removeEventListener('click', handleOutsideClick)
-        }
-      }
-      document.addEventListener('click', handleOutsideClick)
-    }, 100)
   }
   
-  private applyColorChange(type: 'background' | 'text', color: string) {
+  private duplicateElement() {
     if (!this.selectedElement) return
     
-    // Store original value
-    if (!this.originalValues.has(this.selectedElement)) {
-      const computed = window.getComputedStyle(this.selectedElement)
-      this.originalValues.set(this.selectedElement, {
-        backgroundColor: computed.backgroundColor,
-        color: computed.color
-      })
-    }
+    const clone = this.selectedElement.cloneNode(true) as HTMLElement
+    // Remove any absmartly classes from the clone
+    clone.classList.remove('absmartly-selected', 'absmartly-editable', 'absmartly-editing')
     
-    // Apply the change
-    if (type === 'background') {
-      this.selectedElement.style.backgroundColor = color
-      this.addChange({
-        selector: this.getSelector(this.selectedElement),
-        type: 'style',
-        value: { 'background-color': color },
-        enabled: true
-      })
-    } else {
-      this.selectedElement.style.color = color
-      this.addChange({
-        selector: this.getSelector(this.selectedElement),
-        type: 'style',
-        value: { color: color },
-        enabled: true
-      })
-    }
+    this.selectedElement.parentElement?.insertBefore(clone, this.selectedElement.nextSibling)
+    
+    this.addChange({
+      selector: this.getSelector(this.selectedElement),
+      type: 'duplicate',
+      value: true,
+      enabled: true
+    })
+    
+    this.showNotification('Element Duplicated', 'Element has been successfully duplicated')
   }
   
-  private showSizeEditor() {
-    // TODO: Implement size editor with width/height inputs
-    this.showNotification('Size Editor', 'Coming soon...')
+  private copyElementStyle() {
+    if (!this.selectedElement) return
+    
+    const computed = window.getComputedStyle(this.selectedElement)
+    const styles = {
+      backgroundColor: computed.backgroundColor,
+      color: computed.color,
+      fontSize: computed.fontSize,
+      fontFamily: computed.fontFamily,
+      fontWeight: computed.fontWeight,
+      padding: computed.padding,
+      margin: computed.margin,
+      border: computed.border,
+      borderRadius: computed.borderRadius,
+      boxShadow: computed.boxShadow
+    }
+    
+    // Store in clipboard or internal storage for later paste
+    localStorage.setItem('absmartly-copied-styles', JSON.stringify(styles))
+    
+    this.showNotification('Style Copied', 'Element styles have been copied to clipboard')
   }
+  
+
+  
+
+  
+
   
   private moveElement(direction: 'up' | 'down') {
     if (!this.selectedElement) return
@@ -690,20 +792,7 @@ export class VisualEditor {
     }
   }
   
-  private startDragDrop() {
-    // TODO: Integrate with existing drag-drop picker
-    this.showNotification('Drag & Drop', 'Drag the element to its new position')
-  }
-  
-  private copyElement() {
-    if (!this.selectedElement) return
-    
-    const clone = this.selectedElement.cloneNode(true) as HTMLElement
-    this.selectedElement.parentElement?.insertBefore(clone, this.selectedElement.nextSibling)
-    
-    // TODO: Track this change
-    this.showNotification('Element Copied', 'Element has been duplicated')
-  }
+
   
   private hideElement() {
     if (!this.selectedElement) return
@@ -880,16 +969,22 @@ export class VisualEditor {
   }
   
   private isExtensionElement(element: HTMLElement): boolean {
-    const className = typeof element.className === 'string' 
-      ? element.className 
-      : element.className?.baseVal || ''
+    // Check if element or any parent has our extension identifiers
+    let current: HTMLElement | null = element
+    while (current) {
+      const id = current.id || ''
+      const className = typeof current.className === 'string' 
+        ? current.className 
+        : current.className?.baseVal || ''
+      
+      if (id.includes('absmartly') || className.includes('absmartly')) {
+        return true
+      }
+      
+      current = current.parentElement
+    }
     
-    return element.id?.includes('absmartly') || 
-           className.includes('absmartly') ||
-           element.closest('.absmartly-toolbar') !== null ||
-           element.closest('.absmartly-context-menu') !== null ||
-           element.closest('.absmartly-notification') !== null ||
-           element.closest('.absmartly-color-picker') !== null
+    return false
   }
   
   

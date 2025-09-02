@@ -265,5 +265,14 @@ export const injectSidebar = () => {
     })
   })
   
+  // Set up message relay for visual editor changes
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE') {
+      console.log('🔵 ABSmartly Extension: Relaying visual editor changes to sidebar')
+      // The React components inside ExtensionUI will receive this through their own listeners
+      // This just ensures the message gets to the content script context
+    }
+  })
+  
   console.log('🔵 ABSmartly Extension: Sidebar injected successfully')
 }

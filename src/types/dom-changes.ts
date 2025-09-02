@@ -1,4 +1,4 @@
-export type DOMChangeType = 'text' | 'style' | 'class' | 'attribute' | 'html' | 'javascript' | 'move';
+export type DOMChangeType = 'text' | 'style' | 'class' | 'attribute' | 'html' | 'javascript' | 'move' | 'remove' | 'insert';
 
 export interface DOMChangeStyle {
   selector: string;
@@ -51,6 +51,20 @@ export interface DOMChangeMove {
   enabled?: boolean;
 }
 
+export interface DOMChangeRemove {
+  selector: string;
+  type: 'remove';
+  enabled?: boolean;
+}
+
+export interface DOMChangeInsert {
+  selector: string; // Reference element selector
+  type: 'insert';
+  html: string; // HTML content to insert
+  position: 'before' | 'after' | 'firstChild' | 'lastChild';
+  enabled?: boolean;
+}
+
 export type DOMChange = 
   | DOMChangeStyle 
   | DOMChangeText 
@@ -58,7 +72,9 @@ export type DOMChange =
   | DOMChangeAttribute 
   | DOMChangeHTML 
   | DOMChangeJavaScript
-  | DOMChangeMove;
+  | DOMChangeMove
+  | DOMChangeRemove
+  | DOMChangeInsert;
 
 export interface DOMChangeTemplate {
   id: string;
