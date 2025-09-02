@@ -559,29 +559,17 @@ export function ExperimentDetail({
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          // First inject the content script if needed
-          chrome.scripting.executeScript({
-            target: { tabId: tabs[0].id },
-            files: ['content.js']
-          }).then(() => {
-            // Then send the preview message with experiment and variant info
-            chrome.tabs.sendMessage(tabs[0].id, {
-              type: 'ABSMARTLY_PREVIEW',
-              action: 'apply',
-              changes: changes.filter(c => c.enabled !== false),
-              experimentName: experiment.name,
-              variantName: variantName
-            })
-          }).catch(error => {
-            console.error('Error injecting content script:', error)
-            // Try sending anyway in case it's already injected
-            chrome.tabs.sendMessage(tabs[0].id, {
-              type: 'ABSMARTLY_PREVIEW',
-              action: 'apply',
-              changes: changes.filter(c => c.enabled !== false),
-              experimentName: experiment.name,
-              variantName: variantName
-            })
+          // Content script is already injected by the manifest, just send the message
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'apply',
+            changes: changes.filter(c => c.enabled !== false),
+            experimentName: experiment.name,
+            variantName: variantName
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('Error sending preview message:', chrome.runtime.lastError)
+            }
           })
         }
       })
