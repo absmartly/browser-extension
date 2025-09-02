@@ -552,9 +552,11 @@ export function ExperimentDetail({
 
   const handlePreviewToggle = (enabled: boolean) => {
     setPreviewEnabled(enabled)
-    if (enabled && activePreviewVariant) {
+    if (enabled && activePreviewVariant && experiment) {
       // Send preview message through content script to SDK
       const changes = variantData[activePreviewVariant]?.dom_changes || []
+      const variantName = experiment.variants?.find(v => v.name === activePreviewVariant)?.name || activePreviewVariant
+      
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           // First inject the content script if needed
@@ -562,11 +564,13 @@ export function ExperimentDetail({
             target: { tabId: tabs[0].id },
             files: ['content.js']
           }).then(() => {
-            // Then send the preview message
+            // Then send the preview message with experiment and variant info
             chrome.tabs.sendMessage(tabs[0].id, {
               type: 'ABSMARTLY_PREVIEW',
               action: 'apply',
-              changes: changes.filter(c => c.enabled !== false)
+              changes: changes.filter(c => c.enabled !== false),
+              experimentName: experiment.name,
+              variantName: variantName
             })
           }).catch(error => {
             console.error('Error injecting content script:', error)
@@ -574,7 +578,9 @@ export function ExperimentDetail({
             chrome.tabs.sendMessage(tabs[0].id, {
               type: 'ABSMARTLY_PREVIEW',
               action: 'apply',
-              changes: changes.filter(c => c.enabled !== false)
+              changes: changes.filter(c => c.enabled !== false),
+              experimentName: experiment.name,
+              variantName: variantName
             })
           })
         }

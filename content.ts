@@ -74,6 +74,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true
   }
+  
+  // Handle preview messages
+  if (message.type === 'ABSMARTLY_PREVIEW') {
+    console.log('[ABSmartly Content Script] Received preview message:', message.action)
+    
+    if (message.action === 'apply') {
+      // Create preview header
+      createPreviewHeader(message.experimentName, message.variantName)
+      
+      // Send message to SDK plugin to preview changes
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'PREVIEW_CHANGES',
+        payload: {
+          changes: message.changes || []
+        }
+      }, '*')
+      
+      sendResponse({ success: true })
+    } else if (message.action === 'remove') {
+      // Remove preview header
+      removePreviewHeader()
+      
+      // Send message to SDK plugin to remove preview
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'REMOVE_PREVIEW',
+        payload: {}
+      }, '*')
+      
+      sendResponse({ success: true })
+    }
+    
+    return true
+  }
 })
 
 console.log('[Visual Editor Content Script] Loaded and listening for messages')
@@ -90,6 +125,91 @@ document.documentElement.appendChild(debugDiv)
 
 // Send a message to the page to confirm we're loaded
 window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '*')
+
+// Function to create preview header
+function createPreviewHeader(experimentName: string, variantName: string) {
+  // Remove any existing preview header
+  removePreviewHeader()
+  
+  // Create preview header container
+  const headerContainer = document.createElement('div')
+  headerContainer.id = 'absmartly-preview-header'
+  headerContainer.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    color: white;
+    padding: 12px 20px;
+    z-index: 2147483647;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+  `
+  
+  // Create content
+  const content = document.createElement('div')
+  content.style.cssText = 'flex: 1; text-align: center;'
+  content.innerHTML = `
+    <div style="font-weight: 600; margin-bottom: 4px;">
+      🎨 ABSmartly Preview Mode Active
+    </div>
+    <div style="font-size: 12px; opacity: 0.95;">
+      Previewing variant <strong>${variantName}</strong> of experiment <strong>${experimentName}</strong>
+    </div>
+  `
+  
+  // Create close button
+  const closeButton = document.createElement('button')
+  closeButton.style.cssText = `
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  `
+  closeButton.textContent = 'Exit Preview'
+  closeButton.onmouseover = () => {
+    closeButton.style.background = 'rgba(255, 255, 255, 0.3)'
+  }
+  closeButton.onmouseout = () => {
+    closeButton.style.background = 'rgba(255, 255, 255, 0.2)'
+  }
+  closeButton.onclick = () => {
+    // Send message back to extension to disable preview
+    chrome.runtime.sendMessage({
+      type: 'DISABLE_PREVIEW'
+    })
+  }
+  
+  headerContainer.appendChild(content)
+  headerContainer.appendChild(closeButton)
+  document.body.appendChild(headerContainer)
+  
+  // Adjust body padding to accommodate header
+  const originalPaddingTop = document.body.style.paddingTop
+  document.body.style.paddingTop = '60px'
+  headerContainer.dataset.originalPadding = originalPaddingTop
+}
+
+// Function to remove preview header
+function removePreviewHeader() {
+  const header = document.getElementById('absmartly-preview-header')
+  if (header) {
+    // Restore original body padding
+    const originalPadding = header.dataset.originalPadding || ''
+    document.body.style.paddingTop = originalPadding
+    header.remove()
+  }
+}
 
 // Inject the SDK plugin initialization script into the page
 function injectSDKPluginScript() {
