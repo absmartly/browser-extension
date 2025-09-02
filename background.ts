@@ -2258,12 +2258,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         position: position
                       })
                       
+                      // Remove the dialog
+                      dialogHost.remove()
+                      
                       // Select the new element
                       selectedElement = newElement
                       element.classList.remove('absmartly-selected')
                       newElement.classList.add('absmartly-selected')
                       
-                      dialogHost.remove()
                       showNotification('New block inserted!')
                     })
                     
