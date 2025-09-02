@@ -2,6 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 // This is the main content script that will be injected into all web pages
 import { VisualEditor } from '~src/content/visual-editor'
+import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 
 export const config: PlasmoCSConfig = {
@@ -11,10 +12,53 @@ export const config: PlasmoCSConfig = {
 
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
+let elementPicker: ElementPicker | null = null
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Visual Editor Content Script] Received message:', message.type)
+  
+  // Handle test connection message
+  if (message.type === 'TEST_CONNECTION') {
+    console.log('[Visual Editor Content Script] Received message: TEST_CONNECTION')
+    sendResponse({ success: true, message: 'Content script is loaded and ready' })
+    return true
+  }
+  
+  // Handle element picker message
+  if (message.type === 'START_ELEMENT_PICKER') {
+    console.log('[Visual Editor Content Script] Starting element picker')
+    
+    if (!elementPicker) {
+      elementPicker = new ElementPicker()
+    }
+    
+    elementPicker.start((selector: string) => {
+      console.log('[Visual Editor Content Script] Element selected:', selector)
+      // Send the selected element back to the extension
+      chrome.runtime.sendMessage({
+        type: 'ELEMENT_SELECTED',
+        selector: selector
+      })
+      elementPicker = null
+    })
+    
+    sendResponse({ success: true })
+    return true
+  }
+  
+  // Handle cancel element picker message
+  if (message.type === 'CANCEL_ELEMENT_PICKER') {
+    console.log('[Visual Editor Content Script] Canceling element picker')
+    
+    if (elementPicker) {
+      elementPicker.stop()
+      elementPicker = null
+    }
+    
+    sendResponse({ success: true })
+    return true
+  }
   
   if (message.type === 'START_VISUAL_EDITOR') {
     console.log('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)

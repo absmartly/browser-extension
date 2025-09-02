@@ -666,11 +666,8 @@ export function DOMChangesInlineEditor({
           })
         })
         
-        // Close the popup after a brief delay to ensure message is sent
-        setTimeout(() => {
-          console.log('Closing popup window...')
-          window.close()
-        }, 100)
+        // Don't close the window - we're in a sidebar now, not a popup
+        // The sidebar should remain open to receive the element selection
       } else {
         console.error('No active tab found!')
       }
