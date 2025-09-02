@@ -580,24 +580,23 @@ export class VisualEditor {
     this.contextMenu.className = 'absmartly-context-menu'
     this.contextMenu.id = 'absmartly-context-menu-main'
     
-    // Create menu items similar to competitor
-    const menuItems: Array<{ icon: string, label: string, action: string, separator?: boolean }> = [
+    // Create menu items matching Mida's layout
+    const menuItems: Array<{ icon: string, label: string, action: string, separator?: boolean, shortcut?: string }> = [
       { icon: '✏️', label: 'Edit Element', action: 'edit-element' },
-      { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
       { icon: '</>', label: 'Edit HTML', action: 'edit-html' },
-      { icon: '✂️', label: 'Inline Edit', action: 'inline-edit' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '↗️', label: 'Move / Resize', action: 'move-resize' },
-      { icon: '🗑', label: 'Remove', action: 'delete' },
+      { icon: '⬆', label: 'Move up', action: 'move-up' },
+      { icon: '⬇', label: 'Move down', action: 'move-down' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '🎯', label: 'Select Relative Element', action: 'select-relative' },
-      { icon: '📋', label: 'Copy', action: 'copy' },
-      { icon: '👁', label: 'Hide', action: 'hide' },
+      { icon: '📋', label: 'Copy Element', action: 'copy', shortcut: '⌘+C' },
+      { icon: '🔗', label: 'Copy Selector Path', action: 'copy-selector', shortcut: '⌘+Shift+C' },
       { separator: true, icon: '', label: '', action: '' },
-      { icon: '💾', label: 'Save to library', action: 'save-to-library' },
-      { icon: '📝', label: 'Apply saved modification', action: 'apply-saved' },
-      { icon: '👁', label: 'Track Clicks', action: 'track-clicks' },
-      { icon: '💡', label: 'Suggest Variations', action: 'suggest-variations' },
+      { icon: '🎯', label: 'Select Relative Elements', action: 'select-relative' },
+      { separator: true, icon: '', label: '', action: '' },
+      { icon: '➕', label: 'Insert new block', action: 'insert-block' },
+      { separator: true, icon: '', label: '', action: '' },
+      { icon: '👁', label: 'Hide Element', action: 'hide' },
+      { icon: '🗑', label: 'Delete Element', action: 'delete', shortcut: 'Delete' },
     ]
     
     let menuHTML = ''
@@ -607,8 +606,9 @@ export class VisualEditor {
       } else {
         menuHTML += `
           <div class="absmartly-menu-item" data-action="${item.action}">
-            <span>${item.icon}</span>
-            <span>${item.label}</span>
+            <span style="width: 20px; display: inline-block;">${item.icon}</span>
+            <span style="flex: 1;">${item.label}</span>
+            ${item.shortcut ? `<span style="color: #9ca3af; font-size: 12px; margin-left: auto;">${item.shortcut}</span>` : ''}
           </div>
         `
       }
@@ -668,51 +668,331 @@ export class VisualEditor {
   }
   
   private handleMenuAction(action: string) {
-    if (!this.selectedElement) return
+    if (!this.selectedElement && action !== 'insert-block') return
     
     switch (action) {
       case 'edit-element':
         this.startElementEditing()
         break
-      case 'rearrange':
-        this.startRearrangeMode()
-        break
       case 'edit-html':
         this.startHTMLEditing()
         break
-      case 'inline-edit':
-        this.startInlineEditing()
+      case 'move-up':
+        this.moveElement('up')
         break
-      case 'move-resize':
-        this.startMoveResizeMode()
-        break
-      case 'delete':
-        this.deleteElement()
-        break
-      case 'select-relative':
-        this.showRelativeElementSelector()
+      case 'move-down':
+        this.moveElement('down')
         break
       case 'copy':
         this.copyElement()
         break
+      case 'copy-selector':
+        this.copySelectorPath()
+        break
+      case 'select-relative':
+        this.showRelativeElementSelector()
+        break
+      case 'insert-block':
+        this.insertNewBlock()
+        break
       case 'hide':
         this.hideElement()
         break
-      case 'save-to-library':
-        this.saveToLibrary()
-        break
-      case 'apply-saved':
-        this.applySavedModification()
-        break
-      case 'track-clicks':
-        this.trackClicks()
-        break
-      case 'suggest-variations':
-        this.suggestVariations()
+      case 'delete':
+        this.deleteElement()
         break
     }
     
     this.removeContextMenu()
+  }
+  
+  private copySelectorPath() {
+    if (!this.selectedElement) return
+    
+    const selector = this.generateSelector(this.selectedElement)
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(selector).then(() => {
+      // Show a notification that the selector has been copied
+      const notification = document.createElement('div')
+      notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 14px;
+        z-index: 2147483647;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        animation: slideInRight 0.3s ease-out;
+      `
+      notification.textContent = `✅ Selector copied: ${selector}`
+      
+      // Add animation styles
+      const style = document.createElement('style')
+      style.textContent = `
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `
+      document.head.appendChild(style)
+      document.body.appendChild(notification)
+      
+      // Remove notification after 3 seconds
+      setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-out'
+        notification.style.animationFillMode = 'forwards'
+        
+        // Add slide out animation
+        const slideOutStyle = document.createElement('style')
+        slideOutStyle.textContent = `
+          @keyframes slideOutRight {
+            from {
+              transform: translateX(0);
+              opacity: 1;
+            }
+            to {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+          }
+        `
+        document.head.appendChild(slideOutStyle)
+        
+        setTimeout(() => {
+          notification.remove()
+          style.remove()
+          slideOutStyle.remove()
+        }, 300)
+      }, 3000)
+    }).catch(err => {
+      console.error('Failed to copy selector:', err)
+    })
+  }
+  
+  private insertNewBlock() {
+    if (!this.selectedElement) return
+    
+    // Create insert dialog
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border: 2px solid #3b82f6;
+      border-radius: 8px;
+      padding: 20px;
+      z-index: 2147483647;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      width: 500px;
+      max-width: 90%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    `
+    
+    // Add backdrop
+    const backdrop = document.createElement('div')
+    backdrop.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 2147483646;
+    `
+    document.body.appendChild(backdrop)
+    
+    dialog.innerHTML = `
+      <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #1f2937;">Insert New Block</h3>
+      
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #4b5563;">Position:</label>
+        <select id="insert-position" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px;">
+          <option value="before">Before selected element</option>
+          <option value="after">After selected element</option>
+          <option value="prepend">As first child</option>
+          <option value="append">As last child</option>
+        </select>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #4b5563;">Element Type:</label>
+        <select id="element-type" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px;">
+          <option value="div">Div</option>
+          <option value="section">Section</option>
+          <option value="article">Article</option>
+          <option value="header">Header</option>
+          <option value="footer">Footer</option>
+          <option value="nav">Navigation</option>
+          <option value="button">Button</option>
+          <option value="a">Link</option>
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="img">Image</option>
+          <option value="ul">Unordered List</option>
+          <option value="ol">Ordered List</option>
+          <option value="custom">Custom HTML</option>
+        </select>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #4b5563;">Content/HTML:</label>
+        <textarea id="element-content" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px; min-height: 100px; font-family: monospace;" placeholder="Enter text content or HTML">New Block</textarea>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #4b5563;">CSS Classes:</label>
+        <input id="element-classes" type="text" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px;" placeholder="e.g., my-class another-class">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #4b5563;">ID (optional):</label>
+        <input id="element-id" type="text" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px;" placeholder="e.g., my-element-id">
+      </div>
+      
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button id="cancel-insert" style="padding: 8px 16px; background: #f3f4f6; color: #1f2937; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Cancel</button>
+        <button id="apply-insert" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Insert</button>
+      </div>
+    `
+    
+    document.body.appendChild(dialog)
+    
+    // Handle element type change
+    const elementType = dialog.querySelector('#element-type') as HTMLSelectElement
+    const contentArea = dialog.querySelector('#element-content') as HTMLTextAreaElement
+    
+    elementType.addEventListener('change', () => {
+      if (elementType.value === 'custom') {
+        contentArea.placeholder = 'Enter complete HTML (e.g., <div class="my-div">Content</div>)'
+        contentArea.style.minHeight = '150px'
+      } else {
+        contentArea.placeholder = 'Enter text content'
+        contentArea.style.minHeight = '100px'
+        
+        // Set default content based on element type
+        const defaults: { [key: string]: string } = {
+          button: 'Click Me',
+          a: 'Link Text',
+          p: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
+          h1: 'Main Heading',
+          h2: 'Section Heading',
+          h3: 'Subsection Heading',
+          img: '',
+          div: '',
+          section: '',
+          article: '',
+          header: '',
+          footer: '',
+          nav: '',
+          ul: '<li>Item 1</li>\n<li>Item 2</li>\n<li>Item 3</li>',
+          ol: '<li>First item</li>\n<li>Second item</li>\n<li>Third item</li>'
+        }
+        contentArea.value = defaults[elementType.value] || 'New Block'
+      }
+    })
+    
+    // Handle cancel
+    dialog.querySelector('#cancel-insert')?.addEventListener('click', () => {
+      dialog.remove()
+      backdrop.remove()
+    })
+    
+    // Handle apply
+    dialog.querySelector('#apply-insert')?.addEventListener('click', () => {
+      const position = (dialog.querySelector('#insert-position') as HTMLSelectElement).value
+      const type = elementType.value
+      const content = contentArea.value
+      const classes = (dialog.querySelector('#element-classes') as HTMLInputElement).value
+      const id = (dialog.querySelector('#element-id') as HTMLInputElement).value
+      
+      let newElement: HTMLElement
+      
+      if (type === 'custom') {
+        // Parse custom HTML
+        const temp = document.createElement('div')
+        temp.innerHTML = content
+        newElement = temp.firstElementChild as HTMLElement || document.createElement('div')
+      } else if (type === 'img') {
+        newElement = document.createElement('img')
+        if (content) {
+          newElement.setAttribute('src', content)
+          newElement.setAttribute('alt', 'New Image')
+        } else {
+          newElement.setAttribute('src', 'https://via.placeholder.com/300x200')
+          newElement.setAttribute('alt', 'Placeholder Image')
+        }
+      } else {
+        newElement = document.createElement(type)
+        if (type === 'a') {
+          newElement.setAttribute('href', '#')
+        }
+        if (type === 'ul' || type === 'ol') {
+          newElement.innerHTML = content
+        } else if (content) {
+          newElement.textContent = content
+        }
+      }
+      
+      // Apply classes and ID
+      if (classes) {
+        newElement.className = classes
+      }
+      if (id) {
+        newElement.id = id
+      }
+      
+      // Insert the element
+      switch (position) {
+        case 'before':
+          this.selectedElement!.parentNode?.insertBefore(newElement, this.selectedElement!)
+          break
+        case 'after':
+          this.selectedElement!.parentNode?.insertBefore(newElement, this.selectedElement!.nextSibling)
+          break
+        case 'prepend':
+          this.selectedElement!.insertBefore(newElement, this.selectedElement!.firstChild)
+          break
+        case 'append':
+          this.selectedElement!.appendChild(newElement)
+          break
+      }
+      
+      // Track the change
+      this.trackChange({
+        type: 'insert',
+        selector: this.generateSelector(this.selectedElement!),
+        position: position,
+        html: newElement.outerHTML
+      })
+      
+      // Clean up
+      dialog.remove()
+      backdrop.remove()
+      
+      // Select the new element
+      this.selectElement(newElement)
+    })
+    
+    // Close on backdrop click
+    backdrop.addEventListener('click', () => {
+      dialog.remove()
+      backdrop.remove()
+    })
   }
   
   private startTextEditing() {
