@@ -1116,17 +1116,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     
                     // Menu items data
                     const menuItems = [
-                      { icon: '✏️', label: 'Edit Text', action: 'edit' },
+                      { icon: '✏️', label: 'Edit Element', action: 'edit' },
                       { icon: '</>', label: 'Edit HTML', action: 'editHtml' },
                       { divider: true },
-                      { icon: '↑', label: 'Move Up', action: 'moveUp' },
-                      { icon: '↓', label: 'Move Down', action: 'moveDown' },
+                      { icon: '⬆', label: 'Move up', action: 'moveUp' },
+                      { icon: '⬇', label: 'Move down', action: 'moveDown' },
                       { divider: true },
-                      { icon: '⊕', label: 'Duplicate', action: 'duplicate' },
-                      { icon: '📋', label: 'Copy Style', action: 'copyStyle' },
+                      { icon: '📋', label: 'Copy Element', action: 'copy', shortcut: '⌘+C' },
+                      { icon: '🔗', label: 'Copy Selector Path', action: 'copySelector', shortcut: '⌘+Shift+C' },
+                      { divider: true },
+                      { icon: '🎯', label: 'Select Relative Elements', action: 'selectRelative' },
+                      { divider: true },
+                      { icon: '➕', label: 'Insert new block', action: 'insertBlock' },
                       { divider: true },
                       { icon: '👁', label: 'Hide Element', action: 'hide' },
-                      { icon: '🗑', label: 'Delete', action: 'delete' }
+                      { icon: '🗑', label: 'Delete Element', action: 'delete', shortcut: 'Delete' }
                     ]
                     
                     // Create menu items in shadow DOM
@@ -1148,8 +1152,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         label.className = 'menu-label'
                         label.textContent = item.label
                         
+                        // Add shortcut if it exists
+                        let shortcut = null
+                        if (item.shortcut) {
+                          shortcut = document.createElement('span')
+                          shortcut.style.cssText = 'color: #9ca3af; font-size: 11px; margin-left: auto;'
+                          shortcut.textContent = item.shortcut
+                        }
+                        
                         menuItem.appendChild(icon)
                         menuItem.appendChild(label)
+                        if (shortcut) {
+                          menuItem.appendChild(shortcut)
+                        }
                         menuContainer.appendChild(menuItem)
                       }
                     })
@@ -1427,6 +1442,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         })
                         break
                         
+                      case 'copy':
+                        // Copy element HTML to clipboard
+                        navigator.clipboard.writeText(element.outerHTML).then(() => {
+                          showNotification('Element HTML copied to clipboard!')
+                        })
+                        break
+                        
+                      case 'copySelector':
+                        // Generate and copy CSS selector
+                        const selector = getSelector(element)
+                        navigator.clipboard.writeText(selector).then(() => {
+                          showNotification(`Selector copied: ${selector}`)
+                        })
+                        break
+                        
+                      case 'selectRelative':
+                        // Show relative element selector dialog
+                        showRelativeElementSelector(element)
+                        break
+                        
+                      case 'insertBlock':
+                        // Show insert block dialog
+                        showInsertBlockDialog(element)
+                        break
+                        
                       case 'duplicate':
                         const clone = element.cloneNode(true)
                         clone.classList.remove('absmartly-selected', 'absmartly-hover')
@@ -1529,6 +1569,277 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         selectedElement = element
                         break
                     }
+                  }
+                  
+                  // Show relative element selector dialog
+                  function showRelativeElementSelector(element) {
+                    // Remove existing selector UI
+                    const existingHost = document.getElementById('absmartly-relative-selector-host')
+                    if (existingHost) existingHost.remove()
+                    
+                    // Create host for shadow DOM
+                    const selectorHost = document.createElement('div')
+                    selectorHost.id = 'absmartly-relative-selector-host'
+                    selectorHost.style.cssText = `
+                      position: fixed;
+                      top: 0;
+                      left: 0;
+                      width: 0;
+                      height: 0;
+                      z-index: 2147483647;
+                      pointer-events: none;
+                    `
+                    
+                    const shadow = selectorHost.attachShadow({ mode: 'closed' })
+                    
+                    // Create UI for relative element selection
+                    const container = document.createElement('div')
+                    container.style.cssText = `
+                      position: fixed;
+                      bottom: 20px;
+                      right: 20px;
+                      background: white;
+                      border: 1px solid #ddd;
+                      border-radius: 8px;
+                      padding: 15px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                      font-size: 13px;
+                      pointer-events: auto;
+                      min-width: 200px;
+                    `
+                    
+                    container.innerHTML = `
+                      <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">Select Relative Element</h4>
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button data-action="parent" style="padding: 8px 12px; background: #f0f9ff; border: 1px solid #3b82f6; border-radius: 4px; cursor: pointer; text-align: left;">
+                          ⬆️ Parent Element
+                        </button>
+                        <button data-action="children" style="padding: 8px 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 4px; cursor: pointer; text-align: left;">
+                          ⬇️ All Children
+                        </button>
+                        <button data-action="siblings" style="padding: 8px 12px; background: #ecfdf5; border: 1px solid #10b981; border-radius: 4px; cursor: pointer; text-align: left;">
+                          ↔️ All Siblings
+                        </button>
+                        <button data-action="close" style="padding: 8px 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; text-align: center; margin-top: 8px;">
+                          Close
+                        </button>
+                      </div>
+                    `
+                    
+                    // Handle button clicks
+                    container.addEventListener('click', (e) => {
+                      const btn = e.target.closest('button')
+                      if (!btn) return
+                      
+                      const action = btn.dataset.action
+                      switch(action) {
+                        case 'parent':
+                          if (element.parentElement) {
+                            selectedElement = element.parentElement
+                            element.classList.remove('absmartly-selected')
+                            selectedElement.classList.add('absmartly-selected')
+                            showNotification('Parent element selected')
+                          }
+                          break
+                        case 'children':
+                          element.classList.remove('absmartly-selected')
+                          Array.from(element.children).forEach(child => {
+                            child.classList.add('absmartly-selected')
+                          })
+                          showNotification(`${element.children.length} children selected`)
+                          break
+                        case 'siblings':
+                          if (element.parentElement) {
+                            element.classList.remove('absmartly-selected')
+                            Array.from(element.parentElement.children).forEach(sibling => {
+                              if (sibling !== element) {
+                                sibling.classList.add('absmartly-selected')
+                              }
+                            })
+                            showNotification('Siblings selected')
+                          }
+                          break
+                        case 'close':
+                          selectorHost.remove()
+                          break
+                      }
+                    })
+                    
+                    shadow.appendChild(container)
+                    document.body.appendChild(selectorHost)
+                  }
+                  
+                  // Show insert block dialog
+                  function showInsertBlockDialog(element) {
+                    // Remove existing dialog
+                    const existingHost = document.getElementById('absmartly-insert-block-host')
+                    if (existingHost) existingHost.remove()
+                    
+                    // Create host for shadow DOM
+                    const dialogHost = document.createElement('div')
+                    dialogHost.id = 'absmartly-insert-block-host'
+                    dialogHost.style.cssText = `
+                      position: fixed;
+                      top: 0;
+                      left: 0;
+                      width: 100%;
+                      height: 100%;
+                      z-index: 2147483647;
+                      background: rgba(0,0,0,0.5);
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      pointer-events: auto;
+                    `
+                    
+                    const shadow = dialogHost.attachShadow({ mode: 'closed' })
+                    
+                    // Create dialog
+                    const dialog = document.createElement('div')
+                    dialog.style.cssText = `
+                      background: white;
+                      border-radius: 8px;
+                      padding: 20px;
+                      width: 400px;
+                      max-width: 90%;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                      font-size: 14px;
+                    `
+                    
+                    dialog.innerHTML = `
+                      <h3 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">Insert New Block</h3>
+                      
+                      <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px; color: #6b7280;">Position:</label>
+                        <select id="position" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                          <option value="before">Before selected element</option>
+                          <option value="after">After selected element</option>
+                          <option value="prepend">As first child</option>
+                          <option value="append">As last child</option>
+                        </select>
+                      </div>
+                      
+                      <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px; color: #6b7280;">Element Type:</label>
+                        <select id="elementType" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                          <option value="div">Div</option>
+                          <option value="section">Section</option>
+                          <option value="button">Button</option>
+                          <option value="a">Link</option>
+                          <option value="p">Paragraph</option>
+                          <option value="h2">Heading 2</option>
+                          <option value="h3">Heading 3</option>
+                          <option value="img">Image</option>
+                          <option value="custom">Custom HTML</option>
+                        </select>
+                      </div>
+                      
+                      <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px; color: #6b7280;">Content/HTML:</label>
+                        <textarea id="content" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; min-height: 80px; font-family: monospace; font-size: 12px;" placeholder="Enter content or HTML">New Block</textarea>
+                      </div>
+                      
+                      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button id="cancelBtn" style="padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer;">Cancel</button>
+                        <button id="insertBtn" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Insert</button>
+                      </div>
+                    `
+                    
+                    // Handle element type change
+                    const elementTypeSelect = dialog.querySelector('#elementType')
+                    const contentTextarea = dialog.querySelector('#content')
+                    
+                    elementTypeSelect.addEventListener('change', () => {
+                      if (elementTypeSelect.value === 'custom') {
+                        contentTextarea.placeholder = 'Enter complete HTML'
+                        contentTextarea.value = '<div>Custom HTML</div>'
+                      } else {
+                        contentTextarea.placeholder = 'Enter content'
+                        const defaults = {
+                          button: 'Click Me',
+                          a: 'Link Text',
+                          p: 'Lorem ipsum dolor sit amet.',
+                          h2: 'Section Heading',
+                          h3: 'Subsection Heading',
+                          img: '',
+                          div: '',
+                          section: ''
+                        }
+                        contentTextarea.value = defaults[elementTypeSelect.value] || 'New Block'
+                      }
+                    })
+                    
+                    // Handle cancel
+                    dialog.querySelector('#cancelBtn').addEventListener('click', () => {
+                      dialogHost.remove()
+                    })
+                    
+                    // Handle insert
+                    dialog.querySelector('#insertBtn').addEventListener('click', () => {
+                      const position = dialog.querySelector('#position').value
+                      const type = elementTypeSelect.value
+                      const content = contentTextarea.value
+                      
+                      let newElement
+                      if (type === 'custom') {
+                        const temp = document.createElement('div')
+                        temp.innerHTML = content
+                        newElement = temp.firstElementChild || document.createElement('div')
+                      } else if (type === 'img') {
+                        newElement = document.createElement('img')
+                        newElement.src = content || 'https://via.placeholder.com/300x200'
+                        newElement.alt = 'New Image'
+                      } else {
+                        newElement = document.createElement(type)
+                        if (type === 'a') {
+                          newElement.href = '#'
+                        }
+                        if (content) {
+                          newElement.textContent = content
+                        }
+                      }
+                      
+                      // Insert the element
+                      switch(position) {
+                        case 'before':
+                          element.parentNode?.insertBefore(newElement, element)
+                          break
+                        case 'after':
+                          element.parentNode?.insertBefore(newElement, element.nextSibling)
+                          break
+                        case 'prepend':
+                          element.insertBefore(newElement, element.firstChild)
+                          break
+                        case 'append':
+                          element.appendChild(newElement)
+                          break
+                      }
+                      
+                      // Track the change
+                      trackChange('insert', element, {
+                        html: newElement.outerHTML,
+                        position: position
+                      })
+                      
+                      // Select the new element
+                      selectedElement = newElement
+                      element.classList.remove('absmartly-selected')
+                      newElement.classList.add('absmartly-selected')
+                      
+                      dialogHost.remove()
+                      showNotification('New block inserted!')
+                    })
+                    
+                    // Close on backdrop click
+                    dialogHost.addEventListener('click', (e) => {
+                      if (e.target === dialogHost) {
+                        dialogHost.remove()
+                      }
+                    })
+                    
+                    shadow.appendChild(dialog)
+                    document.body.appendChild(dialogHost)
                   }
                   
                   // Track changes for saving with undo/redo support
