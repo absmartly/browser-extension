@@ -1066,11 +1066,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const existingHost = document.getElementById('absmartly-menu-host')
                     if (existingHost) existingHost.remove()
                     
+                    // Calculate menu dimensions (approximate based on number of items)
+                    const menuItemCount = 20 // Approximate number of menu items
+                    const itemHeight = 32 // Approximate height per item
+                    const dividerHeight = 9 // Height of dividers
+                    const dividerCount = 6 // Number of dividers
+                    const menuPadding = 8
+                    const estimatedMenuHeight = (menuItemCount * itemHeight) + (dividerCount * dividerHeight) + menuPadding
+                    const estimatedMenuWidth = 220
+                    
+                    // Determine if menu fits in viewport
+                    const viewportHeight = window.innerHeight
+                    const viewportWidth = window.innerWidth
+                    const scrollY = window.scrollY
+                    const scrollX = window.scrollX
+                    
+                    // Calculate optimal position
+                    let menuLeft = x + 5
+                    let menuTop = y + 5
+                    let useAbsolutePositioning = false
+                    
+                    // Check if menu fits in viewport
+                    if (estimatedMenuHeight > viewportHeight - 40) {
+                      // Menu is too tall for viewport, use absolute positioning
+                      useAbsolutePositioning = true
+                      menuLeft = x + scrollX + 5
+                      menuTop = y + scrollY + 5
+                    } else {
+                      // Menu fits in viewport, adjust position to keep it visible
+                      if (menuLeft + estimatedMenuWidth > viewportWidth) {
+                        menuLeft = Math.max(10, x - estimatedMenuWidth - 5)
+                      }
+                      if (menuTop + estimatedMenuHeight > viewportHeight) {
+                        menuTop = Math.max(10, y - estimatedMenuHeight - 5)
+                      }
+                    }
+                    
                     // Create host element for shadow DOM
                     const menuHost = document.createElement('div')
                     menuHost.id = 'absmartly-menu-host'
                     menuHost.style.cssText = `
-                      position: fixed;
+                      position: ${useAbsolutePositioning ? 'absolute' : 'fixed'};
                       top: 0;
                       left: 0;
                       width: 0;
@@ -1093,8 +1129,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       
                       .menu-backdrop {
                         position: fixed;
-                        top: 0;
-                        left: 0;
+                        top: ${useAbsolutePositioning ? -scrollY : 0}px;
+                        left: ${useAbsolutePositioning ? -scrollX : 0}px;
                         width: 100vw;
                         height: 100vh;
                         background: transparent;
@@ -1103,20 +1139,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       }
                       
                       .menu-container {
-                        position: fixed;
-                        left: ${Math.min(x + 5, window.innerWidth - 220)}px;
-                        top: ${Math.min(y + 5, window.innerHeight - 300)}px;
+                        position: ${useAbsolutePositioning ? 'absolute' : 'fixed'};
+                        left: ${menuLeft}px;
+                        top: ${menuTop}px;
                         background: white;
                         border: 1px solid #ddd;
                         border-radius: 6px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 0 1px rgba(0,0,0,0.1);
                         padding: 4px 0;
-                        min-width: 180px;
+                        min-width: 200px;
+                        max-width: 280px;
+                        ${useAbsolutePositioning ? '' : 'max-height: calc(100vh - 20px);'}
+                        ${useAbsolutePositioning ? '' : 'overflow-y: auto;'}
                         z-index: 2;
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                         font-size: 13px;
                         color: #333;
                         pointer-events: auto;
+                      }
+                      
+                      /* Custom scrollbar for menu when needed */
+                      .menu-container::-webkit-scrollbar {
+                        width: 6px;
+                      }
+                      
+                      .menu-container::-webkit-scrollbar-track {
+                        background: #f1f1f1;
+                        border-radius: 3px;
+                      }
+                      
+                      .menu-container::-webkit-scrollbar-thumb {
+                        background: #888;
+                        border-radius: 3px;
+                      }
+                      
+                      .menu-container::-webkit-scrollbar-thumb:hover {
+                        background: #555;
                       }
                       
                       .menu-item {
