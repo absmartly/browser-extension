@@ -633,30 +633,280 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   
                   (window as any).__absmartlyVisualEditorActive = true
                   
-                  // Create visual editor banner
-                  const existingBanner = document.getElementById('absmartly-visual-editor-banner')
+                  // Create visual editor banner with Shadow DOM
+                  const existingBanner = document.getElementById('absmartly-visual-editor-banner-host')
                   if (existingBanner) existingBanner.remove()
                   
-                  const banner = document.createElement('div')
-                  banner.id = 'absmartly-visual-editor-banner'
-                  banner.style.cssText = `
+                  const bannerHost = document.createElement('div')
+                  bannerHost.id = 'absmartly-visual-editor-banner-host'
+                  bannerHost.style.cssText = `
                     position: fixed;
                     top: 0;
                     left: 0;
                     right: 0;
-                    background: linear-gradient(90deg, #3b82f6, #10b981);
-                    color: white;
-                    padding: 10px;
+                    height: auto;
                     z-index: 2147483647;
-                    text-align: center;
-                    font-family: system-ui, -apple-system, sans-serif;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    pointer-events: none;
                   `
-                  banner.innerHTML = `
-                    <div>🎨 ABSmartly Visual Editor Active - Variant: ${variantName}</div>
-                    <div style="font-size: 12px; margin-top: 5px;">Click any element to edit • Press ESC to exit</div>
+                  
+                  const bannerShadow = bannerHost.attachShadow({ mode: 'closed' })
+                  
+                  const bannerStyle = document.createElement('style')
+                  bannerStyle.textContent = `
+                    .banner {
+                      background: linear-gradient(90deg, #3b82f6, #10b981);
+                      color: white;
+                      padding: 10px;
+                      font-family: system-ui, -apple-system, sans-serif;
+                      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                      pointer-events: auto;
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      gap: 20px;
+                    }
+                    .banner-content {
+                      flex: 1;
+                      text-align: center;
+                    }
+                    .banner-title {
+                      font-size: 14px;
+                      font-weight: 500;
+                    }
+                    .banner-subtitle {
+                      font-size: 12px;
+                      margin-top: 5px;
+                      opacity: 0.9;
+                    }
+                    .banner-actions {
+                      display: flex;
+                      gap: 10px;
+                      align-items: center;
+                    }
+                    .banner-button {
+                      background: rgba(255, 255, 255, 0.2);
+                      border: 1px solid rgba(255, 255, 255, 0.3);
+                      color: white;
+                      padding: 6px 12px;
+                      border-radius: 4px;
+                      font-size: 12px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      display: flex;
+                      align-items: center;
+                      gap: 5px;
+                    }
+                    .banner-button:hover:not(:disabled) {
+                      background: rgba(255, 255, 255, 0.3);
+                      transform: translateY(-1px);
+                    }
+                    .banner-button:disabled {
+                      opacity: 0.5;
+                      cursor: not-allowed;
+                    }
+                    .banner-button-icon {
+                      font-size: 14px;
+                    }
+                    .changes-counter {
+                      background: rgba(255, 255, 255, 0.2);
+                      padding: 4px 8px;
+                      border-radius: 12px;
+                      font-size: 11px;
+                      font-weight: 600;
+                    }
                   `
-                  document.body.appendChild(banner)
+                  
+                  const bannerContent = document.createElement('div')
+                  bannerContent.className = 'banner'
+                  bannerContent.innerHTML = `
+                    <div class="banner-actions">
+                      <button class="banner-button" id="absmartly-undo-btn" title="Undo (Ctrl+Z)">
+                        <span class="banner-button-icon">↶</span>
+                        <span>Undo</span>
+                      </button>
+                      <button class="banner-button" id="absmartly-redo-btn" title="Redo (Ctrl+Y)">
+                        <span class="banner-button-icon">↷</span>
+                        <span>Redo</span>
+                      </button>
+                      <div class="changes-counter" id="absmartly-changes-counter">0 changes</div>
+                    </div>
+                    <div class="banner-content">
+                      <div class="banner-title">🎨 ABSmartly Visual Editor Active - Variant: ${variantName}</div>
+                      <div class="banner-subtitle">Click any element to edit • Press ESC to exit</div>
+                    </div>
+                    <div class="banner-actions">
+                      <button class="banner-button" id="absmartly-clear-btn" title="Clear all changes">
+                        <span class="banner-button-icon">✕</span>
+                        <span>Clear All</span>
+                      </button>
+                      <button class="banner-button" id="absmartly-save-btn" title="Save changes">
+                        <span class="banner-button-icon">✓</span>
+                        <span>Save</span>
+                      </button>
+                    </div>
+                  `
+                  
+                  bannerShadow.appendChild(bannerStyle)
+                  bannerShadow.appendChild(bannerContent)
+                  document.body.appendChild(bannerHost)
+                  
+                  // Set up banner button event listeners
+                  const undoBtn = bannerShadow.getElementById('absmartly-undo-btn')
+                  const redoBtn = bannerShadow.getElementById('absmartly-redo-btn')
+                  const clearBtn = bannerShadow.getElementById('absmartly-clear-btn')
+                  const saveBtn = bannerShadow.getElementById('absmartly-save-btn')
+                  const changesCounter = bannerShadow.getElementById('absmartly-changes-counter')
+                  
+                  // Store references globally for updates
+                  window.__absmartlyUndoBtn = undoBtn
+                  window.__absmartlyRedoBtn = redoBtn
+                  window.__absmartlyChangesCounter = changesCounter
+                  
+                  undoBtn?.addEventListener('click', () => performUndo())
+                  redoBtn?.addEventListener('click', () => performRedo())
+                  
+                  clearBtn?.addEventListener('click', () => {
+                    if (confirm('Clear all changes? This cannot be undone.')) {
+                      allChanges.length = 0
+                      changeHistory.length = 0
+                      historyIndex = -1
+                      updateUndoRedoButtons()
+                      updateChangesCounter()
+                      showNotification('All changes cleared')
+                    }
+                  })
+                  
+                  saveBtn?.addEventListener('click', () => {
+                    if (allChanges.length > 0) {
+                      // Optimize changes: squash multiple moves of the same element
+                      const optimizedChanges = []
+                      const elementTracking = new Map() // Track elements by selector or ID
+                      
+                      for (const change of allChanges) {
+                        if (change.type === 'move') {
+                          // Track moved elements
+                          const key = change.elementId || change.selector
+                          if (!elementTracking.has(key)) {
+                            elementTracking.set(key, {
+                              firstChange: change,
+                              moveCount: 1,
+                              finalPosition: change
+                            })
+                          } else {
+                            const tracked = elementTracking.get(key)
+                            tracked.moveCount++
+                            tracked.finalPosition = change
+                          }
+                        } else {
+                          optimizedChanges.push(change)
+                        }
+                      }
+                      
+                      // Add optimized move changes
+                      for (const [key, tracked] of elementTracking) {
+                        if (tracked.moveCount > 1) {
+                          // Create a single move change representing the final position
+                          // Make sure to preserve the correct type
+                          const optimizedChange = {
+                            type: 'move',
+                            selector: tracked.finalPosition.selector,
+                            elementId: tracked.finalPosition.elementId,
+                            timestamp: tracked.finalPosition.timestamp,
+                            direction: tracked.finalPosition.direction,
+                            moveType: tracked.finalPosition.type, // Rename to avoid confusion
+                            optimized: true,
+                            moveCount: tracked.moveCount
+                          }
+                          optimizedChanges.push(optimizedChange)
+                        } else {
+                          // Ensure the type field is correct for single moves too
+                          const change = { ...tracked.firstChange }
+                          if (change.type === 'move' || change.moveType) {
+                            change.type = 'move'
+                          }
+                          optimizedChanges.push(change)
+                        }
+                      }
+                      
+                      // Convert to DOM changes format
+                      const domChanges = optimizedChanges.map(change => {
+                        let domChange = {
+                          selector: change.elementId ? `#${change.elementId}` : change.selector,
+                          timestamp: change.timestamp
+                        }
+                        
+                        switch(change.type) {
+                          case 'edit':
+                            domChange.type = 'text'
+                            domChange.value = change.newText
+                            break
+                          case 'editHtml':
+                            domChange.type = 'html'
+                            domChange.value = change.newHtml
+                            break
+                          case 'hide':
+                            domChange.type = 'style'
+                            domChange.property = 'display'
+                            domChange.value = 'none'
+                            break
+                          case 'delete':
+                            domChange.type = 'remove'
+                            break
+                          case 'insert':
+                            domChange.type = 'insert'
+                            domChange.html = change.html
+                            domChange.position = change.position || 'after'
+                            break
+                          case 'move':
+                            domChange.type = 'move'
+                            // Get the current element position to determine target
+                            const elem = document.querySelector(domChange.selector)
+                            if (elem && elem.parentElement) {
+                              const parent = elem.parentElement
+                              const nextSibling = elem.nextElementSibling
+                              const prevSibling = elem.previousElementSibling
+                              
+                              // Determine target and position based on current location
+                              if (nextSibling) {
+                                domChange.targetSelector = getSelector(nextSibling)
+                                domChange.position = 'before'
+                              } else if (prevSibling) {
+                                domChange.targetSelector = getSelector(prevSibling)
+                                domChange.position = 'after'
+                              } else {
+                                domChange.targetSelector = getSelector(parent)
+                                domChange.position = 'firstChild'
+                              }
+                            }
+                            // Clean up internal tracking fields
+                            delete domChange.direction
+                            delete domChange.optimized
+                            delete domChange.moveCount
+                            break
+                          default:
+                            domChange.type = change.type
+                            domChange.data = change
+                        }
+                        
+                        return domChange
+                      })
+                      
+                      // Send via postMessage to content script
+                      window.postMessage({
+                        source: 'absmartly-visual-editor',
+                        type: 'VISUAL_EDITOR_COMPLETE',
+                        variantName: variantName,
+                        changes: domChanges,
+                        totalChanges: optimizedChanges.length
+                      }, '*')
+                      
+                      console.log('[ABSmartly] Sent changes via postMessage:', domChanges)
+                      showNotification(`Saved ${optimizedChanges.length} changes (optimized from ${allChanges.length})`)
+                    } else {
+                      showNotification('No changes to save')
+                    }
+                  })
                   
                   // Add visual editor styles
                   const style = document.createElement('style')
@@ -687,14 +937,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   let selectedElement = null
                   let isEditing = false
                   const allChanges = []
+                  const changeHistory = []
+                  let historyIndex = -1
+                  const MAX_HISTORY = 50
                   
                   // Add hover effect
                   const handleMouseOver = (e) => {
                     if (isEditing) return
                     const target = e.target
-                    if (target.id !== 'absmartly-visual-editor-banner' && !target.closest('#absmartly-visual-editor-banner')) {
-                      target.classList.add('absmartly-hover')
+                    // Don't hover on our Shadow DOM hosts
+                    if (target.id === 'absmartly-visual-editor-banner-host' || 
+                        target.closest('#absmartly-visual-editor-banner-host') ||
+                        target.id === 'absmartly-menu-host' || 
+                        target.closest('#absmartly-menu-host') ||
+                        target.id === 'absmartly-html-editor-host' ||
+                        target.closest('#absmartly-html-editor-host')) {
+                      return
                     }
+                    target.classList.add('absmartly-hover')
                   }
                   
                   const handleMouseOut = (e) => {
@@ -706,13 +966,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   const handleClick = (e) => {
                     const target = e.target
                     
-                    // Ignore clicks on our UI
-                    if (target.id === 'absmartly-visual-editor-banner' || 
-                        target.closest('#absmartly-visual-editor-banner') ||
-                        target.closest('#absmartly-context-menu')) {
+                    // CRITICAL: Check for menu host first (shadow DOM container)
+                    const menuHost = document.getElementById('absmartly-menu-host')
+                    if (menuHost && (menuHost === target || menuHost.contains(target))) {
+                      // Don't interfere with shadow DOM menu at all
                       return
                     }
                     
+                    // Ignore clicks on our UI (banner and editor hosts)
+                    if (target.id === 'absmartly-visual-editor-banner-host' || 
+                        target.closest('#absmartly-visual-editor-banner-host') ||
+                        target.id === 'absmartly-html-editor-host' ||
+                        target.closest('#absmartly-html-editor-host')) {
+                      return
+                    }
+                    
+                    // Now prevent default for page elements
                     e.preventDefault()
                     e.stopPropagation()
                     
@@ -720,8 +989,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     if (selectedElement) {
                       selectedElement.classList.remove('absmartly-selected')
                     }
-                    const existingMenu = document.getElementById('absmartly-context-menu')
-                    if (existingMenu) existingMenu.remove()
+                    const existingHost = document.getElementById('absmartly-menu-host')
+                    if (existingHost) existingHost.remove()
                     
                     // Select new element
                     selectedElement = target
@@ -732,29 +1001,110 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     showContextMenu(e.pageX, e.pageY, target)
                   }
                   
-                  // Show context menu function
+                  // Show context menu function with Shadow DOM isolation
                   function showContextMenu(x, y, element) {
-                    const menu = document.createElement('div')
-                    menu.id = 'absmartly-context-menu'
-                    menu.style.cssText = `
-                      position: absolute;
-                      left: ${Math.min(x + 5, window.innerWidth - 220)}px;
-                      top: ${Math.min(y + 5, window.innerHeight - 300)}px;
-                      background: white;
-                      border: 1px solid #ddd;
-                      border-radius: 6px;
-                      box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 0 1px rgba(0,0,0,0.1);
-                      padding: 4px 0;
-                      min-width: 180px;
+                    // Remove any existing menu first
+                    const existingHost = document.getElementById('absmartly-menu-host')
+                    if (existingHost) existingHost.remove()
+                    
+                    // Create host element for shadow DOM
+                    const menuHost = document.createElement('div')
+                    menuHost.id = 'absmartly-menu-host'
+                    menuHost.style.cssText = `
+                      position: fixed;
+                      top: 0;
+                      left: 0;
+                      width: 0;
+                      height: 0;
                       z-index: 2147483647;
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                      font-size: 13px;
-                      color: #333;
+                      pointer-events: none;
                     `
                     
+                    // Attach shadow root with closed mode for complete isolation
+                    const shadow = menuHost.attachShadow({ mode: 'closed' })
+                    
+                    // Create styles for shadow DOM
+                    const style = document.createElement('style')
+                    style.textContent = `
+                      * {
+                        box-sizing: border-box;
+                        margin: 0;
+                        padding: 0;
+                      }
+                      
+                      .menu-backdrop {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        background: transparent;
+                        pointer-events: auto;
+                        z-index: 1;
+                      }
+                      
+                      .menu-container {
+                        position: fixed;
+                        left: ${Math.min(x + 5, window.innerWidth - 220)}px;
+                        top: ${Math.min(y + 5, window.innerHeight - 300)}px;
+                        background: white;
+                        border: 1px solid #ddd;
+                        border-radius: 6px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 0 1px rgba(0,0,0,0.1);
+                        padding: 4px 0;
+                        min-width: 180px;
+                        z-index: 2;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        font-size: 13px;
+                        color: #333;
+                        pointer-events: auto;
+                      }
+                      
+                      .menu-item {
+                        padding: 8px 12px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        transition: background-color 0.15s;
+                        user-select: none;
+                      }
+                      
+                      .menu-item:hover {
+                        background-color: #f0f0f0;
+                      }
+                      
+                      .menu-divider {
+                        height: 1px;
+                        background: #e5e5e5;
+                        margin: 4px 0;
+                      }
+                      
+                      .menu-icon {
+                        width: 16px;
+                        text-align: center;
+                        opacity: 0.7;
+                        font-size: 12px;
+                      }
+                      
+                      .menu-label {
+                        flex: 1;
+                      }
+                    `
+                    shadow.appendChild(style)
+                    
+                    // Create backdrop
+                    const backdrop = document.createElement('div')
+                    backdrop.className = 'menu-backdrop'
+                    
+                    // Create menu container
+                    const menuContainer = document.createElement('div')
+                    menuContainer.className = 'menu-container'
+                    
+                    // Menu items data
                     const menuItems = [
                       { icon: '✏️', label: 'Edit Text', action: 'edit' },
-                      { icon: '</>', label: 'Edit HTML', action: 'editHtml', color: '#0066cc' },
+                      { icon: '</>', label: 'Edit HTML', action: 'editHtml' },
                       { divider: true },
                       { icon: '↑', label: 'Move Up', action: 'moveUp' },
                       { icon: '↓', label: 'Move Down', action: 'moveDown' },
@@ -763,65 +1113,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       { icon: '📋', label: 'Copy Style', action: 'copyStyle' },
                       { divider: true },
                       { icon: '👁', label: 'Hide Element', action: 'hide' },
-                      { icon: '🗑', label: 'Delete', action: 'delete', color: '#dc3545' }
+                      { icon: '🗑', label: 'Delete', action: 'delete' }
                     ]
                     
+                    // Create menu items in shadow DOM
                     menuItems.forEach(item => {
                       if (item.divider) {
                         const divider = document.createElement('div')
-                        divider.style.cssText = 'height: 1px; background: #e5e5e5; margin: 4px 0;'
-                        menu.appendChild(divider)
+                        divider.className = 'menu-divider'
+                        menuContainer.appendChild(divider)
                       } else {
                         const menuItem = document.createElement('div')
-                        menuItem.style.cssText = `
-                          padding: 8px 12px;
-                          cursor: pointer;
-                          display: flex;
-                          align-items: center;
-                          gap: 8px;
-                          transition: background-color 0.15s;
-                          color: ${item.color || '#333'};
-                        `
+                        menuItem.className = 'menu-item'
+                        menuItem.dataset.action = item.action
                         
                         const icon = document.createElement('span')
-                        icon.style.cssText = `
-                          width: 16px;
-                          text-align: center;
-                          opacity: 0.7;
-                          font-size: 12px;
-                        `
+                        icon.className = 'menu-icon'
                         icon.textContent = item.icon
                         
                         const label = document.createElement('span')
+                        label.className = 'menu-label'
                         label.textContent = item.label
-                        label.style.flex = '1'
                         
                         menuItem.appendChild(icon)
                         menuItem.appendChild(label)
-                        
-                        menuItem.onmouseover = () => menuItem.style.backgroundColor = '#f0f0f0'
-                        menuItem.onmouseout = () => menuItem.style.backgroundColor = 'transparent'
-                        menuItem.onclick = (e) => {
-                          e.stopPropagation()
-                          handleMenuAction(item.action, element)
-                          menu.remove()
-                        }
-                        menu.appendChild(menuItem)
+                        menuContainer.appendChild(menuItem)
                       }
                     })
                     
-                    document.body.appendChild(menu)
+                    // Add elements to shadow DOM
+                    shadow.appendChild(backdrop)
+                    shadow.appendChild(menuContainer)
                     
-                    // Close menu when clicking outside
-                    setTimeout(() => {
-                      const closeMenu = (e) => {
-                        if (!menu.contains(e.target)) {
-                          menu.remove()
-                          document.removeEventListener('click', closeMenu)
+                    // Add menu host to document
+                    document.body.appendChild(menuHost)
+                    
+                    // Handle clicks in shadow DOM
+                    backdrop.addEventListener('click', (e) => {
+                      e.stopPropagation()
+                      menuHost.remove()
+                    })
+                    
+                    menuContainer.addEventListener('click', (e) => {
+                      e.stopPropagation()
+                      const menuItem = e.target.closest('.menu-item')
+                      if (menuItem) {
+                        const action = menuItem.dataset.action
+                        if (action) {
+                          handleMenuAction(action, element)
+                          menuHost.remove()
                         }
                       }
-                      document.addEventListener('click', closeMenu)
-                    }, 100)
+                    })
                   }
                   
                   // Handle menu actions
@@ -879,66 +1222,158 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         
                       case 'editHtml':
                         const currentHtml = element.outerHTML
-                        const editor = document.createElement('div')
-                        editor.style.cssText = `
+                        
+                        // Create editor host with Shadow DOM
+                        const editorHost = document.createElement('div')
+                        editorHost.id = 'absmartly-html-editor-host'
+                        editorHost.style.cssText = `
                           position: fixed;
-                          top: 50%;
-                          left: 50%;
-                          transform: translate(-50%, -50%);
-                          background: white;
-                          border: 1px solid #ddd;
-                          border-radius: 8px;
-                          box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-                          padding: 20px;
+                          top: 0;
+                          left: 0;
+                          width: 0;
+                          height: 0;
                           z-index: 2147483648;
-                          width: 80%;
-                          max-width: 600px;
+                          pointer-events: none;
                         `
+                        
+                        const editorShadow = editorHost.attachShadow({ mode: 'closed' })
+                        
+                        const editorStyle = document.createElement('style')
+                        editorStyle.textContent = `
+                          * {
+                            box-sizing: border-box;
+                          }
+                          
+                          .editor-backdrop {
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100vw;
+                            height: 100vh;
+                            background: rgba(0, 0, 0, 0.5);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            pointer-events: auto;
+                          }
+                          
+                          .editor-container {
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                            padding: 20px;
+                            width: 80%;
+                            max-width: 600px;
+                            pointer-events: auto;
+                          }
+                          
+                          .editor-title {
+                            margin: 0 0 15px 0;
+                            font-family: system-ui, -apple-system, sans-serif;
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #111827;
+                          }
+                          
+                          .editor-textarea {
+                            width: 100%;
+                            height: 300px;
+                            padding: 10px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                            font-size: 12px;
+                            resize: vertical;
+                            outline: none;
+                          }
+                          
+                          .editor-textarea:focus {
+                            border-color: #3b82f6;
+                            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                          }
+                          
+                          .editor-buttons {
+                            margin-top: 15px;
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 10px;
+                          }
+                          
+                          .editor-button {
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-family: system-ui, -apple-system, sans-serif;
+                            font-size: 14px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.15s;
+                          }
+                          
+                          .editor-button-cancel {
+                            border: 1px solid #ddd;
+                            background: white;
+                            color: #374151;
+                          }
+                          
+                          .editor-button-cancel:hover {
+                            background: #f9fafb;
+                          }
+                          
+                          .editor-button-save {
+                            border: none;
+                            background: #3b82f6;
+                            color: white;
+                          }
+                          
+                          .editor-button-save:hover {
+                            background: #2563eb;
+                          }
+                        `
+                        
+                        // Create editor elements
+                        const backdrop = document.createElement('div')
+                        backdrop.className = 'editor-backdrop'
+                        
+                        const container = document.createElement('div')
+                        container.className = 'editor-container'
                         
                         const title = document.createElement('h3')
+                        title.className = 'editor-title'
                         title.textContent = 'Edit HTML'
-                        title.style.cssText = 'margin: 0 0 10px 0; font-family: system-ui;'
                         
                         const textarea = document.createElement('textarea')
+                        textarea.className = 'editor-textarea'
                         textarea.value = currentHtml
-                        textarea.style.cssText = `
-                          width: 100%;
-                          height: 300px;
-                          padding: 10px;
-                          border: 1px solid #ddd;
-                          border-radius: 4px;
-                          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-                          font-size: 12px;
-                          resize: vertical;
-                        `
                         
                         const buttons = document.createElement('div')
-                        buttons.style.cssText = 'margin-top: 10px; text-align: right;'
+                        buttons.className = 'editor-buttons'
                         
                         const cancelBtn = document.createElement('button')
+                        cancelBtn.className = 'editor-button editor-button-cancel'
                         cancelBtn.textContent = 'Cancel'
-                        cancelBtn.style.cssText = `
-                          padding: 8px 16px;
-                          margin-right: 8px;
-                          border: 1px solid #ddd;
-                          border-radius: 4px;
-                          background: white;
-                          cursor: pointer;
-                        `
                         
                         const saveBtn = document.createElement('button')
+                        saveBtn.className = 'editor-button editor-button-save'
                         saveBtn.textContent = 'Save'
-                        saveBtn.style.cssText = `
-                          padding: 8px 16px;
-                          border: none;
-                          border-radius: 4px;
-                          background: #3b82f6;
-                          color: white;
-                          cursor: pointer;
-                        `
                         
-                        cancelBtn.onclick = () => editor.remove()
-                        saveBtn.onclick = () => {
+                        buttons.appendChild(cancelBtn)
+                        buttons.appendChild(saveBtn)
+                        container.appendChild(title)
+                        container.appendChild(textarea)
+                        container.appendChild(buttons)
+                        backdrop.appendChild(container)
+                        
+                        editorShadow.appendChild(editorStyle)
+                        editorShadow.appendChild(backdrop)
+                        
+                        document.body.appendChild(editorHost)
+                        
+                        // Handle button clicks
+                        cancelBtn.addEventListener('click', () => {
+                          editorHost.remove()
+                        })
+                        
+                        saveBtn.addEventListener('click', () => {
                           const tempDiv = document.createElement('div')
                           tempDiv.innerHTML = textarea.value
                           const newElement = tempDiv.firstElementChild
@@ -949,18 +1384,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                               newHtml: textarea.value 
                             })
                           }
-                          editor.remove()
-                        }
+                          editorHost.remove()
+                        })
                         
-                        buttons.appendChild(cancelBtn)
-                        buttons.appendChild(saveBtn)
-                        editor.appendChild(title)
-                        editor.appendChild(textarea)
-                        editor.appendChild(buttons)
-                        document.body.appendChild(editor)
+                        // Prevent backdrop clicks from closing (only click outside container)
+                        backdrop.addEventListener('click', (e) => {
+                          if (e.target === backdrop) {
+                            editorHost.remove()
+                          }
+                        })
                         
-                        textarea.focus()
-                        textarea.select()
+                        // Focus and select textarea content
+                        setTimeout(() => {
+                          textarea.focus()
+                          textarea.select()
+                        }, 10)
                         break
                         
                       case 'hide':
@@ -979,8 +1417,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       case 'duplicate':
                         const clone = element.cloneNode(true)
                         clone.classList.remove('absmartly-selected', 'absmartly-hover')
+                        // Remove any IDs to avoid conflicts
+                        clone.removeAttribute('id')
+                        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'))
+                        
                         element.parentNode.insertBefore(clone, element.nextSibling)
-                        trackChange('duplicate', clone, { original: element })
+                        
+                        // Track as an insert operation instead of duplicate
+                        trackChange('insert', element, { 
+                          html: clone.outerHTML,
+                          position: 'after',
+                          insertedElement: clone  // For undo functionality
+                        })
                         break
                       
                       case 'copyStyle':
@@ -993,28 +1441,117 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         break
                         
                       case 'moveUp':
+                        const originalParentUp = element.parentElement
+                        const originalNextSiblingUp = element.nextSibling
+                        
                         if (element.previousElementSibling) {
+                          // Move before previous sibling
                           element.parentNode.insertBefore(element, element.previousElementSibling)
-                          trackChange('move', element, { direction: 'up' })
+                          trackChange('move', element, { 
+                            direction: 'up',
+                            moveType: 'sibling',
+                            originalParent: originalParentUp,
+                            originalNextSibling: originalNextSiblingUp
+                          })
+                          showNotification('Element moved up')
+                        } else if (element.parentElement && element.parentElement !== document.body) {
+                          // Move before parent element
+                          const parent = element.parentElement
+                          const grandParent = parent.parentElement
+                          if (grandParent) {
+                            grandParent.insertBefore(element, parent)
+                            trackChange('move', element, { 
+                              direction: 'up',
+                              moveType: 'parent',
+                              originalParent: originalParentUp,
+                              originalNextSibling: originalNextSiblingUp
+                            })
+                            showNotification('Element moved before parent')
+                          } else {
+                            showNotification('Cannot move further up')
+                          }
+                        } else {
+                          showNotification('Cannot move up - at document root')
                         }
+                        // Keep the element selected after moving
+                        element.classList.add('absmartly-selected')
+                        selectedElement = element
                         break
                         
                       case 'moveDown':
+                        const originalParentDown = element.parentElement
+                        const originalNextSiblingDown = element.nextSibling
+                        
                         if (element.nextElementSibling) {
+                          // Move after next sibling
                           element.parentNode.insertBefore(element.nextElementSibling, element)
-                          trackChange('move', element, { direction: 'down' })
+                          trackChange('move', element, { 
+                            direction: 'down',
+                            moveType: 'sibling',
+                            originalParent: originalParentDown,
+                            originalNextSibling: originalNextSiblingDown
+                          })
+                          showNotification('Element moved down')
+                        } else if (element.parentElement && element.parentElement !== document.body) {
+                          // Move after parent element
+                          const parent = element.parentElement
+                          const grandParent = parent.parentElement
+                          if (grandParent) {
+                            grandParent.insertBefore(element, parent.nextSibling)
+                            trackChange('move', element, { 
+                              direction: 'down',
+                              moveType: 'parent',
+                              originalParent: originalParentDown,
+                              originalNextSibling: originalNextSiblingDown
+                            })
+                            showNotification('Element moved after parent')
+                          } else {
+                            showNotification('Cannot move further down')
+                          }
+                        } else {
+                          showNotification('Cannot move down - at document root')
                         }
+                        // Keep the element selected after moving
+                        element.classList.add('absmartly-selected')
+                        selectedElement = element
                         break
                     }
                   }
                   
-                  // Track changes for saving
+                  // Track changes for saving with undo/redo support
                   function trackChange(type, element, data) {
+                    // For move operations, ensure element has an ID for consistent tracking
+                    let elementId = null
+                    if (type === 'move' && element) {
+                      if (!element.id) {
+                        // Generate a unique ID for tracking
+                        elementId = 'absmartly-' + Math.random().toString(36).substr(2, 9)
+                        element.id = elementId
+                        element.setAttribute('data-absmartly-tracked', 'true')
+                      } else {
+                        elementId = element.id
+                      }
+                    }
+                    
+                    // Filter out DOM elements from data to ensure serializability
+                    const serializableData = {}
+                    for (const key in data) {
+                      const value = data[key]
+                      // Skip DOM elements and functions
+                      if (value && typeof value === 'object' && value.nodeType) {
+                        // It's a DOM element, store its selector instead
+                        serializableData[key + 'Selector'] = getSelector(value)
+                      } else if (typeof value !== 'function') {
+                        serializableData[key] = value
+                      }
+                    }
+                    
                     const change = {
                       type,
                       selector: element ? getSelector(element) : null,
+                      elementId: elementId,
                       timestamp: Date.now(),
-                      ...data
+                      ...serializableData
                     }
                     
                     console.log('[ABSmartly] Change tracked:', change)
@@ -1022,12 +1559,217 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     // Store change locally
                     allChanges.push(change)
                     
+                    // Add to history for undo/redo
+                    // Remove any changes after current index (for new branch after undo)
+                    changeHistory.splice(historyIndex + 1)
+                    
+                    // Store the change with enough info to undo it
+                    // Note: data contains DOM references for undo/redo, change contains serializable version
+                    const historyEntry = {
+                      change: change,
+                      undo: createUndoAction(type, element, data),  // Uses original data with DOM refs
+                      redo: createRedoAction(type, element, data)   // Uses original data with DOM refs
+                    }
+                    
+                    changeHistory.push(historyEntry)
+                    historyIndex++
+                    
+                    // Limit history size
+                    if (changeHistory.length > MAX_HISTORY) {
+                      changeHistory.shift()
+                      historyIndex--
+                    }
+                    
+                    // Update undo/redo button states
+                    updateUndoRedoButtons()
+                    
                     // Also send individual change to extension for real-time updates
                     if (window.chrome && chrome.runtime) {
                       chrome.runtime.sendMessage({
                         type: 'VISUAL_EDITOR_CHANGE',
                         change
                       })
+                    }
+                  }
+                  
+                  // Create undo action for a change
+                  function createUndoAction(type, element, data) {
+                    switch(type) {
+                      case 'edit':
+                        return () => {
+                          if (element) {
+                            element.textContent = data.oldText
+                          }
+                        }
+                      case 'editHtml':
+                        return () => {
+                          const tempDiv = document.createElement('div')
+                          tempDiv.innerHTML = data.oldHtml
+                          const oldElement = tempDiv.firstElementChild
+                          if (element && oldElement) {
+                            element.replaceWith(oldElement)
+                          }
+                        }
+                      case 'hide':
+                        return () => {
+                          if (element) {
+                            element.style.display = ''
+                          }
+                        }
+                      case 'delete':
+                        return () => {
+                          const tempDiv = document.createElement('div')
+                          tempDiv.innerHTML = data.deletedHtml
+                          const restoredElement = tempDiv.firstElementChild
+                          if (restoredElement && data.parent) {
+                            if (data.nextSibling) {
+                              data.parent.insertBefore(restoredElement, data.nextSibling)
+                            } else {
+                              data.parent.appendChild(restoredElement)
+                            }
+                          }
+                        }
+                      case 'insert':
+                        return () => {
+                          if (data.insertedElement) {
+                            data.insertedElement.remove()
+                          }
+                        }
+                      case 'move':
+                        return () => {
+                          // Reverse the move
+                          if (data.direction === 'up') {
+                            if (data.type === 'sibling' && element.nextElementSibling) {
+                              element.parentNode.insertBefore(element.nextElementSibling, element)
+                            } else if (data.type === 'parent' && data.originalParent) {
+                              data.originalParent.appendChild(element)
+                            }
+                          } else if (data.direction === 'down') {
+                            if (data.type === 'sibling' && element.previousElementSibling) {
+                              element.parentNode.insertBefore(element, element.previousElementSibling)
+                            } else if (data.type === 'parent' && data.originalParent) {
+                              data.originalParent.insertBefore(element, data.originalParent.firstChild)
+                            }
+                          }
+                        }
+                      default:
+                        return () => {}
+                    }
+                  }
+                  
+                  // Create redo action for a change
+                  function createRedoAction(type, element, data) {
+                    switch(type) {
+                      case 'edit':
+                        return () => {
+                          if (element) {
+                            element.textContent = data.newText
+                          }
+                        }
+                      case 'editHtml':
+                        return () => {
+                          const tempDiv = document.createElement('div')
+                          tempDiv.innerHTML = data.newHtml
+                          const newElement = tempDiv.firstElementChild
+                          if (element && newElement) {
+                            element.replaceWith(newElement)
+                          }
+                        }
+                      case 'hide':
+                        return () => {
+                          if (element) {
+                            element.style.display = 'none'
+                          }
+                        }
+                      case 'delete':
+                        return () => {
+                          if (element) {
+                            element.remove()
+                          }
+                        }
+                      case 'insert':
+                        return () => {
+                          if (data.html && element) {
+                            const tempDiv = document.createElement('div')
+                            tempDiv.innerHTML = data.html
+                            const newElement = tempDiv.firstElementChild
+                            if (newElement) {
+                              if (data.position === 'after') {
+                                element.parentNode.insertBefore(newElement, element.nextSibling)
+                              } else if (data.position === 'before') {
+                                element.parentNode.insertBefore(newElement, element)
+                              }
+                            }
+                          }
+                        }
+                      case 'move':
+                        return () => {
+                          // Redo the move
+                          if (data.direction === 'up') {
+                            if (data.type === 'sibling' && element.previousElementSibling) {
+                              element.parentNode.insertBefore(element, element.previousElementSibling)
+                            } else if (data.type === 'parent' && element.parentElement) {
+                              const parent = element.parentElement
+                              parent.parentElement?.insertBefore(element, parent)
+                            }
+                          } else if (data.direction === 'down') {
+                            if (data.type === 'sibling' && element.nextElementSibling) {
+                              element.parentNode.insertBefore(element.nextElementSibling, element)
+                            } else if (data.type === 'parent' && element.parentElement) {
+                              const parent = element.parentElement
+                              parent.parentElement?.insertBefore(element, parent.nextSibling)
+                            }
+                          }
+                        }
+                      default:
+                        return () => {}
+                    }
+                  }
+                  
+                  // Perform undo
+                  function performUndo() {
+                    if (historyIndex >= 0 && changeHistory[historyIndex]) {
+                      const entry = changeHistory[historyIndex]
+                      entry.undo()
+                      historyIndex--
+                      updateUndoRedoButtons()
+                      showNotification('Action undone')
+                    }
+                  }
+                  
+                  // Perform redo
+                  function performRedo() {
+                    if (historyIndex < changeHistory.length - 1) {
+                      historyIndex++
+                      const entry = changeHistory[historyIndex]
+                      entry.redo()
+                      updateUndoRedoButtons()
+                      showNotification('Action redone')
+                    }
+                  }
+                  
+                  // Update undo/redo button states
+                  function updateUndoRedoButtons() {
+                    const undoBtn = window.__absmartlyUndoBtn
+                    const redoBtn = window.__absmartlyRedoBtn
+                    
+                    if (undoBtn) {
+                      undoBtn.disabled = historyIndex < 0
+                    }
+                    
+                    if (redoBtn) {
+                      redoBtn.disabled = historyIndex >= changeHistory.length - 1
+                    }
+                    
+                    updateChangesCounter()
+                  }
+                  
+                  // Update changes counter
+                  function updateChangesCounter() {
+                    const counter = window.__absmartlyChangesCounter
+                    if (counter) {
+                      const count = allChanges.length
+                      counter.textContent = `${count} change${count !== 1 ? 's' : ''}`
                     }
                   }
                   
@@ -1053,8 +1795,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     setTimeout(() => notification.remove(), 3000)
                   }
                   
-                  // Handle ESC key
+                  // Handle keyboard shortcuts
                   const handleKeyDown = (e) => {
+                    // Undo shortcut (Ctrl/Cmd + Z)
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                      e.preventDefault()
+                      performUndo()
+                      return
+                    }
+                    
+                    // Redo shortcut (Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z)
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                      e.preventDefault()
+                      performRedo()
+                      return
+                    }
+                    
+                    // ESC to exit
                     if (e.key === 'Escape') {
                       // Send all changes to the sidebar before exiting
                       if (allChanges.length > 0) {
@@ -1089,7 +1846,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                               break
                             case 'move':
                               domChange.type = 'move'
-                              domChange.direction = change.direction
+                              // Get the current element position to determine target
+                              const elem = document.querySelector(domChange.selector)
+                              if (elem && elem.parentElement) {
+                                const parent = elem.parentElement
+                                const nextSibling = elem.nextElementSibling
+                                const prevSibling = elem.previousElementSibling
+                                
+                                // Determine target and position based on current location
+                                if (nextSibling) {
+                                  domChange.targetSelector = getSelector(nextSibling)
+                                  domChange.position = 'before'
+                                } else if (prevSibling) {
+                                  domChange.targetSelector = getSelector(prevSibling)
+                                  domChange.position = 'after'
+                                } else {
+                                  domChange.targetSelector = getSelector(parent)
+                                  domChange.position = 'firstChild'
+                                }
+                              }
+                              // Clean up internal tracking fields
+                              delete domChange.direction
                               break
                             default:
                               domChange.type = change.type
@@ -1119,15 +1896,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       document.removeEventListener('keydown', handleKeyDown)
                       
                       // Remove styles and banner
-                      const banner = document.getElementById('absmartly-visual-editor-banner')
-                      if (banner) banner.remove()
+                      const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
+                      if (bannerHost) bannerHost.remove()
                       
                       const styles = document.getElementById('absmartly-visual-editor-styles')
                       if (styles) styles.remove()
                       
-                      // Remove context menu if open
-                      const menu = document.getElementById('absmartly-context-menu')
-                      if (menu) menu.remove()
+                      // Remove menu host if open
+                      const menuHost = document.getElementById('absmartly-menu-host')
+                      if (menuHost) menuHost.remove()
                       
                       // Remove classes - use Array.from to ensure forEach is available
                       const hoverElements = document.querySelectorAll('.absmartly-hover')
@@ -1161,6 +1938,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   document.addEventListener('click', handleClick, true)
                   document.addEventListener('keydown', handleKeyDown)
                   
+                  // Listen for postMessage from save button and immediately relay
+                  window.addEventListener('message', (event) => {
+                    if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_COMPLETE') {
+                      console.log('[ABSmartly] Received visual editor complete via postMessage:', event.data)
+                      
+                      // Clean up visual editor on save
+                      const stopVisualEditor = () => {
+                        document.removeEventListener('mouseover', handleMouseOver)
+                        document.removeEventListener('mouseout', handleMouseOut)
+                        document.removeEventListener('click', handleClick, true)
+                        document.removeEventListener('keydown', handleKeyDown)
+                        
+                        // Remove visual elements
+                        const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
+                        if (bannerHost) bannerHost.remove()
+                        
+                        const menuHost = document.getElementById('absmartly-menu-host')
+                        if (menuHost) menuHost.remove()
+                        
+                        const htmlEditorHost = document.getElementById('absmartly-html-editor-host')
+                        if (htmlEditorHost) htmlEditorHost.remove()
+                        
+                        const styles = document.getElementById('absmartly-visual-editor-styles')
+                        if (styles) styles.remove()
+                        
+                        // Clear selection
+                        document.querySelectorAll('.absmartly-selected, .absmartly-hover').forEach(el => {
+                          el.classList.remove('absmartly-selected', 'absmartly-hover')
+                        })
+                        
+                        console.log('[ABSmartly] Visual editor stopped after save')
+                      }
+                      
+                      // Stop the visual editor
+                      stopVisualEditor()
+                    }
+                  })
+                  
                   console.log('[ABSmartly] Visual editor is now active!')
                   return { success: true }
                 },
@@ -1170,7 +1985,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               
               console.log('Inline injection result:', injectionResult)
               
-              // The visual editor is now running inline, no need to send messages
+              // Also inject a content script to relay messages from MAIN world to extension
+              await chrome.scripting.executeScript({
+                target: { tabId: tabs[0].id },
+                func: () => {
+                  console.log('[ABSmartly] Installing message relay listener')
+                  
+                  // Listen for postMessage from visual editor in MAIN world
+                  window.addEventListener('message', (event) => {
+                    if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_COMPLETE') {
+                      console.log('[ABSmartly Content] Relaying visual editor complete message:', event.data)
+                      
+                      // Send to background script
+                      chrome.runtime.sendMessage({
+                        type: 'VISUAL_EDITOR_COMPLETE',
+                        variantName: event.data.variantName,
+                        changes: event.data.changes,
+                        totalChanges: event.data.totalChanges
+                      }, (response) => {
+                        console.log('[ABSmartly Content] Background response:', response)
+                      })
+                    }
+                  })
+                },
+                world: 'ISOLATED' // Run in content script world to access chrome.runtime
+              })
+              
+              console.log('Message relay installed')
               sendResponse({ success: true, message: 'Visual editor started successfully' })
           } catch (error) {
             console.error('Failed to inject visual editor script:', error)
@@ -1213,6 +2054,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       variantName: message.variantName,
       changes: message.changes,
       totalChanges: message.totalChanges
+    })
+    
+    // Also send directly to the current tab's content script
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'VISUAL_EDITOR_CHANGES_COMPLETE',
+          variantName: message.variantName,
+          changes: message.changes,
+          totalChanges: message.totalChanges
+        })
+      }
     })
     
     // Also store in local storage for persistence

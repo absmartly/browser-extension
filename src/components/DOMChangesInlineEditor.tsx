@@ -18,7 +18,9 @@ import {
   HashtagIcon,
   CubeIcon,
   CommandLineIcon,
-  ArrowsUpDownIcon
+  ArrowsUpDownIcon,
+  TrashIcon,
+  PlusCircleIcon
 } from '@heroicons/react/24/outline'
 
 interface DOMChangesInlineEditorProps {
@@ -43,6 +45,194 @@ interface EditingDOMChange {
   jsValue?: string
   targetSelector?: string
   position?: 'before' | 'after' | 'firstChild' | 'lastChild'
+}
+
+// Simple CSS selector syntax highlighting
+const highlightCSSSelector = (selector: string): React.ReactNode => {
+  if (!selector) return null
+  
+  // Pattern to match different parts of CSS selectors
+  const parts = []
+  let current = ''
+  let inAttribute = false
+  let inQuote = false
+  let quoteChar = ''
+  
+  for (let i = 0; i < selector.length; i++) {
+    const char = selector[i]
+    
+    if (inQuote) {
+      current += char
+      if (char === quoteChar) {
+        inQuote = false
+        parts.push({ type: 'string', value: current })
+        current = ''
+      }
+    } else if (char === '"' || char === "'") {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      current = char
+      inQuote = true
+      quoteChar = char
+    } else if (char === '.') {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'class', value: '.' })
+      current = ''
+    } else if (char === '#') {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'id', value: '#' })
+      current = ''
+    } else if (char === '[') {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'bracket', value: '[' })
+      current = ''
+      inAttribute = true
+    } else if (char === ']') {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'bracket', value: ']' })
+      current = ''
+      inAttribute = false
+    } else if (char === ':') {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'pseudo', value: ':' })
+      current = ''
+    } else if ((char === '>' || char === '+' || char === '~') && !inAttribute) {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'combinator', value: char })
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  
+  if (current) {
+    parts.push({ type: 'text', value: current })
+  }
+  
+  return (
+    <>
+      {parts.map((part, index) => {
+        switch (part.type) {
+          case 'class':
+            return <span key={index} className="text-blue-600 font-bold">{part.value}</span>
+          case 'id':
+            return <span key={index} className="text-purple-600 font-bold">{part.value}</span>
+          case 'bracket':
+            return <span key={index} className="text-gray-600">{part.value}</span>
+          case 'pseudo':
+            return <span key={index} className="text-green-600">{part.value}</span>
+          case 'combinator':
+            return <span key={index} className="text-orange-600 font-bold mx-1">{part.value}</span>
+          case 'string':
+            return <span key={index} className="text-red-500">{part.value}</span>
+          default:
+            return <span key={index}>{part.value}</span>
+        }
+      })}
+    </>
+  )
+}
+
+// Simple HTML syntax highlighting  
+const highlightHTML = (html: string): React.ReactNode => {
+  if (!html) return null
+  
+  const parts = []
+  let current = ''
+  let inTag = false
+  let inTagName = false
+  let inAttribute = false
+  let inString = false
+  let stringChar = ''
+  
+  for (let i = 0; i < html.length; i++) {
+    const char = html[i]
+    
+    if (inString) {
+      current += char
+      if (char === stringChar) {
+        inString = false
+        parts.push({ type: 'string', value: current })
+        current = ''
+      }
+    } else if (inTag && (char === '"' || char === "'")) {
+      if (current) {
+        parts.push({ type: inAttribute ? 'attribute' : 'text', value: current })
+      }
+      current = char
+      inString = true
+      stringChar = char
+      inAttribute = true
+    } else if (char === '<') {
+      if (current) {
+        parts.push({ type: 'text', value: current })
+      }
+      parts.push({ type: 'bracket', value: '<' })
+      current = ''
+      inTag = true
+      inTagName = true
+    } else if (char === '>') {
+      if (current) {
+        parts.push({ type: inTagName ? 'tagName' : 'attribute', value: current })
+      }
+      parts.push({ type: 'bracket', value: '>' })
+      current = ''
+      inTag = false
+      inTagName = false
+      inAttribute = false
+    } else if (inTag && char === ' ') {
+      if (current) {
+        parts.push({ type: inTagName ? 'tagName' : 'attribute', value: current })
+      }
+      current = ' '
+      inTagName = false
+      inAttribute = true
+    } else if (inTag && char === '/') {
+      if (current) {
+        parts.push({ type: 'attribute', value: current })
+      }
+      parts.push({ type: 'bracket', value: '/' })
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  
+  if (current) {
+    parts.push({ type: 'text', value: current })
+  }
+  
+  return (
+    <>
+      {parts.map((part, index) => {
+        switch (part.type) {
+          case 'bracket':
+            return <span key={index} className="text-gray-600">{part.value}</span>
+          case 'tagName':
+            return <span key={index} className="text-blue-600 font-semibold">{part.value}</span>
+          case 'attribute':
+            return <span key={index} className="text-purple-600">{part.value}</span>
+          case 'string':
+            return <span key={index} className="text-green-600">{part.value}</span>
+          default:
+            return <span key={index}>{part.value}</span>
+        }
+      })}
+    </>
+  )
 }
 
 const createEmptyChange = (): EditingDOMChange => ({
@@ -261,12 +451,14 @@ export function DOMChangesInlineEditor({
   // Listen for visual editor changes
   useEffect(() => {
     const handleVisualEditorChanges = async (message: any) => {
+      console.log('📡 Received message in DOMChangesInlineEditor:', message)
+      
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
         console.log('Visual editor changes received:', message.changes)
         
-        // Update local changes state with visual editor changes
+        // Update parent component with visual editor changes
         if (message.changes && message.changes.length > 0) {
-          setChanges(message.changes)
+          onChange(message.changes)
           
           // Store in session storage for persistence
           const storage = new Storage({ area: "session" })
@@ -280,16 +472,8 @@ export function DOMChangesInlineEditor({
         
         if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
           // Merge new changes with existing ones
-          const existingChanges = [...changes]
-          const newChanges = message.changes
-          
-          // Add new changes to the list
-          const mergedChanges = [...existingChanges, ...newChanges]
-          
+          const mergedChanges = [...changes, ...message.changes]
           console.log('📝 Merged changes:', mergedChanges)
-          
-          // Update our local changes
-          setChanges(mergedChanges)
           
           // Update the parent component
           onChange(mergedChanges)
@@ -526,7 +710,7 @@ export function DOMChangesInlineEditor({
       selector: change.selector,
       type: change.type,
       textValue: change.type === 'text' ? change.value : '',
-      htmlValue: change.type === 'html' ? change.value : '',
+      htmlValue: change.type === 'html' ? change.value : change.type === 'insert' ? (change as any).html : '',
       jsValue: change.type === 'javascript' ? change.value : '',
       styleProperties: change.type === 'style' 
         ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({ key, value }))
@@ -538,7 +722,7 @@ export function DOMChangesInlineEditor({
       classRemove: change.type === 'class' ? (change.remove || []) : [],
       classesWithStatus,
       targetSelector: change.type === 'move' ? change.targetSelector : '',
-      position: change.type === 'move' ? change.position : 'after'
+      position: change.type === 'move' ? change.position : change.type === 'insert' ? (change as any).position : 'after'
     }
     setEditingChange(editing)
   }
@@ -621,6 +805,22 @@ export function DOMChangesInlineEditor({
           enabled: true
         }
         break
+      case 'remove':
+        domChange = {
+          selector: editingChange.selector,
+          type: 'remove',
+          enabled: true
+        }
+        break
+      case 'insert':
+        domChange = {
+          selector: editingChange.selector,
+          type: 'insert',
+          html: editingChange.htmlValue || '',
+          position: editingChange.position || 'after',
+          enabled: true
+        }
+        break
       default:
         return
     }
@@ -668,6 +868,10 @@ export function DOMChangesInlineEditor({
         return CommandLineIcon
       case 'move':
         return ArrowsUpDownIcon
+      case 'remove':
+        return TrashIcon
+      case 'insert':
+        return PlusCircleIcon
       default:
         return CursorArrowRaysIcon
     }
@@ -682,6 +886,8 @@ export function DOMChangesInlineEditor({
       case 'html': return 'HTML'
       case 'javascript': return 'JavaScript'
       case 'move': return 'Move/Reorder'
+      case 'remove': return 'Remove'
+      case 'insert': return 'Insert'
       default: return type
     }
   }
@@ -765,8 +971,17 @@ export function DOMChangesInlineEditor({
             <code className="text-xs font-mono text-blue-600">{change.targetSelector}</code>
           </span>
         )
+      case 'remove':
+        return <span className="text-red-600">Remove element</span>
+      case 'insert':
+        const insertChange = change as any
+        return (
+          <span className="text-green-600">
+            Insert new element {insertChange.position || 'after'} the selected element
+          </span>
+        )
       default:
-        return <span className="text-gray-500">Unknown change type</span>
+        return <span className="text-gray-500">Unknown change type: {change.type}</span>
     }
   }
 
@@ -826,6 +1041,506 @@ export function DOMChangesInlineEditor({
             {changes.map((change, index) => {
               const Icon = getChangeIcon(change.type)
               const isDisabled = change.enabled === false
+              
+              // If we're editing this change, show the edit form instead
+              if (editingChange && editingChange.index === index) {
+                return (
+                  <div key={index} className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-medium text-gray-900">
+                        Edit DOM Change
+                      </h5>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveChange}
+                          className="p-1 text-green-600 hover:text-green-800"
+                          title="Save"
+                        >
+                          <CheckIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="p-1 text-gray-400 hover:text-gray-600"
+                          title="Cancel"
+                        >
+                          <XMarkIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Selector field with picker */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Element Selector
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <div 
+                            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono overflow-hidden bg-white border border-gray-300 rounded-md"
+                          >
+                            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {editingChange.selector ? highlightCSSSelector(editingChange.selector) : <span className="text-gray-400">.cta-button, #header, [data-test='submit']</span>}
+                            </div>
+                          </div>
+                          <input
+                            value={editingChange.selector}
+                            onChange={(e) => setEditingChange({ ...editingChange, selector: e.target.value })}
+                            placeholder=".cta-button, #header, [data-test='submit']"
+                            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
+                            style={{ 
+                              color: 'transparent',
+                              caretColor: 'black',
+                              background: 'transparent'
+                            }}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => handleStartElementPicker('selector')}
+                          size="sm"
+                          variant="secondary"
+                          title="Pick element"
+                          className={pickingForField === 'selector' ? 'bg-blue-100' : ''}
+                        >
+                          🎯
+                        </Button>
+                      </div>
+                      {pickingForField === 'selector' && (
+                        <p className="text-xs text-blue-600 mt-1 animate-pulse">
+                          Click an element on the page...
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Change type selector */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Change Type
+                      </label>
+                      <select
+                        value={editingChange.type}
+                        onChange={(e) => {
+                          const newType = e.target.value as DOMChangeType
+                          console.log('📝 Changing type to:', newType)
+                          const updatedChange = { ...editingChange, type: newType }
+                          console.log('📝 Updated editingChange:', updatedChange)
+                          setEditingChange(updatedChange)
+                        }}
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
+                        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
+                      >
+                        <option value="text">Text</option>
+                        <option value="style">Style</option>
+                        <option value="class">Class</option>
+                        <option value="attribute">Attribute</option>
+                        <option value="html">HTML</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="move">Move/Reorder</option>
+                        <option value="remove">Remove Element</option>
+                        <option value="insert">Insert Element</option>
+                      </select>
+                    </div>
+
+                    {/* Dynamic value fields based on type */}
+                    {editingChange.type === 'text' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Text Content
+                        </label>
+                        <Input
+                          value={editingChange.textValue || ''}
+                          onChange={(e) => setEditingChange({ ...editingChange, textValue: e.target.value })}
+                          placeholder="New text content"
+                        />
+                      </div>
+                    )}
+
+                    {editingChange.type === 'style' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Style Properties
+                        </label>
+                        <div className="space-y-2">
+                          {editingChange.styleProperties?.map((prop, propIndex) => (
+                            <div key={propIndex} className="flex gap-2">
+                              <Input
+                                value={prop.key}
+                                onChange={(e) => {
+                                  const newProps = [...(editingChange.styleProperties || [])]
+                                  newProps[propIndex].key = e.target.value
+                                  setEditingChange({ ...editingChange, styleProperties: newProps })
+                                }}
+                                placeholder="Property (e.g., color)"
+                                className="flex-1"
+                              />
+                              <Input
+                                value={prop.value}
+                                onChange={(e) => {
+                                  const newProps = [...(editingChange.styleProperties || [])]
+                                  newProps[propIndex].value = e.target.value
+                                  setEditingChange({ ...editingChange, styleProperties: newProps })
+                                }}
+                                placeholder="Value (e.g., #ff0000)"
+                                className="flex-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newProps = editingChange.styleProperties?.filter((_, i) => i !== propIndex) || []
+                                  setEditingChange({ ...editingChange, styleProperties: newProps })
+                                }}
+                                className="p-2 text-red-600 hover:text-red-800"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const newProps = [...(editingChange.styleProperties || []), { key: '', value: '' }]
+                              setEditingChange({ ...editingChange, styleProperties: newProps })
+                            }}
+                            size="sm"
+                            variant="secondary"
+                            className="w-full"
+                          >
+                            <PlusIcon className="h-4 w-4 mr-1" />
+                            Add Property
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {editingChange.type === 'class' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Classes to Add
+                          </label>
+                          <MultiSelectTags
+                            currentClasses={editingChange.classAdd || []}
+                            onAddClass={(className) => {
+                              const newClassAdd = [...(editingChange.classAdd || []), className]
+                              const newClassRemove = (editingChange.classRemove || []).filter(c => c !== className)
+                              setEditingChange({ 
+                                ...editingChange, 
+                                classAdd: newClassAdd,
+                                classRemove: newClassRemove
+                              })
+                            }}
+                            onRemoveClass={(className) => {
+                              setEditingChange({
+                                ...editingChange,
+                                classAdd: (editingChange.classAdd || []).filter(c => c !== className)
+                              })
+                            }}
+                            placeholder="Type class name to add and press Enter..."
+                            className="bg-green-50"
+                            pillColor="green"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Classes to Remove
+                          </label>
+                          <MultiSelectTags
+                            currentClasses={editingChange.classRemove || []}
+                            onAddClass={(className) => {
+                              const newClassRemove = [...(editingChange.classRemove || []), className]
+                              const newClassAdd = (editingChange.classAdd || []).filter(c => c !== className)
+                              setEditingChange({ 
+                                ...editingChange, 
+                                classRemove: newClassRemove,
+                                classAdd: newClassAdd
+                              })
+                            }}
+                            onRemoveClass={(className) => {
+                              setEditingChange({
+                                ...editingChange,
+                                classRemove: (editingChange.classRemove || []).filter(c => c !== className)
+                              })
+                            }}
+                            placeholder="Type class name to remove and press Enter..."
+                            className="bg-red-50"
+                            pillColor="red"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {editingChange.type === 'attribute' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Attributes
+                        </label>
+                        <div className="space-y-2">
+                          {editingChange.attributeProperties?.map((prop, propIndex) => (
+                            <div key={propIndex} className="flex gap-2">
+                              <Input
+                                value={prop.key}
+                                onChange={(e) => {
+                                  const newProps = [...(editingChange.attributeProperties || [])]
+                                  newProps[propIndex].key = e.target.value
+                                  setEditingChange({ ...editingChange, attributeProperties: newProps })
+                                }}
+                                placeholder="Attribute (e.g., href)"
+                                className="flex-1"
+                              />
+                              <Input
+                                value={prop.value}
+                                onChange={(e) => {
+                                  const newProps = [...(editingChange.attributeProperties || [])]
+                                  newProps[propIndex].value = e.target.value
+                                  setEditingChange({ ...editingChange, attributeProperties: newProps })
+                                }}
+                                placeholder="Value (e.g., /page)"
+                                className="flex-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newProps = editingChange.attributeProperties?.filter((_, i) => i !== propIndex) || []
+                                  setEditingChange({ ...editingChange, attributeProperties: newProps })
+                                }}
+                                className="p-2 text-red-600 hover:text-red-800"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const newProps = [...(editingChange.attributeProperties || []), { key: '', value: '' }]
+                              setEditingChange({ ...editingChange, attributeProperties: newProps })
+                            }}
+                            size="sm"
+                            variant="secondary"
+                            className="w-full"
+                          >
+                            <PlusIcon className="h-4 w-4 mr-1" />
+                            Add Attribute
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {editingChange.type === 'html' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          HTML Content
+                        </label>
+                        <textarea
+                          value={editingChange.htmlValue || ''}
+                          onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
+                          placeholder="<div>New HTML content</div>"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50"
+                          rows={4}
+                        />
+                      </div>
+                    )}
+
+                    {editingChange.type === 'javascript' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          JavaScript Code
+                        </label>
+                        <textarea
+                          value={editingChange.jsValue || ''}
+                          onChange={(e) => setEditingChange({ ...editingChange, jsValue: e.target.value })}
+                          placeholder="// JavaScript code to execute"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50"
+                          rows={4}
+                        />
+                      </div>
+                    )}
+
+                    {editingChange.type === 'move' && (
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">🎯</span>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-gray-900 mb-1">Drag & Drop Mode</h4>
+                              <p className="text-sm text-gray-600 mb-3">
+                                Click the button below to enter drag-and-drop mode. You'll be able to click and drag any element to a new position.
+                              </p>
+                              <Button
+                                type="button"
+                                onClick={handleStartDragDrop}
+                                size="sm"
+                                variant="primary"
+                                className="w-full"
+                              >
+                                🖱️ Start Drag & Drop
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Show captured values if we have them */}
+                        {(editingChange.selector || editingChange.targetSelector || editingChange.position) && (
+                          <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                            <div className="text-sm">
+                              <span className="font-medium text-gray-700">Element to Move:</span>{' '}
+                              <code className="text-xs bg-white px-1 py-0.5 rounded">
+                                {editingChange.selector || 'Not set'}
+                              </code>
+                            </div>
+                            <div className="text-sm">
+                              <span className="font-medium text-gray-700">Target:</span>{' '}
+                              <code className="text-xs bg-white px-1 py-0.5 rounded">
+                                {editingChange.targetSelector || 'Not set'}
+                              </code>
+                            </div>
+                            <div className="text-sm">
+                              <span className="font-medium text-gray-700">Position:</span>{' '}
+                              <span className="text-gray-600">
+                                {editingChange.position === 'before' ? 'Before element' :
+                                 editingChange.position === 'after' ? 'After element' :
+                                 editingChange.position === 'firstChild' ? 'As first child' :
+                                 editingChange.position === 'lastChild' ? 'As last child' :
+                                 'Not set'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Manual input as fallback */}
+                        <details className="text-sm">
+                          <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                            Manual input (advanced)
+                          </summary>
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Target Selector
+                              </label>
+                              <Input
+                                value={editingChange.targetSelector || ''}
+                                onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
+                                placeholder=".container, #section, [data-role='main']"
+                                className="text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Position
+                              </label>
+                              <select
+                                value={editingChange.position || 'after'}
+                                onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
+                                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
+                        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
+                              >
+                                <option value="before">Before target element</option>
+                                <option value="after">After target element</option>
+                                <option value="firstChild">As first child of target</option>
+                                <option value="lastChild">As last child of target</option>
+                              </select>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    )}
+
+                    {editingChange.type === 'remove' && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <span className="text-xl">⚠️</span>
+                          <div className="flex-1">
+                            <p className="text-sm text-red-800">
+                              This will completely remove the selected element from the page.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {editingChange.type === 'insert' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            HTML to Insert
+                          </label>
+                          <div className="relative" style={{ minHeight: '112px' }}>
+                            <div 
+                              id={`html-overlay-${editingChange.index}`}
+                              className="absolute pointer-events-none text-xs font-mono leading-relaxed bg-white border border-gray-300 rounded-md"
+                              style={{ 
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                padding: '8px 12px 12px 12px',
+                                overflow: 'hidden',
+                                wordBreak: 'break-word',
+                                whiteSpace: 'pre-wrap',
+                                zIndex: 1
+                              }}
+                            >
+                              <div
+                                style={{
+                                  transform: `translateY(${0}px)`,
+                                  transition: 'none'
+                                }}
+                                id={`html-overlay-content-${editingChange.index}`}
+                              >
+                                {editingChange.htmlValue ? highlightHTML(editingChange.htmlValue) : <span className="text-gray-400">&lt;div class='new-element'&gt;New content to insert&lt;/div&gt;</span>}
+                              </div>
+                            </div>
+                            <textarea
+                              value={editingChange.htmlValue || ''}
+                              onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
+                              onScroll={(e) => {
+                                const textarea = e.target as HTMLTextAreaElement
+                                const overlayContent = document.getElementById(`html-overlay-content-${editingChange.index}`)
+                                if (overlayContent) {
+                                  overlayContent.style.transform = `translateY(-${textarea.scrollTop}px)`
+                                }
+                              }}
+                              placeholder="<div class='new-element'>New content to insert</div>"
+                              className="absolute px-3 py-2 border border-transparent rounded-md text-xs font-mono leading-relaxed"
+                              style={{ 
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                color: 'transparent',
+                                caretColor: 'black',
+                                background: 'transparent',
+                                resize: 'vertical',
+                                overflow: 'auto',
+                                minHeight: '96px',
+                                paddingBottom: '12px',
+                                zIndex: 2
+                              }}
+                              rows={4}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Insert Position
+                          </label>
+                          <select
+                            value={editingChange.position || 'after'}
+                            onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
+                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
+                        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
+                          >
+                            <option value="before">Before the selected element</option>
+                            <option value="after">After the selected element</option>
+                            <option value="firstChild">As first child of the selected element</option>
+                            <option value="lastChild">As last child of the selected element</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
               
               return (
                 <div 
@@ -907,8 +1622,8 @@ export function DOMChangesInlineEditor({
         )}
       </div>
 
-      {/* Inline editing form */}
-      {editingChange && (
+      {/* New DOM change form - only show when adding new change */}
+      {editingChange && editingChange.index === null && (
         <div className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
           <div className="flex items-center justify-between">
             <h5 className="font-medium text-gray-900">
@@ -938,12 +1653,18 @@ export function DOMChangesInlineEditor({
               Element Selector
             </label>
             <div className="flex gap-2">
-              <Input
-                value={editingChange.selector}
-                onChange={(e) => setEditingChange({ ...editingChange, selector: e.target.value })}
-                placeholder=".cta-button, #header, [data-test='submit']"
-                className={`flex-1 ${pickingForField === 'selector' ? 'border-blue-500' : ''}`}
-              />
+              <div className="flex-1 relative">
+                <input
+                  value={editingChange.selector}
+                  onChange={(e) => setEditingChange({ ...editingChange, selector: e.target.value })}
+                  placeholder=".cta-button, #header, [data-test='submit']"
+                  className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
+                  style={{ caretColor: 'black' }}
+                />
+                <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden">
+                  {highlightCSSSelector(editingChange.selector)}
+                </div>
+              </div>
               <Button
                 type="button"
                 onClick={() => handleStartElementPicker('selector')}
@@ -1236,18 +1957,30 @@ export function DOMChangesInlineEditor({
         </div>
       )}
 
-      {/* Add button - only show if we have existing changes and not editing */}
+      {/* Action buttons - only show if we have existing changes and not editing */}
       {changes.length > 0 && !editingChange && (
-        <Button
-          type="button"
-          onClick={handleAddChange}
-          size="sm"
-          variant="secondary"
-          className="w-full"
-        >
-          <PlusIcon className="h-4 w-4 mr-1" />
-          Add DOM Change
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            onClick={handleAddChange}
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+          >
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add DOM Change
+          </Button>
+          <Button
+            type="button"
+            onClick={handleLaunchVisualEditor}
+            size="sm"
+            variant="primary"
+            className="flex-1"
+          >
+            <PaintBrushIcon className="h-4 w-4 mr-1" />
+            Visual Editor
+          </Button>
+        </div>
       )}
     </div>
   )

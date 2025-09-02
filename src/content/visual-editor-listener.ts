@@ -4,6 +4,23 @@ import type { DOMChange } from '~src/types/dom-changes'
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 
+// Listen for postMessage from the visual editor (running in MAIN world)
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_COMPLETE') {
+    console.log('[Visual Editor Listener] Received visual editor complete via postMessage:', event.data)
+    
+    // Relay to background script
+    chrome.runtime.sendMessage({
+      type: 'VISUAL_EDITOR_COMPLETE',
+      variantName: event.data.variantName,
+      changes: event.data.changes,
+      totalChanges: event.data.totalChanges
+    }, (response) => {
+      console.log('[Visual Editor Listener] Relayed to background, response:', response)
+    })
+  }
+})
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Visual Editor Listener] Received message:', message.type)
