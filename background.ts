@@ -456,6 +456,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Open login page
     openLoginPage()
     sendResponse({ success: true })
+  } else if (message.type === "DISABLE_PREVIEW") {
+    // Forward disable preview message to all tabs to remove preview
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach(tab => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'remove'
+          })
+        }
+      })
+    })
+    sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
     // Special handler for auth check - directly check user authentication
     getConfig().then(async config => {
