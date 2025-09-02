@@ -192,9 +192,17 @@ export class ElementPicker {
       }
     }
     
-    // Try class combination
+    // Try class combination (filtering out temporary state classes)
     if (element.className && typeof element.className === 'string') {
+      // Common temporary/state classes to filter out
+      const stateClasses = ['hover', 'active', 'focus', 'focused', 'selected', 'disabled', 
+                           'loading', 'animating', 'transitioning', 'entering', 'leaving',
+                           'is-hovered', 'is-active', 'is-focused', 'is-selected',
+                           'framer-hover', 'framer-active', 'framer-v-hover']
+      
       const classes = element.className.trim().split(/\s+/)
+        .filter(cls => !stateClasses.includes(cls) && !cls.match(/^(hover|active|focus)[-_]/i))
+      
       if (classes.length > 0 && classes[0]) {
         let selector = element.tagName.toLowerCase()
         for (const cls of classes) {
