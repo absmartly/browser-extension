@@ -5,6 +5,7 @@ import { Input } from './ui/Input'
 import { Checkbox } from './ui/Checkbox'
 import { MultiSelectTags } from './ui/MultiSelectTags'
 import type { DOMChange, DOMChangeType } from '~src/types/dom-changes'
+import { suggestCleanedSelector } from '~src/utils/selector-cleaner'
 import { 
   PencilIcon, 
   TrashIcon, 
@@ -20,7 +21,8 @@ import {
   CommandLineIcon,
   ArrowsUpDownIcon,
   TrashIcon,
-  PlusCircleIcon
+  PlusCircleIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 
 interface DOMChangesInlineEditorProps {
@@ -1070,6 +1072,37 @@ export function DOMChangesInlineEditor({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Element Selector
                       </label>
+                      {/* Warning for temporary classes */}
+                      {editingChange.selector && (() => {
+                        const suggestion = suggestCleanedSelector(editingChange.selector)
+                        if (suggestion.hasChanges) {
+                          return (
+                            <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                              <div className="flex items-start gap-2">
+                                <ExclamationTriangleIcon className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1 text-xs">
+                                  <p className="text-yellow-800 font-medium">Temporary classes detected</p>
+                                  <p className="text-yellow-700 mt-1">
+                                    Found: {suggestion.removedClasses.map(cls => `.${cls}`).join(', ')}
+                                  </p>
+                                  <p className="text-yellow-700 mt-1">
+                                    Suggested: <code className="bg-yellow-100 px-1 rounded">{suggestion.cleaned}</code>
+                                  </p>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="mt-2"
+                                    onClick={() => setEditingChange({ ...editingChange, selector: suggestion.cleaned })}
+                                  >
+                                    Use cleaned selector
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                       <div className="flex gap-2">
                         <div className="flex-1 relative">
                           <div 
