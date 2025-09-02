@@ -954,7 +954,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   let historyIndex = -1
                   const MAX_HISTORY = 50
                   
-                  // Add hover effect
+                  // Hover tooltip element
+                  let hoverTooltip = null
+                  
+                  // Add hover effect with tooltip
                   const handleMouseOver = (e) => {
                     if (isEditing) return
                     const target = e.target
@@ -964,15 +967,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         target.id === 'absmartly-menu-host' || 
                         target.closest('#absmartly-menu-host') ||
                         target.id === 'absmartly-html-editor-host' ||
-                        target.closest('#absmartly-html-editor-host')) {
+                        target.closest('#absmartly-html-editor-host') ||
+                        target.id === 'absmartly-hover-tooltip') {
                       return
                     }
                     target.classList.add('absmartly-hover')
+                    
+                    // Show tooltip with element selector
+                    if (hoverTooltip) {
+                      hoverTooltip.remove()
+                    }
+                    
+                    const selector = getSelector(target)
+                    hoverTooltip = document.createElement('div')
+                    hoverTooltip.id = 'absmartly-hover-tooltip'
+                    hoverTooltip.style.cssText = `
+                      position: fixed;
+                      background: #1f2937;
+                      color: white;
+                      padding: 6px 10px;
+                      border-radius: 4px;
+                      font-size: 12px;
+                      font-family: monospace;
+                      z-index: 2147483647;
+                      pointer-events: none;
+                      white-space: nowrap;
+                      max-width: 400px;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                    `
+                    hoverTooltip.textContent = selector
+                    
+                    // Position tooltip near cursor
+                    const rect = target.getBoundingClientRect()
+                    const tooltipX = Math.min(rect.left, window.innerWidth - 420)
+                    const tooltipY = rect.top - 30
+                    
+                    hoverTooltip.style.left = tooltipX + 'px'
+                    hoverTooltip.style.top = (tooltipY < 10 ? rect.bottom + 5 : tooltipY) + 'px'
+                    
+                    document.body.appendChild(hoverTooltip)
                   }
                   
                   const handleMouseOut = (e) => {
                     if (isEditing) return
                     e.target.classList.remove('absmartly-hover')
+                    
+                    // Remove tooltip
+                    if (hoverTooltip) {
+                      hoverTooltip.remove()
+                      hoverTooltip = null
+                    }
                   }
                   
                   // Handle element click
@@ -1114,23 +1160,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const menuContainer = document.createElement('div')
                     menuContainer.className = 'menu-container'
                     
-                    // Menu items data
+                    // Menu items data - matching VWO and Mida features
                     const menuItems = [
                       { icon: '✏️', label: 'Edit Element', action: 'edit' },
                       { icon: '</>', label: 'Edit HTML', action: 'editHtml' },
+                      { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
+                      { icon: '✂️', label: 'Inline Edit', action: 'inlineEdit' },
                       { divider: true },
                       { icon: '⬆', label: 'Move up', action: 'moveUp' },
                       { icon: '⬇', label: 'Move down', action: 'moveDown' },
+                      { icon: '↔️', label: 'Move / Resize', action: 'moveResize' },
                       { divider: true },
-                      { icon: '📋', label: 'Copy Element', action: 'copy', shortcut: '⌘+C' },
+                      { icon: '📋', label: 'Copy', action: 'copy' },
                       { icon: '🔗', label: 'Copy Selector Path', action: 'copySelector', shortcut: '⌘+Shift+C' },
                       { divider: true },
-                      { icon: '🎯', label: 'Select Relative Elements', action: 'selectRelative' },
-                      { divider: true },
+                      { icon: '🎯', label: 'Select Relative Element', action: 'selectRelative' },
                       { icon: '➕', label: 'Insert new block', action: 'insertBlock' },
                       { divider: true },
-                      { icon: '👁', label: 'Hide Element', action: 'hide' },
-                      { icon: '🗑', label: 'Delete Element', action: 'delete', shortcut: 'Delete' }
+                      { icon: '💡', label: 'Suggest Variations', action: 'suggestVariations' },
+                      { icon: '💾', label: 'Save to library', action: 'saveToLibrary' },
+                      { icon: '✅', label: 'Apply saved modification', action: 'applySaved' },
+                      { divider: true },
+                      { icon: '🎯', label: 'Track Clicks', action: 'trackClicks' },
+                      { divider: true },
+                      { icon: '👁', label: 'Hide', action: 'hide' },
+                      { icon: '🗑', label: 'Remove', action: 'delete', shortcut: 'Delete' }
                     ]
                     
                     // Create menu items in shadow DOM
@@ -1467,6 +1521,85 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         showInsertBlockDialog(element)
                         break
                         
+                      case 'rearrange':
+                        // Enable drag and drop rearranging
+                        enableRearrangeMode(element)
+                        break
+                        
+                      case 'inlineEdit':
+                        // Quick inline text editing
+                        element.contentEditable = 'true'
+                        element.focus()
+                        const inlineRange = document.createRange()
+                        inlineRange.selectNodeContents(element)
+                        const inlineSelection = window.getSelection()
+                        inlineSelection.removeAllRanges()
+                        inlineSelection.addRange(inlineRange)
+                        isEditing = true
+                        
+                        const finishInlineEdit = () => {
+                          element.contentEditable = 'false'
+                          isEditing = false
+                          trackChange('edit', element, { 
+                            oldText: originalState.html,
+                            newText: element.textContent 
+                          })
+                        }
+                        
+                        element.addEventListener('blur', finishInlineEdit, { once: true })
+                        element.addEventListener('keydown', (e) => {
+                          if (e.key === 'Enter' || e.key === 'Escape') {
+                            e.preventDefault()
+                            element.blur()
+                          }
+                        })
+                        break
+                        
+                      case 'moveResize':
+                        // Enable move/resize mode
+                        enableMoveResizeMode(element)
+                        break
+                        
+                      case 'suggestVariations':
+                        // Show AI-powered variations
+                        showNotification('AI Variations: Coming soon!')
+                        break
+                        
+                      case 'saveToLibrary':
+                        // Save element modification to library
+                        const elementData = {
+                          selector: getSelector(element),
+                          html: element.outerHTML,
+                          styles: window.getComputedStyle(element).cssText
+                        }
+                        localStorage.setItem('absmartly-saved-element', JSON.stringify(elementData))
+                        showNotification('Element saved to library!')
+                        break
+                        
+                      case 'applySaved':
+                        // Apply saved modification
+                        const saved = localStorage.getItem('absmartly-saved-element')
+                        if (saved) {
+                          const data = JSON.parse(saved)
+                          element.outerHTML = data.html
+                          showNotification('Saved modification applied!')
+                        } else {
+                          showNotification('No saved modifications found')
+                        }
+                        break
+                        
+                      case 'trackClicks':
+                        // Enable click tracking
+                        element.dataset.trackClicks = 'true'
+                        element.style.cursor = 'pointer'
+                        element.addEventListener('click', (e) => {
+                          e.preventDefault()
+                          console.log('[Click Tracked]', getSelector(element))
+                          showNotification(`Click tracked on: ${getSelector(element)}`)
+                        })
+                        showNotification('Click tracking enabled for this element')
+                        break
+                        
                       case 'duplicate':
                         const clone = element.cloneNode(true)
                         clone.classList.remove('absmartly-selected', 'absmartly-hover')
@@ -1569,6 +1702,251 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         selectedElement = element
                         break
                     }
+                  }
+                  
+                  // Enable rearrange mode with drag and drop
+                  function enableRearrangeMode(element) {
+                    element.draggable = true
+                    element.style.cursor = 'move'
+                    element.style.opacity = '0.8'
+                    
+                    let draggedElement = null
+                    
+                    const handleDragStart = (e) => {
+                      draggedElement = e.target
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData('text/html', e.target.innerHTML)
+                    }
+                    
+                    const handleDragOver = (e) => {
+                      if (e.preventDefault) {
+                        e.preventDefault()
+                      }
+                      e.dataTransfer.dropEffect = 'move'
+                      
+                      const targetElement = e.target
+                      if (targetElement !== draggedElement) {
+                        targetElement.style.outline = '2px dashed #3b82f6'
+                      }
+                      return false
+                    }
+                    
+                    const handleDragLeave = (e) => {
+                      e.target.style.outline = ''
+                    }
+                    
+                    const handleDrop = (e) => {
+                      if (e.stopPropagation) {
+                        e.stopPropagation()
+                      }
+                      
+                      const targetElement = e.target
+                      targetElement.style.outline = ''
+                      
+                      if (draggedElement !== targetElement) {
+                        // Swap elements
+                        const draggedParent = draggedElement.parentNode
+                        const targetParent = targetElement.parentNode
+                        const draggedNext = draggedElement.nextSibling
+                        const targetNext = targetElement.nextSibling
+                        
+                        if (draggedNext === targetElement) {
+                          draggedParent.insertBefore(targetElement, draggedElement)
+                        } else if (targetNext === draggedElement) {
+                          targetParent.insertBefore(draggedElement, targetElement)
+                        } else {
+                          draggedParent.insertBefore(targetElement, draggedNext)
+                          targetParent.insertBefore(draggedElement, targetNext)
+                        }
+                        
+                        trackChange('move', draggedElement, { 
+                          direction: 'rearrange',
+                          target: getSelector(targetElement)
+                        })
+                      }
+                      
+                      return false
+                    }
+                    
+                    const handleDragEnd = (e) => {
+                      element.draggable = false
+                      element.style.cursor = ''
+                      element.style.opacity = ''
+                      
+                      // Clean up all event listeners
+                      document.removeEventListener('dragstart', handleDragStart)
+                      document.removeEventListener('dragover', handleDragOver)
+                      document.removeEventListener('dragleave', handleDragLeave)
+                      document.removeEventListener('drop', handleDrop)
+                      document.removeEventListener('dragend', handleDragEnd)
+                      
+                      showNotification('Rearrange mode disabled')
+                    }
+                    
+                    // Add event listeners
+                    element.addEventListener('dragstart', handleDragStart)
+                    document.addEventListener('dragover', handleDragOver)
+                    document.addEventListener('dragleave', handleDragLeave)
+                    document.addEventListener('drop', handleDrop)
+                    document.addEventListener('dragend', handleDragEnd)
+                    
+                    showNotification('Drag element to rearrange. Click elsewhere to exit.')
+                  }
+                  
+                  // Enable move/resize mode
+                  function enableMoveResizeMode(element) {
+                    const originalPosition = window.getComputedStyle(element).position
+                    const originalStyles = {
+                      position: element.style.position,
+                      top: element.style.top,
+                      left: element.style.left,
+                      width: element.style.width,
+                      height: element.style.height,
+                      cursor: element.style.cursor
+                    }
+                    
+                    // Make element movable
+                    if (originalPosition === 'static') {
+                      element.style.position = 'relative'
+                    }
+                    
+                    // Create resize handles
+                    const resizeHandles = document.createElement('div')
+                    resizeHandles.id = 'absmartly-resize-handles'
+                    resizeHandles.style.cssText = `
+                      position: absolute;
+                      top: 0;
+                      left: 0;
+                      width: 100%;
+                      height: 100%;
+                      pointer-events: none;
+                      z-index: 2147483646;
+                    `
+                    
+                    // Add corner and edge handles
+                    const handlePositions = [
+                      { name: 'nw', cursor: 'nw-resize', top: '-4px', left: '-4px' },
+                      { name: 'ne', cursor: 'ne-resize', top: '-4px', right: '-4px' },
+                      { name: 'sw', cursor: 'sw-resize', bottom: '-4px', left: '-4px' },
+                      { name: 'se', cursor: 'se-resize', bottom: '-4px', right: '-4px' },
+                      { name: 'n', cursor: 'n-resize', top: '-4px', left: '50%', transform: 'translateX(-50%)' },
+                      { name: 's', cursor: 's-resize', bottom: '-4px', left: '50%', transform: 'translateX(-50%)' },
+                      { name: 'w', cursor: 'w-resize', top: '50%', left: '-4px', transform: 'translateY(-50%)' },
+                      { name: 'e', cursor: 'e-resize', top: '50%', right: '-4px', transform: 'translateY(-50%)' }
+                    ]
+                    
+                    handlePositions.forEach(pos => {
+                      const handle = document.createElement('div')
+                      handle.className = `resize-handle resize-${pos.name}`
+                      handle.style.cssText = `
+                        position: absolute;
+                        width: 8px;
+                        height: 8px;
+                        background: #3b82f6;
+                        border: 1px solid white;
+                        border-radius: 2px;
+                        cursor: ${pos.cursor};
+                        pointer-events: auto;
+                        ${pos.top ? `top: ${pos.top};` : ''}
+                        ${pos.bottom ? `bottom: ${pos.bottom};` : ''}
+                        ${pos.left ? `left: ${pos.left};` : ''}
+                        ${pos.right ? `right: ${pos.right};` : ''}
+                        ${pos.transform ? `transform: ${pos.transform};` : ''}
+                      `
+                      resizeHandles.appendChild(handle)
+                    })
+                    
+                    element.style.position = 'relative'
+                    element.appendChild(resizeHandles)
+                    
+                    // Make element draggable
+                    element.style.cursor = 'move'
+                    
+                    let isDragging = false
+                    let isResizing = false
+                    let startX, startY, startWidth, startHeight, startLeft, startTop
+                    
+                    const handleMouseDown = (e) => {
+                      if (e.target.classList.contains('resize-handle')) {
+                        isResizing = true
+                        startX = e.clientX
+                        startY = e.clientY
+                        startWidth = element.offsetWidth
+                        startHeight = element.offsetHeight
+                        e.preventDefault()
+                      } else if (e.target === element) {
+                        isDragging = true
+                        startX = e.clientX
+                        startY = e.clientY
+                        startLeft = element.offsetLeft
+                        startTop = element.offsetTop
+                        e.preventDefault()
+                      }
+                    }
+                    
+                    const handleMouseMove = (e) => {
+                      if (isDragging) {
+                        const deltaX = e.clientX - startX
+                        const deltaY = e.clientY - startY
+                        element.style.left = (startLeft + deltaX) + 'px'
+                        element.style.top = (startTop + deltaY) + 'px'
+                      } else if (isResizing) {
+                        const deltaX = e.clientX - startX
+                        const deltaY = e.clientY - startY
+                        element.style.width = (startWidth + deltaX) + 'px'
+                        element.style.height = (startHeight + deltaY) + 'px'
+                      }
+                    }
+                    
+                    const handleMouseUp = () => {
+                      if (isDragging || isResizing) {
+                        trackChange('style', element, {
+                          property: isDragging ? 'position' : 'size',
+                          value: isDragging ? 
+                            `left: ${element.style.left}, top: ${element.style.top}` :
+                            `width: ${element.style.width}, height: ${element.style.height}`
+                        })
+                      }
+                      isDragging = false
+                      isResizing = false
+                    }
+                    
+                    // Add event listeners
+                    element.addEventListener('mousedown', handleMouseDown)
+                    document.addEventListener('mousemove', handleMouseMove)
+                    document.addEventListener('mouseup', handleMouseUp)
+                    
+                    // Exit button
+                    const exitBtn = document.createElement('button')
+                    exitBtn.textContent = '✓ Done'
+                    exitBtn.style.cssText = `
+                      position: absolute;
+                      top: -35px;
+                      right: 0;
+                      padding: 4px 8px;
+                      background: #10b981;
+                      color: white;
+                      border: none;
+                      border-radius: 4px;
+                      font-size: 12px;
+                      cursor: pointer;
+                      z-index: 2147483647;
+                    `
+                    exitBtn.onclick = () => {
+                      resizeHandles.remove()
+                      exitBtn.remove()
+                      element.removeEventListener('mousedown', handleMouseDown)
+                      document.removeEventListener('mousemove', handleMouseMove)
+                      document.removeEventListener('mouseup', handleMouseUp)
+                      
+                      // Restore original styles if needed
+                      element.style.cursor = originalStyles.cursor
+                      
+                      showNotification('Move/Resize mode disabled')
+                    }
+                    element.appendChild(exitBtn)
+                    
+                    showNotification('Drag to move, drag handles to resize')
                   }
                   
                   // Show relative element selector dialog
