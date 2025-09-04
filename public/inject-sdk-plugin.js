@@ -22,7 +22,7 @@
   }
 
   // Version for cache busting
-  const INJECT_VERSION = '1.0.6';
+  const INJECT_VERSION = '1.0.7';
   debugLog('[ABsmartly Extension] Inject SDK Plugin version:', INJECT_VERSION);
 
   // Check if already injected
@@ -898,8 +898,14 @@
           return;
         }
 
-        // Check if DOMChangesPlugin is available, if not load it from extension
-        if (typeof window.DOMChangesPlugin === 'undefined' && typeof window.ABSmartlyDOMChanges === 'undefined') {
+        // Check if plugin is already registered with context
+        if (context.__domPlugin && context.__domPlugin.initialized) {
+          debugLog('[ABsmartly Extension] Plugin already initialized via context.__domPlugin');
+          return;
+        }
+        
+        // Check if ABsmartlyDOMChangesPlugin is available, if not load it from extension
+        if (typeof window.ABsmartlyDOMChangesPlugin === 'undefined') {
           debugLog('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
           
           // Use the captured extension URL
@@ -917,30 +923,53 @@
               debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABsmartlyDOMChangesPlugin || {}));
               
               // The UMD bundle exposes ABsmartlyDOMChangesPlugin globally
-              // Check different possible export patterns
+              // We need to instantiate it and let it register itself with the context
               if (window.ABsmartlyDOMChangesPlugin) {
+                let PluginClass = null;
+                
                 // Try direct property
                 if (window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin) {
-                  window.DOMChangesPlugin = window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin;
+                  PluginClass = window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin;
                 }
                 // Try default export
                 else if (window.ABsmartlyDOMChangesPlugin.default) {
-                  window.DOMChangesPlugin = window.ABsmartlyDOMChangesPlugin.default;
+                  PluginClass = window.ABsmartlyDOMChangesPlugin.default;
                 }
                 // Try if ABsmartlyDOMChangesPlugin itself is the plugin class
                 else if (typeof window.ABsmartlyDOMChangesPlugin === 'function') {
-                  window.DOMChangesPlugin = window.ABsmartlyDOMChangesPlugin;
+                  PluginClass = window.ABsmartlyDOMChangesPlugin;
                 }
                 
-                if (window.DOMChangesPlugin) {
-                  debugLog('[ABsmartly Extension] DOMChangesPlugin found and assigned');
-                  // Continue with initialization after plugin loads, pass the context
-                  initializePlugin(context);
+                if (PluginClass) {
+                  debugLog('[ABsmartly Extension] Plugin class found, initializing...');
+                  try {
+                    // Create plugin instance - it will register itself with the context
+                    const plugin = new PluginClass({
+                      context: context,
+                      autoApply: false,
+                      spa: true,
+                      visibilityTracking: true,
+                      extensionBridge: true,
+                      dataSource: 'variable',
+                      dataFieldName: '__dom_changes',
+                      debug: DEBUG
+                    });
+                    
+                    // Initialize the plugin
+                    plugin.initialize().then(() => {
+                      debugLog('[ABsmartly Extension] Plugin initialized and registered with context');
+                      // The plugin is now available via context.__domPlugin
+                    }).catch(error => {
+                      debugError('[ABsmartly Extension] Failed to initialize plugin:', error);
+                    });
+                  } catch (error) {
+                    debugError('[ABsmartly Extension] Failed to create plugin instance:', error);
+                  }
                 } else {
-                  debugError('[ABsmartly Extension] Could not find DOMChangesPlugin in bundle');
+                  debugError('[ABsmartly Extension] Could not find DOMChangesPlugin class in bundle');
                 }
               } else {
-                debugError('[ABsmartly Extension] ABsmartlyDOMChangesPlugin not found on window');
+                debugError('[ABsmartly Extension] ABsmartlyDOMChangesPlugin not loaded');
               }
               };
               script.onerror = () => {
