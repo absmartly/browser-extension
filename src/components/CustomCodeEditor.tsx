@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Button } from './ui/Button'
 import type { CustomCodeSection } from '~src/types/absmartly'
 
@@ -34,7 +36,7 @@ export function CustomCodeEditor({
   useEffect(() => {
     if (!isOpen) return
 
-    console.log('Opening code editor for section:', section, 'with value:', value)
+    debugLog('Opening code editor for section:', section, 'with value:', value)
     
     // Send message to content script to open the editor in the main page
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -53,15 +55,15 @@ export function CustomCodeEditor({
 
     // Listen for messages from the background script (forwarded from content script)
     const handleMessage = (message: any) => {
-      console.log('CustomCodeEditor received message:', message)
+      debugLog('CustomCodeEditor received message:', message)
       
       if (message.type === 'CODE_EDITOR_SAVE') {
-        console.log('Saving value:', message.value)
+        debugLog('Saving value:', message.value)
         // Use the ref values to ensure we have the latest callbacks
         onChangeRef.current(message.value)
         onSaveRef.current()
       } else if (message.type === 'CODE_EDITOR_CLOSE') {
-        console.log('Closing editor')
+        debugLog('Closing editor')
         onCloseRef.current()
       }
     }
