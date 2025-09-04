@@ -17,7 +17,8 @@
     "axios": "^1.6.0",
     "clsx": "^2.0.0",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-style-editor": "^0.4.0"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.1.1",
@@ -49,9 +50,9 @@
     "web_accessible_resources": [
       {
         "resources": [
-          "assets/logo.png", 
-          "assets/icon.png", 
-          "assets/icon128.png", 
+          "assets/logo.png",
+          "assets/icon.png",
+          "assets/icon128.png",
           "assets/absmartly-logo-white.svg",
           "tabs/*",
           "inject-sdk-plugin.js",
@@ -61,7 +62,9 @@
           "absmartly-dom-changes.dev.js",
           "absmartly-dom-changes.dev.js.map"
         ],
-        "matches": ["<all_urls>"]
+        "matches": [
+          "<all_urls>"
+        ]
       }
     ]
   }
