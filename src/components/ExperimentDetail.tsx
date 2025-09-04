@@ -73,21 +73,22 @@ export function ExperimentDetail({
   
   // Effect to cleanup preview when component unmounts or experiment changes
   useEffect(() => {
+    // Store the current experiment ID for cleanup
+    const currentExperimentId = experiment.id
+    
     // Cleanup function runs when component unmounts or experiment.id changes
     return () => {
       debugLog('🧹 Component unmounting or experiment changing, cleaning up DOM changes and preview')
       
-      // Always discard unsaved DOM changes when leaving the page
-      if (hasUnsavedChanges) {
-        debugLog('🧹 Discarding unsaved DOM changes for experiment', experiment.id)
-      }
+      // Always discard unsaved DOM changes when leaving the page (unless saved)
+      // Use the captured experiment ID to ensure we clear the right storage key
+      const storageKey = `experiment-${currentExperimentId}-variants`
+      debugLog('🧹 Clearing storage for experiment', currentExperimentId, 'with key:', storageKey)
       
-      // Clear the saved variant data from storage (discard unsaved changes)
-      const storageKey = `experiment-${experiment.id}-variants`
       storage.remove(storageKey).then(() => {
-        debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+        debugLog('✅ Successfully cleared variant data from storage for experiment', currentExperimentId)
       }).catch(error => {
-        debugError('Failed to clear variant data from storage:', error)
+        debugError('❌ Failed to clear variant data from storage:', error)
       })
       
       // Clear stored DOM changes to prevent leaking between experiments
@@ -110,7 +111,7 @@ export function ExperimentDetail({
         }
       })
     }
-  }, [experiment.id, hasUnsavedChanges])
+  }, [experiment.id]) // Only re-run when experiment ID changes
 
   // Effect to handle experiment data changes and variant parsing
   useEffect(() => {
@@ -719,7 +720,25 @@ export function ExperimentDetail({
     <div className="p-4">
       <div className="mb-4 flex items-center justify-between">
         <button
-          onClick={onBack}
+          onClick={() => {
+            if (hasUnsavedChanges) {
+              if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
+                // User wants to discard changes - clear storage before navigating back
+                const storageKey = `experiment-${experiment.id}-variants`
+                debugLog('🧹 User chose to discard changes for experiment', experiment.id)
+                storage.remove(storageKey).then(() => {
+                  debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+                  onBack()
+                }).catch(error => {
+                  debugError('Failed to clear storage:', error)
+                  onBack()
+                })
+              }
+              // If user cancels, do nothing (stay on the page)
+            } else {
+              onBack()
+            }
+          }}
           className="flex items-center text-sm text-gray-600 hover:text-gray-900"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
