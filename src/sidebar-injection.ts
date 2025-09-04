@@ -1,4 +1,5 @@
 // This file contains the sidebar injection code that will be executed in the content script context
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 let sidebarVisible = false
 let sidebarMinimized = false
@@ -7,7 +8,7 @@ export const injectSidebar = () => {
   // Check if sidebar is already injected
   const existingContainer = document.getElementById('absmartly-sidebar-root')
   if (existingContainer) {
-    console.log('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
+    debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
     // Get current transform to determine actual visibility
     const currentTransform = existingContainer.style.transform
     const isCurrentlyVisible = currentTransform === 'translateX(0)' || currentTransform === ''
@@ -23,7 +24,7 @@ export const injectSidebar = () => {
     return
   }
 
-  console.log('🔵 ABSmartly Extension: Injecting sidebar')
+  debugLog('🔵 ABSmartly Extension: Injecting sidebar')
 
   // Create the sidebar container
   const container = document.createElement('div')
@@ -268,11 +269,11 @@ export const injectSidebar = () => {
   // Set up message relay for visual editor changes
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE') {
-      console.log('🔵 ABSmartly Extension: Relaying visual editor changes to sidebar')
+      debugLog('🔵 ABSmartly Extension: Relaying visual editor changes to sidebar')
       // The React components inside ExtensionUI will receive this through their own listeners
       // This just ensures the message gets to the content script context
     }
   })
   
-  console.log('🔵 ABSmartly Extension: Sidebar injected successfully')
+  debugLog('🔵 ABSmartly Extension: Sidebar injected successfully')
 }
