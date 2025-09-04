@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import StyleEditor from 'react-style-editor'
 
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
@@ -257,6 +256,91 @@ const createEmptyChange = (): EditingDOMChange => ({
   position: 'after'
 })
 
+// DevTools-style CSS editor component
+const CSSStyleEditor = ({ 
+  styleProperties, 
+  onChange 
+}: { 
+  styleProperties: Array<{ key: string; value: string }> | undefined,
+  onChange: (properties: Array<{ key: string; value: string }>) => void 
+}) => {
+  const handlePropertyChange = (index: number, field: 'key' | 'value', newValue: string) => {
+    const newProps = [...(styleProperties || [])]
+    newProps[index][field] = newValue
+    onChange(newProps)
+  }
+
+  const handleAddProperty = () => {
+    onChange([...(styleProperties || []), { key: '', value: '' }])
+  }
+
+  const handleRemoveProperty = (index: number) => {
+    const newProps = (styleProperties || []).filter((_, i) => i !== index)
+    onChange(newProps)
+  }
+
+  return (
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs">
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
+        element.style {'{'}
+      </div>
+      
+      {/* Properties */}
+      <div className="py-1">
+        {(styleProperties || []).map((prop, index) => (
+          <div 
+            key={index} 
+            className="flex items-center hover:bg-gray-800 group px-3 py-1"
+          >
+            {/* Property name */}
+            <input
+              type="text"
+              value={prop.key}
+              onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
+              placeholder="property"
+              className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 flex-1"
+            />
+            <span className="text-gray-500 px-1">:</span>
+            
+            {/* Property value */}
+            <input
+              type="text"
+              value={prop.value}
+              onChange={(e) => handlePropertyChange(index, 'value', e.target.value)}
+              placeholder="value"
+              className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1"
+            />
+            <span className="text-gray-500 px-1">;</span>
+            
+            {/* Delete button */}
+            <button
+              onClick={() => handleRemoveProperty(index)}
+              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 ml-2"
+              title="Remove property"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        
+        {/* Add new property */}
+        <div 
+          className="flex items-center hover:bg-gray-800 cursor-pointer px-3 py-1"
+          onClick={handleAddProperty}
+        >
+          <span className="text-gray-600">+ Add property...</span>
+        </div>
+      </div>
+      
+      {/* Closing brace */}
+      <div className="px-3 py-2 border-t border-gray-700 text-gray-400">
+        {'}'}
+      </div>
+    </div>
+  )
+}
+
 // Reusable DOM change editor component
 const DOMChangeEditorForm = ({ 
   editingChange, 
@@ -478,22 +562,10 @@ const DOMChangeEditorForm = ({
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Style Properties
         </label>
-        <div className="border border-gray-300 rounded-md p-2">
-          <StyleEditor
-            style={
-              editingChange.styleProperties?.reduce((acc, prop) => {
-                if (prop.key && prop.value) {
-                  acc[prop.key] = prop.value
-                }
-                return acc
-              }, {} as Record<string, string>) || {}
-            }
-            onChange={(newStyles) => {
-              const newProps = Object.entries(newStyles).map(([key, value]) => ({ key, value }))
-              setEditingChange({ ...editingChange, styleProperties: newProps })
-            }}
-          />
-        </div>
+        <CSSStyleEditor
+          styleProperties={editingChange.styleProperties}
+          onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
+        />
       </div>
     )}
 
