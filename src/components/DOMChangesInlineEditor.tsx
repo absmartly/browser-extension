@@ -257,6 +257,34 @@ const createEmptyChange = (): EditingDOMChange => ({
   position: 'after'
 })
 
+// Reusable style editor component
+const StylePropertiesEditor = ({ editingChange, setEditingChange }: {
+  editingChange: EditingDOMChange,
+  setEditingChange: (change: EditingDOMChange) => void
+}) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Style Properties
+    </label>
+    <div className="border border-gray-300 rounded-md p-2">
+      <StyleEditor
+        style={
+          editingChange.styleProperties?.reduce((acc, prop) => {
+            if (prop.key && prop.value) {
+              acc[prop.key] = prop.value
+            }
+            return acc
+          }, {} as Record<string, string>) || {}
+        }
+        onChange={(newStyles) => {
+          const newProps = Object.entries(newStyles).map(([key, value]) => ({ key, value }))
+          setEditingChange({ ...editingChange, styleProperties: newProps })
+        }}
+      />
+    </div>
+  </div>
+)
+
 export function DOMChangesInlineEditor({ 
   variantName, 
   changes, 
@@ -1379,27 +1407,10 @@ export function DOMChangesInlineEditor({
                     )}
 
                     {editingChange.type === 'style' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Style Properties
-                        </label>
-                        <div className="border border-gray-300 rounded-md p-2">
-                          <StyleEditor
-                            style={
-                              editingChange.styleProperties?.reduce((acc, prop) => {
-                                if (prop.key && prop.value) {
-                                  acc[prop.key] = prop.value
-                                }
-                                return acc
-                              }, {} as Record<string, string>) || {}
-                            }
-                            onChange={(newStyles) => {
-                              const newProps = Object.entries(newStyles).map(([key, value]) => ({ key, value }))
-                              setEditingChange({ ...editingChange, styleProperties: newProps })
-                            }}
-                          />
-                        </div>
-                      </div>
+                      <StylePropertiesEditor 
+                        editingChange={editingChange} 
+                        setEditingChange={setEditingChange} 
+                      />
                     )}
 
                     {editingChange.type === 'class' && (
@@ -1949,27 +1960,10 @@ export function DOMChangesInlineEditor({
           )}
 
           {editingChange.type === 'style' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Style Properties
-              </label>
-              <div className="border border-gray-300 rounded-md p-2">
-                <StyleEditor
-                  style={
-                    editingChange.styleProperties?.reduce((acc, prop) => {
-                      if (prop.key && prop.value) {
-                        acc[prop.key] = prop.value
-                      }
-                      return acc
-                    }, {} as Record<string, string>) || {}
-                  }
-                  onChange={(newStyles) => {
-                    const newProps = Object.entries(newStyles).map(([key, value]) => ({ key, value }))
-                    setEditingChange({ ...editingChange, styleProperties: newProps })
-                  }}
-                />
-              </div>
-            </div>
+            <StylePropertiesEditor 
+              editingChange={editingChange} 
+              setEditingChange={setEditingChange} 
+            />
           )}
 
           {editingChange.type === 'class' && (
