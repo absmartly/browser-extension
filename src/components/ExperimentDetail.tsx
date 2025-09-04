@@ -46,6 +46,7 @@ export function ExperimentDetail({
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [activePreviewVariant, setActivePreviewVariant] = useState<string | null>(null)
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const lastExperimentIdRef = useRef<number | null>(null)
 
   debugLog('🔍 ExperimentDetail state - variantData:', variantData)
@@ -69,6 +70,47 @@ export function ExperimentDetail({
     }
     restoreData()
   }, [experiment.id])
+  
+  // Effect to cleanup preview when component unmounts or experiment changes
+  useEffect(() => {
+    // Cleanup function runs when component unmounts or experiment.id changes
+    return () => {
+      debugLog('🧹 Component unmounting or experiment changing, cleaning up DOM changes and preview')
+      
+      // Always discard unsaved DOM changes when leaving the page
+      if (hasUnsavedChanges) {
+        debugLog('🧹 Discarding unsaved DOM changes for experiment', experiment.id)
+      }
+      
+      // Clear the saved variant data from storage (discard unsaved changes)
+      const storageKey = `experiment-${experiment.id}-variants`
+      storage.remove(storageKey).then(() => {
+        debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+      }).catch(error => {
+        debugError('Failed to clear variant data from storage:', error)
+      })
+      
+      // Clear stored DOM changes to prevent leaking between experiments
+      chrome.runtime.sendMessage({
+        type: 'CLEAR_STORED_DOM_CHANGES'
+      }, (response) => {
+        debugLog('🧹 Cleared stored DOM changes:', response)
+      })
+      
+      // Always send remove preview message when cleaning up
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'remove',
+            experimentName: experiment.name
+          }, (response) => {
+            debugLog('🧹 Cleanup preview response:', response)
+          })
+        }
+      })
+    }
+  }, [experiment.id, hasUnsavedChanges])
 
   // Effect to handle experiment data changes and variant parsing
   useEffect(() => {
@@ -326,6 +368,9 @@ export function ExperimentDetail({
       }
       
       debugLog('🔄 Updated variant data:', updated)
+      
+      // Mark as having unsaved changes
+      setHasUnsavedChanges(true)
       
       // Save to storage
       const storageKey = `experiment-${experiment.id}-variants`
@@ -607,6 +652,9 @@ export function ExperimentDetail({
       // Send the complete PUT payload (including id, version, data at root level)
       onUpdate(experiment.id, putPayload)
       
+      // Mark as saved
+      setHasUnsavedChanges(false)
+      
     } catch (error) {
       debugError('Failed to save changes:', error)
       alert('Failed to save changes: ' + error.message)
@@ -637,7 +685,8 @@ export function ExperimentDetail({
             action: 'apply',
             changes: changes.filter(c => c.enabled !== false),
             experimentName: experiment.name,
-            variantName: variantName
+            variantName: variantName,
+            experimentId: experiment.id
           }, (response) => {
             if (chrome.runtime.lastError) {
               debugError('❌ Error sending preview message:', chrome.runtime.lastError)
@@ -656,7 +705,8 @@ export function ExperimentDetail({
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'ABSMARTLY_PREVIEW',
-            action: 'remove'
+            action: 'remove',
+            experimentName: experiment.name
           }, (response) => {
             debugLog('🎯 Remove preview response:', response)
           })
@@ -880,8 +930,9 @@ export function ExperimentDetail({
             variant="primary"
             size="sm"
             disabled={loading}
+            className={hasUnsavedChanges ? 'ring-2 ring-yellow-400' : ''}
           >
-            Save Changes
+            {hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
           </Button>
           {(experiment.state === 'ready' || experiment.state === 'created' || experiment.status === 'draft') && (
             <Button 

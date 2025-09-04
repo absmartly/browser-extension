@@ -133,7 +133,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         source: 'absmartly-extension',
         type: 'PREVIEW_CHANGES',
         payload: {
-          changes: message.changes || []
+          changes: message.changes || [],
+          experimentName: message.experimentName,
+          variantName: message.variantName,
+          experimentId: message.experimentId
         }
       }, '*')
       
@@ -146,7 +149,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       window.postMessage({
         source: 'absmartly-extension',
         type: 'REMOVE_PREVIEW',
-        payload: {}
+        payload: {
+          experimentName: message.experimentName
+        }
       }, '*')
       
       sendResponse({ success: true })

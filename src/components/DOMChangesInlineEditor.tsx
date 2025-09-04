@@ -1049,16 +1049,39 @@ export function DOMChangesInlineEditor({
           {changes.length > 0 && (
             <button
               type="button"
-              onClick={() => {
-                // Copy changes to clipboard as JSON
-                navigator.clipboard.writeText(JSON.stringify(changes, null, 2))
-                  .then(() => {
-                    debugLog('✅ DOM changes copied to clipboard')
-                    // Optional: Show a toast notification
-                  })
-                  .catch(err => {
-                    debugError('Failed to copy changes:', err)
-                  })
+              onClick={async () => {
+                const jsonString = JSON.stringify(changes, null, 2);
+                
+                try {
+                  // Try using the Clipboard API first
+                  await navigator.clipboard.writeText(jsonString);
+                  debugLog('✅ DOM changes copied to clipboard using Clipboard API');
+                } catch (err) {
+                  // Fallback: Use a temporary textarea element
+                  try {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = jsonString;
+                    textarea.style.position = 'fixed';
+                    textarea.style.top = '-9999px';
+                    textarea.style.left = '-9999px';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    
+                    if (successful) {
+                      debugLog('✅ DOM changes copied to clipboard using fallback method');
+                    } else {
+                      throw new Error('Document.execCommand failed');
+                    }
+                  } catch (fallbackErr) {
+                    debugError('Failed to copy changes with both methods:', err, fallbackErr);
+                    // Last resort: Show the JSON in a prompt for manual copying
+                    window.prompt('Copy the DOM changes manually:', jsonString);
+                  }
+                }
               }}
               className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
               title="Copy all DOM changes"
