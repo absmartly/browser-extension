@@ -22,7 +22,7 @@
   }
 
   // Version for cache busting
-  const INJECT_VERSION = '1.0.5';
+  const INJECT_VERSION = '1.0.6';
   debugLog('[ABsmartly Extension] Inject SDK Plugin version:', INJECT_VERSION);
 
   // Check if already injected
@@ -913,23 +913,23 @@
               script.src = pluginUrl;
               script.onload = () => {
                 debugLog(`[ABsmartly Extension] ${filename} loaded successfully`);
-              debugLog('[ABsmartly Extension] ABSmartlyDOMChanges object:', window.ABSmartlyDOMChanges);
-              debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABSmartlyDOMChanges || {}));
+              debugLog('[ABsmartly Extension] ABsmartlyDOMChangesPlugin object:', window.ABsmartlyDOMChangesPlugin);
+              debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABsmartlyDOMChangesPlugin || {}));
               
-              // The UMD bundle exposes ABSmartlyDOMChanges globally
+              // The UMD bundle exposes ABsmartlyDOMChangesPlugin globally
               // Check different possible export patterns
-              if (window.ABSmartlyDOMChanges) {
+              if (window.ABsmartlyDOMChangesPlugin) {
                 // Try direct property
-                if (window.ABSmartlyDOMChanges.DOMChangesPlugin) {
-                  window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
+                if (window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin) {
+                  window.DOMChangesPlugin = window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin;
                 }
                 // Try default export
-                else if (window.ABSmartlyDOMChanges.default) {
-                  window.DOMChangesPlugin = window.ABSmartlyDOMChanges.default;
+                else if (window.ABsmartlyDOMChangesPlugin.default) {
+                  window.DOMChangesPlugin = window.ABsmartlyDOMChangesPlugin.default;
                 }
-                // Try if ABSmartlyDOMChanges itself is the plugin class
-                else if (typeof window.ABSmartlyDOMChanges === 'function') {
-                  window.DOMChangesPlugin = window.ABSmartlyDOMChanges;
+                // Try if ABsmartlyDOMChangesPlugin itself is the plugin class
+                else if (typeof window.ABsmartlyDOMChangesPlugin === 'function') {
+                  window.DOMChangesPlugin = window.ABsmartlyDOMChangesPlugin;
                 }
                 
                 if (window.DOMChangesPlugin) {
