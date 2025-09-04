@@ -2938,6 +2938,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     
     return true // Will respond asynchronously
+  } else if (message.type === "CLEAR_STORED_DOM_CHANGES") {
+    // Clear stored DOM changes when switching experiments to prevent leakage
+    debugLog('[Background] Clearing stored DOM changes for experiment switch')
+    
+    // Get all storage keys to find and remove experiment-specific keys
+    chrome.storage.local.get(null, (items) => {
+      const keysToRemove = ['lastVisualEditorChanges', 'lastVisualEditorVariant', 'visualEditorChanges']
+      
+      // Also remove any experiment-specific visual editor keys
+      Object.keys(items).forEach(key => {
+        if (key.startsWith('visualEditor_')) {
+          keysToRemove.push(key)
+        }
+      })
+      
+      chrome.storage.local.remove(keysToRemove, () => {
+        debugLog('[Background] Cleared stored DOM changes, removed keys:', keysToRemove)
+        sendResponse({ success: true, removedKeys: keysToRemove })
+      })
+    })
+    
+    return true // Will respond asynchronously
   } else if (message.type === "VISUAL_EDITOR_COMPLETE") {
     debugLog('[Background] Visual editor complete with changes:', message)
     
@@ -2962,11 +2984,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     
     // Also store in local storage for persistence
-    chrome.storage.local.set({ 
-      lastVisualEditorChanges: message.changes,
-      lastVisualEditorVariant: message.variantName
-    }, () => {
-      debugLog('[Background] Visual editor complete changes saved')
+    // Include the experiment ID if available to scope the changes
+    const storageKey = message.experimentId 
+      ? `visualEditor_${message.experimentId}` 
+      : 'lastVisualEditorChanges'
+    
+    const storageData: any = {}
+    storageData[storageKey] = message.changes
+    
+    // Always store the last variant name globally for reference
+    storageData['lastVisualEditorVariant'] = message.variantName
+    
+    chrome.storage.local.set(storageData, () => {
+      debugLog('[Background] Visual editor complete changes saved with key:', storageKey)
       sendResponse({ success: true, changesSaved: message.totalChanges })
     })
     

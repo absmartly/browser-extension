@@ -57,7 +57,9 @@
           "inject-sdk-plugin.js",
           "inject-sdk-plugin.*.js",
           "inject-sdk-plugin-mapping.json",
-          "absmartly-dom-changes.min.js"
+          "absmartly-dom-changes.min.js",
+          "absmartly-dom-changes.dev.js",
+          "absmartly-dom-changes.dev.js.map"
         ],
         "matches": ["<all_urls>"]
       }
