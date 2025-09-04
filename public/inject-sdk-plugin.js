@@ -6,9 +6,28 @@
 (function() {
   'use strict';
 
+  // Simple debug flag and functions
+  const DEBUG = true;
+  
+  function debugLog(...args) {
+    if (DEBUG) console.log(...args);
+  }
+  
+  function debugError(...args) {
+    if (DEBUG) console.error(...args);
+  }
+  
+  function debugWarn(...args) {
+    if (DEBUG) console.warn(...args);
+  }
+
+  // Version for cache busting
+  const INJECT_VERSION = '1.0.3';
+  debugLog('[ABsmartly Extension] Inject SDK Plugin version:', INJECT_VERSION);
+
   // Check if already injected
   if (window.__absmartlyExtensionInjected) {
-    console.log('[ABsmartly Extension] Already injected, skipping');
+    debugLog('[ABsmartly Extension] Already injected, skipping');
     return;
   }
   window.__absmartlyExtensionInjected = true;
@@ -20,36 +39,74 @@
 
   // Capture the extension URL from the current script (must be done synchronously at script load)
   const scriptSrc = document.currentScript ? document.currentScript.src : null;
-  const extensionBaseUrl = scriptSrc ? scriptSrc.replace('inject-sdk-plugin.js', '') : null;
+  debugLog('[ABsmartly Extension] Script source:', scriptSrc);
+  const extensionBaseUrl = scriptSrc ? scriptSrc.replace(/inject-sdk-plugin\.[a-f0-9]+\.js$/, '').replace(/inject-sdk-plugin\.js$/, '') : null;
+  debugLog('[ABsmartly Extension] Extension base URL:', extensionBaseUrl);
 
   /**
    * Manually apply DOM changes as a fallback when plugin methods aren't available
    */
   function applyDOMChangesManually(changes) {
-    console.log('[ABsmartly Page] Applying DOM changes manually:', changes);
+    debugLog('[ABsmartly Page] 🎨 Applying DOM changes manually:', changes);
+    debugLog('[ABsmartly Page] 📊 Total changes to apply:', changes.length);
     
     if (!changes || !Array.isArray(changes)) {
-      console.warn('[ABsmartly Page] Invalid changes array');
+      debugWarn('[ABsmartly Page] Invalid changes array');
       return;
     }
     
     changes.forEach((change, index) => {
       try {
+        debugLog(`[ABsmartly Page] 🔄 Processing change ${index + 1}/${changes.length}:`, {
+          type: change.type,
+          selector: change.selector,
+          enabled: change.enabled !== false,
+          value: change.value,
+          textValue: change.textValue,
+          styles: change.styles,
+          fullChange: change
+        });
+        
         if (!change.selector || !change.type) {
-          console.warn(`[ABsmartly Page] Invalid change at index ${index}:`, change);
+          debugWarn(`[ABsmartly Page] ⚠️ Invalid change at index ${index}:`, change);
           return;
         }
         
         // Skip disabled changes
         if (change.enabled === false) {
-          console.log(`[ABsmartly Page] Skipping disabled change: ${change.selector}`);
+          debugLog(`[ABsmartly Page] ⏭️ Skipping disabled change: ${change.selector}`);
           return;
         }
         
         const elements = document.querySelectorAll(change.selector);
-        console.log(`[ABsmartly Page] Found ${elements.length} elements for selector: ${change.selector}`);
+        debugLog(`[ABsmartly Page] 🎯 Found ${elements.length} element(s) matching selector: "${change.selector}"`);
         
-        elements.forEach(element => {
+        if (elements.length === 0) {
+          debugWarn(`[ABsmartly Page] ⚠️ No elements found for selector: ${change.selector}`);
+          return;
+        }
+        
+        elements.forEach((element, elementIndex) => {
+          debugLog(`[ABsmartly Page] 🎯 Processing element ${elementIndex + 1}/${elements.length} for change type: ${change.type}`);
+          
+          // Log detailed element state BEFORE any changes
+          const computedStyle = window.getComputedStyle(element);
+          debugLog(`[ABsmartly Page] 📸 Element BEFORE change:`, {
+            selector: change.selector,
+            tagName: element.tagName,
+            id: element.id || 'no-id',
+            className: element.className || 'no-class',
+            textContent: element.textContent?.substring(0, 100),
+            innerHTML: element.innerHTML?.substring(0, 200),
+            inlineStyles: element.getAttribute('style') || 'no-inline-styles',
+            computedBackground: computedStyle.backgroundColor,
+            computedBorder: computedStyle.border,
+            computedBorderRadius: computedStyle.borderRadius,
+            computedPadding: computedStyle.padding,
+            computedMargin: computedStyle.margin,
+            fullOuterHTML: element.outerHTML.substring(0, 1000)
+          });
+          
           // Store original values for preview removal
           if (!element.dataset.absmartlyOriginal) {
             element.dataset.absmartlyOriginal = JSON.stringify({});
@@ -60,15 +117,22 @@
             case 'text':
               if (!originalData.textContent) {
                 originalData.textContent = element.textContent;
+                debugLog(`[ABsmartly Page] 📝 Storing original text: "${originalData.textContent}"`);
               }
+              debugLog(`[ABsmartly Page] ✏️ Changing text from "${element.textContent}" to "${change.value}"`);
               element.textContent = change.value;
+              // Mark element as modified
+              element.dataset.absmartlyModified = 'true';
               break;
               
             case 'html':
               if (!originalData.innerHTML) {
                 originalData.innerHTML = element.innerHTML;
+                debugLog(`[ABsmartly Page] 📄 Storing original HTML (${originalData.innerHTML.length} chars):`, originalData.innerHTML.substring(0, 200));
               }
+              debugLog(`[ABsmartly Page] 🔄 Replacing HTML content with:`, change.value?.substring(0, 200));
               element.innerHTML = change.value;
+              element.dataset.absmartlyModified = 'true';
               break;
               
             case 'attribute':
@@ -84,20 +148,44 @@
               break;
               
             case 'style':
-              if (change.styles && typeof change.styles === 'object') {
-                if (!originalData.styles) {
-                  originalData.styles = {};
+            case 'styles':
+              // Handle both formats: change.styles and change.value
+              const styleObj = change.styles || change.value;
+              if (!originalData.styles) {
+                originalData.styles = {};
+                originalData.originalStyleAttribute = element.getAttribute('style') || '';
+              }
+              
+              debugLog(`[ABsmartly Page] 🎨 Processing style change:`, {
+                changeType: change.type,
+                styleObj: styleObj,
+                typeOfStyleObj: typeof styleObj
+              });
+              
+              if (typeof styleObj === 'string') {
+                // Store original style attribute if not already stored
+                if (!originalData.originalStyleAttribute) {
+                  originalData.originalStyleAttribute = element.getAttribute('style') || '';
                 }
-                Object.entries(change.styles).forEach(([prop, value]) => {
+                debugLog(`[ABsmartly Page] 🎨 Applying style string: "${styleObj}"`);
+                element.setAttribute('style', styleObj);
+              } else if (styleObj && typeof styleObj === 'object') {
+                debugLog(`[ABsmartly Page] 🎨 Applying style object:`, styleObj);
+                Object.entries(styleObj).forEach(([prop, value]) => {
                   if (!originalData.styles[prop]) {
-                    originalData.styles[prop] = element.style[prop];
+                    originalData.styles[prop] = element.style[prop] || '';
+                    debugLog(`[ABsmartly Page] 📦 Storing original style.${prop}: "${originalData.styles[prop]}"`);
                   }
+                  debugLog(`[ABsmartly Page] 🖌️ Setting style.${prop}: "${value}"`);
                   element.style[prop] = value;
                 });
               }
+              // Mark element as modified
+              element.dataset.absmartlyModified = 'true';
               break;
               
             case 'class':
+              debugLog(`[ABsmartly Page] 🏷️ Processing class changes - Add: ${change.add}, Remove: ${change.remove}`);
               if (change.action === 'add' && change.className) {
                 element.classList.add(change.className);
               } else if (change.action === 'remove' && change.className) {
@@ -108,41 +196,81 @@
               break;
               
             default:
-              console.warn(`[ABsmartly Page] Unknown change type: ${change.type}`);
+              debugWarn(`[ABsmartly Page] Unknown change type: ${change.type}`);
           }
           
-          // Mark element as modified
-          element.dataset.absmartlyModified = 'true';
+          // Store the updated original data
           element.dataset.absmartlyOriginal = JSON.stringify(originalData);
+          
+          // Log detailed element state AFTER changes
+          const computedStyleAfter = window.getComputedStyle(element);
+          debugLog(`[ABsmartly Page] 📸 Element AFTER change:`, {
+            selector: change.selector,
+            tagName: element.tagName,
+            id: element.id || 'no-id',
+            className: element.className || 'no-class',
+            textContent: element.textContent?.substring(0, 100),
+            innerHTML: element.innerHTML?.substring(0, 200),
+            inlineStyles: element.getAttribute('style') || 'no-inline-styles',
+            computedBackground: computedStyleAfter.backgroundColor,
+            computedBorder: computedStyleAfter.border,
+            computedBorderRadius: computedStyleAfter.borderRadius,
+            computedPadding: computedStyleAfter.padding,
+            computedMargin: computedStyleAfter.margin,
+            datasetModified: element.dataset.absmartlyModified,
+            fullOuterHTML: element.outerHTML.substring(0, 1000)
+          });
         });
       } catch (error) {
-        console.error(`[ABsmartly Page] Error applying change at index ${index}:`, error, change);
+        debugError(`[ABsmartly Page] ❌ Error applying change at index ${index}:`, error, change);
       }
     });
+    
+    debugLog('[ABsmartly Page] ✅ DOM changes application complete');
+    debugLog('[ABsmartly Page] 📊 Summary: Applied changes to', document.querySelectorAll('[data-absmartly-modified]').length, 'elements');
   }
   
   /**
    * Remove manually applied DOM changes
    */
   function removeDOMChangesManually() {
-    console.log('[ABsmartly Page] Removing DOM changes manually');
+    debugLog('[ABsmartly Page] 🔙 Removing DOM changes manually');
+    debugLog('[ABsmartly Page] 🔍 Looking for elements with data-absmartly-modified attribute...');
     
     const modifiedElements = document.querySelectorAll('[data-absmartly-modified]');
-    console.log(`[ABsmartly Page] Found ${modifiedElements.length} modified elements to restore`);
+    debugLog(`[ABsmartly Page] Found ${modifiedElements.length} modified elements to restore`);
     
-    modifiedElements.forEach(element => {
+    modifiedElements.forEach((element, index) => {
       try {
+        // Log element state BEFORE restoration
+        const computedStyleBefore = window.getComputedStyle(element);
+        debugLog(`[ABsmartly Page] 🔄 Element ${index + 1}/${modifiedElements.length} BEFORE restoration:`, {
+          tagName: element.tagName,
+          id: element.id || 'no-id',
+          className: element.className || 'no-class',
+          currentText: element.textContent?.substring(0, 100),
+          currentInlineStyles: element.getAttribute('style') || 'no-inline-styles',
+          computedBackground: computedStyleBefore.backgroundColor,
+          computedBorder: computedStyleBefore.border,
+          computedBorderRadius: computedStyleBefore.borderRadius,
+          currentOuterHTML: element.outerHTML.substring(0, 500)
+        });
+        
         const originalData = element.dataset.absmartlyOriginal ? 
           JSON.parse(element.dataset.absmartlyOriginal) : null;
+        
+        debugLog(`[ABsmartly Page] 📦 Original data to restore:`, originalData);
         
         if (originalData) {
           // Restore text content
           if (originalData.textContent !== undefined) {
+            debugLog(`[ABsmartly Page] 📝 Restoring text from "${element.textContent}" to "${originalData.textContent}"`);
             element.textContent = originalData.textContent;
           }
           
           // Restore innerHTML
           if (originalData.innerHTML !== undefined) {
+            debugLog(`[ABsmartly Page] 📄 Restoring HTML (${originalData.innerHTML.length} chars)`);
             element.innerHTML = originalData.innerHTML;
           }
           
@@ -157,9 +285,19 @@
             });
           }
           
-          // Restore styles
-          if (originalData.styles) {
+          // Restore styles - try original style attribute first
+          if (originalData.originalStyleAttribute !== undefined) {
+            debugLog(`[ABsmartly Page] 🎨 Restoring original style attribute: "${originalData.originalStyleAttribute}"`);
+            if (originalData.originalStyleAttribute === '') {
+              element.removeAttribute('style');
+            } else {
+              element.setAttribute('style', originalData.originalStyleAttribute);
+            }
+          } else if (originalData.styles) {
+            // Fallback to individual style properties
+            debugLog(`[ABsmartly Page] 🎨 Restoring individual styles:`, originalData.styles);
             Object.entries(originalData.styles).forEach(([prop, value]) => {
+              debugLog(`[ABsmartly Page] 🖌️ Restoring style.${prop} from "${element.style[prop]}" to "${value || ''}"`);
               element.style[prop] = value || '';
             });
           }
@@ -168,10 +306,27 @@
         // Clean up data attributes
         delete element.dataset.absmartlyModified;
         delete element.dataset.absmartlyOriginal;
+        
+        // Log element state AFTER restoration
+        const computedStyleAfter = window.getComputedStyle(element);
+        debugLog(`[ABsmartly Page] ✅ Element ${index + 1}/${modifiedElements.length} AFTER restoration:`, {
+          tagName: element.tagName,
+          id: element.id || 'no-id',
+          className: element.className || 'no-class',
+          restoredText: element.textContent?.substring(0, 100),
+          restoredInlineStyles: element.getAttribute('style') || 'no-inline-styles',
+          computedBackground: computedStyleAfter.backgroundColor,
+          computedBorder: computedStyleAfter.border,
+          computedBorderRadius: computedStyleAfter.borderRadius,
+          finalOuterHTML: element.outerHTML.substring(0, 500)
+        });
       } catch (error) {
-        console.error('[ABsmartly Page] Error restoring element:', error, element);
+        debugError('[ABsmartly Page] ❌ Error restoring element:', error, element);
       }
     });
+    
+    debugLog('[ABsmartly Page] ✅ DOM changes removal complete');
+    debugLog('[ABsmartly Page] 📊 Summary: Restored', modifiedElements.length, 'elements to original state');
   }
 
   /**
@@ -183,7 +338,7 @@
     
     // Check if plugin is registered with the context (new detection method as per PLUGIN_DETECTION.md)
     if (context && context.__domPlugin && context.__domPlugin.initialized) {
-      console.log('[ABsmartly Extension] Plugin detected via context.__domPlugin registration:', {
+      debugLog('[ABsmartly Extension] Plugin detected via context.__domPlugin registration:', {
         version: context.__domPlugin.version,
         capabilities: context.__domPlugin.capabilities,
         timestamp: context.__domPlugin.timestamp
@@ -197,13 +352,13 @@
 
     // Check for existing plugin instances that we created
     if (window.__absmartlyExtensionPlugin) {
-      console.log('[ABsmartly Extension] Extension plugin already loaded from window.__absmartlyExtensionPlugin');
+      debugLog('[ABsmartly Extension] Extension plugin already loaded from window.__absmartlyExtensionPlugin');
       return window.__absmartlyExtensionPlugin;
     }
 
     // Check if site has its own plugin instance (they might have stored it somewhere)
     if (window.__absmartlyPlugin) {
-      console.log('[ABsmartly Extension] Site plugin instance found at window.__absmartlyPlugin');
+      debugLog('[ABsmartly Extension] Site plugin instance found at window.__absmartlyPlugin');
       // Store reference globally for easier access
       if (!window.__absmartlyExtensionPlugin) {
         window.__absmartlyExtensionPlugin = window.__absmartlyPlugin;
@@ -212,7 +367,7 @@
     }
     
     if (window.__absmartlyDOMChangesPlugin) {
-      console.log('[ABsmartly Extension] Site plugin instance found at window.__absmartlyDOMChangesPlugin');
+      debugLog('[ABsmartly Extension] Site plugin instance found at window.__absmartlyDOMChangesPlugin');
       // Store reference globally for easier access
       if (!window.__absmartlyExtensionPlugin) {
         window.__absmartlyExtensionPlugin = window.__absmartlyDOMChangesPlugin;
@@ -223,7 +378,7 @@
     // Check for plugin data attributes in the DOM (indicates plugin is active)
     const pluginElements = document.querySelectorAll('[data-absmartly-modified], [data-absmartly-created], [data-absmartly-injected]');
     if (pluginElements.length > 0) {
-      console.log('[ABsmartly Extension] DOM Changes Plugin artifacts found in DOM - plugin is active but instance not accessible');
+      debugLog('[ABsmartly Extension] DOM Changes Plugin artifacts found in DOM - plugin is active but instance not accessible');
       // Plugin is active but we can't access the instance
       return 'active-but-inaccessible';
     }
@@ -292,7 +447,7 @@
     // Cache the context for future use
     if (context && !cachedContext) {
       cachedContext = context;
-      console.log('[ABsmartly Extension] Context found and cached');
+      debugLog('[ABsmartly Extension] Context found and cached');
     }
 
     return { sdk: null, context };
@@ -303,7 +458,7 @@
    * Scripts injected via innerHTML don't execute, so we need to recreate them
    */
   function executeScriptsInHTML(html, location) {
-    console.log(`[ABsmartly Extension] Processing scripts for ${location}`);
+    debugLog(`[ABsmartly Extension] Processing scripts for ${location}`);
     
     // Create a temporary container
     const temp = document.createElement('div');
@@ -313,7 +468,7 @@
     const scripts = temp.querySelectorAll('script');
     
     scripts.forEach((script, index) => {
-      console.log(`[ABsmartly Extension] Executing script ${index + 1} from ${location}`);
+      debugLog(`[ABsmartly Extension] Executing script ${index + 1} from ${location}`);
       
       try {
         if (script.src) {
@@ -332,11 +487,11 @@
           if (code) {
             const fn = new Function(code);
             fn();
-            console.log(`[ABsmartly Extension] Successfully executed inline script from ${location}`);
+            debugLog(`[ABsmartly Extension] Successfully executed inline script from ${location}`);
           }
         }
       } catch (error) {
-        console.error(`[ABsmartly Extension] Failed to execute script from ${location}:`, error);
+        debugError(`[ABsmartly Extension] Failed to execute script from ${location}:`, error);
       }
     });
   }
@@ -367,7 +522,7 @@
         document.body.appendChild(element);
         break;
       default:
-        console.warn(`[ABsmartly Extension] Unknown injection location: ${location}`);
+        debugWarn(`[ABsmartly Extension] Unknown injection location: ${location}`)
     }
   }
 
@@ -390,11 +545,11 @@
       const existingPlugin = isPluginAlreadyLoaded();
       if (existingPlugin) {
         if (existingPlugin === 'active-but-inaccessible') {
-          console.log('[ABsmartly Extension] Plugin is active but we cannot access it to inject custom code');
+          debugLog('[ABsmartly Extension] Plugin is active but we cannot access it to inject custom code');
           return;
         }
         
-        console.log('[ABsmartly Extension] Plugin already loaded, requesting custom code injection only');
+        debugLog('[ABsmartly Extension] Plugin already loaded, requesting custom code injection only');
         
         // Store reference if we have access to it
         if (typeof existingPlugin === 'object') {
@@ -412,7 +567,7 @@
       const context = cachedContext;
 
       if (context) {
-        console.log('[ABsmartly Extension] SDK context found, requesting plugin initialization');
+        debugLog('[ABsmartly Extension] SDK context found, requesting plugin initialization');
         
         // Request plugin initialization from extension
         window.postMessage({
@@ -422,7 +577,7 @@
       } else if (attempts < maxAttempts) {
         setTimeout(checkAndInit, 100);
       } else {
-        console.log('[ABsmartly Extension] No ABsmartly SDK found after 5 seconds');
+        debugLog('[ABsmartly Extension] No ABsmartly SDK found after 5 seconds');
       }
     };
 
@@ -433,11 +588,11 @@
   // Listen for messages from content script
   window.addEventListener('message', (event) => {
     if (event.data && event.data.source === 'absmartly-extension') {
-      console.log('[ABsmartly Page] Received message from extension:', event.data);
+      debugLog('[ABsmartly Page] Received message from extension:', event.data);
 
       // Handle preview changes
       if (event.data.type === 'PREVIEW_CHANGES') {
-        console.log('[ABsmartly Page] Handling PREVIEW_CHANGES message');
+        debugLog('[ABsmartly Page] Handling PREVIEW_CHANGES message');
         const { changes } = event.data.payload || {};
         
         // Try to get the plugin instance - check all possible locations
@@ -446,67 +601,128 @@
         // First try from context
         if (cachedContext && cachedContext.__domPlugin && cachedContext.__domPlugin.instance) {
           plugin = cachedContext.__domPlugin.instance;
-          console.log('[ABsmartly Page] Got plugin from context.__domPlugin');
+          debugLog('[ABsmartly Page] Got plugin from context.__domPlugin');
         }
         // Try window reference
         else if (window.__absmartlyExtensionPlugin) {
           plugin = window.__absmartlyExtensionPlugin;
-          console.log('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
+          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
         }
         // Try site's own plugin instances
         else if (window.__absmartlyPlugin) {
           plugin = window.__absmartlyPlugin;
-          console.log('[ABsmartly Page] Got plugin from window.__absmartlyPlugin');
+          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyPlugin');
         }
         else if (window.__absmartlyDOMChangesPlugin) {
           plugin = window.__absmartlyDOMChangesPlugin;
-          console.log('[ABsmartly Page] Got plugin from window.__absmartlyDOMChangesPlugin');
+          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyDOMChangesPlugin');
         }
         // If still no plugin, try to detect it
         else {
           const existingPlugin = isPluginAlreadyLoaded();
           if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
             plugin = existingPlugin;
-            console.log('[ABsmartly Page] Got plugin from isPluginAlreadyLoaded()');
+            debugLog('[ABsmartly Page] Got plugin from isPluginAlreadyLoaded()');
           }
         }
         
         if (plugin && typeof plugin.previewChanges === 'function') {
-          console.log('[ABsmartly Page] Calling plugin.previewChanges with changes:', changes);
+          debugLog('[ABsmartly Page] Calling plugin.previewChanges with changes:', changes);
+          debugLog('[ABsmartly Page] 🆕 VERSION CHECK: 1.0.4 - Debug code is running!');
           try {
             plugin.previewChanges(changes || []);
-            console.log('[ABsmartly Page] Successfully applied preview changes');
+            debugLog('[ABsmartly Page] Successfully applied preview changes');
+            
+            // IMMEDIATE DOM INSPECTION
+            debugLog('[ABsmartly Page] 🔍 IMMEDIATE DOM CHECK:');
+            if (changes && changes.length > 0) {
+              changes.forEach((change) => {
+                if (change.selector === 'div:nth-of-type(1) > div:nth-of-type(1) > div > h1') {
+                  const h1Elements = document.querySelectorAll(change.selector);
+                  h1Elements.forEach((el) => {
+                    const computed = window.getComputedStyle(el);
+                    debugLog('[ABsmartly Page] 🔍 H1 Element State:', {
+                      text: el.textContent,
+                      inlineStyles: el.getAttribute('style'),
+                      backgroundColor: computed.backgroundColor,
+                      border: computed.border,
+                      borderRadius: computed.borderRadius,
+                      parentBg: el.parentElement ? window.getComputedStyle(el.parentElement).backgroundColor : 'none'
+                    });
+                  });
+                }
+              });
+            }
+            
+            // Immediately inspect DOM state after plugin applies changes
+            if (changes && changes.length > 0) {
+              debugLog('[ABsmartly Page] 🔍 DEBUG: Inspecting DOM state after plugin changes - Version 1.0.3');
+              debugLog('[ABsmartly Page] 🔍 Changes to inspect:', changes);
+              changes.forEach((change, index) => {
+                if (change.selector) {
+                  const elements = document.querySelectorAll(change.selector);
+                  elements.forEach((element, elemIndex) => {
+                    const computedStyle = window.getComputedStyle(element);
+                    debugLog(`[ABsmartly Page] 🔍 Element after plugin change ${index + 1}:`, {
+                      selector: change.selector,
+                      changeType: change.type,
+                      enabled: change.enabled !== false,
+                      element: element,
+                      tagName: element.tagName,
+                      id: element.id || 'no-id',
+                      className: element.className || 'no-class',
+                      textContent: element.textContent?.substring(0, 100),
+                      inlineStyles: element.getAttribute('style') || 'no-inline-styles',
+                      dataAttributes: {
+                        absmartlyExperiment: element.dataset.absmartlyExperiment,
+                        absmartlyOriginal: element.dataset.absmartlyOriginal?.substring(0, 100),
+                        absmartlyModified: element.dataset.absmartlyModified
+                      },
+                      computedStyles: {
+                        backgroundColor: computedStyle.backgroundColor,
+                        border: computedStyle.border,
+                        borderRadius: computedStyle.borderRadius,
+                        padding: computedStyle.padding,
+                        boxShadow: computedStyle.boxShadow,
+                        display: computedStyle.display
+                      },
+                      outerHTML: element.outerHTML.substring(0, 500)
+                    });
+                  });
+                }
+              });
+            }
           } catch (error) {
-            console.error('[ABsmartly Page] Error applying preview changes:', error);
+            debugError('[ABsmartly Page] Error applying preview changes:', error);
           }
         } else if (plugin && typeof plugin.applyChanges === 'function') {
           // Fallback: try applyChanges method
-          console.log('[ABsmartly Page] Using applyChanges as fallback for preview');
+          debugLog('[ABsmartly Page] Using applyChanges as fallback for preview');
           try {
             plugin.applyChanges(changes || [], true); // true for preview mode
-            console.log('[ABsmartly Page] Successfully applied changes via applyChanges');
+            debugLog('[ABsmartly Page] Successfully applied changes via applyChanges');
           } catch (error) {
-            console.error('[ABsmartly Page] Error applying changes:', error);
+            debugError('[ABsmartly Page] Error applying changes:', error);
           }
         } else if (plugin) {
-          console.error('[ABsmartly Page] Plugin found but preview methods not available. Plugin:', plugin);
-          console.log('[ABsmartly Page] Available plugin methods:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
+          debugError('[ABsmartly Page] Plugin found but preview methods not available. Plugin:', plugin);
+          debugLog('[ABsmartly Page] Available plugin methods:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
           
           // Try to apply changes manually as last resort
           if (changes && changes.length > 0) {
-            console.log('[ABsmartly Page] Attempting manual DOM changes application');
+            debugLog('[ABsmartly Page] Attempting manual DOM changes application');
             applyDOMChangesManually(changes);
           }
         } else {
-          console.error('[ABsmartly Page] Plugin not found. Checking available objects...');
-          console.log('[ABsmartly Page] window.__absmartlyExtensionPlugin:', window.__absmartlyExtensionPlugin);
-          console.log('[ABsmartly Page] window.__absmartlyPlugin:', window.__absmartlyPlugin);
-          console.log('[ABsmartly Page] cachedContext:', cachedContext);
-          console.log('[ABsmartly Page] cachedContext.__domPlugin:', cachedContext ? cachedContext.__domPlugin : 'no context');
+          debugError('[ABsmartly Page] Plugin not found. Checking available objects...');
+          debugLog('[ABsmartly Page] window.__absmartlyExtensionPlugin:', window.__absmartlyExtensionPlugin);
+          debugLog('[ABsmartly Page] window.__absmartlyPlugin:', window.__absmartlyPlugin);
+          debugLog('[ABsmartly Page] cachedContext:', cachedContext);
+          debugLog('[ABsmartly Page] cachedContext.__domPlugin:', cachedContext ? cachedContext.__domPlugin : 'no context');
           
           // Try to apply changes manually as last resort
           if (changes && changes.length > 0) {
-            console.log('[ABsmartly Page] Attempting manual DOM changes application without plugin');
+            debugLog('[ABsmartly Page] Attempting manual DOM changes application without plugin');
             applyDOMChangesManually(changes);
           }
         }
@@ -515,7 +731,7 @@
 
       // Handle remove preview
       if (event.data.type === 'REMOVE_PREVIEW') {
-        console.log('[ABsmartly Page] Handling REMOVE_PREVIEW message');
+        debugLog('[ABsmartly Page] Handling REMOVE_PREVIEW message');
         
         // Try to get the plugin instance - check all possible locations
         let plugin = null;
@@ -523,51 +739,133 @@
         // First try from context
         if (cachedContext && cachedContext.__domPlugin && cachedContext.__domPlugin.instance) {
           plugin = cachedContext.__domPlugin.instance;
-          console.log('[ABsmartly Page] Got plugin from context.__domPlugin');
+          debugLog('[ABsmartly Page] Got plugin from context.__domPlugin');
         }
         // Try window reference
         else if (window.__absmartlyExtensionPlugin) {
           plugin = window.__absmartlyExtensionPlugin;
-          console.log('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
+          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
         }
         // Try site's own plugin instances
         else if (window.__absmartlyPlugin) {
           plugin = window.__absmartlyPlugin;
-          console.log('[ABsmartly Page] Got plugin from window.__absmartlyPlugin');
+          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyPlugin');
         }
         else if (window.__absmartlyDOMChangesPlugin) {
           plugin = window.__absmartlyDOMChangesPlugin;
-          console.log('[ABsmartly Page] Got plugin from window.__absmartlyDOMChangesPlugin');
+          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyDOMChangesPlugin');
         }
         // If still no plugin, try to detect it
         else {
           const existingPlugin = isPluginAlreadyLoaded();
           if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
             plugin = existingPlugin;
-            console.log('[ABsmartly Page] Got plugin from isPluginAlreadyLoaded()');
+            debugLog('[ABsmartly Page] Got plugin from isPluginAlreadyLoaded()');
           }
         }
         
         if (plugin && typeof plugin.removePreview === 'function') {
-          console.log('[ABsmartly Page] Calling plugin.removePreview');
+          debugLog('[ABsmartly Page] Calling plugin.removePreview');
+          debugLog('[ABsmartly Page] 🆕 VERSION CHECK: 1.0.4 - Remove preview debug running!');
+          
+          // Check H1 state BEFORE removal
+          const h1BeforeRemoval = document.querySelector('div:nth-of-type(1) > div:nth-of-type(1) > div > h1');
+          if (h1BeforeRemoval) {
+            const computedBefore = window.getComputedStyle(h1BeforeRemoval);
+            debugLog('[ABsmartly Page] 🔍 H1 BEFORE removal:', {
+              text: h1BeforeRemoval.textContent,
+              inlineStyles: h1BeforeRemoval.getAttribute('style'),
+              backgroundColor: computedBefore.backgroundColor,
+              border: computedBefore.border,
+              borderRadius: computedBefore.borderRadius
+            });
+          }
+          
+          // First, capture state of elements BEFORE removal
+          debugLog('[ABsmartly Page] 🔍 DEBUG: Capturing state BEFORE removal');
+          const elementsBeforeRemoval = [];
+          // Find all elements with preview changes
+          const previewElements = document.querySelectorAll('[data-absmartly-experiment="__preview__"]');
+          previewElements.forEach((element) => {
+            const computedStyle = window.getComputedStyle(element);
+            elementsBeforeRemoval.push({
+              element: element,
+              tagName: element.tagName,
+              textContent: element.textContent?.substring(0, 100),
+              inlineStyles: element.getAttribute('style') || 'no-inline-styles',
+              computedStyles: {
+                backgroundColor: computedStyle.backgroundColor,
+                border: computedStyle.border,
+                borderRadius: computedStyle.borderRadius
+              }
+            });
+          });
+          debugLog('[ABsmartly Page] Elements before removal:', elementsBeforeRemoval);
+          
           try {
             plugin.removePreview();
-            console.log('[ABsmartly Page] Successfully removed preview');
+            debugLog('[ABsmartly Page] Successfully removed preview');
+            
+            // Check H1 state AFTER removal
+            setTimeout(() => {
+              const h1AfterRemoval = document.querySelector('div:nth-of-type(1) > div:nth-of-type(1) > div > h1');
+              if (h1AfterRemoval) {
+                const computedAfter = window.getComputedStyle(h1AfterRemoval);
+                debugLog('[ABsmartly Page] 🔍 H1 AFTER removal:', {
+                  text: h1AfterRemoval.textContent,
+                  inlineStyles: h1AfterRemoval.getAttribute('style'),
+                  backgroundColor: computedAfter.backgroundColor,
+                  border: computedAfter.border,
+                  borderRadius: computedAfter.borderRadius,
+                  dataset: h1AfterRemoval.dataset
+                });
+              }
+            }, 100);
+            
+            // Now inspect the same elements AFTER removal
+            debugLog('[ABsmartly Page] 🔍 DEBUG: Inspecting DOM state AFTER removal');
+            elementsBeforeRemoval.forEach((beforeState, index) => {
+              const element = beforeState.element;
+              const computedStyleAfter = window.getComputedStyle(element);
+              debugLog(`[ABsmartly Page] 🔍 Element ${index + 1} after removal:`, {
+                tagName: element.tagName,
+                id: element.id || 'no-id',
+                className: element.className || 'no-class',
+                textContentBefore: beforeState.textContent,
+                textContentAfter: element.textContent?.substring(0, 100),
+                inlineStylesBefore: beforeState.inlineStyles,
+                inlineStylesAfter: element.getAttribute('style') || 'no-inline-styles',
+                dataAttributes: {
+                  absmartlyExperiment: element.dataset.absmartlyExperiment,
+                  absmartlyOriginal: element.dataset.absmartlyOriginal?.substring(0, 100),
+                  absmartlyModified: element.dataset.absmartlyModified
+                },
+                computedStylesBefore: beforeState.computedStyles,
+                computedStylesAfter: {
+                  backgroundColor: computedStyleAfter.backgroundColor,
+                  border: computedStyleAfter.border,
+                  borderRadius: computedStyleAfter.borderRadius,
+                  padding: computedStyleAfter.padding,
+                  boxShadow: computedStyleAfter.boxShadow
+                },
+                outerHTML: element.outerHTML.substring(0, 500)
+              });
+            });
           } catch (error) {
-            console.error('[ABsmartly Page] Error removing preview:', error);
+            debugError('[ABsmartly Page] Error removing preview:', error);
           }
         } else if (plugin && typeof plugin.revertChanges === 'function') {
           // Fallback: try revertChanges method
-          console.log('[ABsmartly Page] Using revertChanges as fallback for removing preview');
+          debugLog('[ABsmartly Page] Using revertChanges as fallback for removing preview');
           try {
             plugin.revertChanges();
-            console.log('[ABsmartly Page] Successfully reverted changes via revertChanges');
+            debugLog('[ABsmartly Page] Successfully reverted changes via revertChanges');
           } catch (error) {
-            console.error('[ABsmartly Page] Error reverting changes:', error);
+            debugError('[ABsmartly Page] Error reverting changes:', error);
           }
         } else {
           // Fallback to manual removal
-          console.log('[ABsmartly Page] Using manual DOM changes removal as fallback');
+          debugLog('[ABsmartly Page] Using manual DOM changes removal as fallback');
           removeDOMChangesManually();
         }
         return;
@@ -576,7 +874,7 @@
       if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
         if (isInitialized || isInitializing) {
-          console.log('[ABsmartly Extension] Already initialized or initializing, skipping');
+          debugLog('[ABsmartly Extension] Already initialized or initializing, skipping');
           return;
         }
         isInitializing = true;
@@ -596,26 +894,26 @@
         const context = cachedContext;
         
         if (!context) {
-          console.error('[ABsmartly Extension] No context available for plugin initialization');
+          debugError('[ABsmartly Extension] No context available for plugin initialization');
           return;
         }
 
         // Check if DOMChangesPlugin is available, if not load it from extension
         if (typeof window.DOMChangesPlugin === 'undefined' && typeof window.ABSmartlyDOMChanges === 'undefined') {
-          console.log('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
+          debugLog('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
           
           // Use the captured extension URL
           if (extensionBaseUrl) {
             const pluginUrl = extensionBaseUrl + 'absmartly-dom-changes.min.js';
-            console.log('[ABsmartly Extension] Loading plugin from:', pluginUrl);
+            debugLog('[ABsmartly Extension] Loading plugin from:', pluginUrl);
             
             // Load the plugin script
             const script = document.createElement('script');
             script.src = pluginUrl;
             script.onload = () => {
-              console.log('[ABsmartly Extension] DOM Changes plugin loaded successfully');
-              console.log('[ABsmartly Extension] ABSmartlyDOMChanges object:', window.ABSmartlyDOMChanges);
-              console.log('[ABsmartly Extension] Available properties:', Object.keys(window.ABSmartlyDOMChanges || {}));
+              debugLog('[ABsmartly Extension] DOM Changes plugin loaded successfully');
+              debugLog('[ABsmartly Extension] ABSmartlyDOMChanges object:', window.ABSmartlyDOMChanges);
+              debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABSmartlyDOMChanges || {}));
               
               // The UMD bundle exposes ABSmartlyDOMChanges globally
               // Check different possible export patterns
@@ -634,23 +932,23 @@
                 }
                 
                 if (window.DOMChangesPlugin) {
-                  console.log('[ABsmartly Extension] DOMChangesPlugin found and assigned');
+                  debugLog('[ABsmartly Extension] DOMChangesPlugin found and assigned');
                   // Continue with initialization after plugin loads, pass the context
                   initializePlugin(context);
                 } else {
-                  console.error('[ABsmartly Extension] Could not find DOMChangesPlugin in bundle');
+                  debugError('[ABsmartly Extension] Could not find DOMChangesPlugin in bundle');
                 }
               } else {
-                console.error('[ABsmartly Extension] ABSmartlyDOMChanges not found on window');
+                debugError('[ABsmartly Extension] ABSmartlyDOMChanges not found on window');
               }
             };
             script.onerror = () => {
-              console.error('[ABsmartly Extension] Failed to load DOM Changes plugin from extension');
+              debugError('[ABsmartly Extension] Failed to load DOM Changes plugin from extension');
             };
             document.head.appendChild(script);
             return; // Wait for script to load
           } else {
-            console.error('[ABsmartly Extension] Cannot determine extension URL to load plugin');
+            debugError('[ABsmartly Extension] Cannot determine extension URL to load plugin');
             return;
           }
         }
@@ -665,12 +963,12 @@
           const context = ctx || cachedContext;
           
           if (!context) {
-            console.error('[ABsmartly Extension] No context available for plugin initialization');
+            debugError('[ABsmartly Extension] No context available for plugin initialization');
             return;
           }
 
           if (typeof window.DOMChangesPlugin === 'undefined') {
-            console.error('[ABsmartly Extension] DOMChangesPlugin still not available');
+            debugError('[ABsmartly Extension] DOMChangesPlugin still not available');
             return;
           }
 
@@ -694,13 +992,13 @@
               // The plugin now registers itself with context.__domPlugin
               // We can verify it's registered
               if (context.__domPlugin && context.__domPlugin.instance === plugin) {
-                console.log('[ABsmartly Extension] Plugin successfully registered with context.__domPlugin');
-                console.log('[ABsmartly Extension] Plugin methods available:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
+                debugLog('[ABsmartly Extension] Plugin successfully registered with context.__domPlugin');
+                debugLog('[ABsmartly Extension] Plugin methods available:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
               }
 
               // Inject custom code if provided
               if (customCode) {
-                console.log('[ABsmartly Extension] Injecting custom code directly');
+                debugLog('[ABsmartly Extension] Injecting custom code directly');
                 try {
                   // Parse the custom code object
                   const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
@@ -708,18 +1006,18 @@
                   // Call the plugin's injectCode method for HTML/CSS
                   if (plugin.injectCode && typeof plugin.injectCode === 'function') {
                     plugin.injectCode(codeData);
-                    console.log('[ABsmartly Extension] Custom code injected via plugin.injectCode');
+                    debugLog('[ABsmartly Extension] Custom code injected via plugin.injectCode');
                   }
                   
                   // ALWAYS execute scripts manually since the plugin's injection doesn't execute them
                   ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
                     if (codeData[location]) {
-                      console.log(`[ABsmartly Extension] Executing scripts for ${location}`);
+                      debugLog(`[ABsmartly Extension] Executing scripts for ${location}`);
                       executeScriptsInHTML(codeData[location], location);
                     }
                   });
                 } catch (error) {
-                  console.error('[ABsmartly Extension] Failed to inject custom code:', error);
+                  debugError('[ABsmartly Extension] Failed to inject custom code:', error);
                 }
               }
 
@@ -733,15 +1031,15 @@
                 }
               }, '*');
 
-              console.log('[ABsmartly Extension] Plugin initialized successfully');
+              debugLog('[ABsmartly Extension] Plugin initialized successfully');
               isInitialized = true;
               isInitializing = false;
             }).catch(error => {
-              console.error('[ABsmartly Extension] Failed to initialize plugin:', error);
+              debugError('[ABsmartly Extension] Failed to initialize plugin:', error);
               isInitializing = false;
             });
           } catch (error) {
-            console.error('[ABsmartly Extension] Failed to initialize plugin:', error);
+            debugError('[ABsmartly Extension] Failed to initialize plugin:', error);
             isInitializing = false;
           }
         }
@@ -750,7 +1048,7 @@
         initializePlugin(context);
       } else if (event.data.type === 'INJECT_CUSTOM_CODE') {
         // This message type is not currently used - custom code comes via INJECTION_CODE
-        console.log('[ABsmartly Extension] INJECT_CUSTOM_CODE message received but not used');
+        debugLog('[ABsmartly Extension] INJECT_CUSTOM_CODE message received but not used');
       }
     }
   });
