@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import { all as knownCSSProperties } from 'known-css-properties'
 
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
@@ -256,7 +257,24 @@ const createEmptyChange = (): EditingDOMChange => ({
   position: 'after'
 })
 
-// DevTools-style CSS editor component
+// Get all CSS property names from known-css-properties
+const cssPropertyNames = knownCSSProperties.map(prop => prop.property).sort()
+
+// Common CSS values for different property types
+const commonCSSValues: Record<string, string[]> = {
+  display: ['none', 'block', 'inline', 'inline-block', 'flex', 'grid', 'inline-flex', 'inline-grid'],
+  position: ['static', 'relative', 'absolute', 'fixed', 'sticky'],
+  'text-align': ['left', 'right', 'center', 'justify'],
+  'font-weight': ['normal', 'bold', 'bolder', 'lighter', '100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  visibility: ['visible', 'hidden', 'collapse'],
+  overflow: ['visible', 'hidden', 'scroll', 'auto'],
+  cursor: ['auto', 'default', 'pointer', 'wait', 'text', 'move', 'not-allowed'],
+  'flex-direction': ['row', 'row-reverse', 'column', 'column-reverse'],
+  'justify-content': ['flex-start', 'flex-end', 'center', 'space-between', 'space-around', 'space-evenly'],
+  'align-items': ['stretch', 'flex-start', 'flex-end', 'center', 'baseline'],
+}
+
+// DevTools-style CSS editor component with autocomplete
 const CSSStyleEditor = ({ 
   styleProperties, 
   onChange 
@@ -264,10 +282,69 @@ const CSSStyleEditor = ({
   styleProperties: Array<{ key: string; value: string }> | undefined,
   onChange: (properties: Array<{ key: string; value: string }>) => void 
 }) => {
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const [activeField, setActiveField] = useState<'key' | 'value' | null>(null)
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0)
+
   const handlePropertyChange = (index: number, field: 'key' | 'value', newValue: string) => {
     const newProps = [...(styleProperties || [])]
     newProps[index][field] = newValue
     onChange(newProps)
+
+    // Update suggestions based on input
+    if (field === 'key') {
+      const filtered = cssPropertyNames.filter(prop => 
+        prop.toLowerCase().startsWith(newValue.toLowerCase())
+      )
+      setSuggestions(filtered.slice(0, 8))
+      setShowSuggestions(filtered.length > 0 && newValue.length > 0)
+    } else if (field === 'value') {
+      const propertyName = newProps[index].key
+      const values = commonCSSValues[propertyName] || []
+      if (values.length > 0) {
+        const filtered = values.filter(val => 
+          val.toLowerCase().startsWith(newValue.toLowerCase())
+        )
+        setSuggestions(filtered)
+        setShowSuggestions(filtered.length > 0)
+      } else {
+        setShowSuggestions(false)
+      }
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, field: 'key' | 'value') => {
+    if (!showSuggestions) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedSuggestion(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedSuggestion(prev => 
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        )
+        break
+      case 'Tab':
+      case 'Enter':
+        if (suggestions[selectedSuggestion]) {
+          e.preventDefault()
+          handlePropertyChange(index, field, suggestions[selectedSuggestion])
+          setShowSuggestions(false)
+          setSelectedSuggestion(0)
+        }
+        break
+      case 'Escape':
+        setShowSuggestions(false)
+        setSelectedSuggestion(0)
+        break
+    }
   }
 
   const handleAddProperty = () => {
@@ -280,7 +357,7 @@ const CSSStyleEditor = ({
   }
 
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs">
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
         element.style {'{'}
@@ -291,13 +368,30 @@ const CSSStyleEditor = ({
         {(styleProperties || []).map((prop, index) => (
           <div 
             key={index} 
-            className="flex items-center hover:bg-gray-800 group px-3 py-1"
+            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative"
           >
             {/* Property name */}
             <input
               type="text"
               value={prop.key}
               onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, index, 'key')}
+              onFocus={() => {
+                setActiveIndex(index)
+                setActiveField('key')
+                const filtered = cssPropertyNames.filter(p => 
+                  prop.key ? p.startsWith(prop.key) : true
+                ).slice(0, 8)
+                setSuggestions(filtered)
+                setShowSuggestions(true)
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setShowSuggestions(false)
+                  setActiveIndex(null)
+                  setActiveField(null)
+                }, 200)
+              }}
               placeholder="property"
               className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 flex-1"
             />
@@ -308,6 +402,21 @@ const CSSStyleEditor = ({
               type="text"
               value={prop.value}
               onChange={(e) => handlePropertyChange(index, 'value', e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, index, 'value')}
+              onFocus={() => {
+                setActiveIndex(index)
+                setActiveField('value')
+                const values = commonCSSValues[prop.key] || []
+                setSuggestions(values)
+                setShowSuggestions(values.length > 0)
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setShowSuggestions(false)
+                  setActiveIndex(null)
+                  setActiveField(null)
+                }, 200)
+              }}
               placeholder="value"
               className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1"
             />
@@ -337,6 +446,42 @@ const CSSStyleEditor = ({
       <div className="px-3 py-2 border-t border-gray-700 text-gray-400">
         {'}'}
       </div>
+
+      {/* Autocomplete dropdown */}
+      {showSuggestions && activeIndex !== null && (
+        <div 
+          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-md shadow-lg"
+          style={{
+            top: `${36 + (activeIndex + 1) * 28}px`,
+            left: activeField === 'key' ? '12px' : '50%',
+            minWidth: '150px',
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}
+        >
+          {suggestions.map((suggestion, idx) => (
+            <div
+              key={suggestion}
+              className={`px-3 py-1 cursor-pointer text-xs ${
+                idx === selectedSuggestion 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-300 hover:bg-gray-700'
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                if (activeIndex !== null && activeField) {
+                  handlePropertyChange(activeIndex, activeField, suggestion)
+                  setShowSuggestions(false)
+                  setSelectedSuggestion(0)
+                }
+              }}
+              onMouseEnter={() => setSelectedSuggestion(idx)}
+            >
+              {suggestion}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -958,10 +1103,10 @@ export function DOMChangesInlineEditor({
   const [draggedChange, setDraggedChange] = useState<DOMChange | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
 
-  // Debug editingChange state changes
-  useEffect(() => {
-    debugLog('🔄 editingChange state updated:', editingChange)
-  }, [editingChange])
+  // Debug editingChange state changes (commented out - too verbose)
+  // useEffect(() => {
+  //   debugLog('🔄 editingChange state updated:', editingChange)
+  // }, [editingChange])
 
   // Restore state when component mounts
   useEffect(() => {
