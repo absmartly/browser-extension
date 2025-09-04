@@ -22,7 +22,7 @@
   }
 
   // Version for cache busting
-  const INJECT_VERSION = '1.0.3';
+  const INJECT_VERSION = '1.0.5';
   debugLog('[ABsmartly Extension] Inject SDK Plugin version:', INJECT_VERSION);
 
   // Check if already injected
@@ -904,14 +904,15 @@
           
           // Use the captured extension URL
           if (extensionBaseUrl) {
-            const pluginUrl = extensionBaseUrl + 'absmartly-dom-changes.min.js';
-            debugLog('[ABsmartly Extension] Loading plugin from:', pluginUrl);
-            
-            // Load the plugin script
-            const script = document.createElement('script');
-            script.src = pluginUrl;
-            script.onload = () => {
-              debugLog('[ABsmartly Extension] DOM Changes plugin loaded successfully');
+            // Function to load plugin script with error handling
+            const loadPlugin = (filename, fallbackFilename) => {
+              const pluginUrl = extensionBaseUrl + filename;
+              debugLog(`[ABsmartly Extension] Attempting to load plugin from: ${pluginUrl}`);
+              
+              const script = document.createElement('script');
+              script.src = pluginUrl;
+              script.onload = () => {
+                debugLog(`[ABsmartly Extension] ${filename} loaded successfully`);
               debugLog('[ABsmartly Extension] ABSmartlyDOMChanges object:', window.ABSmartlyDOMChanges);
               debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABSmartlyDOMChanges || {}));
               
@@ -941,11 +942,20 @@
               } else {
                 debugError('[ABsmartly Extension] ABSmartlyDOMChanges not found on window');
               }
+              };
+              script.onerror = () => {
+                debugError(`[ABsmartly Extension] Failed to load ${filename}`);
+                // Try fallback if provided
+                if (fallbackFilename) {
+                  debugLog(`[ABsmartly Extension] Trying fallback: ${fallbackFilename}`);
+                  loadPlugin(fallbackFilename);
+                }
+              };
+              document.head.appendChild(script);
             };
-            script.onerror = () => {
-              debugError('[ABsmartly Extension] Failed to load DOM Changes plugin from extension');
-            };
-            document.head.appendChild(script);
+            
+            // Try dev build first, fallback to production build
+            loadPlugin('absmartly-dom-changes.dev.js', 'absmartly-dom-changes.min.js');
             return; // Wait for script to load
           } else {
             debugError('[ABsmartly Extension] Cannot determine extension URL to load plugin');
