@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
@@ -263,10 +265,12 @@ export function DOMChangesInlineEditor({
 }: DOMChangesInlineEditorProps) {
   const [editingChange, setEditingChange] = useState<EditingDOMChange | null>(null)
   const [pickingForField, setPickingForField] = useState<string | null>(null)
+  const [draggedChange, setDraggedChange] = useState<DOMChange | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   // Debug editingChange state changes
   useEffect(() => {
-    console.log('🔄 editingChange state updated:', editingChange)
+    debugLog('🔄 editingChange state updated:', editingChange)
   }, [editingChange])
 
   // Restore state when component mounts
@@ -275,12 +279,12 @@ export function DOMChangesInlineEditor({
     
     // First restore the editing state
     storage.get('domChangesInlineState').then(async (result) => {
-      console.log('Checking for saved DOM Changes inline state, variantName:', variantName)
-      console.log('Retrieved state:', result)
+      debugLog('Checking for saved DOM Changes inline state, variantName:', variantName)
+      debugLog('Retrieved state:', result)
       
       if (result && result.variantName === variantName) {
-        console.log('Restoring DOM Changes inline state:', result)
-        console.log('Was in dragDropMode?', result.dragDropMode)
+        debugLog('Restoring DOM Changes inline state:', result)
+        debugLog('Was in dragDropMode?', result.dragDropMode)
         
         setEditingChange(result.editingChange)
         setPickingForField(result.pickingForField)
@@ -288,7 +292,7 @@ export function DOMChangesInlineEditor({
         // Then check for element picker result
         const pickerResult = await storage.get('elementPickerResult')
         if (pickerResult && pickerResult.variantName === variantName && pickerResult.selector) {
-          console.log('Applying element picker result:', pickerResult)
+          debugLog('Applying element picker result:', pickerResult)
           
           // Apply the selected element to the restored editing state
           if (pickerResult.fieldId === 'selector' && result.editingChange) {
@@ -303,12 +307,12 @@ export function DOMChangesInlineEditor({
         
         // Check for drag-drop result
         const dragDropResult = await storage.get('dragDropResult')
-        console.log('Checking for drag-drop result:', dragDropResult)
-        console.log('Current editingChange from state:', result.editingChange)
+        debugLog('Checking for drag-drop result:', dragDropResult)
+        debugLog('Current editingChange from state:', result.editingChange)
         
         if (dragDropResult && dragDropResult.variantName === variantName) {
-          console.log('Applying drag-drop result:', dragDropResult)
-          console.log('Variant names match:', dragDropResult.variantName, '===', variantName)
+          debugLog('Applying drag-drop result:', dragDropResult)
+          debugLog('Variant names match:', dragDropResult.variantName, '===', variantName)
           
           if (result.editingChange) {
             const updatedChange = { 
@@ -317,45 +321,45 @@ export function DOMChangesInlineEditor({
               targetSelector: dragDropResult.targetSelector,
               position: dragDropResult.position 
             }
-            console.log('Updated editingChange with drag-drop result:', updatedChange)
-            console.log('Setting editingChange state to:', updatedChange)
+            debugLog('Updated editingChange with drag-drop result:', updatedChange)
+            debugLog('Setting editingChange state to:', updatedChange)
             setEditingChange(updatedChange)
             
             // Force a re-render by updating a dummy state
             setTimeout(() => {
-              console.log('🔄 Force checking editingChange after setEditingChange:', editingChange)
+              debugLog('🔄 Force checking editingChange after setEditingChange:', editingChange)
               setEditingChange(prev => {
-                console.log('🔄 Previous editingChange in setState:', prev)
+                debugLog('🔄 Previous editingChange in setState:', prev)
                 return updatedChange
               })
             }, 100)
           } else {
-            console.warn('No editingChange found in restored state, cannot apply drag-drop result')
+            debugWarn('No editingChange found in restored state, cannot apply drag-drop result')
           }
           
           // Clear the drag-drop result
           await storage.remove('dragDropResult')
-          console.log('Cleared dragDropResult from storage')
+          debugLog('Cleared dragDropResult from storage')
         } else {
-          console.log('Drag-drop result not applicable:', 
+          debugLog('Drag-drop result not applicable:', 
             'variantName match:', dragDropResult?.variantName === variantName,
             'dragDropResult exists:', !!dragDropResult)
         }
         
         // Only clear the inline state if we're not waiting for drag-drop
         if (!result.dragDropMode || dragDropResult) {
-          console.log('Clearing domChangesInlineState')
+          debugLog('Clearing domChangesInlineState')
           storage.remove('domChangesInlineState')
         } else {
-          console.log('Keeping domChangesInlineState for drag-drop completion')
+          debugLog('Keeping domChangesInlineState for drag-drop completion')
         }
       }
       
       // Also check for visual editor changes
       const visualEditorResult = await storage.get('visualEditorChanges')
-      console.log('💾 visualEditorChanges:', visualEditorResult)
+      debugLog('💾 visualEditorChanges:', visualEditorResult)
       if (visualEditorResult && visualEditorResult.variantName === variantName) {
-        console.log('Found visual editor changes for this variant!')
+        debugLog('Found visual editor changes for this variant!')
         if (visualEditorResult.changes && visualEditorResult.changes.length > 0) {
           // Merge visual editor changes with existing changes
           setChanges(prevChanges => {
@@ -386,7 +390,7 @@ export function DOMChangesInlineEditor({
   // Listen for element selection
   useEffect(() => {
     const handleElementSelected = (message: any) => {
-      console.log('DOMChangesInlineEditor received message:', message)
+      debugLog('DOMChangesInlineEditor received message:', message)
       if (message.type === 'ELEMENT_SELECTED' && message.selector && pickingForField) {
         const storage = new Storage({ area: "session" })
         
@@ -419,13 +423,13 @@ export function DOMChangesInlineEditor({
 
   // Listen for drag-drop complete from content script
   useEffect(() => {
-    console.log('📡 Setting up drag-drop listener for variant:', variantName)
+    debugLog('📡 Setting up drag-drop listener for variant:', variantName)
     
     const handleDragDropComplete = async (message: any) => {
-      console.log('📡 Received message in DOMChangesInlineEditor:', message)
+      debugLog('📡 Received message in DOMChangesInlineEditor:', message)
       
       if (message.type === 'DRAG_DROP_COMPLETE') {
-        console.log('Drag-drop complete message received:', message)
+        debugLog('Drag-drop complete message received:', message)
         
         // Store result in session storage
         const storage = new Storage({ area: "session" })
@@ -435,13 +439,13 @@ export function DOMChangesInlineEditor({
           targetSelector: message.targetSelector,
           position: message.position
         }
-        console.log('Storing drag-drop result:', dragDropData)
+        debugLog('Storing drag-drop result:', dragDropData)
         
         await storage.set('dragDropResult', dragDropData)
         
         // Verify it was stored
         const verification = await storage.get('dragDropResult')
-        console.log('Verification - drag-drop result stored:', verification)
+        debugLog('Verification - drag-drop result stored:', verification)
       }
     }
     
@@ -454,10 +458,10 @@ export function DOMChangesInlineEditor({
   // Listen for visual editor changes
   useEffect(() => {
     const handleVisualEditorChanges = async (message: any) => {
-      console.log('📡 Received message in DOMChangesInlineEditor:', message)
+      debugLog('📡 Received message in DOMChangesInlineEditor:', message)
       
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
-        console.log('Visual editor changes received:', message.changes)
+        debugLog('Visual editor changes received:', message.changes)
         
         // Update parent component with visual editor changes
         if (message.changes && message.changes.length > 0) {
@@ -471,12 +475,12 @@ export function DOMChangesInlineEditor({
           })
         }
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
-        console.log('✅ Visual Editor Complete - Received changes:', message)
+        debugLog('✅ Visual Editor Complete - Received changes:', message)
         
         if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
           // Merge new changes with existing ones
           const mergedChanges = [...changes, ...message.changes]
-          console.log('📝 Merged changes:', mergedChanges)
+          debugLog('📝 Merged changes:', mergedChanges)
           
           // Update the parent component
           onChange(mergedChanges)
@@ -505,7 +509,13 @@ export function DOMChangesInlineEditor({
   }, [variantName, changes, onChange])
 
   const handleLaunchVisualEditor = async () => {
-    console.log('🎨 Launching Visual Editor')
+    debugLog('🎨 Launching Visual Editor')
+    
+    // Disable preview if it's active to avoid conflicts
+    if (previewEnabled) {
+      debugLog('🔄 Disabling preview before launching visual editor')
+      onPreviewToggle(false)
+    }
     
     // Save current state
     const storage = new Storage({ area: "session" })
@@ -516,13 +526,13 @@ export function DOMChangesInlineEditor({
     })
     
     // Send message to background script to start visual editor
-    console.log('🚀 Sending START_VISUAL_EDITOR message to background')
-    console.log('Variant:', variantName)
-    console.log('Changes:', changes)
+    debugLog('🚀 Sending START_VISUAL_EDITOR message to background')
+    debugLog('Variant:', variantName)
+    debugLog('Changes:', changes)
     
     // Test if we can send any message at all
     chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
-      console.log('PING response:', response)
+      debugLog('PING response:', response)
     })
     
     chrome.runtime.sendMessage({ 
@@ -530,17 +540,17 @@ export function DOMChangesInlineEditor({
       variantName,
       changes
     }, (response) => {
-      console.log('📨 Response received from background:', response)
+      debugLog('📨 Response received from background:', response)
       if (chrome.runtime.lastError) {
-        console.error('❌ Chrome runtime error:', chrome.runtime.lastError)
+        debugError('❌ Chrome runtime error:', chrome.runtime.lastError)
       } else if (response?.error) {
-        console.error('❌ Error from background:', response.error)
+        debugError('❌ Error from background:', response.error)
         // Show user-friendly error
         if (response.error.includes('browser pages')) {
           alert('Visual editor cannot run on browser pages. Please navigate to a regular website.')
         }
       } else {
-        console.log('✅ Visual editor started successfully:', response)
+        debugLog('✅ Visual editor started successfully:', response)
         // Close popup after a short delay
         setTimeout(() => {
           window.close()
@@ -550,7 +560,7 @@ export function DOMChangesInlineEditor({
   }
 
   const handleStartDragDrop = async () => {
-    console.log('Starting drag-drop picker')
+    debugLog('Starting drag-drop picker')
     
     // Ensure we have an editingChange for move type
     const changeToSave = editingChange || {
@@ -561,7 +571,7 @@ export function DOMChangesInlineEditor({
       index: null
     }
     
-    console.log('Saving state before drag-drop:', { variantName, editingChange: changeToSave })
+    debugLog('Saving state before drag-drop:', { variantName, editingChange: changeToSave })
     
     // Save current state before starting
     const storage = new Storage({ area: "session" })
@@ -571,7 +581,7 @@ export function DOMChangesInlineEditor({
       dragDropMode: true
     }
     
-    console.log('💾 Saving state for drag-drop:', stateToSave)
+    debugLog('💾 Saving state for drag-drop:', stateToSave)
     await storage.set('domChangesInlineState', stateToSave)
     
     // Start drag-drop picker
@@ -585,7 +595,7 @@ export function DOMChangesInlineEditor({
             tabUrl.startsWith('chrome-extension://') || 
             tabUrl.startsWith('edge://') ||
             tabUrl.includes('chrome.google.com/webstore')) {
-          console.error('Content scripts cannot run on this page.')
+          debugError('Content scripts cannot run on this page.')
           return
         }
         
@@ -595,9 +605,9 @@ export function DOMChangesInlineEditor({
           fromPopup: true
         }, (response) => {
           if (chrome.runtime.lastError) {
-            console.error('Error starting drag-drop picker:', chrome.runtime.lastError)
+            debugError('Error starting drag-drop picker:', chrome.runtime.lastError)
           } else {
-            console.log('Drag-drop picker started successfully:', response)
+            debugLog('Drag-drop picker started successfully:', response)
           }
         })
         
@@ -610,7 +620,7 @@ export function DOMChangesInlineEditor({
   }
 
   const handleStartElementPicker = async (fieldId: string) => {
-    console.log('Starting element picker for field:', fieldId)
+    debugLog('Starting element picker for field:', fieldId)
     setPickingForField(fieldId)
     
     // Save current state before picker starts
@@ -620,41 +630,41 @@ export function DOMChangesInlineEditor({
       editingChange,
       pickingForField: fieldId
     })
-    console.log('Saved state to storage')
+    debugLog('Saved state to storage')
     
     // Popup state will be handled by the parent component's effect
     // We just need to ensure our state is saved before closing
     
     // Start element picker
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      console.log('Found tabs:', tabs)
+      debugLog('Found tabs:', tabs)
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
         const tabUrl = tabs[0].url || 'unknown'
         
-        console.log('Current tab URL:', tabUrl)
+        debugLog('Current tab URL:', tabUrl)
         
         // Check if this is a restricted page
         if (tabUrl.startsWith('chrome://') || 
             tabUrl.startsWith('chrome-extension://') || 
             tabUrl.startsWith('edge://') ||
             tabUrl.includes('chrome.google.com/webstore')) {
-          console.error('Content scripts cannot run on this page. Please try on a regular website.')
+          debugError('Content scripts cannot run on this page. Please try on a regular website.')
           return
         }
         
         // Send a test message first to check if content script is responding
-        console.log('Sending test message to content script...')
+        debugLog('Sending test message to content script...')
         chrome.tabs.sendMessage(tabId, { 
           type: 'TEST_CONNECTION',
           fromPopup: true
         }, (testResponse) => {
           if (chrome.runtime.lastError) {
-            console.error('Content script not responding to test:', chrome.runtime.lastError)
-            console.log('Content script is not loaded. Please refresh the page and try again.')
+            debugError('Content script not responding to test:', chrome.runtime.lastError)
+            debugLog('Content script is not loaded. Please refresh the page and try again.')
             return
           }
-          console.log('Test connection successful:', testResponse)
+          debugLog('Test connection successful:', testResponse)
           
           // Now send the actual element picker message
           chrome.tabs.sendMessage(tabId, { 
@@ -662,9 +672,9 @@ export function DOMChangesInlineEditor({
             fromPopup: true
           }, (response) => {
             if (chrome.runtime.lastError) {
-              console.error('Error starting element picker:', chrome.runtime.lastError)
+              debugError('Error starting element picker:', chrome.runtime.lastError)
             } else {
-              console.log('Element picker started successfully:', response)
+              debugLog('Element picker started successfully:', response)
             }
           })
         })
@@ -672,14 +682,22 @@ export function DOMChangesInlineEditor({
         // Don't close the window - we're in a sidebar now, not a popup
         // The sidebar should remain open to receive the element selection
       } else {
-        console.error('No active tab found!')
+        debugError('No active tab found!')
       }
     })
   }
 
   const handleToggleChange = (index: number) => {
     const newChanges = [...changes]
-    newChanges[index] = { ...newChanges[index], enabled: !newChanges[index].enabled }
+    const wasEnabled = newChanges[index].enabled !== false
+    newChanges[index] = { ...newChanges[index], enabled: !wasEnabled }
+    debugLog('🔄 Toggle change:', {
+      index,
+      selector: newChanges[index].selector,
+      wasEnabled,
+      isNowEnabled: newChanges[index].enabled,
+      allChanges: newChanges
+    })
     onChange(newChanges)
   }
 
@@ -690,7 +708,7 @@ export function DOMChangesInlineEditor({
 
   const handleAddChange = () => {
     const newChange = createEmptyChange()
-    console.log('🆕 Creating new DOM change:', newChange)
+    debugLog('🆕 Creating new DOM change:', newChange)
     setEditingChange(newChange)
   }
 
@@ -728,8 +746,8 @@ export function DOMChangesInlineEditor({
   }
 
   const handleSaveChange = () => {
-    console.log('💾 Saving change, editingChange:', editingChange)
-    console.log('💾 Current changes array:', changes)
+    debugLog('💾 Saving change, editingChange:', editingChange)
+    debugLog('💾 Current changes array:', changes)
     
     if (!editingChange || !editingChange.selector) {
       alert('Please enter a selector')
@@ -828,11 +846,11 @@ export function DOMChangesInlineEditor({
     if (editingChange.index !== null) {
       const newChanges = [...changes]
       newChanges[editingChange.index] = domChange
-      console.log('💾 Updating existing change at index', editingChange.index, 'newChanges:', newChanges)
+      debugLog('💾 Updating existing change at index', editingChange.index, 'newChanges:', newChanges)
       onChange(newChanges)
     } else {
       const newChanges = [...changes, domChange]
-      console.log('💾 Adding new change to array, newChanges:', newChanges)
+      debugLog('💾 Adding new change to array, newChanges:', newChanges)
       onChange(newChanges)
     }
     
@@ -986,10 +1004,103 @@ export function DOMChangesInlineEditor({
   }
 
   return (
-    <div className="space-y-3">
+    <div 
+      className={`space-y-3 ${isDragOver ? 'ring-2 ring-blue-400 ring-opacity-50 bg-blue-50 rounded-lg p-2' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragOver(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragOver(false)
+        
+        // Try to get the dragged change from dataTransfer
+        const changeData = e.dataTransfer.getData('application/json')
+        if (changeData) {
+          try {
+            const draggedChange = JSON.parse(changeData) as DOMChange
+            
+            // Check if this change already exists (by selector)
+            const existingIndex = changes.findIndex(c => c.selector === draggedChange.selector)
+            if (existingIndex === -1) {
+              // Add the new change
+              onChange([...changes, draggedChange])
+              debugLog('✅ DOM change dropped and added')
+            } else {
+              debugLog('⚠️ Change with this selector already exists')
+            }
+          } catch (err) {
+            debugError('Failed to parse dropped change:', err)
+          }
+        }
+      }}
+    >
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-gray-700">DOM Changes</h4>
         <div className="flex items-center gap-2">
+          {/* Copy all changes button */}
+          {changes.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                // Copy changes to clipboard as JSON
+                navigator.clipboard.writeText(JSON.stringify(changes, null, 2))
+                  .then(() => {
+                    debugLog('✅ DOM changes copied to clipboard')
+                    // Optional: Show a toast notification
+                  })
+                  .catch(err => {
+                    debugError('Failed to copy changes:', err)
+                  })
+              }}
+              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+              title="Copy all DOM changes"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          )}
+          
+          {/* Paste changes button */}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText()
+                const pastedChanges = JSON.parse(text) as DOMChange[]
+                
+                // Validate that it's an array of DOM changes
+                if (Array.isArray(pastedChanges) && pastedChanges.every(c => 
+                  c.selector && c.type && ['text', 'html', 'attribute', 'style', 'class'].includes(c.type)
+                )) {
+                  // Merge with existing changes (avoiding duplicates by selector)
+                  const existingSelectors = new Set(changes.map(c => c.selector))
+                  const newChanges = pastedChanges.filter(c => !existingSelectors.has(c.selector))
+                  onChange([...changes, ...newChanges])
+                  debugLog(`✅ Pasted ${newChanges.length} new DOM changes`)
+                } else {
+                  debugError('Invalid DOM changes format in clipboard')
+                }
+              } catch (err) {
+                debugError('Failed to paste changes:', err)
+              }
+            }}
+            className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+            title="Paste DOM changes from clipboard"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          </button>
+          
           <label className="flex items-center gap-2 text-sm">
             <span>Preview:</span>
             <button
@@ -1121,7 +1232,7 @@ export function DOMChangesInlineEditor({
                                             <button
                                               key={idx}
                                               onClick={() => {
-                                                console.log('Selected alternative selector:', suggestion.selector)
+                                                debugLog('Selected alternative selector:', suggestion.selector)
                                                 setEditingChange({ ...editingChange, selector: suggestion.selector })
                                               }}
                                               className="w-full text-left p-2 bg-white hover:bg-amber-100 border border-amber-200 rounded text-xs transition-colors"
@@ -1147,7 +1258,7 @@ export function DOMChangesInlineEditor({
                               }
                             }
                           } catch (e) {
-                            console.log('Could not generate suggestions:', e)
+                            debugLog('Could not generate suggestions:', e)
                           }
                         }
                         return null
@@ -1209,9 +1320,9 @@ export function DOMChangesInlineEditor({
                         value={editingChange.type}
                         onChange={(e) => {
                           const newType = e.target.value as DOMChangeType
-                          console.log('📝 Changing type to:', newType)
+                          debugLog('📝 Changing type to:', newType)
                           const updatedChange = { ...editingChange, type: newType }
-                          console.log('📝 Updated editingChange:', updatedChange)
+                          debugLog('📝 Updated editingChange:', updatedChange)
                           setEditingChange(updatedChange)
                         }}
                         className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
@@ -1633,8 +1744,22 @@ export function DOMChangesInlineEditor({
               return (
                 <div 
                   key={index} 
+                  draggable={true}
+                  title="Drag to copy this change to another variant"
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'copy'
+                    e.dataTransfer.setData('application/json', JSON.stringify(change))
+                    setDraggedChange(change)
+                    // Add visual feedback
+                    e.currentTarget.classList.add('opacity-50')
+                  }}
+                  onDragEnd={(e) => {
+                    setDraggedChange(null)
+                    // Remove visual feedback
+                    e.currentTarget.classList.remove('opacity-50')
+                  }}
                   className={`
-                    relative border rounded-lg transition-all
+                    relative border rounded-lg transition-all cursor-move hover:scale-[1.02] hover:shadow-md
                     ${isDisabled 
                       ? 'border-gray-200 bg-gray-50 opacity-60' 
                       : 'border-gray-300 bg-white hover:border-blue-300 hover:shadow-sm'
@@ -1692,7 +1817,28 @@ export function DOMChangesInlineEditor({
                         </div>
                       </div>
                       
-                      {/* Edit button on the right */}
+                      {/* Copy button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(JSON.stringify([change], null, 2))
+                            .then(() => {
+                              debugLog('✅ DOM change copied to clipboard')
+                            })
+                            .catch(err => {
+                              debugError('Failed to copy change:', err)
+                            })
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors flex-shrink-0"
+                        title="Copy this change"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      
+                      {/* Edit button */}
                       <button
                         type="button"
                         onClick={() => handleEditChange(index)}
@@ -1780,9 +1926,9 @@ export function DOMChangesInlineEditor({
               value={editingChange.type}
               onChange={(e) => {
                 const newType = e.target.value as DOMChangeType
-                console.log('📝 Changing type to:', newType)
+                debugLog('📝 Changing type to:', newType)
                 const updatedChange = { ...editingChange, type: newType }
-                console.log('📝 Updated editingChange:', updatedChange)
+                debugLog('📝 Updated editingChange:', updatedChange)
                 setEditingChange(updatedChange)
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"

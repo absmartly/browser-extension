@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Badge } from './ui/Badge'
@@ -59,7 +60,7 @@ export function ExperimentEditor({
             domChanges = config.dom_changes
           }
         } catch (e) {
-          console.error('Failed to parse variant config:', e)
+          debugError('Failed to parse variant config:', e)
         }
         
         return {

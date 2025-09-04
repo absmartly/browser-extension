@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
@@ -33,9 +35,9 @@ export function ExperimentDetail({
   onUpdate,
   loading 
 }: ExperimentDetailProps) {
-  console.log('🔍 ExperimentDetail render start - experiment:', experiment)
-  console.log('🔍 ExperimentDetail render start - experiment.variants:', experiment?.variants)
-  console.log('🔍 ExperimentDetail render start - loading:', loading)
+  debugLog('🔍 ExperimentDetail render start - experiment:', experiment)
+  debugLog('🔍 ExperimentDetail render start - experiment.variants:', experiment?.variants)
+  debugLog('🔍 ExperimentDetail render start - loading:', loading)
 
   // Always in edit mode - removed isEditing state
   const [editingName, setEditingName] = useState(false)
@@ -46,10 +48,10 @@ export function ExperimentDetail({
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
   const lastExperimentIdRef = useRef<number | null>(null)
 
-  console.log('🔍 ExperimentDetail state - variantData:', variantData)
-  console.log('🔍 ExperimentDetail state - displayName:', displayName)
-  console.log('🔍 ExperimentDetail state - variants length:', experiment?.variants?.length)
-  console.log('🔍 ExperimentDetail state - should show variants section:', experiment.variants && experiment.variants.length > 0)
+  debugLog('🔍 ExperimentDetail state - variantData:', variantData)
+  debugLog('🔍 ExperimentDetail state - displayName:', displayName)
+  debugLog('🔍 ExperimentDetail state - variants length:', experiment?.variants?.length)
+  debugLog('🔍 ExperimentDetail state - should show variants section:', experiment.variants && experiment.variants.length > 0)
 
   // Effect to restore saved variant data on mount
   useEffect(() => {
@@ -58,11 +60,11 @@ export function ExperimentDetail({
       try {
         const savedData = await storage.get(storageKey)
         if (savedData) {
-          console.log('📦 Restoring saved variant data for experiment', experiment.id)
+          debugLog('📦 Restoring saved variant data for experiment', experiment.id)
           setVariantData(savedData)
         }
       } catch (error) {
-        console.error('Failed to restore variant data:', error)
+        debugError('Failed to restore variant data:', error)
       }
     }
     restoreData()
@@ -76,7 +78,7 @@ export function ExperimentDetail({
     // Check if this is a new experiment
     const isNewExperiment = lastExperimentIdRef.current !== currentExperimentId
     
-    console.log('🔄 useEffect triggered for experiment', currentExperimentId, {
+    debugLog('🔄 useEffect triggered for experiment', currentExperimentId, {
       isNewExperiment,
       lastExperimentId: lastExperimentIdRef.current,
       currentVariantsLength: currentVariants.length,
@@ -88,7 +90,7 @@ export function ExperimentDetail({
       lastExperimentIdRef.current = currentExperimentId
       
       // Clear existing data to prevent showing old experiment's data
-      console.log('🔄 New experiment detected, clearing variant data')
+      debugLog('🔄 New experiment detected, clearing variant data')
       setVariantData({})
       
       // If we have variants, parse and set them
@@ -102,19 +104,19 @@ export function ExperimentDetail({
         
         // Load saved DOM changes from storage
         const storageKey = `experiment-${currentExperimentId}-variants`
-        console.log('🔍 Checking storage for key:', storageKey)
+        debugLog('🔍 Checking storage for key:', storageKey)
         
         storage.get(storageKey).then(savedData => {
-          console.log('🔍 Raw storage result:', savedData)
+          debugLog('🔍 Raw storage result:', savedData)
           
           if (savedData) {
-            console.log('📦 Found saved variant data in storage:', savedData)
+            debugLog('📦 Found saved variant data in storage:', savedData)
             // Merge saved DOM changes with parsed config
             Object.keys(savedData).forEach(key => {
               if (data[key] && savedData[key].dom_changes) {
                 // Use saved DOM changes as source of truth (they're the latest user edits)
                 data[key].dom_changes = savedData[key].dom_changes
-                console.log(`Applied saved DOM changes for variant ${key}:`, savedData[key].dom_changes)
+                debugLog(`Applied saved DOM changes for variant ${key}:`, savedData[key].dom_changes)
               }
               // Also preserve variables if they were edited
               if (data[key] && savedData[key].variables) {
@@ -123,15 +125,15 @@ export function ExperimentDetail({
               }
             })
           }
-          console.log('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
+          debugLog('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
           setVariantData(data)
         }).catch(error => {
-          console.error('Failed to load saved variant data:', error)
-          console.log('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
+          debugError('Failed to load saved variant data:', error)
+          debugLog('✅ Setting variant data for new experiment', currentExperimentId, ':', data)
           setVariantData(data)
         })
       } else {
-        console.log('⚠️ New experiment has no variants yet')
+        debugLog('⚠️ New experiment has no variants yet')
       }
     } else {
       // Same experiment - check if variants were added/updated
@@ -148,13 +150,13 @@ export function ExperimentDetail({
         const storageKey = `experiment-${currentExperimentId}-variants`
         storage.get(storageKey).then(savedData => {
           if (savedData) {
-            console.log('📦 Found saved variant data in storage (same experiment):', savedData)
+            debugLog('📦 Found saved variant data in storage (same experiment):', savedData)
             // Merge saved DOM changes with parsed config
             Object.keys(savedData).forEach(key => {
               if (data[key] && savedData[key].dom_changes) {
                 // Use saved DOM changes as source of truth (they're the latest user edits)
                 data[key].dom_changes = savedData[key].dom_changes
-                console.log(`Applied saved DOM changes for variant ${key}:`, savedData[key].dom_changes)
+                debugLog(`Applied saved DOM changes for variant ${key}:`, savedData[key].dom_changes)
               }
               // Also preserve variables if they were edited
               if (data[key] && savedData[key].variables) {
@@ -163,11 +165,11 @@ export function ExperimentDetail({
               }
             })
           }
-          console.log('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
+          debugLog('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
           setVariantData(data)
         }).catch(error => {
-          console.error('Failed to load saved variant data:', error)
-          console.log('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
+          debugError('Failed to load saved variant data:', error)
+          debugLog('✅ Setting variant data for current experiment', currentExperimentId, ':', data)
           setVariantData(data)
         })
       } else if (currentVariants.length > 0) {
@@ -197,7 +199,7 @@ export function ExperimentDetail({
           })
           
           if (hasChanges) {
-            console.log('🔄 Updated variant data with new configs')
+            debugLog('🔄 Updated variant data with new configs')
             return updated
           }
           
@@ -219,7 +221,7 @@ export function ExperimentDetail({
           try {
             config = JSON.parse(variant.config)
           } catch (parseError) {
-            console.warn('Invalid JSON in variant config for', variantKey, ':', parseError)
+            debugWarn('Invalid JSON in variant config for', variantKey, ':', parseError)
             config = {}
           }
         } else if (typeof variant.config === 'object') {
@@ -251,7 +253,7 @@ export function ExperimentDetail({
         }
       }
     } catch (e) {
-      console.error('Failed to parse variant config for', variantKey, ':', e, 'config:', variant.config)
+      debugError('Failed to parse variant config for', variantKey, ':', e, 'config:', variant.config)
       // Always provide fallback data to prevent UI breaks
       return {
         variables: {},
@@ -309,11 +311,11 @@ export function ExperimentDetail({
   }
 
   const handleDOMChangesUpdate = (variantName: string, changes: DOMChange[]) => {
-    console.log('🔄 handleDOMChangesUpdate called:', { variantName, changes })
-    console.log('🔄 Current experiment ID:', experiment.id)
+    debugLog('🔄 handleDOMChangesUpdate called:', { variantName, changes })
+    debugLog('🔄 Current experiment ID:', experiment.id)
     
     setVariantData(prev => {
-      console.log('🔄 Previous variant data:', prev)
+      debugLog('🔄 Previous variant data:', prev)
       
       const updated = {
         ...prev,
@@ -323,17 +325,78 @@ export function ExperimentDetail({
         }
       }
       
-      console.log('🔄 Updated variant data:', updated)
+      debugLog('🔄 Updated variant data:', updated)
       
       // Save to storage
       const storageKey = `experiment-${experiment.id}-variants`
-      console.log('🔄 Saving to storage with key:', storageKey)
+      debugLog('🔄 Saving to storage with key:', storageKey)
       
       storage.set(storageKey, updated).then(() => {
-        console.log('✅ Successfully saved variant data to storage')
+        debugLog('✅ Successfully saved variant data to storage')
       }).catch(error => {
-        console.error('❌ Failed to save variant data:', error)
+        debugError('❌ Failed to save variant data:', error)
       })
+      
+      // If preview is currently enabled for this variant, re-apply with updated changes
+      if (previewEnabled && activePreviewVariant === variantName) {
+        debugLog('🔄 Re-applying preview with updated changes')
+        const enabledChanges = changes.filter(c => c.enabled !== false)
+        debugLog('🔄 Changes being sent:', {
+          allChanges: changes,
+          enabledChanges: enabledChanges,
+          disabledChanges: changes.filter(c => c.enabled === false)
+        })
+        
+        // First remove the current preview, then apply the new one
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            // Remove current preview
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: 'ABSMARTLY_PREVIEW',
+              action: 'remove'
+            }, () => {
+              // Then apply new preview with only enabled changes
+              setTimeout(() => {
+                chrome.tabs.sendMessage(tabs[0].id, {
+                  type: 'ABSMARTLY_PREVIEW',
+                  action: 'apply',
+                  changes: enabledChanges,
+                  experimentName: experiment.name,
+                  variantName: variantName
+                }, (response) => {
+                  if (chrome.runtime.lastError) {
+                    debugError('Failed to re-apply preview:', chrome.runtime.lastError)
+                  } else {
+                    debugLog('Preview re-applied with enabled changes only:', {
+                      enabledCount: enabledChanges.length,
+                      totalCount: changes.length,
+                      enabledChanges
+                    })
+                  }
+                })
+              }, 100) // Small delay to ensure removal completes
+            })
+          }
+        })
+      } else {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: 'ABSMARTLY_PREVIEW',
+              action: 'apply',
+              changes: enabledChanges,
+              experimentName: experiment.name,
+              variantName: variantName
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                debugError('Failed to re-apply preview:', chrome.runtime.lastError)
+              } else {
+                debugLog('Preview re-applied with updated changes:', response)
+              }
+            })
+          }
+        })
+      }
       
       return updated
     })
@@ -355,7 +418,7 @@ export function ExperimentDetail({
       // Save to storage
       const storageKey = `experiment-${experiment.id}-variants`
       storage.set(storageKey, updated).catch(error => {
-        console.error('Failed to save variant data:', error)
+        debugError('Failed to save variant data:', error)
       })
       
       return updated
@@ -377,7 +440,7 @@ export function ExperimentDetail({
       // Save to storage
       const storageKey = `experiment-${experiment.id}-variants`
       storage.set(storageKey, newData).catch(error => {
-        console.error('Failed to save variant data:', error)
+        debugError('Failed to save variant data:', error)
       })
       
       return newData
@@ -545,20 +608,20 @@ export function ExperimentDetail({
       onUpdate(experiment.id, putPayload)
       
     } catch (error) {
-      console.error('Failed to save changes:', error)
+      debugError('Failed to save changes:', error)
       alert('Failed to save changes: ' + error.message)
     }
   }
 
   const handlePreviewToggleForVariant = (enabled: boolean, variantKey: string) => {
-    console.log('🎯 handlePreviewToggleForVariant called:', { enabled, variantKey, hasExperiment: !!experiment })
+    debugLog('🎯 handlePreviewToggleForVariant called:', { enabled, variantKey, hasExperiment: !!experiment })
     setPreviewEnabled(enabled)
     if (enabled && variantKey && experiment) {
       // Send preview message through content script to SDK
       const changes = variantData[variantKey]?.dom_changes || []
       const variantName = experiment.variants?.find(v => v.name === variantKey)?.name || variantKey
       
-      console.log('🎯 Sending preview message:', {
+      debugLog('🎯 Sending preview message:', {
         variantName,
         changesCount: changes.length,
         changes: changes,
@@ -567,7 +630,7 @@ export function ExperimentDetail({
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          console.log('🎯 Sending to tab:', tabs[0].id, tabs[0].url)
+          debugLog('🎯 Sending to tab:', tabs[0].id, tabs[0].url)
           // Content script is already injected by the manifest, just send the message
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'ABSMARTLY_PREVIEW',
@@ -577,17 +640,17 @@ export function ExperimentDetail({
             variantName: variantName
           }, (response) => {
             if (chrome.runtime.lastError) {
-              console.error('❌ Error sending preview message:', chrome.runtime.lastError)
+              debugError('❌ Error sending preview message:', chrome.runtime.lastError)
             } else {
-              console.log('✅ Preview message sent, response:', response)
+              debugLog('✅ Preview message sent, response:', response)
             }
           })
         } else {
-          console.error('❌ No active tab found')
+          debugError('❌ No active tab found')
         }
       })
     } else if (!enabled) {
-      console.log('🎯 Removing preview')
+      debugLog('🎯 Removing preview')
       // Remove preview
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
@@ -595,7 +658,7 @@ export function ExperimentDetail({
             type: 'ABSMARTLY_PREVIEW',
             action: 'remove'
           }, (response) => {
-            console.log('🎯 Remove preview response:', response)
+            debugLog('🎯 Remove preview response:', response)
           })
         }
       })
@@ -698,7 +761,7 @@ export function ExperimentDetail({
                 return expVariantKey === variantKey
               })
               
-              console.log('🔍 Rendering variant:', {
+              debugLog('🔍 Rendering variant:', {
                 variantKey,
                 hasData: !!data,
                 variablesCount: Object.keys(data.variables).length,
@@ -725,7 +788,7 @@ export function ExperimentDetail({
                               // Save to storage
                               const storageKey = `experiment-${experiment.id}-variants`
                               storage.set(storageKey, newData).catch(error => {
-                                console.error('Failed to save variant data:', error)
+                                debugError('Failed to save variant data:', error)
                               })
                               
                               return newData

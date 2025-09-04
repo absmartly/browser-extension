@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react"
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Storage } from "@plasmohq/storage"
 import { ExperimentList } from "~src/components/ExperimentList"
 import { ExperimentDetail } from "~src/components/ExperimentDetail"
@@ -64,7 +66,7 @@ function IndexPopupContent() {
   // Load experiments when switching to list view AND filters are loaded
   useEffect(() => {
     if (config && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
-      console.log('Initializing experiments for this session with filters:', filters)
+      debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
       loadExperiments(false)
       loadFavorites()
@@ -78,7 +80,7 @@ function IndexPopupContent() {
     // Restore popup state
     storage.get('popupState').then(result => {
       if (result) {
-        console.log('Restoring popup state:', result)
+        debugLog('Restoring popup state:', result)
         const state = result
         if (state.view) setView(state.view)
         if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment)
@@ -88,7 +90,7 @@ function IndexPopupContent() {
     
     // Restore filters
     storage.get('experimentFilters').then(result => {
-      console.log('Loading saved filters:', result)
+      debugLog('Loading saved filters:', result)
       if (result) {
         setFilters(result)
       } else {
@@ -115,7 +117,7 @@ function IndexPopupContent() {
       timestamp: Date.now()
     }
     storage.set('popupState', state)
-    console.log('Saved popup state:', state)
+    debugLog('Saved popup state:', state)
   }, [view, selectedExperiment])
 
   // Reset to first page when switching to list view
@@ -130,7 +132,7 @@ function IndexPopupContent() {
       const favoriteIds = await getFavorites()
       setFavoriteExperiments(new Set(favoriteIds))
     } catch (error) {
-      console.error('Failed to load favorites:', error)
+      debugError('Failed to load favorites:', error)
       // Continue without favorites if the call fails
     }
   }
@@ -209,7 +211,7 @@ function IndexPopupContent() {
         try {
           await setExperimentsCache(experiments)
         } catch (cacheError) {
-          console.warn('Failed to cache experiments:', cacheError)
+          debugWarn('Failed to cache experiments:', cacheError)
           // Continue without caching
         }
       }
@@ -221,7 +223,7 @@ function IndexPopupContent() {
       } else {
         setError('Failed to load experiments. Please check your API settings.')
       }
-      console.error('Failed to load experiments:', err)
+      debugError('Failed to load experiments:', err)
       // Set empty arrays on error to prevent crashes
       setExperiments([])
       setFilteredExperiments([])
@@ -247,7 +249,7 @@ function IndexPopupContent() {
       // Update on server
       await setExperimentFavorite(experimentId, newFavorite)
     } catch (error) {
-      console.error('Failed to update favorite:', error)
+      debugError('Failed to update favorite:', error)
       // Revert on error
       const revertedFavorites = new Set(favoriteExperiments)
       if (isFavorite) {
@@ -274,13 +276,13 @@ function IndexPopupContent() {
         const experimentData = fullExperiment.experiment || fullExperiment
         setSelectedExperiment(experimentData)
       } else {
-        console.warn('getExperiment returned null/undefined, using cached data')
+        debugWarn('getExperiment returned null/undefined, using cached data')
         // Use the cached data as fallback - handle nested structure
         const experimentData = experiment.experiment || experiment
         setSelectedExperiment(experimentData)
       }
     } catch (err: any) {
-      console.error('Failed to fetch full experiment details:', err)
+      debugError('Failed to fetch full experiment details:', err)
       // Use cached data on error - also handle nested structure
       const experimentData = experiment.experiment || experiment
       setSelectedExperiment(experimentData)
@@ -290,7 +292,7 @@ function IndexPopupContent() {
         setIsAuthExpired(true)
         setError('Your session has expired. Please log in again.')
       } else {
-        console.warn('API fetch failed, continuing with cached experiment data')
+        debugWarn('API fetch failed, continuing with cached experiment data')
         // Don't clear the experiment data - continue with what we have
       }
       // Continue with cached data if available
@@ -310,7 +312,7 @@ function IndexPopupContent() {
       } else {
         setError('Failed to start experiment')
       }
-      console.error('Failed to start experiment:', err)
+      debugError('Failed to start experiment:', err)
     }
   }
 
@@ -325,7 +327,7 @@ function IndexPopupContent() {
       } else {
         setError('Failed to stop experiment')
       }
-      console.error('Failed to stop experiment:', err)
+      debugError('Failed to stop experiment:', err)
     }
   }
 
@@ -360,13 +362,13 @@ function IndexPopupContent() {
       } else {
         setError('Failed to save experiment')
       }
-      console.error('Failed to save experiment:', err)
+      debugError('Failed to save experiment:', err)
     }
   }
 
   const handleFilterChange = (filterState: any) => {
-    console.log('handleFilterChange called with:', filterState)
-    console.log('Current filters:', filters)
+    debugLog('handleFilterChange called with:', filterState)
+    debugLog('Current filters:', filters)
     
     // Mark filters as initialized on first call
     if (!filtersInitialized) {
@@ -374,20 +376,20 @@ function IndexPopupContent() {
     }
     
     const hasActualChange = JSON.stringify(filterState) !== JSON.stringify(filters)
-    console.log('Has actual change:', hasActualChange)
+    debugLog('Has actual change:', hasActualChange)
     
     if (hasActualChange) {
       setFilters(filterState)
       // Save filters to storage
       const storage = new Storage({ area: "local" })
       storage.set('experimentFilters', filterState)
-      console.log('Filter changed, reloading experiments')
+      debugLog('Filter changed, reloading experiments')
       // Reset to first page when filters change
       setCurrentPage(1)
       // Need to pass the new filter state directly since state update is async
       loadExperimentsWithFilters(filterState, 1, pageSize)
     } else {
-      console.log('No actual change detected, not reloading')
+      debugLog('No actual change detected, not reloading')
     }
   }
   
@@ -464,7 +466,7 @@ function IndexPopupContent() {
         try {
           await setExperimentsCache(experiments)
         } catch (cacheError) {
-          console.warn('Failed to cache experiments:', cacheError)
+          debugWarn('Failed to cache experiments:', cacheError)
         }
       }
     } catch (err: any) {
@@ -474,7 +476,7 @@ function IndexPopupContent() {
       } else {
         setError('Failed to load experiments. Please check your API settings.')
       }
-      console.error('Failed to load experiments:', err)
+      debugError('Failed to load experiments:', err)
       setExperiments([])
       setFilteredExperiments([])
     } finally {
@@ -488,7 +490,7 @@ function IndexPopupContent() {
       // Close the popup after opening login
       window.close()
     } catch (err) {
-      console.error('Failed to open login:', err)
+      debugError('Failed to open login:', err)
     }
   }
 
@@ -670,7 +672,7 @@ function IndexPopupContent() {
                 setError('Failed to update experiment')
                 setToast({ message: 'Failed to save experiment', type: 'error' })
               }
-              console.error('Failed to update experiment:', err)
+              debugError('Failed to update experiment:', err)
             }
           }}
           loading={experimentDetailLoading}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Checkbox } from './ui/Checkbox'
@@ -32,7 +34,7 @@ export function DOMChangesEditor({
     const storage = new Storage({ area: "session" })
     storage.get('domChangesEditorState').then(result => {
       if (result && result.variantName === variantName) {
-        console.log('Restoring DOM Changes Editor state:', result)
+        debugLog('Restoring DOM Changes Editor state:', result)
         if (result.showAddModal) {
           setShowAddModal(true)
         }
