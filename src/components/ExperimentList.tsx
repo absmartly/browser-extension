@@ -1,4 +1,5 @@
 import React from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
 import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon } from '@heroicons/react/24/outline'
@@ -191,7 +192,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       {experiments.map((experiment) => {
         // Debug: Check owners structure
         if (experiment.name === 'larger_product_image_size') {
-          console.log('Experiment with owners:', experiment.name, 'Owners:', (experiment as any).owners, 'Created by:', experiment.created_by)
+          debugLog('Experiment with owners:', experiment.name, 'Owners:', (experiment as any).owners, 'Created by:', experiment.created_by)
         }
         const allAvatars = getAllAvatars(experiment)
         const duration = formatDuration(experiment.started_at, experiment.stopped_at)

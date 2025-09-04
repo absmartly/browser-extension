@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { CustomCodeSettings } from './CustomCodeSettings'
@@ -73,7 +74,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         checkAuthStatus(loadedApiEndpoint)
       }
     } catch (error) {
-      console.error('[SettingsView] Failed to load config:', error)
+      debugError('[SettingsView] Failed to load config:', error)
     } finally {
       setLoading(false)
     }
@@ -127,10 +128,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             if (avatarResponse.success && avatarResponse.dataUrl) {
               setAvatarDataUrl(avatarResponse.dataUrl)
             } else {
-              console.error('Failed to fetch avatar:', avatarResponse.error)
+              debugError('Failed to fetch avatar:', avatarResponse.error)
             }
           }).catch(err => {
-            console.error('Error fetching avatar:', err)
+            debugError('Error fetching avatar:', err)
           })
         }
       } else {
@@ -193,7 +194,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       }
       onSave(config)
     } catch (error) {
-      console.error('Failed to save config:', error)
+      debugError('Failed to save config:', error)
       setErrors({ general: 'Failed to save settings' })
     }
   }
@@ -205,6 +206,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       chrome.tabs.create({ url: baseUrl })
     }
   }
+
 
   if (loading) {
     return (
@@ -282,10 +284,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
                   alt={user.name || 'User'} 
                   className="w-10 h-10 rounded-full object-cover"
                   onError={(e) => {
-                    console.error('Avatar failed to load:', avatarDataUrl || user.picture)
+                    debugError('Avatar failed to load:', avatarDataUrl || user.picture)
                     e.currentTarget.style.display = 'none'
-                  }}
-                  onLoad={() => {
                   }}
                 />
               )}
@@ -402,7 +402,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       {/* Custom Code Settings */}
       <CustomCodeSettings onSave={() => {
         // Optionally trigger a refresh or notification
-        console.log('Custom code saved')
+        debugLog('Custom code saved')
       }} />
       
       <div className="flex gap-2 pt-2">

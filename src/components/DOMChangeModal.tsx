@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
@@ -31,7 +33,7 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
     storage.get('domChangeModalState').then(result => {
       if (result) {
         const state = result
-        console.log('Restoring modal state:', state)
+        debugLog('Restoring modal state:', state)
         
         if (state.selectedSelector) {
           setSelector(state.selectedSelector)
@@ -109,9 +111,9 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
     try {
       const storage = new Storage({ area: "session" })
       await storage.set('domChangeModalState', currentState)
-      console.log('Saved modal state before element picker:', currentState)
+      debugLog('Saved modal state before element picker:', currentState)
     } catch (err) {
-      console.error('Failed to save modal state:', err)
+      debugError('Failed to save modal state:', err)
     }
     
     // Store current state and start element picker without closing popup
@@ -123,9 +125,9 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
         
         // Add a listener for the element selection
         const handleElementSelected = (message: any) => {
-          console.log('DOMChangeModal received message:', message)
+          debugLog('DOMChangeModal received message:', message)
           if (message.type === 'ELEMENT_SELECTED' && message.selector) {
-            console.log('Element selected in modal:', message.selector)
+            debugLog('Element selected in modal:', message.selector)
             // Update the stored state with the selected element
             const storage = new Storage({ area: "session" })
             storage.set('domChangeModalState', { 
@@ -144,12 +146,12 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
         chrome.runtime.onMessage.addListener(handleElementSelected)
         
         // Send message to start element picker
-        console.log('Sending START_ELEMENT_PICKER message to tab:', tabId)
+        debugLog('Sending START_ELEMENT_PICKER message to tab:', tabId)
         chrome.tabs.sendMessage(tabId, { 
           type: 'START_ELEMENT_PICKER',
           fromPopup: true
         }, (response) => {
-          console.log('START_ELEMENT_PICKER response:', response)
+          debugLog('START_ELEMENT_PICKER response:', response)
         })
       }
     })

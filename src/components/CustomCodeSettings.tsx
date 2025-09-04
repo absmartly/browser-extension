@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+
 import { Button } from './ui/Button'
 import { PencilIcon } from '@heroicons/react/24/outline'
 import { getCustomCode, setCustomCode } from '~src/utils/storage'
@@ -32,7 +34,7 @@ export function CustomCodeSettings({ onSave }: CustomCodeSettingsProps) {
         setCustomCodeState(code)
       }
     } catch (error) {
-      console.error('Failed to load custom code:', error)
+      debugError('Failed to load custom code:', error)
     } finally {
       setLoading(false)
     }
@@ -45,15 +47,15 @@ export function CustomCodeSettings({ onSave }: CustomCodeSettingsProps) {
 
   const handleSaveSection = async () => {
     if (editingSection) {
-      console.log('Saving section:', editingSection, 'with value:', tempValue)
+      debugLog('Saving section:', editingSection, 'with value:', tempValue)
       const updatedCode = {
         ...customCode,
         [editingSection]: tempValue
       }
-      console.log('Updated custom code:', updatedCode)
+      debugLog('Updated custom code:', updatedCode)
       setCustomCodeState(updatedCode)
       await setCustomCode(updatedCode)
-      console.log('Custom code saved to storage')
+      debugLog('Custom code saved to storage')
       setEditingSection(null)
       setTempValue('')
       onSave?.()
