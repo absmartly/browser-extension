@@ -1,4 +1,5 @@
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 /**
  * API client that communicates through the background service worker
@@ -6,7 +7,7 @@ import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
  */
 export class BackgroundAPIClient {
   async makeRequest(method: string, path: string, data?: any): Promise<any> {
-    console.log('BackgroundAPIClient.makeRequest:', { method, path, data })
+    debugLog('BackgroundAPIClient.makeRequest:', { method, path, data })
     
     const response = await chrome.runtime.sendMessage({
       type: 'API_REQUEST',
@@ -14,46 +15,42 @@ export class BackgroundAPIClient {
       path,
       data
     })
-    
-    console.log('BackgroundAPIClient response:', response)
-    
+    debugLog('BackgroundAPIClient response:', response)
     if (!response.success) {
       // Create an error with additional context
       const error = new Error(response.error || 'API request failed')
       ;(error as any).isAuthError = response.isAuthError
       throw error
     }
-    
     return response.data
   }
-
+  
   async openLogin(): Promise<void> {
     await chrome.runtime.sendMessage({
       type: 'OPEN_LOGIN'
     })
   }
-
+  
   async getExperiments(params?: any): Promise<{experiments: Experiment[], total?: number, hasMore?: boolean}> {
     try {
       const data = await this.makeRequest('GET', '/experiments', params)
-      console.log('API response structure:', data)
+      debugLog('API response structure:', data)
       
       // Handle different possible response structures
       const experiments = data.experiments || data.data || data || []
       const total = data.total || data.totalCount || data.count
       const hasMore = data.has_more || data.hasMore || (params?.page && experiments.length === params.items)
-      
       return {
         experiments: Array.isArray(experiments) ? experiments : [],
         total,
         hasMore
       }
     } catch (error) {
-      console.error('Failed to fetch experiments:', error)
+      debugError('Failed to fetch experiments:', error)
       throw error
     }
   }
-
+  
   async getExperiment(id: number): Promise<Experiment> {
     try {
       const response = await this.makeRequest('GET', `/experiments/${id}`)
@@ -61,106 +58,105 @@ export class BackgroundAPIClient {
       // Extract just the experiment object
       return response.experiment || response
     } catch (error) {
-      console.error(`Failed to fetch experiment ${id}:`, error)
+      debugError(`Failed to fetch experiment ${id}:`, error)
       throw error
     }
   }
-
+  
   async createExperiment(data: any): Promise<Experiment> {
     try {
       return await this.makeRequest('POST', '/experiments', data)
     } catch (error) {
-      console.error('Failed to create experiment:', error)
+      debugError('Failed to create experiment:', error)
       throw error
     }
   }
-
+  
   async updateExperiment(id: number, data: any): Promise<Experiment> {
     try {
       return await this.makeRequest('PUT', `/experiments/${id}`, data)
     } catch (error) {
-      console.error(`Failed to update experiment ${id}:`, error)
+      debugError(`Failed to update experiment ${id}:`, error)
       throw error
     }
   }
-
+  
   async startExperiment(id: number): Promise<Experiment> {
     try {
       const response = await this.makeRequest('PUT', `/experiments/${id}/start`)
       // Extract experiment if response is nested
       return response.experiment || response
     } catch (error) {
-      console.error(`Failed to start experiment ${id}:`, error)
+      debugError(`Failed to start experiment ${id}:`, error)
       throw error
     }
   }
-
+  
   async stopExperiment(id: number): Promise<Experiment> {
     try {
       const response = await this.makeRequest('PUT', `/experiments/${id}/stop`)
-      // Extract experiment if response is nested
       return response.experiment || response
     } catch (error) {
-      console.error(`Failed to stop experiment ${id}:`, error)
+      debugError(`Failed to stop experiment ${id}:`, error)
       throw error
     }
   }
-
+  
   async getApplications(): Promise<any[]> {
     try {
       const data = await this.makeRequest('GET', '/applications')
       return data.applications || []
     } catch (error) {
-      console.error('Failed to fetch applications:', error)
+      debugError('Failed to fetch applications:', error)
       throw error
     }
   }
-
+  
   async getUnitTypes(): Promise<any[]> {
     try {
       const data = await this.makeRequest('GET', '/unit_types')
       return data.unit_types || []
     } catch (error) {
-      console.error('Failed to fetch unit types:', error)
+      debugError('Failed to fetch unit types:', error)
       throw error
     }
   }
-
+  
   async getMetrics(): Promise<any[]> {
     try {
       const data = await this.makeRequest('GET', '/metrics')
       return data.metrics || []
     } catch (error) {
-      console.error('Failed to fetch metrics:', error)
+      debugError('Failed to fetch metrics:', error)
       throw error
     }
   }
-
+  
   async getExperimentTags(): Promise<any[]> {
     try {
       const data = await this.makeRequest('GET', '/experiment_tags')
       return data.experiment_tags || []
     } catch (error) {
-      console.error('Failed to fetch experiment tags:', error)
+      debugError('Failed to fetch experiment tags:', error)
       throw error
     }
   }
-
+  
   async getFavorites(): Promise<number[]> {
     try {
       const data = await this.makeRequest('GET', '/favorites')
       return data?.experiments || []
     } catch (error) {
-      console.error('Failed to fetch favorites:', error)
+      debugError('Failed to fetch favorites:', error)
       throw error
     }
   }
-
+  
   async setExperimentFavorite(id: number, favorite: boolean): Promise<void> {
     try {
       await this.makeRequest('PUT', `/favorites/experiment?id=${id}&favorite=${favorite}`)
     } catch (error) {
-      console.error(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
+      debugError(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
       throw error
     }
   }
