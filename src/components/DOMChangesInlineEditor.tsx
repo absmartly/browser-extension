@@ -2068,10 +2068,15 @@ export function DOMChangesInlineEditor({
                     )}
 
                     {editingChange.type === 'style' && (
-                      <StylePropertiesEditor 
-                        editingChange={editingChange} 
-                        setEditingChange={setEditingChange} 
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Style Properties
+                        </label>
+                        <CSSStyleEditor
+                          styleProperties={editingChange.styleProperties}
+                          onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
+                        />
+                      </div>
                     )}
 
                     {editingChange.type === 'class' && (
@@ -2621,10 +2626,15 @@ export function DOMChangesInlineEditor({
           )}
 
           {editingChange.type === 'style' && (
-            <StylePropertiesEditor 
-              editingChange={editingChange} 
-              setEditingChange={setEditingChange} 
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Style Properties
+              </label>
+              <CSSStyleEditor
+                styleProperties={editingChange.styleProperties}
+                onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
+              />
+            </div>
           )}
 
           {editingChange.type === 'class' && (
