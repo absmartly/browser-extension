@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import StyleEditor from 'react-style-editor'
 
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
@@ -1382,54 +1383,21 @@ export function DOMChangesInlineEditor({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Style Properties
                         </label>
-                        <div className="space-y-2">
-                          {editingChange.styleProperties?.map((prop, propIndex) => (
-                            <div key={propIndex} className="flex gap-2">
-                              <Input
-                                value={prop.key}
-                                onChange={(e) => {
-                                  const newProps = [...(editingChange.styleProperties || [])]
-                                  newProps[propIndex].key = e.target.value
-                                  setEditingChange({ ...editingChange, styleProperties: newProps })
-                                }}
-                                placeholder="Property (e.g., color)"
-                                className="flex-1"
-                              />
-                              <Input
-                                value={prop.value}
-                                onChange={(e) => {
-                                  const newProps = [...(editingChange.styleProperties || [])]
-                                  newProps[propIndex].value = e.target.value
-                                  setEditingChange({ ...editingChange, styleProperties: newProps })
-                                }}
-                                placeholder="Value (e.g., #ff0000)"
-                                className="flex-1"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newProps = editingChange.styleProperties?.filter((_, i) => i !== propIndex) || []
-                                  setEditingChange({ ...editingChange, styleProperties: newProps })
-                                }}
-                                className="p-2 text-red-600 hover:text-red-800"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              const newProps = [...(editingChange.styleProperties || []), { key: '', value: '' }]
+                        <div className="border border-gray-300 rounded-md p-2">
+                          <StyleEditor
+                            style={
+                              editingChange.styleProperties?.reduce((acc, prop) => {
+                                if (prop.key && prop.value) {
+                                  acc[prop.key] = prop.value
+                                }
+                                return acc
+                              }, {} as Record<string, string>) || {}
+                            }
+                            onChange={(newStyles) => {
+                              const newProps = Object.entries(newStyles).map(([key, value]) => ({ key, value }))
                               setEditingChange({ ...editingChange, styleProperties: newProps })
                             }}
-                            size="sm"
-                            variant="secondary"
-                            className="w-full"
-                          >
-                            <PlusIcon className="h-4 w-4 mr-1" />
-                            Add Property
-                          </Button>
+                          />
                         </div>
                       </div>
                     )}
@@ -1985,54 +1953,21 @@ export function DOMChangesInlineEditor({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Style Properties
               </label>
-              <div className="space-y-2">
-                {editingChange.styleProperties?.map((prop, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={prop.key}
-                      onChange={(e) => {
-                        const newProps = [...(editingChange.styleProperties || [])]
-                        newProps[index].key = e.target.value
-                        setEditingChange({ ...editingChange, styleProperties: newProps })
-                      }}
-                      placeholder="Property (e.g., color)"
-                      className="flex-1"
-                    />
-                    <Input
-                      value={prop.value}
-                      onChange={(e) => {
-                        const newProps = [...(editingChange.styleProperties || [])]
-                        newProps[index].value = e.target.value
-                        setEditingChange({ ...editingChange, styleProperties: newProps })
-                      }}
-                      placeholder="Value (e.g., #ff0000)"
-                      className="flex-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newProps = editingChange.styleProperties?.filter((_, i) => i !== index) || []
-                        setEditingChange({ ...editingChange, styleProperties: newProps })
-                      }}
-                      className="p-2 text-red-600 hover:text-red-800"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const newProps = [...(editingChange.styleProperties || []), { key: '', value: '' }]
+              <div className="border border-gray-300 rounded-md p-2">
+                <StyleEditor
+                  style={
+                    editingChange.styleProperties?.reduce((acc, prop) => {
+                      if (prop.key && prop.value) {
+                        acc[prop.key] = prop.value
+                      }
+                      return acc
+                    }, {} as Record<string, string>) || {}
+                  }
+                  onChange={(newStyles) => {
+                    const newProps = Object.entries(newStyles).map(([key, value]) => ({ key, value }))
                     setEditingChange({ ...editingChange, styleProperties: newProps })
                   }}
-                  size="sm"
-                  variant="secondary"
-                  className="w-full"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add Property
-                </Button>
+                />
               </div>
             </div>
           )}
