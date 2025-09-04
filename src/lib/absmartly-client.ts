@@ -1,10 +1,10 @@
 import axios, { AxiosInstance } from 'axios'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 export class ABsmartlyClient {
   private client: AxiosInstance
   private config: ABsmartlyConfig
-
   constructor(config: ABsmartlyConfig) {
     this.config = config
     
@@ -12,7 +12,6 @@ export class ABsmartlyClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }
-    
     // Only add Authorization header if API key is provided
     if (config.apiKey) {
       // Determine auth header based on API key format
@@ -28,13 +27,12 @@ export class ABsmartlyClient {
       withCredentials: !config.apiKey // Use cookies if no API key
     })
   }
-
   async getExperiments(params?: any): Promise<Experiment[]> {
     try {
       const response = await this.client.get('/experiments', { params })
       return response.data.experiments || []
     } catch (error) {
-      console.error('Failed to fetch experiments:', error)
+      debugError('Failed to fetch experiments:', error)
       throw error
     }
   }
@@ -44,7 +42,7 @@ export class ABsmartlyClient {
       const response = await this.client.get(`/experiments/${id}`)
       return response.data
     } catch (error) {
-      console.error(`Failed to fetch experiment ${id}:`, error)
+      debugError(`Failed to fetch experiment ${id}:`, error)
       throw error
     }
   }
@@ -54,7 +52,7 @@ export class ABsmartlyClient {
       const response = await this.client.post('/experiments', data)
       return response.data
     } catch (error) {
-      console.error('Failed to create experiment:', error)
+      debugError('Failed to create experiment:', error)
       throw error
     }
   }
@@ -64,7 +62,7 @@ export class ABsmartlyClient {
       const response = await this.client.put(`/experiments/${id}`, data)
       return response.data
     } catch (error) {
-      console.error(`Failed to update experiment ${id}:`, error)
+      debugError(`Failed to update experiment ${id}:`, error)
       throw error
     }
   }
@@ -74,7 +72,7 @@ export class ABsmartlyClient {
       const response = await this.client.put(`/experiments/${id}/start`)
       return response.data
     } catch (error) {
-      console.error(`Failed to start experiment ${id}:`, error)
+      debugError(`Failed to start experiment ${id}:`, error)
       throw error
     }
   }
@@ -84,7 +82,7 @@ export class ABsmartlyClient {
       const response = await this.client.put(`/experiments/${id}/stop`)
       return response.data
     } catch (error) {
-      console.error(`Failed to stop experiment ${id}:`, error)
+      debugError(`Failed to stop experiment ${id}:`, error)
       throw error
     }
   }
@@ -94,7 +92,7 @@ export class ABsmartlyClient {
       const response = await this.client.get('/applications')
       return response.data.applications || []
     } catch (error) {
-      console.error('Failed to fetch applications:', error)
+      debugError('Failed to fetch applications:', error)
       throw error
     }
   }
@@ -104,7 +102,7 @@ export class ABsmartlyClient {
       const response = await this.client.get('/unit_types')
       return response.data.unit_types || []
     } catch (error) {
-      console.error('Failed to fetch unit types:', error)
+      debugError('Failed to fetch unit types:', error)
       throw error
     }
   }
@@ -114,7 +112,7 @@ export class ABsmartlyClient {
       const response = await this.client.get('/metrics')
       return response.data.metrics || []
     } catch (error) {
-      console.error('Failed to fetch metrics:', error)
+      debugError('Failed to fetch metrics:', error)
       throw error
     }
   }
@@ -124,7 +122,7 @@ export class ABsmartlyClient {
       const response = await this.client.get('/experiment_tags')
       return response.data.experiment_tags || []
     } catch (error) {
-      console.error('Failed to fetch experiment tags:', error)
+      debugError('Failed to fetch experiment tags:', error)
       throw error
     }
   }
@@ -134,16 +132,15 @@ export class ABsmartlyClient {
       const response = await this.client.get('/favorites')
       return response.data?.experiments || []
     } catch (error) {
-      console.error('Failed to fetch favorites:', error)
+      debugError('Failed to fetch favorites:', error)
       throw error
     }
   }
-
   async setExperimentFavorite(id: number, favorite: boolean): Promise<void> {
     try {
       await this.client.put(`/favorites/experiment?id=${id}&favorite=${favorite}`)
     } catch (error) {
-      console.error(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
+      debugError(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
       throw error
     }
   }
