@@ -940,7 +940,7 @@
                   debugError('[ABsmartly Extension] Could not find DOMChangesPlugin in bundle');
                 }
               } else {
-                debugError('[ABsmartly Extension] ABSmartlyDOMChanges not found on window');
+                debugError('[ABsmartly Extension] ABsmartlyDOMChangesPlugin not found on window');
               }
               };
               script.onerror = () => {
