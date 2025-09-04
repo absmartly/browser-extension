@@ -1,6 +1,7 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
 import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 // Storage instance
 const storage = new Storage()
@@ -10,20 +11,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'STORAGE_GET') {
     const sessionStorage = new Storage({ area: "session" })
     sessionStorage.get(message.key).then(value => {
-      console.log('[Background] Storage GET:', message.key, '=', value)
+      debugLog('[Background] Storage GET:', message.key, '=', value)
       sendResponse({ success: true, value })
     }).catch(error => {
-      console.error('[Background] Storage GET error:', error)
+      debugError('[Background] Storage GET error:', error)
       sendResponse({ success: false, error: error.message })
     })
     return true // Keep the message channel open for async response
   } else if (message.type === 'STORAGE_SET') {
     const sessionStorage = new Storage({ area: "session" })
     sessionStorage.set(message.key, message.value).then(() => {
-      console.log('[Background] Storage SET:', message.key, '=', message.value)
+      debugLog('[Background] Storage SET:', message.key, '=', message.value)
       sendResponse({ success: true })
     }).catch(error => {
-      console.error('[Background] Storage SET error:', error)
+      debugError('[Background] Storage SET error:', error)
       sendResponse({ success: false, error: error.message })
     })
     return true // Keep the message channel open for async response
@@ -32,18 +33,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Initialize config with environment variables on startup
 async function initializeConfig() {
-  console.log('[Background] Initializing config...')
+  debugLog('[Background] Initializing config...')
   
   // Get current config from storage
   const storedConfig = await storage.get("absmartly-config") as ABsmartlyConfig | null
-  console.log('[Background] Stored config:', storedConfig)
+  debugLog('[Background] Stored config:', storedConfig)
   
   // Check if we have environment variables
   const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
   const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
   const envApplicationId = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
   
-  console.log('[Background] Environment variables:', {
+  debugLog('[Background] Environment variables:', {
     hasApiKey: !!envApiKey,
     apiEndpoint: envApiEndpoint,
     applicationId: envApplicationId
@@ -60,32 +61,32 @@ async function initializeConfig() {
   if (!newConfig.apiKey && envApiKey) {
     newConfig.apiKey = envApiKey
     updated = true
-    console.log('[Background] Using API key from environment')
+    debugLog('[Background] Using API key from environment')
   }
   
   if (!newConfig.apiEndpoint && envApiEndpoint) {
     newConfig.apiEndpoint = envApiEndpoint
     updated = true
-    console.log('[Background] Using API endpoint from environment')
+    debugLog('[Background] Using API endpoint from environment')
   }
   
   if (!newConfig.applicationId && envApplicationId) {
     newConfig.applicationId = parseInt(envApplicationId)
     updated = true
-    console.log('[Background] Using application ID from environment')
+    debugLog('[Background] Using application ID from environment')
   }
   
   // Save updated config if we made changes
   if (updated) {
     await storage.set("absmartly-config", newConfig)
-    console.log('[Background] Updated config with environment variables:', newConfig)
+    debugLog('[Background] Updated config with environment variables:', newConfig)
   } else {
-    console.log('[Background] No updates needed from environment variables')
+    debugLog('[Background] No updates needed from environment variables')
   }
 }
 
 // Initialize on startup
-initializeConfig().catch(console.error)
+initializeConfig().catch(err => debugError('Init config error:', err))
 
 // Helper function to get config
 async function getConfig(): Promise<ABsmartlyConfig | null> {
@@ -118,7 +119,7 @@ async function getJWTCookie(domain: string): Promise<string | null> {
   try {
     // Remove protocol and path from domain
     const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-    console.log('Looking for JWT cookie for domain:', cleanDomain)
+    debugLog('Looking for JWT cookie for domain:', cleanDomain)
     
     // Try to get ALL cookies for the URL to see what's available
     const url = domain.startsWith('http') ? domain : `https://${domain}`
@@ -126,11 +127,11 @@ async function getJWTCookie(domain: string): Promise<string | null> {
       url: url 
     })
     
-    console.log(`Found ${allCookiesForUrl.length} cookies for URL ${url}`)
+    debugLog(`Found ${allCookiesForUrl.length} cookies for URL ${url}`)
     // Only log JWT cookie if found
     const jwtPreview = allCookiesForUrl.find(c => c.name.toLowerCase() === 'jwt')
     if (jwtPreview) {
-      console.log(`  - jwt cookie found (length: ${jwtPreview.value.length})`)
+      debugLog(`  - jwt cookie found (length: ${jwtPreview.value.length})`)
     }
     
     // Look for JWT cookie - check common ABsmartly cookie names first
@@ -145,7 +146,7 @@ async function getJWTCookie(domain: string): Promise<string | null> {
     )
     
     if (jwtCookie) {
-      console.log('Found JWT cookie:', jwtCookie.name, 'value length:', jwtCookie.value.length)
+      debugLog('Found JWT cookie:', jwtCookie.name, 'value length:', jwtCookie.value.length)
       return jwtCookie.value
     }
     
@@ -154,7 +155,7 @@ async function getJWTCookie(domain: string): Promise<string | null> {
       domain: cleanDomain 
     })
     
-    console.log(`Found ${cookies.length} cookies for domain ${cleanDomain}`)
+    debugLog(`Found ${cookies.length} cookies for domain ${cleanDomain}`)
     
     const domainJwtCookie = cookies.find(cookie => 
       cookie.name === 'jwt' ||
@@ -165,7 +166,7 @@ async function getJWTCookie(domain: string): Promise<string | null> {
     )
     
     if (domainJwtCookie) {
-      console.log('Found JWT cookie from domain search:', domainJwtCookie.name)
+      debugLog('Found JWT cookie from domain search:', domainJwtCookie.name)
       return domainJwtCookie.value
     }
     
@@ -176,7 +177,7 @@ async function getJWTCookie(domain: string): Promise<string | null> {
         domain: `.${baseDomain}` // Leading dot for domain cookies
       })
       
-      console.log(`Found ${baseCookies.length} cookies for base domain .${baseDomain}`)
+      debugLog(`Found ${baseCookies.length} cookies for base domain .${baseDomain}`)
       
       const baseJwtCookie = baseCookies.find(cookie => 
         cookie.name === 'jwt' ||
@@ -187,25 +188,25 @@ async function getJWTCookie(domain: string): Promise<string | null> {
       )
       
       if (baseJwtCookie) {
-        console.log('Found JWT cookie from base domain:', baseJwtCookie.name)
+        debugLog('Found JWT cookie from base domain:', baseJwtCookie.name)
         return baseJwtCookie.value
       }
     }
     
-    console.log('No JWT cookie found for domain:', cleanDomain)
+    debugLog('No JWT cookie found for domain:', cleanDomain)
     return null
   } catch (error) {
-    console.error('Error getting JWT cookie:', error)
+    debugError('Error getting JWT cookie:', error)
     return null
   }
 }
 
 // Helper function to make API requests with automatic JWT fallback
 async function makeAPIRequest(method: string, path: string, data?: any, retryWithJWT: boolean = true) {
-  console.log('=== makeAPIRequest called ===', { method, path, data })
+  debugLog('=== makeAPIRequest called ===', { method, path, data })
   
   const config = await getConfig()
-  console.log('Config loaded:', { 
+  debugLog('Config loaded:', { 
     hasApiKey: !!config?.apiKey, 
     apiEndpoint: config?.apiEndpoint,
     apiKeyLength: config?.apiKey?.length || 0
@@ -228,7 +229,7 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
 
     // If we know JWT works better, try it first
     if (shouldTryJwtFirst && useApiKey) {
-      console.log('Preferring JWT based on previous success...')
+      debugLog('Preferring JWT based on previous success...')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
       if (jwtToken) {
         if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
@@ -236,24 +237,24 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
         } else {
           headers['Authorization'] = `Bearer ${jwtToken}`
         }
-        console.log('Using cached JWT preference')
+        debugLog('Using cached JWT preference')
         return headers
       }
-      console.log('JWT not available, falling back to API key')
+      debugLog('JWT not available, falling back to API key')
     }
 
     // Try API key if available and we haven't disabled it
     if (config.apiKey && useApiKey && !shouldTryJwtFirst) {
-      console.log('Using API key for auth')
+      debugLog('Using API key for auth')
       const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
         ? `JWT ${config.apiKey}`
         : `Api-Key ${config.apiKey}`
       headers['Authorization'] = authHeader
     } else if (!config.apiKey || !useApiKey) {
       // Try to get JWT from cookies
-      console.log('Attempting to get JWT from cookies...')
+      debugLog('Attempting to get JWT from cookies...')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
-      console.log('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length})` : 'Not found')
+      debugLog('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length})` : 'Not found')
       
       if (jwtToken) {
         // Determine if it's already a full JWT or just the token
@@ -262,9 +263,9 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
         } else {
           headers['Authorization'] = `Bearer ${jwtToken}`
         }
-        console.log('Using JWT from cookie for authentication')
+        debugLog('Using JWT from cookie for authentication')
       } else {
-        console.log('No JWT cookie available')
+        debugLog('No JWT cookie available')
       }
     }
     
@@ -302,7 +303,7 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
     requestData = data
   }
 
-  console.log('Making axios request:', { 
+  debugLog('Making axios request:', { 
     method, 
     url, 
     requestData, 
@@ -320,11 +321,11 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
 
     return response.data
   } catch (error) {
-    console.error('Request failed:', error.response?.status, error.response?.data)
+    debugError('Request failed:', error.response?.status, error.response?.data)
     
     // If we got a 401 and we were using an API key, retry with JWT from cookies
     if (isAuthError(error) && config.apiKey && retryWithJWT && headers.Authorization?.startsWith('Api-Key')) {
-      console.log('API key auth failed (401), retrying with JWT cookie...')
+      debugLog('API key auth failed (401), retrying with JWT cookie...')
       
       // Try to get JWT from cookies
       const jwtToken = await getJWTCookie(config.apiEndpoint)
@@ -342,7 +343,7 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
           newHeaders['Authorization'] = `Bearer ${jwtToken}`
         }
         
-        console.log('Retrying with JWT authorization:', newHeaders.Authorization)
+        debugLog('Retrying with JWT authorization:', newHeaders.Authorization)
         
         // Make the request directly with new headers, don't recurse
         try {
@@ -354,17 +355,17 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
             withCredentials: false
           })
           
-          console.log('JWT fallback successful!')
+          debugLog('JWT fallback successful!')
           // Cache that JWT works better than API key
           await storage.set('auth-method-preference', 'jwt')
           
           return response.data
         } catch (jwtError) {
-          console.error('JWT fallback also failed:', jwtError.response?.status)
+          debugError('JWT fallback also failed:', jwtError.response?.status)
           throw new Error('AUTH_EXPIRED')
         }
       } else {
-        console.log('No JWT cookie available for retry')
+        debugLog('No JWT cookie available for retry')
       }
     }
     
@@ -378,11 +379,11 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
 
 // Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('🔵 Background received message:', message.type, 'Full message:', message)
+  debugLog('🔵 Background received message:', message.type, 'Full message:', message)
   
   // Test message
   if (message.type === 'PING') {
-    console.log('🏓 PONG! Message system is working')
+    debugLog('🏓 PONG! Message system is working')
     sendResponse({ pong: true })
     return false
   }
@@ -396,7 +397,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
   } else if (message.type === "ELEMENT_SELECTED") {
     // Element picker returned a selector
-    console.log('Background received ELEMENT_SELECTED:', message)
+    debugLog('Background received ELEMENT_SELECTED:', message)
     
     if (message.reopenPopup) {
       // Store the result using Plasmo Storage for cross-browser compatibility
@@ -405,7 +406,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Get the current state to find out which field we were picking for
       sessionStorage.get('domChangesInlineState').then(async (state) => {
         if (state && state.pickingForField) {
-          console.log('Storing element picker result for field:', state.pickingForField)
+          debugLog('Storing element picker result for field:', state.pickingForField)
           
           // Store the result
           await sessionStorage.set('elementPickerResult', {
@@ -435,15 +436,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true // Will respond asynchronously
   } else if (message.type === "API_REQUEST") {
     // Handle API requests
-    console.log('Background received API_REQUEST:', { method: message.method, path: message.path, data: message.data })
+    debugLog('Background received API_REQUEST:', { method: message.method, path: message.path, data: message.data })
     
     makeAPIRequest(message.method, message.path, message.data)
       .then(data => {
-        console.log('Background API request successful')
+        debugLog('Background API request successful')
         sendResponse({ success: true, data })
       })
       .catch(error => {
-        console.error('Background API request failed:', error)
+        debugError('Background API request failed:', error)
         const errorMessage = error.message || 'API request failed'
         sendResponse({ 
           success: false, 
@@ -482,7 +483,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         // Try to get user info directly from /auth/current-user
         const fullAuthUrl = `${baseUrl}/auth/current-user`
-        console.log('CHECK_AUTH: Fetching user from', fullAuthUrl)
+        debugLog('CHECK_AUTH: Fetching user from', fullAuthUrl)
         
         // Build auth headers
         const authHeaders: any = {
@@ -501,14 +502,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
               ? `JWT ${jwtToken}`
               : `Bearer ${jwtToken}`
-            console.log('CHECK_AUTH: Using JWT from preference')
+            debugLog('CHECK_AUTH: Using JWT from preference')
           }
         } else if (config.apiKey) {
           // Try API key first
           authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
             ? `JWT ${config.apiKey}`
             : `Api-Key ${config.apiKey}`
-          console.log('CHECK_AUTH: Using API key')
+          debugLog('CHECK_AUTH: Using API key')
         } else {
           // No API key, try JWT
           const jwtToken = await getJWTCookie(config.apiEndpoint)
@@ -516,7 +517,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
               ? `JWT ${jwtToken}`
               : `Bearer ${jwtToken}`
-            console.log('CHECK_AUTH: Using JWT (no API key available)')
+            debugLog('CHECK_AUTH: Using JWT (no API key available)')
           }
         }
         
@@ -541,7 +542,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   // No avatar found in user response
                 }
               } catch (avatarError) {
-                console.log('Could not fetch full user details for avatar:', avatarError)
+                debugLog('Could not fetch full user details for avatar:', avatarError)
               }
             }
             
@@ -549,7 +550,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } catch (authError) {
           // If first attempt failed with API key, try with JWT
           if (authError.response?.status === 401 && config.apiKey && !shouldTryJwtFirst) {
-            console.log('CHECK_AUTH: API key failed, trying JWT fallback')
+            debugLog('CHECK_AUTH: API key failed, trying JWT fallback')
             const jwtToken = await getJWTCookie(config.apiEndpoint)
             
             if (jwtToken) {
@@ -565,35 +566,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 
                 // Cache that JWT works better
                 await storage.set('auth-method-preference', 'jwt')
-                console.log('CHECK_AUTH: JWT fallback successful')
+                debugLog('CHECK_AUTH: JWT fallback successful')
                 
                 sendResponse({ success: true, data: retryResponse.data })
               } catch (retryError) {
-                console.log('CHECK_AUTH: JWT also failed')
+                debugLog('CHECK_AUTH: JWT also failed')
                 sendResponse({ success: false, error: 'Not authenticated' })
               }
             } else {
               sendResponse({ success: false, error: 'Not authenticated' })
             }
           } else {
-            console.log('CHECK_AUTH: Authentication failed:', authError.response?.status)
+            debugLog('CHECK_AUTH: Authentication failed:', authError.response?.status)
             sendResponse({ success: false, error: 'Not authenticated' })
           }
         }
       } catch (error) {
-        console.error('Auth check error:', error)
+        debugError('Auth check error:', error)
         sendResponse({ success: false, error: error.message || 'Auth check failed' })
       }
     }).catch(error => {
-      console.error('Config error:', error)
+      debugError('Config error:', error)
       sendResponse({ success: false, error: 'Failed to get config' })
     })
     return true // Will respond asynchronously
   } else if (message.type === "START_VISUAL_EDITOR") {
     // Forward visual editor command to content script in active tab
-    console.log('===============================================')
-    console.log('Background received START_VISUAL_EDITOR:', message)
-    console.log('===============================================')
+    debugLog('===============================================')
+    debugLog('Background received START_VISUAL_EDITOR:', message)
+    debugLog('===============================================')
     
     // Handle async properly
     ;(async () => {
@@ -603,25 +604,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const tabId = tabs[0].id
           const tabUrl = tabs[0].url
           
-          console.log('Attempting to start visual editor on tab:', tabId, 'URL:', tabUrl)
+          debugLog('Attempting to start visual editor on tab:', tabId, 'URL:', tabUrl)
           
           // Check if this is a restricted URL
           if (tabUrl?.startsWith('chrome://') || 
               tabUrl?.startsWith('chrome-extension://') || 
               tabUrl?.startsWith('edge://') ||
               tabUrl?.startsWith('about:')) {
-            console.error('Cannot inject content script on restricted URL:', tabUrl)
+            debugError('Cannot inject content script on restricted URL:', tabUrl)
             sendResponse({ success: false, error: 'Cannot use visual editor on browser pages' })
             return
           }
           
           // Always inject the visual editor directly
-          console.log('Injecting visual editor directly into page...')
-          console.log('Tab ID:', tabId, 'Tab URL:', tabUrl)
+          debugLog('Injecting visual editor directly into page...')
+          debugLog('Tab ID:', tabId, 'Tab URL:', tabUrl)
           
           try {
             // First, test with a simple alert to confirm injection works
-            console.log('Testing simple injection first...')
+            debugLog('Testing simple injection first...')
             const testResult = await chrome.scripting.executeScript({
               target: { tabId: tabId },
               func: () => {
@@ -629,7 +630,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 return { test: 'success' }
               }
             })
-            console.log('Test injection result:', testResult)
+            debugLog('Test injection result:', testResult)
             
             // Now inject the actual visual editor
             const injectionResult = await chrome.scripting.executeScript({
@@ -757,6 +758,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         <span class="banner-button-icon">✓</span>
                         <span>Save</span>
                       </button>
+                      <button class="banner-button" id="absmartly-exit-btn" title="Exit visual editor" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.3);">
+                        <span class="banner-button-icon">✕</span>
+                        <span>Exit</span>
+                      </button>
                     </div>
                   `
                   
@@ -769,6 +774,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   const redoBtn = bannerShadow.getElementById('absmartly-redo-btn')
                   const clearBtn = bannerShadow.getElementById('absmartly-clear-btn')
                   const saveBtn = bannerShadow.getElementById('absmartly-save-btn')
+                  const exitBtn = bannerShadow.getElementById('absmartly-exit-btn')
                   const changesCounter = bannerShadow.getElementById('absmartly-changes-counter')
                   
                   // Store references globally for updates
@@ -787,11 +793,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       updateUndoRedoButtons()
                       updateChangesCounter()
                       showNotification('All changes cleared')
+                      // Exit visual editor after clearing
+                      setTimeout(() => cleanupVisualEditor(), 1000)
                     }
                   })
                   
                   saveBtn?.addEventListener('click', () => {
-                    if (allChanges.length > 0) {
+                    if (allChanges.length > 0 && !changesSent) {
                       // Optimize changes: squash multiple moves of the same element
                       const optimizedChanges = []
                       const elementTracking = new Map() // Track elements by selector or ID
@@ -915,10 +923,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       }, '*')
                       
                       console.log('[ABSmartly] Sent changes via postMessage:', domChanges)
+                      changesSent = true  // Mark changes as sent
                       showNotification(`Saved ${optimizedChanges.length} changes (optimized from ${allChanges.length})`)
+                      // Exit visual editor after successful save
+                      setTimeout(() => cleanupVisualEditor(), 1500)
                     } else {
                       showNotification('No changes to save')
                     }
+                  })
+                  
+                  // Add exit button handler and cleanup function
+                  function cleanupVisualEditor() {
+                    // Remove all event listeners
+                    document.removeEventListener('mouseover', handleMouseOver)
+                    document.removeEventListener('mouseout', handleMouseOut)
+                    document.removeEventListener('click', handleClick)
+                    document.removeEventListener('keydown', handleKeyPress)
+                    
+                    // Remove visual editor elements
+                    document.getElementById('absmartly-visual-editor-banner-host')?.remove()
+                    document.getElementById('absmartly-visual-editor-styles')?.remove()
+                    document.getElementById('absmartly-menu-host')?.remove()
+                    document.getElementById('absmartly-html-editor-host')?.remove()
+                    document.getElementById('absmartly-hover-tooltip')?.remove()
+                    
+                    // Remove any selected/hover classes
+                    document.querySelectorAll('.absmartly-hover').forEach(el => {
+                      el.classList.remove('absmartly-hover')
+                    })
+                    document.querySelectorAll('.absmartly-selected').forEach(el => {
+                      el.classList.remove('absmartly-selected')
+                    })
+                    
+                    // Clear visual editor state
+                    window.__absmartlyVisualEditorActive = false
+                    window.postMessage({
+                      source: 'absmartly-visual-editor',
+                      type: 'VISUAL_EDITOR_CLOSED'
+                    }, '*')
+                    
+                    console.log('[ABSmartly] Visual editor cleaned up and closed')
+                  }
+                  
+                  exitBtn?.addEventListener('click', () => {
+                    if (allChanges.length > 0 && !confirm('You have unsaved changes. Are you sure you want to exit?')) {
+                      return
+                    }
+                    cleanupVisualEditor()
                   })
                   
                   // Add visual editor styles
@@ -953,6 +1004,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   const changeHistory = []
                   let historyIndex = -1
                   const MAX_HISTORY = 50
+                  let changesSent = false  // Track if changes were already sent
                   
                   // Hover tooltip element
                   let hoverTooltip = null
@@ -2592,7 +2644,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     // ESC to exit
                     if (e.key === 'Escape') {
                       // Send all changes to the sidebar before exiting
-                      if (allChanges.length > 0) {
+                      if (allChanges.length > 0 && !changesSent) {
                         console.log('[ABSmartly] Sending all changes to sidebar:', allChanges)
                         
                         // Convert changes to DOM change format for the sidebar
@@ -2702,12 +2754,75 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   
                   // Helper function to get selector
                   function getSelector(element) {
-                    if (element.id) return '#' + element.id
-                    if (element.className && typeof element.className === 'string') {
-                      const classes = element.className.split(' ').filter(c => !c.includes('absmartly'))
-                      if (classes.length) return '.' + classes.join('.')
+                    // Check if ID exists and is not auto-generated
+                    if (element.id && !isAutoGenerated(element.id)) {
+                      return '#' + element.id
                     }
-                    return element.tagName.toLowerCase()
+                    
+                    // Check for semantic classes
+                    if (element.className && typeof element.className === 'string') {
+                      const classes = element.className.split(' ')
+                        .filter(c => !c.includes('absmartly') && !isAutoGenerated(c))
+                      
+                      if (classes.length > 0) {
+                        // Prefer shorter, likely human-readable classes
+                        const semanticClasses = classes.filter(c => c.length < 20 && !c.match(/^[a-z]{1,3}-[a-f0-9]{6,}$/i))
+                        if (semanticClasses.length > 0) {
+                          return element.tagName.toLowerCase() + '.' + semanticClasses[0]
+                        }
+                      }
+                    }
+                    
+                    // Build selector using parent chain if no good ID or class
+                    let path = []
+                    let current = element
+                    
+                    while (current && current !== document.body && path.length < 3) {
+                      let selector = current.tagName.toLowerCase()
+                      
+                      // Check if this element has a good ID
+                      if (current.id && !isAutoGenerated(current.id)) {
+                        path.unshift('#' + current.id)
+                        break
+                      }
+                      
+                      // Add index if there are multiple siblings of same type
+                      if (current.parentElement) {
+                        const siblings = Array.from(current.parentElement.children)
+                          .filter(child => child.tagName === current.tagName)
+                        if (siblings.length > 1) {
+                          const index = siblings.indexOf(current) + 1
+                          selector += ':nth-of-type(' + index + ')'
+                        }
+                      }
+                      
+                      path.unshift(selector)
+                      current = current.parentElement
+                    }
+                    
+                    return path.join(' > ')
+                  }
+                  
+                  // Helper function to check if string is auto-generated
+                  function isAutoGenerated(str) {
+                    if (!str) return false
+                    
+                    // Check for common auto-generated patterns
+                    const patterns = [
+                      /^framer-[a-zA-Z0-9]+$/,  // Framer classes
+                      /^[a-z]{1,3}-[a-f0-9]{6,}$/i,  // Hash-based classes
+                      /^css-[a-z0-9]+$/i,  // CSS modules
+                      /^sc-[a-zA-Z0-9]+$/,  // Styled-components
+                      /^[a-zA-Z0-9]{8,}$/,  // Long random strings
+                      /^v-[a-f0-9]{8}$/,  // Vue scoped classes
+                      /^svelte-[a-z0-9]+$/,  // Svelte classes
+                      /^emotion-[0-9]+$/,  // Emotion CSS
+                      /^chakra-/,  // Chakra UI
+                      /^MuiBox-root/,  // Material-UI
+                      /^[0-9]/  // Starts with number
+                    ]
+                    
+                    return patterns.some(pattern => pattern.test(str))
                   }
                   
                   // Add event listeners
@@ -2761,7 +2876,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 world: 'MAIN' // Run in main world to modify the page directly
               })
               
-              console.log('Inline injection result:', injectionResult)
+              debugLog('Inline injection result:', injectionResult)
               
               // Also inject a content script to relay messages from MAIN world to extension
               await chrome.scripting.executeScript({
@@ -2789,25 +2904,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 world: 'ISOLATED' // Run in content script world to access chrome.runtime
               })
               
-              console.log('Message relay installed')
+              debugLog('Message relay installed')
               sendResponse({ success: true, message: 'Visual editor started successfully' })
           } catch (error) {
-            console.error('Failed to inject visual editor script:', error)
+            debugError('Failed to inject visual editor script:', error)
             sendResponse({ success: false, error: error.message || 'Failed to inject visual editor script' })
           }
         } else {
-          console.error('No active tab found')
+          debugError('No active tab found')
           sendResponse({ success: false, error: 'No active tab found' })
         }
       } catch (error) {
-        console.error('Unexpected error in START_VISUAL_EDITOR handler:', error)
+        debugError('Unexpected error in START_VISUAL_EDITOR handler:', error)
         sendResponse({ success: false, error: error.message || 'Unexpected error' })
       }
     })()
     
     return true // Will respond asynchronously
   } else if (message.type === "VISUAL_EDITOR_CHANGE") {
-    console.log('[Background] Visual editor change received:', message.change)
+    debugLog('[Background] Visual editor change received:', message.change)
     
     // Store the change
     chrome.storage.local.get(['visualEditorChanges'], (result) => {
@@ -2817,14 +2932,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       chrome.storage.local.set({ 
         visualEditorChanges: changes 
       }, () => {
-        console.log('[Background] Visual editor change saved')
+        debugLog('[Background] Visual editor change saved')
         sendResponse({ success: true })
       })
     })
     
     return true // Will respond asynchronously
   } else if (message.type === "VISUAL_EDITOR_COMPLETE") {
-    console.log('[Background] Visual editor complete with changes:', message)
+    debugLog('[Background] Visual editor complete with changes:', message)
     
     // Forward all changes to the sidebar
     chrome.runtime.sendMessage({
@@ -2851,7 +2966,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       lastVisualEditorChanges: message.changes,
       lastVisualEditorVariant: message.variantName
     }, () => {
-      console.log('[Background] Visual editor complete changes saved')
+      debugLog('[Background] Visual editor complete changes saved')
       sendResponse({ success: true, changesSaved: message.totalChanges })
     })
     
@@ -2889,14 +3004,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, dataUrl })
       })
       .catch(error => {
-        console.error('Avatar fetch error:', error)
+        debugError('Avatar fetch error:', error)
         sendResponse({ success: false, error: error.message })
       })
     })
     return true // Will respond asynchronously
   } else if (message.type === "REQUEST_INJECTION_CODE") {
     // Handle request from SDK plugin for custom code injection
-    console.log('Background received REQUEST_INJECTION_CODE from SDK plugin')
+    debugLog('Background received REQUEST_INJECTION_CODE from SDK plugin')
     
     storage.get("absmartly-custom-code").then((customCode: CustomCode | null) => {
       if (customCode) {
@@ -2909,13 +3024,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           styleTag: customCode.styleTag || ''
         }
         
-        console.log('Sending custom code to SDK plugin:', injectionData)
+        debugLog('Sending custom code to SDK plugin:', injectionData)
         sendResponse({ 
           success: true, 
           data: injectionData 
         })
       } else {
-        console.log('No custom code configured')
+        debugLog('No custom code configured')
         sendResponse({ 
           success: true, 
           data: {
@@ -2928,7 +3043,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         })
       }
     }).catch(error => {
-      console.error('Error retrieving custom code:', error)
+      debugError('Error retrieving custom code:', error)
       sendResponse({ 
         success: false, 
         error: error.message 
@@ -2938,7 +3053,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true // Will respond asynchronously
   } else if (message.type === "CODE_EDITOR_SAVE" || message.type === "CODE_EDITOR_CLOSE") {
     // Forward these messages from content script to popup
-    console.log('Background forwarding message to popup:', message.type)
+    debugLog('Background forwarding message to popup:', message.type)
     
     // Send to all extension views (including popup)
     chrome.runtime.sendMessage(message)
@@ -2962,7 +3077,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // Handle extension icon clicks
 chrome.action.onClicked.addListener(async (tab) => {
-  console.log('[Background] Extension icon clicked for tab:', tab.id)
+  debugLog('[Background] Extension icon clicked for tab:', tab.id)
   
   if (tab.id && tab.url) {
     // Don't inject on chrome:// or other restricted URLs
@@ -2970,7 +3085,7 @@ chrome.action.onClicked.addListener(async (tab) => {
         tab.url.startsWith('edge://') || 
         tab.url.startsWith('about:') ||
         tab.url.startsWith('chrome-extension://')) {
-      console.log('[Background] Cannot inject sidebar on restricted URL:', tab.url)
+      debugLog('[Background] Cannot inject sidebar on restricted URL:', tab.url)
       return
     }
     
@@ -3042,7 +3157,7 @@ chrome.action.onClicked.addListener(async (tab) => {
           }
         })
     } catch (error) {
-      console.error('[Background] Failed to inject sidebar:', error)
+      debugError('[Background] Failed to inject sidebar:', error)
     }
   }
 })
