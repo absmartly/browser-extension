@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Copy sidebar files from tabs folder to root for injection
 const buildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-prod');
@@ -39,22 +40,51 @@ if (fs.existsSync(tabsDir)) {
   }
 }
 
-// Copy inject-sdk-plugin.js from public to build directory
+// Copy inject-sdk-plugin.js with hash from public to build directory
 const injectScriptSource = path.join(publicDir, 'inject-sdk-plugin.js');
-const injectScriptDest = path.join(buildDir, 'inject-sdk-plugin.js');
 if (fs.existsSync(injectScriptSource)) {
+  // Read the file content and generate a hash
+  const fileContent = fs.readFileSync(injectScriptSource, 'utf8');
+  const hash = crypto.createHash('md5').update(fileContent).digest('hex').substring(0, 8);
+  const hashedFilename = `inject-sdk-plugin.${hash}.js`;
+  
+  // Copy to prod build with hash
+  const injectScriptDest = path.join(buildDir, hashedFilename);
   fs.copyFileSync(injectScriptSource, injectScriptDest);
-  console.log('Copied inject-sdk-plugin.js to build directory');
-}
-
-// Also copy to dev build if it exists
-const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
-if (fs.existsSync(devBuildDir)) {
-  const devInjectScriptDest = path.join(devBuildDir, 'inject-sdk-plugin.js');
-  if (fs.existsSync(injectScriptSource)) {
+  console.log(`Copied inject-sdk-plugin.js as ${hashedFilename} to build directory`);
+  
+  // Also copy to dev build if it exists
+  const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
+  if (fs.existsSync(devBuildDir)) {
+    const devInjectScriptDest = path.join(devBuildDir, hashedFilename);
     fs.copyFileSync(injectScriptSource, devInjectScriptDest);
-    console.log('Copied inject-sdk-plugin.js to dev build directory');
+    console.log(`Copied inject-sdk-plugin.js as ${hashedFilename} to dev build directory`);
   }
+  
+  // Create a mapping file so the content script knows which file to load
+  const mappingData = { filename: hashedFilename, hash: hash };
+  const mappingPath = path.join(buildDir, 'inject-sdk-plugin-mapping.json');
+  fs.writeFileSync(mappingPath, JSON.stringify(mappingData));
+  console.log('Created inject-sdk-plugin-mapping.json');
+  
+  if (fs.existsSync(devBuildDir)) {
+    const devMappingPath = path.join(devBuildDir, 'inject-sdk-plugin-mapping.json');
+    fs.writeFileSync(devMappingPath, JSON.stringify(mappingData));
+    console.log('Created inject-sdk-plugin-mapping.json in dev build');
+  }
+  
+  // Clean up old versioned files (optional)
+  [buildDir, devBuildDir].forEach(dir => {
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir);
+      files.forEach(file => {
+        if (file.startsWith('inject-sdk-plugin.') && file.endsWith('.js') && file !== hashedFilename) {
+          fs.unlinkSync(path.join(dir, file));
+          console.log(`Removed old version: ${file}`);
+        }
+      });
+    }
+  });
 }
 
 // Copy ABsmartly DOM Changes Plugin from node_modules

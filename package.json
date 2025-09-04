@@ -5,7 +5,7 @@
   "description": "A basic Plasmo extension.",
   "author": "Jonas Alves",
   "scripts": {
-    "dev": "plasmo dev --src-path=.",
+    "dev": "plasmo dev --src-path=. & node scripts/dev-build.js --watch",
     "build": "plasmo build --src-path=. && node scripts/post-build.js",
     "package": "plasmo package --src-path=.",
     "test": "playwright test",
@@ -55,6 +55,8 @@
           "assets/absmartly-logo-white.svg",
           "tabs/*",
           "inject-sdk-plugin.js",
+          "inject-sdk-plugin.*.js",
+          "inject-sdk-plugin-mapping.json",
           "absmartly-dom-changes.min.js"
         ],
         "matches": ["<all_urls>"]
