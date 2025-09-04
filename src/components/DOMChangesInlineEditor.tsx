@@ -132,15 +132,15 @@ const highlightCSSSelector = (selector: string): React.ReactNode => {
       {parts.map((part, index) => {
         switch (part.type) {
           case 'class':
-            return <span key={index} className="text-blue-600 font-bold">{part.value}</span>
+            return <span key={index} className="text-blue-600">{part.value}</span>
           case 'id':
-            return <span key={index} className="text-purple-600 font-bold">{part.value}</span>
+            return <span key={index} className="text-purple-600">{part.value}</span>
           case 'bracket':
             return <span key={index} className="text-gray-600">{part.value}</span>
           case 'pseudo':
             return <span key={index} className="text-green-600">{part.value}</span>
           case 'combinator':
-            return <span key={index} className="text-orange-600 font-bold">{part.value}</span>
+            return <span key={index} className="text-orange-600">{part.value}</span>
           case 'string':
             return <span key={index} className="text-red-500">{part.value}</span>
           default:
@@ -227,7 +227,7 @@ const highlightHTML = (html: string): React.ReactNode => {
           case 'bracket':
             return <span key={index} className="text-gray-600">{part.value}</span>
           case 'tagName':
-            return <span key={index} className="text-blue-600 font-semibold">{part.value}</span>
+            return <span key={index} className="text-blue-600">{part.value}</span>
           case 'attribute':
             return <span key={index} className="text-purple-600">{part.value}</span>
           case 'string':
