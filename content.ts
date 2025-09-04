@@ -4,6 +4,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import { VisualEditor } from '~src/content/visual-editor'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -16,25 +17,25 @@ let elementPicker: ElementPicker | null = null
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[Visual Editor Content Script] Received message:', message.type)
+  debugLog('[Visual Editor Content Script] Received message:', message.type)
   
   // Handle test connection message
   if (message.type === 'TEST_CONNECTION') {
-    console.log('[Visual Editor Content Script] Received message: TEST_CONNECTION')
+    debugLog('[Visual Editor Content Script] Received message: TEST_CONNECTION')
     sendResponse({ success: true, message: 'Content script is loaded and ready' })
     return true
   }
   
   // Handle element picker message
   if (message.type === 'START_ELEMENT_PICKER') {
-    console.log('[Visual Editor Content Script] Starting element picker')
+    debugLog('[Visual Editor Content Script] Starting element picker')
     
     if (!elementPicker) {
       elementPicker = new ElementPicker()
     }
     
     elementPicker.start((selector: string) => {
-      console.log('[Visual Editor Content Script] Element selected:', selector)
+      debugLog('[Visual Editor Content Script] Element selected:', selector)
       // Send the selected element back to the extension
       chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
@@ -49,7 +50,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Handle cancel element picker message
   if (message.type === 'CANCEL_ELEMENT_PICKER') {
-    console.log('[Visual Editor Content Script] Canceling element picker')
+    debugLog('[Visual Editor Content Script] Canceling element picker')
     
     if (elementPicker) {
       elementPicker.stop()
@@ -61,7 +62,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.type === 'START_VISUAL_EDITOR') {
-    console.log('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)
+    debugLog('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)
     
     try {
       // Stop any existing editor
@@ -75,7 +76,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         variantName: message.variantName,
         initialChanges: message.changes || [],
         onChangesUpdate: (changes: DOMChange[]) => {
-          console.log('[Visual Editor Content Script] Changes updated:', changes)
+          debugLog('[Visual Editor Content Script] Changes updated:', changes)
           // Send changes back to extension
           chrome.runtime.sendMessage({
             type: 'VISUAL_EDITOR_CHANGES',
@@ -87,9 +88,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
       currentEditor.start()
       sendResponse({ success: true })
-      console.log('[Visual Editor Content Script] Visual editor started successfully')
+      debugLog('[Visual Editor Content Script] Visual editor started successfully')
     } catch (error) {
-      console.error('[Visual Editor Content Script] Error starting visual editor:', error)
+      debugError('[Visual Editor Content Script] Error starting visual editor:', error)
       sendResponse({ success: false, error: error.message })
     }
     
@@ -97,7 +98,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.type === 'STOP_VISUAL_EDITOR') {
-    console.log('[Visual Editor Content Script] Stopping visual editor')
+    debugLog('[Visual Editor Content Script] Stopping visual editor')
     
     if (currentEditor) {
       const changes = currentEditor.getChanges()
@@ -121,7 +122,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Handle preview messages
   if (message.type === 'ABSMARTLY_PREVIEW') {
-    console.log('[ABSmartly Content Script] Received preview message:', message.action)
+    debugLog('[ABSmartly Content Script] Received preview message:', message.action)
     
     if (message.action === 'apply') {
       // Create preview header
@@ -155,7 +156,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 })
 
-console.log('[Visual Editor Content Script] Loaded and listening for messages')
+debugLog('[Visual Editor Content Script] Loaded and listening for messages')
 
 // Also log to the page directly to ensure we can see it
 const debugDiv = document.createElement('div')
@@ -256,11 +257,48 @@ function removePreviewHeader() {
 }
 
 // Inject the SDK plugin initialization script into the page
-function injectSDKPluginScript() {
-  const script = document.createElement('script')
-  script.src = chrome.runtime.getURL('inject-sdk-plugin.js')
-  script.onload = () => script.remove()
-  document.documentElement.appendChild(script)
+async function injectSDKPluginScript() {
+  try {
+    // First try to load the mapping file to get the hashed filename
+    const mappingUrl = chrome.runtime.getURL('inject-sdk-plugin-mapping.json')
+    const response = await fetch(mappingUrl)
+    
+    let scriptFilename = 'inject-sdk-plugin.js' // fallback
+    
+    if (response.ok) {
+      const mapping = await response.json()
+      scriptFilename = mapping.filename
+      debugLog('[Content Script] Loading hashed inject script:', scriptFilename)
+    } else {
+      debugLog('[Content Script] No mapping file found, using default filename')
+    }
+    
+    const script = document.createElement('script')
+    script.src = chrome.runtime.getURL(scriptFilename)
+    script.onload = () => {
+      debugLog('[Content Script] Inject script loaded:', scriptFilename)
+      script.remove()
+    }
+    script.onerror = () => {
+      debugError('[Content Script] Failed to load inject script:', scriptFilename)
+      // Fallback to non-hashed version
+      if (scriptFilename !== 'inject-sdk-plugin.js') {
+        debugLog('[Content Script] Trying fallback: inject-sdk-plugin.js')
+        const fallbackScript = document.createElement('script')
+        fallbackScript.src = chrome.runtime.getURL('inject-sdk-plugin.js')
+        fallbackScript.onload = () => fallbackScript.remove()
+        document.documentElement.appendChild(fallbackScript)
+      }
+    }
+    document.documentElement.appendChild(script)
+  } catch (error) {
+    debugError('[Content Script] Error loading inject script:', error)
+    // Fallback to direct load
+    const script = document.createElement('script')
+    script.src = chrome.runtime.getURL('inject-sdk-plugin.js')
+    script.onload = () => script.remove()
+    document.documentElement.appendChild(script)
+  }
 }
 
 // Initialize SDK plugin when the page loads
@@ -278,7 +316,7 @@ window.addEventListener('message', async (event) => {
   
   // Handle messages from the injected script (absmartly-page)
   if (event.data && event.data.source === 'absmartly-page') {
-    console.log('[Content Script] Received message from page:', event.data)
+    debugLog('[Content Script] Received message from page:', event.data)
     
     if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
       // Get custom code from extension settings
@@ -306,7 +344,7 @@ window.addEventListener('message', async (event) => {
   
   // Handle messages from the SDK plugin (absmartly-sdk)
   else if (event.data && event.data.source === 'absmartly-sdk') {
-    console.log('[Content Script] Received message from SDK plugin:', event.data)
+    debugLog('[Content Script] Received message from SDK plugin:', event.data)
     
     // We can handle other plugin messages here if needed
     // but we don't need to handle REQUEST_INJECTION_CODE anymore
@@ -316,7 +354,7 @@ window.addEventListener('message', async (event) => {
 
 // Also listen for test events
 document.addEventListener('absmartly-test', (event: any) => {
-  console.log('[Visual Editor Content Script] Received test event:', event.detail)
+  debugLog('[Visual Editor Content Script] Received test event:', event.detail)
   document.dispatchEvent(new CustomEvent('absmartly-response', {
     detail: { message: 'Content script received your message', originalMessage: event.detail }
   }))
