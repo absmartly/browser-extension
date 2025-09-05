@@ -2070,6 +2070,11 @@ export function DOMChangesInlineEditor({
           </div>
         )
       case 'class':
+        // Show empty state if no classes
+        if ((!change.add || change.add.length === 0) && (!change.remove || change.remove.length === 0)) {
+          return <span className="text-gray-400 text-xs italic">No classes configured</span>
+        }
+        
         return (
           <div className="flex flex-wrap gap-1.5">
             {change.add?.map((cls, i) => (
