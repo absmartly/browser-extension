@@ -2872,10 +2872,11 @@ export function DOMChangesInlineEditor({
                 <div 
                   key={index} 
                   draggable={true}
-                  title="Drag to copy this change to another variant"
+                  title="Drag to reorder or copy to another variant"
                   onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = 'copy'
+                    e.dataTransfer.effectAllowed = 'copyMove'
                     e.dataTransfer.setData('application/json', JSON.stringify(change))
+                    e.dataTransfer.setData('source-index', index.toString())
                     setDraggedChange(change)
                     // Add visual feedback
                     e.currentTarget.classList.add('opacity-50')
@@ -2884,6 +2885,30 @@ export function DOMChangesInlineEditor({
                     setDraggedChange(null)
                     // Remove visual feedback
                     e.currentTarget.classList.remove('opacity-50')
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    // Add visual indicator for drop zone
+                    e.currentTarget.classList.add('border-blue-500', 'border-2')
+                  }}
+                  onDragLeave={(e) => {
+                    // Remove drop zone indicator
+                    e.currentTarget.classList.remove('border-blue-500', 'border-2')
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.currentTarget.classList.remove('border-blue-500', 'border-2')
+                    
+                    const sourceIndex = parseInt(e.dataTransfer.getData('source-index'))
+                    
+                    // If source index exists, it's a reorder within the same variant
+                    if (!isNaN(sourceIndex) && sourceIndex !== index) {
+                      const newChanges = [...changes]
+                      const [removed] = newChanges.splice(sourceIndex, 1)
+                      newChanges.splice(index, 0, removed)
+                      onUpdateChanges(newChanges)
+                    }
                   }}
                   className={`
                     relative border rounded-lg transition-all cursor-move hover:scale-[1.02] hover:shadow-md
