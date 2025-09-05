@@ -509,8 +509,9 @@ const CSSStyleEditor = ({
         </div>
       )}
     </div>
-
   )
+}
+
 // Common HTML attributes for autocomplete
 const commonAttributes = [
   'href', 'src', 'alt', 'title', 'target', 'rel', 'role', 'aria-label', 'aria-describedby',
