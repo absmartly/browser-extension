@@ -383,10 +383,12 @@ export function ExperimentDetail({
         debugError('❌ Failed to save variant data:', error)
       })
       
+      // Filter enabled changes
+      const enabledChanges = changes.filter(c => c.enabled !== false)
+      
       // If preview is currently enabled for this variant, re-apply with updated changes
       if (previewEnabled && activePreviewVariant === variantName) {
         debugLog('🔄 Re-applying preview with updated changes')
-        const enabledChanges = changes.filter(c => c.enabled !== false)
         debugLog('🔄 Changes being sent:', {
           allChanges: changes,
           enabledChanges: enabledChanges,
