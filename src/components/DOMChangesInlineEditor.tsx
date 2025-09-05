@@ -51,6 +51,7 @@ interface EditingDOMChange {
   jsValue?: string
   targetSelector?: string
   position?: 'before' | 'after' | 'firstChild' | 'lastChild'
+  mode?: 'replace' | 'merge'
 }
 
 // Simple CSS selector syntax highlighting
@@ -254,7 +255,8 @@ const createEmptyChange = (): EditingDOMChange => ({
   htmlValue: '',
   jsValue: '',
   targetSelector: '',
-  position: 'after'
+  position: 'after',
+  mode: 'merge'
 })
 
 // Get all CSS property names from known-css-properties
@@ -449,10 +451,10 @@ const CSSStyleEditor = ({
             {/* Delete button */}
             <button
               onClick={() => handleRemoveProperty(index)}
-              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 ml-2"
+              className="text-red-400 hover:text-red-300 ml-2"
               title="Remove property"
             >
-              ×
+              <TrashIcon className="h-3 w-3" />
             </button>
           </div>
         ))}
@@ -507,8 +509,263 @@ const CSSStyleEditor = ({
         </div>
       )}
     </div>
+
+  )
+// Common HTML attributes for autocomplete
+const commonAttributes = [
+  'href', 'src', 'alt', 'title', 'target', 'rel', 'role', 'aria-label', 'aria-describedby',
+  'aria-expanded', 'aria-hidden', 'aria-current', 'data-testid', 'id', 'name', 'type', 
+  'value', 'placeholder', 'disabled', 'readonly', 'required', 'checked', 'selected',
+  'multiple', 'accept', 'autocomplete', 'autofocus', 'min', 'max', 'step', 'pattern',
+  'maxlength', 'minlength', 'size', 'rows', 'cols', 'wrap', 'for', 'form', 'action',
+  'method', 'enctype', 'novalidate', 'formnovalidate', 'tabindex', 'accesskey',
+  'contenteditable', 'draggable', 'spellcheck', 'translate', 'dir', 'lang', 'hidden'
+].sort()
+
+// DevTools-style Attribute editor component with autocomplete
+const AttributeEditor = ({ 
+  attributeProperties, 
+  onChange 
+}: { 
+  attributeProperties: Array<{ key: string; value: string }> | undefined,
+  onChange: (properties: Array<{ key: string; value: string }>) => void 
+}) => {
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const [activeField, setActiveField] = useState<'key' | 'value' | null>(null)
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0)
+  const [focusNewProperty, setFocusNewProperty] = useState(false)
+  const propertyRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  const handlePropertyChange = (index: number, field: 'key' | 'value', newValue: string) => {
+    const newProps = [...(attributeProperties || [])]
+    newProps[index][field] = newValue
+    onChange(newProps)
+    // Update suggestions based on input
+    if (field === 'key') {
+      const filtered = commonAttributes.filter(attr => 
+        attr.toLowerCase().startsWith(newValue.toLowerCase())
+      )
+      setSuggestions(filtered.slice(0, 8))
+      setShowSuggestions(filtered.length > 0 && newValue.length > 0)
+    } else {
+      setShowSuggestions(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, field: 'key' | 'value') => {
+    // Handle Enter key in value field to add new property
+    if (field === 'value' && e.key === 'Enter' && !showSuggestions) {
+      e.preventDefault()
+      handleAddProperty()
+      return
+    }
+
+    if (!showSuggestions) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedSuggestion(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedSuggestion(prev => 
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        )
+        break
+      case 'Enter':
+      case 'Tab':
+        e.preventDefault()
+        if (suggestions[selectedSuggestion] && activeField) {
+          handlePropertyChange(index, activeField, suggestions[selectedSuggestion])
+          setShowSuggestions(false)
+          setSelectedSuggestion(0)
+        }
+        break
+      case 'Escape':
+        setShowSuggestions(false)
+        setSelectedSuggestion(0)
+        break
+    }
+  }
+
+  const handleAddProperty = () => {
+    onChange([...(attributeProperties || []), { key: '', value: '' }])
+    setFocusNewProperty(true)
+  }
+
+  // Effect to focus the new property input
+  useEffect(() => {
+    if (focusNewProperty) {
+      const newIndex = (attributeProperties || []).length - 1
+      setTimeout(() => {
+        if (propertyRefs.current[newIndex]) {
+          propertyRefs.current[newIndex]?.focus()
+        }
+      }, 50)
+      setFocusNewProperty(false)
+    }
+  }, [attributeProperties?.length, focusNewProperty])
+
+  const handleRemoveProperty = (index: number) => {
+    const newProps = (attributeProperties || []).filter((_, i) => i !== index)
+    onChange(newProps)
+  }
+
+  return (
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative">
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
+        element.attributes {'{'}
+      </div>
+      
+      {/* Properties */}
+      <div className="py-1">
+        {(attributeProperties || []).map((prop, index) => (
+          <div 
+            key={index} 
+            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative"
+          >
+            {/* Attribute name */}
+            <input
+              ref={el => propertyRefs.current[index] = el}
+              type="text"
+              value={prop.key}
+              onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, index, 'key')}
+              onFocus={() => {
+                setActiveIndex(index)
+                setActiveField('key')
+                const filtered = commonAttributes.filter(attr => 
+                  prop.key ? attr.toLowerCase().startsWith(prop.key.toLowerCase()) : true
+                ).slice(0, 8)
+                setSuggestions(filtered)
+                setShowSuggestions(filtered.length > 0)
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setShowSuggestions(false)
+                  setActiveIndex(null)
+                  setActiveField(null)
+                }, 200)
+              }}
+              placeholder="attribute"
+              className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 flex-1"
+            />
+            <span className="text-gray-500 px-1">=</span>
+            <span className="text-gray-500">"</span>
+            
+            {/* Attribute value */}
+            <input
+              type="text"
+              value={prop.value}
+              onChange={(e) => handlePropertyChange(index, 'value', e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, index, 'value')}
+              onFocus={() => {
+                setActiveIndex(index)
+                setActiveField('value')
+                setShowSuggestions(false)
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setShowSuggestions(false)
+                  setActiveIndex(null)
+                  setActiveField(null)
+                }, 200)
+              }}
+              placeholder="value"
+              className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1"
+            />
+            <span className="text-gray-500">"</span>
+            
+            {/* Delete button */}
+            <button
+              onClick={() => handleRemoveProperty(index)}
+              className="text-red-400 hover:text-red-300 ml-2"
+              title="Remove attribute"
+            >
+              <TrashIcon className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+        
+        {/* Add new property */}
+        <div 
+          className="flex items-center hover:bg-gray-800 cursor-pointer px-3 py-1"
+          onClick={handleAddProperty}
+        >
+          <span className="text-gray-600">+ Add attribute...</span>
+        </div>
+      </div>
+      
+      {/* Closing brace */}
+      <div className="px-3 py-2 border-t border-gray-700 text-gray-400">
+        {'}'}
+      </div>
+
+      {/* Autocomplete dropdown */}
+      {showSuggestions && activeIndex !== null && (
+        <div 
+          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-md shadow-lg"
+          style={{
+            top: `${36 + (activeIndex + 1) * 28}px`,
+            left: activeField === 'key' ? '12px' : '50%',
+            minWidth: '150px',
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}
+        >
+          {suggestions.map((suggestion, idx) => (
+            <div
+              key={`${suggestion}-${idx}`}
+              className={`px-3 py-1 cursor-pointer text-xs ${
+                idx === selectedSuggestion 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-300 hover:bg-gray-700'
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                if (activeIndex !== null && activeField) {
+                  handlePropertyChange(activeIndex, activeField, suggestion)
+                  setShowSuggestions(false)
+                  setSelectedSuggestion(0)
+                }
+              }}
+              onMouseEnter={() => setSelectedSuggestion(idx)}
+            >
+              {suggestion}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
+
+// Operation Mode Selector Component
+const OperationModeSelector = ({
+  mode,
+  onChange
+}: {
+  mode: 'replace' | 'merge'
+  onChange: (mode: 'replace' | 'merge') => void
+}) => (
+  <div className="flex items-center gap-2 text-xs">
+    <label className="text-gray-600">Mode:</label>
+    <select
+      value={mode}
+      onChange={(e) => onChange(e.target.value as 'replace' | 'merge')}
+      className="bg-gray-800 border border-gray-600 text-white text-xs px-2 py-1 rounded"
+    >
+      <option value="merge">Merge (Add to existing)</option>
+      <option value="replace">Replace (Override existing)</option>
+    </select>
+  </div>
+)}
 
 // Reusable DOM change editor component
 const DOMChangeEditorForm = ({ 
@@ -732,10 +989,16 @@ const DOMChangeEditorForm = ({
     )}
 
     {editingChange.type === 'style' && (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Style Properties
-        </label>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Style Properties
+          </label>
+          <OperationModeSelector
+            mode={editingChange.mode || 'merge'}
+            onChange={(mode) => setEditingChange({ ...editingChange, mode })}
+          />
+        </div>
         <CSSStyleEditor
           styleProperties={editingChange.styleProperties}
           onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
@@ -1431,7 +1694,8 @@ export function DOMChangesInlineEditor({
       type: 'move',
       selector: '',
       targetSelector: '',
-      position: 'after' as const,
+      position: 'after',
+  mode: 'merge' as const,
       index: null
     }
     
@@ -1604,7 +1868,8 @@ export function DOMChangesInlineEditor({
       classRemove: change.type === 'class' ? (change.remove || []) : [],
       classesWithStatus,
       targetSelector: change.type === 'move' ? change.targetSelector : '',
-      position: change.type === 'move' ? change.position : change.type === 'insert' ? (change as any).position : 'after'
+      position: change.type === 'move' ? change.position : change.type === 'insert' ? (change as any).position : 'after',
+      mode: (change as any).mode || 'merge'
     }
     setEditingChange(editing)
   }
@@ -1626,7 +1891,8 @@ export function DOMChangesInlineEditor({
           selector: editingChange.selector, 
           type: 'text', 
           value: editingChange.textValue || '', 
-          enabled: true 
+          enabled: true,
+          mode: editingChange.mode || 'merge' 
         }
         break
       case 'html':
@@ -1634,7 +1900,8 @@ export function DOMChangesInlineEditor({
           selector: editingChange.selector, 
           type: 'html', 
           value: editingChange.htmlValue || '', 
-          enabled: true 
+          enabled: true,
+          mode: editingChange.mode || 'merge' 
         }
         break
       case 'javascript':
@@ -1642,7 +1909,8 @@ export function DOMChangesInlineEditor({
           selector: editingChange.selector, 
           type: 'javascript', 
           value: editingChange.jsValue || '', 
-          enabled: true 
+          enabled: true,
+          mode: editingChange.mode || 'merge' 
         }
         break
       case 'style':
@@ -1654,7 +1922,8 @@ export function DOMChangesInlineEditor({
           selector: editingChange.selector, 
           type: 'style', 
           value: styleValue, 
-          enabled: true 
+          enabled: true,
+          mode: editingChange.mode || 'merge' 
         }
         break
       case 'attribute':
@@ -1666,7 +1935,8 @@ export function DOMChangesInlineEditor({
           selector: editingChange.selector, 
           type: 'attribute', 
           value: attrValue, 
-          enabled: true 
+          enabled: true,
+          mode: editingChange.mode || 'merge' 
         }
         break
       case 'class':
@@ -1675,7 +1945,8 @@ export function DOMChangesInlineEditor({
           type: 'class', 
           add: editingChange.classAdd?.filter(c => c) || [], 
           remove: editingChange.classRemove?.filter(c => c) || [],
-          enabled: true 
+          enabled: true,
+          mode: editingChange.mode || 'merge' 
         }
         break
       case 'move':
@@ -1684,14 +1955,16 @@ export function DOMChangesInlineEditor({
           type: 'move',
           targetSelector: editingChange.targetSelector || '',
           position: editingChange.position || 'after',
-          enabled: true
+          enabled: true,
+          mode: editingChange.mode || 'merge'
         }
         break
       case 'remove':
         domChange = {
           selector: editingChange.selector,
           type: 'remove',
-          enabled: true
+          enabled: true,
+          mode: editingChange.mode || 'merge'
         }
         break
       case 'insert':
@@ -1700,7 +1973,8 @@ export function DOMChangesInlineEditor({
           type: 'insert',
           html: editingChange.htmlValue || '',
           position: editingChange.position || 'after',
-          enabled: true
+          enabled: true,
+          mode: editingChange.mode || 'merge'
         }
         break
       default:
