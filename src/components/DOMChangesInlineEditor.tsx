@@ -615,8 +615,11 @@ const DOMChangeEditorForm = ({
         <div className="flex-1 relative">
           {/* Syntax highlighted overlay */}
           <div 
-            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono bg-white border border-gray-300 rounded-md overflow-x-auto overflow-y-hidden whitespace-nowrap"
-            style={{ scrollLeft: 0 }}
+            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono bg-white border border-gray-300 rounded-md overflow-x-auto overflow-y-hidden"
+            style={{ 
+              scrollLeft: 0,
+              whiteSpace: 'nowrap'
+            }}
             id={`selector-overlay-edit-${editingChange.index}`}
           >
             {editingChange.selector ? highlightCSSSelector(editingChange.selector) : <span className="text-gray-400">.cta-button, #header, [data-test='submit']</span>}
@@ -633,11 +636,13 @@ const DOMChangeEditorForm = ({
               }
             }}
             placeholder=".cta-button, #header, [data-test='submit']"
-            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
+            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono whitespace-nowrap ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
             style={{ 
               color: 'transparent',
               caretColor: 'black',
-              background: 'transparent'
+              background: 'transparent',
+              overflowX: 'auto',
+              overflowY: 'hidden'
             }}
           />
         </div>
@@ -2125,8 +2130,11 @@ export function DOMChangesInlineEditor({
                         <div className="flex-1 relative">
                           {/* Syntax highlighted overlay */}
                           <div 
-                            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono bg-white border border-gray-300 rounded-md overflow-x-auto overflow-y-hidden whitespace-nowrap"
-                            style={{ scrollLeft: 0 }}
+                            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono bg-white border border-gray-300 rounded-md overflow-x-auto overflow-y-hidden"
+                            style={{ 
+                              scrollLeft: 0,
+                              whiteSpace: 'nowrap'
+                            }}
                             id={`selector-overlay-edit-${editingChange.index}`}
                           >
                             {editingChange.selector ? highlightCSSSelector(editingChange.selector) : <span className="text-gray-400">.cta-button, #header, [data-test='submit']</span>}
@@ -2143,11 +2151,13 @@ export function DOMChangesInlineEditor({
                               }
                             }}
                             placeholder=".cta-button, #header, [data-test='submit']"
-                            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
+                            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono whitespace-nowrap ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
                             style={{ 
                               color: 'transparent',
                               caretColor: 'black',
-                              background: 'transparent'
+                              background: 'transparent',
+                              overflowX: 'auto',
+                              overflowY: 'hidden'
                             }}
                           />
                         </div>
