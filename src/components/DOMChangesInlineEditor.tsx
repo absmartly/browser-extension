@@ -258,7 +258,7 @@ const createEmptyChange = (): EditingDOMChange => ({
 })
 
 // Get all CSS property names from known-css-properties
-const cssPropertyNames = knownCSSProperties.map(prop => prop.property).sort()
+const cssPropertyNames = knownCSSProperties.filter(prop => typeof prop === 'string').sort()
 
 // Common CSS values for different property types
 const commonCSSValues: Record<string, string[]> = {
@@ -287,6 +287,8 @@ const CSSStyleEditor = ({
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [activeField, setActiveField] = useState<'key' | 'value' | null>(null)
   const [selectedSuggestion, setSelectedSuggestion] = useState(0)
+  const [focusNewProperty, setFocusNewProperty] = useState(false)
+  const propertyRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const handlePropertyChange = (index: number, field: 'key' | 'value', newValue: string) => {
     const newProps = [...(styleProperties || [])]
@@ -316,6 +318,13 @@ const CSSStyleEditor = ({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, field: 'key' | 'value') => {
+    // Handle Enter key in value field to add new property
+    if (field === 'value' && e.key === 'Enter' && !showSuggestions) {
+      e.preventDefault()
+      handleAddProperty()
+      return
+    }
+
     if (!showSuggestions) return
 
     switch (e.key) {
@@ -349,7 +358,21 @@ const CSSStyleEditor = ({
 
   const handleAddProperty = () => {
     onChange([...(styleProperties || []), { key: '', value: '' }])
+    setFocusNewProperty(true)
   }
+
+  // Effect to focus the new property input
+  useEffect(() => {
+    if (focusNewProperty) {
+      const newIndex = (styleProperties || []).length - 1
+      setTimeout(() => {
+        if (propertyRefs.current[newIndex]) {
+          propertyRefs.current[newIndex]?.focus()
+        }
+      }, 50)
+      setFocusNewProperty(false)
+    }
+  }, [styleProperties?.length, focusNewProperty])
 
   const handleRemoveProperty = (index: number) => {
     const newProps = (styleProperties || []).filter((_, i) => i !== index)
@@ -372,6 +395,7 @@ const CSSStyleEditor = ({
           >
             {/* Property name */}
             <input
+              ref={el => propertyRefs.current[index] = el}
               type="text"
               value={prop.key}
               onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
@@ -380,10 +404,10 @@ const CSSStyleEditor = ({
                 setActiveIndex(index)
                 setActiveField('key')
                 const filtered = cssPropertyNames.filter(p => 
-                  prop.key ? p.startsWith(prop.key) : true
+                  prop.key ? p.toLowerCase().startsWith(prop.key.toLowerCase()) : true
                 ).slice(0, 8)
                 setSuggestions(filtered)
-                setShowSuggestions(true)
+                setShowSuggestions(filtered.length > 0)
               }}
               onBlur={() => {
                 setTimeout(() => {
@@ -461,7 +485,7 @@ const CSSStyleEditor = ({
         >
           {suggestions.map((suggestion, idx) => (
             <div
-              key={suggestion}
+              key={`${suggestion}-${idx}`}
               className={`px-3 py-1 cursor-pointer text-xs ${
                 idx === selectedSuggestion 
                   ? 'bg-blue-600 text-white' 
