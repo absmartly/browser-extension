@@ -5,6 +5,7 @@ export interface DOMChangeStyle {
   type: 'style';
   value: Record<string, string>;
   enabled?: boolean;
+  mode?: 'replace' | 'merge';
 }
 
 export interface DOMChangeText {
@@ -20,6 +21,7 @@ export interface DOMChangeClass {
   add?: string[];
   remove?: string[];
   enabled?: boolean;
+  mode?: 'replace' | 'merge';
 }
 
 export interface DOMChangeAttribute {
@@ -27,6 +29,7 @@ export interface DOMChangeAttribute {
   type: 'attribute';
   value: Record<string, string>;
   enabled?: boolean;
+  mode?: 'replace' | 'merge';
 }
 
 export interface DOMChangeHTML {
