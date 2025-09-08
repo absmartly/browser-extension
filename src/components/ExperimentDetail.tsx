@@ -7,8 +7,9 @@ import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
+import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import { getConfig } from '~src/utils/storage'
 
 const storage = new Storage({ area: "local" })
@@ -47,6 +48,8 @@ export function ExperimentDetail({
   const [activePreviewVariant, setActivePreviewVariant] = useState<string | null>(null)
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
+  const [jsonEditorVariant, setJsonEditorVariant] = useState<string | null>(null)
   const lastExperimentIdRef = useRef<number | null>(null)
 
   debugLog('🔍 ExperimentDetail state - variantData:', variantData)
@@ -846,8 +849,9 @@ export function ExperimentDetail({
               
               return (
                 <div key={variantKey} className="border border-gray-200 rounded-lg p-4">
-                  <div className="mb-3">
+                  <div className="mb-3 flex items-center gap-2">
                     <Input
+                        className="flex-1"
                         value={variantKey}
                         onChange={(e) => {
                           const newName = e.target.value
@@ -871,8 +875,20 @@ export function ExperimentDetail({
                           }
                         }}
                         placeholder="Variant name"
-                        className="font-medium w-full"
+                        className="font-medium"
                       />
+                    <Button
+                      onClick={() => {
+                        setJsonEditorVariant(variantKey)
+                        setJsonEditorOpen(true)
+                      }}
+                      size="sm"
+                      variant="secondary"
+                      title="Edit DOM Changes as JSON"
+                    >
+                      <CodeBracketIcon className="h-4 w-4" />
+                      JSON
+                    </Button>
                   </div>
 
                   {/* Variables Section */}
@@ -983,6 +999,24 @@ export function ExperimentDetail({
           )}
         </div>
       </div>
+      
+      {/* JSON Editor Modal */}
+      {jsonEditorVariant && (
+        <DOMChangesJSONEditor
+          isOpen={jsonEditorOpen}
+          onClose={() => {
+            setJsonEditorOpen(false)
+            setJsonEditorVariant(null)
+          }}
+          changes={variantData[jsonEditorVariant]?.dom_changes || []}
+          onSave={(newChanges) => {
+            handleDOMChangesUpdate(jsonEditorVariant, newChanges)
+            setJsonEditorOpen(false)
+            setJsonEditorVariant(null)
+          }}
+          variantName={jsonEditorVariant}
+        />
+      )}
     </div>
   )
 }
