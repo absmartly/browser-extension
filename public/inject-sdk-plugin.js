@@ -235,10 +235,11 @@
    */
   function removeDOMChangesManually() {
     debugLog('[ABsmartly Page] 🔙 Removing DOM changes manually');
-    debugLog('[ABsmartly Page] 🔍 Looking for elements with data-absmartly-modified attribute...');
+    debugLog('[ABsmartly Page] 🔍 Looking for elements with data-absmartly attributes...');
     
-    const modifiedElements = document.querySelectorAll('[data-absmartly-modified]');
-    debugLog(`[ABsmartly Page] Found ${modifiedElements.length} modified elements to restore`);
+    // Look for both modified elements and preview elements
+    const modifiedElements = document.querySelectorAll('[data-absmartly-modified], [data-absmartly-experiment="__preview__"]');
+    debugLog(`[ABsmartly Page] Found ${modifiedElements.length} elements to restore`);
     
     modifiedElements.forEach((element, index) => {
       try {
@@ -306,6 +307,9 @@
         // Clean up data attributes
         delete element.dataset.absmartlyModified;
         delete element.dataset.absmartlyOriginal;
+        delete element.dataset.absmartlyExperiment;
+        delete element.dataset.absmartlyCreated;
+        delete element.dataset.absmartlyInjected;
         
         // Log element state AFTER restoration
         const computedStyleAfter = window.getComputedStyle(element);
@@ -626,11 +630,48 @@
           }
         }
         
-        if (plugin && typeof plugin.previewChanges === 'function') {
-          debugLog('[ABsmartly Page] Calling plugin.previewChanges with changes:', changes);
-          debugLog('[ABsmartly Page] 🆕 VERSION CHECK: 1.0.4 - Debug code is running!');
+        if (plugin) {
+          const { experimentName } = event.data.payload || {};
+          const expName = experimentName || '__preview__';
+          debugLog('[ABsmartly Page] Applying preview changes for experiment:', expName);
+          debugLog('[ABsmartly Page] Changes to apply:', changes);
+          
           try {
-            plugin.previewChanges(changes || []);
+            // First remove any existing changes for this experiment
+            if (typeof plugin.removeChanges === 'function') {
+              plugin.removeChanges(expName);
+              debugLog('[ABsmartly Page] Removed existing changes for experiment:', expName);
+            }
+            
+            // Apply changes using the public applyChange method
+            if (typeof plugin.applyChange === 'function') {
+              let appliedCount = 0;
+              for (const change of (changes || [])) {
+                if (plugin.applyChange(change, expName)) {
+                  appliedCount++;
+                  debugLog('[ABsmartly Page] Applied change:', change.selector, change.type);
+                } else {
+                  debugLog('[ABsmartly Page] Failed to apply change:', change.selector, change.type);
+                }
+              }
+              debugLog('[ABsmartly Page] Successfully applied', appliedCount, 'of', (changes || []).length, 'changes via applyChange');
+            } else if (plugin.domManipulator && typeof plugin.domManipulator.applyChange === 'function') {
+              // Fallback to domManipulator for older plugin versions
+              debugLog('[ABsmartly Page] Using domManipulator fallback (older plugin version)');
+              let appliedCount = 0;
+              for (const change of (changes || [])) {
+                if (plugin.domManipulator.applyChange(change, expName)) {
+                  appliedCount++;
+                  debugLog('[ABsmartly Page] Applied change:', change.selector, change.type);
+                } else {
+                  debugLog('[ABsmartly Page] Failed to apply change:', change.selector, change.type);
+                }
+              }
+              debugLog('[ABsmartly Page] Successfully applied', appliedCount, 'of', (changes || []).length, 'changes via domManipulator');
+            } else {
+              debugLog('[ABsmartly Page] ERROR: No applyChange method available on plugin');
+            }
+            
             debugLog('[ABsmartly Page] Successfully applied preview changes');
             
             // IMMEDIATE DOM INSPECTION
@@ -695,17 +736,8 @@
           } catch (error) {
             debugError('[ABsmartly Page] Error applying preview changes:', error);
           }
-        } else if (plugin && typeof plugin.applyChanges === 'function') {
-          // Fallback: try applyChanges method
-          debugLog('[ABsmartly Page] Using applyChanges as fallback for preview');
-          try {
-            plugin.applyChanges(changes || [], true); // true for preview mode
-            debugLog('[ABsmartly Page] Successfully applied changes via applyChanges');
-          } catch (error) {
-            debugError('[ABsmartly Page] Error applying changes:', error);
-          }
         } else if (plugin) {
-          debugError('[ABsmartly Page] Plugin found but preview methods not available. Plugin:', plugin);
+          debugError('[ABsmartly Page] Plugin found but required methods not available. Plugin:', plugin);
           debugLog('[ABsmartly Page] Available plugin methods:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
           
           // Try to apply changes manually as last resort
@@ -764,9 +796,10 @@
           }
         }
         
-        if (plugin && typeof plugin.removePreview === 'function') {
-          debugLog('[ABsmartly Page] Calling plugin.removePreview');
-          debugLog('[ABsmartly Page] 🆕 VERSION CHECK: 1.0.4 - Remove preview debug running!');
+        if (plugin && typeof plugin.removeChanges === 'function') {
+          const { experimentName } = event.data.payload || {};
+          const expName = experimentName || '__preview__';
+          debugLog('[ABsmartly Page] Removing preview changes using removeChanges for experiment:', expName);
           
           // Check H1 state BEFORE removal
           const h1BeforeRemoval = document.querySelector('div:nth-of-type(1) > div:nth-of-type(1) > div > h1');
@@ -803,8 +836,9 @@
           debugLog('[ABsmartly Page] Elements before removal:', elementsBeforeRemoval);
           
           try {
-            plugin.removePreview();
-            debugLog('[ABsmartly Page] Successfully removed preview');
+            // Use removeChanges to remove all changes for this experiment
+            plugin.removeChanges(expName);
+            debugLog('[ABsmartly Page] Successfully called plugin.removeChanges for:', expName);
             
             // Check H1 state AFTER removal
             setTimeout(() => {
