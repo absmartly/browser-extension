@@ -597,7 +597,7 @@
       // Handle preview changes
       if (event.data.type === 'PREVIEW_CHANGES') {
         debugLog('[ABsmartly Page] Handling PREVIEW_CHANGES message');
-        const { changes } = event.data.payload || {};
+        const { changes, updateMode } = event.data.payload || {};
         
         // Try to get the plugin instance - check all possible locations
         let plugin = null;
@@ -634,10 +634,12 @@
           const { experimentName } = event.data.payload || {};
           const expName = experimentName || '__preview__';
           debugLog('[ABsmartly Page] Applying preview changes for experiment:', expName);
+          debugLog('[ABsmartly Page] Update mode:', updateMode);
           debugLog('[ABsmartly Page] Changes to apply:', changes);
           
           try {
-            // First remove any existing changes for this experiment
+            // Always remove all changes first for now
+            // The plugin doesn't have a way to remove individual changes yet
             if (typeof plugin.removeChanges === 'function') {
               plugin.removeChanges(expName);
               debugLog('[ABsmartly Page] Removed existing changes for experiment:', expName);

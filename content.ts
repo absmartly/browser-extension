@@ -143,7 +143,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true })
     } else if (message.action === 'update') {
       // Update changes WITHOUT recreating the header
-      // Just send the new changes to the SDK plugin
+      // Just send the new changes to the SDK plugin with updateMode flag
       window.postMessage({
         source: 'absmartly-extension',
         type: 'PREVIEW_CHANGES',
@@ -151,7 +151,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           changes: message.changes || [],
           experimentName: message.experimentName,
           variantName: message.variantName,
-          experimentId: message.experimentId
+          experimentId: message.experimentId,
+          updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
         }
       }, '*')
       
