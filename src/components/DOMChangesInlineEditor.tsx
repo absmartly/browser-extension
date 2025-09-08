@@ -303,7 +303,7 @@ const CSSStyleEditor = ({
         prop.toLowerCase().startsWith(newValue.toLowerCase())
       )
       setSuggestions(filtered.slice(0, 8))
-      setShowSuggestions(filtered.length > 0 && newValue.length > 0)
+      setShowSuggestions(filtered.length > 0)
     } else if (field === 'value') {
       const propertyName = newProps[index].key
       const values = commonCSSValues[propertyName] || []
@@ -324,6 +324,25 @@ const CSSStyleEditor = ({
     if (field === 'value' && e.key === 'Enter' && !showSuggestions) {
       e.preventDefault()
       handleAddProperty()
+      return
+    }
+
+    // Handle Tab key in value field to jump to next property
+    if (field === 'value' && e.key === 'Tab' && !showSuggestions && !e.shiftKey) {
+      e.preventDefault()
+      const nextIndex = index + 1
+      if (nextIndex < (styleProperties || []).length) {
+        // Focus next property's key field
+        setTimeout(() => {
+          const nextInput = propertyRefs.current[nextIndex]
+          if (nextInput) {
+            nextInput.focus()
+          }
+        }, 0)
+      } else {
+        // No next property, add a new one
+        handleAddProperty()
+      }
       return
     }
 
@@ -382,7 +401,7 @@ const CSSStyleEditor = ({
   }
 
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative">
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-visible">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
         element.style {'{'}
@@ -393,66 +412,74 @@ const CSSStyleEditor = ({
         {(styleProperties || []).map((prop, index) => (
           <div 
             key={index} 
-            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative"
+            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative pr-8"
           >
-            {/* Property name */}
-            <input
-              ref={el => propertyRefs.current[index] = el}
-              type="text"
-              value={prop.key}
-              onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, index, 'key')}
-              onFocus={() => {
-                setActiveIndex(index)
-                setActiveField('key')
-                const filtered = cssPropertyNames.filter(p => 
-                  prop.key ? p.toLowerCase().startsWith(prop.key.toLowerCase()) : true
-                ).slice(0, 8)
-                setSuggestions(filtered)
-                setShowSuggestions(filtered.length > 0)
-              }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setShowSuggestions(false)
-                  setActiveIndex(null)
-                  setActiveField(null)
-                }, 200)
-              }}
-              placeholder="property"
-              className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 flex-1"
-            />
-            <span className="text-gray-500 px-1">:</span>
+            {/* Property inputs container */}
+            <div className="flex items-center flex-1 mr-2">
+              {/* Property name */}
+              <input
+                ref={el => propertyRefs.current[index] = el}
+                type="text"
+                value={prop.key}
+                onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, index, 'key')}
+                onFocus={() => {
+                  // Reset state on focus to ensure autocomplete works
+                  setActiveIndex(index)
+                  setActiveField('key')
+                  setSelectedSuggestion(0)
+                  // Always show suggestions on focus
+                  const currentValue = prop.key || ''
+                  const filtered = cssPropertyNames.filter(p => 
+                    currentValue ? p.toLowerCase().startsWith(currentValue.toLowerCase()) : true
+                  ).slice(0, 8)
+                  setSuggestions(filtered)
+                  // Force show suggestions if there are any available
+                  if (filtered.length > 0) {
+                    setShowSuggestions(true)
+                  }
+                }}
+                onBlur={() => {
+                  // Don't clear the state completely, just hide suggestions
+                  setTimeout(() => {
+                    setShowSuggestions(false)
+                  }, 200)
+                }}
+                placeholder="property"
+                className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 flex-1 min-w-0"
+              />
+              <span className="text-gray-500 px-1">:</span>
+              
+              {/* Property value */}
+              <input
+                type="text"
+                value={prop.value}
+                onChange={(e) => handlePropertyChange(index, 'value', e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, index, 'value')}
+                onFocus={() => {
+                  setActiveIndex(index)
+                  setActiveField('value')
+                  const values = commonCSSValues[prop.key] || []
+                  setSuggestions(values)
+                  setShowSuggestions(values.length > 0)
+                }}
+                onBlur={() => {
+                  // Don't clear the state completely, just hide suggestions
+                  setTimeout(() => {
+                    setShowSuggestions(false)
+                  }, 200)
+                }}
+                placeholder="value"
+                className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1 min-w-0"
+              />
+              <span className="text-gray-500 px-1">;</span>
+            </div>
             
-            {/* Property value */}
-            <input
-              type="text"
-              value={prop.value}
-              onChange={(e) => handlePropertyChange(index, 'value', e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, index, 'value')}
-              onFocus={() => {
-                setActiveIndex(index)
-                setActiveField('value')
-                const values = commonCSSValues[prop.key] || []
-                setSuggestions(values)
-                setShowSuggestions(values.length > 0)
-              }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setShowSuggestions(false)
-                  setActiveIndex(null)
-                  setActiveField(null)
-                }, 200)
-              }}
-              placeholder="value"
-              className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1"
-            />
-            <span className="text-gray-500 px-1">;</span>
-            
-            {/* Delete button */}
+            {/* Delete button - positioned absolutely */}
             <button
               onClick={() => handleRemoveProperty(index)}
-              className="text-red-400 hover:text-red-300 ml-2"
-              title="Remove property"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Remove property"
             >
               <TrashIcon className="h-3 w-3" />
             </button>
@@ -549,7 +576,7 @@ const AttributeEditor = ({
         attr.toLowerCase().startsWith(newValue.toLowerCase())
       )
       setSuggestions(filtered.slice(0, 8))
-      setShowSuggestions(filtered.length > 0 && newValue.length > 0)
+      setShowSuggestions(filtered.length > 0)
     } else {
       setShowSuggestions(false)
     }
@@ -560,6 +587,25 @@ const AttributeEditor = ({
     if (field === 'value' && e.key === 'Enter' && !showSuggestions) {
       e.preventDefault()
       handleAddProperty()
+      return
+    }
+
+    // Handle Tab key in value field to jump to next property
+    if (field === 'value' && e.key === 'Tab' && !showSuggestions && !e.shiftKey) {
+      e.preventDefault()
+      const nextIndex = index + 1
+      if (nextIndex < (attributeProperties || []).length) {
+        // Focus next property's key field
+        setTimeout(() => {
+          const nextInput = propertyRefs.current[nextIndex]
+          if (nextInput) {
+            nextInput.focus()
+          }
+        }, 0)
+      } else {
+        // No next property, add a new one
+        handleAddProperty()
+      }
       return
     }
 
@@ -618,7 +664,7 @@ const AttributeEditor = ({
   }
 
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative">
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-visible">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
         element.attributes {'{'}
@@ -629,7 +675,7 @@ const AttributeEditor = ({
         {(attributeProperties || []).map((prop, index) => (
           <div 
             key={index} 
-            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative"
+            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative pr-10"
           >
             {/* Attribute name */}
             <input
@@ -639,19 +685,25 @@ const AttributeEditor = ({
               onChange={(e) => handlePropertyChange(index, 'key', e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, index, 'key')}
               onFocus={() => {
+                // Reset state on focus to ensure autocomplete works
                 setActiveIndex(index)
                 setActiveField('key')
+                setSelectedSuggestion(0)
+                // Always show suggestions on focus
+                const currentValue = prop.key || ''
                 const filtered = commonAttributes.filter(attr => 
-                  prop.key ? attr.toLowerCase().startsWith(prop.key.toLowerCase()) : true
+                  currentValue ? attr.toLowerCase().startsWith(currentValue.toLowerCase()) : true
                 ).slice(0, 8)
                 setSuggestions(filtered)
-                setShowSuggestions(filtered.length > 0)
+                // Force show suggestions if there are any available
+                if (filtered.length > 0) {
+                  setShowSuggestions(true)
+                }
               }}
               onBlur={() => {
+                // Don't clear the state completely, just hide suggestions
                 setTimeout(() => {
                   setShowSuggestions(false)
-                  setActiveIndex(null)
-                  setActiveField(null)
                 }, 200)
               }}
               placeholder="attribute"
@@ -672,10 +724,9 @@ const AttributeEditor = ({
                 setShowSuggestions(false)
               }}
               onBlur={() => {
+                // Don't clear the state completely, just hide suggestions
                 setTimeout(() => {
                   setShowSuggestions(false)
-                  setActiveIndex(null)
-                  setActiveField(null)
                 }, 200)
               }}
               placeholder="value"
@@ -766,7 +817,7 @@ const OperationModeSelector = ({
       <option value="replace">Replace (Override existing)</option>
     </select>
   </div>
-)}
+)
 
 // Reusable DOM change editor component
 const DOMChangeEditorForm = ({ 
@@ -1069,55 +1120,10 @@ const DOMChangeEditorForm = ({
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Attributes
         </label>
-        <div className="space-y-2">
-          {editingChange.attributeProperties?.map((prop, propIndex) => (
-            <div key={propIndex} className="flex gap-2">
-              <Input
-                value={prop.key}
-                onChange={(e) => {
-                  const newProps = [...(editingChange.attributeProperties || [])]
-                  newProps[propIndex].key = e.target.value
-                  setEditingChange({ ...editingChange, attributeProperties: newProps })
-                }}
-                placeholder="Attribute (e.g., href)"
-                className="flex-1"
-              />
-              <Input
-                value={prop.value}
-                onChange={(e) => {
-                  const newProps = [...(editingChange.attributeProperties || [])]
-                  newProps[propIndex].value = e.target.value
-                  setEditingChange({ ...editingChange, attributeProperties: newProps })
-                }}
-                placeholder="Value (e.g., /page)"
-                className="flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const newProps = editingChange.attributeProperties?.filter((_, i) => i !== propIndex) || []
-                  setEditingChange({ ...editingChange, attributeProperties: newProps })
-                }}
-                className="p-2 text-red-600 hover:text-red-800"
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-          <Button
-            type="button"
-            onClick={() => {
-              const newProps = [...(editingChange.attributeProperties || []), { key: '', value: '' }]
-              setEditingChange({ ...editingChange, attributeProperties: newProps })
-            }}
-            size="sm"
-            variant="secondary"
-            className="w-full"
-          >
-            <PlusIcon className="h-4 w-4 mr-1" />
-            Add Attribute
-          </Button>
-        </div>
+        <AttributeEditor 
+          attributeProperties={editingChange.attributeProperties}
+          onChange={(newProps) => setEditingChange({ ...editingChange, attributeProperties: newProps })}
+        />
       </div>
     )}
 
@@ -1395,6 +1401,8 @@ export function DOMChangesInlineEditor({
   const [pickingForField, setPickingForField] = useState<string | null>(null)
   const [draggedChange, setDraggedChange] = useState<DOMChange | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   // Debug editingChange state changes (commented out - too verbose)
   // useEffect(() => {
@@ -2600,55 +2608,10 @@ export function DOMChangesInlineEditor({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Attributes
                         </label>
-                        <div className="space-y-2">
-                          {editingChange.attributeProperties?.map((prop, propIndex) => (
-                            <div key={propIndex} className="flex gap-2">
-                              <Input
-                                value={prop.key}
-                                onChange={(e) => {
-                                  const newProps = [...(editingChange.attributeProperties || [])]
-                                  newProps[propIndex].key = e.target.value
-                                  setEditingChange({ ...editingChange, attributeProperties: newProps })
-                                }}
-                                placeholder="Attribute (e.g., href)"
-                                className="flex-1"
-                              />
-                              <Input
-                                value={prop.value}
-                                onChange={(e) => {
-                                  const newProps = [...(editingChange.attributeProperties || [])]
-                                  newProps[propIndex].value = e.target.value
-                                  setEditingChange({ ...editingChange, attributeProperties: newProps })
-                                }}
-                                placeholder="Value (e.g., /page)"
-                                className="flex-1"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newProps = editingChange.attributeProperties?.filter((_, i) => i !== propIndex) || []
-                                  setEditingChange({ ...editingChange, attributeProperties: newProps })
-                                }}
-                                className="p-2 text-red-600 hover:text-red-800"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              const newProps = [...(editingChange.attributeProperties || []), { key: '', value: '' }]
-                              setEditingChange({ ...editingChange, attributeProperties: newProps })
-                            }}
-                            size="sm"
-                            variant="secondary"
-                            className="w-full"
-                          >
-                            <PlusIcon className="h-4 w-4 mr-1" />
-                            Add Attribute
-                          </Button>
-                        </div>
+                        <AttributeEditor 
+                          attributeProperties={editingChange.attributeProperties}
+                          onChange={(newProps) => setEditingChange({ ...editingChange, attributeProperties: newProps })}
+                        />
                       </div>
                     )}
 
@@ -2874,31 +2837,41 @@ export function DOMChangesInlineEditor({
                   draggable={true}
                   title="Drag to reorder or copy to another variant"
                   onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = 'copyMove'
+                    e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('application/json', JSON.stringify(change))
                     e.dataTransfer.setData('source-index', index.toString())
                     setDraggedChange(change)
+                    setDraggedIndex(index)
                     // Add visual feedback
                     e.currentTarget.classList.add('opacity-50')
                   }}
                   onDragEnd={(e) => {
                     setDraggedChange(null)
+                    setDraggedIndex(null)
+                    setDragOverIndex(null)
                     // Remove visual feedback
                     e.currentTarget.classList.remove('opacity-50')
+                  }}
+                  onDragEnter={(e) => {
+                    if (draggedIndex !== null && draggedIndex !== index) {
+                      setDragOverIndex(index)
+                    }
                   }}
                   onDragOver={(e) => {
                     e.preventDefault()
                     e.dataTransfer.dropEffect = 'move'
-                    // Add visual indicator for drop zone
-                    e.currentTarget.classList.add('border-blue-500', 'border-2')
                   }}
                   onDragLeave={(e) => {
-                    // Remove drop zone indicator
-                    e.currentTarget.classList.remove('border-blue-500', 'border-2')
+                    // Only clear if we're leaving the entire card, not just moving between child elements
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      if (dragOverIndex === index) {
+                        setDragOverIndex(null)
+                      }
+                    }
                   }}
                   onDrop={(e) => {
                     e.preventDefault()
-                    e.currentTarget.classList.remove('border-blue-500', 'border-2')
+                    setDragOverIndex(null)
                     
                     const sourceIndex = parseInt(e.dataTransfer.getData('source-index'))
                     
@@ -2907,16 +2880,28 @@ export function DOMChangesInlineEditor({
                       const newChanges = [...changes]
                       const [removed] = newChanges.splice(sourceIndex, 1)
                       newChanges.splice(index, 0, removed)
-                      onUpdateChanges(newChanges)
+                      // Type-safe way to pass reorder flag
+                      ;(onChange as any)(newChanges, { isReorder: true })
                     }
+                    setDraggedIndex(null)
                   }}
                   className={`
-                    relative border rounded-lg transition-all cursor-move hover:scale-[1.02] hover:shadow-md
+                    relative border rounded-lg cursor-move hover:shadow-md
                     ${isDisabled 
                       ? 'border-gray-200 bg-gray-50 opacity-60' 
                       : 'border-gray-300 bg-white hover:border-blue-300 hover:shadow-sm'
                     }
+                    ${draggedIndex === index ? 'opacity-50 scale-95' : ''}
+                    ${dragOverIndex === index && draggedIndex !== null && draggedIndex !== index 
+                      ? 'border-blue-500 border-2' 
+                      : ''
+                    }
+                    transition-all duration-200 ease-in-out
                   `}
+                  style={{
+                    marginTop: dragOverIndex === index && draggedIndex !== null && draggedIndex > index ? '48px' : '0',
+                    marginBottom: dragOverIndex === index && draggedIndex !== null && draggedIndex < index ? '48px' : '0',
+                  }}
                 >
                   <div className="p-3">
                     {/* Compact Layout */}
@@ -3047,7 +3032,7 @@ export function DOMChangesInlineEditor({
                   className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
                   style={{ caretColor: 'black' }}
                 />
-                <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden">
+                <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden whitespace-nowrap">
                   {highlightCSSSelector(editingChange.selector)}
                 </div>
               </div>

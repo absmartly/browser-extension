@@ -353,8 +353,8 @@ export function ExperimentDetail({
     setEditingName(false)
   }
 
-  const handleDOMChangesUpdate = (variantName: string, changes: DOMChange[]) => {
-    debugLog('🔄 handleDOMChangesUpdate called:', { variantName, changes })
+  const handleDOMChangesUpdate = (variantName: string, changes: DOMChange[], options?: { isReorder?: boolean }) => {
+    debugLog('🔄 handleDOMChangesUpdate called:', { variantName, changes, options })
     debugLog('🔄 Current experiment ID:', experiment.id)
     
     setVariantData(prev => {
@@ -386,8 +386,18 @@ export function ExperimentDetail({
       // Filter enabled changes
       const enabledChanges = changes.filter(c => c.enabled !== false)
       
-      // If preview is currently enabled for this variant, re-apply with updated changes
-      if (previewEnabled && activePreviewVariant === variantName) {
+      // Only re-apply preview if it's actually enabled AND this is the active variant
+      // Don't apply preview on every change unless preview was explicitly turned on
+      // Skip preview re-application if this is just a reorder operation
+      debugLog('🔍 Preview check:', { 
+        previewEnabled, 
+        activePreviewVariant, 
+        variantName,
+        isReorder: options?.isReorder,
+        shouldReapply: previewEnabled === true && activePreviewVariant === variantName && !options?.isReorder
+      })
+      
+      if (previewEnabled === true && activePreviewVariant === variantName && enabledChanges.length > 0 && !options?.isReorder) {
         debugLog('🔄 Re-applying preview with updated changes')
         debugLog('🔄 Changes being sent:', {
           allChanges: changes,
@@ -401,7 +411,8 @@ export function ExperimentDetail({
             // Remove current preview
             chrome.tabs.sendMessage(tabs[0].id, {
               type: 'ABSMARTLY_PREVIEW',
-              action: 'remove'
+              action: 'remove',
+              experimentName: experiment.name
             }, () => {
               // Then apply new preview with only enabled changes
               setTimeout(() => {
@@ -427,23 +438,7 @@ export function ExperimentDetail({
           }
         })
       } else {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-              type: 'ABSMARTLY_PREVIEW',
-              action: 'apply',
-              changes: enabledChanges,
-              experimentName: experiment.name,
-              variantName: variantName
-            }, (response) => {
-              if (chrome.runtime.lastError) {
-                debugError('Failed to re-apply preview:', chrome.runtime.lastError)
-              } else {
-                debugLog('Preview re-applied with updated changes:', response)
-              }
-            })
-          }
-        })
+        debugLog('Preview not enabled or conditions not met, skipping DOM changes application')
       }
       
       return updated
@@ -667,6 +662,11 @@ export function ExperimentDetail({
   const handlePreviewToggleForVariant = (enabled: boolean, variantKey: string) => {
     debugLog('🎯 handlePreviewToggleForVariant called:', { enabled, variantKey, hasExperiment: !!experiment })
     setPreviewEnabled(enabled)
+    
+    // Clear active preview variant when disabling
+    if (!enabled) {
+      setActivePreviewVariant(null)
+    }
     if (enabled && variantKey && experiment) {
       // Send preview message through content script to SDK
       const changes = variantData[variantKey]?.dom_changes || []
@@ -709,9 +709,13 @@ export function ExperimentDetail({
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'ABSMARTLY_PREVIEW',
             action: 'remove',
-            experimentName: experiment.name
+            experimentName: experiment?.name || 'preview'
           }, (response) => {
-            debugLog('🎯 Remove preview response:', response)
+            if (chrome.runtime.lastError) {
+              debugError('❌ Error removing preview:', chrome.runtime.lastError)
+            } else {
+              debugLog('🎯 Remove preview response:', response)
+            }
           })
         }
       })
