@@ -408,35 +408,26 @@ export function ExperimentDetail({
           disabledChanges: changes.filter(c => c.enabled === false)
         })
         
-        // First remove the current preview, then apply the new one
+        // Use 'update' action to update changes without recreating the header
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {
-            // Remove current preview
+            // Send update message that won't recreate the header
             chrome.tabs.sendMessage(tabs[0].id, {
               type: 'ABSMARTLY_PREVIEW',
-              action: 'remove',
-              experimentName: experiment.name
-            }, () => {
-              // Then apply new preview with only enabled changes
-              setTimeout(() => {
-                chrome.tabs.sendMessage(tabs[0].id, {
-                  type: 'ABSMARTLY_PREVIEW',
-                  action: 'apply',
-                  changes: enabledChanges,
-                  experimentName: experiment.name,
-                  variantName: variantName
-                }, (response) => {
-                  if (chrome.runtime.lastError) {
-                    debugError('Failed to re-apply preview:', chrome.runtime.lastError)
-                  } else {
-                    debugLog('Preview re-applied with enabled changes only:', {
-                      enabledCount: enabledChanges.length,
-                      totalCount: changes.length,
-                      enabledChanges
-                    })
-                  }
+              action: 'update',  // Use 'update' instead of 'remove' then 'apply'
+              changes: enabledChanges,
+              experimentName: experiment.name,
+              variantName: variantName
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                debugError('Failed to update preview:', chrome.runtime.lastError)
+              } else {
+                debugLog('Preview updated with enabled changes only:', {
+                  enabledCount: enabledChanges.length,
+                  totalCount: changes.length,
+                  enabledChanges
                 })
-              }, 100) // Small delay to ensure removal completes
+              }
             })
           }
         })
@@ -851,7 +842,7 @@ export function ExperimentDetail({
                 <div key={variantKey} className="border border-gray-200 rounded-lg p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Input
-                        className="flex-1"
+                        className="flex-1 font-medium"
                         value={variantKey}
                         onChange={(e) => {
                           const newName = e.target.value
@@ -875,7 +866,6 @@ export function ExperimentDetail({
                           }
                         }}
                         placeholder="Variant name"
-                        className="font-medium"
                       />
                     <Button
                       onClick={() => {

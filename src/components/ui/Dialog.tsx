@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 
 interface DialogProps {
@@ -26,18 +27,27 @@ interface DialogFooterProps {
 }
 
 export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
-  if (!open) return null
+  const [container, setContainer] = useState<HTMLElement | null>(null)
+  
+  useEffect(() => {
+    // Find the extension root or body
+    const root = document.getElementById('__plasmo') || document.body
+    setContainer(root)
+  }, [])
+  
+  if (!open || !container) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div 
         className="fixed inset-0 bg-black/50" 
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-50">
+      <div className="relative z-[10000]">
         {children}
       </div>
-    </div>
+    </div>,
+    container
   )
 }
 
