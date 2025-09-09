@@ -19,6 +19,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [applicationId, setApplicationId] = useState('')
   const [domChangesStorageType, setDomChangesStorageType] = useState<'variable' | 'custom_field'>('variable')
   const [domChangesFieldName, setDomChangesFieldName] = useState('dom_changes')
+  const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt') // Default to JWT
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
@@ -39,6 +40,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedApplicationId = config?.applicationId?.toString() || ''
       let loadedDomChangesStorageType = config?.domChangesStorageType || 'variable'
       let loadedDomChangesFieldName = config?.domChangesFieldName || 'dom_changes'
+      let loadedAuthMethod = config?.authMethod || 'jwt' // Default to JWT
       
       
       // In development, auto-load from environment variables if fields are empty
@@ -66,6 +68,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setApplicationId(loadedApplicationId)
       setDomChangesStorageType(loadedDomChangesStorageType)
       setDomChangesFieldName(loadedDomChangesFieldName)
+      setAuthMethod(loadedAuthMethod)
       
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
@@ -149,7 +152,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     
-    // API Key is now optional
+    // API Key is required only when authMethod is 'apikey'
+    if (authMethod === 'apikey' && !apiKey.trim()) {
+      newErrors.apiKey = 'API Key is required when using API Key authentication'
+    }
     
     if (!apiEndpoint.trim()) {
       newErrors.apiEndpoint = 'ABsmartly Endpoint is required'
@@ -182,7 +188,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       apiEndpoint,
       applicationId: applicationId ? parseInt(applicationId) : undefined,
       domChangesStorageType,
-      domChangesFieldName: domChangesFieldName.trim() || 'dom_changes'
+      domChangesFieldName: domChangesFieldName.trim() || 'dom_changes',
+      authMethod
     }
 
     try {
@@ -329,9 +336,41 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         error={errors.apiEndpoint}
       />
       
+      {/* Authentication Method Toggle */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">Authentication Method</label>
+        <div className="flex gap-4">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="jwt"
+              checked={authMethod === 'jwt'}
+              onChange={(e) => setAuthMethod(e.target.value as 'jwt')}
+              className="mr-2"
+            />
+            <span className="text-sm">JWT from Browser Cookie (Default)</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="apikey"
+              checked={authMethod === 'apikey'}
+              onChange={(e) => setAuthMethod(e.target.value as 'apikey')}
+              className="mr-2"
+            />
+            <span className="text-sm">API Key</span>
+          </label>
+        </div>
+        <p className="text-xs text-gray-500">
+          {authMethod === 'jwt' 
+            ? 'Uses JWT token from browser cookies. You must be logged into ABsmartly.'
+            : 'Uses the API key configured below for authentication.'}
+        </p>
+      </div>
+      
       <div>
         <Input
-          label="API Key (Optional)"
+          label={`API Key ${authMethod === 'apikey' ? '(Required)' : '(Optional - used as fallback)'}`}
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
@@ -340,7 +379,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           showPasswordToggle={true}
         />
         <p className="mt-1 text-xs text-gray-500">
-          If not provided, will use JWT from browser cookies. Please authenticate into ABsmartly if no API key is set.
+          {authMethod === 'jwt' 
+            ? 'API key will be used as fallback if JWT authentication fails.'
+            : 'API key will be used for all authentication requests.'}
         </p>
       </div>
       

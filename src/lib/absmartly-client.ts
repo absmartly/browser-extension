@@ -12,8 +12,12 @@ export class ABsmartlyClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }
-    // Only add Authorization header if API key is provided
-    if (config.apiKey) {
+    
+    // Check auth method preference
+    const useApiKey = config.authMethod === 'apikey' && config.apiKey
+    
+    // Only add Authorization header if using API key method and key is provided
+    if (useApiKey) {
       // Determine auth header based on API key format
       const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
         ? `JWT ${config.apiKey}`
@@ -24,7 +28,7 @@ export class ABsmartlyClient {
     this.client = axios.create({
       baseURL: config.apiEndpoint.endsWith('/v1') ? config.apiEndpoint : `${config.apiEndpoint}/v1`,
       headers,
-      withCredentials: !config.apiKey // Use cookies if no API key
+      withCredentials: config.authMethod === 'jwt' // Use cookies for JWT auth
     })
   }
   async getExperiments(params?: any): Promise<Experiment[]> {
