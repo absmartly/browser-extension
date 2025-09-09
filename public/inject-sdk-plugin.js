@@ -347,35 +347,22 @@
         capabilities: context.__domPlugin.capabilities,
         timestamp: context.__domPlugin.timestamp
       });
-      // Store reference globally for easier access
-      if (!window.__absmartlyExtensionPlugin) {
-        window.__absmartlyExtensionPlugin = context.__domPlugin.instance;
-      }
+      // Plugin is properly registered with context, no need to store globally
       return context.__domPlugin.instance;
     }
 
-    // Check for existing plugin instances that we created
-    if (window.__absmartlyExtensionPlugin) {
-      debugLog('[ABsmartly Extension] Extension plugin already loaded from window.__absmartlyExtensionPlugin');
-      return window.__absmartlyExtensionPlugin;
-    }
+    // No need to check window storage - plugin should only be accessed via context
 
     // Check if site has its own plugin instance (they might have stored it somewhere)
     if (window.__absmartlyPlugin) {
       debugLog('[ABsmartly Extension] Site plugin instance found at window.__absmartlyPlugin');
-      // Store reference globally for easier access
-      if (!window.__absmartlyExtensionPlugin) {
-        window.__absmartlyExtensionPlugin = window.__absmartlyPlugin;
-      }
+      // Don't store plugin globally - access via context only
       return window.__absmartlyPlugin;
     }
     
     if (window.__absmartlyDOMChangesPlugin) {
       debugLog('[ABsmartly Extension] Site plugin instance found at window.__absmartlyDOMChangesPlugin');
-      // Store reference globally for easier access
-      if (!window.__absmartlyExtensionPlugin) {
-        window.__absmartlyExtensionPlugin = window.__absmartlyDOMChangesPlugin;
-      }
+      // Don't store plugin globally - access via context only
       return window.__absmartlyDOMChangesPlugin;
     }
 
@@ -555,10 +542,7 @@
         
         debugLog('[ABsmartly Extension] Plugin already loaded, requesting custom code injection only');
         
-        // Store reference if we have access to it
-        if (typeof existingPlugin === 'object') {
-          window.__absmartlyExtensionPlugin = existingPlugin;
-        }
+        // Plugin is already loaded and registered with context
         
         // Request custom code from extension
         window.postMessage({
@@ -607,11 +591,7 @@
           plugin = cachedContext.__domPlugin.instance;
           debugLog('[ABsmartly Page] Got plugin from context.__domPlugin');
         }
-        // Try window reference
-        else if (window.__absmartlyExtensionPlugin) {
-          plugin = window.__absmartlyExtensionPlugin;
-          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
-        }
+        // Don't use window reference - only use context.__domPlugin
         // Try site's own plugin instances
         else if (window.__absmartlyPlugin) {
           plugin = window.__absmartlyPlugin;
@@ -749,7 +729,6 @@
           }
         } else {
           debugError('[ABsmartly Page] Plugin not found. Checking available objects...');
-          debugLog('[ABsmartly Page] window.__absmartlyExtensionPlugin:', window.__absmartlyExtensionPlugin);
           debugLog('[ABsmartly Page] window.__absmartlyPlugin:', window.__absmartlyPlugin);
           debugLog('[ABsmartly Page] cachedContext:', cachedContext);
           debugLog('[ABsmartly Page] cachedContext.__domPlugin:', cachedContext ? cachedContext.__domPlugin : 'no context');
@@ -775,11 +754,7 @@
           plugin = cachedContext.__domPlugin.instance;
           debugLog('[ABsmartly Page] Got plugin from context.__domPlugin');
         }
-        // Try window reference
-        else if (window.__absmartlyExtensionPlugin) {
-          plugin = window.__absmartlyExtensionPlugin;
-          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyExtensionPlugin');
-        }
+        // Don't use window reference - only use context.__domPlugin
         // Try site's own plugin instances
         else if (window.__absmartlyPlugin) {
           plugin = window.__absmartlyPlugin;
@@ -991,6 +966,8 @@
                       debug: DEBUG
                     });
                     
+                    // Plugin will register itself with context.__domPlugin during initialization
+                    
                     // Initialize the plugin
                     plugin.initialize().then(() => {
                       debugLog('[ABsmartly Extension] Plugin initialized and registered with context');
@@ -1060,9 +1037,9 @@
               debug: true
             });
 
+            // Plugin will register itself with context.__domPlugin during initialization
+
             plugin.initialize().then(() => {
-              // Store our plugin instance for fallback detection
-              window.__absmartlyExtensionPlugin = plugin;
               
               // The plugin now registers itself with context.__domPlugin
               // We can verify it's registered
