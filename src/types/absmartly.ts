@@ -62,6 +62,7 @@ export interface ABsmartlyConfig {
   applicationId?: number
   domChangesStorageType?: 'variable' | 'custom_field'
   domChangesFieldName?: string
+  authMethod?: 'jwt' | 'apikey'  // New field for auth method preference
 }
 
 export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'

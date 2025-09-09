@@ -55,7 +55,10 @@ async function initializeConfig() {
   const newConfig: ABsmartlyConfig = {
     apiKey: storedConfig?.apiKey || '',
     apiEndpoint: storedConfig?.apiEndpoint || '',
-    applicationId: storedConfig?.applicationId
+    applicationId: storedConfig?.applicationId,
+    authMethod: storedConfig?.authMethod || 'jwt', // Default to JWT
+    domChangesStorageType: storedConfig?.domChangesStorageType,
+    domChangesFieldName: storedConfig?.domChangesFieldName
   }
   
   if (!newConfig.apiKey && envApiKey) {
@@ -117,83 +120,79 @@ async function openLoginPage() {
 // Helper function to get JWT cookie for a domain
 async function getJWTCookie(domain: string): Promise<string | null> {
   try {
-    // Remove protocol and path from domain
-    const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-    debugLog('Looking for JWT cookie for domain:', cleanDomain)
+    debugLog('=== getJWTCookie START ===')
+    debugLog('Input domain:', domain)
     
-    // Try to get ALL cookies for the URL to see what's available
-    const url = domain.startsWith('http') ? domain : `https://${domain}`
-    const allCookiesForUrl = await chrome.cookies.getAll({ 
-      url: url 
-    })
-    
-    debugLog(`Found ${allCookiesForUrl.length} cookies for URL ${url}`)
-    // Only log JWT cookie if found
-    const jwtPreview = allCookiesForUrl.find(c => c.name.toLowerCase() === 'jwt')
-    if (jwtPreview) {
-      debugLog(`  - jwt cookie found (length: ${jwtPreview.value.length})`)
+    // Parse the URL to get the base domain
+    let parsedUrl: URL
+    try {
+      parsedUrl = new URL(domain.startsWith('http') ? domain : `https://${domain}`)
+    } catch (e) {
+      debugError('Failed to parse URL:', domain, e)
+      return null
     }
     
-    // Look for JWT cookie - check common ABsmartly cookie names first
-    const jwtCookie = allCookiesForUrl.find(cookie => 
-      cookie.name === 'jwt' || // ABsmartly uses 'jwt' cookie name
+    const hostname = parsedUrl.hostname
+    const protocol = parsedUrl.protocol
+    const baseUrl = `${protocol}//${hostname}`
+    
+    debugLog('Parsed URL:', { hostname, protocol, baseUrl })
+    
+    // Try multiple strategies to find the JWT cookie
+    
+    // Strategy 1: Get cookies for the exact URL
+    debugLog('Strategy 1: Fetching cookies for exact URL:', baseUrl)
+    const urlCookies = await chrome.cookies.getAll({ url: baseUrl })
+    debugLog(`Found ${urlCookies.length} cookies for URL ${baseUrl}`)
+    
+    if (urlCookies.length > 0) {
+      debugLog('URL cookies:', urlCookies.map(c => `${c.name} (domain: ${c.domain})`))
+    }
+    
+    // Strategy 2: Get cookies for the domain (without subdomain)
+    const domainParts = hostname.split('.')
+    const baseDomain = domainParts.length > 2 
+      ? domainParts.slice(-2).join('.') 
+      : hostname
+    
+    debugLog('Strategy 2: Fetching cookies for base domain:', baseDomain)
+    const domainCookies = await chrome.cookies.getAll({ domain: baseDomain })
+    debugLog(`Found ${domainCookies.length} cookies for domain ${baseDomain}`)
+    
+    if (domainCookies.length > 0) {
+      debugLog('Domain cookies:', domainCookies.map(c => `${c.name} (domain: ${c.domain})`))
+    }
+    
+    // Strategy 3: Get cookies with dot prefix (for subdomain access)
+    debugLog('Strategy 3: Fetching cookies for .domain:', `.${baseDomain}`)
+    const dotDomainCookies = await chrome.cookies.getAll({ domain: `.${baseDomain}` })
+    debugLog(`Found ${dotDomainCookies.length} cookies for .${baseDomain}`)
+    
+    if (dotDomainCookies.length > 0) {
+      debugLog('.Domain cookies:', dotDomainCookies.map(c => `${c.name} (domain: ${c.domain})`))
+    }
+    
+    // Combine all cookies and look for JWT
+    const allCookies = [...urlCookies, ...domainCookies, ...dotDomainCookies]
+    const uniqueCookies = Array.from(new Map(allCookies.map(c => [`${c.name}-${c.value}`, c])).values())
+    
+    debugLog(`Total unique cookies found: ${uniqueCookies.length}`)
+    
+    // Look for JWT cookie - check common ABsmartly cookie names
+    const jwtCookie = uniqueCookies.find(cookie => 
+      cookie.name === 'jwt' || // ABsmartly typically uses lowercase 'jwt'
       cookie.name === 'JWT' ||
-      cookie.name.toLowerCase().includes('jwt') ||
-      cookie.name.toLowerCase().includes('token') ||
-      cookie.name.toLowerCase() === 'auth' ||
-      cookie.name === 'absmartly_jwt' ||
-      cookie.name === 'session' // Sometimes session cookies contain JWT
+      cookie.name.toLowerCase() === 'jwt'
     )
     
     if (jwtCookie) {
-      debugLog('Found JWT cookie:', jwtCookie.name, 'value length:', jwtCookie.value.length)
+      debugLog(`✅ JWT cookie found: ${jwtCookie.name} (length: ${jwtCookie.value.length}, domain: ${jwtCookie.domain})`)
+      debugLog('=== getJWTCookie END (SUCCESS) ===')
       return jwtCookie.value
     }
     
-    // Try domain-based search as fallback
-    const cookies = await chrome.cookies.getAll({ 
-      domain: cleanDomain 
-    })
-    
-    debugLog(`Found ${cookies.length} cookies for domain ${cleanDomain}`)
-    
-    const domainJwtCookie = cookies.find(cookie => 
-      cookie.name === 'jwt' ||
-      cookie.name === 'JWT' ||
-      cookie.name.toLowerCase().includes('jwt') ||
-      cookie.name.toLowerCase().includes('token') ||
-      cookie.name.toLowerCase() === 'auth'
-    )
-    
-    if (domainJwtCookie) {
-      debugLog('Found JWT cookie from domain search:', domainJwtCookie.name)
-      return domainJwtCookie.value
-    }
-    
-    // Also try with base domain (remove subdomains)
-    const baseDomain = cleanDomain.split('.').slice(-2).join('.')
-    if (baseDomain !== cleanDomain) {
-      const baseCookies = await chrome.cookies.getAll({ 
-        domain: `.${baseDomain}` // Leading dot for domain cookies
-      })
-      
-      debugLog(`Found ${baseCookies.length} cookies for base domain .${baseDomain}`)
-      
-      const baseJwtCookie = baseCookies.find(cookie => 
-        cookie.name === 'jwt' ||
-        cookie.name === 'JWT' ||
-        cookie.name.toLowerCase().includes('jwt') ||
-        cookie.name.toLowerCase().includes('token') ||
-        cookie.name.toLowerCase() === 'auth'
-      )
-      
-      if (baseJwtCookie) {
-        debugLog('Found JWT cookie from base domain:', baseJwtCookie.name)
-        return baseJwtCookie.value
-      }
-    }
-    
-    debugLog('No JWT cookie found for domain:', cleanDomain)
+    debugLog('❌ No JWT cookie found')
+    debugLog('=== getJWTCookie END (NOT FOUND) ===')
     return null
   } catch (error) {
     debugError('Error getting JWT cookie:', error)
@@ -209,16 +208,17 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
   debugLog('Config loaded:', { 
     hasApiKey: !!config?.apiKey, 
     apiEndpoint: config?.apiEndpoint,
-    apiKeyLength: config?.apiKey?.length || 0
+    apiKeyLength: config?.apiKey?.length || 0,
+    authMethod: config?.authMethod || 'jwt'
   })
   
   if (!config?.apiEndpoint) {
     throw new Error('No API endpoint configured')
   }
 
-  // Check if we have a cached preference for auth method
-  const authPreference = await storage.get('auth-method-preference')
-  const shouldTryJwtFirst = authPreference === 'jwt' && !config.apiKey?.startsWith('new-') // Don't use JWT first if user just entered a new key
+  // Use auth method from config, defaulting to JWT
+  const authMethod = config.authMethod || 'jwt'
+  const shouldTryJwtFirst = authMethod === 'jwt'
   
   // Helper to build headers
   const buildHeaders = async (useApiKey: boolean = true) => {
@@ -227,45 +227,54 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
       'Accept': 'application/json'
     }
 
-    // If we know JWT works better, try it first
-    if (shouldTryJwtFirst && useApiKey) {
-      debugLog('Preferring JWT based on previous success...')
+    // If auth method is JWT, try JWT first
+    if (shouldTryJwtFirst) {
+      debugLog('Using JWT authentication method...')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
-      if (jwtToken) {
-        if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
-          headers['Authorization'] = `JWT ${jwtToken}`
-        } else {
-          headers['Authorization'] = `Bearer ${jwtToken}`
-        }
-        debugLog('Using cached JWT preference')
-        return headers
-      }
-      debugLog('JWT not available, falling back to API key')
-    }
-
-    // Try API key if available and we haven't disabled it
-    if (config.apiKey && useApiKey && !shouldTryJwtFirst) {
-      debugLog('Using API key for auth')
-      const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-        ? `JWT ${config.apiKey}`
-        : `Api-Key ${config.apiKey}`
-      headers['Authorization'] = authHeader
-    } else if (!config.apiKey || !useApiKey) {
-      // Try to get JWT from cookies
-      debugLog('Attempting to get JWT from cookies...')
-      const jwtToken = await getJWTCookie(config.apiEndpoint)
-      debugLog('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length})` : 'Not found')
+      debugLog('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length}, preview: ${jwtToken.substring(0, 20)}...)` : 'Not found')
       
       if (jwtToken) {
-        // Determine if it's already a full JWT or just the token
         if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
           headers['Authorization'] = `JWT ${jwtToken}`
         } else {
           headers['Authorization'] = `Bearer ${jwtToken}`
         }
-        debugLog('Using JWT from cookie for authentication')
+        debugLog('Using JWT from browser cookie, Authorization header:', headers['Authorization'].substring(0, 30) + '...')
+        return headers
+      }
+      // If JWT not available but we have API key as fallback
+      if (config.apiKey && useApiKey) {
+        debugLog('JWT not available, falling back to API key')
+        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+          ? `JWT ${config.apiKey}`
+          : `Api-Key ${config.apiKey}`
+        headers['Authorization'] = authHeader
+        debugLog('Using API key fallback, Authorization header:', headers['Authorization'].substring(0, 30) + '...')
       } else {
-        debugLog('No JWT cookie available')
+        debugLog('No JWT cookie available and no API key fallback')
+      }
+    } else {
+      // Auth method is API key
+      if (config.apiKey && useApiKey) {
+        debugLog('Using API key authentication method')
+        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+          ? `JWT ${config.apiKey}`
+          : `Api-Key ${config.apiKey}`
+        headers['Authorization'] = authHeader
+      } else if (!config.apiKey) {
+        // No API key provided, try JWT as fallback
+        debugLog('No API key provided, attempting JWT fallback...')
+        const jwtToken = await getJWTCookie(config.apiEndpoint)
+        if (jwtToken) {
+          if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
+            headers['Authorization'] = `JWT ${jwtToken}`
+          } else {
+            headers['Authorization'] = `Bearer ${jwtToken}`
+          }
+          debugLog('Using JWT from cookie as fallback')
+        } else {
+          debugLog('No authentication method available')
+        }
       }
     }
     
@@ -323,29 +332,66 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
   } catch (error) {
     debugError('Request failed:', error.response?.status, error.response?.data)
     
-    // If we got a 401 and we were using an API key, retry with JWT from cookies
-    if (isAuthError(error) && config.apiKey && retryWithJWT && headers.Authorization?.startsWith('Api-Key')) {
-      debugLog('API key auth failed (401), retrying with JWT cookie...')
-      
-      // Try to get JWT from cookies
-      const jwtToken = await getJWTCookie(config.apiEndpoint)
-      
-      if (jwtToken) {
-        // Build new headers with JWT instead of API key
+    // If we got a 401, try the opposite auth method as fallback
+    if (isAuthError(error) && retryWithJWT) {
+      // If we were using API key, try JWT
+      if (authMethod === 'apikey' && headers.Authorization?.startsWith('Api-Key')) {
+        debugLog('API key auth failed (401), retrying with JWT cookie...')
+        
+        // Try to get JWT from cookies
+        const jwtToken = await getJWTCookie(config.apiEndpoint)
+        
+        if (jwtToken) {
+          // Build new headers with JWT instead of API key
+          const newHeaders: any = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+          
+          if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
+            newHeaders['Authorization'] = `JWT ${jwtToken}`
+          } else {
+            newHeaders['Authorization'] = `Bearer ${jwtToken}`
+          }
+          
+          debugLog('Retrying with JWT authorization:', newHeaders.Authorization)
+          
+          // Make the request directly with new headers, don't recurse
+          try {
+            const response = await axios({
+              method,
+              url,
+              data: requestData,
+              headers: newHeaders,
+              withCredentials: false
+            })
+            
+            debugLog('JWT fallback successful!')
+            return response.data
+          } catch (jwtError) {
+            debugError('JWT fallback also failed:', jwtError.response?.status)
+            throw new Error('AUTH_EXPIRED')
+          }
+        } else {
+          debugLog('No JWT cookie available for retry')
+        }
+      }
+      // If we were using JWT, try API key as fallback
+      else if (authMethod === 'jwt' && config.apiKey && !headers.Authorization?.startsWith('Api-Key')) {
+        debugLog('JWT auth failed (401), retrying with API key...')
+        
         const newHeaders: any = {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
         
-        if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
-          newHeaders['Authorization'] = `JWT ${jwtToken}`
-        } else {
-          newHeaders['Authorization'] = `Bearer ${jwtToken}`
-        }
+        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+          ? `JWT ${config.apiKey}`
+          : `Api-Key ${config.apiKey}`
+        newHeaders['Authorization'] = authHeader
         
-        debugLog('Retrying with JWT authorization:', newHeaders.Authorization)
+        debugLog('Retrying with API key authorization')
         
-        // Make the request directly with new headers, don't recurse
         try {
           const response = await axios({
             method,
@@ -355,17 +401,12 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
             withCredentials: false
           })
           
-          debugLog('JWT fallback successful!')
-          // Cache that JWT works better than API key
-          await storage.set('auth-method-preference', 'jwt')
-          
+          debugLog('API key fallback successful!')
           return response.data
-        } catch (jwtError) {
-          debugError('JWT fallback also failed:', jwtError.response?.status)
+        } catch (apiKeyError) {
+          debugError('API key fallback also failed:', apiKeyError.response?.status)
           throw new Error('AUTH_EXPIRED')
         }
-      } else {
-        debugLog('No JWT cookie available for retry')
       }
     }
     
@@ -445,6 +486,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch(error => {
         debugError('Background API request failed:', error)
+        debugError('Error details:', { 
+          message: error.message,
+          response: error.response,
+          status: error.response?.status,
+          data: error.response?.data 
+        })
         const errorMessage = error.message || 'API request failed'
         sendResponse({ 
           success: false, 
@@ -491,33 +538,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           'Accept': 'application/json'
         }
         
-        // Check cached auth preference
-        const authPreference = await storage.get('auth-method-preference')
-        const shouldTryJwtFirst = authPreference === 'jwt'
+        // Use auth method from config
+        const authMethod = config.authMethod || 'jwt'
+        const shouldTryJwtFirst = authMethod === 'jwt'
         
         if (shouldTryJwtFirst) {
-          // Try JWT first if we know it works
+          // Try JWT first
           const jwtToken = await getJWTCookie(config.apiEndpoint)
           if (jwtToken) {
             authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
               ? `JWT ${jwtToken}`
               : `Bearer ${jwtToken}`
-            debugLog('CHECK_AUTH: Using JWT from preference')
+            debugLog('CHECK_AUTH: Using JWT authentication')
+          } else if (config.apiKey) {
+            // Fallback to API key if JWT not available
+            authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+              ? `JWT ${config.apiKey}`
+              : `Api-Key ${config.apiKey}`
+            debugLog('CHECK_AUTH: Using API key as fallback')
           }
         } else if (config.apiKey) {
           // Try API key first
           authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
             ? `JWT ${config.apiKey}`
             : `Api-Key ${config.apiKey}`
-          debugLog('CHECK_AUTH: Using API key')
+          debugLog('CHECK_AUTH: Using API key authentication')
         } else {
-          // No API key, try JWT
+          // No API key, try JWT as fallback
           const jwtToken = await getJWTCookie(config.apiEndpoint)
           if (jwtToken) {
             authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
               ? `JWT ${jwtToken}`
               : `Bearer ${jwtToken}`
-            debugLog('CHECK_AUTH: Using JWT (no API key available)')
+            debugLog('CHECK_AUTH: Using JWT as fallback (no API key available)')
           }
         }
         
@@ -564,8 +617,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   headers: authHeaders
                 })
                 
-                // Cache that JWT works better
-                await storage.set('auth-method-preference', 'jwt')
                 debugLog('CHECK_AUTH: JWT fallback successful')
                 
                 sendResponse({ success: true, data: retryResponse.data })
