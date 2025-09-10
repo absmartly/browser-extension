@@ -3189,15 +3189,72 @@ chrome.action.onClicked.addListener(async (tab) => {
               // Toggle based on actual current state
               if (isCurrentlyVisible) {
                 console.log('Hiding sidebar')
+                // Hide sidebar
                 existingSidebar.style.transform = 'translateX(100%)'
+                
+                // Restore original body margin
+                const originalMargin = document.body.getAttribute('data-absmartly-original-margin-right')
+                if (originalMargin !== null) {
+                  document.body.style.marginRight = originalMargin
+                  document.body.removeAttribute('data-absmartly-original-margin-right')
+                }
+                
+                // Restore fixed elements
+                const fixedElements = document.querySelectorAll('[data-absmartly-original-right]')
+                fixedElements.forEach(el => {
+                  const originalRight = el.getAttribute('data-absmartly-original-right')
+                  if (originalRight !== null) {
+                    ;(el as HTMLElement).style.right = originalRight
+                    el.removeAttribute('data-absmartly-original-right')
+                  }
+                })
               } else {
                 console.log('Showing sidebar')
+                // Show sidebar
                 existingSidebar.style.transform = 'translateX(0)'
+                
+                // Store and modify body margin
+                const currentMargin = document.body.style.marginRight || '0px'
+                document.body.setAttribute('data-absmartly-original-margin-right', currentMargin)
+                document.body.style.marginRight = '384px'
+                
+                // Adjust fixed elements positioned with right: 0
+                const fixedElements = document.querySelectorAll('*')
+                fixedElements.forEach(el => {
+                  const computedStyle = window.getComputedStyle(el)
+                  if (computedStyle.position === 'fixed' && computedStyle.right === '0px') {
+                    const htmlEl = el as HTMLElement
+                    htmlEl.setAttribute('data-absmartly-original-right', htmlEl.style.right || '0px')
+                    htmlEl.style.right = '384px'
+                  }
+                })
               }
               return
             }
 
             console.log('🔵 ABSmartly Extension: Injecting sidebar')
+
+            // Store original body margin before modifying
+            const originalMargin = document.body.style.marginRight || '0px'
+            document.body.setAttribute('data-absmartly-original-margin-right', originalMargin)
+            
+            // Add transition to body for smooth animation
+            const originalTransition = document.body.style.transition
+            document.body.style.transition = 'margin-right 0.3s ease-in-out'
+            
+            // Set body margin to push content left
+            document.body.style.marginRight = '384px'
+            
+            // Adjust fixed elements positioned with right: 0
+            const fixedElements = document.querySelectorAll('*')
+            fixedElements.forEach(el => {
+              const computedStyle = window.getComputedStyle(el)
+              if (computedStyle.position === 'fixed' && computedStyle.right === '0px') {
+                const htmlEl = el as HTMLElement
+                htmlEl.setAttribute('data-absmartly-original-right', htmlEl.style.right || '0px')
+                htmlEl.style.right = '384px'
+              }
+            })
 
             // Create the sidebar container
             const container = document.createElement('div')
