@@ -2,7 +2,7 @@ import React from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
-import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 
 interface ExperimentListProps {
@@ -334,27 +334,68 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
             
             {/* Action buttons stacked vertically, aligned to top */}
             <div className="flex flex-col items-center gap-0.5 ml-2 self-start">
-              <ChevronRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0" />
-              
+              {/* Chevron button for opening detail view */}
               <div className="relative group">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const endpoint = localStorage.getItem('absmartly-endpoint') || ''
-                    const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                    const url = `${baseUrl}/experiments/${experiment.id}`
-                    chrome.tabs.create({ url })
-                  }}
-                  className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                  aria-label="Open in ABsmartly"
+                  onClick={() => onExperimentClick(experiment)}
+                  className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  aria-label="View experiment details"
                 >
-                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  <ChevronRightIcon className="h-5 w-5" />
                 </button>
                 
                 {/* Tooltip */}
-                <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Open in ABsmartly
+                <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                  View details
                   <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-0.5">
+                {/* Open in ABsmartly */}
+                <div className="relative group">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const endpoint = localStorage.getItem('absmartly-endpoint') || ''
+                      const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                      const url = `${baseUrl}/experiments/${experiment.id}`
+                      chrome.tabs.create({ url })
+                    }}
+                    className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    aria-label="Open in ABsmartly"
+                  >
+                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  </button>
+                  
+                  {/* Tooltip with high z-index */}
+                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    Open in ABsmartly
+                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+                
+                {/* Edit in ABsmartly */}
+                <div className="relative group">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const endpoint = localStorage.getItem('absmartly-endpoint') || ''
+                      const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                      const url = `${baseUrl}/experiments/${experiment.id}/edit`
+                      chrome.tabs.create({ url })
+                    }}
+                    className="p-0.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                    aria-label="Edit in ABsmartly"
+                  >
+                    <PencilSquareIcon className="h-4 w-4" />
+                  </button>
+                  
+                  {/* Tooltip with high z-index */}
+                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    Edit in ABsmartly
+                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
                 </div>
               </div>
             </div>
