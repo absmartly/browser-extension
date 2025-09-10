@@ -63,6 +63,22 @@ export function useABsmartly() {
     return client.setExperimentFavorite(id, favorite)
   }, [client])
 
+  const getApplications = useCallback(async (): Promise<any[]> => {
+    return client.getApplications()
+  }, [client])
+
+  const getUnitTypes = useCallback(async (): Promise<any[]> => {
+    return client.getUnitTypes()
+  }, [client])
+
+  const getMetrics = useCallback(async (): Promise<any[]> => {
+    return client.getMetrics()
+  }, [client])
+
+  const getExperimentTags = useCallback(async (): Promise<any[]> => {
+    return client.getExperimentTags()
+  }, [client])
+
   return {
     client,
     config,
@@ -76,6 +92,10 @@ export function useABsmartly() {
     createExperiment,
     updateExperiment,
     getFavorites,
-    setExperimentFavorite
+    setExperimentFavorite,
+    getApplications,
+    getUnitTypes,
+    getMetrics,
+    getExperimentTags
   }
 }

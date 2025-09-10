@@ -114,8 +114,20 @@ export class BackgroundAPIClient {
   
   async getUnitTypes(): Promise<any[]> {
     try {
+      debugLog('Fetching unit types...')
       const data = await this.makeRequest('GET', '/unit_types')
-      return data.unit_types || []
+      debugLog('Unit types API raw response:', JSON.stringify(data))
+      
+      // Check if data is an array directly
+      if (Array.isArray(data)) {
+        debugLog('Unit types is direct array, length:', data.length)
+        return data
+      }
+      
+      // Check for nested structures
+      const unitTypes = data.unit_types || data.data || data.items || []
+      debugLog('Extracted unit types, length:', unitTypes.length, 'first item:', unitTypes[0])
+      return unitTypes
     } catch (error) {
       debugError('Failed to fetch unit types:', error)
       throw error

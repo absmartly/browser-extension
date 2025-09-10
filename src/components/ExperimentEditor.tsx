@@ -7,7 +7,7 @@ import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import type { Experiment } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -39,15 +39,14 @@ export function ExperimentEditor({
   const [formData, setFormData] = useState({
     name: experiment?.name || '',
     display_name: experiment?.display_name || '',
-    state: experiment?.state || 'ready',
+    state: experiment?.state || 'created',
     percentage_of_traffic: experiment?.percentage_of_traffic || 100,
     nr_variants: experiment?.nr_variants || 2,
     percentages: experiment?.percentages || '50/50',
-    audience_strict: experiment?.audience_strict ?? true,
-    audience: experiment?.audience || '',
-    unit_type_id: experiment?.unit_type?.unit_type_id || 1,
-    primary_metric_id: experiment?.primary_metric?.metric_id || null,
-    application_ids: experiment?.applications?.map(a => a.application_id) || [1],
+    audience_strict: experiment?.audience_strict ?? false,
+    audience: experiment?.audience || '{"filter":[{"and":[]}]}',
+    unit_type_id: experiment?.unit_type?.unit_type_id || null,
+    application_ids: experiment?.applications?.map(a => a.application_id) || [],
     tag_ids: experiment?.experiment_tags?.map(t => t.experiment_tag_id) || []
   })
 
@@ -86,9 +85,48 @@ export function ExperimentEditor({
   const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(null)
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [activePreviewVariant, setActivePreviewVariant] = useState<number | null>(null)
+  const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
+
+  // Helper functions for name conversion
+  const snakeToTitle = (snake: string): string => {
+    return snake
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  const titleToSnake = (title: string): string => {
+    return title
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '')
+  }
+
+  const handleNameChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      name: value,
+      ...(namesSynced ? { display_name: snakeToTitle(value) } : {})
+    }))
+  }
+
+  const handleDisplayNameChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      display_name: value,
+      ...(namesSynced ? { name: titleToSnake(value) } : {})
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate required fields
+    if (!formData.unit_type_id) {
+      alert('Please select a unit type')
+      return
+    }
     
     // Prepare variants with DOM changes
     const preparedVariants = variants.map((v, index) => {
@@ -108,16 +146,45 @@ export function ExperimentEditor({
 
     const experimentData: any = {
       ...formData,
+      state: experiment ? formData.state : 'created', // New experiments start as created/draft
+      iteration: 1,
       unit_type: { unit_type_id: formData.unit_type_id },
-      primary_metric: formData.primary_metric_id ? { metric_id: formData.primary_metric_id } : null,
+      primary_metric: { metric_id: null },
+      secondary_metrics: [],
       applications: formData.application_ids.map(id => ({
         application_id: id,
         application_version: "0"
       })),
       experiment_tags: formData.tag_ids.map(id => ({ experiment_tag_id: id })),
       variants: preparedVariants,
+      variant_screenshots: [],
       owners: [{ user_id: 3 }], // TODO: Get current user ID
-      teams: []
+      teams: [],
+      // Add analysis type fields for new experiments
+      type: 'test',
+      analysis_type: 'group_sequential',
+      baseline_participants_per_day: '33',
+      required_alpha: '0.100',
+      required_power: '0.800',
+      group_sequential_futility_type: 'binding',
+      group_sequential_analysis_count: null,
+      group_sequential_min_analysis_interval: '1d',
+      group_sequential_first_analysis_interval: '7d',
+      minimum_detectable_effect: null,
+      group_sequential_max_duration_interval: '6w',
+      parent_experiment: null,
+      template_permission: {},
+      template_name: '',
+      template_description: '',
+      // Add custom section field values (empty for now)
+      custom_section_field_values: {
+        "1": { value: "", type: "text", id: 1 },
+        "2": { value: "", type: "text", id: 2 },
+        "3": { value: "", type: "text", id: 3 },
+        "4": { value: "", type: "text", id: 4 },
+        "5": { value: "", type: "text", id: 5 },
+        "111": { value: "", type: "string", id: 111 }
+      }
     }
 
     await onSave(experimentData)
@@ -242,27 +309,89 @@ export function ExperimentEditor({
 
         {/* Basic Information */}
         <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Experiment Name
-            </label>
-            <Input
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="my_experiment_name"
-              required
-            />
-          </div>
+          {/* Name fields with sync lock */}
+          <div className="flex items-start gap-1">
+            <div className="flex-1 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Experiment Name
+                </label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="my_experiment_name"
+                  required
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Display Name
-            </label>
-            <Input
-              value={formData.display_name}
-              onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-              placeholder="My Experiment"
-            />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Name
+                </label>
+                <Input
+                  value={formData.display_name}
+                  onChange={(e) => handleDisplayNameChange(e.target.value)}
+                  placeholder="My Experiment"
+                />
+              </div>
+            </div>
+            
+            {/* Lock icon with bracket */}
+            <div className="relative" style={{ width: '30px', paddingTop: '28px' }}>
+              {/* Bracket lines */}
+              {namesSynced && (
+                <svg
+                  className="absolute"
+                  width="30"
+                  height="108"
+                  style={{
+                    left: '0',
+                    top: '28px'
+                  }}
+                >
+                  {/* Top horizontal */}
+                  <path
+                    d="M 0 20 L 15 20"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  {/* Bottom horizontal */}
+                  <path
+                    d="M 0 88 L 15 88"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  {/* Vertical connector */}
+                  <path
+                    d="M 15 20 L 15 88"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                </svg>
+              )}
+              
+              {/* Lock button positioned on the vertical line */}
+              <button
+                type="button"
+                onClick={() => setNamesSynced(!namesSynced)}
+                className="absolute z-10 p-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                style={{
+                  left: '7px',
+                  top: '82px',
+                  transform: 'translateY(-50%)'
+                }}
+                title={namesSynced ? "Names are synced. Click to unlock" : "Names are not synced. Click to lock"}
+              >
+                {namesSynced ? (
+                  <LockClosedIcon className="h-4 w-4 text-blue-600" />
+                ) : (
+                  <LockOpenIcon className="h-4 w-4 text-gray-400" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div>
@@ -284,30 +413,19 @@ export function ExperimentEditor({
             </label>
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              value={formData.unit_type_id}
-              onChange={(e) => setFormData({ ...formData, unit_type_id: parseInt(e.target.value) })}
+              value={formData.unit_type_id || ''}
+              onChange={(e) => setFormData({ ...formData, unit_type_id: e.target.value ? parseInt(e.target.value) : null })}
+              required
             >
+              <option value="">Select a unit type</option>
               {unitTypes.map(ut => (
-                <option key={ut.id} value={ut.id}>{ut.name}</option>
+                <option key={ut.unit_type_id || ut.id} value={ut.unit_type_id || ut.id}>
+                  {ut.name || ut.display_name || `Unit Type ${ut.unit_type_id || ut.id}`}
+                </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Primary Metric
-            </label>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              value={formData.primary_metric_id || ''}
-              onChange={(e) => setFormData({ ...formData, primary_metric_id: e.target.value ? parseInt(e.target.value) : null })}
-            >
-              <option value="">Select a metric</option>
-              {metrics.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Variants */}

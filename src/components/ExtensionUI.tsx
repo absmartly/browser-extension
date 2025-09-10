@@ -44,6 +44,12 @@ function IndexPopupContent() {
   // Favorite experiments state
   const [favoriteExperiments, setFavoriteExperiments] = useState<Set<number>>(new Set())
   
+  // Resource states for ExperimentEditor
+  const [applications, setApplications] = useState<any[]>([])
+  const [unitTypes, setUnitTypes] = useState<any[]>([])
+  const [metrics, setMetrics] = useState<any[]>([])
+  const [tags, setTags] = useState<any[]>([])
+  
   const {
     client,
     config,
@@ -56,7 +62,11 @@ function IndexPopupContent() {
     createExperiment,
     updateExperiment,
     getFavorites,
-    setExperimentFavorite
+    setExperimentFavorite,
+    getApplications,
+    getUnitTypes,
+    getMetrics,
+    getExperimentTags
   } = useABsmartly()
 
   // Track if we've initialized experiments for this session
@@ -72,6 +82,14 @@ function IndexPopupContent() {
       loadFavorites()
     }
   }, [config, view, hasInitialized, filtersLoaded, filters])
+
+  // Load editor resources when switching to create or edit view
+  useEffect(() => {
+    if (config && (view === 'create' || view === 'edit')) {
+      debugLog('Loading editor resources for view:', view)
+      loadEditorResources()
+    }
+  }, [config, view])
 
   // Restore popup state and filters when component mounts
   useEffect(() => {
@@ -134,6 +152,32 @@ function IndexPopupContent() {
     } catch (error) {
       debugError('Failed to load favorites:', error)
       // Continue without favorites if the call fails
+    }
+  }
+
+  const loadEditorResources = async () => {
+    debugLog('Loading editor resources...')
+    try {
+      const [apps, units, metricsData, tagsData] = await Promise.all([
+        getApplications(),
+        getUnitTypes(),
+        getMetrics(),
+        getExperimentTags()
+      ])
+      debugLog('Editor resources loaded:', { 
+        apps: apps?.length || 0, 
+        units: units?.length || 0,
+        metricsData: metricsData?.length || 0,
+        tagsData: tagsData?.length || 0,
+        unitsExample: units?.[0]
+      })
+      setApplications(apps || [])
+      setUnitTypes(units || [])
+      setMetrics(metricsData || [])
+      setTags(tagsData || [])
+    } catch (error) {
+      debugError('Failed to load editor resources:', error)
+      // Continue with empty arrays if the call fails
     }
   }
 
@@ -699,6 +743,10 @@ function IndexPopupContent() {
           experiment={selectedExperiment}
           onSave={handleSaveExperiment}
           onCancel={() => setView('list')}
+          applications={applications}
+          unitTypes={unitTypes}
+          metrics={metrics}
+          tags={tags}
         />
       )}
       
