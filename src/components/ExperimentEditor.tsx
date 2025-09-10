@@ -3,10 +3,11 @@ import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Badge } from './ui/Badge'
-import { NaturalLanguageInput } from './NaturalLanguageInput'
+import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
+import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import type { Experiment } from '~src/types/absmartly'
-import type { DOMChangeInstruction } from '~src/types/dom'
-import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import type { DOMChange } from '~src/types/dom-changes'
+import { ArrowLeftIcon, PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -21,8 +22,8 @@ interface ExperimentEditorProps {
 
 interface VariantData {
   name: string
-  config: string
-  domChanges: DOMChangeInstruction[]
+  variables: Record<string, any>
+  dom_changes: DOMChange[]
 }
 
 export function ExperimentEditor({
@@ -53,11 +54,16 @@ export function ExperimentEditor({
   const [variants, setVariants] = useState<VariantData[]>(() => {
     if (experiment?.variants) {
       return experiment.variants.map(v => {
-        let domChanges: DOMChangeInstruction[] = []
+        let dom_changes: DOMChange[] = []
+        let variables: Record<string, any> = {}
         try {
           const config = JSON.parse(v.config || '{}')
           if (config.dom_changes) {
-            domChanges = config.dom_changes
+            dom_changes = config.dom_changes
+            const { dom_changes: _, ...otherVars } = config
+            variables = otherVars
+          } else {
+            variables = config
           }
         } catch (e) {
           debugError('Failed to parse variant config:', e)
@@ -65,30 +71,32 @@ export function ExperimentEditor({
         
         return {
           name: v.name || '',
-          config: v.config || '{}',
-          domChanges
+          variables,
+          dom_changes
         }
       })
     }
     return [
-      { name: 'Control', config: '{}', domChanges: [] },
-      { name: 'Variant 1', config: '{}', domChanges: [] }
+      { name: 'Control', variables: {}, dom_changes: [] },
+      { name: 'Variant 1', variables: {}, dom_changes: [] }
     ]
   })
 
-  const [showDOMEditor, setShowDOMEditor] = useState<number | null>(null)
-  const [importedChanges, setImportedChanges] = useState<string>('')
+  const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
+  const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(null)
+  const [previewEnabled, setPreviewEnabled] = useState(false)
+  const [activePreviewVariant, setActivePreviewVariant] = useState<number | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     // Prepare variants with DOM changes
     const preparedVariants = variants.map((v, index) => {
-      const config: any = {}
+      const config: any = { ...v.variables }
       
       // Include DOM changes if any
-      if (v.domChanges.length > 0) {
-        config.dom_changes = v.domChanges
+      if (v.dom_changes.length > 0) {
+        config.dom_changes = v.dom_changes
       }
       
       return {
@@ -118,8 +126,8 @@ export function ExperimentEditor({
   const addVariant = () => {
     setVariants([...variants, { 
       name: `Variant ${variants.length}`, 
-      config: '{}',
-      domChanges: []
+      variables: {},
+      dom_changes: []
     }])
     
     // Update percentages
@@ -156,33 +164,61 @@ export function ExperimentEditor({
     })
   }
 
-  const updateVariantDOMChanges = (index: number, changes: DOMChangeInstruction[]) => {
+  const updateVariantDOMChanges = (index: number, changes: DOMChange[]) => {
     const newVariants = [...variants]
-    newVariants[index].domChanges = changes
+    newVariants[index].dom_changes = changes
     setVariants(newVariants)
   }
 
-  const importDOMChanges = (variantIndex: number) => {
-    try {
-      const changes = JSON.parse(importedChanges)
-      if (Array.isArray(changes)) {
-        updateVariantDOMChanges(variantIndex, changes)
-        setImportedChanges('')
-        setShowDOMEditor(null)
-      } else {
-        alert('Invalid DOM changes format. Must be an array.')
-      }
-    } catch (e) {
-      alert('Invalid JSON format')
+  const updateVariantVariables = (index: number, key: string, value: string) => {
+    const newVariants = [...variants]
+    newVariants[index].variables[key] = value
+    setVariants(newVariants)
+  }
+
+  const addVariantVariable = (index: number) => {
+    const key = prompt('Enter variable name:')
+    if (key) {
+      updateVariantVariables(index, key, '')
     }
   }
 
-  const getChangesFromContentScript = async (variantIndex: number) => {
-    chrome.runtime.sendMessage({ type: "GET_DOM_CHANGES_FROM_TAB" }, (response) => {
-      if (response?.changes) {
-        updateVariantDOMChanges(variantIndex, response.changes)
-      }
-    })
+  const deleteVariantVariable = (index: number, key: string) => {
+    const newVariants = [...variants]
+    delete newVariants[index].variables[key]
+    setVariants(newVariants)
+  }
+
+  const handlePreviewToggleForVariant = (enabled: boolean, variantIndex: number) => {
+    setPreviewEnabled(enabled)
+    setActivePreviewVariant(enabled ? variantIndex : null)
+    
+    if (enabled && variants[variantIndex]) {
+      const changes = variants[variantIndex].dom_changes || []
+      const variantName = variants[variantIndex].name
+      
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'apply',
+            changes: changes.filter(c => c.enabled !== false),
+            experimentName: formData.name,
+            variantName: variantName
+          })
+        }
+      })
+    } else if (!enabled) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'remove',
+            experimentName: formData.name
+          })
+        }
+      })
+    }
   }
 
   return (
@@ -291,9 +327,10 @@ export function ExperimentEditor({
 
           <div className="space-y-2">
             {variants.map((variant, index) => (
-              <div key={index} className="border border-gray-200 rounded-md p-3">
-                <div className="flex items-center justify-between mb-2">
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <div className="mb-3 flex items-center gap-2">
                   <Input
+                    className="flex-1 font-medium"
                     value={variant.name}
                     onChange={(e) => {
                       const newVariants = [...variants]
@@ -301,94 +338,78 @@ export function ExperimentEditor({
                       setVariants(newVariants)
                     }}
                     placeholder={`Variant ${index}`}
-                    className="w-48"
                   />
-                  <div className="flex items-center gap-2">
-                    <Badge variant="info">
-                      {variant.domChanges.length} DOM changes
-                    </Badge>
-                    {variants.length > 2 && (
-                      <button
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setJsonEditorVariant(index)
+                      setJsonEditorOpen(true)
+                    }}
+                    size="sm"
+                    variant="secondary"
+                    title="Edit DOM Changes as JSON"
+                  >
+                    <CodeBracketIcon className="h-4 w-4" />
+                    JSON
+                  </Button>
+                  {variants.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(index)}
+                      className="p-1 text-red-600 hover:text-red-800"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Variables Section */}
+                <div className="space-y-3">
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
+                    <div className="space-y-2">
+                      {Object.entries(variant.variables).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <Input
+                            value={key}
+                            disabled
+                            className="flex-1 text-sm"
+                          />
+                          <Input
+                            value={typeof value === 'object' ? JSON.stringify(value) : value}
+                            onChange={(e) => updateVariantVariables(index, key, e.target.value)}
+                            className="flex-1 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => deleteVariantVariable(index, key)}
+                            className="p-1 text-red-600 hover:text-red-800"
+                          >
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <Button
                         type="button"
-                        onClick={() => removeVariant(index)}
-                        className="text-red-600 hover:text-red-800"
+                        onClick={() => addVariantVariable(index)}
+                        size="sm"
+                        variant="secondary"
+                        className="w-full"
                       >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => setShowDOMEditor(index)}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    Edit DOM Changes
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => getChangesFromContentScript(index)}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    Import from Visual Editor
-                  </Button>
-                </div>
-
-                {showDOMEditor === index && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                    <div className="space-y-4">
-                      <NaturalLanguageInput 
-                        onGenerate={(changes) => {
-                          updateVariantDOMChanges(index, changes)
-                          setShowDOMEditor(null)
-                        }}
-                      />
-                      
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-gray-300" />
-                        </div>
-                        <div className="relative flex justify-center text-sm">
-                          <span className="px-2 bg-gray-50 text-gray-500">or edit manually</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">DOM Changes JSON</h4>
-                        <textarea
-                          className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md text-xs font-mono"
-                          value={JSON.stringify(variant.domChanges, null, 2)}
-                          onChange={(e) => setImportedChanges(e.target.value)}
-                          placeholder='[{"selector": ".title", "action": "text", "value": "New Title"}]'
-                        />
-                        <div className="mt-2 flex gap-2">
-                          <Button
-                            type="button"
-                            onClick={() => importDOMChanges(index)}
-                            size="sm"
-                          >
-                            Apply JSON Changes
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              setShowDOMEditor(null)
-                              setImportedChanges('')
-                            }}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
+                        Add Variable
+                      </Button>
                     </div>
                   </div>
-                )}
+
+                  {/* DOM Changes Section */}
+                  <DOMChangesInlineEditor
+                    variantName={variant.name}
+                    changes={variant.dom_changes}
+                    onChange={(changes) => updateVariantDOMChanges(index, changes)}
+                    previewEnabled={previewEnabled && activePreviewVariant === index}
+                    onPreviewToggle={(enabled) => handlePreviewToggleForVariant(enabled, index)}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -413,6 +434,24 @@ export function ExperimentEditor({
           </Button>
         </div>
       </form>
+      
+      {/* JSON Editor Modal */}
+      {jsonEditorVariant !== null && (
+        <DOMChangesJSONEditor
+          isOpen={jsonEditorOpen}
+          onClose={() => {
+            setJsonEditorOpen(false)
+            setJsonEditorVariant(null)
+          }}
+          changes={variants[jsonEditorVariant]?.dom_changes || []}
+          onSave={(newChanges) => {
+            updateVariantDOMChanges(jsonEditorVariant, newChanges)
+            setJsonEditorOpen(false)
+            setJsonEditorVariant(null)
+          }}
+          variantName={variants[jsonEditorVariant]?.name || ''}
+        />
+      )}
     </div>
   )
 }
