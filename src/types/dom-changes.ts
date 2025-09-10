@@ -1,4 +1,4 @@
-export type DOMChangeType = 'text' | 'style' | 'class' | 'attribute' | 'html' | 'javascript' | 'move' | 'remove' | 'insert';
+export type DOMChangeType = 'text' | 'style' | 'styleRules' | 'class' | 'attribute' | 'html' | 'javascript' | 'move' | 'remove' | 'insert' | 'create';
 
 export interface DOMChangeStyle {
   selector: string;
@@ -6,6 +6,23 @@ export interface DOMChangeStyle {
   value: Record<string, string>;
   enabled?: boolean;
   mode?: 'replace' | 'merge';
+  waitForElement?: boolean;
+  observerRoot?: string;
+}
+
+export interface DOMChangeStyleRules {
+  selector: string;
+  type: 'styleRules';
+  states: {
+    normal?: Record<string, string>;
+    hover?: Record<string, string>;
+    active?: Record<string, string>;
+    focus?: Record<string, string>;
+  };
+  important?: boolean;
+  enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeText {
@@ -13,6 +30,8 @@ export interface DOMChangeText {
   type: 'text';
   value: string;
   enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeClass {
@@ -22,6 +41,8 @@ export interface DOMChangeClass {
   remove?: string[];
   enabled?: boolean;
   mode?: 'replace' | 'merge';
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeAttribute {
@@ -30,6 +51,8 @@ export interface DOMChangeAttribute {
   value: Record<string, string>;
   enabled?: boolean;
   mode?: 'replace' | 'merge';
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeHTML {
@@ -37,6 +60,8 @@ export interface DOMChangeHTML {
   type: 'html';
   value: string;
   enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeJavaScript {
@@ -44,6 +69,8 @@ export interface DOMChangeJavaScript {
   type: 'javascript';
   value: string;
   enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeMove {
@@ -52,12 +79,16 @@ export interface DOMChangeMove {
   targetSelector: string;
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
   enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeRemove {
   selector: string;
   type: 'remove';
   enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export interface DOMChangeInsert {
@@ -66,10 +97,24 @@ export interface DOMChangeInsert {
   html: string; // HTML content to insert
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
   enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
+}
+
+export interface DOMChangeCreate {
+  selector: string; // Unique ID for created element
+  type: 'create';
+  element: string; // HTML content to create
+  targetSelector: string;
+  position: 'before' | 'after' | 'firstChild' | 'lastChild';
+  enabled?: boolean;
+  waitForElement?: boolean;
+  observerRoot?: string;
 }
 
 export type DOMChange = 
   | DOMChangeStyle 
+  | DOMChangeStyleRules
   | DOMChangeText 
   | DOMChangeClass 
   | DOMChangeAttribute 
@@ -77,7 +122,8 @@ export type DOMChange =
   | DOMChangeJavaScript
   | DOMChangeMove
   | DOMChangeRemove
-  | DOMChangeInsert;
+  | DOMChangeInsert
+  | DOMChangeCreate;
 
 export interface DOMChangeTemplate {
   id: string;
@@ -87,6 +133,133 @@ export interface DOMChangeTemplate {
   add?: string[]; // For class type
   remove?: string[]; // For class type
 }
+
+export interface StyleRulesTemplate {
+  id: string;
+  name: string;
+  description: string;
+  states: {
+    normal?: Record<string, string>;
+    hover?: Record<string, string>;
+    active?: Record<string, string>;
+    focus?: Record<string, string>;
+  };
+  important?: boolean;
+}
+
+export const STYLE_RULES_TEMPLATES: StyleRulesTemplate[] = [
+  {
+    id: 'primary-button',
+    name: 'Primary Button',
+    description: 'Blue button with hover effects',
+    states: {
+      normal: {
+        backgroundColor: '#007bff',
+        color: 'white',
+        padding: '10px 20px',
+        borderRadius: '4px',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      },
+      hover: {
+        backgroundColor: '#0056b3',
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+      },
+      active: {
+        backgroundColor: '#004085',
+        transform: 'translateY(0)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+      }
+    }
+  },
+  {
+    id: 'danger-button',
+    name: 'Danger Button',
+    description: 'Red button for destructive actions',
+    states: {
+      normal: {
+        backgroundColor: '#dc3545',
+        color: 'white',
+        padding: '10px 20px',
+        borderRadius: '4px',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      },
+      hover: {
+        backgroundColor: '#c82333',
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 8px rgba(220,53,69,0.3)'
+      },
+      active: {
+        backgroundColor: '#bd2130',
+        transform: 'translateY(0)'
+      }
+    }
+  },
+  {
+    id: 'ghost-button',
+    name: 'Ghost Button',
+    description: 'Transparent button with border',
+    states: {
+      normal: {
+        backgroundColor: 'transparent',
+        color: '#007bff',
+        padding: '10px 20px',
+        borderRadius: '4px',
+        border: '2px solid #007bff',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      },
+      hover: {
+        backgroundColor: '#007bff',
+        color: 'white',
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 8px rgba(0,123,255,0.3)'
+      },
+      active: {
+        transform: 'translateY(0)'
+      }
+    }
+  },
+  {
+    id: 'card-hover',
+    name: 'Card Hover Effect',
+    description: 'Elevate card on hover',
+    states: {
+      normal: {
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        transition: 'all 0.3s ease'
+      },
+      hover: {
+        transform: 'translateY(-4px)',
+        boxShadow: '0 8px 16px rgba(0,0,0,0.15)'
+      }
+    }
+  },
+  {
+    id: 'link-underline',
+    name: 'Link Underline',
+    description: 'Animated underline on hover',
+    states: {
+      normal: {
+        color: '#007bff',
+        textDecoration: 'none',
+        position: 'relative',
+        transition: 'color 0.2s ease'
+      },
+      hover: {
+        color: '#0056b3',
+        textDecoration: 'underline'
+      }
+    }
+  }
+];
 
 export const DOM_CHANGE_TEMPLATES: DOMChangeTemplate[] = [
   {
