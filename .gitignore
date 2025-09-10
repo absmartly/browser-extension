@@ -6,6 +6,10 @@
 .mcp.json
 
 public/absmartly-dom-changes.min.js
+react.production.min.js
+playwright-report/
+playwright-report/index.html
+test-results
 
 # dependencies
 /node_modules
