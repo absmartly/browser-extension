@@ -7,9 +7,10 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Checkbox } from './ui/Checkbox'
 import { MultiSelectTags } from './ui/MultiSelectTags'
-import type { DOMChange, DOMChangeType } from '~src/types/dom-changes'
+import type { DOMChange, DOMChangeType, DOMChangeStyleRules } from '~src/types/dom-changes'
 import { suggestCleanedSelector } from '~src/utils/selector-cleaner'
 import { generateSelectorSuggestions } from '~src/utils/selector-suggestions'
+import { StyleRulesEditor } from './StyleRulesEditor'
 import { 
   PencilIcon, 
   TrashIcon, 
@@ -26,7 +27,8 @@ import {
   ArrowsUpDownIcon,
   TrashIcon,
   PlusCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline'
 
 interface DOMChangesInlineEditorProps {
@@ -43,6 +45,13 @@ interface EditingDOMChange {
   type: DOMChangeType
   textValue?: string
   styleProperties?: Array<{ key: string; value: string }>
+  styleRulesStates?: {
+    normal?: Record<string, string>
+    hover?: Record<string, string>
+    active?: Record<string, string>
+    focus?: Record<string, string>
+  }
+  styleRulesImportant?: boolean
   classAdd?: string[]
   classRemove?: string[]
   classesWithStatus?: Array<{ name: string; action: 'add' | 'remove' }>
@@ -52,6 +61,8 @@ interface EditingDOMChange {
   targetSelector?: string
   position?: 'before' | 'after' | 'firstChild' | 'lastChild'
   mode?: 'replace' | 'merge'
+  waitForElement?: boolean
+  observerRoot?: string
 }
 
 // Simple CSS selector syntax highlighting
@@ -1016,6 +1027,7 @@ const DOMChangeEditorForm = ({
       >
         <option value="text">Text</option>
         <option value="style">Style</option>
+        <option value="styleRules">Style Rules (with states)</option>
         <option value="class">Class</option>
         <option value="attribute">Attribute</option>
         <option value="html">HTML</option>
@@ -1054,6 +1066,30 @@ const DOMChangeEditorForm = ({
         <CSSStyleEditor
           styleProperties={editingChange.styleProperties}
           onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
+        />
+      </div>
+    )}
+
+    {editingChange.type === 'styleRules' && (
+      <div>
+        <StyleRulesEditor
+          change={{
+            selector: editingChange.selector,
+            type: 'styleRules',
+            states: editingChange.styleRulesStates || {},
+            important: editingChange.styleRulesImportant,
+            waitForElement: editingChange.waitForElement,
+            observerRoot: editingChange.observerRoot
+          }}
+          onChange={(change) => {
+            setEditingChange({
+              ...editingChange,
+              styleRulesStates: change.states,
+              styleRulesImportant: change.important,
+              waitForElement: change.waitForElement,
+              observerRoot: change.observerRoot
+            })
+          }}
         />
       </div>
     )}
@@ -1385,6 +1421,45 @@ const DOMChangeEditorForm = ({
             <option value="lastChild">As last child of the selected element</option>
           </select>
         </div>
+      </div>
+    )}
+
+    {/* Lazy Loading Options - Available for all change types */}
+    {editingChange && editingChange.type !== 'remove' && (
+      <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+        <div className="flex items-start">
+          <input
+            type="checkbox"
+            id="waitForElement"
+            checked={editingChange.waitForElement || false}
+            onChange={(e) => setEditingChange({ ...editingChange, waitForElement: e.target.checked })}
+            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="waitForElement" className="ml-2">
+            <span className="text-sm font-medium text-gray-700">Wait for element (lazy-loaded)</span>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Apply this change when the element appears in the DOM (useful for dynamically loaded content)
+            </p>
+          </label>
+        </div>
+        
+        {editingChange.waitForElement && (
+          <div className="ml-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Observer Root (optional)
+            </label>
+            <Input
+              type="text"
+              value={editingChange.observerRoot || ''}
+              onChange={(e) => setEditingChange({ ...editingChange, observerRoot: e.target.value })}
+              placeholder="e.g., .main-content (leave empty to watch entire document)"
+              className="w-full text-xs"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Specify a container to watch for better performance. The observer will only watch for changes within this element.
+            </p>
+          </div>
+        )}
       </div>
     )}
   </div>
@@ -1870,6 +1945,8 @@ export function DOMChangesInlineEditor({
       styleProperties: change.type === 'style' 
         ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({ key, value }))
         : [{ key: '', value: '' }],
+      styleRulesStates: change.type === 'styleRules' ? (change as DOMChangeStyleRules).states : undefined,
+      styleRulesImportant: change.type === 'styleRules' ? (change as DOMChangeStyleRules).important : undefined,
       attributeProperties: change.type === 'attribute'
         ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({ key, value }))
         : [{ key: '', value: '' }],
@@ -1878,7 +1955,9 @@ export function DOMChangesInlineEditor({
       classesWithStatus,
       targetSelector: change.type === 'move' ? change.targetSelector : '',
       position: change.type === 'move' ? change.position : change.type === 'insert' ? (change as any).position : 'after',
-      mode: (change as any).mode || 'merge'
+      mode: (change as any).mode || 'merge',
+      waitForElement: (change as any).waitForElement,
+      observerRoot: (change as any).observerRoot
     }
     setEditingChange(editing)
   }
@@ -1901,7 +1980,9 @@ export function DOMChangesInlineEditor({
           type: 'text', 
           value: editingChange.textValue || '', 
           enabled: true,
-          mode: editingChange.mode || 'merge' 
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'html':
@@ -1910,7 +1991,9 @@ export function DOMChangesInlineEditor({
           type: 'html', 
           value: editingChange.htmlValue || '', 
           enabled: true,
-          mode: editingChange.mode || 'merge' 
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'javascript':
@@ -1919,7 +2002,9 @@ export function DOMChangesInlineEditor({
           type: 'javascript', 
           value: editingChange.jsValue || '', 
           enabled: true,
-          mode: editingChange.mode || 'merge' 
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'style':
@@ -1932,8 +2017,21 @@ export function DOMChangesInlineEditor({
           type: 'style', 
           value: styleValue, 
           enabled: true,
-          mode: editingChange.mode || 'merge' 
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
+        break
+      case 'styleRules':
+        domChange = {
+          selector: editingChange.selector,
+          type: 'styleRules',
+          states: editingChange.styleRulesStates || {},
+          important: editingChange.styleRulesImportant,
+          enabled: true,
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
+        } as DOMChangeStyleRules
         break
       case 'attribute':
         const attrValue: Record<string, string> = {}
@@ -1945,7 +2043,9 @@ export function DOMChangesInlineEditor({
           type: 'attribute', 
           value: attrValue, 
           enabled: true,
-          mode: editingChange.mode || 'merge' 
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'class':
@@ -1955,7 +2055,9 @@ export function DOMChangesInlineEditor({
           add: editingChange.classAdd?.filter(c => c) || [], 
           remove: editingChange.classRemove?.filter(c => c) || [],
           enabled: true,
-          mode: editingChange.mode || 'merge' 
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'move':
@@ -1965,7 +2067,9 @@ export function DOMChangesInlineEditor({
           targetSelector: editingChange.targetSelector || '',
           position: editingChange.position || 'after',
           enabled: true,
-          mode: editingChange.mode || 'merge'
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'remove':
@@ -1973,7 +2077,9 @@ export function DOMChangesInlineEditor({
           selector: editingChange.selector,
           type: 'remove',
           enabled: true,
-          mode: editingChange.mode || 'merge'
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       case 'insert':
@@ -1983,7 +2089,9 @@ export function DOMChangesInlineEditor({
           html: editingChange.htmlValue || '',
           position: editingChange.position || 'after',
           enabled: true,
-          mode: editingChange.mode || 'merge'
+          mode: editingChange.mode || 'merge',
+          waitForElement: editingChange.waitForElement,
+          observerRoot: editingChange.observerRoot
         }
         break
       default:
@@ -2023,6 +2131,8 @@ export function DOMChangesInlineEditor({
         return DocumentTextIcon
       case 'style':
         return PaintBrushIcon
+      case 'styleRules':
+        return SparklesIcon
       case 'class':
         return HashtagIcon
       case 'attribute':
@@ -2037,6 +2147,8 @@ export function DOMChangesInlineEditor({
         return TrashIcon
       case 'insert':
         return PlusCircleIcon
+      case 'create':
+        return PlusCircleIcon
       default:
         return CursorArrowRaysIcon
     }
@@ -2046,6 +2158,7 @@ export function DOMChangesInlineEditor({
     switch (type) {
       case 'text': return 'Text'
       case 'style': return 'Style'
+      case 'styleRules': return 'Style Rules'
       case 'class': return 'Class'
       case 'attribute': return 'Attribute'
       case 'html': return 'HTML'
@@ -2053,6 +2166,7 @@ export function DOMChangesInlineEditor({
       case 'move': return 'Move/Reorder'
       case 'remove': return 'Remove'
       case 'insert': return 'Insert'
+      case 'create': return 'Create'
       default: return type
     }
   }
@@ -2075,6 +2189,30 @@ export function DOMChangesInlineEditor({
                 <span className="ml-0.5 text-blue-600">{value}</span>
               </span>
             ))}
+          </div>
+        )
+      case 'styleRules':
+        const styleRulesChange = change as DOMChangeStyleRules
+        const stateCount = Object.entries(styleRulesChange.states || {})
+          .filter(([_, styles]) => styles && Object.keys(styles).length > 0)
+          .length
+        return (
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(styleRulesChange.states || {}).map(([state, styles]) => {
+              const styleCount = styles ? Object.keys(styles).length : 0
+              if (styleCount === 0) return null
+              return (
+                <span key={state} className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-50 text-xs">
+                  <span className="text-purple-700 font-medium">{state}:</span>
+                  <span className="ml-0.5 text-purple-600">{styleCount} styles</span>
+                </span>
+              )
+            })}
+            {styleRulesChange.important !== false && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-yellow-50 text-xs">
+                <span className="text-yellow-700">!important</span>
+              </span>
+            )}
           </div>
         )
       case 'class':
@@ -2510,6 +2648,7 @@ export function DOMChangesInlineEditor({
                       >
                         <option value="text">Text</option>
                         <option value="style">Style</option>
+                        <option value="styleRules">Style Rules (with states)</option>
                         <option value="class">Class</option>
                         <option value="attribute">Attribute</option>
                         <option value="html">HTML</option>
@@ -2542,6 +2681,30 @@ export function DOMChangesInlineEditor({
                         <CSSStyleEditor
                           styleProperties={editingChange.styleProperties}
                           onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
+                        />
+                      </div>
+                    )}
+
+                    {editingChange.type === 'styleRules' && (
+                      <div>
+                        <StyleRulesEditor
+                          change={{
+                            selector: editingChange.selector,
+                            type: 'styleRules',
+                            states: editingChange.styleRulesStates || {},
+                            important: editingChange.styleRulesImportant,
+                            waitForElement: editingChange.waitForElement,
+                            observerRoot: editingChange.observerRoot
+                          }}
+                          onChange={(change) => {
+                            setEditingChange({
+                              ...editingChange,
+                              styleRulesStates: change.states,
+                              styleRulesImportant: change.important,
+                              waitForElement: change.waitForElement,
+                              observerRoot: change.observerRoot
+                            })
+                          }}
                         />
                       </div>
                     )}
@@ -3072,6 +3235,7 @@ export function DOMChangesInlineEditor({
             >
               <option value="text">Text</option>
               <option value="style">Style</option>
+              <option value="styleRules">Style Rules (with states)</option>
               <option value="class">Class</option>
               <option value="attribute">Attribute</option>
               <option value="html">HTML</option>
@@ -3102,6 +3266,30 @@ export function DOMChangesInlineEditor({
               <CSSStyleEditor
                 styleProperties={editingChange.styleProperties}
                 onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
+              />
+            </div>
+          )}
+
+          {editingChange.type === 'styleRules' && (
+            <div>
+              <StyleRulesEditor
+                change={{
+                  selector: editingChange.selector,
+                  type: 'styleRules',
+                  states: editingChange.styleRulesStates || {},
+                  important: editingChange.styleRulesImportant,
+                  waitForElement: editingChange.waitForElement,
+                  observerRoot: editingChange.observerRoot
+                }}
+                onChange={(change) => {
+                  setEditingChange({
+                    ...editingChange,
+                    styleRulesStates: change.states,
+                    styleRulesImportant: change.important,
+                    waitForElement: change.waitForElement,
+                    observerRoot: change.observerRoot
+                  })
+                }}
               />
             </div>
           )}
