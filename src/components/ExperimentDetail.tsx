@@ -7,7 +7,7 @@ import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import { getConfig } from '~src/utils/storage'
@@ -794,12 +794,65 @@ export function ExperimentDetail({
                     <p className="text-sm text-gray-500" title={`ID: ${experiment.id}`}>{experiment.name}</p>
                   )}
                 </div>
-                <button
-                  onClick={() => setEditingName(true)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setEditingName(true)}
+                    className="p-1 text-gray-400 hover:text-gray-600"
+                    title="Edit name"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                  </button>
+                  
+                  <div className="flex gap-1">
+                    {/* Open in ABsmartly */}
+                    <div className="relative group">
+                      <button
+                        onClick={async () => {
+                          const config = await getConfig()
+                          if (config?.apiEndpoint) {
+                            const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                            const url = `${baseUrl}/experiments/${experiment.id}`
+                            chrome.tabs.create({ url })
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        aria-label="Open in ABsmartly"
+                      >
+                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                      </button>
+                      
+                      {/* Tooltip with high z-index */}
+                      <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                        Open in ABsmartly
+                        <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
+                    
+                    {/* Edit in ABsmartly */}
+                    <div className="relative group">
+                      <button
+                        onClick={async () => {
+                          const config = await getConfig()
+                          if (config?.apiEndpoint) {
+                            const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                            const url = `${baseUrl}/experiments/${experiment.id}/edit`
+                            chrome.tabs.create({ url })
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        aria-label="Edit in ABsmartly"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </button>
+                      
+                      {/* Tooltip with high z-index */}
+                      <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                        Edit in ABsmartly
+                        <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
