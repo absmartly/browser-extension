@@ -83,6 +83,24 @@ export const DOMChangesJSONEditor: React.FC<DOMChangesJSONEditorProps> = ({
               return;
             }
             break;
+          case 'styleRules':
+            if (!change.states || typeof change.states !== 'object') {
+              setError(`Change at index ${i} (styleRules) must have 'states' as an object`);
+              return;
+            }
+            // Validate states structure
+            const validStates = ['normal', 'hover', 'active', 'focus'];
+            for (const state in change.states) {
+              if (!validStates.includes(state)) {
+                setError(`Change at index ${i} (styleRules) has invalid state '${state}'. Valid states are: ${validStates.join(', ')}`);
+                return;
+              }
+              if (change.states[state] && typeof change.states[state] !== 'object') {
+                setError(`Change at index ${i} (styleRules) state '${state}' must be an object`);
+                return;
+              }
+            }
+            break;
           case 'class':
             if (!change.add && !change.remove) {
               setError(`Change at index ${i} (class) must have 'add' or 'remove' array`);

@@ -53,8 +53,8 @@ This creates production builds for all supported browsers in the `build/` direct
 
 ## Configuration
 
-1. Click the ABsmartly extension icon in your browser toolbar
-2. Click the settings icon (⚙️)
+1. Click the ABsmartly extension icon in your browser toolbar to open the sidebar
+2. In the sidebar, click the settings icon (⚙️)
 3. Enter your ABsmartly API credentials:
    - **API Key**: Your ABsmartly API key (JWT or API key format)
    - **API Endpoint**: Your ABsmartly API endpoint (e.g., `https://demo.absmartly.com`)
@@ -64,8 +64,8 @@ This creates production builds for all supported browsers in the `build/` direct
 ### Visual Editor
 
 1. Navigate to any webpage where you want to create an experiment
-2. Click the ABsmartly extension icon
-3. Click the paint brush icon (🎨) to open the visual editor
+2. Click the ABsmartly extension icon to toggle the sidebar on that page
+3. In the sidebar, click the paint brush icon (🎨) to open the visual editor
 4. Click "Start Selection" to begin selecting elements
 5. Click on any element on the page to select it
 6. Apply changes:
@@ -77,8 +77,8 @@ This creates production builds for all supported browsers in the `build/` direct
 
 ### Creating Experiments
 
-1. Click the ABsmartly extension icon
-2. Click the plus icon (➕) to create a new experiment
+1. Open the sidebar by clicking the ABsmartly extension icon
+2. In the sidebar, click the plus icon (➕) to create a new experiment
 3. Fill in the experiment details:
    - Experiment name and display name
    - Traffic percentage
@@ -157,10 +157,10 @@ DOM changes are stored as JSON in experiment variant variables:
 
 ## Architecture
 
-- **Popup**: Main extension UI built with React and Tailwind CSS
-- **Content Script**: Injected into web pages for visual editing
-- **Background Script**: Handles messaging between popup and content scripts
-- **SDK Plugin**: Separate package for applying DOM changes on target websites
+- **Sidebar (Injected UI)**: Main extension UI built with React and Tailwind CSS, injected into pages by the content script (`src/contents/sidebar.tsx`)
+- **Content Script**: Injected into web pages for visual editing, SDK plugin initialization, and message relay (`content.ts`)
+- **Background Script**: Handles messaging between the sidebar/content scripts and browser actions (`background.ts`)
+- **SDK Plugin**: Injected helper to apply DOM changes on target websites (built artifact at `public/inject-sdk-plugin.js` and loader code under `src/injection/`)
 
 ## Development
 
@@ -168,38 +168,32 @@ DOM changes are stored as JSON in experiment variant variables:
 
 ```
 absmartly-browser-extension/
-├── popup.tsx              # Main popup UI
-├── content.tsx            # Content script for visual editor
+├── content.ts             # Main content script (visual editor, SDK injection, message relay)
+├── src/contents/
+│   └── sidebar.tsx        # Injected sidebar UI
+├── tabs/
+│   └── sidebar.tsx        # Plasmo tab entry used for sidebar rendering
 ├── background.ts          # Background service worker
 ├── src/
 │   ├── components/        # React components
-│   ├── hooks/            # Custom React hooks
-│   ├── lib/              # API client and utilities
-│   ├── types/            # TypeScript types
-│   └── utils/            # Helper functions
-├── sdk-plugin/           # SDK plugin package
-│   ├── src/              # Plugin source code
-│   └── tests/            # Plugin tests
+│   ├── content/           # Visual editor and element picker
+│   ├── contents/          # Content script UIs (e.g., sidebar)
+│   ├── injection/         # SDK plugin loader and related code
+│   ├── types/             # TypeScript types
+│   └── utils/             # Helper functions
+├── public/
+│   └── inject-sdk-plugin.js  # Injected DOM changes plugin bundle
 └── style.css             # Global styles
 ```
 
 ### Testing
 
-Run tests for the SDK plugin:
-
-```bash
-cd sdk-plugin
-npm test
-```
+Playwright tests are under `tests/`. Use your package scripts to run the e2e test suite.
 
 ### Building for Production
 
 ```bash
 # Build extension
-npm run build
-
-# Build SDK plugin
-cd sdk-plugin
 npm run build
 ```
 
