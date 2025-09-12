@@ -312,7 +312,7 @@ export function ExperimentEditor({
         <div className="space-y-3">
           {/* Name fields with sync lock */}
           <div className="flex items-start">
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 space-y-3" style={{ paddingRight: '24px' }}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Experiment Name
@@ -338,12 +338,12 @@ export function ExperimentEditor({
             </div>
             
             {/* Lock icon with bracket */}
-            <div className="relative" style={{ width: '40px', paddingTop: '28px', marginLeft: '-2px' }}>
+            <div className="relative" style={{ width: '24px', paddingTop: '28px', marginLeft: '-24px' }}>
               {/* Bracket lines */}
               {namesSynced && (
                 <svg
                   className="absolute"
-                  width="40"
+                  width="24"
                   height="108"
                   style={{
                     left: '0',
@@ -352,21 +352,21 @@ export function ExperimentEditor({
                 >
                   {/* Top horizontal */}
                   <path
-                    d="M 0 20 L 20 20"
+                    d="M 0 20 L 12 20"
                     stroke="#3b82f6"
                     strokeWidth="2"
                     fill="none"
                   />
                   {/* Bottom horizontal */}
                   <path
-                    d="M 0 88 L 20 88"
+                    d="M 0 88 L 12 88"
                     stroke="#3b82f6"
                     strokeWidth="2"
                     fill="none"
                   />
                   {/* Vertical connector */}
                   <path
-                    d="M 20 20 L 20 88"
+                    d="M 12 20 L 12 88"
                     stroke="#3b82f6"
                     strokeWidth="2"
                     fill="none"
@@ -382,7 +382,7 @@ export function ExperimentEditor({
                 style={{
                   left: '12px',
                   top: '82px',
-                  transform: 'translateY(-50%)'
+                  transform: 'translate(-50%, -50%)'
                 }}
                 title={namesSynced ? "Names are synced. Click to unlock" : "Names are not synced. Click to lock"}
               >
