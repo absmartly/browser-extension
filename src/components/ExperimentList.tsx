@@ -90,6 +90,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     // Convert index to letter: 0->A, 1->B, 2->C, etc.
     return String.fromCharCode(65 + index) // 65 is 'A' in ASCII
   }
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">

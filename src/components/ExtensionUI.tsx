@@ -78,7 +78,50 @@ function IndexPopupContent() {
     if (config && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
-      loadExperiments(false)
+      
+      // Load applications first, then check for pending application filter
+      getApplications().then(apps => {
+        if (apps && apps.length > 0) {
+          setApplications(apps)
+          
+          // Check if we have a pending application filter from config
+          const storage = new Storage({ area: "local" })
+          storage.get('pendingApplicationFilter').then(appName => {
+            if (appName) {
+              // Find the application by name
+              const app = apps.find(a => a.name === appName)
+              if (app) {
+                // Update filters to include this application
+                const newFilters = {
+                  ...filters,
+                  applications: [app.id]
+                }
+                setFilters(newFilters)
+                // Save the updated filters
+                storage.set('experimentFilters', newFilters)
+                // Remove the pending filter
+                storage.remove('pendingApplicationFilter')
+                // Load experiments with the new filter
+                loadExperiments(false, 1, pageSize, newFilters)
+              } else {
+                // Application not found, load without filter
+                loadExperiments(false)
+              }
+            } else {
+              // No pending filter, load normally
+              loadExperiments(false)
+            }
+          })
+        } else {
+          // No applications available, load normally
+          loadExperiments(false)
+        }
+      }).catch(error => {
+        debugError('Failed to load applications:', error)
+        // Continue without applications
+        loadExperiments(false)
+      })
+      
       loadFavorites()
     }
   }, [config, view, hasInitialized, filtersLoaded, filters])
@@ -90,6 +133,20 @@ function IndexPopupContent() {
       loadEditorResources()
     }
   }, [config, view])
+  
+  // Load applications for filter when they're not loaded yet
+  useEffect(() => {
+    if (config && view === 'list' && applications.length === 0) {
+      debugLog('Loading applications for filter')
+      getApplications().then(apps => {
+        if (apps && apps.length > 0) {
+          setApplications(apps)
+        }
+      }).catch(error => {
+        debugError('Failed to load applications for filter:', error)
+      })
+    }
+  }, [config, view, applications.length])
 
   // Restore popup state and filters when component mounts
   useEffect(() => {
@@ -106,16 +163,29 @@ function IndexPopupContent() {
       }
     })
     
-    // Restore filters
-    storage.get('experimentFilters').then(result => {
-      debugLog('Loading saved filters:', result)
-      if (result) {
-        setFilters(result)
+    // Restore filters and check for configured application
+    Promise.all([
+      storage.get('experimentFilters'),
+      storage.get('absmartly-config')
+    ]).then(([savedFilters, savedConfig]) => {
+      debugLog('Loading saved filters:', savedFilters)
+      debugLog('Loading config for app filter:', savedConfig)
+      
+      let defaultFilters = {
+        state: ['created', 'ready']  // 'created' maps to 'Draft' in the UI
+      }
+      
+      // If there's a configured application, we'll need to load applications first
+      // to get the application ID for filtering
+      if (savedConfig?.applicationName) {
+        // Store the application name for later use
+        storage.set('pendingApplicationFilter', savedConfig.applicationName)
+      }
+      
+      if (savedFilters) {
+        setFilters(savedFilters)
       } else {
-        // Use default filters if none saved
-        setFilters({
-          state: ['created', 'ready']  // 'created' maps to 'Draft' in the UI
-        })
+        setFilters(defaultFilters)
       }
       setFiltersLoaded(true)
     })
@@ -181,9 +251,11 @@ function IndexPopupContent() {
     }
   }
 
-  const loadExperiments = async (forceRefresh = false, page = currentPage, size = pageSize) => {
+  const loadExperiments = async (forceRefresh = false, page = currentPage, size = pageSize, customFilters = null) => {
     setExperimentsLoading(true)
     setError(null)
+    
+    const activeFilters = customFilters || filters
     
     try {
       // Always fetch fresh data when this function is called
@@ -197,47 +269,47 @@ function IndexPopupContent() {
       }
       
       // Add all filter parameters
-      if (filters.search && filters.search.trim()) {
-        params.search = filters.search.trim()
+      if (activeFilters.search && activeFilters.search.trim()) {
+        params.search = activeFilters.search.trim()
       }
       
       // State filter
-      if (filters.state && filters.state.length > 0) {
-        params.state = filters.state.join(',')
+      if (activeFilters.state && activeFilters.state.length > 0) {
+        params.state = activeFilters.state.join(',')
       }
       
       // Significance filter
-      if (filters.significance && filters.significance.length > 0) {
-        params.significance = filters.significance.join(',')
+      if (activeFilters.significance && activeFilters.significance.length > 0) {
+        params.significance = activeFilters.significance.join(',')
       }
       
       // Owners filter
-      if (filters.owners && filters.owners.length > 0) {
-        params.owners = filters.owners.join(',')
+      if (activeFilters.owners && activeFilters.owners.length > 0) {
+        params.owners = activeFilters.owners.join(',')
       }
       
       // Teams filter  
-      if (filters.teams && filters.teams.length > 0) {
-        params.teams = filters.teams.join(',')
+      if (activeFilters.teams && activeFilters.teams.length > 0) {
+        params.teams = activeFilters.teams.join(',')
       }
       
       // Tags filter
-      if (filters.tags && filters.tags.length > 0) {
-        params.tags = filters.tags.join(',')
+      if (activeFilters.tags && activeFilters.tags.length > 0) {
+        params.tags = activeFilters.tags.join(',')
       }
       
       // Applications filter
-      if (filters.applications && filters.applications.length > 0) {
-        params.applications = filters.applications.join(',')
+      if (activeFilters.applications && activeFilters.applications.length > 0) {
+        params.applications = activeFilters.applications.join(',')
       }
       
       // Boolean filters
-      if (filters.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
-      if (filters.cleanup_needed === true) params.cleanup_needed = true
-      if (filters.audience_mismatch === true) params.audience_mismatch = true
-      if (filters.sample_size_reached === true) params.sample_size_reached = true
-      if (filters.experiments_interact === true) params.experiments_interact = true
-      if (filters.assignment_conflict === true) params.assignment_conflict = true
+      if (activeFilters.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
+      if (activeFilters.cleanup_needed === true) params.cleanup_needed = true
+      if (activeFilters.audience_mismatch === true) params.audience_mismatch = true
+      if (activeFilters.sample_size_reached === true) params.sample_size_reached = true
+      if (activeFilters.experiments_interact === true) params.experiments_interact = true
+      if (activeFilters.assignment_conflict === true) params.assignment_conflict = true
       
       const response = await getExperiments(params)
       const experiments = response.experiments || []
@@ -530,11 +602,28 @@ function IndexPopupContent() {
 
   const handleLoginRedirect = async () => {
     try {
-      await client.openLogin()
-      // Close the popup after opening login
-      window.close()
+      // First check if already authenticated
+      setExperimentsLoading(true)
+      try {
+        // Try to fetch current user to check auth status
+        await client.makeRequest('GET', '/auth/current-user')
+        // If successful, user is authenticated, just reload experiments
+        debugLog('User is already authenticated, reloading experiments')
+        setIsAuthExpired(false)
+        setError(null)
+        loadExperiments(true) // Force refresh
+      } catch (authError: any) {
+        // If auth check fails, open login page
+        debugLog('Auth check failed, opening login page')
+        await client.openLogin()
+        // Close the popup after opening login
+        window.close()
+      } finally {
+        setExperimentsLoading(false)
+      }
     } catch (err) {
-      debugError('Failed to open login:', err)
+      debugError('Failed to handle login:', err)
+      setExperimentsLoading(false)
     }
   }
 
@@ -644,6 +733,7 @@ function IndexPopupContent() {
               <ExperimentFilter
                 onFilterChange={handleFilterChange}
                 initialFilters={filters}
+                applications={applications}
               />
             )}
           </div>

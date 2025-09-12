@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { Select } from './ui/Select'
 import { CustomCodeSettings } from './CustomCodeSettings'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
@@ -16,7 +17,7 @@ interface SettingsViewProps {
 export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [apiKey, setApiKey] = useState('')
   const [apiEndpoint, setApiEndpoint] = useState('')
-  const [applicationId, setApplicationId] = useState('')
+  const [applicationName, setApplicationName] = useState('')
   const [domChangesStorageType, setDomChangesStorageType] = useState<'variable' | 'custom_field'>('variable')
   const [domChangesFieldName, setDomChangesFieldName] = useState('dom_changes')
   const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt') // Default to JWT
@@ -38,7 +39,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       // Load from config first
       let loadedApiKey = config?.apiKey || ''
       let loadedApiEndpoint = config?.apiEndpoint || ''
-      let loadedApplicationId = config?.applicationId?.toString() || ''
+      let loadedApplicationName = config?.applicationName || ''
       let loadedDomChangesStorageType = config?.domChangesStorageType || 'variable'
       let loadedDomChangesFieldName = config?.domChangesFieldName || 'dom_changes'
       let loadedAuthMethod = config?.authMethod || 'jwt' // Default to JWT
@@ -49,7 +50,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       // Plasmo replaces process.env.PLASMO_PUBLIC_* at build time
       const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
       const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
-      const envApplicationId = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
+      const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
       
       
       // Only use env vars if the loaded values are empty
@@ -59,15 +60,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       if (!loadedApiEndpoint && envApiEndpoint) {
         loadedApiEndpoint = envApiEndpoint
       }
-      if (!loadedApplicationId && envApplicationId) {
-        loadedApplicationId = envApplicationId
+      if (!loadedApplicationName && envApplicationName) {
+        loadedApplicationName = envApplicationName
       }
       
       
       // Set the final values
       setApiKey(loadedApiKey)
       setApiEndpoint(loadedApiEndpoint)
-      setApplicationId(loadedApplicationId)
+      setApplicationName(loadedApplicationName)
       setDomChangesStorageType(loadedDomChangesStorageType)
       setDomChangesFieldName(loadedDomChangesFieldName)
       setAuthMethod(loadedAuthMethod)
@@ -166,10 +167,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       newErrors.apiEndpoint = 'Please enter a valid URL'
     }
     
-    if (applicationId && isNaN(parseInt(applicationId))) {
-      newErrors.applicationId = 'Application ID must be a number'
-    }
-    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -189,7 +186,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     const config: ABsmartlyConfig = {
       apiKey: apiKey.trim() || undefined,
       apiEndpoint,
-      applicationId: applicationId ? parseInt(applicationId) : undefined,
+      applicationName: applicationName.trim() || undefined,
       domChangesStorageType,
       domChangesFieldName: domChangesFieldName.trim() || 'dom_changes',
       authMethod,
@@ -390,12 +387,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       </div>
       
       <Input
-        label="Application ID (Optional)"
+        label="Application Name (Optional)"
         type="text"
-        value={applicationId}
-        onChange={(e) => setApplicationId(e.target.value)}
-        placeholder="Enter application ID"
-        error={errors.applicationId}
+        value={applicationName}
+        onChange={(e) => setApplicationName(e.target.value)}
+        placeholder="e.g., my-app, website, mobile-app"
+        error={errors.applicationName}
       />
       
       {/* DOM Changes Storage Settings */}
