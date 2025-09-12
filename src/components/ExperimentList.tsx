@@ -1,9 +1,11 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
-import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
+import { type ExperimentOverrides, initializeOverrides, saveOverrides, reloadPageWithOverrides } from '~src/utils/overrides'
+import { getCurrentVariantAssignments, type VariantAssignments, type SDKVariantData } from '~src/utils/sdk-bridge'
 
 interface ExperimentListProps {
   experiments: Experiment[]
@@ -14,6 +16,80 @@ interface ExperimentListProps {
 }
 
 export function ExperimentList({ experiments, onExperimentClick, loading, favoriteExperiments = new Set(), onToggleFavorite }: ExperimentListProps) {
+  const [overrides, setOverrides] = useState<ExperimentOverrides>({})
+  const [showReloadBanner, setShowReloadBanner] = useState(false)
+  const [realVariants, setRealVariants] = useState<VariantAssignments>({})
+  const [experimentsInContext, setExperimentsInContext] = useState<string[]>([])
+
+  // Initialize overrides on mount (loads from storage and syncs to cookie)
+  useEffect(() => {
+    initializeOverrides().then(setOverrides)
+  }, [])
+  
+  // Get real variant assignments from SDK
+  useEffect(() => {
+    if (experiments.length > 0) {
+      const experimentNames = experiments.map(exp => exp.name)
+      getCurrentVariantAssignments(experimentNames).then(data => {
+        setRealVariants(data.assignments)
+        setExperimentsInContext(data.experimentsInContext)
+        debugLog('SDK data:', data)
+        
+        // Check if any existing overrides differ from real variants
+        const hasActiveOverrides = Object.entries(overrides).some(([expName, overrideVariant]) => {
+          return data.assignments[expName] !== overrideVariant
+        })
+        setShowReloadBanner(hasActiveOverrides)
+      })
+    }
+  }, [experiments, overrides])
+
+  const handleOverrideChange = async (experimentName: string, variantIndex: number) => {
+    const newOverrides = { ...overrides }
+    if (variantIndex === -1) {
+      delete newOverrides[experimentName]
+    } else {
+      newOverrides[experimentName] = variantIndex
+    }
+    setOverrides(newOverrides)
+    
+    // Save to storage and sync to cookie
+    await saveOverrides(newOverrides)
+    
+    // Check if any overrides differ from real variants
+    const hasActiveOverrides = Object.entries(newOverrides).some(([expName, overrideVariant]) => {
+      return realVariants[expName] !== overrideVariant
+    })
+    
+    // Only show reload banner if there are active overrides that differ from real variants
+    setShowReloadBanner(hasActiveOverrides)
+  }
+
+  const handleReload = async () => {
+    await reloadPageWithOverrides()
+    setShowReloadBanner(false)
+  }
+
+  const getDOMChangesCount = (experiment: Experiment): number => {
+    let totalChanges = 0
+    experiment.variants.forEach(variant => {
+      try {
+        if (!variant.config) return
+        const config = typeof variant.config === 'string' ? JSON.parse(variant.config) : variant.config
+        if (config.dom_changes && Array.isArray(config.dom_changes)) {
+          totalChanges += config.dom_changes.length
+        }
+      } catch {
+        // ignore
+      }
+    })
+    return totalChanges
+  }
+
+  const getVariantLabel = (index: number): string => {
+    // Convert index to letter: 0->A, 1->B, 2->C, etc.
+    return String.fromCharCode(65 + index) // 65 is 'A' in ASCII
+  }
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -188,7 +264,36 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
   }
 
   return (
-    <div className="divide-y divide-gray-200">
+    <div>
+      {/* Reload Banner */}
+      {showReloadBanner && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm text-blue-800">
+              Experiment overrides changed. Reload to apply changes.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReload}
+              className="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+            >
+              Reload Now
+            </button>
+            <button
+              onClick={() => setShowReloadBanner(false)}
+              className="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <div className="divide-y divide-gray-200">
       {experiments.map((experiment) => {
         // Debug: Check owners structure
         if (experiment.name === 'larger_product_image_size') {
@@ -304,16 +409,112 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                   </div>
                 </div>
                 
-                {/* Status and Metrics Row */}
+                {/* Status, Metrics and Override Row */}
                 <div className="mt-2 flex items-center gap-3 flex-wrap">
                   <span className={`inline-flex items-center h-[26px] px-3 text-xs font-medium rounded-full ${getStatusColor(status)}`}>
                     {getStatusLabel(status)}
                   </span>
                   
-                  {experiment.type && (
-                    <span className="text-xs text-gray-500">
-                      {experiment.type === 'group_sequential' ? 'Group sequential' : 'Fixed horizon'}
-                    </span>
+                  {(() => {
+                    const domChangesCount = getDOMChangesCount(experiment)
+                    if (domChangesCount > 0) {
+                      return (
+                        <div className="relative group">
+                          <span className="inline-flex items-center h-[26px] px-2 text-xs font-medium rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                            <BeakerIcon className="h-3.5 w-3.5" />
+                            <span className="ml-1 font-semibold">{domChangesCount}</span>
+                          </span>
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                            {domChangesCount} DOM {domChangesCount === 1 ? 'change' : 'changes'}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+                  
+                  {/* Variant Display with Override Controls */}
+                  {experiment.variants.length > 0 && (
+                    <>
+                      <div className="inline-flex items-center gap-1.5">
+                        <div className="inline-flex rounded-md shadow-sm" role="group">
+                          {experiment.variants.map((variant, idx) => {
+                            const isOverridden = overrides[experiment.name] === idx
+                            const isRealVariant = realVariants[experiment.name] === idx
+                            const hasRealVariant = realVariants[experiment.name] !== undefined
+                            const experimentInContext = experimentsInContext.includes(experiment.name)
+                            const label = getVariantLabel(idx)
+                            const variantName = variant.name || `Variant ${label}`
+                            
+                            // Determine button state and styling
+                            let buttonClass = 'px-2.5 py-1 text-xs font-medium transition-colors '
+                            if (idx === 0) buttonClass += 'rounded-l-md '
+                            if (idx === experiment.variants.length - 1) buttonClass += 'rounded-r-md '
+                            if (idx > 0) buttonClass += 'border-l '
+                            
+                            // Color based on state
+                            if (isOverridden) {
+                              // Override is active - blue
+                              buttonClass += 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 '
+                            } else if (isRealVariant && !overrides[experiment.name] && hasRealVariant && experimentInContext) {
+                              // Real variant, no override, AND experiment exists in SDK context - green
+                              buttonClass += 'bg-green-600 text-white border-green-600 hover:bg-green-700 '
+                            } else if (isRealVariant && !overrides[experiment.name] && hasRealVariant && !experimentInContext) {
+                              // Real variant but experiment not in SDK context - gray
+                              buttonClass += 'bg-gray-400 text-white border-gray-400 hover:bg-gray-500 '
+                            } else if (isRealVariant && overrides[experiment.name] !== undefined) {
+                              // Real variant but overridden to something else - gray/muted
+                              buttonClass += 'bg-gray-200 text-gray-500 border-gray-300 hover:bg-gray-300 '
+                            } else {
+                              // Other variants or no SDK data - default
+                              buttonClass += 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 '
+                            }
+                            
+                            buttonClass += 'border-t border-b '
+                            if (idx === 0) buttonClass += 'border-l '
+                            if (idx === experiment.variants.length - 1) buttonClass += 'border-r '
+                            
+                            return (
+                              <div key={variant.id || idx} className="relative group">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // If clicking the real variant while override exists, remove override
+                                    // If clicking any other variant, set override
+                                    if (isRealVariant && overrides[experiment.name] !== undefined) {
+                                      handleOverrideChange(experiment.name, -1)
+                                    } else if (!isOverridden) {
+                                      handleOverrideChange(experiment.name, idx)
+                                    } else {
+                                      // Clicking active override removes it
+                                      handleOverrideChange(experiment.name, -1)
+                                    }
+                                  }}
+                                  className={buttonClass}
+                                >
+                                  {label}
+                                </button>
+                                {/* Tooltip with variant name */}
+                                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                  {variantName}
+                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        
+                        {/* Overridden indicator pill */}
+                        {overrides[experiment.name] !== undefined && (
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                            overridden
+                          </span>
+                        )}
+                      </div>
+                    </>
                   )}
                   
                   {experiment.exposures !== undefined && (
@@ -402,6 +603,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

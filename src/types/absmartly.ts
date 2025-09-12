@@ -63,6 +63,7 @@ export interface ABsmartlyConfig {
   domChangesStorageType?: 'variable' | 'custom_field'
   domChangesFieldName?: string
   authMethod?: 'jwt' | 'apikey'  // New field for auth method preference
+  sdkWindowProperty?: string  // Window property where SDK context is stored (e.g., 'ABsmartlyContext', 'window.sdk.context')
 }
 
 export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'

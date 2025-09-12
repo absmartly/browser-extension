@@ -36,6 +36,7 @@
   let isInitializing = false;
   let isInitialized = false;
   let cachedContext = null; // Cache the context to avoid repeated detection
+  let contextPropertyPath = null; // Store WHERE the context is found
 
   // Capture the extension URL from the current script (must be done synchronously at script load)
   const scriptSrc = document.currentScript ? document.currentScript.src : null;
@@ -435,10 +436,22 @@
       }
     }
 
-    // Cache the context for future use
+    // Cache the context and its location for future use
     if (context && !cachedContext) {
       cachedContext = context;
-      debugLog('[ABsmartly Extension] Context found and cached');
+      
+      // Store where we found it
+      if (window.ABsmartlyContext === context) {
+        contextPropertyPath = 'ABsmartlyContext';
+      } else if (window.absmartly === context) {
+        contextPropertyPath = 'absmartly';
+      } else if (window.sdk && window.sdk.context === context) {
+        contextPropertyPath = 'sdk.context';
+      } else {
+        contextPropertyPath = 'unknown';
+      }
+      
+      debugLog('[ABsmartly Extension] Context found and cached at:', contextPropertyPath);
     }
 
     return { sdk: null, context };
@@ -518,6 +531,40 @@
   }
 
   /**
+   * Apply experiment overrides from cookie
+   */
+  function applyExperimentOverrides(context) {
+    try {
+      // Read the absmartly_overrides cookie
+      const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('absmartly_overrides='))
+        ?.split('=')[1];
+      
+      if (cookieValue) {
+        const overrides = JSON.parse(decodeURIComponent(cookieValue));
+        debugLog('[ABsmartly Extension] Found experiment overrides in cookie:', overrides);
+        
+        // Apply overrides to the context
+        if (typeof context.override === 'function') {
+          Object.entries(overrides).forEach(([experimentName, variantIndex]) => {
+            debugLog(`[ABsmartly Extension] Applying override: ${experimentName} -> variant ${variantIndex}`);
+            context.override(experimentName, variantIndex);
+          });
+        } else if (typeof context.overrides === 'function') {
+          // Some SDKs might use overrides method instead
+          debugLog('[ABsmartly Extension] Using context.overrides method');
+          context.overrides(overrides);
+        } else {
+          debugWarn('[ABsmartly Extension] Context does not have override/overrides method');
+        }
+      }
+    } catch (error) {
+      debugError('[ABsmartly Extension] Failed to apply experiment overrides:', error);
+    }
+  }
+
+  /**
    * Wait for SDK and custom code, then initialize
    */
   function waitForSDKAndInitialize() {
@@ -530,6 +577,13 @@
       // Detect context only once
       if (!cachedContext) {
         detectABsmartlySDK();
+      }
+      
+      // Log context data when found
+      if (cachedContext && cachedContext.data && typeof cachedContext.data === 'function') {
+        const data = cachedContext.data();
+        debugLog('[ABsmartly Extension] Context data on init:', data);
+        debugLog('[ABsmartly Extension] Experiments available:', data?.experiments ? Object.keys(data.experiments) : 'none');
       }
 
       // Check if plugin is already loaded (uses cached context)
@@ -544,6 +598,11 @@
         
         // Plugin is already loaded and registered with context
         
+        // Apply overrides if context is available
+        if (cachedContext) {
+          applyExperimentOverrides(cachedContext);
+        }
+        
         // Request custom code from extension
         window.postMessage({
           source: 'absmartly-page',
@@ -556,6 +615,22 @@
 
       if (context) {
         debugLog('[ABsmartly Extension] SDK context found, requesting plugin initialization');
+        
+        // Check if context needs to be ready
+        if (context.ready && typeof context.ready === 'function' && context.pending && context.pending()) {
+          debugLog('[ABsmartly Extension] Context is pending, waiting for it to be ready...');
+          context.ready().then(() => {
+            debugLog('[ABsmartly Extension] Context is now ready after waiting');
+            const data = context.data ? context.data() : null;
+            debugLog('[ABsmartly Extension] Context data after ready:', data);
+            debugLog('[ABsmartly Extension] Experiments after ready:', data?.experiments ? Object.keys(data.experiments) : 'none');
+          }).catch(err => {
+            debugError('[ABsmartly Extension] Error waiting for context:', err);
+          });
+        }
+        
+        // Apply experiment overrides from cookie
+        applyExperimentOverrides(context);
         
         // Request plugin initialization from extension
         window.postMessage({
@@ -577,6 +652,29 @@
   window.addEventListener('message', (event) => {
     if (event.data && event.data.source === 'absmartly-extension') {
       debugLog('[ABsmartly Page] Received message from extension:', event.data);
+
+      // Handle dynamic override updates
+      if (event.data.type === 'APPLY_OVERRIDES') {
+        debugLog('[ABsmartly Page] Applying overrides dynamically');
+        const { overrides } = event.data.payload || {};
+        
+        if (cachedContext && overrides) {
+          // Apply the overrides to the context
+          if (typeof cachedContext.override === 'function') {
+            Object.entries(overrides).forEach(([experimentName, variantIndex]) => {
+              debugLog(`[ABsmartly Page] Applying override: ${experimentName} -> variant ${variantIndex}`);
+              cachedContext.override(experimentName, variantIndex);
+            });
+            
+            // After applying overrides, we need to refresh the page for DOM changes to take effect
+            // Since DOM changes are applied during initialization
+            debugLog('[ABsmartly Page] Overrides applied. Page will reload to apply DOM changes.');
+          } else {
+            debugWarn('[ABsmartly Page] Context does not have override method');
+          }
+        }
+        return;
+      }
 
       // Handle preview changes
       if (event.data.type === 'PREVIEW_CHANGES') {
@@ -1105,6 +1203,71 @@
     }
   });
 
+  // Expose a function to get variant assignments for the extension
+  window.__absmartlyGetVariantAssignments = async function(experimentNames) {
+    debugLog('[ABsmartly Extension] Getting variant assignments for:', experimentNames);
+    
+    const context = cachedContext || detectABsmartlySDK().context;
+    
+    if (!context) {
+      debugWarn('[ABsmartly Extension] No context available for getting variants');
+      return { assignments: {}, experimentsInContext: [] };
+    }
+    
+    // Check if context is ready, if not wait for it
+    if (context.ready && typeof context.ready === 'function') {
+      try {
+        await context.ready();
+      } catch (error) {
+        debugWarn('[ABsmartly Extension] Error waiting for context ready:', error);
+      }
+    }
+    
+    // Get experiments that exist in the context data
+    let experimentsInContext = [];
+    if (context.data && typeof context.data === 'function') {
+      const contextData = context.data();
+      if (contextData?.experiments) {
+        experimentsInContext = Object.keys(contextData.experiments);
+      }
+    }
+    
+    const assignments = {};
+    for (const expName of experimentNames) {
+      try {
+        if (typeof context.peek === 'function') {
+          const variant = context.peek(expName);
+          
+          // Only include valid variant assignments (not -1, null, or undefined)
+          // But DO include 0 as it's a valid variant
+          if (variant !== undefined && variant !== null && variant !== -1) {
+            assignments[expName] = variant;
+          }
+        }
+      } catch (error) {
+        debugWarn(`[ABsmartly Extension] Failed to peek experiment ${expName}:`, error);
+      }
+    }
+    
+    return { assignments, experimentsInContext };
+  };
+  
+  // Expose the SDK context location for the extension to save in settings
+  window.__absmartlyGetContextPath = function() {
+    // First detect SDK if not already cached
+    if (!cachedContext) {
+      detectABsmartlySDK();
+    }
+    
+    return {
+      found: !!cachedContext,
+      path: contextPropertyPath || null,
+      hasContext: !!cachedContext,
+      hasPeek: cachedContext && typeof cachedContext.peek === 'function',
+      hasTreatment: cachedContext && typeof cachedContext.treatment === 'function'
+    };
+  };
+  
   // Start the process
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', waitForSDKAndInitialize);
