@@ -20,6 +20,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [domChangesStorageType, setDomChangesStorageType] = useState<'variable' | 'custom_field'>('variable')
   const [domChangesFieldName, setDomChangesFieldName] = useState('dom_changes')
   const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt') // Default to JWT
+  const [sdkWindowProperty, setSdkWindowProperty] = useState('') // Add SDK window property state
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
@@ -41,6 +42,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedDomChangesStorageType = config?.domChangesStorageType || 'variable'
       let loadedDomChangesFieldName = config?.domChangesFieldName || 'dom_changes'
       let loadedAuthMethod = config?.authMethod || 'jwt' // Default to JWT
+      let loadedSdkWindowProperty = config?.sdkWindowProperty || ''
       
       
       // In development, auto-load from environment variables if fields are empty
@@ -69,6 +71,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setDomChangesStorageType(loadedDomChangesStorageType)
       setDomChangesFieldName(loadedDomChangesFieldName)
       setAuthMethod(loadedAuthMethod)
+      setSdkWindowProperty(loadedSdkWindowProperty)
       
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
@@ -189,7 +192,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       applicationId: applicationId ? parseInt(applicationId) : undefined,
       domChangesStorageType,
       domChangesFieldName: domChangesFieldName.trim() || 'dom_changes',
-      authMethod
+      authMethod,
+      sdkWindowProperty: sdkWindowProperty.trim() || undefined
     }
 
     try {
@@ -438,6 +442,20 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
               : 'The SDK field name of the custom field. Must exist in the experiment.'}
           </p>
         </div>
+      </div>
+      
+      {/* SDK Configuration */}
+      <div className="border-t pt-4 mt-4">
+        <Input
+          label="SDK Window Property (Optional)"
+          type="text"
+          value={sdkWindowProperty}
+          onChange={(e) => setSdkWindowProperty(e.target.value)}
+          placeholder="e.g., ABsmartlyContext or sdk.context"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          The window property where the ABsmartly SDK context is stored. Leave empty to use automatic detection.
+        </p>
       </div>
       
       {/* Custom Code Settings */}
