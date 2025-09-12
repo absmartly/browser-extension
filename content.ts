@@ -5,6 +5,7 @@ import { VisualEditor } from '~src/content/visual-editor'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import { initializeOverrides } from '~src/utils/overrides'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -14,6 +15,16 @@ export const config: PlasmoCSConfig = {
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
+
+// Initialize overrides on page load
+// This ensures storage is synced to cookie for SSR compatibility
+initializeOverrides().then(overrides => {
+  if (Object.keys(overrides).length > 0) {
+    debugLog('[Content Script] Initialized experiment overrides:', overrides)
+  }
+}).catch(error => {
+  debugWarn('[Content Script] Failed to initialize overrides:', error)
+})
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
