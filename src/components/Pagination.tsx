@@ -1,5 +1,6 @@
 import React from 'react'
 import { Button } from './ui/Button'
+import { Select } from './ui/Select'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 
 interface PaginationProps {
@@ -33,18 +34,20 @@ export function Pagination({
       {/* Top row: Page size selector and item count */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            disabled={loading}
-            className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
-          >
-            {PAGE_SIZE_OPTIONS.map(size => (
-              <option key={size} value={size}>
-                {size} per page
-              </option>
-            ))}
-          </select>
+          <div style={{ minWidth: '120px' }}>
+            <Select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              disabled={loading}
+              className="text-xs py-0.5"
+            >
+              {PAGE_SIZE_OPTIONS.map(size => (
+                <option key={size} value={size}>
+                  {size} per page
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
         
         <div className="text-xs text-gray-600">

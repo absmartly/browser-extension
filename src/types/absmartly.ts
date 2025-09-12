@@ -59,7 +59,7 @@ export interface DOMChange {
 export interface ABsmartlyConfig {
   apiKey?: string
   apiEndpoint: string
-  applicationId?: number
+  applicationName?: string  // Changed from applicationId to applicationName
   domChangesStorageType?: 'variable' | 'custom_field'
   domChangesFieldName?: string
   authMethod?: 'jwt' | 'apikey'  // New field for auth method preference

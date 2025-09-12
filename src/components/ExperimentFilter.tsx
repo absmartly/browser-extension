@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Badge } from './ui/Badge'
+import { Select } from './ui/Select'
 import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 interface FilterState {
@@ -233,26 +234,22 @@ export function ExperimentFilter({
 
           {/* Owners */}
           {users.length > 0 && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Owners
-              </label>
-              <select
-                multiple
-                className="w-full text-xs border border-gray-300 rounded-md p-1"
-                value={filters.owners?.map(String) || []}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, option => Number(option.value))
-                  updateFilter('owners', selected)
-                }}
-              >
-                {users.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.first_name} {user.last_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Owners"
+              multiple
+              className="text-xs"
+              value={filters.owners?.map(String) || []}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions, option => Number(option.value))
+                updateFilter('owners', selected)
+              }}
+            >
+              {users.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.first_name} {user.last_name}
+                </option>
+              ))}
+            </Select>
           )}
 
           {/* Tags */}

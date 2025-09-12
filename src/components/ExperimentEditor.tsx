@@ -3,6 +3,7 @@ import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Badge } from './ui/Badge'
+import { Select } from './ui/Select'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import type { Experiment } from '~src/types/absmartly'
@@ -310,7 +311,7 @@ export function ExperimentEditor({
         {/* Basic Information */}
         <div className="space-y-3">
           {/* Name fields with sync lock */}
-          <div className="flex items-start gap-1">
+          <div className="flex items-start">
             <div className="flex-1 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -337,12 +338,12 @@ export function ExperimentEditor({
             </div>
             
             {/* Lock icon with bracket */}
-            <div className="relative" style={{ width: '30px', paddingTop: '28px' }}>
+            <div className="relative" style={{ width: '40px', paddingTop: '28px', marginLeft: '-2px' }}>
               {/* Bracket lines */}
               {namesSynced && (
                 <svg
                   className="absolute"
-                  width="30"
+                  width="40"
                   height="108"
                   style={{
                     left: '0',
@@ -351,21 +352,21 @@ export function ExperimentEditor({
                 >
                   {/* Top horizontal */}
                   <path
-                    d="M 0 20 L 15 20"
+                    d="M 0 20 L 20 20"
                     stroke="#3b82f6"
                     strokeWidth="2"
                     fill="none"
                   />
                   {/* Bottom horizontal */}
                   <path
-                    d="M 0 88 L 15 88"
+                    d="M 0 88 L 20 88"
                     stroke="#3b82f6"
                     strokeWidth="2"
                     fill="none"
                   />
                   {/* Vertical connector */}
                   <path
-                    d="M 15 20 L 15 88"
+                    d="M 20 20 L 20 88"
                     stroke="#3b82f6"
                     strokeWidth="2"
                     fill="none"
@@ -379,7 +380,7 @@ export function ExperimentEditor({
                 onClick={() => setNamesSynced(!namesSynced)}
                 className="absolute z-10 p-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                 style={{
-                  left: '7px',
+                  left: '12px',
                   top: '82px',
                   transform: 'translateY(-50%)'
                 }}
@@ -407,24 +408,32 @@ export function ExperimentEditor({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unit Type
-            </label>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              value={formData.unit_type_id || ''}
-              onChange={(e) => setFormData({ ...formData, unit_type_id: e.target.value ? parseInt(e.target.value) : null })}
-              required
-            >
-              <option value="">Select a unit type</option>
-              {unitTypes.map(ut => (
-                <option key={ut.unit_type_id || ut.id} value={ut.unit_type_id || ut.id}>
-                  {ut.name || ut.display_name || `Unit Type ${ut.unit_type_id || ut.id}`}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Unit Type"
+            value={formData.unit_type_id || ''}
+            onChange={(e) => setFormData({ ...formData, unit_type_id: e.target.value ? parseInt(e.target.value) : null })}
+            placeholder="Select a unit type"
+            required
+          >
+            {unitTypes.map(ut => (
+              <option key={ut.unit_type_id || ut.id} value={ut.unit_type_id || ut.id}>
+                {ut.name || ut.display_name || `Unit Type ${ut.unit_type_id || ut.id}`}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label="Applications"
+            value={formData.application_ids[0] || ''}
+            onChange={(e) => setFormData({ ...formData, application_ids: e.target.value ? [parseInt(e.target.value)] : [] })}
+            placeholder="Select an application"
+          >
+            {applications.map(app => (
+              <option key={app.application_id || app.id} value={app.application_id || app.id}>
+                {app.name || app.display_name || `Application ${app.application_id || app.id}`}
+              </option>
+            ))}
+          </Select>
 
         </div>
 
