@@ -74,7 +74,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === 'START_VISUAL_EDITOR') {
     debugLog('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)
-    
+
+    // Ensure SDK plugin is injected before starting visual editor
+    ensureSDKPluginInjected()
+
     try {
       // Stop any existing editor
       if (currentEditor) {
@@ -134,7 +137,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle preview messages
   if (message.type === 'ABSMARTLY_PREVIEW') {
     debugLog('[ABSmartly Content Script] Received preview message:', message.action)
-    
+
+    // Ensure SDK plugin is injected before handling preview
+    ensureSDKPluginInjected()
+
     if (message.action === 'apply') {
       // Create preview header
       createPreviewHeader(message.experimentName, message.variantName)
@@ -333,12 +339,16 @@ async function injectSDKPluginScript() {
   }
 }
 
-// Initialize SDK plugin when the page loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', injectSDKPluginScript)
-} else {
-  // DOM is already ready, inject immediately
-  injectSDKPluginScript()
+// Don't automatically inject SDK plugin on every page
+// Only inject when the user actually opens the sidebar or uses extension features
+// This prevents breaking websites that don't need the SDK
+let sdkPluginInjected = false
+
+function ensureSDKPluginInjected() {
+  if (!sdkPluginInjected) {
+    injectSDKPluginScript()
+    sdkPluginInjected = true
+  }
 }
 
 // Listen for messages from the injected script and SDK plugin
@@ -351,19 +361,35 @@ window.addEventListener('message', async (event) => {
     debugLog('[Content Script] Received message from page:', event.data)
     
     if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
-      // Get custom code from extension settings
+      // Get custom code and config from extension settings
       const response = await chrome.runtime.sendMessage({
         type: 'REQUEST_INJECTION_CODE',
         source: 'content-script'
       })
-      
+
       const customCode = response?.data || null
-      
-      // Send custom code to the page
+      const config = response?.config || null
+
+      // Send custom code and config to the page
       window.postMessage({
         source: 'absmartly-extension',
         type: 'INITIALIZE_PLUGIN',
-        payload: { customCode }
+        payload: { customCode, config }
+      }, window.location.origin)
+    } else if (event.data.type === 'REQUEST_SDK_INJECTION_CONFIG') {
+      // Get SDK injection config from extension settings
+      const response = await chrome.runtime.sendMessage({
+        type: 'REQUEST_INJECTION_CODE',
+        source: 'content-script'
+      })
+
+      const config = response?.config || null
+
+      // Send config to the page for SDK injection decision
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'SDK_INJECTION_CONFIG',
+        payload: { config }
       }, window.location.origin)
     } else if (event.data.type === 'PLUGIN_INITIALIZED') {
       // Notify background script that plugin is ready
