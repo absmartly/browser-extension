@@ -530,39 +530,95 @@
     }
   }
 
-  /**
-   * Apply experiment overrides from cookie
-   */
-  function applyExperimentOverrides(context) {
+  // Removed parseCookieOverrides - OverridesPlugin handles all cookie parsing now
+
+  /* DEPRECATED - Kept for reference only
+  function parseCookieOverrides(cookieValue) {
+    if (!cookieValue) return { overrides: {}, devEnv: null };
+
     try {
-      // Read the absmartly_overrides cookie
+      let devEnv = null;
+      let experimentsStr = cookieValue;
+
+      // Check if dev environment is included
+      if (cookieValue.startsWith('devEnv=')) {
+        const parts = cookieValue.split('|');
+        devEnv = decodeURIComponent(parts[0].substring(7)); // Remove 'devEnv=' prefix
+        experimentsStr = parts[1] || '';
+      }
+
+      const overrides = {};
+      if (experimentsStr) {
+        // NEW FORMAT: comma separates experiments, dot separates values within each experiment
+        const experiments = experimentsStr.split(',');
+
+        for (const exp of experiments) {
+          const [name, values] = exp.split(':');
+          if (!name || !values) continue;
+
+          const decodedName = decodeURIComponent(name);
+          const parts = values.split('.');
+
+          if (parts.length === 1) {
+            // Simple format: just variant (running experiment)
+            overrides[decodedName] = parseInt(parts[0], 10);
+          } else if (parts.length === 2) {
+            // Format: variant.env
+            overrides[decodedName] = {
+              variant: parseInt(parts[0], 10),
+              env: parseInt(parts[1], 10)
+            };
+          } else {
+            // Full format: variant.env.id
+            overrides[decodedName] = {
+              variant: parseInt(parts[0], 10),
+              env: parseInt(parts[1], 10),
+              id: parseInt(parts[2], 10)
+            };
+          }
+        }
+      }
+
+      return { overrides, devEnv };
+    } catch (error) {
+      debugWarn('[ABsmartly Extension] Failed to parse override cookie:', error);
+      return { overrides: {}, devEnv: null };
+    }
+  }
+  */
+
+  /**
+   * Store override metadata for SDK consumption
+   * The OverridesPlugin handles the actual application of overrides
+   */
+  function checkOverridesCookie() {
+    try {
+      // Just check if cookie exists - OverridesPlugin handles all parsing and application
       const cookieValue = document.cookie
         .split('; ')
         .find(row => row.startsWith('absmartly_overrides='))
         ?.split('=')[1];
-      
+
       if (cookieValue) {
-        const overrides = JSON.parse(decodeURIComponent(cookieValue));
-        debugLog('[ABsmartly Extension] Found experiment overrides in cookie:', overrides);
-        
-        // Apply overrides to the context
-        if (typeof context.override === 'function') {
-          Object.entries(overrides).forEach(([experimentName, variantIndex]) => {
-            debugLog(`[ABsmartly Extension] Applying override: ${experimentName} -> variant ${variantIndex}`);
-            context.override(experimentName, variantIndex);
-          });
-        } else if (typeof context.overrides === 'function') {
-          // Some SDKs might use overrides method instead
-          debugLog('[ABsmartly Extension] Using context.overrides method');
-          context.overrides(overrides);
-        } else {
-          debugWarn('[ABsmartly Extension] Context does not have override/overrides method');
+        debugLog('[ABsmartly Extension] Found absmartly_overrides cookie (will be handled by OverridesPlugin)');
+        // Log if development environment is present (just for debugging)
+        if (cookieValue.startsWith('devEnv=')) {
+          const devEnvMatch = cookieValue.match(/^devEnv=([^|]+)/);
+          if (devEnvMatch) {
+            debugLog('[ABsmartly Extension] Development environment in cookie:', decodeURIComponent(devEnvMatch[1]));
+          }
         }
+      } else {
+        debugLog('[ABsmartly Extension] No experiment overrides cookie found');
       }
     } catch (error) {
-      debugError('[ABsmartly Extension] Failed to apply experiment overrides:', error);
+      debugError('[ABsmartly Extension] Error checking overrides cookie:', error);
     }
   }
+
+  // Check if we need to inject SDK first
+  let sdkInjectionConfig = null;
+  let sdkInjectionPending = false;
 
   /**
    * Wait for SDK and custom code, then initialize
@@ -574,16 +630,35 @@
     const checkAndInit = () => {
       attempts++;
 
+      // If SDK injection is pending, wait for it
+      if (sdkInjectionPending) {
+        if (attempts < maxAttempts) {
+          setTimeout(checkAndInit, 200);
+        }
+        return;
+      }
+
       // Detect context only once
       if (!cachedContext) {
         detectABsmartlySDK();
       }
       
-      // Log context data when found
+      // Log context data when found (but only if context is ready)
       if (cachedContext && cachedContext.data && typeof cachedContext.data === 'function') {
-        const data = cachedContext.data();
-        debugLog('[ABsmartly Extension] Context data on init:', data);
-        debugLog('[ABsmartly Extension] Experiments available:', data?.experiments ? Object.keys(data.experiments) : 'none');
+        // Use ready() promise to wait for context to be ready before accessing data
+        if (cachedContext.ready && typeof cachedContext.ready === 'function') {
+          cachedContext.ready().then(() => {
+            try {
+              const data = cachedContext.data();
+              debugLog('[ABsmartly Extension] Context data on init:', data);
+              debugLog('[ABsmartly Extension] Experiments available:', data?.experiments ? Object.keys(data.experiments) : 'none');
+            } catch (error) {
+              debugLog('[ABsmartly Extension] Error accessing context data:', error.message);
+            }
+          }).catch(error => {
+            debugLog('[ABsmartly Extension] Context ready() failed:', error.message);
+          });
+        }
       }
 
       // Check if plugin is already loaded (uses cached context)
@@ -595,13 +670,10 @@
         }
         
         debugLog('[ABsmartly Extension] Plugin already loaded, requesting custom code injection only');
-        
+
         // Plugin is already loaded and registered with context
-        
-        // Apply overrides if context is available
-        if (cachedContext) {
-          applyExperimentOverrides(cachedContext);
-        }
+        // Store metadata for SDK consumption (OverridesPlugin handles actual application)
+        checkOverridesCookie();
         
         // Request custom code from extension
         window.postMessage({
@@ -629,8 +701,9 @@
           });
         }
         
-        // Apply experiment overrides from cookie
-        applyExperimentOverrides(context);
+        // Store override metadata for SDK consumption
+        // The OverridesPlugin will handle actual application of overrides
+        checkOverridesCookie();
         
         // Request plugin initialization from extension
         window.postMessage({
@@ -638,6 +711,14 @@
           type: 'SDK_CONTEXT_READY'
         }, '*');
       } else if (attempts < maxAttempts) {
+        // If config says to inject SDK and we haven't tried yet, request config and inject
+        if (!sdkInjectionConfig && attempts === 5) { // Check after 500ms
+          debugLog('[ABsmartly Extension] No SDK found, checking if we should inject it...');
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'REQUEST_SDK_INJECTION_CONFIG'
+          }, '*');
+        }
         setTimeout(checkAndInit, 100);
       } else {
         debugLog('[ABsmartly Extension] No ABsmartly SDK found after 5 seconds');
@@ -657,21 +738,14 @@
       if (event.data.type === 'APPLY_OVERRIDES') {
         debugLog('[ABsmartly Page] Applying overrides dynamically');
         const { overrides } = event.data.payload || {};
-        
-        if (cachedContext && overrides) {
-          // Apply the overrides to the context
-          if (typeof cachedContext.override === 'function') {
-            Object.entries(overrides).forEach(([experimentName, variantIndex]) => {
-              debugLog(`[ABsmartly Page] Applying override: ${experimentName} -> variant ${variantIndex}`);
-              cachedContext.override(experimentName, variantIndex);
-            });
-            
-            // After applying overrides, we need to refresh the page for DOM changes to take effect
-            // Since DOM changes are applied during initialization
-            debugLog('[ABsmartly Page] Overrides applied. Page will reload to apply DOM changes.');
-          } else {
-            debugWarn('[ABsmartly Page] Context does not have override method');
-          }
+
+        // The OverridesPlugin handles override application
+        // We just need to update metadata and reload the page
+        if (overrides) {
+          // Store metadata about overrides
+          checkOverridesCookie();
+          // After updating overrides, we need to refresh the page for changes to take effect
+          debugLog('[ABsmartly Page] Override metadata updated. Page will reload to apply changes.');
         }
         return;
       }
@@ -980,6 +1054,20 @@
         return;
       }
 
+      if (event.data.type === 'SDK_INJECTION_CONFIG') {
+        const { config } = event.data.payload || {};
+        sdkInjectionConfig = config;
+
+        if (config?.injectSDK && !cachedContext) {
+          debugLog('[ABsmartly Extension] SDK injection enabled, injecting ABsmartly SDK...');
+          sdkInjectionPending = true;
+          injectABsmartlySDK(config);
+        } else {
+          debugLog('[ABsmartly Extension] SDK injection disabled or SDK already present');
+        }
+        return;
+      }
+
       if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
         if (isInitialized || isInitializing) {
@@ -987,8 +1075,9 @@
           return;
         }
         isInitializing = true;
-        
-        const { customCode } = event.data.payload || {};
+
+        const { customCode, config } = event.data.payload || {};
+        debugLog('[ABsmartly Extension] Received config from extension:', config);
         
         // Check again if plugin is already loaded
         const existingPlugin = isPluginAlreadyLoaded();
@@ -1013,75 +1102,51 @@
           return;
         }
         
+        // Check if the website already has the plugins loaded and initialized
+        if (window.ABsmartlySDKPlugins && context.__domPlugin && context.__domPlugin.initialized) {
+          debugLog('[ABsmartly Extension] Plugins already loaded and initialized by website, skipping extension initialization');
+          isInitialized = true;
+          isInitializing = false;
+          return;
+        }
+
         // Check if ABsmartlyDOMChangesPlugin is available, if not load it from extension
-        if (typeof window.ABsmartlyDOMChangesPlugin === 'undefined') {
+        if (typeof window.ABsmartlySDKPlugins === 'undefined') {
           debugLog('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
-          
+
           // Use the captured extension URL
           if (extensionBaseUrl) {
             // Function to load plugin script with error handling
             const loadPlugin = (filename, fallbackFilename) => {
               const pluginUrl = extensionBaseUrl + filename;
               debugLog(`[ABsmartly Extension] Attempting to load plugin from: ${pluginUrl}`);
-              
+
               const script = document.createElement('script');
               script.src = pluginUrl;
               script.onload = () => {
                 debugLog(`[ABsmartly Extension] ${filename} loaded successfully`);
-              debugLog('[ABsmartly Extension] ABsmartlyDOMChangesPlugin object:', window.ABsmartlyDOMChangesPlugin);
-              debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABsmartlyDOMChangesPlugin || {}));
-              
-              // The UMD bundle exposes ABsmartlyDOMChangesPlugin globally
-              // We need to instantiate it and let it register itself with the context
-              if (window.ABsmartlyDOMChangesPlugin) {
-                let PluginClass = null;
-                
-                // Try direct property
-                if (window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin) {
-                  PluginClass = window.ABsmartlyDOMChangesPlugin.DOMChangesPlugin;
-                }
-                // Try default export
-                else if (window.ABsmartlyDOMChangesPlugin.default) {
-                  PluginClass = window.ABsmartlyDOMChangesPlugin.default;
-                }
-                // Try if ABsmartlyDOMChangesPlugin itself is the plugin class
-                else if (typeof window.ABsmartlyDOMChangesPlugin === 'function') {
-                  PluginClass = window.ABsmartlyDOMChangesPlugin;
-                }
-                
-                if (PluginClass) {
-                  debugLog('[ABsmartly Extension] Plugin class found, initializing...');
-                  try {
-                    // Create plugin instance - it will register itself with the context
-                    const plugin = new PluginClass({
-                      context: context,
-                      autoApply: false,
-                      spa: true,
-                      visibilityTracking: true,
-                      extensionBridge: true,
-                      dataSource: 'variable',
-                      dataFieldName: '__dom_changes',
-                      debug: DEBUG
-                    });
-                    
-                    // Plugin will register itself with context.__domPlugin during initialization
-                    
-                    // Initialize the plugin
-                    plugin.initialize().then(() => {
-                      debugLog('[ABsmartly Extension] Plugin initialized and registered with context');
-                      // The plugin is now available via context.__domPlugin
-                    }).catch(error => {
-                      debugError('[ABsmartly Extension] Failed to initialize plugin:', error);
-                    });
-                  } catch (error) {
-                    debugError('[ABsmartly Extension] Failed to create plugin instance:', error);
+                debugLog('[ABsmartly Extension] ABsmartlySDKPlugins object:', window.ABsmartlySDKPlugins);
+                debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABsmartlySDKPlugins || {}));
+
+                // The UMD bundle exposes ABsmartlySDKPlugins globally
+                // The plugin now exports both DOMChangesPlugin and OverridesPluginFull/OverridesPluginLite
+                if (window.ABsmartlySDKPlugins) {
+                  // Try to get OverridesPluginFull first (for extensions), fallback to OverridesPlugin
+                  const { DOMChangesPlugin, OverridesPluginFull, OverridesPlugin } = window.ABsmartlySDKPlugins;
+                  const OverridesClass = OverridesPluginFull || OverridesPlugin;
+
+                  if (DOMChangesPlugin && OverridesClass) {
+                    debugLog('[ABsmartly Extension] Plugin classes found, will initialize after config is received');
+                    debugLog('[ABsmartly Extension] Using:', OverridesPluginFull ? 'OverridesPluginFull' : 'OverridesPlugin');
+                    // Store classes for later initialization
+                    window.__absmartlyPluginClasses = { DOMChangesPlugin, OverridesClass };
+                  } else {
+                    debugError('[ABsmartly Extension] Could not find required plugin classes in bundle');
+                    debugLog('[ABsmartly Extension] Available exports:', Object.keys(window.ABsmartlySDKPlugins));
                   }
                 } else {
-                  debugError('[ABsmartly Extension] Could not find DOMChangesPlugin class in bundle');
+                  debugError('[ABsmartly Extension] ABsmartlyDOMChangesPlugin not loaded');
                 }
-              } else {
-                debugError('[ABsmartly Extension] ABsmartlyDOMChangesPlugin not loaded');
-              }
               };
               script.onerror = () => {
                 debugError(`[ABsmartly Extension] Failed to load ${filename}`);
@@ -1093,9 +1158,9 @@
               };
               document.head.appendChild(script);
             };
-            
+
             // Try dev build first, fallback to production build
-            loadPlugin('absmartly-dom-changes.dev.js', 'absmartly-dom-changes.min.js');
+            loadPlugin('absmartly-sdk-plugins.dev.js', 'absmartly-sdk-plugins.min.js');
             return; // Wait for script to load
           } else {
             debugError('[ABsmartly Extension] Cannot determine extension URL to load plugin');
@@ -1103,99 +1168,203 @@
           }
         }
         
-        // If plugin is already available or was aliased from ABSmartlyDOMChanges
-        if (typeof window.DOMChangesPlugin === 'undefined' && window.ABSmartlyDOMChanges && window.ABSmartlyDOMChanges.DOMChangesPlugin) {
-          window.DOMChangesPlugin = window.ABSmartlyDOMChanges.DOMChangesPlugin;
+        // If plugin is already available, initialize only if not already done by website
+        if (window.ABsmartlySDKPlugins) {
+          debugLog('[ABsmartly Extension] Plugin library already loaded by website');
+
+          // Check if already initialized by the website
+          if (context.__domPlugin && context.__domPlugin.initialized) {
+            debugLog('[ABsmartly Extension] Plugin already initialized by website, skipping');
+            isInitialized = true;
+            isInitializing = false;
+            return;
+          }
+
+          const { DOMChangesPlugin, OverridesPluginFull, OverridesPlugin } = window.ABsmartlySDKPlugins;
+          const OverridesClass = OverridesPluginFull || OverridesPlugin;
+
+          if (DOMChangesPlugin && OverridesClass) {
+            debugLog('[ABsmartly Extension] Initializing plugins with extension config');
+            // Store classes for initialization
+            window.__absmartlyPluginClasses = { DOMChangesPlugin, OverridesClass };
+            // Don't initialize here - wait for proper config
+          } else {
+            debugError('[ABsmartly Extension] Plugin classes not found in ABsmartlyDOMChangesPlugin');
+          }
         }
-        
-        // Function to initialize the plugin
-        function initializePlugin(ctx) {
+
+        // Function to initialize both plugins in the correct order
+        async function initializePlugins(ctx, customCode, config) {
           const context = ctx || cachedContext;
-          
+
           if (!context) {
             debugError('[ABsmartly Extension] No context available for plugin initialization');
             return;
           }
 
-          if (typeof window.DOMChangesPlugin === 'undefined') {
-            debugError('[ABsmartly Extension] DOMChangesPlugin still not available');
+          // Wait for context to be ready before initializing plugins
+          if (context.ready && typeof context.ready === 'function') {
+            try {
+              debugLog('[ABsmartly Extension] Waiting for context to be ready before initializing plugins...');
+              await context.ready();
+              debugLog('[ABsmartly Extension] Context is now ready');
+            } catch (error) {
+              debugError('[ABsmartly Extension] Error waiting for context to be ready:', error);
+              // Continue anyway - context might still work
+            }
+          }
+
+          // Get plugin classes (stored during script load or from global)
+          const classes = window.__absmartlyPluginClasses || window.ABsmartlySDKPlugins || {};
+          let DOMChangesPlugin, OverridesClass;
+
+          if (window.__absmartlyPluginClasses) {
+            // Use stored classes
+            DOMChangesPlugin = classes.DOMChangesPlugin;
+            OverridesClass = classes.OverridesClass;
+          } else if (window.ABsmartlySDKPlugins) {
+            // Fallback to global exports
+            DOMChangesPlugin = classes.DOMChangesPlugin;
+            OverridesClass = classes.OverridesPluginFull || classes.OverridesPlugin;
+          }
+
+          if (!DOMChangesPlugin || !OverridesClass) {
+            debugError('[ABsmartly Extension] Plugin classes not available');
+            debugLog('[ABsmartly Extension] Available:', Object.keys(classes));
             return;
           }
 
           try {
-            // Initialize the plugin
-            const plugin = new window.DOMChangesPlugin({
+            // STEP 1: Initialize OverridesPlugin FIRST (must be before DOMChangesPlugin)
+            debugLog('[ABsmartly Extension] Initializing OverridesPlugin with config...');
+
+            const overridesConfig = {
               context: context,
-              autoApply: true,
-              spa: true,
-              visibilityTracking: true,
-              extensionBridge: true,
-              dataSource: 'variable',
-              dataFieldName: '__dom_changes',
-              debug: true
-            });
+              cookieName: 'absmartly_overrides',
+              debug: DEBUG
+            };
 
-            // Plugin will register itself with context.__domPlugin during initialization
+            // Add config from extension if available
+            if (config) {
+              // Add cookie options (simplified for client-side)
+              overridesConfig.cookieOptions = {
+                path: '/',
+                maxAge: 2592000 // 30 days
+                // No secure or sameSite - not supported in document.cookie
+              };
 
-            plugin.initialize().then(() => {
-              
-              // The plugin now registers itself with context.__domPlugin
-              // We can verify it's registered
-              if (context.__domPlugin && context.__domPlugin.instance === plugin) {
-                debugLog('[ABsmartly Extension] Plugin successfully registered with context.__domPlugin');
-                debugLog('[ABsmartly Extension] Plugin methods available:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
+              // Add query string configuration
+              overridesConfig.useQueryString = true;
+              overridesConfig.queryPrefix = config.queryPrefix || '_exp_';
+              overridesConfig.envParam = 'env';
+              overridesConfig.persistQueryToCookie = config.persistQueryToCookie ?? true;
+
+              // Add endpoints if available
+              if (config.sdkEndpoint) {
+                // Remove trailing /v1 if present since OverridesPlugin might add it
+                overridesConfig.sdkEndpoint = config.sdkEndpoint.replace(/\/v1\/?$/, '');
+              }
+              if (config.apiEndpoint) {
+                // Remove trailing /v1 if present since OverridesPlugin might add it
+                overridesConfig.absmartlyEndpoint = config.apiEndpoint.replace(/\/v1\/?$/, '');
               }
 
-              // Inject custom code if provided
-              if (customCode) {
-                debugLog('[ABsmartly Extension] Injecting custom code directly');
-                try {
-                  // Parse the custom code object
-                  const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
-                  
-                  // Call the plugin's injectCode method for HTML/CSS
-                  if (plugin.injectCode && typeof plugin.injectCode === 'function') {
-                    plugin.injectCode(codeData);
-                    debugLog('[ABsmartly Extension] Custom code injected via plugin.injectCode');
-                  }
-                  
-                  // ALWAYS execute scripts manually since the plugin's injection doesn't execute them
-                  ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
-                    if (codeData[location]) {
-                      debugLog(`[ABsmartly Extension] Executing scripts for ${location}`);
-                      executeScriptsInHTML(codeData[location], location);
+              debugLog('[ABsmartly Extension] Using endpoints:', {
+                sdk: overridesConfig.sdkEndpoint,
+                api: overridesConfig.absmartlyEndpoint
+              });
+            }
+
+            const overridesPlugin = new OverridesClass(overridesConfig);
+
+            // Apply overrides from cookies
+            overridesPlugin.initialize().then(() => {
+              debugLog('[ABsmartly Extension] OverridesPlugin initialized, overrides applied');
+
+              // STEP 2: Initialize DOMChangesPlugin SECOND (after overrides)
+              debugLog('[ABsmartly Extension] Initializing DOMChangesPlugin...');
+              const domPlugin = new DOMChangesPlugin({
+                context: context,
+                autoApply: true,
+                spa: true,
+                visibilityTracking: true,
+                extensionBridge: true,
+                dataSource: 'variable',
+                dataFieldName: '__dom_changes',
+                debug: DEBUG
+              });
+
+              // Initialize DOM plugin
+              domPlugin.initialize().then(() => {
+                debugLog('[ABsmartly Extension] DOMChangesPlugin initialized successfully');
+
+                // The plugin registers itself with context.__domPlugin
+                // We can verify it's registered
+                if (context.__domPlugin && context.__domPlugin.instance === domPlugin) {
+                  debugLog('[ABsmartly Extension] Plugin successfully registered with context.__domPlugin');
+                  debugLog('[ABsmartly Extension] Plugin methods available:', Object.keys(domPlugin).filter(k => typeof domPlugin[k] === 'function'));
+                }
+
+                // Inject custom code if provided
+                if (customCode) {
+                  debugLog('[ABsmartly Extension] Injecting custom code directly');
+                  try {
+                    // Parse the custom code object
+                    const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
+
+                    // Call the plugin's injectCode method for HTML/CSS
+                    if (domPlugin.injectCode && typeof domPlugin.injectCode === 'function') {
+                      domPlugin.injectCode(codeData);
+                      debugLog('[ABsmartly Extension] Custom code injected via plugin.injectCode');
                     }
-                  });
-                } catch (error) {
-                  debugError('[ABsmartly Extension] Failed to inject custom code:', error);
-                }
-              }
 
-              // Notify extension
-              window.postMessage({
-                source: 'absmartly-page',
-                type: 'PLUGIN_INITIALIZED',
-                payload: {
-                  version: context.__domPlugin ? context.__domPlugin.version : '1.0.0',
-                  capabilities: context.__domPlugin ? context.__domPlugin.capabilities : []
+                    // ALWAYS execute scripts manually since the plugin's injection doesn't execute them
+                    ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
+                      if (codeData[location]) {
+                        debugLog(`[ABsmartly Extension] Executing scripts for ${location}`);
+                        executeScriptsInHTML(codeData[location], location);
+                      }
+                    });
+                  } catch (error) {
+                    debugError('[ABsmartly Extension] Failed to inject custom code:', error);
+                  }
                 }
-              }, '*');
 
-              debugLog('[ABsmartly Extension] Plugin initialized successfully');
-              isInitialized = true;
-              isInitializing = false;
+                // Notify extension
+                window.postMessage({
+                  source: 'absmartly-page',
+                  type: 'PLUGIN_INITIALIZED',
+                  payload: {
+                    version: context.__domPlugin ? context.__domPlugin.version : '1.0.0',
+                    capabilities: context.__domPlugin ? context.__domPlugin.capabilities : []
+                  }
+                }, '*');
+
+                debugLog('[ABsmartly Extension] Both plugins initialized successfully');
+                isInitialized = true;
+                isInitializing = false;
+              }).catch(error => {
+                debugError('[ABsmartly Extension] Failed to initialize DOMChangesPlugin:', error);
+                isInitializing = false;
+              });
             }).catch(error => {
-              debugError('[ABsmartly Extension] Failed to initialize plugin:', error);
+              debugError('[ABsmartly Extension] Failed to initialize OverridesPlugin:', error);
               isInitializing = false;
             });
           } catch (error) {
-            debugError('[ABsmartly Extension] Failed to initialize plugin:', error);
+            debugError('[ABsmartly Extension] Failed to initialize plugins:', error);
             isInitializing = false;
           }
         }
-        
-        // Now initialize the plugin with the context we already have
-        initializePlugin(context);
+
+        // Now initialize the plugins with the context and config we have (only if not already initialized)
+        if (!isInitialized) {
+          initializePlugins(context, customCode, config);
+          isInitialized = true;
+        } else {
+          debugLog('[ABsmartly Extension] Plugins already initialized, skipping');
+        }
+        isInitializing = false;
       } else if (event.data.type === 'INJECT_CUSTOM_CODE') {
         // This message type is not currently used - custom code comes via INJECTION_CODE
         debugLog('[ABsmartly Extension] INJECT_CUSTOM_CODE message received but not used');
@@ -1267,7 +1436,48 @@
       hasTreatment: cachedContext && typeof cachedContext.treatment === 'function'
     };
   };
-  
+
+  // Function to inject ABsmartly SDK
+  function injectABsmartlySDK(config) {
+    debugLog('[ABsmartly Extension] Injecting ABsmartly SDK...');
+
+    // First, inject the SDK library from unpkg
+    const sdkLibScript = document.createElement('script');
+    sdkLibScript.src = 'https://unpkg.com/@absmartly/javascript-sdk/dist/absmartly.min.js';
+    sdkLibScript.onload = () => {
+      debugLog('[ABsmartly Extension] ABsmartly SDK library loaded');
+
+      // Now inject the SDK initialization script
+      const sdkUrl = config.sdkUrl || 'https://sdk.absmartly.com/sdk.js';
+      const sdkScript = document.createElement('script');
+
+      // Append current page query parameters to SDK URL
+      const queryString = window.location.search;
+      sdkScript.src = sdkUrl + queryString;
+      sdkScript.async = true;
+
+      sdkScript.onload = () => {
+        debugLog('[ABsmartly Extension] ABsmartly SDK loaded from:', sdkUrl + queryString);
+        sdkInjectionPending = false;
+        // SDK should now be available, let the check cycle find it
+      };
+
+      sdkScript.onerror = (error) => {
+        debugError('[ABsmartly Extension] Failed to load ABsmartly SDK:', error);
+        sdkInjectionPending = false;
+      };
+
+      document.head.appendChild(sdkScript);
+    };
+
+    sdkLibScript.onerror = (error) => {
+      debugError('[ABsmartly Extension] Failed to load ABsmartly SDK library:', error);
+      sdkInjectionPending = false;
+    };
+
+    document.head.appendChild(sdkLibScript);
+  }
+
   // Start the process
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', waitForSDKAndInitialize);
