@@ -108,13 +108,32 @@ async function openLoginPage() {
   if (!config?.apiEndpoint) {
     return
   }
-  
-  // Extract base URL from API endpoint
+
+  // Extract base URL from API endpoint - just remove /v1 suffix
   const baseUrl = config.apiEndpoint.replace(/\/v1$/, '').replace(/\/api.*$/, '')
-  const loginUrl = `${baseUrl}/login`
-  
-  // Open login page in new tab
-  chrome.tabs.create({ url: loginUrl })
+
+  // Check if user is already authenticated first
+  try {
+    const authResponse = await makeApiRequest(`${config.apiEndpoint}/auth/current-user`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (authResponse.ok) {
+      // User is already authenticated, no need to redirect
+      debugLog('User is already authenticated')
+      return { authenticated: true }
+    }
+  } catch (error) {
+    debugLog('Auth check failed, user needs to login:', error)
+  }
+
+  // User not authenticated, open login page (without /login suffix)
+  chrome.tabs.create({ url: baseUrl })
+  return { authenticated: false }
 }
 
 // Helper function to get JWT cookie for a domain
@@ -683,10 +702,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             })
             debugLog('Test injection result:', testResult)
             
+            // Get the logo URL to pass to the visual editor
+            const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
+
             // Now inject the actual visual editor
             const injectionResult = await chrome.scripting.executeScript({
                 target: { tabId: tabId },
-                func: function(variantName, initialChanges) {
+                func: function(variantName, experimentName, logoUrl, initialChanges) {
                   // This runs in the page context
                   console.log('[ABSmartly] Starting inline visual editor immediately')
                   
