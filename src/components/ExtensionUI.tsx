@@ -602,27 +602,24 @@ function IndexPopupContent() {
 
   const handleLoginRedirect = async () => {
     try {
-      // First check if already authenticated
       setExperimentsLoading(true)
-      try {
-        // Try to fetch current user to check auth status
-        await client.makeRequest('GET', '/auth/current-user')
-        // If successful, user is authenticated, just reload experiments
+
+      // openLogin now checks auth status before redirecting
+      const result = await client.openLogin()
+
+      if (result?.authenticated) {
+        // User is already authenticated, just reload experiments
         debugLog('User is already authenticated, reloading experiments')
         setIsAuthExpired(false)
         setError(null)
         loadExperiments(true) // Force refresh
-      } catch (authError: any) {
-        // If auth check fails, open login page
-        debugLog('Auth check failed, opening login page')
-        await client.openLogin()
-        // Close the popup after opening login
+      } else {
+        // Login page was opened, close the popup
         window.close()
-      } finally {
-        setExperimentsLoading(false)
       }
     } catch (err) {
       debugError('Failed to handle login:', err)
+    } finally {
       setExperimentsLoading(false)
     }
   }
