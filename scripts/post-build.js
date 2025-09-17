@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 // Copy sidebar files from tabs folder to root for injection
 const buildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-prod');
+const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
 const tabsDir = path.join(buildDir, 'tabs');
 const publicDir = path.join(__dirname, '..', 'public');
 const manifestPath = path.join(buildDir, 'manifest.json');
@@ -87,16 +88,49 @@ if (fs.existsSync(injectScriptSource)) {
   });
 }
 
-// Copy ABsmartly DOM Changes Plugin from node_modules
-const pluginSource = path.join(__dirname, '..', 'node_modules', '@absmartly', 'dom-changes-plugin', 'dist', 'absmartly-dom-changes.min.js');
+// Copy ABsmartly SDK Plugins from sibling directory
+const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-dom-changes-sdk-plugin', 'dist');
+const pluginDevSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.dev.js');
+const pluginProdSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.min.js');
+
+// Use dev build for both prod and dev directories
+let pluginSource = pluginDevSource;
+let pluginFilename = 'absmartly-sdk-plugins.dev.js';
+
+if (!fs.existsSync(pluginDevSource)) {
+  console.log('SDK plugins dev build not found, using production build');
+  pluginSource = pluginProdSource;
+  pluginFilename = 'absmartly-sdk-plugins.min.js';
+}
+
 if (fs.existsSync(pluginSource)) {
-  const pluginDestProd = path.join(buildDir, 'absmartly-dom-changes.min.js');
+  const pluginDestProd = path.join(buildDir, pluginFilename);
   fs.copyFileSync(pluginSource, pluginDestProd);
-  console.log('Copied absmartly-dom-changes.min.js to prod build directory');
-  
+  console.log(`Copied ${pluginFilename} to prod build directory`);
+
+  // Also copy source map if using dev build
+  if (pluginSource === pluginDevSource) {
+    const mapSource = pluginDevSource + '.map';
+    if (fs.existsSync(mapSource)) {
+      const mapDestProd = path.join(buildDir, pluginFilename + '.map');
+      fs.copyFileSync(mapSource, mapDestProd);
+      console.log(`Copied ${pluginFilename}.map to prod build directory`);
+    }
+  }
+
   if (fs.existsSync(devBuildDir)) {
-    const pluginDestDev = path.join(devBuildDir, 'absmartly-dom-changes.min.js');
+    const pluginDestDev = path.join(devBuildDir, pluginFilename);
     fs.copyFileSync(pluginSource, pluginDestDev);
-    console.log('Copied absmartly-dom-changes.min.js to dev build directory');
+    console.log(`Copied ${pluginFilename} to dev build directory`);
+
+    // Also copy source map for dev build
+    if (pluginSource === pluginDevSource) {
+      const mapSource = pluginDevSource + '.map';
+      if (fs.existsSync(mapSource)) {
+        const mapDestDev = path.join(devBuildDir, pluginFilename + '.map');
+        fs.copyFileSync(mapSource, mapDestDev);
+        console.log(`Copied ${pluginFilename}.map to dev build directory`);
+      }
+    }
   }
 }

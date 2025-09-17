@@ -19,9 +19,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [apiEndpoint, setApiEndpoint] = useState('')
   const [applicationName, setApplicationName] = useState('')
   const [domChangesStorageType, setDomChangesStorageType] = useState<'variable' | 'custom_field'>('variable')
-  const [domChangesFieldName, setDomChangesFieldName] = useState('dom_changes')
+  const [domChangesFieldName, setDomChangesFieldName] = useState('__dom_changes')
   const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt') // Default to JWT
   const [sdkWindowProperty, setSdkWindowProperty] = useState('') // Add SDK window property state
+  const [sdkEndpoint, setSdkEndpoint] = useState('') // SDK endpoint for collector
+  const [queryPrefix, setQueryPrefix] = useState('_exp_') // Query parameter prefix
+  const [persistQueryToCookie, setPersistQueryToCookie] = useState(true) // Persist query to cookie
+  const [injectSDK, setInjectSDK] = useState(false) // Whether to inject SDK if not detected
+  const [sdkUrl, setSdkUrl] = useState('') // Custom SDK URL
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
@@ -41,9 +46,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedApiEndpoint = config?.apiEndpoint || ''
       let loadedApplicationName = config?.applicationName || ''
       let loadedDomChangesStorageType = config?.domChangesStorageType || 'variable'
-      let loadedDomChangesFieldName = config?.domChangesFieldName || 'dom_changes'
+      let loadedDomChangesFieldName = config?.domChangesFieldName || '__dom_changes'
       let loadedAuthMethod = config?.authMethod || 'jwt' // Default to JWT
       let loadedSdkWindowProperty = config?.sdkWindowProperty || ''
+      let loadedSdkEndpoint = config?.sdkEndpoint || ''
+      let loadedQueryPrefix = config?.queryPrefix || '_exp_'
+      let loadedPersistQueryToCookie = config?.persistQueryToCookie ?? true
+      let loadedInjectSDK = config?.injectSDK ?? false
+      let loadedSdkUrl = config?.sdkUrl || ''
       
       
       // In development, auto-load from environment variables if fields are empty
@@ -73,6 +83,11 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setDomChangesFieldName(loadedDomChangesFieldName)
       setAuthMethod(loadedAuthMethod)
       setSdkWindowProperty(loadedSdkWindowProperty)
+      setSdkEndpoint(loadedSdkEndpoint)
+      setQueryPrefix(loadedQueryPrefix)
+      setPersistQueryToCookie(loadedPersistQueryToCookie)
+      setInjectSDK(loadedInjectSDK)
+      setSdkUrl(loadedSdkUrl)
       
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
@@ -186,11 +201,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     const config: ABsmartlyConfig = {
       apiKey: apiKey.trim() || undefined,
       apiEndpoint,
+      sdkEndpoint: sdkEndpoint.trim() || undefined,
       applicationName: applicationName.trim() || undefined,
       domChangesStorageType,
-      domChangesFieldName: domChangesFieldName.trim() || 'dom_changes',
+      domChangesFieldName: domChangesFieldName.trim() || '__dom_changes',
       authMethod,
-      sdkWindowProperty: sdkWindowProperty.trim() || undefined
+      sdkWindowProperty: sdkWindowProperty.trim() || undefined,
+      queryPrefix: queryPrefix.trim() || '_exp_',
+      persistQueryToCookie,
+      injectSDK,
+      sdkUrl: sdkUrl.trim() || undefined
     }
 
     try {
@@ -431,7 +451,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             type="text"
             value={domChangesFieldName}
             onChange={(e) => setDomChangesFieldName(e.target.value)}
-            placeholder="dom_changes"
+            placeholder="__dom_changes"
           />
           <p className="mt-1 text-xs text-gray-500">
             {domChangesStorageType === 'variable' 
@@ -453,8 +473,89 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         <p className="mt-1 text-xs text-gray-500">
           The window property where the ABsmartly SDK context is stored. Leave empty to use automatic detection.
         </p>
+
+        <div className="mt-4">
+          <Input
+            label="SDK Endpoint (Optional)"
+            type="url"
+            value={sdkEndpoint}
+            onChange={(e) => setSdkEndpoint(e.target.value)}
+            placeholder="e.g., https://demo.absmartly.io"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            SDK collector endpoint for fetching development experiments. Defaults to API endpoint with .io domain.
+          </p>
+        </div>
       </div>
-      
+
+      {/* Query String Override Configuration */}
+      <div className="border-t pt-4 mt-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Query String Overrides</h3>
+
+        <Input
+          label="Query Parameter Prefix"
+          type="text"
+          value={queryPrefix}
+          onChange={(e) => setQueryPrefix(e.target.value)}
+          placeholder="_exp_"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Prefix for query parameters (e.g., ?_exp_button_color=1)
+        </p>
+
+        <div className="mt-4 flex items-center">
+          <input
+            id="persistQueryToCookie"
+            type="checkbox"
+            checked={persistQueryToCookie}
+            onChange={(e) => setPersistQueryToCookie(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="persistQueryToCookie" className="ml-2 block text-sm text-gray-700">
+            Persist query string overrides to cookie
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          When enabled, query string overrides will be saved to a cookie for persistence across page loads.
+        </p>
+      </div>
+
+      {/* SDK Injection Settings */}
+      <div className="border-t pt-4 mt-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">SDK Injection</h3>
+
+        <div className="flex items-center">
+          <input
+            id="injectSDK"
+            type="checkbox"
+            checked={injectSDK}
+            onChange={(e) => setInjectSDK(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="injectSDK" className="ml-2 block text-sm text-gray-700">
+            Inject ABsmartly SDK if not detected
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          When enabled, the extension will inject the ABsmartly SDK (including all plugins) on pages where it's not already present.
+        </p>
+
+        {injectSDK && (
+          <div className="mt-4">
+            <Input
+              label="Custom SDK URL (Optional)"
+              type="url"
+              value={sdkUrl}
+              onChange={(e) => setSdkUrl(e.target.value)}
+              placeholder="https://sdk.absmartly.com/sdk.js"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Custom URL for the SDK script. Leave empty to use the default SDK URL with current page's query parameters.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Custom Code Settings */}
       <CustomCodeSettings onSave={() => {
         // Optionally trigger a refresh or notification

@@ -148,4 +148,14 @@ export class ABsmartlyClient {
       throw error
     }
   }
+
+  async getEnvironments(): Promise<any[]> {
+    try {
+      const response = await this.client.get('/environments')
+      return response.data?.environments || []
+    } catch (error) {
+      debugError('Failed to fetch environments:', error)
+      throw error
+    }
+  }
 }
