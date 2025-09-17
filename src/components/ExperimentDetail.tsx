@@ -50,6 +50,7 @@ export function ExperimentDetail({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [jsonEditorVariant, setJsonEditorVariant] = useState<string | null>(null)
+  const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
   const lastExperimentIdRef = useRef<number | null>(null)
 
   debugLog('🔍 ExperimentDetail state - variantData:', variantData)
@@ -57,11 +58,17 @@ export function ExperimentDetail({
   debugLog('🔍 ExperimentDetail state - variants length:', experiment?.variants?.length)
   debugLog('🔍 ExperimentDetail state - should show variants section:', experiment.variants && experiment.variants.length > 0)
 
-  // Effect to restore saved variant data on mount
+  // Effect to restore saved variant data on mount and get config
   useEffect(() => {
     const restoreData = async () => {
       const storageKey = `experiment-${experiment.id}-variants`
       try {
+        // Get the config to know which field name to use
+        const config = await getConfig()
+        const fieldName = config?.domChangesFieldName || '__dom_changes'
+        setDomFieldName(fieldName)
+        debugLog('📦 Using DOM field name:', fieldName)
+
         const savedData = await storage.get(storageKey)
         if (savedData) {
           debugLog('📦 Restoring saved variant data for experiment', experiment.id)
@@ -145,7 +152,7 @@ export function ExperimentDetail({
         
         currentVariants.forEach((variant) => {
           const variantKey = variant.name || `Variant ${variant.variant}`
-          data[variantKey] = parseVariantConfig(variant, variantKey)
+          data[variantKey] = parseVariantConfig(variant, variantKey, domFieldName)
         })
         
         // Load saved DOM changes from storage
@@ -189,7 +196,7 @@ export function ExperimentDetail({
         
         currentVariants.forEach((variant) => {
           const variantKey = variant.name || `Variant ${variant.variant}`
-          data[variantKey] = parseVariantConfig(variant, variantKey)
+          data[variantKey] = parseVariantConfig(variant, variantKey, domFieldName)
         })
         
         // Load saved DOM changes from storage
@@ -230,11 +237,11 @@ export function ExperimentDetail({
             // Only update if we don't have this variant yet, or if the config has changed
             if (!updated[variantKey]) {
               // New variant, parse it
-              updated[variantKey] = parseVariantConfig(variant, variantKey)
+              updated[variantKey] = parseVariantConfig(variant, variantKey, domFieldName)
               hasChanges = true
             } else if (shouldUpdateVariantConfig(variant, updated[variantKey])) {
               // Update variant but preserve DOM changes if any
-              const parsedConfig = parseVariantConfig(variant, variantKey)
+              const parsedConfig = parseVariantConfig(variant, variantKey, domFieldName)
               // Keep existing DOM changes if we have any
               if (updated[variantKey].dom_changes && updated[variantKey].dom_changes.length > 0) {
                 parsedConfig.dom_changes = updated[variantKey].dom_changes
@@ -256,7 +263,7 @@ export function ExperimentDetail({
   }, [experiment.id, experiment.variants]) // Only re-run when ID or variants change
   
   // Helper function to parse variant configuration safely
-  const parseVariantConfig = (variant: any, variantKey: string): VariantData => {
+  const parseVariantConfig = (variant: any, variantKey: string, fieldName: string = '__dom_changes'): VariantData => {
     try {
       // Check if variant has config data
       if (variant.config !== undefined && variant.config !== null) {
@@ -279,10 +286,14 @@ export function ExperimentDetail({
           config = {}
         }
         
-        const { dom_changes, ...variables } = config
-        
+        // Extract DOM changes using configurable field name
+        const domChanges = config[fieldName]
+
+        // Get variables (everything except the DOM changes field)
+        const { [fieldName]: _, ...variables } = config
+
         // Validate dom_changes is an array
-        const validDomChanges = Array.isArray(dom_changes) ? dom_changes : []
+        const validDomChanges = Array.isArray(domChanges) ? domChanges : []
         
         // Ensure variables is an object
         const validVariables = variables && typeof variables === 'object' ? variables : {}
@@ -491,7 +502,7 @@ export function ExperimentDetail({
       // Get the configuration to check storage settings
       const config = await getConfig()
       const storageType = config?.domChangesStorageType || 'variable'
-      const fieldName = config?.domChangesFieldName || 'dom_changes'
+      const fieldName = config?.domChangesFieldName || '__dom_changes'
       
       // Fetch full experiment data first
       const fullExperimentResponse = await chrome.runtime.sendMessage({
@@ -973,6 +984,7 @@ export function ExperimentDetail({
                     {/* DOM Changes Section */}
                     <DOMChangesInlineEditor
                       variantName={variantKey}
+                      experimentName={experiment.name}
                       changes={data.dom_changes}
                       onChange={(changes) => handleDOMChangesUpdate(variantKey, changes)}
                       previewEnabled={previewEnabled && activePreviewVariant === variantKey}

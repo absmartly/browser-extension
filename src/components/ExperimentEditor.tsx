@@ -9,6 +9,7 @@ import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import type { Experiment } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
 import { ArrowLeftIcon, PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
+import { getConfig } from '~src/utils/storage'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -37,6 +38,7 @@ export function ExperimentEditor({
   metrics = [],
   tags = []
 }: ExperimentEditorProps) {
+  const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
   const [formData, setFormData] = useState({
     name: experiment?.name || '',
     display_name: experiment?.display_name || '',
@@ -58,10 +60,13 @@ export function ExperimentEditor({
         let variables: Record<string, any> = {}
         try {
           const config = JSON.parse(v.config || '{}')
-          if (config.dom_changes) {
-            dom_changes = config.dom_changes
-            const { dom_changes: _, ...otherVars } = config
-            variables = otherVars
+          // Try default field name first (will be properly loaded in useEffect)
+          const fieldName = '__dom_changes'
+          if (config[fieldName] && Array.isArray(config[fieldName])) {
+            dom_changes = config[fieldName]
+            const tempConfig = { ...config }
+            delete tempConfig[fieldName]
+            variables = tempConfig
           } else {
             variables = config
           }
@@ -87,6 +92,43 @@ export function ExperimentEditor({
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [activePreviewVariant, setActivePreviewVariant] = useState<number | null>(null)
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
+
+  // Load config on mount to get the DOM changes field name
+  useEffect(() => {
+    const loadConfig = async () => {
+      const config = await getConfig()
+      const fieldName = config?.domChangesFieldName || '__dom_changes'
+      setDomFieldName(fieldName)
+
+      // Re-parse variants with correct field name if we have an existing experiment
+      if (experiment?.variants && fieldName !== '__dom_changes') {
+        setVariants(experiment.variants.map(v => {
+          let dom_changes: DOMChange[] = []
+          let variables: Record<string, any> = {}
+          try {
+            const config = JSON.parse(v.config || '{}')
+            if (config[fieldName] && Array.isArray(config[fieldName])) {
+              dom_changes = config[fieldName]
+              const tempConfig = { ...config }
+              delete tempConfig[fieldName]
+              variables = tempConfig
+            } else {
+              variables = config
+            }
+          } catch (e) {
+            debugError('Failed to parse variant config:', e)
+          }
+
+          return {
+            name: v.name || '',
+            variables,
+            dom_changes
+          }
+        }))
+      }
+    }
+    loadConfig()
+  }, [experiment])
 
   // Helper functions for name conversion
   const snakeToTitle = (snake: string): string => {
@@ -133,9 +175,9 @@ export function ExperimentEditor({
     const preparedVariants = variants.map((v, index) => {
       const config: any = { ...v.variables }
       
-      // Include DOM changes if any
-      if (v.dom_changes.length > 0) {
-        config.dom_changes = v.dom_changes
+      // Include DOM changes only if not empty
+      if (v.dom_changes && v.dom_changes.length > 0) {
+        config[domFieldName] = v.dom_changes
       }
       
       return {

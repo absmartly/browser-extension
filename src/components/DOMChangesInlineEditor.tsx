@@ -33,6 +33,7 @@ import {
 
 interface DOMChangesInlineEditorProps {
   variantName: string
+  experimentName?: string
   changes: DOMChange[]
   onChange: (changes: DOMChange[]) => void
   previewEnabled: boolean
@@ -1465,10 +1466,11 @@ const DOMChangeEditorForm = ({
   </div>
 )
 
-export function DOMChangesInlineEditor({ 
-  variantName, 
-  changes, 
-  onChange, 
+export function DOMChangesInlineEditor({
+  variantName,
+  experimentName,
+  changes,
+  onChange,
   previewEnabled,
   onPreviewToggle
 }: DOMChangesInlineEditorProps) {
@@ -1637,10 +1639,8 @@ export function DOMChangesInlineEditor({
     debugLog('📡 Setting up drag-drop listener for variant:', variantName)
     
     const handleDragDropComplete = async (message: any) => {
-      debugLog('📡 Received message in DOMChangesInlineEditor:', message)
-      
       if (message.type === 'DRAG_DROP_COMPLETE') {
-        debugLog('Drag-drop complete message received:', message)
+        debugLog('📡 Received drag-drop message in DOMChangesInlineEditor:', message)
         
         // Store result in session storage
         const storage = new Storage({ area: "session" })
@@ -1669,10 +1669,8 @@ export function DOMChangesInlineEditor({
   // Listen for visual editor changes
   useEffect(() => {
     const handleVisualEditorChanges = async (message: any) => {
-      debugLog('📡 Received message in DOMChangesInlineEditor:', message)
-      
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
-        debugLog('Visual editor changes received:', message.changes)
+        debugLog('📡 Visual editor changes received:', message.changes)
         
         // Update parent component with visual editor changes
         if (message.changes && message.changes.length > 0) {
@@ -1684,6 +1682,13 @@ export function DOMChangesInlineEditor({
             variantName,
             changes: message.changes
           })
+        }
+      } else if (message.type === 'PREVIEW_STATE_CHANGED') {
+        // Update preview toggle state when visual editor disables it
+        debugLog('📡 Preview state changed:', message.enabled)
+        if (message.enabled === false && previewEnabled) {
+          // Turn off the preview toggle
+          onPreviewToggle(false)
         }
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
         debugLog('✅ Visual Editor Complete - Received changes:', message)
@@ -1721,12 +1726,26 @@ export function DOMChangesInlineEditor({
 
   const handleLaunchVisualEditor = async () => {
     debugLog('🎨 Launching Visual Editor')
-    
-    // Disable preview if it's active to avoid conflicts
-    if (previewEnabled) {
-      debugLog('🔄 Disabling preview before launching visual editor')
+    debugLog('Current preview state:', previewEnabled)
+    debugLog('Variant name:', variantName)
+    debugLog('Existing changes:', changes.length)
+
+    // If preview is already enabled with existing changes, we need to disable it first
+    // to restore the original state, then re-enable it to capture the true original values
+    if (previewEnabled && changes.length > 0) {
+      debugLog('🔄 Preview active with existing changes - resetting to capture true original state')
       onPreviewToggle(false)
+      await new Promise(resolve => setTimeout(resolve, 200))
     }
+
+    // Now enable preview for visual editor
+    debugLog('🔄 Enabling preview for visual editor')
+    debugLog('Calling onPreviewToggle(true) for variant:', variantName)
+    onPreviewToggle(true)
+
+    // Give preview a moment to activate before starting visual editor
+    await new Promise(resolve => setTimeout(resolve, 300))
+    debugLog('Preview activation complete, starting visual editor...')
     
     // Save current state
     const storage = new Storage({ area: "session" })
@@ -1746,9 +1765,10 @@ export function DOMChangesInlineEditor({
       debugLog('PING response:', response)
     })
     
-    chrome.runtime.sendMessage({ 
+    chrome.runtime.sendMessage({
       type: 'START_VISUAL_EDITOR',
       variantName,
+      experimentName,
       changes
     }, (response) => {
       debugLog('📨 Response received from background:', response)

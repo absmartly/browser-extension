@@ -15,6 +15,7 @@ export const config: PlasmoCSConfig = {
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
+let isVisualEditorActive = false
 
 // Initialize overrides on page load
 // This ensures storage is synced to cookie for SSR compatibility
@@ -84,7 +85,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentEditor.destroy()
         currentEditor = null
       }
-      
+
+      // Mark visual editor as active BEFORE starting
+      isVisualEditorActive = true
+
       // Create and start new editor
       currentEditor = new VisualEditor({
         variantName: message.variantName,
@@ -99,7 +103,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           })
         }
       })
-      
+
       currentEditor.start()
       sendResponse({ success: true })
       debugLog('[Visual Editor Content Script] Visual editor started successfully')
@@ -113,7 +117,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === 'STOP_VISUAL_EDITOR') {
     debugLog('[Visual Editor Content Script] Stopping visual editor')
-    
+
+    isVisualEditorActive = false
+
     if (currentEditor) {
       const changes = currentEditor.getChanges()
       currentEditor.destroy()
@@ -134,6 +140,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
   
+  // Visual editor preview messages aren't sent through chrome.tabs.sendMessage
+  // They're sent via chrome.runtime.sendMessage and need to be handled differently
+
   // Handle preview messages
   if (message.type === 'ABSMARTLY_PREVIEW') {
     debugLog('[ABSmartly Content Script] Received preview message:', message.action)
@@ -142,8 +151,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     ensureSDKPluginInjected()
 
     if (message.action === 'apply') {
-      // Create preview header
-      createPreviewHeader(message.experimentName, message.variantName)
+      // Only create preview header if visual editor is NOT active
+      if (!isVisualEditorActive) {
+        createPreviewHeader(message.experimentName, message.variantName)
+      }
       
       // Send message to SDK plugin to preview changes
       window.postMessage({
@@ -175,8 +186,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
       sendResponse({ success: true })
     } else if (message.action === 'remove') {
-      // Remove preview header
-      removePreviewHeader()
+      // Only remove preview header if visual editor is NOT active
+      if (!isVisualEditorActive) {
+        removePreviewHeader()
+      }
       
       // Send message to SDK plugin to remove preview
       window.postMessage({
@@ -237,9 +250,14 @@ function createPreviewHeader(experimentName: string, variantName: string) {
   // Create content
   const content = document.createElement('div')
   content.style.cssText = 'flex: 1; text-align: center;'
+
+  // Get the extension URL for the logo
+  const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
+
   content.innerHTML = `
-    <div style="font-weight: 600; margin-bottom: 4px;">
-      🎨 ABSmartly Preview Mode Active
+    <div style="font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <img src="${logoUrl}" alt="ABSmartly" style="height: 20px; width: auto; vertical-align: middle;">
+      <span>ABSmartly Preview Mode Active</span>
     </div>
     <div style="font-size: 12px; opacity: 0.95;">
       Previewing variant <strong>${variantName}</strong> of experiment <strong>${experimentName}</strong>
@@ -355,7 +373,20 @@ function ensureSDKPluginInjected() {
 window.addEventListener('message', async (event) => {
   // Only accept messages from the same origin
   if (event.origin !== window.location.origin) return
-  
+
+  // Handle visual editor closed message
+  if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_CLOSED') {
+    debugLog('[Content Script] Visual editor closed, updating state')
+    isVisualEditorActive = false
+
+    // Show preview header again if we're in preview mode
+    const previewHeader = document.getElementById('absmartly-preview-header')
+    if (previewHeader) {
+      previewHeader.style.display = ''
+    }
+    return
+  }
+
   // Handle messages from the injected script (absmartly-page)
   if (event.data && event.data.source === 'absmartly-page') {
     debugLog('[Content Script] Received message from page:', event.data)

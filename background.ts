@@ -520,21 +520,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
     return true // Will respond asynchronously
   } else if (message.type === "OPEN_LOGIN") {
-    // Open login page
-    openLoginPage()
-    sendResponse({ success: true })
-  } else if (message.type === "DISABLE_PREVIEW") {
-    // Forward disable preview message to all tabs to remove preview
-    chrome.tabs.query({}, (tabs) => {
-      tabs.forEach(tab => {
-        if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove'
-          })
-        }
-      })
+    // Open login page with auth check
+    openLoginPage().then(result => {
+      sendResponse({ success: true, ...result })
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message })
     })
+    return true // Will respond asynchronously
+  } else if (message.type === "DISABLE_PREVIEW") {
+    // Forward disable preview message to active tab to remove preview
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove'
+        }, () => {
+          // Ignore connection errors - tab might have navigated
+          if (chrome.runtime.lastError) {
+            console.log('Preview remove message failed (tab may have navigated):', chrome.runtime.lastError)
+          }
+        })
+      }
+    })
+
+    // Also notify any open extension popups to update their preview toggle state
+    chrome.runtime.sendMessage({
+      type: 'PREVIEW_STATE_CHANGED',
+      enabled: false
+    }).catch(() => {
+      // Ignore errors if no popup is open
+    })
+
     sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
     // Special handler for auth check - directly check user authentication
@@ -719,6 +735,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   }
                   
                   (window as any).__absmartlyVisualEditorActive = true
+
+                  // Hide preview header when visual editor starts
+                  const previewHeader = document.getElementById('absmartly-preview-header')
+                  if (previewHeader) {
+                    previewHeader.style.display = 'none'
+                  }
                   
                   // Create visual editor banner with Shadow DOM
                   const existingBanner = document.getElementById('absmartly-visual-editor-banner-host')
@@ -819,7 +841,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       <div class="changes-counter" id="absmartly-changes-counter">0 changes</div>
                     </div>
                     <div class="banner-content">
-                      <div class="banner-title">🎨 ABSmartly Visual Editor Active - Variant: ${variantName}</div>
+                      <div class="banner-title" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <img src="${logoUrl}" alt="ABSmartly" style="height: 20px; width: auto;">
+                        <span>ABSmartly Visual Editor Active - Variant: ${variantName}</span>
+                      </div>
                       <div class="banner-subtitle">Click any element to edit • Press ESC to exit</div>
                     </div>
                     <div class="banner-actions">
@@ -1010,16 +1035,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     // Remove all event listeners
                     document.removeEventListener('mouseover', handleMouseOver)
                     document.removeEventListener('mouseout', handleMouseOut)
-                    document.removeEventListener('click', handleClick)
-                    document.removeEventListener('keydown', handleKeyPress)
-                    
+                    document.removeEventListener('click', handleClick, true)
+                    // handleKeyPress is local to each edit action, not global
+
                     // Remove visual editor elements
                     document.getElementById('absmartly-visual-editor-banner-host')?.remove()
                     document.getElementById('absmartly-visual-editor-styles')?.remove()
                     document.getElementById('absmartly-menu-host')?.remove()
                     document.getElementById('absmartly-html-editor-host')?.remove()
                     document.getElementById('absmartly-hover-tooltip')?.remove()
-                    
+
                     // Remove any selected/hover classes
                     document.querySelectorAll('.absmartly-hover').forEach(el => {
                       el.classList.remove('absmartly-hover')
@@ -1027,14 +1052,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     document.querySelectorAll('.absmartly-selected').forEach(el => {
                       el.classList.remove('absmartly-selected')
                     })
-                    
+
                     // Clear visual editor state
                     window.__absmartlyVisualEditorActive = false
+
+                    // Show preview header again if it exists
+                    const previewHeader = document.getElementById('absmartly-preview-header')
+                    if (previewHeader) {
+                      previewHeader.style.display = ''
+                    }
+
                     window.postMessage({
                       source: 'absmartly-visual-editor',
                       type: 'VISUAL_EDITOR_CLOSED'
                     }, '*')
-                    
+
                     console.log('[ABSmartly] Visual editor cleaned up and closed')
                   }
                   
@@ -1084,6 +1116,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   
                   // Add hover effect with tooltip
                   const handleMouseOver = (e) => {
+                    // Ignore preview header elements
+                    if (e.target.closest('#absmartly-preview-header')) {
+                      return
+                    }
                     if (isEditing) return
                     const target = e.target
                     // Don't hover on our Shadow DOM hosts
@@ -1149,19 +1185,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   // Handle element click
                   const handleClick = (e) => {
                     const target = e.target
-                    
+
                     // CRITICAL: Check for menu host first (shadow DOM container)
                     const menuHost = document.getElementById('absmartly-menu-host')
                     if (menuHost && (menuHost === target || menuHost.contains(target))) {
                       // Don't interfere with shadow DOM menu at all
                       return
                     }
+
+                    // Don't open menu if clicking within editable content
+                    if (isEditing || target.contentEditable === 'true') {
+                      return
+                    }
                     
-                    // Ignore clicks on our UI (banner and editor hosts)
-                    if (target.id === 'absmartly-visual-editor-banner-host' || 
+                    // Ignore clicks on our UI (banner, editor hosts, and preview header)
+                    if (target.id === 'absmartly-visual-editor-banner-host' ||
                         target.closest('#absmartly-visual-editor-banner-host') ||
                         target.id === 'absmartly-html-editor-host' ||
-                        target.closest('#absmartly-html-editor-host')) {
+                        target.closest('#absmartly-html-editor-host') ||
+                        target.id === 'absmartly-preview-header' ||
+                        target.closest('#absmartly-preview-header')) {
+                      return
+                    }
+
+                    // IMPORTANT: Don't show menu if we're currently editing text
+                    if (isEditing || target.contentEditable === 'true') {
+                      console.log('[ABSmartly] Ignoring click - currently editing')
                       return
                     }
                     
@@ -1180,6 +1229,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     selectedElement = target
                     target.classList.remove('absmartly-hover')
                     target.classList.add('absmartly-selected')
+
+                    // Store original values in DOM immediately when element is selected
+                    // This ensures we always have the original value before any changes
+                    if (!target.dataset.absmartlyOriginal) {
+                      target.dataset.absmartlyOriginal = JSON.stringify({
+                        textContent: target.textContent,
+                        innerHTML: target.innerHTML
+                      })
+                      target.dataset.absmartlyExperiment = experimentName || '__preview__'
+                    }
                     
                     // Show context menu
                     showContextMenu(e.pageX, e.pageY, target)
@@ -1437,23 +1496,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const originalState = {
                       html: element.outerHTML,
                       parent: element.parentNode,
-                      nextSibling: element.nextSibling
+                      nextSibling: element.nextSibling,
+                      textContent: element.textContent // Store original text for restoration
                     }
                     
                     switch(action) {
                       case 'edit':
+                        // Close menu immediately when starting edit
+                        const existingMenu = document.getElementById('absmartly-menu-host')
+                        if (existingMenu) {
+                          existingMenu.remove()
+                        }
+
+                        // Mark as modified when editing starts
+                        element.dataset.absmartlyModified = 'true'
+
+                        // Prevent link navigation during editing
+                        const preventDefault = (e) => {
+                          if (isEditing) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }
+                        }
+                        element.addEventListener('click', preventDefault, true)
+
                         // Remove selection styling while editing
                         element.classList.remove('absmartly-selected')
                         element.contentEditable = 'true'
                         element.focus()
-                        
+
                         // Select all text for easy replacement
                         const range = document.createRange()
                         range.selectNodeContents(element)
                         const selection = window.getSelection()
                         selection.removeAllRanges()
                         selection.addRange(range)
-                        
+
                         isEditing = true
                         
                         const handleBlur = () => {
@@ -1462,11 +1540,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                           isEditing = false
                           element.removeEventListener('blur', handleBlur)
                           element.removeEventListener('keydown', handleKeyPress)
+                          // Remove click prevention after editing
+                          element.removeEventListener('click', preventDefault, true)
                           
-                          // Track change
-                          trackChange('edit', element, { 
-                            oldText: originalState.html,
-                            newText: element.textContent 
+                          // Track change with original text for restoration
+                          trackChange('edit', element, {
+                            oldText: originalState.textContent,
+                            newText: element.textContent,
+                            originalHtml: originalState.html
                           })
                         }
                         
@@ -1474,9 +1555,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault()
                             element.blur()
+                            // Ensure menu is closed after Enter
+                            const menuAfterEnter = document.getElementById('absmartly-menu-host')
+                            if (menuAfterEnter) {
+                              menuAfterEnter.remove()
+                            }
                           }
                           if (e.key === 'Escape') {
-                            element.innerHTML = originalState.html
+                            // Restore original text instead of full HTML
+                            element.textContent = originalState.textContent
                             element.blur()
                           }
                         }
@@ -2827,39 +2914,192 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   
                   // Helper function to get selector
                   function getSelector(element) {
+                    // First, try to build a basic selector
+                    let baseSelector = ''
+
                     // Check if ID exists and is not auto-generated
                     if (element.id && !isAutoGenerated(element.id)) {
-                      return '#' + element.id
+                      baseSelector = '#' + element.id
+
+                      // IMPORTANT: Check if this ID selector matches multiple elements
+                      const matches = document.querySelectorAll(baseSelector)
+                      console.log('[ABSmartly] Selector "' + baseSelector + '" matches', matches.length, 'element(s)')
+
+                      if (matches.length > 1) {
+                        // ID should be unique, but some sites have duplicates
+                        // Add nth-of-type to make it unique
+                        console.log('[ABSmartly] WARNING: Duplicate ID found, making selector unique')
+
+                        // Find the position of this element among matches
+                        let elementIndex = -1
+                        for (let i = 0; i < matches.length; i++) {
+                          if (matches[i] === element) {
+                            elementIndex = i + 1
+                            break
+                          }
+                        }
+
+                        if (elementIndex > 0) {
+                          // Since IDs are duplicated across different parents, we need to be more specific
+                          // Build a selector using parent context to make it unique
+
+                          // Try using the parent's unique attributes
+                          const elementParent = element.parentElement
+                          if (elementParent) {
+                            let parentSelector = ''
+
+                            // Check if parent has a unique ID
+                            if (elementParent.id && !isAutoGenerated(elementParent.id)) {
+                              parentSelector = '#' + elementParent.id
+                            }
+                            // Or if parent has unique classes
+                            else if (elementParent.className && typeof elementParent.className === 'string') {
+                              const parentClasses = elementParent.className.split(' ')
+                                .filter(c => !c.includes('absmartly') && !isAutoGenerated(c) && c.length < 20)
+                              if (parentClasses.length > 0) {
+                                parentSelector = elementParent.tagName.toLowerCase() + '.' + parentClasses[0]
+                              }
+                            }
+                            // Or use parent's position relative to its parent
+                            else if (elementParent.parentElement) {
+                              const grandParent = elementParent.parentElement
+                              const parentSiblings = Array.from(grandParent.children)
+                              const parentIndex = parentSiblings.indexOf(elementParent) + 1
+                              parentSelector = elementParent.tagName.toLowerCase() + ':nth-child(' + parentIndex + ')'
+                            }
+
+                            // Build unique selector using parent context
+                            if (parentSelector) {
+                              const uniqueSelector = parentSelector + ' > ' + baseSelector
+                              console.log('[ABSmartly] Created parent-context selector:', uniqueSelector)
+
+                              try {
+                                const uniqueMatches = document.querySelectorAll(uniqueSelector)
+                                console.log('[ABSmartly] Testing parent-context selector, matches:', uniqueMatches.length)
+                                if (uniqueMatches.length === 1 && uniqueMatches[0] === element) {
+                                  console.log('[ABSmartly] ✅ SUCCESS: Returning parent-context selector:', uniqueSelector)
+                                  return uniqueSelector
+                                }
+                              } catch (e) {
+                                console.log('[ABSmartly] Error testing parent-context selector:', e)
+                              }
+                            }
+
+                            // If parent context didn't work, try using element position among ALL matching elements
+                            // This is a last resort - use the document-wide index
+                            const allMatches = document.querySelectorAll(baseSelector)
+                            for (let i = 0; i < allMatches.length; i++) {
+                              if (allMatches[i] === element) {
+                                // We found our element at position i
+                                // Build a selector that targets specifically this nth occurrence
+                                // We'll use a custom approach: find distinguishing ancestor
+                                let current = element
+                                let path = []
+                                let depth = 0
+
+                                while (current && depth < 5) {
+                                  if (current.id && !isAutoGenerated(current.id)) {
+                                    // Check if this ID at this level makes it unique
+                                    const testSelector = '#' + current.id + (path.length > 0 ? ' ' + path.join(' ') : '')
+                                    const testMatches = document.querySelectorAll(testSelector)
+                                    if (testMatches.length === 1 && testMatches[0] === element) {
+                                      console.log('[ABSmartly] ✅ Found unique ancestor path:', testSelector)
+                                      return testSelector
+                                    }
+                                  }
+
+                                  // Build the path from current element
+                                  if (current === element) {
+                                    path.unshift(baseSelector.replace('#', '[id="') + '"]')
+                                  } else {
+                                    let currentSelector = current.tagName.toLowerCase()
+                                    if (current.className && typeof current.className === 'string') {
+                                      const classes = current.className.split(' ').filter(c => !isAutoGenerated(c) && c.length < 15)
+                                      if (classes.length > 0) {
+                                        currentSelector += '.' + classes[0]
+                                      }
+                                    }
+                                    path.unshift(currentSelector)
+                                  }
+
+                                  current = current.parentElement
+                                  depth++
+                                }
+
+                                console.log('[ABSmartly] Using positional index:', i + 1, 'of', allMatches.length)
+                                // As a final fallback, we'll add a data attribute to make it unique
+                                // But log that this is not ideal
+                                console.log('[ABSmartly] ⚠️ Could not find natural unique selector for duplicate ID')
+                                break
+                              }
+                            }
+                          }
+
+                          // Fallback: try nth-child if parent context didn't work
+                          // (elementParent variable already defined above, so reuse it)
+                          if (elementParent) {
+                            const allChildren = Array.from(elementParent.children)
+                            const childIndex = allChildren.indexOf(element) + 1
+                            const fallbackSelector = '#' + element.id + ':nth-child(' + childIndex + ')'
+                            console.log('[ABSmartly] Using nth-child fallback:', fallbackSelector)
+
+                            // Verify the fallback selector works
+                            try {
+                              const fallbackMatches = document.querySelectorAll(fallbackSelector)
+                              if (fallbackMatches.length === 1 && fallbackMatches[0] === element) {
+                                console.log('[ABSmartly] Fallback selector successful:', fallbackSelector)
+                                return fallbackSelector
+                              }
+                            } catch (e) {
+                              console.log('[ABSmartly] Fallback selector failed:', e)
+                            }
+                          }
+                        }
+                      }
+
+                      // If we have a baseSelector and it's unique, return it
+                      if (baseSelector) {
+                        const finalMatches = document.querySelectorAll(baseSelector)
+                        if (finalMatches.length === 1 && finalMatches[0] === element) {
+                          return baseSelector
+                        }
+                      }
                     }
-                    
+
                     // Check for semantic classes
                     if (element.className && typeof element.className === 'string') {
                       const classes = element.className.split(' ')
                         .filter(c => !c.includes('absmartly') && !isAutoGenerated(c))
-                      
+
                       if (classes.length > 0) {
                         // Prefer shorter, likely human-readable classes
                         const semanticClasses = classes.filter(c => c.length < 20 && !c.match(/^[a-z]{1,3}-[a-f0-9]{6,}$/i))
                         if (semanticClasses.length > 0) {
-                          return element.tagName.toLowerCase() + '.' + semanticClasses[0]
+                          baseSelector = element.tagName.toLowerCase() + '.' + semanticClasses[0]
+
+                          // Check if this selector is unique
+                          const matches = document.querySelectorAll(baseSelector)
+                          if (matches.length === 1 && matches[0] === element) {
+                            return baseSelector
+                          }
                         }
                       }
                     }
-                    
+
                     // Build selector using parent chain if no good ID or class
                     let path = []
                     let current = element
-                    
+
                     while (current && current !== document.body && path.length < 3) {
                       let selector = current.tagName.toLowerCase()
-                      
+
                       // Check if this element has a good ID
                       if (current.id && !isAutoGenerated(current.id)) {
                         path.unshift('#' + current.id)
                         break
                       }
-                      
-                      // Add index if there are multiple siblings of same type
+
+                      // Always add index if there are multiple siblings of same type
                       if (current.parentElement) {
                         const siblings = Array.from(current.parentElement.children)
                           .filter(child => child.tagName === current.tagName)
@@ -2868,12 +3108,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                           selector += ':nth-of-type(' + index + ')'
                         }
                       }
-                      
+
                       path.unshift(selector)
                       current = current.parentElement
                     }
-                    
-                    return path.join(' > ')
+
+                    const finalSelector = path.join(' > ')
+                    console.log('[ABSmartly] Final selector:', finalSelector)
+                    return finalSelector
                   }
                   
                   // Helper function to check if string is auto-generated
@@ -2945,7 +3187,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   console.log('[ABSmartly] Visual editor is now active!')
                   return { success: true }
                 },
-                args: [message.variantName, message.changes],
+                args: [message.variantName, message.experimentName || '__preview__', logoUrl, message.changes],
                 world: 'MAIN' // Run in main world to modify the page directly
               })
               
@@ -3113,46 +3355,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true // Will respond asynchronously
   } else if (message.type === "REQUEST_INJECTION_CODE") {
-    // Handle request from SDK plugin for custom code injection
+    // Handle request from SDK plugin for custom code injection and config
     debugLog('Background received REQUEST_INJECTION_CODE from SDK plugin')
-    
-    storage.get("absmartly-custom-code").then((customCode: CustomCode | null) => {
-      if (customCode) {
-        // Prepare injection data for SDK plugin
-        const injectionData = {
-          headStart: customCode.headStart || '',
-          headEnd: customCode.headEnd || '',
-          bodyStart: customCode.bodyStart || '',
-          bodyEnd: customCode.bodyEnd || '',
-          styleTag: customCode.styleTag || ''
-        }
-        
-        debugLog('Sending custom code to SDK plugin:', injectionData)
-        sendResponse({ 
-          success: true, 
-          data: injectionData 
-        })
-      } else {
-        debugLog('No custom code configured')
-        sendResponse({ 
-          success: true, 
-          data: {
-            headStart: '',
-            headEnd: '',
-            bodyStart: '',
-            bodyEnd: '',
-            styleTag: ''
-          }
-        })
+
+    // Get both custom code and config
+    Promise.all([
+      storage.get("absmartly-custom-code"),
+      getConfig()
+    ]).then(([customCode, config]: [CustomCode | null, ABsmartlyConfig | null]) => {
+      // Prepare injection data for SDK plugin
+      const injectionData = {
+        headStart: customCode?.headStart || '',
+        headEnd: customCode?.headEnd || '',
+        bodyStart: customCode?.bodyStart || '',
+        bodyEnd: customCode?.bodyEnd || '',
+        styleTag: customCode?.styleTag || ''
       }
+
+      // Derive SDK endpoint if not set
+      let sdkEndpoint = config?.sdkEndpoint
+      if (!sdkEndpoint && config?.apiEndpoint) {
+        // Default: convert .com to .io for SDK endpoint
+        sdkEndpoint = config.apiEndpoint.replace('.com', '.io')
+      }
+
+      // Prepare config data for plugins
+      const configData = {
+        apiEndpoint: config?.apiEndpoint,
+        sdkEndpoint: sdkEndpoint,
+        queryPrefix: config?.queryPrefix || '_exp_',
+        persistQueryToCookie: config?.persistQueryToCookie ?? true,
+        injectSDK: config?.injectSDK ?? false,
+        sdkUrl: config?.sdkUrl || ''
+      }
+
+      debugLog('Sending custom code and config to SDK plugin:', { injectionData, configData })
+      sendResponse({
+        success: true,
+        data: injectionData,
+        config: configData
+      })
     }).catch(error => {
-      debugError('Error retrieving custom code:', error)
-      sendResponse({ 
-        success: false, 
-        error: error.message 
+      debugError('Error retrieving custom code or config:', error)
+      sendResponse({
+        success: false,
+        error: error.message
       })
     })
-    
+
     return true // Will respond asynchronously
   } else if (message.type === "CODE_EDITOR_SAVE" || message.type === "CODE_EDITOR_CLOSE") {
     // Forward these messages from content script to popup

@@ -59,11 +59,16 @@ export interface DOMChange {
 export interface ABsmartlyConfig {
   apiKey?: string
   apiEndpoint: string
+  sdkEndpoint?: string  // Optional SDK endpoint (defaults to apiEndpoint with .io)
   applicationName?: string  // Changed from applicationId to applicationName
   domChangesStorageType?: 'variable' | 'custom_field'
   domChangesFieldName?: string
   authMethod?: 'jwt' | 'apikey'  // New field for auth method preference
   sdkWindowProperty?: string  // Window property where SDK context is stored (e.g., 'ABsmartlyContext', 'window.sdk.context')
+  queryPrefix?: string  // Query parameter prefix for overrides (e.g., '_exp_')
+  persistQueryToCookie?: boolean  // Whether to persist query overrides to cookie
+  injectSDK?: boolean  // Whether to inject the ABsmartly SDK if not detected
+  sdkUrl?: string  // Custom SDK URL (defaults to https://sdk.absmartly.com/sdk.js)
 }
 
 export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'

@@ -14,26 +14,26 @@ function copyWithHash() {
     return;
   }
 
-  // Copy DOM Changes plugin - use development build for dev builds
+  // Copy SDK plugins bundle - use development build for dev builds
   const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-dom-changes-sdk-plugin', 'dist');
-  const pluginDevSource = path.join(sdkPluginDir, 'absmartly-dom-changes.dev.js');
-  const pluginProdSource = path.join(publicDir, 'absmartly-dom-changes.min.js');
-  
+  const pluginDevSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.dev.js');
+  const pluginProdSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.min.js');
+
   // Try to use dev build from SDK plugin repo, fallback to production build
   let pluginSource = pluginDevSource;
-  let pluginFilename = 'absmartly-dom-changes.dev.js';
-  
+  let pluginFilename = 'absmartly-sdk-plugins.dev.js';
+
   if (!fs.existsSync(pluginDevSource)) {
-    console.log('[Dev Build] SDK plugin dev build not found, using production build');
+    console.log('[Dev Build] SDK plugins dev build not found, using production build');
     pluginSource = pluginProdSource;
-    pluginFilename = 'absmartly-dom-changes.min.js';
+    pluginFilename = 'absmartly-sdk-plugins.min.js';
   }
-  
+
   if (fs.existsSync(pluginSource)) {
     const pluginDest = path.join(devBuildDir, pluginFilename);
     fs.copyFileSync(pluginSource, pluginDest);
     console.log(`[Dev Build] Copied ${pluginFilename}`);
-    
+
     // Also copy source map if using dev build
     if (pluginSource === pluginDevSource) {
       const mapSource = pluginDevSource + '.map';

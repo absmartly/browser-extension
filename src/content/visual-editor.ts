@@ -1,4 +1,5 @@
 import type { DOMChange } from '~src/types/dom-changes'
+import { generateRobustSelector } from '~src/utils/selector-generator'
 
 export interface VisualEditorOptions {
   variantName: string
@@ -31,20 +32,24 @@ export class VisualEditor {
   start() {
     console.log('[Visual Editor] Starting - Version:', this.VERSION)
     console.log('[Visual Editor] Build timestamp:', new Date().toISOString())
-    
+
     if (this.isActive) {
       console.log('[Visual Editor] Already active, returning')
       return
     }
-    
+
     this.isActive = true
     console.log('Visual Editor: Starting...')
+
+    // Preview mode is enabled by the DOMChangesInlineEditor before launching
+    // This ensures original values are captured
+
     this.injectStyles()
     this.createToolbar()
     this.setupEventListeners()
     this.startMutationObserver()
     this.makeElementsEditable()
-    
+
     // Show notification
     this.showNotification('Visual Editor Active', 'Click any element to edit')
     console.log('Visual Editor: Started successfully')
@@ -52,7 +57,7 @@ export class VisualEditor {
   
   stop() {
     if (!this.isActive) return
-    
+
     this.isActive = false
     this.removeEventListeners()
     this.stopMutationObserver()
@@ -60,9 +65,14 @@ export class VisualEditor {
     this.removeContextMenu()
     this.removeToolbar()
     this.removeStyles()
-    
+
     // Save final changes
     this.options.onChangesUpdate(this.changes)
+
+    // Send message to disable preview mode
+    chrome.runtime.sendMessage({
+      type: 'DISABLE_PREVIEW'
+    })
   }
   
   destroy() {
@@ -430,34 +440,42 @@ export class VisualEditor {
   
   private handleElementClick = (e: MouseEvent) => {
     if (!this.isActive) return
-    
+
     const target = e.target as HTMLElement
-    
+
     // CRITICAL: Check if this is an extension element FIRST before any other processing
     if (this.isExtensionElement(target)) {
       console.log('Visual Editor: Click on extension UI - ignoring completely')
       // Don't process this event at all
       return
     }
-    
+
+    // Check if we're currently editing an element
+    if (this.selectedElement && this.selectedElement.contentEditable === 'true') {
+      // Don't interfere with text editing - let the user click within the editable text
+      console.log('Visual Editor: Click within editable element - allowing normal text editing')
+      return
+    }
+
     console.log('Visual Editor: Click detected on page element', target)
-    
+
     // Now we know it's a page element, so prevent default and stop propagation
     e.preventDefault()
     e.stopPropagation()
-    
+
     // If clicking outside context menu, close it
     if (this.contextMenu) {
       this.removeContextMenu()
     }
-    
+
     // Don't select during certain operations
     if (target.contentEditable === 'true') return
-    
+
     // Select the element on normal click
     this.selectElement(target)
-    console.log('Visual Editor: Element selected', this.getSelector(target))
-    
+    const selector = this.getSelector(target)
+    console.log('Visual Editor: Element selected with selector:', selector)
+
     // Show context menu on selection
     this.showContextMenu(e.clientX, e.clientY)
   }
@@ -567,11 +585,14 @@ export class VisualEditor {
     console.log('[Visual Editor Debug] showContextMenu called - Version 2.1 with NEW menu items')
     console.log('[Visual Editor Debug] Build timestamp:', new Date().toISOString())
     this.removeContextMenu()
-    
+
     if (!this.selectedElement) {
       console.log('[Visual Editor Debug] No selected element, returning')
       return
     }
+
+    // Get the element's bounding rect for better positioning
+    const elementRect = this.selectedElement.getBoundingClientRect()
     
     // Create a blocking overlay that covers the entire page
     const overlay = document.createElement('div')
@@ -629,14 +650,45 @@ export class VisualEditor {
       }
     })
     this.contextMenu.innerHTML = menuHTML
-    
+
+    // Calculate optimal menu position
+    const menuWidth = 250  // Approximate menu width
+    const menuHeight = 500 // Approximate menu height
+    const padding = 10     // Padding from viewport edges
+
+    // Try to position menu next to the element, not at click position
+    let menuX = elementRect.right + 10  // Default: right of element
+    let menuY = elementRect.top
+
+    // If menu would go off right edge, place it to the left of element
+    if (menuX + menuWidth > window.innerWidth - padding) {
+      menuX = elementRect.left - menuWidth - 10
+    }
+
+    // If still off-screen (element too far left), position at click with constraints
+    if (menuX < padding) {
+      menuX = Math.min(x + 10, window.innerWidth - menuWidth - padding)
+      menuX = Math.max(padding, menuX)
+    }
+
+    // Vertical positioning - prefer aligning with element top
+    if (menuY + menuHeight > window.innerHeight - padding) {
+      // If menu would go off bottom, move it up
+      menuY = Math.max(padding, window.innerHeight - menuHeight - padding)
+    }
+
+    // Ensure menu is visible even for elements near the top
+    menuY = Math.max(padding, menuY)
+
     // Position the menu
     this.contextMenu.style.cssText = `
       position: fixed !important;
-      left: ${Math.min(x, window.innerWidth - 220)}px !important;
-      top: ${Math.min(y, window.innerHeight - 400)}px !important;
+      left: ${menuX}px !important;
+      top: ${menuY}px !important;
       z-index: 2147483647 !important;
       pointer-events: auto !important;
+      max-height: ${window.innerHeight - padding * 2}px !important;
+      overflow-y: auto !important;
     `
     
     // Add the menu to the overlay
@@ -1012,49 +1064,66 @@ export class VisualEditor {
   
   private startTextEditing() {
     if (!this.selectedElement) return
-    
+
     // Store original value
     if (!this.originalValues.has(this.selectedElement)) {
       this.originalValues.set(this.selectedElement, {
         text: this.selectedElement.textContent
       })
     }
-    
+
+    // Remove context menu before starting edit
+    this.removeContextMenu()
+
     this.selectedElement.contentEditable = 'true'
     this.selectedElement.classList.add('absmartly-editing')
     this.selectedElement.focus()
-    
+
     // Select all text
     const range = document.createRange()
     range.selectNodeContents(this.selectedElement)
     const selection = window.getSelection()
     selection?.removeAllRanges()
     selection?.addRange(range)
-    
+
     // Handle when editing ends
     const handleBlur = () => {
       if (!this.selectedElement) return
-      
+
       this.selectedElement.contentEditable = 'false'
       this.selectedElement.classList.remove('absmartly-editing')
-      
-      // Track the change
+
+      // Track the change with unique selector
       const newText = this.selectedElement.textContent || ''
       const original = this.originalValues.get(this.selectedElement)
-      
+
       if (original && original.text !== newText) {
+        const uniqueSelector = this.getSelector(this.selectedElement)
+        console.log('[Visual Editor] Saving text change with unique selector:', uniqueSelector)
+
         this.addChange({
-          selector: this.getSelector(this.selectedElement),
+          selector: uniqueSelector,
           type: 'text',
           value: newText,
+          originalText: original.text,  // Store original text for restoration
           enabled: true
         })
       }
-      
+
       this.selectedElement.removeEventListener('blur', handleBlur)
+      this.selectedElement.removeEventListener('keydown', handleKeyDown)
     }
-    
+
+    // Handle Enter key to finish editing
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        this.selectedElement?.blur()
+      }
+    }
+
     this.selectedElement.addEventListener('blur', handleBlur)
+    this.selectedElement.addEventListener('keydown', handleKeyDown)
   }
   
   private startHTMLEditing() {
@@ -1103,6 +1172,7 @@ export class VisualEditor {
           selector: this.getSelector(this.selectedElement),
           type: 'html',
           value: newHTML,
+          originalHtml: originalHTML,  // Store original HTML for restoration
           enabled: true
         })
       }
@@ -1262,10 +1332,10 @@ export class VisualEditor {
   
   private addChange(change: DOMChange) {
     // Check if we already have a change for this selector and type
-    const existingIndex = this.changes.findIndex(c => 
+    const existingIndex = this.changes.findIndex(c =>
       c.selector === change.selector && c.type === change.type
     )
-    
+
     if (existingIndex >= 0) {
       // Update existing change
       if (change.type === 'style' && this.changes[existingIndex].type === 'style') {
@@ -1281,19 +1351,19 @@ export class VisualEditor {
       // Add new change
       this.changes.push(change)
     }
-    
+
     this.updateToolbar()
     this.options.onChangesUpdate(this.changes)
+
+    // Changes are already being saved and will be applied when preview re-enables
   }
   
   private undoLastChange() {
     if (this.changes.length === 0) return
-    
+
     this.changes.pop()
     this.updateToolbar()
     this.options.onChangesUpdate(this.changes)
-    
-    // TODO: Actually revert the visual change
     this.showNotification('Undo', 'Last change has been undone')
   }
   
@@ -1302,8 +1372,6 @@ export class VisualEditor {
       this.changes = []
       this.updateToolbar()
       this.options.onChangesUpdate(this.changes)
-      
-      // TODO: Revert all visual changes
       this.showNotification('Cleared', 'All changes have been cleared')
     }
   }
@@ -1311,6 +1379,11 @@ export class VisualEditor {
   private saveChanges() {
     this.options.onChangesUpdate(this.changes)
     this.showNotification('Saved', `${this.changes.length} changes saved`)
+
+    // Send message to disable preview (returning to original state)
+    chrome.runtime.sendMessage({
+      type: 'DISABLE_PREVIEW'
+    })
   }
   
   private showNotification(title: string, message: string) {
@@ -1325,44 +1398,176 @@ export class VisualEditor {
   }
   
   private getSelector(element: HTMLElement): string {
-    if (element.id) {
-      return `#${element.id}`
+    // First generate a robust selector
+    let selector = generateRobustSelector(element)
+    console.log(`[Visual Editor] Initial selector from generateRobustSelector: "${selector}"`)
+
+    // Check if this selector matches multiple elements
+    try {
+      const matches = document.querySelectorAll(selector)
+      console.log(`[Visual Editor] Selector matches ${matches.length} element(s)`)
+
+      if (matches.length > 1) {
+        console.log(`[Visual Editor] Selector "${selector}" matches ${matches.length} elements, making it unique...`)
+
+        // Find the index of our specific element among the matches
+        let elementIndex = -1
+        for (let i = 0; i < matches.length; i++) {
+          if (matches[i] === element) {
+            elementIndex = i
+            break
+          }
+        }
+
+        console.log(`[Visual Editor] Element is at index ${elementIndex} among matches`)
+
+        if (elementIndex !== -1) {
+          // Try to make the selector unique using nth-of-type or nth-child
+          const uniqueSelector = this.makeUniqueSelector(element, selector, elementIndex + 1)
+          console.log(`[Visual Editor] Generated unique selector: "${uniqueSelector}"`)
+
+          // Verify the unique selector works
+          try {
+            const uniqueMatches = document.querySelectorAll(uniqueSelector)
+            console.log(`[Visual Editor] Unique selector matches ${uniqueMatches.length} element(s)`)
+
+            if (uniqueMatches.length === 1 && uniqueMatches[0] === element) {
+              console.log(`[Visual Editor] ✅ Successfully created unique selector: "${uniqueSelector}"`)
+              return uniqueSelector
+            } else {
+              console.log(`[Visual Editor] ⚠️ Unique selector didn't work as expected`)
+            }
+          } catch (e) {
+            console.error('[Visual Editor] Error testing unique selector:', e)
+          }
+        }
+
+        // If we couldn't make it unique with nth-selectors, try with more parent context
+        console.log('[Visual Editor] Trying to build more specific selector with parent context...')
+        const contextualSelector = this.buildMoreSpecificSelector(element)
+        if (contextualSelector) {
+          console.log(`[Visual Editor] Built contextual selector: "${contextualSelector}"`)
+
+          try {
+            const contextMatches = document.querySelectorAll(contextualSelector)
+            console.log(`[Visual Editor] Contextual selector matches ${contextMatches.length} element(s)`)
+
+            if (contextMatches.length === 1 && contextMatches[0] === element) {
+              console.log(`[Visual Editor] ✅ Successfully created unique contextual selector: "${contextualSelector}"`)
+              return contextualSelector
+            }
+          } catch (e) {
+            console.error('[Visual Editor] Error testing contextual selector:', e)
+          }
+        }
+      } else {
+        console.log(`[Visual Editor] Selector is already unique, using: "${selector}"`)
+      }
+    } catch (e) {
+      console.error('[Visual Editor] Error checking selector uniqueness:', e)
     }
-    
+
+    console.log(`[Visual Editor] Returning final selector: "${selector}"`)
+    return selector
+  }
+
+  private makeUniqueSelector(element: HTMLElement, baseSelector: string, position: number): string {
+    // Try different nth-pseudo-class strategies
+
+    // 1. Try nth-of-type if the element has siblings of the same type
+    const parent = element.parentElement
+    if (parent) {
+      const sameTypeSiblings = Array.from(parent.children).filter(child =>
+        child.tagName === element.tagName
+      )
+
+      if (sameTypeSiblings.length > 1) {
+        const typePosition = sameTypeSiblings.indexOf(element) + 1
+        if (typePosition > 0) {
+          // For nth-of-type, we need to append it to the tag name part of the selector
+          const tagName = element.tagName.toLowerCase()
+
+          // If selector already has the tag name, append nth-of-type to it
+          if (baseSelector.includes(tagName)) {
+            return baseSelector.replace(
+              new RegExp(`(${tagName}(?:\\.[\\w-]+|\\[[^\\]]+\\])*)`, 'i'),
+              `$1:nth-of-type(${typePosition})`
+            )
+          } else {
+            // Otherwise append to the whole selector
+            return `${baseSelector}:nth-of-type(${typePosition})`
+          }
+        }
+      }
+
+      // 2. Try nth-child as fallback
+      const allSiblings = Array.from(parent.children)
+      const childPosition = allSiblings.indexOf(element) + 1
+      if (childPosition > 0) {
+        return `${baseSelector}:nth-child(${childPosition})`
+      }
+    }
+
+    // 3. If nothing else works, try using the position in the matched set
+    return `${baseSelector}:nth-of-type(${position})`
+  }
+
+  private buildMoreSpecificSelector(element: HTMLElement): string | null {
+    // Build a more specific selector by including more parent context
     const path: string[] = []
     let current: HTMLElement | null = element
-    
-    while (current && current !== document.body) {
+    let depth = 0
+    const maxDepth = 4 // Look up to 4 levels
+
+    while (current && depth < maxDepth) {
       let selector = current.tagName.toLowerCase()
-      
-      const className = typeof current.className === 'string' 
-        ? current.className 
-        : current.className?.baseVal || ''
-      
-      if (className) {
-        const classes = className.split(' ').filter(c => 
-          c && !c.includes('absmartly')
-        )
+
+      // Add ID if available and not auto-generated
+      if (current.id && !/^\d/.test(current.id) && current.id.length < 30) {
+        selector = `#${CSS.escape(current.id)}`
+        path.unshift(selector)
+        break // ID should be unique enough
+      }
+
+      // Add semantic classes
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\s+/).filter(cls => {
+          // Filter out auto-generated and temporary classes
+          return cls &&
+                 cls.length < 20 &&
+                 !/^(framer-|css-|sc-|v-|svelte-|emotion-)/.test(cls) &&
+                 !/^(hover|active|focus|selected|loading)/.test(cls)
+        })
+
         if (classes.length > 0) {
-          selector += '.' + classes.join('.')
+          selector += '.' + classes.map(cls => CSS.escape(cls)).join('.')
         }
       }
-      
-      // Add nth-child if needed
+
+      // Add position if there are siblings
       const parent = current.parentElement
       if (parent) {
-        const siblings = Array.from(parent.children)
-        const index = siblings.indexOf(current)
-        if (siblings.filter(s => s.tagName === current!.tagName).length > 1) {
-          selector += `:nth-child(${index + 1})`
+        const siblings = Array.from(parent.children).filter(child =>
+          child.tagName === current!.tagName
+        )
+
+        if (siblings.length > 1) {
+          const position = siblings.indexOf(current) + 1
+          selector += `:nth-of-type(${position})`
         }
       }
-      
+
       path.unshift(selector)
       current = current.parentElement
+      depth++
     }
-    
+
     return path.join(' > ')
+  }
+
+  // Alias for backward compatibility if needed
+  private generateSelector(element: HTMLElement): string {
+    return this.getSelector(element)
   }
   
   private isExtensionElement(element: HTMLElement): boolean {
@@ -1429,7 +1634,10 @@ export class VisualEditor {
   
   private startElementEditing() {
     if (!this.selectedElement) return
-    
+
+    // Remove context menu before starting edit
+    this.removeContextMenu()
+
     // Show a comprehensive edit dialog with all properties
     const editDialog = document.createElement('div')
     editDialog.style.cssText = `
@@ -1482,10 +1690,22 @@ export class VisualEditor {
         const fontSizeInput = document.getElementById('edit-font-size') as HTMLInputElement
         
         if (textInput.value !== element.textContent) {
+          // Store original text if not already stored
+          if (!this.originalValues.has(element)) {
+            this.originalValues.set(element, {
+              text: element.textContent
+            })
+          }
+          const original = this.originalValues.get(element)
+
+          const uniqueSelector = this.getSelector(element)
+          console.log('[Visual Editor] Saving element edit with unique selector:', uniqueSelector)
+
           this.addChange({
-            selector: this.getSelector(element),
+            selector: uniqueSelector,
             type: 'text',
             value: textInput.value,
+            originalText: original?.text || element.textContent,  // Store original text for restoration
             enabled: true
           })
           element.textContent = textInput.value
@@ -1597,11 +1817,14 @@ export class VisualEditor {
     // Convert rgb(r, g, b) to #rrggbb
     const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)
     if (!match) return '#000000'
-    
+
     const r = parseInt(match[1]).toString(16).padStart(2, '0')
     const g = parseInt(match[2]).toString(16).padStart(2, '0')
     const b = parseInt(match[3]).toString(16).padStart(2, '0')
-    
+
     return `#${r}${g}${b}`
   }
+
+  // Preview mode is managed by the DOMChangesInlineEditor
+  // Visual editor just updates changes which are automatically applied
 }

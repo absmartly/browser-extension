@@ -4,8 +4,18 @@ import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
 import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
-import { type ExperimentOverrides, initializeOverrides, saveOverrides, reloadPageWithOverrides } from '~src/utils/overrides'
+import {
+  type ExperimentOverrides,
+  type OverrideValue,
+  ENV_TYPE,
+  initializeOverrides,
+  saveOverrides,
+  reloadPageWithOverrides,
+  saveDevelopmentEnvironment,
+  getDevelopmentEnvironment
+} from '~src/utils/overrides'
 import { getCurrentVariantAssignments, type VariantAssignments, type SDKVariantData } from '~src/utils/sdk-bridge'
+import { getConfig } from '~src/utils/storage'
 
 interface ExperimentListProps {
   experiments: Experiment[]
@@ -20,10 +30,56 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
   const [showReloadBanner, setShowReloadBanner] = useState(false)
   const [realVariants, setRealVariants] = useState<VariantAssignments>({})
   const [experimentsInContext, setExperimentsInContext] = useState<string[]>([])
+  const [developmentEnv, setDevelopmentEnv] = useState<string | null>(null)
+  const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
 
-  // Initialize overrides on mount (loads from storage and syncs to cookie)
+  // Initialize overrides and fetch environments on mount
   useEffect(() => {
-    initializeOverrides().then(setOverrides)
+    const init = async () => {
+      // Get config for field name
+      const config = await getConfig()
+      const fieldName = config?.domChangesFieldName || '__dom_changes'
+      setDomFieldName(fieldName)
+
+      // Load overrides
+      const loadedOverrides = await initializeOverrides()
+      setOverrides(loadedOverrides)
+
+      // Check if we have a stored dev environment, if not fetch and store it
+      let devEnv = await getDevelopmentEnvironment()
+      if (!devEnv) {
+        try {
+          // Fetch environments from API
+          const endpoint = localStorage.getItem('absmartly-endpoint')
+          const apiKey = localStorage.getItem('absmartly-apikey')
+          const authMethod = localStorage.getItem('absmartly-auth-method') || 'apikey'
+
+          if (endpoint) {
+            const { ABsmartlyClient } = await import('~src/lib/absmartly-client')
+            const client = new ABsmartlyClient({
+              apiEndpoint: endpoint,
+              apiKey: apiKey || '',
+              authMethod: authMethod as 'apikey' | 'jwt'
+            })
+
+            const environments = await client.getEnvironments()
+            debugLog('Fetched environments:', environments)
+
+            // Find first development environment
+            const firstDevEnv = environments.find(env => env.type === 'development')
+            if (firstDevEnv) {
+              devEnv = firstDevEnv.name
+              await saveDevelopmentEnvironment(firstDevEnv.name)
+              debugLog('Saved development environment:', firstDevEnv.name)
+            }
+          }
+        } catch (error) {
+          debugWarn('Failed to fetch environments:', error)
+        }
+      }
+      setDevelopmentEnv(devEnv)
+    }
+    init()
   }, [])
   
   // Get real variant assignments from SDK
@@ -36,31 +92,58 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         debugLog('SDK data:', data)
         
         // Check if any existing overrides differ from real variants
-        const hasActiveOverrides = Object.entries(overrides).some(([expName, overrideVariant]) => {
-          return data.assignments[expName] !== overrideVariant
+        const hasActiveOverrides = Object.entries(overrides).some(([expName, overrideValue]) => {
+          const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
+          return data.assignments[expName] !== variant
         })
         setShowReloadBanner(hasActiveOverrides)
       })
     }
   }, [experiments, overrides])
 
-  const handleOverrideChange = async (experimentName: string, variantIndex: number) => {
+  const handleOverrideChange = async (experimentName: string, variantIndex: number, experiment: Experiment) => {
     const newOverrides = { ...overrides }
     if (variantIndex === -1) {
       delete newOverrides[experimentName]
     } else {
-      newOverrides[experimentName] = variantIndex
+      // Determine environment type based on experiment status
+      const status = experiment.state || experiment.status || 'created'
+      let overrideValue: number | OverrideValue = variantIndex
+      console.log('[ABsmartly] handleOverrideChange - experiment:', experimentName, 'status:', status, 'variantIndex:', variantIndex)
+
+      if (status === 'development') {
+        // Development experiments need env flag and ID
+        overrideValue = {
+          variant: variantIndex,
+          env: ENV_TYPE.DEVELOPMENT,
+          id: experiment.id
+        }
+        console.log('[ABsmartly] Setting development override:', overrideValue)
+      } else if (status !== 'running' && status !== 'running_not_full_on' && status !== 'full_on') {
+        // Non-running experiments (draft, stopped, etc) need API fetch flag and ID
+        overrideValue = {
+          variant: variantIndex,
+          env: ENV_TYPE.API_FETCH,
+          id: experiment.id
+        }
+        console.log('[ABsmartly] Setting non-running override:', overrideValue)
+      }
+      // Running experiments just use the variant number (no env or ID needed)
+
+      newOverrides[experimentName] = overrideValue
     }
+    console.log('[ABsmartly] New overrides to save:', newOverrides)
     setOverrides(newOverrides)
-    
+
     // Save to storage and sync to cookie
     await saveOverrides(newOverrides)
-    
+
     // Check if any overrides differ from real variants
-    const hasActiveOverrides = Object.entries(newOverrides).some(([expName, overrideVariant]) => {
-      return realVariants[expName] !== overrideVariant
+    const hasActiveOverrides = Object.entries(newOverrides).some(([expName, overrideValue]) => {
+      const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
+      return realVariants[expName] !== variant
     })
-    
+
     // Only show reload banner if there are active overrides that differ from real variants
     setShowReloadBanner(hasActiveOverrides)
   }
@@ -76,8 +159,8 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       try {
         if (!variant.config) return
         const config = typeof variant.config === 'string' ? JSON.parse(variant.config) : variant.config
-        if (config.dom_changes && Array.isArray(config.dom_changes)) {
-          totalChanges += config.dom_changes.length
+        if (config[domFieldName] && Array.isArray(config[domFieldName])) {
+          totalChanges += config[domFieldName].length
         }
       } catch {
         // ignore
@@ -442,7 +525,9 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                       <div className="inline-flex items-center gap-1.5">
                         <div className="inline-flex rounded-md shadow-sm" role="group">
                           {experiment.variants.map((variant, idx) => {
-                            const isOverridden = overrides[experiment.name] === idx
+                            const overrideValue = overrides[experiment.name]
+                            const overriddenVariant = typeof overrideValue === 'number' ? overrideValue : overrideValue?.variant
+                            const isOverridden = overriddenVariant === idx
                             const isRealVariant = realVariants[experiment.name] === idx
                             const hasRealVariant = realVariants[experiment.name] !== undefined
                             const experimentInContext = experimentsInContext.includes(experiment.name)
@@ -486,12 +571,12 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                                     // If clicking the real variant while override exists, remove override
                                     // If clicking any other variant, set override
                                     if (isRealVariant && overrides[experiment.name] !== undefined) {
-                                      handleOverrideChange(experiment.name, -1)
+                                      handleOverrideChange(experiment.name, -1, experiment)
                                     } else if (!isOverridden) {
-                                      handleOverrideChange(experiment.name, idx)
+                                      handleOverrideChange(experiment.name, idx, experiment)
                                     } else {
                                       // Clicking active override removes it
-                                      handleOverrideChange(experiment.name, -1)
+                                      handleOverrideChange(experiment.name, -1, experiment)
                                     }
                                   }}
                                   className={buttonClass}
