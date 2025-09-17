@@ -25,10 +25,11 @@ export class BackgroundAPIClient {
     return response.data
   }
   
-  async openLogin(): Promise<void> {
-    await chrome.runtime.sendMessage({
+  async openLogin(): Promise<{ authenticated?: boolean }> {
+    const response = await chrome.runtime.sendMessage({
       type: 'OPEN_LOGIN'
     })
+    return response || {}
   }
   
   async getExperiments(params?: any): Promise<{experiments: Experiment[], total?: number, hasMore?: boolean}> {
