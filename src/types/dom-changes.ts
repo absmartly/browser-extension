@@ -29,6 +29,7 @@ export interface DOMChangeText {
   selector: string;
   type: 'text';
   value: string;
+  originalText?: string; // Store original text for restoration when preview is removed
   enabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
@@ -59,6 +60,7 @@ export interface DOMChangeHTML {
   selector: string;
   type: 'html';
   value: string;
+  originalHtml?: string; // Store original HTML for restoration when preview is removed
   enabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
