@@ -381,12 +381,8 @@ const DOMChangeEditor = ({
               value={localChange.selector}
               onChange={(e) => setLocalChange({ ...localChange, selector: e.target.value })}
               placeholder=".cta-button, #header, [data-test='submit']"
-              className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
-              style={{ caretColor: 'black' }}
+              className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
             />
-            <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden whitespace-nowrap">
-              {highlightCSSSelector(localChange.selector)}
-            </div>
           </div>
           <Button
             type="button"
@@ -646,12 +642,8 @@ const DOMChangeEditor = ({
                   value={localChange.targetSelector || ''}
                   onChange={(e) => setLocalChange({ ...localChange, targetSelector: e.target.value })}
                   placeholder=".target-container, #sidebar"
-                  className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'targetSelector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
-                  style={{ caretColor: 'black' }}
+                  className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'targetSelector' ? 'border-blue-500' : 'border-gray-300'}`}
                 />
-                <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden whitespace-nowrap">
-                  {highlightCSSSelector(localChange.targetSelector || '')}
-                </div>
               </div>
               <Button
                 type="button"
@@ -1308,6 +1300,68 @@ export function DOMChangesInlineEditor({
   //   debugLog('🔄 editingChange state updated:', editingChange)
   // }, [editingChange])
 
+  // Start element picker
+  const startElementPicker = async (field: string) => {
+    debugLog('Starting element picker for field:', field)
+    setPickingForField(field)
+
+    // Save current state to storage
+    const storage = new Storage({ area: "session" })
+    await storage.set('domChangesInlineState', {
+      variantName,
+      editingChange,
+      pickingForField: field
+    })
+    debugLog('Saved state to storage')
+
+    // Start element picker
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      debugLog('Found tabs:', tabs)
+      if (tabs[0]?.id) {
+        const tabId = tabs[0].id
+        const tabUrl = tabs[0].url || 'unknown'
+
+        debugLog('Current tab URL:', tabUrl)
+
+        // Check if this is a restricted page
+        if (tabUrl.startsWith('chrome://') ||
+            tabUrl.startsWith('chrome-extension://') ||
+            tabUrl.startsWith('edge://') ||
+            tabUrl.includes('chrome.google.com/webstore')) {
+          debugError('Content scripts cannot run on this page. Please try on a regular website.')
+          alert('Element picker cannot run on this page.\n\nPlease navigate to a regular website and try again.')
+          setPickingForField(null)
+          return
+        }
+
+        debugLog('Sending START_ELEMENT_PICKER to tab:', tabId)
+
+        // First test if content script is loaded
+        chrome.tabs.sendMessage(tabId, {
+          type: 'TEST_CONNECTION'
+        }, (testResponse) => {
+          if (chrome.runtime.lastError) {
+            debugError('Content script not responding to test:', chrome.runtime.lastError)
+            debugLog('Content script is not loaded. Please refresh the page and try again.')
+            return
+          }
+          debugLog('Test connection successful:', testResponse)
+
+          // Now send the actual element picker message
+          chrome.tabs.sendMessage(tabId, {
+            type: 'START_ELEMENT_PICKER'
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              debugError('Error starting element picker:', chrome.runtime.lastError)
+            } else {
+              debugLog('Element picker started successfully:', response)
+            }
+          })
+        })
+      }
+    })
+  }
+
   // Restore state when component mounts
   useEffect(() => {
     const storage = new Storage({ area: "session" })
@@ -1397,23 +1451,21 @@ export function DOMChangesInlineEditor({
         debugLog('Found visual editor changes for this variant!')
         if (visualEditorResult.changes && visualEditorResult.changes.length > 0) {
           // Merge visual editor changes with existing changes
-          setChanges(prevChanges => {
-            const merged = [...prevChanges]
-            for (const change of visualEditorResult.changes) {
-              // Check if this change already exists
-              const existingIndex = merged.findIndex(c => 
-                c.type === change.type && c.selector === change.selector
-              )
-              if (existingIndex >= 0) {
-                // Update existing change
-                merged[existingIndex] = change
-              } else {
-                // Add new change
-                merged.push(change)
-              }
+          const merged = [...changes]
+          for (const change of visualEditorResult.changes) {
+            // Check if this change already exists
+            const existingIndex = merged.findIndex(c =>
+              c.type === change.type && c.selector === change.selector
+            )
+            if (existingIndex >= 0) {
+              // Update existing change
+              merged[existingIndex] = change
+            } else {
+              // Add new change
+              merged.push(change)
             }
-            return merged
-          })
+          }
+          onChange(merged)
           
           // Clear visual editor changes after using them
           storage.remove('visualEditorChanges')
@@ -1665,9 +1717,8 @@ export function DOMChangesInlineEditor({
         }
         
         // Send message to start drag-drop picker
-        chrome.tabs.sendMessage(tabId, { 
-          type: 'START_DRAG_DROP_PICKER',
-          fromPopup: true
+        chrome.tabs.sendMessage(tabId, {
+          type: 'START_DRAG_DROP_PICKER'
         }, (response) => {
           if (chrome.runtime.lastError) {
             debugError('Error starting drag-drop picker:', chrome.runtime.lastError)
@@ -1720,9 +1771,8 @@ export function DOMChangesInlineEditor({
         
         // Send a test message first to check if content script is responding
         debugLog('Sending test message to content script...')
-        chrome.tabs.sendMessage(tabId, { 
-          type: 'TEST_CONNECTION',
-          fromPopup: true
+        chrome.tabs.sendMessage(tabId, {
+          type: 'TEST_CONNECTION'
         }, (testResponse) => {
           if (chrome.runtime.lastError) {
             debugError('Content script not responding to test:', chrome.runtime.lastError)
@@ -1732,9 +1782,8 @@ export function DOMChangesInlineEditor({
           debugLog('Test connection successful:', testResponse)
           
           // Now send the actual element picker message
-          chrome.tabs.sendMessage(tabId, { 
-            type: 'START_ELEMENT_PICKER',
-            fromPopup: true
+          chrome.tabs.sendMessage(tabId, {
+            type: 'START_ELEMENT_PICKER'
           }, (response) => {
             if (chrome.runtime.lastError) {
               debugError('Error starting element picker:', chrome.runtime.lastError)
@@ -2461,7 +2510,10 @@ export function DOMChangesInlineEditor({
                       <div className="flex-1 min-w-0">
                         {/* Selector with smaller font */}
                         <div className="mb-1.5">
-                          <code className="text-xs font-mono text-gray-700">
+                          <code
+                            className="text-xs font-mono text-gray-700 block truncate"
+                            title={change.selector}
+                          >
                             {change.selector}
                           </code>
                         </div>

@@ -1056,15 +1056,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     // Clear visual editor state
                     window.__absmartlyVisualEditorActive = false
 
-                    // Show preview header again if it exists
-                    const previewHeader = document.getElementById('absmartly-preview-header')
-                    if (previewHeader) {
-                      previewHeader.style.display = ''
-                    }
-
+                    // Send message that visual editor is closed
+                    // The content script will handle showing the preview header
                     window.postMessage({
                       source: 'absmartly-visual-editor',
-                      type: 'VISUAL_EDITOR_CLOSED'
+                      type: 'VISUAL_EDITOR_CLOSED',
+                      experimentName: experimentName,
+                      variantName: variantName
                     }, '*')
 
                     console.log('[ABSmartly] Visual editor cleaned up and closed')
@@ -1088,6 +1086,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     .absmartly-selected {
                       outline: 3px solid #10b981 !important;
                       position: relative !important;
+                    }
+                    .absmartly-editing {
+                      outline: 2px solid #10b981 !important;
+                      overflow: visible !important;
+                      text-overflow: clip !important;
+                      white-space: normal !important;
+                      word-wrap: break-word !important;
+                      min-height: auto !important;
                     }
                     @keyframes slideIn {
                       from {
@@ -1522,6 +1528,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                         // Remove selection styling while editing
                         element.classList.remove('absmartly-selected')
+                        element.classList.add('absmartly-editing')
                         element.contentEditable = 'true'
                         element.focus()
 
@@ -1536,6 +1543,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         
                         const handleBlur = () => {
                           element.contentEditable = 'false'
+                          element.classList.remove('absmartly-editing')
                           element.classList.add('absmartly-selected')
                           isEditing = false
                           element.removeEventListener('blur', handleBlur)
@@ -1798,6 +1806,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         
                       case 'inlineEdit':
                         // Quick inline text editing
+                        element.classList.add('absmartly-editing')
                         element.contentEditable = 'true'
                         element.focus()
                         const inlineRange = document.createRange()
@@ -1809,6 +1818,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         
                         const finishInlineEdit = () => {
                           element.contentEditable = 'false'
+                          element.classList.remove('absmartly-editing')
                           isEditing = false
                           trackChange('edit', element, { 
                             oldText: originalState.html,
@@ -3066,6 +3076,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                       }
                     }
 
+                    // Check for data attributes (but skip ABSmartly-added ones)
+                    const dataAttrs = Array.from(element.attributes)
+                      .filter(attr => {
+                        return attr.name.startsWith('data-') &&
+                               !attr.name.startsWith('data-absmartly') &&
+                               attr.value &&
+                               attr.value.length < 50 &&
+                               !attr.value.includes('"') &&
+                               !attr.value.includes("'")
+                      })
+
+                    // Prefer certain data attributes that are commonly used for testing
+                    const preferredDataAttrs = ['data-testid', 'data-test', 'data-cy', 'data-id', 'data-name']
+                    const preferredAttr = dataAttrs.find(attr => preferredDataAttrs.includes(attr.name))
+
+                    if (preferredAttr) {
+                      const dataSelector = '[' + preferredAttr.name + '="' + preferredAttr.value + '"]'
+                      try {
+                        const matches = document.querySelectorAll(dataSelector)
+                        if (matches.length === 1 && matches[0] === element) {
+                          console.log('[ABSmartly] Using data attribute selector:', dataSelector)
+                          return dataSelector
+                        }
+                      } catch (e) {
+                        console.log('[ABSmartly] Invalid data selector:', dataSelector, e)
+                      }
+                    }
+
+                    // Try any other data attribute if no preferred one works
+                    for (const attr of dataAttrs) {
+                      const dataSelector = '[' + attr.name + '="' + attr.value + '"]'
+                      try {
+                        const matches = document.querySelectorAll(dataSelector)
+                        if (matches.length === 1 && matches[0] === element) {
+                          console.log('[ABSmartly] Using data attribute selector:', dataSelector)
+                          return dataSelector
+                        }
+                      } catch (e) {
+                        console.log('[ABSmartly] Invalid data selector:', dataSelector, e)
+                      }
+                    }
+
                     // Check for semantic classes
                     if (element.className && typeof element.className === 'string') {
                       const classes = element.className.split(' ')
@@ -3087,57 +3139,447 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     }
 
                     // Build selector using parent chain if no good ID or class
-                    let path = []
+                    // First, collect the element path from target to root
+                    let pathElements = []
                     let current = element
+                    const maxDepth = 10
 
-                    while (current && current !== document.body && path.length < 3) {
-                      let selector = current.tagName.toLowerCase()
-
-                      // Check if this element has a good ID
-                      if (current.id && !isAutoGenerated(current.id)) {
-                        path.unshift('#' + current.id)
-                        break
-                      }
-
-                      // Always add index if there are multiple siblings of same type
-                      if (current.parentElement) {
-                        const siblings = Array.from(current.parentElement.children)
-                          .filter(child => child.tagName === current.tagName)
-                        if (siblings.length > 1) {
-                          const index = siblings.indexOf(current) + 1
-                          selector += ':nth-of-type(' + index + ')'
-                        }
-                      }
-
-                      path.unshift(selector)
+                    while (current && current !== document.body && current !== document.documentElement && pathElements.length < maxDepth) {
+                      pathElements.push(current)
                       current = current.parentElement
                     }
 
-                    const finalSelector = path.join(' > ')
-                    console.log('[ABSmartly] Final selector:', finalSelector)
-                    return finalSelector
+                    // Try to find the minimal unique selector
+                    // First check if element itself has a unique ID
+                    if (element.id && !isAutoGenerated(element.id)) {
+                      const idMatches = document.querySelectorAll('#' + element.id)
+                      if (idMatches.length === 1) {
+                        console.log('[ABSmartly] Element has unique ID:', element.id)
+                        return '#' + element.id
+                      }
+                    }
+
+                    // Look for the closest element with an ID (even if duplicate) and build minimal path
+                    for (let i = 0; i < pathElements.length; i++) {
+                      const elem = pathElements[i]
+
+                      if (elem.id && !isAutoGenerated(elem.id)) {
+                        // Found an ID, try to build selector from here
+                        let selector = '#' + elem.id
+
+                        // Add minimal path from this ID to target
+                        if (i > 0) {
+                          // Check if we need intermediate elements
+                          let minimalPath = []
+
+                          // First try direct child selector
+                          if (i === 1) {
+                            // Direct child
+                            minimalPath = [pathElements[0].tagName.toLowerCase()]
+                          } else {
+                            // Try with just the target element tag
+                            minimalPath = [pathElements[0].tagName.toLowerCase()]
+                            let testSel = selector + ' ' + minimalPath.join(' > ')
+                            let testMatches = document.querySelectorAll(testSel)
+
+                            if (testMatches.length !== 1 || testMatches[0] !== element) {
+                              // Need more specificity, add immediate parent
+                              minimalPath = []
+                              for (let j = i - 1; j >= 0; j--) {
+                                const pathElem = pathElements[j]
+                                if (pathElem.id && !isAutoGenerated(pathElem.id)) {
+                                  minimalPath.push('#' + pathElem.id)
+                                  break
+                                } else {
+                                  minimalPath.push(pathElem.tagName.toLowerCase())
+                                }
+                              }
+                            }
+                          }
+
+                          selector = selector + ' > ' + minimalPath.join(' > ')
+                        }
+
+                        // Test if this selector is unique
+                        const matches = document.querySelectorAll(selector)
+                        if (matches.length === 1 && matches[0] === element) {
+                          console.log('[ABSmartly] Found minimal selector with ID:', selector)
+                          return selector
+                        }
+
+                        // If not unique, we need parent context
+                        // Find the minimal parent that makes it unique
+                        for (let parentIdx = i + 1; parentIdx < pathElements.length; parentIdx++) {
+                          const parent = pathElements[parentIdx]
+                          let parentSelector = ''
+
+                          if (parent.id && !isAutoGenerated(parent.id)) {
+                            parentSelector = '#' + parent.id
+                          } else {
+                            // Build path from this parent
+                            continue
+                          }
+
+                          const fullSelector = parentSelector + ' ' + selector
+                          const fullMatches = document.querySelectorAll(fullSelector)
+
+                          if (fullMatches.length === 1 && fullMatches[0] === element) {
+                            console.log('[ABSmartly] Made unique with parent context:', fullSelector)
+                            return fullSelector
+                          }
+                        }
+                      }
+                    }
+
+                    // Try with minimal tag path, but always include parent IDs for context
+                    for (let startDepth = 1; startDepth <= pathElements.length; startDepth++) {
+                      let basePath = []
+                      let foundId = false
+
+                      for (let i = startDepth - 1; i >= 0; i--) {
+                        const elem = pathElements[i]
+
+                        // If we find a parent with ID, use it as anchor
+                        if (elem.id && !isAutoGenerated(elem.id)) {
+                          basePath.unshift('#' + elem.id)
+                          foundId = true
+                          // Add remaining path to target
+                          for (let j = i - 1; j >= 0; j--) {
+                            basePath.push(pathElements[j].tagName.toLowerCase())
+                          }
+                          break
+                        } else {
+                          basePath.unshift(elem.tagName.toLowerCase())
+                        }
+                      }
+
+                      const selector = basePath.join(' > ')
+                      const matches = document.querySelectorAll(selector)
+
+                      if (matches.length === 1 && matches[0] === element) {
+                        // Don't accept single tag selectors - too brittle!
+                        if (!selector.includes('#') && !selector.includes('>') && !selector.includes('[')) {
+                          console.log('[ABSmartly] Single tag selector too brittle, continuing search:', selector)
+                          continue
+                        }
+                        console.log('[ABSmartly] Found unique selector with context:', selector)
+                        return selector
+                      }
+                    }
+
+                    // If simple tag paths don't work, we need to add specificity
+                    console.log('[ABSmartly] Simple paths not unique. Adding nth-child for specificity...')
+
+                    // Try using duplicate IDs with parent context to make them unique
+                    for (let i = 0; i < pathElements.length; i++) {
+                      const elem = pathElements[i]
+
+                      if (elem.id && !isAutoGenerated(elem.id)) {
+                        // Even if ID is duplicate, try to use it with parent context
+                        let baseSelector = '#' + elem.id
+
+                        // Add minimal path to target if needed
+                        if (i > 0) {
+                          // Check if child has ID too
+                          const child = pathElements[0]
+                          if (child.id && !isAutoGenerated(child.id)) {
+                            baseSelector = baseSelector + ' #' + child.id
+                          } else {
+                            // Just add the child tag
+                            baseSelector = baseSelector + ' > ' + child.tagName.toLowerCase()
+                          }
+                        }
+
+                        // Test if unique
+                        let matches = document.querySelectorAll(baseSelector)
+                        if (matches.length === 1 && matches[0] === element) {
+                          console.log('[ABSmartly] Found unique selector using duplicate ID:', baseSelector)
+                          return baseSelector
+                        }
+
+                        // Try with parent IDs
+                        for (let p = i + 1; p < pathElements.length; p++) {
+                          const parent = pathElements[p]
+                          if (parent.id && !isAutoGenerated(parent.id)) {
+                            const parentSelector = '#' + parent.id + ' ' + baseSelector
+                            matches = document.querySelectorAll(parentSelector)
+                            if (matches.length === 1 && matches[0] === element) {
+                              console.log('[ABSmartly] Made unique with parent ID:', parentSelector)
+                              return parentSelector
+                            }
+                          }
+                        }
+                      }
+                    }
+
+                    // Try adding nth-child only where necessary
+                    for (let targetIndex = 0; targetIndex < pathElements.length; targetIndex++) {
+                      const targetElem = pathElements[targetIndex]
+
+                      // Try minimal selector with nth-child at this level
+                      // Start from different depths to find the minimal one
+                      for (let startDepth = 1; startDepth <= pathElements.length; startDepth++) {
+                        let specificPath = []
+                        let foundUniqueId = false
+
+                        for (let i = startDepth - 1; i >= 0; i--) {
+                          const elem = pathElements[i]
+
+                          if (elem.id && !isAutoGenerated(elem.id)) {
+                            const idMatches = document.querySelectorAll('#' + elem.id)
+                            if (idMatches.length === 1) {
+                              // Unique ID found, use as anchor
+                              specificPath = ['#' + elem.id]
+                              foundUniqueId = true
+                              // Add rest of path
+                              for (let j = i - 1; j >= 0; j--) {
+                                if (j === targetIndex && pathElements[j].parentElement) {
+                                  // Only add nth-child at target if needed
+                                  const siblings = Array.from(pathElements[j].parentElement.children)
+                                  if (siblings.length > 1) {
+                                    const childIndex = siblings.indexOf(pathElements[j]) + 1
+                                    specificPath.push(pathElements[j].tagName.toLowerCase() + ':nth-child(' + childIndex + ')')
+                                  } else {
+                                    specificPath.push(pathElements[j].tagName.toLowerCase())
+                                  }
+                                } else {
+                                  specificPath.push(pathElements[j].tagName.toLowerCase())
+                                }
+                              }
+                              break
+                            } else {
+                              // Duplicate ID - still use it!
+                              if (i === targetIndex && elem.parentElement) {
+                                // Only add nth-child if there are multiple siblings
+                                const siblings = Array.from(elem.parentElement.children)
+                                if (siblings.length > 1) {
+                                  const childIndex = siblings.indexOf(elem) + 1
+                                  specificPath.unshift('#' + elem.id + ':nth-child(' + childIndex + ')')
+                                } else {
+                                  specificPath.unshift('#' + elem.id)
+                                }
+                              } else {
+                                specificPath.unshift('#' + elem.id)
+                              }
+                            }
+                          } else if (i === targetIndex && elem.parentElement) {
+                            // Add nth-child at target level only if there are multiple siblings
+                            const siblings = Array.from(elem.parentElement.children)
+                            if (siblings.length > 1) {
+                              const childIndex = siblings.indexOf(elem) + 1
+                              specificPath.unshift(elem.tagName.toLowerCase() + ':nth-child(' + childIndex + ')')
+                            } else {
+                              specificPath.unshift(elem.tagName.toLowerCase())
+                            }
+                          } else {
+                            specificPath.unshift(elem.tagName.toLowerCase())
+                          }
+                        }
+
+                        const testSelector = specificPath.join(' > ')
+                        const testMatches = document.querySelectorAll(testSelector)
+
+                        if (testMatches.length === 1 && testMatches[0] === element) {
+                          console.log('[ABSmartly] Found minimal unique selector with nth-child at', targetElem.tagName, ':', testSelector)
+                          return testSelector
+                        }
+
+                        // If we have a unique ID anchor, no need to try longer paths
+                        if (foundUniqueId) break
+                    }
+
+                    // If still not unique, try adding nth-of-type where there are siblings
+                    let pathWithTypes = []
+
+                    for (let i = pathElements.length - 1; i >= 0; i--) {
+                        const elem = pathElements[i]
+
+                        if (elem.id && !isAutoGenerated(elem.id)) {
+                          // Check if ID is unique before using it
+                          const idMatches = document.querySelectorAll('#' + elem.id)
+                          if (idMatches.length === 1) {
+                            pathWithTypes = ['#' + elem.id]
+                          } else {
+                            // ID is duplicate, treat as regular element
+                            let sel = elem.tagName.toLowerCase()
+                            if (elem.parentElement) {
+                              const siblings = Array.from(elem.parentElement.children)
+                                .filter(child => child.tagName === elem.tagName)
+                              if (siblings.length > 1) {
+                                const index = siblings.indexOf(elem) + 1
+                                sel += ':nth-of-type(' + index + ')'
+                              }
+                            }
+                            pathWithTypes.push(sel)
+                          }
+                        } else {
+                          let sel = elem.tagName.toLowerCase()
+
+                          // Add nth-of-type if there are siblings of the same type
+                          if (elem.parentElement) {
+                            const siblings = Array.from(elem.parentElement.children)
+                              .filter(child => child.tagName === elem.tagName)
+
+                            if (siblings.length > 1) {
+                              const index = siblings.indexOf(elem) + 1
+                              sel += ':nth-of-type(' + index + ')'
+                            }
+                          }
+
+                          pathWithTypes.push(sel)
+                        }
+                      }
+
+                    let selector = pathWithTypes.join(' > ')
+                    let matches = document.querySelectorAll(selector)
+
+                    if (matches.length === 1 && matches[0] === element) {
+                      console.log('[ABSmartly] Made unique with nth-of-type:', selector)
+                      return selector
+                    }
+
+                    // Last resort: use nth-child but still try to keep it minimal
+                    console.log('[ABSmartly] Using fallback with nth-child')
+
+                    // Try building minimal selector with nth-child, starting from shortest path
+                    for (let startDepth = 1; startDepth <= pathElements.length; startDepth++) {
+                      let fallbackPath = []
+                      let foundUniqueId = false
+
+                      for (let i = startDepth - 1; i >= 0; i--) {
+                        const elem = pathElements[i]
+
+                        if (elem.id && !isAutoGenerated(elem.id)) {
+                          const idMatches = document.querySelectorAll('#' + elem.id)
+                          if (idMatches.length === 1) {
+                            fallbackPath = ['#' + elem.id]
+                            foundUniqueId = true
+                            // Add rest of path, only using nth-child when necessary
+                            for (let j = i - 1; j >= 0; j--) {
+                              const e = pathElements[j]
+                              let selector = e.tagName.toLowerCase()
+
+                              // Only add nth-child if there are multiple siblings
+                              if (e.parentElement) {
+                                const siblings = Array.from(e.parentElement.children)
+                                if (siblings.length > 1) {
+                                  const idx = siblings.indexOf(e) + 1
+                                  selector += ':nth-child(' + idx + ')'
+                                }
+                              }
+
+                              fallbackPath.push(selector)
+                            }
+                            break
+                          } else {
+                            // Duplicate ID, use nth-child only if needed
+                            let selector = elem.tagName.toLowerCase()
+                            if (elem.parentElement) {
+                              const siblings = Array.from(elem.parentElement.children)
+                              if (siblings.length > 1) {
+                                const idx = siblings.indexOf(elem) + 1
+                                selector += ':nth-child(' + idx + ')'
+                              }
+                            }
+                            fallbackPath.unshift(selector)
+                          }
+                        } else {
+                          let selector = elem.tagName.toLowerCase()
+                          // Only add nth-child if there are multiple siblings
+                          if (elem.parentElement) {
+                            const siblings = Array.from(elem.parentElement.children)
+                            if (siblings.length > 1) {
+                              const idx = siblings.indexOf(elem) + 1
+                              selector += ':nth-child(' + idx + ')'
+                            }
+                          }
+                          fallbackPath.unshift(selector)
+                        }
+                      }
+
+                      const testSelector = fallbackPath.join(' > ')
+                      const testMatches = document.querySelectorAll(testSelector)
+
+                      if (testMatches.length === 1 && testMatches[0] === element) {
+                        console.log('[ABSmartly] Found minimal fallback selector:', testSelector)
+                        return testSelector
+                      }
+
+                      if (foundUniqueId) break
+                    }
+
+                    // If still not unique (shouldn't happen), return the full path
+                    let selector = pathElements.map((elem, i) => {
+                      let sel = elem.tagName.toLowerCase()
+                      if (elem.parentElement && i > 0) {
+                        const siblings = Array.from(elem.parentElement.children)
+                        if (siblings.length > 1) {
+                          const idx = siblings.indexOf(elem) + 1
+                          sel += ':nth-child(' + idx + ')'
+                        }
+                      }
+                      return sel
+                    }).reverse().join(' > ')
+
+                    console.log('[ABSmartly] Final selector:', selector, 'Matches:', document.querySelectorAll(selector).length)
+                    return selector
                   }
                   
                   // Helper function to check if string is auto-generated
                   function isAutoGenerated(str) {
                     if (!str) return false
-                    
-                    // Check for common auto-generated patterns
+
+                    // CRITICAL: Skip IDs/classes added by ABSmartly itself
+                    if (str.includes('absmartly') || str.includes('ABSmartly')) {
+                      return true
+                    }
+
+                    // IDs starting with numbers are likely auto-generated
+                    if (/^[0-9]/.test(str)) {
+                      return true
+                    }
+
+                    // Check for framework-specific patterns
                     const patterns = [
                       /^framer-[a-zA-Z0-9]+$/,  // Framer classes
-                      /^[a-z]{1,3}-[a-f0-9]{6,}$/i,  // Hash-based classes
                       /^css-[a-z0-9]+$/i,  // CSS modules
                       /^sc-[a-zA-Z0-9]+$/,  // Styled-components
-                      /^[a-zA-Z0-9]{8,}$/,  // Long random strings
                       /^v-[a-f0-9]{8}$/,  // Vue scoped classes
                       /^svelte-[a-z0-9]+$/,  // Svelte classes
                       /^emotion-[0-9]+$/,  // Emotion CSS
                       /^chakra-/,  // Chakra UI
                       /^MuiBox-root/,  // Material-UI
-                      /^[0-9]/  // Starts with number
+                      /^[a-f0-9]{8,}$/i,  // Hex strings
+                      /_[a-f0-9]{6,}$/i  // Ending with hex strings
                     ]
-                    
-                    return patterns.some(pattern => pattern.test(str))
+
+                    if (patterns.some(pattern => pattern.test(str))) {
+                      return true
+                    }
+
+                    // Look for random character sequences in segments
+                    const segments = str.split(/[-_]/)
+                    for (const segment of segments) {
+                      if (segment.length < 6) continue
+
+                      // Check if segment looks like a normal word
+                      const looksNormal = /^[A-Z][a-z]+$/.test(segment) || // PascalCase word
+                                         /^[a-z]+$/.test(segment) ||        // all lowercase
+                                         /^[A-Z]+$/.test(segment) ||        // all uppercase
+                                         /^[a-z]+[0-9]{1,2}$/.test(segment) // word with 1-2 digits
+
+                      if (!looksNormal) {
+                        // Check for random patterns: mixed case/numbers without clear pattern
+                        // Examples that should match: "0nd0iSQcMZb94MDr", "6h6XQ"
+                        if (/[0-9][a-zA-Z]{2,}[0-9]/.test(segment) ||  // number-letters-number
+                            /[a-z][A-Z]{2,}[a-z]/.test(segment) ||      // lowercase-UPPER-lowercase
+                            /[A-Z][a-z][0-9][a-zA-Z]{3,}/.test(segment)) { // Mixed pattern
+                          return true
+                        }
+                      }
+                    }
+
+                    return false
                   }
                   
                   // Add event listeners

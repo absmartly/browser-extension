@@ -1058,6 +1058,12 @@
         const { config } = event.data.payload || {};
         sdkInjectionConfig = config;
 
+        debugLog('[ABsmartly Extension] SDK injection config received:', {
+          injectSDK: config?.injectSDK,
+          cachedContext: cachedContext,
+          hasCachedContext: !!cachedContext
+        });
+
         if (config?.injectSDK && !cachedContext) {
           debugLog('[ABsmartly Extension] SDK injection enabled, injecting ABsmartly SDK...');
           sdkInjectionPending = true;

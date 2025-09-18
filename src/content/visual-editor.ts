@@ -104,6 +104,11 @@ export class VisualEditor {
       
       .absmartly-editing {
         outline: 2px solid #10b981 !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        min-height: auto !important;
       }
       
       .absmartly-context-menu {
@@ -656,29 +661,27 @@ export class VisualEditor {
     const menuHeight = 500 // Approximate menu height
     const padding = 10     // Padding from viewport edges
 
-    // Try to position menu next to the element, not at click position
-    let menuX = elementRect.right + 10  // Default: right of element
-    let menuY = elementRect.top
+    // Position menu near the click position, not at element edge
+    let menuX = x + 10  // Position slightly to the right of click
+    let menuY = y + 10  // Position slightly below click
 
-    // If menu would go off right edge, place it to the left of element
+    // Adjust if menu would go off right edge
     if (menuX + menuWidth > window.innerWidth - padding) {
-      menuX = elementRect.left - menuWidth - 10
+      menuX = x - menuWidth - 10  // Place to the left of click position
     }
 
-    // If still off-screen (element too far left), position at click with constraints
-    if (menuX < padding) {
-      menuX = Math.min(x + 10, window.innerWidth - menuWidth - padding)
-      menuX = Math.max(padding, menuX)
-    }
+    // Ensure menu stays within viewport horizontally
+    menuX = Math.max(padding, menuX)
+    menuX = Math.min(window.innerWidth - menuWidth - padding, menuX)
 
-    // Vertical positioning - prefer aligning with element top
+    // Adjust if menu would go off bottom edge
     if (menuY + menuHeight > window.innerHeight - padding) {
-      // If menu would go off bottom, move it up
-      menuY = Math.max(padding, window.innerHeight - menuHeight - padding)
+      menuY = y - menuHeight - 10  // Place above click position
     }
 
-    // Ensure menu is visible even for elements near the top
+    // Ensure menu stays within viewport vertically
     menuY = Math.max(padding, menuY)
+    menuY = Math.min(window.innerHeight - menuHeight - padding, menuY)
 
     // Position the menu
     this.contextMenu.style.cssText = `
