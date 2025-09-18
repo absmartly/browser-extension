@@ -16,6 +16,7 @@ export const config: PlasmoCSConfig = {
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
 let isVisualEditorActive = false
+let isVisualEditorStarting = false
 
 // Initialize overrides on page load
 // This ensures storage is synced to cookie for SSR compatibility
@@ -73,6 +74,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
   
+  if (message.type === 'SET_VISUAL_EDITOR_STARTING') {
+    debugLog('[Visual Editor Content Script] Setting visual editor starting flag:', message.starting)
+    isVisualEditorStarting = message.starting
+    sendResponse({ success: true })
+    return true
+  }
+
   if (message.type === 'START_VISUAL_EDITOR') {
     debugLog('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)
 
@@ -88,6 +96,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // Mark visual editor as active BEFORE starting
       isVisualEditorActive = true
+      isVisualEditorStarting = false
 
       // Create and start new editor
       currentEditor = new VisualEditor({
@@ -119,6 +128,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     debugLog('[Visual Editor Content Script] Stopping visual editor')
 
     isVisualEditorActive = false
+    isVisualEditorStarting = false
 
     if (currentEditor) {
       const changes = currentEditor.getChanges()
@@ -151,10 +161,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     ensureSDKPluginInjected()
 
     if (message.action === 'apply') {
-      // Only create preview header if visual editor is NOT active
-      if (!isVisualEditorActive) {
-        createPreviewHeader(message.experimentName, message.variantName)
-      }
+      // Create preview header (it will check visual editor state internally)
+      createPreviewHeader(message.experimentName, message.variantName)
       
       // Send message to SDK plugin to preview changes
       window.postMessage({
@@ -226,6 +234,11 @@ window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '
 function createPreviewHeader(experimentName: string, variantName: string) {
   // Remove any existing preview header
   removePreviewHeader()
+
+  // Don't create header if visual editor is active or starting
+  if (isVisualEditorActive || isVisualEditorStarting) {
+    return
+  }
   
   // Create preview header container
   const headerContainer = document.createElement('div')
@@ -276,6 +289,8 @@ function createPreviewHeader(experimentName: string, variantName: string) {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
   `
   closeButton.textContent = 'Exit Preview'
   closeButton.onmouseover = () => {
@@ -378,11 +393,12 @@ window.addEventListener('message', async (event) => {
   if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_CLOSED') {
     debugLog('[Content Script] Visual editor closed, updating state')
     isVisualEditorActive = false
+    isVisualEditorStarting = false
 
-    // Show preview header again if we're in preview mode
-    const previewHeader = document.getElementById('absmartly-preview-header')
-    if (previewHeader) {
-      previewHeader.style.display = ''
+    // Always create preview header if we have experiment info (preview is still on)
+    if (event.data.experimentName && event.data.variantName) {
+      debugLog('[Content Script] Creating preview header after visual editor close')
+      createPreviewHeader(event.data.experimentName, event.data.variantName)
     }
     return
   }
