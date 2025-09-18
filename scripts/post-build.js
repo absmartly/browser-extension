@@ -1,13 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
 
 // Copy sidebar files from tabs folder to root for injection
+// Build the visual editor first
+console.log('Building visual editor...');
+try {
+  execSync('node scripts/build-visual-editor.js', { stdio: 'inherit' });
+} catch (error) {
+  console.error('Failed to build visual editor:', error);
+}
+
 const buildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-prod');
 const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
 const tabsDir = path.join(buildDir, 'tabs');
 const publicDir = path.join(__dirname, '..', 'public');
 const manifestPath = path.join(buildDir, 'manifest.json');
+
+// Visual editor bundled script paths
+const visualEditorSource = path.join(__dirname, '..', '..', 'absmartly-visual-editor-bundles', 'visual-editor-injection.bundle');
 
 if (fs.existsSync(tabsDir)) {
   const files = fs.readdirSync(tabsDir);
@@ -131,6 +143,41 @@ if (fs.existsSync(pluginSource)) {
         fs.copyFileSync(mapSource, mapDestDev);
         console.log(`Copied ${pluginFilename}.map to dev build directory`);
       }
+    }
+  }
+}
+
+// Copy visual editor bundled script
+if (fs.existsSync(visualEditorSource)) {
+  // Create the src/injected/build directory structure in both build directories
+  [buildDir, devBuildDir].forEach(targetDir => {
+    if (fs.existsSync(targetDir)) {
+      const srcDir = path.join(targetDir, 'src');
+      const injectedDir = path.join(srcDir, 'injected');
+      const buildSubDir = path.join(injectedDir, 'build');
+
+      // Create directories if they don't exist
+      if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir);
+      if (!fs.existsSync(injectedDir)) fs.mkdirSync(injectedDir);
+      if (!fs.existsSync(buildSubDir)) fs.mkdirSync(buildSubDir);
+
+      // Copy the visual editor script
+      const dest = path.join(buildSubDir, 'visual-editor-injection.js');
+      fs.copyFileSync(visualEditorSource, dest);
+      console.log(`Copied visual-editor-injection.js to ${targetDir}`);
+    }
+  });
+
+  // Add to web accessible resources
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (manifest.web_accessible_resources && manifest.web_accessible_resources[0]) {
+    const resources = manifest.web_accessible_resources[0].resources;
+    const visualEditorResource = 'src/injected/build/visual-editor-injection.js';
+
+    if (!resources.includes(visualEditorResource)) {
+      resources.push(visualEditorResource);
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      console.log('Added visual-editor-injection.js to web accessible resources');
     }
   }
 }
