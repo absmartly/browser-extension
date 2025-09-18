@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import { all as knownCSSProperties } from 'known-css-properties'
 
-const cssPropertyNames = knownCSSProperties.map(p => p.property)
+const cssPropertyNames = knownCSSProperties
+  .map(p => p.property)
+  .filter((prop): prop is string => prop !== undefined && prop !== null)
 
 const commonCSSValues: Record<string, string[]> = {
   display: ['none', 'block', 'inline', 'inline-block', 'flex', 'grid', 'none'],
@@ -43,8 +45,8 @@ export const CSSStyleEditor = ({
 
     // Update suggestions based on input
     if (field === 'key') {
-      const filtered = cssPropertyNames.filter(prop => 
-        prop.toLowerCase().startsWith(newValue.toLowerCase())
+      const filtered = cssPropertyNames.filter(prop =>
+        prop && prop.toLowerCase().startsWith(newValue.toLowerCase())
       )
       setSuggestions(filtered.slice(0, 8))
       setShowSuggestions(filtered.length > 0)
@@ -52,8 +54,8 @@ export const CSSStyleEditor = ({
       const propertyName = newProps[index].key
       const values = commonCSSValues[propertyName] || []
       if (values.length > 0) {
-        const filtered = values.filter(val => 
-          val.toLowerCase().startsWith(newValue.toLowerCase())
+        const filtered = values.filter(val =>
+          val && val.toLowerCase().startsWith(newValue.toLowerCase())
         )
         setSuggestions(filtered)
         setShowSuggestions(filtered.length > 0)
@@ -182,8 +184,8 @@ export const CSSStyleEditor = ({
                     setSelectedSuggestion(0)
                     // Always show suggestions on focus
                     const currentValue = prop.key || ''
-                    const filtered = cssPropertyNames.filter(p => 
-                      currentValue ? p.toLowerCase().startsWith(currentValue.toLowerCase()) : true
+                    const filtered = cssPropertyNames.filter(p =>
+                      p && (currentValue ? p.toLowerCase().startsWith(currentValue.toLowerCase()) : true)
                     ).slice(0, 8)
                     setSuggestions(filtered)
                     // Force show suggestions if there are any available
