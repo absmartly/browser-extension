@@ -8,8 +8,9 @@
     "dev": "plasmo dev --src-path=. & node scripts/dev-build.js --watch",
     "build": "plasmo build --src-path=. && node scripts/post-build.js",
     "package": "plasmo package --src-path=.",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "test:unit": "jest",
     "test:unit:watch": "jest --watch",
     "test:unit:coverage": "jest --coverage"
