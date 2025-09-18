@@ -53,6 +53,7 @@ interface EditingDOMChange {
     focus?: Record<string, string>
   }
   styleRulesImportant?: boolean
+  styleImportant?: boolean
   classAdd?: string[]
   classRemove?: string[]
   classesWithStatus?: Array<{ name: string; action: 'add' | 'remove' }>
@@ -270,6 +271,461 @@ const createEmptyChange = (): EditingDOMChange => ({
   position: 'after',
   mode: 'merge'
 })
+
+// Helper function to handle type changes and preserve styles
+const handleDOMChangeTypeChange = (
+  editingChange: EditingDOMChange,
+  newType: DOMChangeType
+): EditingDOMChange => {
+  debugLog('📝 Changing type to:', newType)
+  let updatedChange = { ...editingChange, type: newType }
+
+  // Preserve styles when switching between style and styleRules
+  if (editingChange.type === 'style' && newType === 'styleRules') {
+    // From style to styleRules: preserve inline styles in the normal state
+    const normalStyles: Record<string, string> = {}
+    if (editingChange.styleProperties) {
+      editingChange.styleProperties.forEach(({ key, value }) => {
+        if (key && value) {
+          normalStyles[key] = value
+        }
+      })
+    }
+
+    updatedChange.styleRulesStates = {
+      normal: normalStyles,
+      hover: editingChange.styleRulesStates?.hover || {},
+      active: editingChange.styleRulesStates?.active || {},
+      focus: editingChange.styleRulesStates?.focus || {},
+    }
+  } else if (editingChange.type === 'styleRules' && newType === 'style') {
+    // From styleRules to style: preserve normal state styles as inline styles
+    const styleProperties: Array<{ key: string; value: string }> = []
+    if (editingChange.styleRulesStates?.normal) {
+      Object.entries(editingChange.styleRulesStates.normal).forEach(([key, value]) => {
+        if (key && value) {
+          styleProperties.push({ key, value })
+        }
+      })
+    }
+
+    // If no normal styles exist but we have inline styles already, keep them
+    if (styleProperties.length === 0 && editingChange.styleProperties) {
+      updatedChange.styleProperties = editingChange.styleProperties
+    } else if (styleProperties.length > 0) {
+      updatedChange.styleProperties = styleProperties
+    } else {
+      // Default empty property if nothing exists
+      updatedChange.styleProperties = [{ key: '', value: '' }]
+    }
+  }
+
+  debugLog('📝 Updated editingChange:', updatedChange)
+  return updatedChange
+}
+
+// Unified DOM Change Editor Component
+const DOMChangeEditor = ({
+  editingChange: initialChange,
+  onSave,
+  onCancel,
+  onStartPicker
+}: {
+  editingChange: EditingDOMChange,
+  onSave: (change: EditingDOMChange) => void,
+  onCancel: () => void,
+  onStartPicker: (field: string) => void
+}) => {
+  const [localChange, setLocalChange] = useState<EditingDOMChange>(initialChange)
+  const [pickingForField, setPickingForField] = useState<string | null>(null)
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setLocalChange(initialChange)
+  }, [initialChange])
+
+  const isEditMode = localChange.index !== null
+
+  return (
+    <div className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
+      <div className="flex items-center justify-between">
+        <h5 className="font-medium text-gray-900">
+          {isEditMode ? 'Edit' : 'Add'} DOM Change
+        </h5>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onSave(localChange)}
+            className="p-1 text-green-600 hover:text-green-800"
+            title="Save"
+          >
+            <CheckIcon className="h-5 w-5" />
+          </button>
+          <button
+            onClick={onCancel}
+            className="p-1 text-gray-400 hover:text-gray-600"
+            title="Cancel"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Selector field with picker */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Element Selector
+        </label>
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              value={localChange.selector}
+              onChange={(e) => setLocalChange({ ...localChange, selector: e.target.value })}
+              placeholder=".cta-button, #header, [data-test='submit']"
+              className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
+              style={{ caretColor: 'black' }}
+            />
+            <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden whitespace-nowrap">
+              {highlightCSSSelector(localChange.selector)}
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setPickingForField('selector')
+              onStartPicker('selector')
+            }}
+            size="sm"
+            variant="secondary"
+            title="Pick element"
+            className={pickingForField === 'selector' ? 'bg-blue-100' : ''}
+          >
+            🎯
+          </Button>
+        </div>
+        {pickingForField === 'selector' && (
+          <p className="text-xs text-blue-600 mt-1 animate-pulse">
+            Click an element on the page...
+          </p>
+        )}
+      </div>
+
+      {/* Change type selector */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Change Type
+        </label>
+        <select
+          value={localChange.type}
+          onChange={(e) => {
+            const newType = e.target.value as DOMChangeType
+            setLocalChange(handleDOMChangeTypeChange(localChange, newType))
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        >
+          <option value="text">Text</option>
+          <option value="style">Inline Style</option>
+          <option value="styleRules">Stylesheet</option>
+          <option value="class">Class</option>
+          <option value="attribute">Attribute</option>
+          <option value="html">HTML</option>
+          <option value="javascript">JavaScript</option>
+          <option value="move">Move/Reorder</option>
+        </select>
+      </div>
+
+      {/* Dynamic value fields based on type */}
+      {localChange.type === 'text' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Text Content
+          </label>
+          <Input
+            value={localChange.textValue || ''}
+            onChange={(e) => setLocalChange({ ...localChange, textValue: e.target.value })}
+            placeholder="New text content"
+          />
+        </div>
+      )}
+
+      {localChange.type === 'style' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Style Properties
+            </label>
+            {/* Mode checkbox instead of dropdown */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="merge-mode"
+                checked={localChange.mode === 'merge'}
+                onChange={(e) => setLocalChange({ ...localChange, mode: e.target.checked ? 'merge' : 'replace' })}
+                className="mr-2"
+              />
+              <label htmlFor="merge-mode" className="text-sm text-gray-600">
+                Merge with existing styles
+              </label>
+            </div>
+          </div>
+          <CSSStyleEditor
+            styleProperties={localChange.styleProperties}
+            onChange={(newProps) => setLocalChange({ ...localChange, styleProperties: newProps })}
+          />
+
+          {/* Checkboxes for important flag and lazy loading */}
+          <div className="space-y-2 pt-2 border-t border-gray-200">
+            <div className="flex items-start">
+              <input
+                type="checkbox"
+                id={`style-important-${isEditMode ? 'edit' : 'new'}`}
+                checked={localChange.styleImportant || false}
+                onChange={(e) => setLocalChange({ ...localChange, styleImportant: e.target.checked })}
+                className="mt-1 mr-2"
+              />
+              <label htmlFor={`style-important-${isEditMode ? 'edit' : 'new'}`} className="text-sm">
+                <span className="font-medium text-gray-700">Use !important flag</span>
+                <p className="text-gray-500">Ensures styles override existing CSS</p>
+              </label>
+            </div>
+
+            <div className="flex items-start">
+              <input
+                type="checkbox"
+                id={`style-wait-${isEditMode ? 'edit' : 'new'}`}
+                checked={localChange.waitForElement || false}
+                onChange={(e) => setLocalChange({ ...localChange, waitForElement: e.target.checked })}
+                className="mt-1 mr-2"
+              />
+              <label htmlFor={`style-wait-${isEditMode ? 'edit' : 'new'}`} className="text-sm">
+                <span className="font-medium text-gray-700">Wait for element (lazy-loaded)</span>
+                <p className="text-gray-500">Apply change when element appears in DOM</p>
+              </label>
+            </div>
+
+            {localChange.waitForElement && (
+              <div className="ml-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observer Root (optional)
+                </label>
+                <Input
+                  value={localChange.observerRoot || ''}
+                  onChange={(e) => setLocalChange({ ...localChange, observerRoot: e.target.value })}
+                  placeholder="body, .container, #app"
+                  className="text-xs"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {localChange.type === 'styleRules' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Style Rules (with pseudo-classes)
+          </label>
+          <StyleRulesEditor
+            change={{
+              selector: localChange.selector,
+              type: 'styleRules',
+              states: localChange.styleRulesStates || { normal: {}, hover: {}, active: {}, focus: {} },
+              important: localChange.styleRulesImportant,
+              waitForElement: localChange.waitForElement,
+              observerRoot: localChange.observerRoot
+            }}
+            onChange={(change) => setLocalChange({
+              ...localChange,
+              styleRulesStates: change.states,
+              styleRulesImportant: change.important,
+              waitForElement: change.waitForElement,
+              observerRoot: change.observerRoot
+            })}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'class' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              CSS Classes
+            </label>
+            {/* Mode checkbox instead of dropdown */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="class-merge-mode"
+                checked={localChange.mode === 'merge'}
+                onChange={(e) => setLocalChange({ ...localChange, mode: e.target.checked ? 'merge' : 'replace' })}
+                className="mr-2"
+              />
+              <label htmlFor="class-merge-mode" className="text-sm text-gray-600">
+                Merge with existing classes
+              </label>
+            </div>
+          </div>
+          <MultiSelectTags
+            value={localChange.classesWithStatus || []}
+            onChange={(classes) => {
+              const classAdd = classes.filter(c => c.action === 'add').map(c => c.name)
+              const classRemove = classes.filter(c => c.action === 'remove').map(c => c.name)
+              setLocalChange({ ...localChange, classesWithStatus: classes, classAdd, classRemove })
+            }}
+            placeholder="Type class name and press Enter"
+            label="Classes to add or remove"
+          />
+        </div>
+      )}
+
+      {localChange.type === 'attribute' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Attributes
+            </label>
+            {/* Mode checkbox instead of dropdown */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="attr-merge-mode"
+                checked={localChange.mode === 'merge'}
+                onChange={(e) => setLocalChange({ ...localChange, mode: e.target.checked ? 'merge' : 'replace' })}
+                className="mr-2"
+              />
+              <label htmlFor="attr-merge-mode" className="text-sm text-gray-600">
+                Merge with existing attributes
+              </label>
+            </div>
+          </div>
+          <AttributeEditor
+            attributeProperties={localChange.attributeProperties || [{ key: '', value: '' }]}
+            onChange={(attrs) => setLocalChange({ ...localChange, attributeProperties: attrs })}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'html' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            HTML Content
+          </label>
+          <textarea
+            value={localChange.htmlValue || ''}
+            onChange={(e) => setLocalChange({ ...localChange, htmlValue: e.target.value })}
+            placeholder="<div>New HTML content</div>"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+            rows={5}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'javascript' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            JavaScript Code
+          </label>
+          <textarea
+            value={localChange.jsValue || ''}
+            onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
+            placeholder="// JavaScript code to execute\nconsole.log('Hello');"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+            rows={5}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'move' && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Target Selector
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  value={localChange.targetSelector || ''}
+                  onChange={(e) => setLocalChange({ ...localChange, targetSelector: e.target.value })}
+                  placeholder=".target-container, #sidebar"
+                  className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'targetSelector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
+                  style={{ caretColor: 'black' }}
+                />
+                <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden whitespace-nowrap">
+                  {highlightCSSSelector(localChange.targetSelector || '')}
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  setPickingForField('targetSelector')
+                  onStartPicker('targetSelector')
+                }}
+                size="sm"
+                variant="secondary"
+                title="Pick target element"
+                className={pickingForField === 'targetSelector' ? 'bg-blue-100' : ''}
+              >
+                🎯
+              </Button>
+            </div>
+            {pickingForField === 'targetSelector' && (
+              <p className="text-xs text-blue-600 mt-1 animate-pulse">
+                Click the target element...
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Position
+            </label>
+            <select
+              value={localChange.position || 'after'}
+              onChange={(e) => setLocalChange({ ...localChange, position: e.target.value as any })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="before">Before target</option>
+              <option value="after">After target</option>
+              <option value="firstChild">As first child</option>
+              <option value="lastChild">As last child</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Wait for element checkbox for applicable types */}
+      {localChange.type !== 'style' && localChange.type !== 'styleRules' && (
+        <div className="space-y-2 pt-2 border-t border-gray-200">
+          <div className="flex items-start">
+            <input
+              type="checkbox"
+              id={`wait-${isEditMode ? 'edit' : 'new'}`}
+              checked={localChange.waitForElement || false}
+              onChange={(e) => setLocalChange({ ...localChange, waitForElement: e.target.checked })}
+              className="mt-1 mr-2"
+            />
+            <label htmlFor={`wait-${isEditMode ? 'edit' : 'new'}`} className="text-sm">
+              <span className="font-medium text-gray-700">Wait for element (lazy-loaded)</span>
+              <p className="text-gray-500">Apply change when element appears in DOM</p>
+            </label>
+          </div>
+
+          {localChange.waitForElement && (
+            <div className="ml-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observer Root (optional)
+              </label>
+              <Input
+                value={localChange.observerRoot || ''}
+                onChange={(e) => setLocalChange({ ...localChange, observerRoot: e.target.value })}
+                placeholder="body, .container, #app"
+                className="text-xs"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Get all CSS property names from known-css-properties
 const cssPropertyNames = knownCSSProperties.filter(prop => typeof prop === 'string').sort()
@@ -831,640 +1287,6 @@ const OperationModeSelector = ({
   </div>
 )
 
-// Reusable DOM change editor component
-const DOMChangeEditorForm = ({ 
-  editingChange, 
-  setEditingChange, 
-  pickingForField, 
-  handleStartElementPicker,
-  handleStartDragDrop,
-  onSave,
-  onCancel
-}: {
-  editingChange: EditingDOMChange,
-  setEditingChange: (change: EditingDOMChange) => void,
-  pickingForField: string | null,
-  handleStartElementPicker: (field: string) => void,
-  handleStartDragDrop: () => void,
-  onSave: () => void,
-  onCancel: () => void
-}) => (
-  <div className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
-    <div className="flex items-center justify-between">
-      <h5 className="font-medium text-gray-900">
-        {editingChange.index !== null ? 'Edit' : 'Add'} DOM Change
-      </h5>
-      <div className="flex gap-2">
-        <button
-          onClick={onSave}
-          className="p-1 text-green-600 hover:text-green-800"
-          title="Save"
-        >
-          <CheckIcon className="h-5 w-5" />
-        </button>
-        <button
-          onClick={onCancel}
-          className="p-1 text-gray-400 hover:text-gray-600"
-          title="Cancel"
-        >
-          <XMarkIcon className="h-5 w-5" />
-        </button>
-      </div>
-    </div>
-
-    {/* Selector field with picker */}
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Element Selector
-      </label>
-      {/* Selector suggestions for better selectors */}
-      {editingChange.selector && (() => {
-        // Check if selector has auto-generated, temporary classes, or could be improved
-        const hasAutoGenerated = /framer-[a-zA-Z0-9]+|css-[a-z0-9]+|hover|active|focus|^#\d|sc-[a-zA-Z0-9]+|svelte-[a-z0-9]+|emotion-[0-9]+|chakra-|MuiBox-root|is-hovered|is-active|is-focused/.test(editingChange.selector)
-        
-        // Also show suggestions if selector has low quality (many classes, complex structure)
-        const needsSuggestions = hasAutoGenerated || 
-          editingChange.selector.split('.').length > 4 || // Too many classes
-          editingChange.selector.includes(':nth-') // Position-based selector
-        
-        if (needsSuggestions) {
-          // Try to find the element and generate suggestions
-          try {
-            const elements = document.querySelectorAll(editingChange.selector)
-            if (elements.length > 0) {
-              // Always generate suggestions to see if there are better alternatives
-              const allSuggestions = generateSelectorSuggestions(elements[0])
-              
-              // Filter out the current selector and prioritize unique matches
-              const suggestions = allSuggestions
-                .filter(s => s.selector !== editingChange.selector)
-                .sort((a, b) => {
-                  // Prioritize unique selectors
-                  if (a.matchCount === 1 && b.matchCount !== 1) return -1
-                  if (b.matchCount === 1 && a.matchCount !== 1) return 1
-                  // Then by specificity
-                  const specOrder = { high: 3, medium: 2, low: 1 }
-                  return specOrder[b.specificity] - specOrder[a.specificity]
-                })
-                .slice(0, 5)
-              
-              if (suggestions.length > 0) {
-                return (
-                  <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                    <div className="flex items-start gap-2">
-                      <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-amber-800 font-medium text-xs mb-2">
-                          This selector uses auto-generated classes that may change
-                        </p>
-                        <p className="text-amber-700 text-xs mb-2">
-                          Pick a better selector:
-                        </p>
-                        <div className="space-y-1">
-                          {suggestions.map((suggestion, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                debugLog('Selected alternative selector:', suggestion.selector)
-                                setEditingChange({ ...editingChange, selector: suggestion.selector })
-                              }}
-                              className="w-full text-left p-2 bg-white hover:bg-amber-100 border border-amber-200 rounded text-xs transition-colors"
-                            >
-                              <div className="flex items-center justify-between">
-                                <code className="font-mono text-amber-900">
-                                  {suggestion.selector}
-                                </code>
-                                <span className="text-amber-600 ml-2">
-                                  {suggestion.matchCount === 1 ? '✓ unique' : `${suggestion.matchCount} matches`}
-                                </span>
-                              </div>
-                              <div className="text-amber-600 mt-0.5">
-                                {suggestion.description}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-            }
-          } catch (e) {
-            debugLog('Could not generate suggestions:', e)
-          }
-        }
-        return null
-      })()}
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          {/* Syntax highlighted overlay */}
-          <div 
-            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono bg-white border border-gray-300 rounded-md overflow-x-auto overflow-y-hidden"
-            style={{ 
-              scrollLeft: 0,
-              whiteSpace: 'nowrap'
-            }}
-            id={`selector-overlay-edit-${editingChange.index}`}
-          >
-            {editingChange.selector ? highlightCSSSelector(editingChange.selector) : <span className="text-gray-400">.cta-button, #header, [data-test='submit']</span>}
-          </div>
-          {/* Actual input field */}
-          <input
-            value={editingChange.selector}
-            onChange={(e) => setEditingChange({ ...editingChange, selector: e.target.value })}
-            onScroll={(e) => {
-              const input = e.target as HTMLInputElement
-              const overlay = document.getElementById(`selector-overlay-edit-${editingChange.index}`)
-              if (overlay) {
-                overlay.scrollLeft = input.scrollLeft
-              }
-            }}
-            placeholder=".cta-button, #header, [data-test='submit']"
-            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono whitespace-nowrap ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
-            style={{ 
-              color: 'transparent',
-              caretColor: 'black',
-              background: 'transparent',
-              overflowX: 'auto',
-              overflowY: 'hidden'
-            }}
-          />
-        </div>
-        <Button
-          type="button"
-          onClick={() => handleStartElementPicker('selector')}
-          size="sm"
-          variant="secondary"
-          title="Pick element"
-          className={pickingForField === 'selector' ? 'bg-blue-100' : ''}
-        >
-          🎯
-        </Button>
-      </div>
-      {pickingForField === 'selector' && (
-        <p className="text-xs text-blue-600 mt-1 animate-pulse">
-          Click an element on the page...
-        </p>
-      )}
-    </div>
-
-    {/* Change type selector */}
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Change Type
-      </label>
-      <select
-        value={editingChange.type}
-        onChange={(e) => {
-          const newType = e.target.value as DOMChangeType
-          debugLog('📝 Changing type to:', newType)
-          const updatedChange = { ...editingChange, type: newType }
-          debugLog('📝 Updated editingChange:', updatedChange)
-          setEditingChange(updatedChange)
-        }}
-        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
-        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
-      >
-        <option value="text">Text</option>
-        <option value="style">Style</option>
-        <option value="styleRules">Style Rules (with states)</option>
-        <option value="class">Class</option>
-        <option value="attribute">Attribute</option>
-        <option value="html">HTML</option>
-        <option value="javascript">JavaScript</option>
-        <option value="move">Move/Reorder</option>
-        <option value="remove">Remove Element</option>
-        <option value="insert">Insert Element</option>
-      </select>
-    </div>
-
-    {/* Dynamic value fields based on type */}
-    {editingChange.type === 'text' && (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Text Content
-        </label>
-        <Input
-          value={editingChange.textValue || ''}
-          onChange={(e) => setEditingChange({ ...editingChange, textValue: e.target.value })}
-          placeholder="New text content"
-        />
-      </div>
-    )}
-
-    {editingChange.type === 'style' && (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700">
-            Style Properties
-          </label>
-          <OperationModeSelector
-            mode={editingChange.mode || 'merge'}
-            onChange={(mode) => setEditingChange({ ...editingChange, mode })}
-          />
-        </div>
-        <CSSStyleEditor
-          styleProperties={editingChange.styleProperties}
-          onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
-        />
-      </div>
-    )}
-
-    {editingChange.type === 'styleRules' && (
-      <div>
-        <StyleRulesEditor
-          change={{
-            selector: editingChange.selector,
-            type: 'styleRules',
-            states: editingChange.styleRulesStates || {},
-            important: editingChange.styleRulesImportant,
-            waitForElement: editingChange.waitForElement,
-            observerRoot: editingChange.observerRoot
-          }}
-          onChange={(change) => {
-            setEditingChange({
-              ...editingChange,
-              styleRulesStates: change.states,
-              styleRulesImportant: change.important,
-              waitForElement: change.waitForElement,
-              observerRoot: change.observerRoot
-            })
-          }}
-        />
-      </div>
-    )}
-
-    {editingChange.type === 'class' && (
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Classes to Add
-          </label>
-          <MultiSelectTags
-            currentClasses={editingChange.classAdd || []}
-            onAddClass={(className) => {
-              const newClassAdd = [...(editingChange.classAdd || []), className]
-              const newClassRemove = (editingChange.classRemove || []).filter(c => c !== className)
-              setEditingChange({ 
-                ...editingChange, 
-                classAdd: newClassAdd,
-                classRemove: newClassRemove
-              })
-            }}
-            onRemoveClass={(className) => {
-              setEditingChange({
-                ...editingChange,
-                classAdd: (editingChange.classAdd || []).filter(c => c !== className)
-              })
-            }}
-            placeholder="Type class name to add and press Enter..."
-            className="bg-green-50"
-            pillColor="green"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Classes to Remove
-          </label>
-          <MultiSelectTags
-            currentClasses={editingChange.classRemove || []}
-            onAddClass={(className) => {
-              const newClassRemove = [...(editingChange.classRemove || []), className]
-              const newClassAdd = (editingChange.classAdd || []).filter(c => c !== className)
-              setEditingChange({ 
-                ...editingChange, 
-                classRemove: newClassRemove,
-                classAdd: newClassAdd
-              })
-            }}
-            onRemoveClass={(className) => {
-              setEditingChange({
-                ...editingChange,
-                classRemove: (editingChange.classRemove || []).filter(c => c !== className)
-              })
-            }}
-            placeholder="Type class name to remove and press Enter..."
-            className="bg-red-50"
-            pillColor="red"
-          />
-        </div>
-      </div>
-    )}
-
-    {editingChange.type === 'attribute' && (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Attributes
-        </label>
-        <AttributeEditor 
-          attributeProperties={editingChange.attributeProperties}
-          onChange={(newProps) => setEditingChange({ ...editingChange, attributeProperties: newProps })}
-        />
-      </div>
-    )}
-
-    {editingChange.type === 'html' && (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          HTML Content
-        </label>
-        <div className="relative" style={{ minHeight: '112px' }}>
-          <div 
-            id={`html-overlay-${editingChange.index}`}
-            className="absolute pointer-events-none text-xs font-mono leading-relaxed bg-white border border-gray-300 rounded-md"
-            style={{ 
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              padding: '8px 12px 12px 12px',
-              overflow: 'hidden',
-              wordBreak: 'break-word',
-              whiteSpace: 'pre-wrap',
-              zIndex: 1
-            }}
-          >
-            <div
-              style={{
-                transform: `translateY(${0}px)`,
-                transition: 'none'
-              }}
-              id={`html-overlay-content-${editingChange.index}`}
-            >
-              {editingChange.htmlValue ? highlightHTML(editingChange.htmlValue) : <span className="text-gray-400">&lt;div class='new-element'&gt;New content to insert&lt;/div&gt;</span>}
-            </div>
-          </div>
-          <textarea
-            value={editingChange.htmlValue || ''}
-            onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
-            onScroll={(e) => {
-              const textarea = e.target as HTMLTextAreaElement
-              const overlayContent = document.getElementById(`html-overlay-content-${editingChange.index}`)
-              if (overlayContent) {
-                overlayContent.style.transform = `translateY(-${textarea.scrollTop}px)`
-              }
-            }}
-            placeholder="<div class='new-element'>New content to insert</div>"
-            className="absolute px-3 py-2 border border-transparent rounded-md text-xs font-mono leading-relaxed"
-            style={{ 
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              color: 'transparent',
-              caretColor: 'black',
-              background: 'transparent',
-              resize: 'vertical',
-              overflow: 'auto',
-              minHeight: '96px',
-              paddingBottom: '12px',
-              zIndex: 2
-            }}
-            rows={4}
-          />
-        </div>
-      </div>
-    )}
-
-    {editingChange.type === 'javascript' && (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          JavaScript Code
-        </label>
-        <textarea
-          value={editingChange.jsValue || ''}
-          onChange={(e) => setEditingChange({ ...editingChange, jsValue: e.target.value })}
-          placeholder="// JavaScript code to execute"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50"
-          rows={4}
-        />
-      </div>
-    )}
-
-    {editingChange.type === 'move' && (
-      <div className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">🎯</span>
-            <div className="flex-1">
-              <h4 className="font-medium text-gray-900 mb-1">Drag & Drop Mode</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                Click the button below to enter drag-and-drop mode. You'll be able to click and drag any element to a new position.
-              </p>
-              <Button
-                type="button"
-                onClick={handleStartDragDrop}
-                size="sm"
-                variant="primary"
-                className="w-full"
-              >
-                🖱️ Start Drag & Drop
-              </Button>
-            </div>
-          </div>
-        </div>
-        
-        {/* Show captured values if we have them */}
-        {(editingChange.selector || editingChange.targetSelector || editingChange.position) && (
-          <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-            <div className="text-sm">
-              <span className="font-medium text-gray-700">Element to Move:</span>{' '}
-              <code className="text-xs bg-white px-1 py-0.5 rounded">
-                {editingChange.selector || 'Not set'}
-              </code>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium text-gray-700">Target:</span>{' '}
-              <code className="text-xs bg-white px-1 py-0.5 rounded">
-                {editingChange.targetSelector || 'Not set'}
-              </code>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium text-gray-700">Position:</span>{' '}
-              <span className="text-gray-600">
-                {editingChange.position === 'before' ? 'Before element' :
-                 editingChange.position === 'after' ? 'After element' :
-                 editingChange.position === 'firstChild' ? 'As first child' :
-                 editingChange.position === 'lastChild' ? 'As last child' :
-                 'Not set'}
-              </span>
-            </div>
-          </div>
-        )}
-        
-        {/* Manual input as fallback */}
-        <details className="text-sm">
-          <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
-            Manual input (advanced)
-          </summary>
-          <div className="mt-3 space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Target Selector
-              </label>
-              <Input
-                value={editingChange.targetSelector || ''}
-                onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
-                placeholder=".container, #section, [data-role='main']"
-                className="text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Position
-              </label>
-              <select
-                value={editingChange.position || 'after'}
-                onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
-                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
-        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
-              >
-                <option value="before">Before target element</option>
-                <option value="after">After target element</option>
-                <option value="firstChild">As first child of target</option>
-                <option value="lastChild">As last child of target</option>
-              </select>
-            </div>
-          </div>
-        </details>
-      </div>
-    )}
-
-    {editingChange.type === 'remove' && (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <span className="text-xl">⚠️</span>
-          <div className="flex-1">
-            <p className="text-sm text-red-800">
-              This will completely remove the selected element from the page.
-            </p>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {editingChange.type === 'insert' && (
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            HTML to Insert
-          </label>
-          <div className="relative" style={{ minHeight: '112px' }}>
-            <div 
-              id={`html-overlay-${editingChange.index}`}
-              className="absolute pointer-events-none text-xs font-mono leading-relaxed bg-white border border-gray-300 rounded-md"
-              style={{ 
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                padding: '8px 12px 12px 12px',
-                overflow: 'hidden',
-                wordBreak: 'break-word',
-                whiteSpace: 'pre-wrap',
-                zIndex: 1
-              }}
-            >
-              <div
-                style={{
-                  transform: `translateY(${0}px)`,
-                  transition: 'none'
-                }}
-                id={`html-overlay-content-${editingChange.index}`}
-              >
-                {editingChange.htmlValue ? highlightHTML(editingChange.htmlValue) : <span className="text-gray-400">&lt;div class='new-element'&gt;New content to insert&lt;/div&gt;</span>}
-              </div>
-            </div>
-            <textarea
-              value={editingChange.htmlValue || ''}
-              onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
-              onScroll={(e) => {
-                const textarea = e.target as HTMLTextAreaElement
-                const overlayContent = document.getElementById(`html-overlay-content-${editingChange.index}`)
-                if (overlayContent) {
-                  overlayContent.style.transform = `translateY(-${textarea.scrollTop}px)`
-                }
-              }}
-              placeholder="<div class='new-element'>New content to insert</div>"
-              className="absolute px-3 py-2 border border-transparent rounded-md text-xs font-mono leading-relaxed"
-              style={{ 
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                color: 'transparent',
-                caretColor: 'black',
-                background: 'transparent',
-                resize: 'vertical',
-                overflow: 'auto',
-                minHeight: '96px',
-                paddingBottom: '12px',
-                zIndex: 2
-              }}
-              rows={4}
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Insert Position
-          </label>
-          <select
-            value={editingChange.position || 'after'}
-            onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
-            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
-        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
-          >
-            <option value="before">Before the selected element</option>
-            <option value="after">After the selected element</option>
-            <option value="firstChild">As first child of the selected element</option>
-            <option value="lastChild">As last child of the selected element</option>
-          </select>
-        </div>
-      </div>
-    )}
-
-    {/* Lazy Loading Options - Available for all change types */}
-    {editingChange && editingChange.type !== 'remove' && (
-      <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-        <div className="flex items-start">
-          <input
-            type="checkbox"
-            id="waitForElement"
-            checked={editingChange.waitForElement || false}
-            onChange={(e) => setEditingChange({ ...editingChange, waitForElement: e.target.checked })}
-            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="waitForElement" className="ml-2">
-            <span className="text-sm font-medium text-gray-700">Wait for element (lazy-loaded)</span>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Apply this change when the element appears in the DOM (useful for dynamically loaded content)
-            </p>
-          </label>
-        </div>
-        
-        {editingChange.waitForElement && (
-          <div className="ml-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Observer Root (optional)
-            </label>
-            <Input
-              type="text"
-              value={editingChange.observerRoot || ''}
-              onChange={(e) => setEditingChange({ ...editingChange, observerRoot: e.target.value })}
-              placeholder="e.g., .main-content (leave empty to watch entire document)"
-              className="w-full text-xs"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Specify a container to watch for better performance. The observer will only watch for changes within this element.
-            </p>
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-)
 
 export function DOMChangesInlineEditor({
   variantName,
@@ -1738,9 +1560,20 @@ export function DOMChangesInlineEditor({
       await new Promise(resolve => setTimeout(resolve, 200))
     }
 
-    // Now enable preview for visual editor
+    // Now enable preview for visual editor (with flag to prevent header)
     debugLog('🔄 Enabling preview for visual editor')
     debugLog('Calling onPreviewToggle(true) for variant:', variantName)
+
+    // Set a flag to prevent preview header from showing
+    await chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'SET_VISUAL_EDITOR_STARTING',
+          starting: true
+        })
+      }
+    })
+
     onPreviewToggle(true)
 
     // Give preview a moment to activate before starting visual editor
@@ -1962,9 +1795,15 @@ export function DOMChangesInlineEditor({
       textValue: change.type === 'text' ? change.value : '',
       htmlValue: change.type === 'html' ? change.value : change.type === 'insert' ? (change as any).html : '',
       jsValue: change.type === 'javascript' ? change.value : '',
-      styleProperties: change.type === 'style' 
-        ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({ key, value }))
+      styleProperties: change.type === 'style'
+        ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({
+            key,
+            value: value.replace(/ !important$/i, '') // Remove !important from value as it's handled by checkbox
+          }))
         : [{ key: '', value: '' }],
+      styleImportant: change.type === 'style'
+        ? Object.values(change.value as Record<string, string>).some(v => v.includes('!important'))
+        : false,
       styleRulesStates: change.type === 'styleRules' ? (change as DOMChangeStyleRules).states : undefined,
       styleRulesImportant: change.type === 'styleRules' ? (change as DOMChangeStyleRules).important : undefined,
       attributeProperties: change.type === 'attribute'
@@ -1982,146 +1821,153 @@ export function DOMChangesInlineEditor({
     setEditingChange(editing)
   }
 
-  const handleSaveChange = () => {
-    debugLog('💾 Saving change, editingChange:', editingChange)
+  const handleSaveChange = (changeToSave?: EditingDOMChange) => {
+    const change = changeToSave || editingChange
+    debugLog('💾 Saving change, change:', change)
     debugLog('💾 Current changes array:', changes)
-    
-    if (!editingChange || !editingChange.selector) {
+
+    if (!change || !change.selector) {
       alert('Please enter a selector')
       return
     }
 
     let domChange: DOMChange
 
-    switch (editingChange.type) {
+    switch (change.type) {
       case 'text':
-        domChange = { 
-          selector: editingChange.selector, 
-          type: 'text', 
-          value: editingChange.textValue || '', 
+        domChange = {
+          selector: change.selector,
+          type: 'text',
+          value: change.textValue || '',
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'html':
-        domChange = { 
-          selector: editingChange.selector, 
-          type: 'html', 
-          value: editingChange.htmlValue || '', 
+        domChange = {
+          selector: change.selector,
+          type: 'html',
+          value: change.htmlValue || '',
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'javascript':
-        domChange = { 
-          selector: editingChange.selector, 
-          type: 'javascript', 
-          value: editingChange.jsValue || '', 
+        domChange = {
+          selector: change.selector,
+          type: 'javascript',
+          value: change.jsValue || '',
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'style':
         const styleValue: Record<string, string> = {}
-        editingChange.styleProperties?.forEach(({ key, value }) => {
-          if (key && value) styleValue[key] = value
+        change.styleProperties?.forEach(({ key, value }) => {
+          if (key && value) {
+            // Add !important flag if checkbox is checked
+            const finalValue = change.styleImportant && !value.includes('!important')
+              ? `${value} !important`
+              : value
+            styleValue[key] = finalValue
+          }
         })
-        domChange = { 
-          selector: editingChange.selector, 
-          type: 'style', 
-          value: styleValue, 
+        domChange = {
+          selector: change.selector,
+          type: 'style',
+          value: styleValue,
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'styleRules':
         domChange = {
-          selector: editingChange.selector,
+          selector: change.selector,
           type: 'styleRules',
-          states: editingChange.styleRulesStates || {},
-          important: editingChange.styleRulesImportant,
+          states: change.styleRulesStates || {},
+          important: change.styleRulesImportant,
           enabled: true,
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         } as DOMChangeStyleRules
         break
       case 'attribute':
         const attrValue: Record<string, string> = {}
-        editingChange.attributeProperties?.forEach(({ key, value }) => {
+        change.attributeProperties?.forEach(({ key, value }) => {
           if (key && value) attrValue[key] = value
         })
-        domChange = { 
-          selector: editingChange.selector, 
-          type: 'attribute', 
-          value: attrValue, 
+        domChange = {
+          selector: change.selector,
+          type: 'attribute',
+          value: attrValue,
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'class':
-        domChange = { 
-          selector: editingChange.selector, 
-          type: 'class', 
-          add: editingChange.classAdd?.filter(c => c) || [], 
-          remove: editingChange.classRemove?.filter(c => c) || [],
+        domChange = {
+          selector: change.selector,
+          type: 'class',
+          add: change.classAdd?.filter(c => c) || [],
+          remove: change.classRemove?.filter(c => c) || [],
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'move':
         domChange = {
-          selector: editingChange.selector,
+          selector: change.selector,
           type: 'move',
-          targetSelector: editingChange.targetSelector || '',
-          position: editingChange.position || 'after',
+          targetSelector: change.targetSelector || '',
+          position: change.position || 'after',
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'remove':
         domChange = {
-          selector: editingChange.selector,
+          selector: change.selector,
           type: 'remove',
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       case 'insert':
         domChange = {
-          selector: editingChange.selector,
+          selector: change.selector,
           type: 'insert',
-          html: editingChange.htmlValue || '',
-          position: editingChange.position || 'after',
+          html: change.htmlValue || '',
+          position: change.position || 'after',
           enabled: true,
-          mode: editingChange.mode || 'merge',
-          waitForElement: editingChange.waitForElement,
-          observerRoot: editingChange.observerRoot
+          mode: change.mode || 'merge',
+          waitForElement: change.waitForElement,
+          observerRoot: change.observerRoot
         }
         break
       default:
         return
     }
 
-    if (editingChange.index !== null) {
+    if (change.index !== null) {
       const newChanges = [...changes]
-      newChanges[editingChange.index] = domChange
-      debugLog('💾 Updating existing change at index', editingChange.index, 'newChanges:', newChanges)
+      newChanges[change.index] = domChange
+      debugLog('💾 Updating existing change at index', change.index, 'newChanges:', newChanges)
       onChange(newChanges)
     } else {
       const newChanges = [...changes, domChange]
@@ -2489,531 +2335,20 @@ export function DOMChangesInlineEditor({
               // If we're editing this change, show the edit form instead
               if (editingChange && editingChange.index === index) {
                 return (
-                  <div key={index} className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-medium text-gray-900">
-                        Edit DOM Change
-                      </h5>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSaveChange}
-                          className="p-1 text-green-600 hover:text-green-800"
-                          title="Save"
-                        >
-                          <CheckIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="p-1 text-gray-400 hover:text-gray-600"
-                          title="Cancel"
-                        >
-                          <XMarkIcon className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Selector field with picker */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Element Selector
-                      </label>
-                      {/* Selector suggestions for better selectors */}
-                      {editingChange.selector && (() => {
-                        // Check if selector has auto-generated, temporary classes, or could be improved
-                        const hasAutoGenerated = /framer-[a-zA-Z0-9]+|css-[a-z0-9]+|hover|active|focus|^#\d|sc-[a-zA-Z0-9]+|svelte-[a-z0-9]+|emotion-[0-9]+|chakra-|MuiBox-root|is-hovered|is-active|is-focused/.test(editingChange.selector)
-                        
-                        // Also show suggestions if selector has low quality (many classes, complex structure)
-                        const needsSuggestions = hasAutoGenerated || 
-                          editingChange.selector.split('.').length > 4 || // Too many classes
-                          editingChange.selector.includes(':nth-') // Position-based selector
-                        
-                        if (needsSuggestions) {
-                          // Try to find the element and generate suggestions
-                          try {
-                            const elements = document.querySelectorAll(editingChange.selector)
-                            if (elements.length > 0) {
-                              // Always generate suggestions to see if there are better alternatives
-                              const allSuggestions = generateSelectorSuggestions(elements[0])
-                              
-                              // Filter out the current selector and prioritize unique matches
-                              const suggestions = allSuggestions
-                                .filter(s => s.selector !== editingChange.selector)
-                                .sort((a, b) => {
-                                  // Prioritize unique selectors
-                                  if (a.matchCount === 1 && b.matchCount !== 1) return -1
-                                  if (b.matchCount === 1 && a.matchCount !== 1) return 1
-                                  // Then by specificity
-                                  const specOrder = { high: 3, medium: 2, low: 1 }
-                                  return specOrder[b.specificity] - specOrder[a.specificity]
-                                })
-                                .slice(0, 5)
-                              
-                              if (suggestions.length > 0) {
-                                return (
-                                  <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                                    <div className="flex items-start gap-2">
-                                      <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                                      <div className="flex-1">
-                                        <p className="text-amber-800 font-medium text-xs mb-2">
-                                          This selector uses auto-generated classes that may change
-                                        </p>
-                                        <p className="text-amber-700 text-xs mb-2">
-                                          Pick a better selector:
-                                        </p>
-                                        <div className="space-y-1">
-                                          {suggestions.map((suggestion, idx) => (
-                                            <button
-                                              key={idx}
-                                              onClick={() => {
-                                                debugLog('Selected alternative selector:', suggestion.selector)
-                                                setEditingChange({ ...editingChange, selector: suggestion.selector })
-                                              }}
-                                              className="w-full text-left p-2 bg-white hover:bg-amber-100 border border-amber-200 rounded text-xs transition-colors"
-                                            >
-                                              <div className="flex items-center justify-between">
-                                                <code className="font-mono text-amber-900">
-                                                  {suggestion.selector}
-                                                </code>
-                                                <span className="text-amber-600 ml-2">
-                                                  {suggestion.matchCount === 1 ? '✓ unique' : `${suggestion.matchCount} matches`}
-                                                </span>
-                                              </div>
-                                              <div className="text-amber-600 mt-0.5">
-                                                {suggestion.description}
-                                              </div>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              }
-                            }
-                          } catch (e) {
-                            debugLog('Could not generate suggestions:', e)
-                          }
-                        }
-                        return null
-                      })()}
-                      <div className="flex gap-2">
-                        <div className="flex-1 relative">
-                          {/* Syntax highlighted overlay */}
-                          <div 
-                            className="absolute inset-0 px-3 py-2 pr-10 pointer-events-none text-xs font-mono bg-white border border-gray-300 rounded-md overflow-x-auto overflow-y-hidden"
-                            style={{ 
-                              scrollLeft: 0,
-                              whiteSpace: 'nowrap'
-                            }}
-                            id={`selector-overlay-edit-${editingChange.index}`}
-                          >
-                            {editingChange.selector ? highlightCSSSelector(editingChange.selector) : <span className="text-gray-400">.cta-button, #header, [data-test='submit']</span>}
-                          </div>
-                          {/* Actual input field */}
-                          <input
-                            value={editingChange.selector}
-                            onChange={(e) => setEditingChange({ ...editingChange, selector: e.target.value })}
-                            onScroll={(e) => {
-                              const input = e.target as HTMLInputElement
-                              const overlay = document.getElementById(`selector-overlay-edit-${editingChange.index}`)
-                              if (overlay) {
-                                overlay.scrollLeft = input.scrollLeft
-                              }
-                            }}
-                            placeholder=".cta-button, #header, [data-test='submit']"
-                            className={`relative w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono whitespace-nowrap ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
-                            style={{ 
-                              color: 'transparent',
-                              caretColor: 'black',
-                              background: 'transparent',
-                              overflowX: 'auto',
-                              overflowY: 'hidden'
-                            }}
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          onClick={() => handleStartElementPicker('selector')}
-                          size="sm"
-                          variant="secondary"
-                          title="Pick element"
-                          className={pickingForField === 'selector' ? 'bg-blue-100' : ''}
-                        >
-                          🎯
-                        </Button>
-                      </div>
-                      {pickingForField === 'selector' && (
-                        <p className="text-xs text-blue-600 mt-1 animate-pulse">
-                          Click an element on the page...
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Change type selector */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Change Type
-                      </label>
-                      <select
-                        value={editingChange.type}
-                        onChange={(e) => {
-                          const newType = e.target.value as DOMChangeType
-                          debugLog('📝 Changing type to:', newType)
-                          const updatedChange = { ...editingChange, type: newType }
-                          debugLog('📝 Updated editingChange:', updatedChange)
-                          setEditingChange(updatedChange)
-                        }}
-                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
-                        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
-                      >
-                        <option value="text">Text</option>
-                        <option value="style">Style</option>
-                        <option value="styleRules">Style Rules (with states)</option>
-                        <option value="class">Class</option>
-                        <option value="attribute">Attribute</option>
-                        <option value="html">HTML</option>
-                        <option value="javascript">JavaScript</option>
-                        <option value="move">Move/Reorder</option>
-                        <option value="remove">Remove Element</option>
-                        <option value="insert">Insert Element</option>
-                      </select>
-                    </div>
-
-                    {/* Dynamic value fields based on type */}
-                    {editingChange.type === 'text' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Text Content
-                        </label>
-                        <Input
-                          value={editingChange.textValue || ''}
-                          onChange={(e) => setEditingChange({ ...editingChange, textValue: e.target.value })}
-                          placeholder="New text content"
-                        />
-                      </div>
-                    )}
-
-                    {editingChange.type === 'style' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Style Properties
-                        </label>
-                        <CSSStyleEditor
-                          styleProperties={editingChange.styleProperties}
-                          onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
-                        />
-                      </div>
-                    )}
-
-                    {editingChange.type === 'styleRules' && (
-                      <div>
-                        <StyleRulesEditor
-                          change={{
-                            selector: editingChange.selector,
-                            type: 'styleRules',
-                            states: editingChange.styleRulesStates || {},
-                            important: editingChange.styleRulesImportant,
-                            waitForElement: editingChange.waitForElement,
-                            observerRoot: editingChange.observerRoot
-                          }}
-                          onChange={(change) => {
-                            setEditingChange({
-                              ...editingChange,
-                              styleRulesStates: change.states,
-                              styleRulesImportant: change.important,
-                              waitForElement: change.waitForElement,
-                              observerRoot: change.observerRoot
-                            })
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {editingChange.type === 'class' && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Classes to Add
-                          </label>
-                          <MultiSelectTags
-                            currentClasses={editingChange.classAdd || []}
-                            onAddClass={(className) => {
-                              const newClassAdd = [...(editingChange.classAdd || []), className]
-                              const newClassRemove = (editingChange.classRemove || []).filter(c => c !== className)
-                              setEditingChange({ 
-                                ...editingChange, 
-                                classAdd: newClassAdd,
-                                classRemove: newClassRemove
-                              })
-                            }}
-                            onRemoveClass={(className) => {
-                              setEditingChange({
-                                ...editingChange,
-                                classAdd: (editingChange.classAdd || []).filter(c => c !== className)
-                              })
-                            }}
-                            placeholder="Type class name to add and press Enter..."
-                            className="bg-green-50"
-                            pillColor="green"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Classes to Remove
-                          </label>
-                          <MultiSelectTags
-                            currentClasses={editingChange.classRemove || []}
-                            onAddClass={(className) => {
-                              const newClassRemove = [...(editingChange.classRemove || []), className]
-                              const newClassAdd = (editingChange.classAdd || []).filter(c => c !== className)
-                              setEditingChange({ 
-                                ...editingChange, 
-                                classRemove: newClassRemove,
-                                classAdd: newClassAdd
-                              })
-                            }}
-                            onRemoveClass={(className) => {
-                              setEditingChange({
-                                ...editingChange,
-                                classRemove: (editingChange.classRemove || []).filter(c => c !== className)
-                              })
-                            }}
-                            placeholder="Type class name to remove and press Enter..."
-                            className="bg-red-50"
-                            pillColor="red"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {editingChange.type === 'attribute' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Attributes
-                        </label>
-                        <AttributeEditor 
-                          attributeProperties={editingChange.attributeProperties}
-                          onChange={(newProps) => setEditingChange({ ...editingChange, attributeProperties: newProps })}
-                        />
-                      </div>
-                    )}
-
-                    {editingChange.type === 'html' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          HTML Content
-                        </label>
-                        <textarea
-                          value={editingChange.htmlValue || ''}
-                          onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
-                          placeholder="<div>New HTML content</div>"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50"
-                          rows={4}
-                        />
-                      </div>
-                    )}
-
-                    {editingChange.type === 'javascript' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          JavaScript Code
-                        </label>
-                        <textarea
-                          value={editingChange.jsValue || ''}
-                          onChange={(e) => setEditingChange({ ...editingChange, jsValue: e.target.value })}
-                          placeholder="// JavaScript code to execute"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50"
-                          rows={4}
-                        />
-                      </div>
-                    )}
-
-                    {editingChange.type === 'move' && (
-                      <div className="space-y-4">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <span className="text-2xl">🎯</span>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-900 mb-1">Drag & Drop Mode</h4>
-                              <p className="text-sm text-gray-600 mb-3">
-                                Click the button below to enter drag-and-drop mode. You'll be able to click and drag any element to a new position.
-                              </p>
-                              <Button
-                                type="button"
-                                onClick={handleStartDragDrop}
-                                size="sm"
-                                variant="primary"
-                                className="w-full"
-                              >
-                                🖱️ Start Drag & Drop
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Show captured values if we have them */}
-                        {(editingChange.selector || editingChange.targetSelector || editingChange.position) && (
-                          <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                            <div className="text-sm">
-                              <span className="font-medium text-gray-700">Element to Move:</span>{' '}
-                              <code className="text-xs bg-white px-1 py-0.5 rounded">
-                                {editingChange.selector || 'Not set'}
-                              </code>
-                            </div>
-                            <div className="text-sm">
-                              <span className="font-medium text-gray-700">Target:</span>{' '}
-                              <code className="text-xs bg-white px-1 py-0.5 rounded">
-                                {editingChange.targetSelector || 'Not set'}
-                              </code>
-                            </div>
-                            <div className="text-sm">
-                              <span className="font-medium text-gray-700">Position:</span>{' '}
-                              <span className="text-gray-600">
-                                {editingChange.position === 'before' ? 'Before element' :
-                                 editingChange.position === 'after' ? 'After element' :
-                                 editingChange.position === 'firstChild' ? 'As first child' :
-                                 editingChange.position === 'lastChild' ? 'As last child' :
-                                 'Not set'}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Manual input as fallback */}
-                        <details className="text-sm">
-                          <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
-                            Manual input (advanced)
-                          </summary>
-                          <div className="mt-3 space-y-3">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Target Selector
-                              </label>
-                              <Input
-                                value={editingChange.targetSelector || ''}
-                                onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
-                                placeholder=".container, #section, [data-role='main']"
-                                className="text-xs"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Position
-                              </label>
-                              <select
-                                value={editingChange.position || 'after'}
-                                onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
-                                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
-                        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
-                              >
-                                <option value="before">Before target element</option>
-                                <option value="after">After target element</option>
-                                <option value="firstChild">As first child of target</option>
-                                <option value="lastChild">As last child of target</option>
-                              </select>
-                            </div>
-                          </div>
-                        </details>
-                      </div>
-                    )}
-
-                    {editingChange.type === 'remove' && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <span className="text-xl">⚠️</span>
-                          <div className="flex-1">
-                            <p className="text-sm text-red-800">
-                              This will completely remove the selected element from the page.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {editingChange.type === 'insert' && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            HTML to Insert
-                          </label>
-                          <div className="relative" style={{ minHeight: '112px' }}>
-                            <div 
-                              id={`html-overlay-${editingChange.index}`}
-                              className="absolute pointer-events-none text-xs font-mono leading-relaxed bg-white border border-gray-300 rounded-md"
-                              style={{ 
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                padding: '8px 12px 12px 12px',
-                                overflow: 'hidden',
-                                wordBreak: 'break-word',
-                                whiteSpace: 'pre-wrap',
-                                zIndex: 1
-                              }}
-                            >
-                              <div
-                                style={{
-                                  transform: `translateY(${0}px)`,
-                                  transition: 'none'
-                                }}
-                                id={`html-overlay-content-${editingChange.index}`}
-                              >
-                                {editingChange.htmlValue ? highlightHTML(editingChange.htmlValue) : <span className="text-gray-400">&lt;div class='new-element'&gt;New content to insert&lt;/div&gt;</span>}
-                              </div>
-                            </div>
-                            <textarea
-                              value={editingChange.htmlValue || ''}
-                              onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
-                              onScroll={(e) => {
-                                const textarea = e.target as HTMLTextAreaElement
-                                const overlayContent = document.getElementById(`html-overlay-content-${editingChange.index}`)
-                                if (overlayContent) {
-                                  overlayContent.style.transform = `translateY(-${textarea.scrollTop}px)`
-                                }
-                              }}
-                              placeholder="<div class='new-element'>New content to insert</div>"
-                              className="absolute px-3 py-2 border border-transparent rounded-md text-xs font-mono leading-relaxed"
-                              style={{ 
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                color: 'transparent',
-                                caretColor: 'black',
-                                background: 'transparent',
-                                resize: 'vertical',
-                                overflow: 'auto',
-                                minHeight: '96px',
-                                paddingBottom: '12px',
-                                zIndex: 2
-                              }}
-                              rows={4}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Insert Position
-                          </label>
-                          <select
-                            value={editingChange.position || 'after'}
-                            onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-xs font-mono appearance-none bg-white bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center]"
-                        style={{ backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"%236b7280\"%3e%3cpath fill-rule=\"evenodd\" d=\"M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clip-rule=\"evenodd\" /%3e%3c/svg%3e')" }}
-                          >
-                            <option value="before">Before the selected element</option>
-                            <option value="after">After the selected element</option>
-                            <option value="firstChild">As first child of the selected element</option>
-                            <option value="lastChild">As last child of the selected element</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
+                  <div key={index}>
+                    <DOMChangeEditor
+                      editingChange={editingChange}
+                      onSave={handleSaveChange}
+                      onCancel={handleCancelEdit}
+                      onStartPicker={(field) => {
+                        setPickingForField(field)
+                        startElementPicker(field)
+                      }}
+                    />
                   </div>
                 )
               }
-              
+
               return (
                 <div 
                   key={index} 
@@ -3178,317 +2513,15 @@ export function DOMChangesInlineEditor({
 
       {/* New DOM change form - only show when adding new change */}
       {editingChange && editingChange.index === null && (
-        <div className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
-          <div className="flex items-center justify-between">
-            <h5 className="font-medium text-gray-900">
-              {editingChange.index !== null ? 'Edit' : 'Add'} DOM Change
-            </h5>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSaveChange}
-                className="p-1 text-green-600 hover:text-green-800"
-                title="Save"
-              >
-                <CheckIcon className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                className="p-1 text-gray-400 hover:text-gray-600"
-                title="Cancel"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Selector field with picker */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Element Selector
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <input
-                  value={editingChange.selector}
-                  onChange={(e) => setEditingChange({ ...editingChange, selector: e.target.value })}
-                  placeholder=".cta-button, #header, [data-test='submit']"
-                  className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'} text-transparent caret-black`}
-                  style={{ caretColor: 'black' }}
-                />
-                <div className="absolute inset-0 px-3 py-2 pointer-events-none text-xs font-mono overflow-hidden whitespace-nowrap">
-                  {highlightCSSSelector(editingChange.selector)}
-                </div>
-              </div>
-              <Button
-                type="button"
-                onClick={() => handleStartElementPicker('selector')}
-                size="sm"
-                variant="secondary"
-                title="Pick element"
-                className={pickingForField === 'selector' ? 'bg-blue-100' : ''}
-              >
-                🎯
-              </Button>
-            </div>
-            {pickingForField === 'selector' && (
-              <p className="text-xs text-blue-600 mt-1 animate-pulse">
-                Click an element on the page...
-              </p>
-            )}
-          </div>
-
-          {/* Change type selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Change Type
-            </label>
-            <select
-              value={editingChange.type}
-              onChange={(e) => {
-                const newType = e.target.value as DOMChangeType
-                debugLog('📝 Changing type to:', newType)
-                const updatedChange = { ...editingChange, type: newType }
-                debugLog('📝 Updated editingChange:', updatedChange)
-                setEditingChange(updatedChange)
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="text">Text</option>
-              <option value="style">Style</option>
-              <option value="styleRules">Style Rules (with states)</option>
-              <option value="class">Class</option>
-              <option value="attribute">Attribute</option>
-              <option value="html">HTML</option>
-              <option value="javascript">JavaScript</option>
-              <option value="move">Move/Reorder</option>
-            </select>
-          </div>
-
-          {/* Dynamic value fields based on type */}
-          {editingChange.type === 'text' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Text Content
-              </label>
-              <Input
-                value={editingChange.textValue || ''}
-                onChange={(e) => setEditingChange({ ...editingChange, textValue: e.target.value })}
-                placeholder="New text content"
-              />
-            </div>
-          )}
-
-          {editingChange.type === 'style' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Style Properties
-              </label>
-              <CSSStyleEditor
-                styleProperties={editingChange.styleProperties}
-                onChange={(newProps) => setEditingChange({ ...editingChange, styleProperties: newProps })}
-              />
-            </div>
-          )}
-
-          {editingChange.type === 'styleRules' && (
-            <div>
-              <StyleRulesEditor
-                change={{
-                  selector: editingChange.selector,
-                  type: 'styleRules',
-                  states: editingChange.styleRulesStates || {},
-                  important: editingChange.styleRulesImportant,
-                  waitForElement: editingChange.waitForElement,
-                  observerRoot: editingChange.observerRoot
-                }}
-                onChange={(change) => {
-                  setEditingChange({
-                    ...editingChange,
-                    styleRulesStates: change.states,
-                    styleRulesImportant: change.important,
-                    waitForElement: change.waitForElement,
-                    observerRoot: change.observerRoot
-                  })
-                }}
-              />
-            </div>
-          )}
-
-          {editingChange.type === 'class' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Classes to Add
-                </label>
-                <MultiSelectTags
-                  currentClasses={editingChange.classAdd || []}
-                  onAddClass={(className) => {
-                    const newClassAdd = [...(editingChange.classAdd || []), className]
-                    const newClassRemove = (editingChange.classRemove || []).filter(c => c !== className)
-                    setEditingChange({ 
-                      ...editingChange, 
-                      classAdd: newClassAdd,
-                      classRemove: newClassRemove
-                    })
-                  }}
-                  onRemoveClass={(className) => {
-                    setEditingChange({
-                      ...editingChange,
-                      classAdd: (editingChange.classAdd || []).filter(c => c !== className)
-                    })
-                  }}
-                  placeholder="Type class name to add and press Enter..."
-                  className="bg-green-50"
-                  pillColor="green"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Classes to Remove
-                </label>
-                <MultiSelectTags
-                  currentClasses={editingChange.classRemove || []}
-                  onAddClass={(className) => {
-                    const newClassRemove = [...(editingChange.classRemove || []), className]
-                    const newClassAdd = (editingChange.classAdd || []).filter(c => c !== className)
-                    setEditingChange({ 
-                      ...editingChange, 
-                      classRemove: newClassRemove,
-                      classAdd: newClassAdd
-                    })
-                  }}
-                  onRemoveClass={(className) => {
-                    setEditingChange({
-                      ...editingChange,
-                      classRemove: (editingChange.classRemove || []).filter(c => c !== className)
-                    })
-                  }}
-                  placeholder="Type class name to remove and press Enter..."
-                  className="bg-red-50"
-                  pillColor="red"
-                />
-              </div>
-            </div>
-          )}
-
-          {editingChange.type === 'html' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                HTML Content
-              </label>
-              <textarea
-                value={editingChange.htmlValue || ''}
-                onChange={(e) => setEditingChange({ ...editingChange, htmlValue: e.target.value })}
-                placeholder="<div>New HTML content</div>"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-                rows={4}
-              />
-            </div>
-          )}
-
-          {editingChange.type === 'javascript' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                JavaScript Code
-              </label>
-              <textarea
-                value={editingChange.jsValue || ''}
-                onChange={(e) => setEditingChange({ ...editingChange, jsValue: e.target.value })}
-                placeholder="// JavaScript code to execute"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-                rows={4}
-              />
-            </div>
-          )}
-
-          {editingChange.type === 'move' && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">🎯</span>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 mb-1">Drag & Drop Mode</h4>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Click the button below to enter drag-and-drop mode. You'll be able to click and drag any element to a new position.
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={handleStartDragDrop}
-                      size="sm"
-                      variant="primary"
-                      className="w-full"
-                    >
-                      🖱️ Start Drag & Drop
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Show captured values if we have them */}
-              {(editingChange.selector || editingChange.targetSelector || editingChange.position) && (
-                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                  <div className="text-sm">
-                    <span className="font-medium text-gray-700">Element to Move:</span>{' '}
-                    <code className="text-xs bg-white px-1 py-0.5 rounded">
-                      {editingChange.selector || 'Not set'}
-                    </code>
-                  </div>
-                  <div className="text-sm">
-                    <span className="font-medium text-gray-700">Target:</span>{' '}
-                    <code className="text-xs bg-white px-1 py-0.5 rounded">
-                      {editingChange.targetSelector || 'Not set'}
-                    </code>
-                  </div>
-                  <div className="text-sm">
-                    <span className="font-medium text-gray-700">Position:</span>{' '}
-                    <span className="text-gray-600">
-                      {editingChange.position === 'before' ? 'Before element' :
-                       editingChange.position === 'after' ? 'After element' :
-                       editingChange.position === 'firstChild' ? 'As first child' :
-                       editingChange.position === 'lastChild' ? 'As last child' :
-                       'Not set'}
-                    </span>
-                  </div>
-                </div>
-              )}
-              
-              {/* Manual input as fallback */}
-              <details className="text-sm">
-                <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
-                  Manual input (advanced)
-                </summary>
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Target Selector
-                    </label>
-                    <Input
-                      value={editingChange.targetSelector || ''}
-                      onChange={(e) => setEditingChange({ ...editingChange, targetSelector: e.target.value })}
-                      placeholder=".container, #section, [data-role='main']"
-                      className="text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Position
-                    </label>
-                    <select
-                      value={editingChange.position || 'after'}
-                      onChange={(e) => setEditingChange({ ...editingChange, position: e.target.value as 'before' | 'after' | 'firstChild' | 'lastChild' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    >
-                      <option value="before">Before target element</option>
-                      <option value="after">After target element</option>
-                      <option value="firstChild">As first child of target</option>
-                      <option value="lastChild">As last child of target</option>
-                    </select>
-                  </div>
-                </div>
-              </details>
-            </div>
-          )}
-        </div>
+        <DOMChangeEditor
+          editingChange={editingChange}
+          onSave={handleSaveChange}
+          onCancel={handleCancelEdit}
+          onStartPicker={(field) => {
+            setPickingForField(field)
+            startElementPicker(field)
+          }}
+        />
       )}
 
       {/* Action buttons - only show if we have existing changes and not editing */}
