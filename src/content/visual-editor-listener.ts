@@ -1,4 +1,4 @@
-import { VisualEditor } from './visual-editor'
+import { VisualEditor } from '~src/visual-editor'
 import type { DOMChange } from '~src/types/dom-changes'
 
 // Keep track of the current visual editor instance

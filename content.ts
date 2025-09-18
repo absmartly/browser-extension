@@ -1,7 +1,7 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 // This is the main content script that will be injected into all web pages
-import { VisualEditor } from '~src/content/visual-editor'
+import { VisualEditor } from '~src/visual-editor'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
@@ -120,7 +120,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       debugError('[Visual Editor Content Script] Error starting visual editor:', error)
       sendResponse({ success: false, error: error.message })
     }
-    
+
     return true // Keep message channel open for async response
   }
   
@@ -138,13 +138,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else {
       sendResponse({ success: true, changes: [] })
     }
-    
+
     return true
   }
   
   if (message.type === 'GET_VISUAL_EDITOR_STATUS') {
-    sendResponse({ 
-      active: currentEditor !== null,
+    sendResponse({
+      active: isVisualEditorActive,
       changes: currentEditor?.getChanges() || []
     })
     return true
