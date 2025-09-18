@@ -3,7 +3,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const srcDir = path.join(__dirname, '..', 'src', 'visual-editor');
-const buildDir = path.join(__dirname, '..', 'injected-bundles');
+const buildDir = path.join(__dirname, '..', '..', 'absmartly-visual-editor-bundles');
 const entryFile = path.join(srcDir, 'index.ts');
 const outputFile = path.join(buildDir, 'visual-editor-injection.bundle');
 
