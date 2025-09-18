@@ -175,7 +175,8 @@ describe('getSelector', () => {
       `
       const span = container.querySelector('span')!
       const selector = getSelector(span)
-      expect(selector).toBe('#parent > span')
+      // Now uses descendant selector for better performance
+      expect(selector).toBe('#parent span')
       expect(selector).not.toMatch(/:nth-child\(1\)/)
     })
 
@@ -199,7 +200,7 @@ describe('getSelector', () => {
   })
 
   describe('Multiple children (needs nth-child)', () => {
-    test('should add nth-child for multiple siblings', () => {
+    test('should add nth-of-type for multiple siblings when needed', () => {
       container.innerHTML = `
         <div id="parent">
           <span>First</span>
@@ -209,7 +210,8 @@ describe('getSelector', () => {
       `
       const second = container.querySelectorAll('span')[1]
       const selector = getSelector(second)
-      expect(selector).toMatch(/:nth-child\(2\)/)
+      // Should use nth-of-type when necessary for uniqueness
+      expect(selector).toMatch(/:nth-of-type\(2\)/)
 
       // Should be unique
       const matches = document.querySelectorAll(selector)
@@ -252,7 +254,8 @@ describe('getSelector', () => {
       const p = container.querySelector('p')!
       const selector = getSelector(p)
       expect(selector).not.toBe('p')
-      expect(selector).toMatch(/#content/)
+      // Should use descendant selector for performance
+      expect(selector).toBe('#content p')
     })
 
     test('should include context even for seemingly unique elements', () => {
@@ -264,7 +267,8 @@ describe('getSelector', () => {
       const h1 = container.querySelector('h1')!
       const selector = getSelector(h1)
       expect(selector).not.toBe('h1')
-      expect(selector).toMatch(/article/)
+      // Should add parent context for structural elements
+      expect(selector).toBe('article > h1')
     })
   })
 
