@@ -4,6 +4,7 @@ import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
 import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
+import { getAvatarColor, getInitials } from '~src/utils/avatar'
 import {
   type ExperimentOverrides,
   type OverrideValue,
@@ -280,12 +281,10 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       const avatar = user.avatar?.base_url ? 
         `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${user.avatar.base_url}/crop/32x32.webp` : 
         null
-      const name = user.first_name || user.last_name ? 
-        `${user.first_name || ''} ${user.last_name || ''}`.trim() : 
+      const name = user.first_name || user.last_name ?
+        `${user.first_name || ''} ${user.last_name || ''}`.trim() :
         user.email || 'Unknown'
-      const initials = user.first_name || user.last_name ?
-        ((user.first_name?.[0] || '') + (user.last_name?.[0] || '')).toUpperCase() || user.email?.[0]?.toUpperCase() || '?' :
-        user.email?.[0]?.toUpperCase() || '?'
+      const initials = getInitials(name)
       
       avatars.push({
         user,
@@ -314,12 +313,10 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         const avatar = owner.avatar?.base_url ? 
           `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp` : 
           null
-        const name = owner.first_name || owner.last_name ? 
-          `${owner.first_name || ''} ${owner.last_name || ''}`.trim() : 
+        const name = owner.first_name || owner.last_name ?
+          `${owner.first_name || ''} ${owner.last_name || ''}`.trim() :
           owner.email || 'Unknown'
-        const initials = owner.first_name || owner.last_name ?
-          ((owner.first_name?.[0] || '') + (owner.last_name?.[0] || '')).toUpperCase() || owner.email?.[0]?.toUpperCase() || '?' :
-          owner.email?.[0]?.toUpperCase() || '?'
+        const initials = getInitials(name)
         
         avatars.push({
           user: owner,
@@ -456,15 +453,18 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                                     }
                                   }}
                                 />
-                                <div 
-                                  className="hidden h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                                  style={{ display: 'none' }}
+                                <div
+                                  className="hidden h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
+                                  style={{ display: 'none', backgroundColor: getAvatarColor(avatarData.name) }}
                                 >
                                   {avatarData.initials}
                                 </div>
                               </>
                             ) : (
-                              <div className="flex h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm">
+                              <div
+                                className="flex h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
+                                style={{ backgroundColor: getAvatarColor(avatarData.name) }}
+                              >
                                 {avatarData.initials}
                               </div>
                             )}
