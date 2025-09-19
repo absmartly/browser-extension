@@ -206,6 +206,14 @@ export class VisualEditor {
     return this.changes
   }
 
+  get experimentName(): string {
+    return this.options.experimentName
+  }
+
+  get variantName(): string {
+    return this.options.variantName
+  }
+
   // Style injection methods
   private injectStyles(): void {
     const style = document.createElement('style')
