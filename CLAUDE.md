@@ -27,7 +27,7 @@ npx prettier --write .   # Format code with Prettier
 ## Architecture & Structure
 
 ### Key Directories
-- **popup.tsx** - Main extension popup UI entry point
+- **index.tsx** - Main extension sidebar UI entry point
 - **content.tsx** - Content script for visual editor injection
 - **background.ts** - Background service worker for messaging and API calls
 - **src/components/** - React components for the extension UI

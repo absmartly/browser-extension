@@ -437,7 +437,7 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
   }
 }
 
-// Listen for messages from popup and content scripts
+// Listen for messages from sidebar and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   debugLog('🔵 Background received message:', message.type, 'Full message:', message)
   
@@ -459,27 +459,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Element picker returned a selector
     debugLog('Background received ELEMENT_SELECTED:', message)
     
-    if (message.reopenPopup) {
-      // Store the result using Plasmo Storage for cross-browser compatibility
-      const sessionStorage = new Storage({ area: "session" })
-      
-      // Get the current state to find out which field we were picking for
-      sessionStorage.get('domChangesInlineState').then(async (state) => {
-        if (state && state.pickingForField) {
-          debugLog('Storing element picker result for field:', state.pickingForField)
-          
-          // Store the result
-          await sessionStorage.set('elementPickerResult', {
-            variantName: state.variantName,
-            fieldId: state.pickingForField,
-            selector: message.selector
-          })
-          
-          // Reopen the popup
-          chrome.action.openPopup()
-        }
-      })
-    }
+    // Store the result using Plasmo Storage for cross-browser compatibility
+    const sessionStorage = new Storage({ area: "session" })
+
+    // Get the current state to find out which field we were picking for
+    sessionStorage.get('domChangesInlineState').then(async (state) => {
+      if (state && state.pickingForField) {
+        debugLog('Storing element picker result for field:', state.pickingForField)
+
+        // Store the result
+        await sessionStorage.set('elementPickerResult', {
+          variantName: state.variantName,
+          fieldId: state.pickingForField,
+          selector: message.selector
+        })
+
+        // Send message to sidebar to refresh with the selected element
+        chrome.runtime.sendMessage({
+          type: 'ELEMENT_PICKER_RESULT',
+          variantName: state.variantName,
+          fieldId: state.pickingForField,
+          selector: message.selector
+        }).catch(() => {
+          // Ignore errors if no sidebar is open
+        })
+      }
+    })
   } else if (message.type === "GET_CURRENT_TAB_URL") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       sendResponse({ url: tabs[0]?.url || "" })
@@ -533,7 +538,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (tabs[0]?.id) {
         chrome.tabs.sendMessage(tabs[0].id, {
           type: 'ABSMARTLY_PREVIEW',
-          action: 'remove'
+          action: 'remove',
+          experimentName: message.experimentName
         }, () => {
           // Ignore connection errors - tab might have navigated
           if (chrome.runtime.lastError) {
@@ -543,12 +549,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })
 
-    // Also notify any open extension popups to update their preview toggle state
+    // Also notify any open extension sidebars to update their preview toggle state
     chrome.runtime.sendMessage({
       type: 'PREVIEW_STATE_CHANGED',
       enabled: false
     }).catch(() => {
-      // Ignore errors if no popup is open
+      // Ignore errors if no sidebar is open
     })
 
     sendResponse({ success: true })
@@ -997,13 +1003,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true // Will respond asynchronously
   } else if (message.type === "CODE_EDITOR_SAVE" || message.type === "CODE_EDITOR_CLOSE") {
-    // Forward these messages from content script to popup
-    debugLog('Background forwarding message to popup:', message.type)
-    
-    // Send to all extension views (including popup)
+    // Forward these messages from content script to sidebar
+    debugLog('Background forwarding message to sidebar:', message.type)
+
+    // Send to all extension views (including sidebar)
     chrome.runtime.sendMessage(message)
     sendResponse({ success: true })
-    
+
     return false
   }
 })
