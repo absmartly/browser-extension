@@ -368,7 +368,10 @@ export class VisualEditor {
     }
     this.notifications.show(`${currentChanges.length} changes saved`, '', 'success')
 
-    // Don't disable preview when saving - only when exiting visual editor
+    // Exit the visual editor after saving (but keep preview active)
+    setTimeout(() => {
+      this.stop()
+    }, 500) // Small delay to show success message
   }
 }
 
