@@ -29,5 +29,8 @@ module.exports = {
     '<rootDir>/node_modules/',
     '<rootDir>/tests/', // Ignore Playwright tests
   ],
+  transformIgnorePatterns: [
+    'node_modules/(?!(@plasmohq/storage|pify))',
+  ],
   verbose: true,
 }

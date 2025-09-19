@@ -116,7 +116,7 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
       debugError('Failed to save modal state:', err)
     }
     
-    // Store current state and start element picker without closing popup
+    // Store current state and start element picker from sidebar
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
@@ -149,7 +149,7 @@ export function DOMChangeModal({ change, onSave, onClose }: DOMChangeModalProps)
         debugLog('Sending START_ELEMENT_PICKER message to tab:', tabId)
         chrome.tabs.sendMessage(tabId, { 
           type: 'START_ELEMENT_PICKER',
-          fromPopup: true
+          fromSidebar: true
         }, (response) => {
           debugLog('START_ELEMENT_PICKER response:', response)
         })

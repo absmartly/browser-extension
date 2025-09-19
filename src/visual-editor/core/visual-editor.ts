@@ -10,7 +10,7 @@ import ChangeTracker from './change-tracker'
 import UIComponents from '../ui/components'
 import EditModes from './edit-modes'
 import Cleanup from './cleanup'
-import { Toolbar } from '../ui/toolbar'
+// Removed toolbar import - using UIComponents banner instead
 import { Notifications } from '../ui/notifications'
 import { ElementActions } from './element-actions'
 import { EditorCoordinator, EditorCoordinatorCallbacks } from './editor-coordinator'
@@ -36,7 +36,7 @@ export class VisualEditor {
   private uiComponents: UIComponents
   private editModes: EditModes
   private cleanup: Cleanup
-  private toolbar: Toolbar
+  // Removed toolbar - using UIComponents banner instead
   private notifications: Notifications
   private elementActions: ElementActions
   private coordinator: EditorCoordinator
@@ -65,7 +65,7 @@ export class VisualEditor {
     this.uiComponents = new UIComponents(this.stateManager)
     this.editModes = new EditModes(this.stateManager)
     this.cleanup = new Cleanup(this.stateManager)
-    this.toolbar = new Toolbar(this.stateManager)
+    // Removed toolbar - using UIComponents banner instead
     this.notifications = new Notifications()
 
     // Initialize element actions
@@ -73,14 +73,28 @@ export class VisualEditor {
       this.stateManager,
       this.changeTracker,
       this.notifications,
-      { onChangesUpdate: this.options.onChangesUpdate }
+      {
+        onChangesUpdate: (changes: DOMChange[]) => {
+          // Sync changes with visual editor's internal state
+          this.changes = changes
+          this.options.onChangesUpdate(changes)
+        },
+        addChange: (change: DOMChange) => {
+          // Delegate to visual editor's addChange for proper undo/redo management
+          console.log('[VisualEditor] ElementActions delegating addChange')
+          this.addChange(change)
+        }
+      }
     )
 
     // Setup coordinator callbacks
     const callbacks: EditorCoordinatorCallbacks = {
       onChangesUpdate: this.options.onChangesUpdate,
       removeStyles: () => this.removeStyles(),
-      addChange: (change: DOMChange) => this.addChange(change),
+      addChange: (change: DOMChange) => {
+        console.log('[VisualEditor] addChange callback called with:', change)
+        this.addChange(change)
+      },
       getSelector: (element: HTMLElement) => this.elementActions.getSelector(element),
       hideElement: () => this.elementActions.hideElement(),
       deleteElement: () => this.elementActions.deleteElement(),
@@ -105,7 +119,7 @@ export class VisualEditor {
       this.uiComponents,
       this.editModes,
       this.cleanup,
-      this.toolbar,
+      null, // toolbar removed - using UIComponents banner
       this.notifications,
       callbacks
     )
@@ -132,10 +146,11 @@ export class VisualEditor {
     this.isActive = true
     ;(window as any).__absmartlyVisualEditorActive = true
 
-    // Hide preview header when visual editor starts
+    // Keep preview header visible when visual editor starts
+    // Users should see both the preview header and visual editor UI
     const previewHeader = document.getElementById('absmartly-preview-header')
     if (previewHeader) {
-      previewHeader.style.display = 'none'
+      console.log('[ABSmartly] Preview header found, keeping it visible')
     }
 
     // Create UI and setup everything
@@ -144,6 +159,10 @@ export class VisualEditor {
 
     // Use coordinator to setup all modules and integrations
     this.coordinator.setupAll()
+
+    // Create the visual editor banner/header
+    this.uiComponents.createBanner()
+    console.log('[ABSmartly] Visual editor banner created')
 
     // Show notification
     this.notifications.show('Visual Editor Active', 'Click any element to edit', 'success')
@@ -156,12 +175,15 @@ export class VisualEditor {
     if (!this.isActive) return
 
     console.log('[ABSmartly] Stopping unified visual editor')
+    console.trace('[ABSmartly] Stop called from:')
 
     this.isActive = false
     ;(window as any).__absmartlyVisualEditorActive = false
 
-    // Save final changes
-    this.options.onChangesUpdate(this.changes)
+    // Save final changes from state manager
+    const finalChanges = this.stateManager.getState().changes || []
+    console.log('[ABSmartly] Final changes on exit:', finalChanges.length)
+    this.options.onChangesUpdate(finalChanges)
 
     // Use coordinator to teardown all modules
     this.coordinator.teardownAll()
@@ -169,17 +191,11 @@ export class VisualEditor {
     // Remove styles
     this.removeStyles()
 
-    // Send message to disable preview mode (if chrome extension context is available)
-    try {
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: 'DISABLE_PREVIEW'
-        })
-      }
-    } catch (error) {
-      // Ignore chrome API errors in non-extension contexts (e.g., tests)
-      console.debug('[ABSmartly] Chrome API not available for preview disable message')
-    }
+    // Send message to content script to stop visual editor
+    window.postMessage({
+      type: 'ABSMARTLY_VISUAL_EDITOR_EXIT',
+      changes: finalChanges
+    }, '*')
   }
 
   destroy(): void {
@@ -280,11 +296,17 @@ export class VisualEditor {
 
   // Change management methods
   private addChange(change: DOMChange): void {
+    console.log('[VisualEditor] addChange called with:', change)
+    console.log('[VisualEditor] Current changes count before:', this.changes.length)
+
     const existingIndex = this.changes.findIndex(c =>
       c.selector === change.selector && c.type === change.type
     )
 
     if (existingIndex >= 0) {
+      // Store old change for undo
+      const oldChange = { ...this.changes[existingIndex] }
+
       if (change.type === 'style' && this.changes[existingIndex].type === 'style') {
         this.changes[existingIndex].value = {
           ...this.changes[existingIndex].value,
@@ -293,29 +315,52 @@ export class VisualEditor {
       } else {
         this.changes[existingIndex] = change
       }
+
+      // Add to undo stack
+      this.stateManager.pushUndo({
+        type: 'update',
+        change: oldChange,
+        index: existingIndex
+      })
     } else {
       this.changes.push(change)
+
+      // Add to undo stack
+      this.stateManager.pushUndo({
+        type: 'add',
+        change: change,
+        index: this.changes.length - 1
+      })
     }
 
+    console.log('[VisualEditor] New changes count:', this.changes.length)
+    console.log('[VisualEditor] Updating state manager with changes')
+
+    // Update state manager with new changes array
     this.stateManager.setChanges(this.changes)
-    this.options.onChangesUpdate(this.changes)
+
+    // Auto-save changes to the sidebar
+    try {
+      console.log('[VisualEditor] Calling onChangesUpdate callback with', this.changes.length, 'changes')
+      this.options.onChangesUpdate(this.changes)
+    } catch (error) {
+      console.error('Error in onChangesUpdate callback:', error)
+    }
   }
 
   private saveChanges(): void {
-    this.options.onChangesUpdate(this.changes)
-    this.notifications.show(`${this.changes.length} changes saved`, '', 'success')
+    // Get the latest changes from the state manager
+    const currentChanges = this.stateManager.getState().changes || []
+    console.log('[ABSmartly] Saving changes:', currentChanges.length, 'changes')
 
-    // Send message to disable preview mode (if chrome extension context is available)
     try {
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: 'DISABLE_PREVIEW'
-        })
-      }
+      this.options.onChangesUpdate(currentChanges)
     } catch (error) {
-      // Ignore chrome API errors in non-extension contexts (e.g., tests)
-      console.debug('[ABSmartly] Chrome API not available for preview disable message')
+      console.error('Error in onChangesUpdate callback:', error)
     }
+    this.notifications.show(`${currentChanges.length} changes saved`, '', 'success')
+
+    // Don't disable preview when saving - only when exiting visual editor
   }
 }
 

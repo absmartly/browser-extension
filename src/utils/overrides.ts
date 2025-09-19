@@ -283,7 +283,7 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
     const devEnv = await getDevelopmentEnvironment()
     console.log('[ABsmartly] Syncing to cookie - overrides:', overrides, 'devEnv:', devEnv)
 
-    // Check if we're in extension popup/background (have access to chrome.tabs)
+    // Check if we're in extension sidebar/background (have access to chrome.tabs)
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       if (!tabs[0]?.id) return
@@ -351,13 +351,13 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
 
 /**
  * Load overrides from cookie (fallback/migration)
- * This version works in both extension popup and content scripts
+ * This version works in both extension sidebar and content scripts
  */
 export async function loadOverridesFromCookie(): Promise<ExperimentOverrides> {
   try {
     // Check if we're in a content script (no access to chrome.tabs)
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
-      // We're in extension popup/background
+      // We're in extension sidebar/background
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       if (!tabs[0]?.id) return {}
 

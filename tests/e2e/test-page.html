@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Editor DOM Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .navigation {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nav-button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .nav-button:hover {
+            background: #0056b3;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+
+        .card h3 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        .form-section {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .table-section {
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .media-section {
+            margin: 20px 0;
+        }
+
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .image-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .image-placeholder {
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-weight: bold;
+        }
+
+        .image-info {
+            padding: 10px;
+        }
+
+        .sidebar {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            width: 250px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar h4 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        .sidebar li:hover {
+            background: #f8f9fa;
+            padding-left: 10px;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .resizable-element {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 100px;
+            background: #fafafa;
+            position: relative;
+            resize: both;
+            overflow: auto;
+        }
+
+        .draggable-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        .draggable-item {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: move;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .draggable-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .nested-structure {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .nested-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            font-weight: bold;
+        }
+
+        .nested-content {
+            padding: 15px;
+        }
+
+        .nested-item {
+            border-left: 3px solid #007bff;
+            padding-left: 15px;
+            margin: 10px 0;
+        }
+
+        .footer {
+            background: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-top: 40px;
+            border-radius: 8px;
+        }
+
+        .footer a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Test-specific classes for targeting */
+        .test-text-element {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .test-style-element {
+            transition: all 0.3s ease;
+        }
+
+        .test-hide-element {
+            background: #ffebee;
+            padding: 15px;
+            border: 1px solid #f8bbd9;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .test-delete-element {
+            background: #fff3e0;
+            padding: 15px;
+            border: 1px solid #ffcc02;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .test-move-container {
+            border: 2px solid #4caf50;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .test-move-item {
+            background: #e8f5e8;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header class="header" id="main-header">
+            <h1 data-testid="main-title">Visual Editor Test Page</h1>
+            <p data-testid="subtitle">Comprehensive test page for DOM manipulation features</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="navigation" data-testid="main-navigation">
+            <button class="nav-button" id="nav-home">Home</button>
+            <button class="nav-button" id="nav-products">Products</button>
+            <button class="nav-button" id="nav-services">Services</button>
+            <button class="nav-button" id="nav-about">About</button>
+            <button class="nav-button" id="nav-contact">Contact</button>
+        </nav>
+
+        <!-- Grid Layout -->
+        <div class="grid">
+            <div class="card" data-testid="card-1">
+                <h3>Text Editing Tests</h3>
+                <p class="test-text-element" id="editable-text-1">This text can be edited inline. Click to modify.</p>
+                <p class="test-text-element" id="editable-text-2">Another editable text element for testing.</p>
+                <span class="test-text-element" id="editable-span">Editable span element</span>
+            </div>
+
+            <div class="card" data-testid="card-2">
+                <h3>Style Change Tests</h3>
+                <div class="test-style-element" id="style-target-1">Element for color changes</div>
+                <div class="test-style-element" id="style-target-2">Element for size changes</div>
+                <div class="test-style-element" id="style-target-3">Element for positioning changes</div>
+            </div>
+        </div>
+
+        <!-- Form Section -->
+        <div class="form-section" data-testid="form-section">
+            <h2>Form Elements</h2>
+            <form id="test-form">
+                <div class="form-group">
+                    <label for="text-input">Text Input:</label>
+                    <input type="text" id="text-input" name="text-input" placeholder="Enter text here">
+                </div>
+
+                <div class="form-group">
+                    <label for="email-input">Email Input:</label>
+                    <input type="email" id="email-input" name="email-input" placeholder="Enter email">
+                </div>
+
+                <div class="form-group">
+                    <label for="select-input">Select Dropdown:</label>
+                    <select id="select-input" name="select-input">
+                        <option value="">Choose an option</option>
+                        <option value="option1">Option 1</option>
+                        <option value="option2">Option 2</option>
+                        <option value="option3">Option 3</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="textarea-input">Textarea:</label>
+                    <textarea id="textarea-input" name="textarea-input" rows="4" placeholder="Enter longer text here"></textarea>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary" id="submit-btn">Submit</button>
+                    <button type="button" class="btn btn-secondary" id="reset-btn">Reset</button>
+                    <button type="button" class="btn btn-success" id="save-btn">Save</button>
+                    <button type="button" class="btn btn-danger" id="delete-btn">Delete</button>
+                    <button type="button" class="btn btn-warning" id="warning-btn">Warning</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Hide/Delete Test Section -->
+        <div class="test-section" data-testid="hide-delete-section">
+            <h2>Hide/Delete Elements Tests</h2>
+            <div class="test-hide-element" id="hide-target-1">This element will be hidden during tests</div>
+            <div class="test-hide-element" id="hide-target-2">Another element to hide</div>
+            <div class="test-delete-element" id="delete-target-1">This element will be deleted during tests</div>
+            <div class="test-delete-element" id="delete-target-2">Another element to delete</div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="table-section" data-testid="table-section">
+            <h2>Table Elements</h2>
+            <table id="test-table">
+                <thead>
+                    <tr>
+                        <th id="th-name">Name</th>
+                        <th id="th-email">Email</th>
+                        <th id="th-role">Role</th>
+                        <th id="th-status">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="row-1" data-testid="table-row-1">
+                        <td class="name-cell">John Doe</td>
+                        <td class="email-cell">john@example.com</td>
+                        <td class="role-cell">Admin</td>
+                        <td class="status-cell">Active</td>
+                    </tr>
+                    <tr id="row-2" data-testid="table-row-2">
+                        <td class="name-cell">Jane Smith</td>
+                        <td class="email-cell">jane@example.com</td>
+                        <td class="role-cell">User</td>
+                        <td class="status-cell">Inactive</td>
+                    </tr>
+                    <tr id="row-3" data-testid="table-row-3">
+                        <td class="name-cell">Bob Johnson</td>
+                        <td class="email-cell">bob@example.com</td>
+                        <td class="role-cell">Manager</td>
+                        <td class="status-cell">Active</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Drag and Drop Section -->
+        <div class="test-move-container" data-testid="drag-drop-section">
+            <h2>Drag & Drop / Move Elements</h2>
+            <ul class="draggable-list" id="sortable-list">
+                <li class="draggable-item test-move-item" id="item-1" data-testid="drag-item-1">Item 1 - Drag me around</li>
+                <li class="draggable-item test-move-item" id="item-2" data-testid="drag-item-2">Item 2 - Reorder elements</li>
+                <li class="draggable-item test-move-item" id="item-3" data-testid="drag-item-3">Item 3 - Test drag and drop</li>
+                <li class="draggable-item test-move-item" id="item-4" data-testid="drag-item-4">Item 4 - Move up and down</li>
+                <li class="draggable-item test-move-item" id="item-5" data-testid="drag-item-5">Item 5 - Last item</li>
+            </ul>
+        </div>
+
+        <!-- Media Section -->
+        <div class="media-section" data-testid="media-section">
+            <h2>Media Elements</h2>
+            <div class="image-gallery">
+                <div class="image-card" id="image-1">
+                    <div class="image-placeholder">Image 1</div>
+                    <div class="image-info">
+                        <h4>Sample Image 1</h4>
+                        <p>Description for image 1</p>
+                    </div>
+                </div>
+                <div class="image-card" id="image-2">
+                    <div class="image-placeholder">Image 2</div>
+                    <div class="image-info">
+                        <h4>Sample Image 2</h4>
+                        <p>Description for image 2</p>
+                    </div>
+                </div>
+                <div class="image-card" id="image-3">
+                    <div class="image-placeholder">Image 3</div>
+                    <div class="image-info">
+                        <h4>Sample Image 3</h4>
+                        <p>Description for image 3</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizable Element -->
+        <div class="resizable-element" id="resizable-box" data-testid="resizable-element">
+            <h3>Resizable Element</h3>
+            <p>This element can be resized by dragging the corner. Test the resize functionality here.</p>
+            <div style="background: #e0e0e0; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                Nested content that should resize with parent
+            </div>
+        </div>
+
+        <!-- Nested Structure for Hierarchy Tests -->
+        <div class="nested-structure" data-testid="nested-structure">
+            <div class="nested-header" id="nested-header">
+                Nested Structure for Hierarchy Testing
+            </div>
+            <div class="nested-content">
+                <div class="nested-item" id="nested-item-1">
+                    <h4>Level 1 Item</h4>
+                    <div class="nested-item" id="nested-item-2">
+                        <h5>Level 2 Item</h5>
+                        <div class="nested-item" id="nested-item-3">
+                            <h6>Level 3 Item</h6>
+                            <p>Deep nested content for testing hierarchy movement</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="nested-item" id="nested-item-4">
+                    <h4>Another Level 1 Item</h4>
+                    <p>Test moving items up and down in the hierarchy</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-selection Test Area -->
+        <div class="multi-select-area" data-testid="multi-select-area">
+            <h2>Multi-Selection Test Area</h2>
+            <div class="card" id="multi-card-1">
+                <h3>Card 1</h3>
+                <p>Content for multi-selection testing</p>
+                <button class="btn btn-primary">Button 1</button>
+            </div>
+            <div class="card" id="multi-card-2">
+                <h3>Card 2</h3>
+                <p>Another card for multi-selection</p>
+                <button class="btn btn-secondary">Button 2</button>
+            </div>
+            <div class="card" id="multi-card-3">
+                <h3>Card 3</h3>
+                <p>Third card for testing</p>
+                <button class="btn btn-success">Button 3</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer" data-testid="footer">
+            <p>&copy; 2024 Visual Editor Test Page. Created for testing DOM manipulation features.</p>
+            <p>
+                <a href="#" id="footer-link-1">Privacy Policy</a> |
+                <a href="#" id="footer-link-2">Terms of Service</a> |
+                <a href="#" id="footer-link-3">Contact Support</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Sidebar (Fixed Position) -->
+    <div class="sidebar" data-testid="sidebar">
+        <h4>Quick Actions</h4>
+        <ul>
+            <li id="action-1">Action Item 1</li>
+            <li id="action-2">Action Item 2</li>
+            <li id="action-3">Action Item 3</li>
+            <li id="action-4">Action Item 4</li>
+            <li id="action-5">Action Item 5</li>
+        </ul>
+    </div>
+
+    <!-- Modal for Testing -->
+    <div class="modal-overlay" id="test-modal">
+        <div class="modal">
+            <h3>Test Modal</h3>
+            <p>This modal can be used for testing overlay interactions.</p>
+            <div class="button-group">
+                <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+                <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple JavaScript for interactivity
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add some basic interactivity for testing
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Button clicked:', this.id);
+                });
+            });
+
+            // Navigation button interactions
+            const navButtons = document.querySelectorAll('.nav-button');
+            navButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            // Sidebar interactions
+            const sidebarItems = document.querySelectorAll('.sidebar li');
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    sidebarItems.forEach(li => li.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+
+            // Table row interactions
+            const tableRows = document.querySelectorAll('tbody tr');
+            tableRows.forEach(row => {
+                row.addEventListener('click', function() {
+                    tableRows.forEach(r => r.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+
+            // Form submission
+            const form = document.getElementById('test-form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    console.log('Form submitted');
+                });
+            }
+
+            // Add visual feedback for testing
+            let changeCounter = 0;
+            window.testChangeCounter = () => ++changeCounter;
+            window.getChangeCounter = () => changeCounter;
+
+            // Utility function to highlight element
+            window.highlightElement = function(selector) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    element.style.outline = '3px solid red';
+                    setTimeout(() => {
+                        element.style.outline = '';
+                    }, 2000);
+                }
+            };
+
+            // Utility function to check if element is visible
+            window.isElementVisible = function(selector) {
+                const element = document.querySelector(selector);
+                if (!element) return false;
+
+                const style = window.getComputedStyle(element);
+                return style.display !== 'none' &&
+                       style.visibility !== 'hidden' &&
+                       style.opacity !== '0';
+            };
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco HTML Editor - Manual Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .test-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+        }
+
+        .test-card h2 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .test-card .emoji {
+            font-size: 1.2em;
+        }
+
+        .test-element {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .test-element:hover {
+            border-color: #007bff;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+        }
+
+        .test-element::before {
+            content: "Click to edit with Monaco";
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 11px;
+            color: #6c757d;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .test-element:hover::before {
+            opacity: 1;
+        }
+
+        .instructions {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .instructions h2 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        .instructions ol {
+            line-height: 1.8;
+            color: #555;
+        }
+
+        .instructions .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .feature {
+            background: #f0f8ff;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+
+        .feature strong {
+            color: #0056b3;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .complex-structure {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .complex-structure img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .complex-structure .info {
+            flex: 1;
+        }
+
+        .complex-structure h3 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+
+        .complex-structure p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #28a745;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .nested-structure {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .nested-structure > div {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Monaco HTML Editor Test Suite</h1>
+        <p>Test the enhanced HTML editing features with Monaco Editor</p>
+    </div>
+
+    <div class="instructions">
+        <h2>📋 How to Test Monaco Features</h2>
+        <ol>
+            <li>Install and activate the ABsmartly Browser Extension</li>
+            <li>Enable Visual Editor mode for this page</li>
+            <li>Click any gray box below to select it</li>
+            <li>Right-click and select <span class="highlight">Edit HTML</span> from the menu</li>
+            <li>The Monaco Editor will open with these features:</li>
+        </ol>
+
+        <div class="feature-list">
+            <div class="feature">
+                <strong>✨ Syntax Highlighting</strong><br>
+                HTML tags and attributes are color-coded
+            </div>
+            <div class="feature">
+                <strong>🔤 Autocomplete</strong><br>
+                Type <code>&lt;</code> for tag suggestions
+            </div>
+            <div class="feature">
+                <strong>📐 Format Document</strong><br>
+                Click Format or press <code>Shift+Alt+F</code>
+            </div>
+            <div class="feature">
+                <strong>📦 Wrap Selection</strong><br>
+                Select text and click Wrap
+            </div>
+            <div class="feature">
+                <strong>👁️ Live Preview</strong><br>
+                Preview changes before applying
+            </div>
+            <div class="feature">
+                <strong>⌨️ Shortcuts</strong><br>
+                <code>ESC</code> to close, <code>Ctrl+Space</code> for hints
+            </div>
+        </div>
+    </div>
+
+    <div class="test-grid">
+        <div class="test-card">
+            <h2><span class="emoji">📝</span> Simple Text</h2>
+            <p>Test basic HTML editing and formatting</p>
+            <div class="test-element" id="simple-text">
+                <p>This is a simple paragraph that you can edit using Monaco Editor.</p>
+                <p>Try adding new tags or changing the content.</p>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🎨</span> Styled Elements</h2>
+            <p>Test with inline styles and classes</p>
+            <div class="test-element" id="styled">
+                <div style="color: #007bff; font-weight: bold;">
+                    Styled text with inline CSS
+                </div>
+                <p class="text-muted" style="font-style: italic;">
+                    Paragraph with class and style attributes
+                </p>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">📋</span> Lists</h2>
+            <p>Test list editing and formatting</p>
+            <div class="test-element" id="lists">
+                <ul>
+                    <li>First item</li>
+                    <li>Second item with <strong>bold</strong></li>
+                    <li>Third item with <em>italic</em></li>
+                </ul>
+                <ol>
+                    <li>Numbered item one</li>
+                    <li>Numbered item two</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🏗️</span> Complex Structure</h2>
+            <p>Test with nested HTML elements</p>
+            <div class="test-element" id="complex">
+                <div class="complex-structure">
+                    <img src="https://via.placeholder.com/60" alt="Avatar">
+                    <div class="info">
+                        <h3>John Doe</h3>
+                        <p>john.doe@example.com</p>
+                        <span class="badge">Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">📊</span> Table</h2>
+            <p>Test table HTML editing</p>
+            <div class="test-element" id="table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Syntax Highlighting</td>
+                            <td>✅ Active</td>
+                        </tr>
+                        <tr>
+                            <td>Autocomplete</td>
+                            <td>✅ Active</td>
+                        </tr>
+                        <tr>
+                            <td>Format Document</td>
+                            <td>✅ Active</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">📝</span> Forms</h2>
+            <p>Test form element editing</p>
+            <div class="test-element" id="form">
+                <form>
+                    <div style="margin-bottom: 10px;">
+                        <label for="name">Name:</label><br>
+                        <input type="text" id="name" placeholder="Enter name" style="width: 100%; padding: 5px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="email">Email:</label><br>
+                        <input type="email" id="email" placeholder="Enter email" style="width: 100%; padding: 5px;">
+                    </div>
+                    <button type="submit" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px;">
+                        Submit
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🎯</span> Nested Divs</h2>
+            <p>Test deeply nested structures</p>
+            <div class="test-element" id="nested">
+                <div class="nested-structure">
+                    <div>Level 1
+                        <div style="margin-left: 20px;">Level 2
+                            <div style="margin-left: 20px;">Level 3
+                                <div style="margin-left: 20px;">Level 4</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🔧</span> Unformatted HTML</h2>
+            <p>Test the Format feature</p>
+            <div class="test-element" id="unformatted">
+                <div><p>This</p><span>is</span><div>unformatted</div><ul><li>HTML</li><li>that</li><li>needs</li></ul><div>formatting</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="instructions">
+        <h2>✅ Test Checklist</h2>
+        <p>Verify these Monaco features are working:</p>
+        <ol>
+            <li><strong>Syntax Highlighting:</strong> HTML tags appear in different colors (blue/purple for tags, orange for attributes, green for strings)</li>
+            <li><strong>Autocomplete:</strong> Type <code>&lt;</code> and see tag suggestions. Type space after a tag name for attribute suggestions</li>
+            <li><strong>Format Document:</strong> Click the Format button to auto-indent messy HTML</li>
+            <li><strong>Dark Theme:</strong> Editor should have a dark background matching VS Code</li>
+            <li><strong>Line Numbers:</strong> Line numbers should appear on the left</li>
+            <li><strong>Wrap Selection:</strong> Select text and click Wrap to surround with <code>&lt;div&gt;</code> tags</li>
+            <li><strong>Preview:</strong> Click Preview to temporarily see changes</li>
+            <li><strong>Save/Cancel:</strong> Save applies changes, Cancel discards them</li>
+            <li><strong>ESC Key:</strong> Press ESC to quickly close the editor</li>
+        </ol>
+    </div>
+
+    <script>
+        // Helper to initialize visual editor (if extension supports it)
+        setTimeout(() => {
+            window.postMessage({
+                type: 'ABSMARTLY_INIT_VISUAL_EDITOR',
+                config: {
+                    experimentName: 'Monaco Editor Test',
+                    variantName: 'Test Variant',
+                    changes: [],
+                    logoUrl: 'data:image/svg+xml,<svg></svg>'
+                }
+            }, '*');
+        }, 1000);
+
+        // Add visual feedback
+        document.querySelectorAll('.test-element').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                el.style.transform = 'scale(1.02)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+</body>
+</html>
