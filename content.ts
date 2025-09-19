@@ -98,9 +98,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       isVisualEditorActive = true
       isVisualEditorStarting = false
 
+      // Get the extension URL for the logo
+      const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
+
       // Create and start new editor
       currentEditor = new VisualEditor({
         variantName: message.variantName,
+        experimentName: message.experimentName,
+        logoUrl: logoUrl,
         initialChanges: message.changes || [],
         onChangesUpdate: (changes: DOMChange[]) => {
           debugLog('[Visual Editor Content Script] Changes updated:', changes)
@@ -113,11 +118,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       })
 
-      currentEditor.start()
+      const result = currentEditor.start()
+      debugLog('[Visual Editor Content Script] Visual editor start result:', result)
+
+      if (!result.success) {
+        throw new Error('Visual editor failed to start')
+      }
+
       sendResponse({ success: true })
       debugLog('[Visual Editor Content Script] Visual editor started successfully')
     } catch (error) {
       debugError('[Visual Editor Content Script] Error starting visual editor:', error)
+      console.error('[Visual Editor Content Script] Full error:', error)
+      isVisualEditorActive = false
       sendResponse({ success: false, error: error.message })
     }
 
@@ -156,6 +169,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle preview messages
   if (message.type === 'ABSMARTLY_PREVIEW') {
     debugLog('[ABSmartly Content Script] Received preview message:', message.action)
+
+    // If visual editor is active or starting, ignore preview update messages
+    // The visual editor manages its own changes and we don't want conflicts
+    if ((isVisualEditorActive || isVisualEditorStarting) && message.action === 'update') {
+      debugLog('[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update')
+      sendResponse({ success: true, message: 'Visual editor active, preview update ignored' })
+      return true
+    }
 
     // Ensure SDK plugin is injected before handling preview
     ensureSDKPluginInjected()
@@ -230,12 +251,38 @@ document.documentElement.appendChild(debugDiv)
 // Send a message to the page to confirm we're loaded
 window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '*')
 
+// Listen for messages from the visual editor
+window.addEventListener('message', (event) => {
+  // Only handle messages from the same origin
+  if (event.source !== window) return
+
+  if (event.data.type === 'ABSMARTLY_VISUAL_EDITOR_EXIT') {
+    debugLog('[Visual Editor Content Script] Received EXIT message from visual editor')
+
+    // Stop the visual editor
+    if (currentEditor) {
+      const changes = currentEditor.getChanges()
+      currentEditor.destroy()
+      currentEditor = null
+      isVisualEditorActive = false
+      isVisualEditorStarting = false
+
+      // Send message to extension that visual editor was stopped
+      chrome.runtime.sendMessage({
+        type: 'VISUAL_EDITOR_STOPPED',
+        changes: changes
+      })
+    }
+  }
+})
+
 // Function to create preview header
 function createPreviewHeader(experimentName: string, variantName: string) {
   // Remove any existing preview header
   removePreviewHeader()
 
   // Don't create header if visual editor is active or starting
+  // The visual editor has its own toolbar with exit button
   if (isVisualEditorActive || isVisualEditorStarting) {
     return
   }
@@ -302,7 +349,8 @@ function createPreviewHeader(experimentName: string, variantName: string) {
   closeButton.onclick = () => {
     // Send message back to extension to disable preview
     chrome.runtime.sendMessage({
-      type: 'DISABLE_PREVIEW'
+      type: 'DISABLE_PREVIEW',
+      experimentName: experimentName
     })
   }
   

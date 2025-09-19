@@ -108,11 +108,12 @@ export class EventHandlers {
       return
     }
 
-    // Ignore clicks on our UI (banner, editor hosts, and preview header)
+    // Ignore clicks on our UI (banner, editor hosts, toolbar, and preview header)
     if (target.id === 'absmartly-visual-editor-banner-host' ||
         target.closest('#absmartly-visual-editor-banner-host') ||
         target.id === 'absmartly-html-editor-host' ||
         target.closest('#absmartly-html-editor-host') ||
+        target.closest('.absmartly-toolbar') ||
         target.id === 'absmartly-preview-header' ||
         target.closest('#absmartly-preview-header')) {
       return
@@ -152,6 +153,7 @@ export class EventHandlers {
     }
 
     // Show context menu - this will be handled by context-menu module
+    console.log('[EventHandlers] Calling showContextMenu at', e.pageX, e.pageY, 'for element:', target)
     this.showContextMenu(e.pageX, e.pageY, target)
   }
 

@@ -950,24 +950,36 @@ describe('EditorCoordinator', () => {
   })
 
   describe('handleEditHtmlAction', () => {
-    it('should show notification and fall back to text editing', async () => {
+    it('should open HTML editor and handle changes', async () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
         nextSibling: mockElement.nextElementSibling,
-        textContent: mockElement.textContent
+        textContent: mockElement.textContent,
+        innerHTML: mockElement.innerHTML
       }
 
-      const handleEditActionSpy = jest.spyOn(coordinator, 'handleEditAction').mockImplementation()
+      // Mock HTML editor to return modified HTML
+      const mockHtmlEditor = {
+        show: jest.fn().mockResolvedValue('<div>Modified HTML</div>')
+      }
+      ;(coordinator as any).htmlEditor = mockHtmlEditor
 
       await coordinator.handleEditHtmlAction(mockElement, originalState)
 
+      expect(mockHtmlEditor.show).toHaveBeenCalledWith(mockElement, 'Test content')
+      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
+        selector: '.mock-selector',
+        type: 'html',
+        value: '<div>Modified HTML</div>',
+        originalHtml: 'Test content',
+        enabled: true
+      })
       expect(mockNotifications.show).toHaveBeenCalledWith(
-        'HTML editing coming soon',
-        'Using text edit for now',
-        'info'
+        'HTML updated successfully',
+        '',
+        'success'
       )
-      expect(handleEditActionSpy).toHaveBeenCalledWith(mockElement, originalState)
     })
   })
 
@@ -1353,6 +1365,45 @@ describe('EditorCoordinator', () => {
       expect(coordinator['changes']).toEqual(newState.changes)
       expect(mockToolbar.updateChangesCount).toHaveBeenCalledWith(1)
       expect(mockToolbar.updateUndoRedoButtons).toHaveBeenCalledWith(true, false)
+    })
+  })
+
+  describe('Event Cleanup', () => {
+    it('should register keydown event cleanup handler', () => {
+      const registerSpy = jest.spyOn(mockCleanup, 'registerEventHandler')
+
+      coordinator.setupKeyboardHandlers()
+
+      expect(registerSpy).toHaveBeenCalled()
+
+      // Execute the cleanup handler to cover line 202
+      const cleanupHandler = registerSpy.mock.calls[0][0]
+      expect(() => cleanupHandler()).not.toThrow()
+    })
+
+    it('should register message event cleanup handler', () => {
+      const registerSpy = jest.spyOn(mockCleanup, 'registerEventHandler')
+
+      coordinator.setupMessageHandlers()
+
+      expect(registerSpy).toHaveBeenCalled()
+
+      // Execute the cleanup handler to cover line 219
+      const cleanupHandler = registerSpy.mock.calls[0][0]
+      expect(() => cleanupHandler()).not.toThrow()
+    })
+
+    it('should handle message event for visual editor exit', () => {
+      coordinator.setupMessageHandlers()
+
+      const messageEvent = new MessageEvent('message', {
+        data: { type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' },
+        source: window
+      })
+
+      window.dispatchEvent(messageEvent)
+
+      expect(mockCallbacks.stop).toHaveBeenCalled()
     })
   })
 })

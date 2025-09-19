@@ -10,7 +10,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: 'html',
+  reporter: [['html'], ['list']],
   use: {
     actionTimeout: 0,
     trace: 'on-first-retry',
@@ -20,10 +20,16 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { 
+      use: {
         ...devices['Desktop Chrome'],
         headless: false
       },
+      testMatch: [
+        // Include all E2E tests
+        'e2e/**/*.spec.ts',
+        // Specifically include Monaco tests
+        'e2e/monaco-automated.spec.ts'
+      ]
     }
   ],
 })

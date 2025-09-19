@@ -1481,7 +1481,7 @@ export function DOMChangesInlineEditor({
       if (message.type === 'ELEMENT_SELECTED' && message.selector && pickingForField) {
         const storage = new Storage({ area: "session" })
         
-        // Store the result for when popup reopens
+        // Store the result for when selector is picked
         storage.set('elementPickerResult', {
           variantName,
           fieldId: pickingForField,
@@ -1545,7 +1545,7 @@ export function DOMChangesInlineEditor({
     const handleVisualEditorChanges = async (message: any) => {
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
         debugLog('📡 Visual editor changes received:', message.changes)
-        
+
         // Update parent component with visual editor changes
         if (message.changes && message.changes.length > 0) {
           onChange(message.changes)
@@ -1667,10 +1667,7 @@ export function DOMChangesInlineEditor({
         }
       } else {
         debugLog('✅ Visual editor started successfully:', response)
-        // Close popup after a short delay
-        setTimeout(() => {
-          window.close()
-        }, 100)
+        // Visual editor started in sidebar
       }
     })
   }
@@ -1726,11 +1723,7 @@ export function DOMChangesInlineEditor({
             debugLog('Drag-drop picker started successfully:', response)
           }
         })
-        
-        // Close popup to allow drag-drop interaction
-        setTimeout(() => {
-          window.close()
-        }, 100)
+        // Visual editor started in sidebar
       }
     })
   }
@@ -1748,7 +1741,7 @@ export function DOMChangesInlineEditor({
     })
     debugLog('Saved state to storage')
     
-    // Popup state will be handled by the parent component's effect
+    // Sidebar state will be handled by the parent component's effect
     // We just need to ensure our state is saved before closing
     
     // Start element picker
@@ -1793,7 +1786,6 @@ export function DOMChangesInlineEditor({
           })
         })
         
-        // Don't close the window - we're in a sidebar now, not a popup
         // The sidebar should remain open to receive the element selection
       } else {
         debugError('No active tab found!')

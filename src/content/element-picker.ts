@@ -228,11 +228,10 @@ export class ElementPicker {
       console.log('Generated selector:', selector)
       this.selectedElement = element
       
-      // Send message to reopen popup with the selected element
+      // Send message with the selected element
       chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
-        selector: selector,
-        reopenPopup: true
+        selector: selector
       })
       
       if (this.callback) {

@@ -11,8 +11,9 @@ import ChangeTracker from './change-tracker'
 import UIComponents from '../ui/components'
 import EditModes from './edit-modes'
 import Cleanup from './cleanup'
-import { Toolbar } from '../ui/toolbar'
+// Removed toolbar import - using UIComponents banner instead
 import { Notifications } from '../ui/notifications'
+import HtmlEditor from '../ui/html-editor'
 import type { DOMChange } from '../types/visual-editor'
 
 export interface EditorCoordinatorCallbacks {
@@ -42,8 +43,9 @@ export class EditorCoordinator {
   private uiComponents: UIComponents
   private editModes: EditModes
   private cleanup: Cleanup
-  private toolbar: Toolbar
+  // Removed toolbar - using UIComponents banner instead
   private notifications: Notifications
+  private htmlEditor: HtmlEditor
   private callbacks: EditorCoordinatorCallbacks
 
   // State for event handling
@@ -61,7 +63,7 @@ export class EditorCoordinator {
     uiComponents: UIComponents,
     editModes: EditModes,
     cleanup: Cleanup,
-    toolbar: Toolbar,
+    toolbar: any, // toolbar removed - using UIComponents banner
     notifications: Notifications,
     callbacks: EditorCoordinatorCallbacks
   ) {
@@ -72,8 +74,9 @@ export class EditorCoordinator {
     this.uiComponents = uiComponents
     this.editModes = editModes
     this.cleanup = cleanup
-    this.toolbar = toolbar
+    // this.toolbar = toolbar // removed - using UIComponents banner
     this.notifications = notifications
+    this.htmlEditor = new HtmlEditor(stateManager)
     this.callbacks = callbacks
   }
 
@@ -92,12 +95,12 @@ export class EditorCoordinator {
     this.uiComponents.onUndo = () => this.changeTracker.performUndo()
     this.uiComponents.onRedo = () => this.changeTracker.performRedo()
 
-    // Connect toolbar to actions
-    this.toolbar.onUndo = () => this.callbacks.undoLastChange()
-    this.toolbar.onRedo = () => this.callbacks.redoChange()
-    this.toolbar.onClear = () => this.callbacks.clearAllChanges()
-    this.toolbar.onSave = () => this.callbacks.saveChanges()
-    this.toolbar.onExit = () => this.callbacks.stop()
+    // Connect UI components banner actions
+    this.uiComponents.onUndo = () => this.callbacks.undoLastChange()
+    this.uiComponents.onRedo = () => this.callbacks.redoChange()
+    this.uiComponents.onClear = () => this.callbacks.clearAllChanges()
+    this.uiComponents.onSave = () => this.callbacks.saveChanges()
+    this.uiComponents.onExit = () => this.callbacks.stop()
 
     // Register cleanup handlers
     this.cleanup.registerEventHandler(() => this.eventHandlers.detachEventListeners())
@@ -105,7 +108,7 @@ export class EditorCoordinator {
     this.cleanup.registerEventHandler(() => this.stopMutationObserver())
     this.cleanup.registerEventHandler(() => this.makeElementsNonEditable())
     this.cleanup.registerEventHandler(() => this.callbacks.removeStyles())
-    this.cleanup.registerEventHandler(() => this.toolbar.remove())
+    // this.cleanup.registerEventHandler(() => this.toolbar.remove()) // removed toolbar
     this.cleanup.registerEventHandler(() => this.uiComponents.removeBanner())
   }
 
@@ -116,33 +119,39 @@ export class EditorCoordinator {
       this.hoveredElement = state.hoveredElement as HTMLElement | null
       this.changes = state.changes || []
 
-      // Update toolbar
-      this.toolbar.updateChangesCount(this.changes.length)
-      this.toolbar.updateUndoRedoButtons(
-        state.undoStack.length > 0,
-        state.redoStack.length > 0
-      )
+      console.log('[EditorCoordinator] State changed - total changes:', this.changes.length)
+      console.log('[EditorCoordinator] Session changes (undo stack):', state.undoStack.length)
+      console.log('[EditorCoordinator] Redo stack length:', state.redoStack.length)
+
+      // Update banner - changes counter shows session changes (undo stack)
+      this.uiComponents.updateBanner({
+        changesCount: state.undoStack.length,  // Session changes, not total
+        canUndo: state.undoStack.length > 0,
+        canRedo: state.redoStack.length > 0
+      })
     })
   }
 
   setupEventListeners(): void {
-    document.addEventListener('click', this.handleElementClick, true)
+    // Use the event handlers module for main event handling
+    this.eventHandlers.attachEventListeners()
+
+    // Add coordinator-specific event listeners
     document.addEventListener('contextmenu', this.handleContextMenu, true)
     document.addEventListener('keydown', this.handleKeyDown, true)
     document.addEventListener('mousedown', this.handleMouseDown, true)
     document.addEventListener('mouseup', this.handleMouseUp, true)
-    document.addEventListener('mouseover', this.handleMouseOver, true)
-    document.addEventListener('mouseout', this.handleMouseOut, true)
   }
 
   removeEventListeners(): void {
-    document.removeEventListener('click', this.handleElementClick, true)
+    // Detach event handlers module listeners
+    this.eventHandlers.detachEventListeners()
+
+    // Remove coordinator-specific event listeners
     document.removeEventListener('contextmenu', this.handleContextMenu, true)
     document.removeEventListener('keydown', this.handleKeyDown, true)
     document.removeEventListener('mousedown', this.handleMouseDown, true)
     document.removeEventListener('mouseup', this.handleMouseUp, true)
-    document.removeEventListener('mouseover', this.handleMouseOver, true)
-    document.removeEventListener('mouseout', this.handleMouseOut, true)
     this.removeHoverTooltip()
   }
 
@@ -290,6 +299,9 @@ export class EditorCoordinator {
   handleEditAction(element: Element, originalState: any): void {
     this.removeContextMenu()
 
+    // Set editing mode to prevent selection while editing text
+    this.eventHandlers.setEditing(true)
+
     ;(element as HTMLElement).dataset.absmartlyModified = 'true'
 
     const preventDefault = (e: Event) => {
@@ -347,13 +359,38 @@ export class EditorCoordinator {
   }
 
   async handleEditHtmlAction(element: Element, originalState: any): Promise<void> {
-    // This would be implemented with Monaco editor integration
-    // For now, fall back to text editing
-    this.notifications.show('HTML editing coming soon', 'Using text edit for now', 'info')
-    this.handleEditAction(element, originalState)
+    this.removeContextMenu()
+
+    // Set editing mode to prevent selection while HTML editor is open
+    this.eventHandlers.setEditing(true)
+
+    const currentHtml = element.innerHTML
+    const newHtml = await this.htmlEditor.show(element, currentHtml)
+
+    if (newHtml !== null && newHtml !== currentHtml) {
+      element.innerHTML = newHtml
+
+      this.callbacks.addChange({
+        selector: this.callbacks.getSelector(element as HTMLElement),
+        type: 'html',
+        value: newHtml,
+        originalHtml: originalState.innerHTML,
+        enabled: true
+      })
+
+      this.notifications.show('HTML updated successfully', '', 'success')
+    }
+
+    // Clear editing mode after HTML editor closes
+    this.eventHandlers.setEditing(false)
   }
 
   handleInlineEditAction(element: Element, originalState: any): void {
+    this.removeContextMenu()
+
+    // Set editing mode to prevent selection while inline editing
+    this.eventHandlers.setEditing(true)
+
     element.classList.add('absmartly-editing')
     ;(element as HTMLElement).contentEditable = 'true'
     ;(element as HTMLElement).focus()
@@ -441,11 +478,6 @@ export class EditorCoordinator {
   }
 
   // Event handlers bound to this class
-  private handleElementClick = (e: Event) => {
-    // Delegate to event handlers using the method that exists
-    this.eventHandlers.handleClick(e as MouseEvent)
-  }
-
   private handleContextMenu = (e: Event) => {
     // Context menu handling - for now, prevent default
     e.preventDefault()
@@ -463,16 +495,6 @@ export class EditorCoordinator {
 
   private handleMouseUp = (e: Event) => {
     // Mouse up handling - placeholder for future implementation
-  }
-
-  private handleMouseOver = (e: Event) => {
-    // Delegate to event handlers
-    this.eventHandlers.handleMouseOver(e as MouseEvent)
-  }
-
-  private handleMouseOut = (e: Event) => {
-    // Delegate to event handlers
-    this.eventHandlers.handleMouseOut(e as MouseEvent)
   }
 
   // Helper methods
@@ -501,6 +523,7 @@ export class EditorCoordinator {
 
   // Setup all integrations and handlers
   setupAll(): void {
+    console.log('[EditorCoordinator] setupAll called')
     this.setupModuleIntegrations()
     this.setupStateListeners()
     this.setupEventListeners()
@@ -508,12 +531,26 @@ export class EditorCoordinator {
     this.setupMessageHandlers()
     this.startMutationObserver()
     this.makeElementsEditable()
+
+    // Banner is created in visual-editor.ts start() method
+    console.log('[EditorCoordinator] setupAll completed')
   }
 
   // Teardown all integrations and handlers
   teardownAll(): void {
+    console.log('[EditorCoordinator] Starting teardownAll')
+
+    // Call all registered cleanup handlers (includes removeBanner)
+    this.cleanup.cleanupVisualEditor()
+
+    // Additional cleanup
     this.removeEventListeners()
     this.stopMutationObserver()
     this.makeElementsNonEditable()
+
+    // Explicitly remove banner in case it wasn't registered
+    this.uiComponents.removeBanner()
+
+    console.log('[EditorCoordinator] teardownAll completed')
   }
 }

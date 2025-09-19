@@ -47,7 +47,7 @@ describe('overrides.ts', () => {
     })
 
     it('should parse simple running experiment format', () => {
-      const cookieValue = 'experiment1:0;experiment2:1'
+      const cookieValue = 'experiment1:0,experiment2:1'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -58,7 +58,7 @@ describe('overrides.ts', () => {
     })
 
     it('should parse development experiment format with env', () => {
-      const cookieValue = 'experiment1:0,1;experiment2:1,1'
+      const cookieValue = 'experiment1:0.1,experiment2:1.1'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -74,7 +74,7 @@ describe('overrides.ts', () => {
     })
 
     it('should parse full format with env and id', () => {
-      const cookieValue = 'experiment1:0,2,123;experiment2:1,2,456'
+      const cookieValue = 'experiment1:0.2.123,experiment2:1.2.456'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -92,7 +92,7 @@ describe('overrides.ts', () => {
     })
 
     it('should parse dev environment prefix', () => {
-      const cookieValue = 'devEnv=development|experiment1:0;experiment2:1'
+      const cookieValue = 'devEnv=development|experiment1:0,experiment2:1'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -113,7 +113,7 @@ describe('overrides.ts', () => {
     })
 
     it('should handle URL encoded experiment names', () => {
-      const cookieValue = 'my%20experiment:0;another%2Bexp:1'
+      const cookieValue = 'my%20experiment:0,another%2Bexp:1'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -123,7 +123,7 @@ describe('overrides.ts', () => {
     })
 
     it('should handle mixed formats in the same cookie', () => {
-      const cookieValue = 'exp1:0;exp2:1,1;exp3:2,2,789'
+      const cookieValue = 'exp1:0,exp2:1.1,exp3:2.2.789'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -141,7 +141,7 @@ describe('overrides.ts', () => {
     })
 
     it('should skip malformed entries', () => {
-      const cookieValue = 'exp1:0;;:invalid;exp3:2'
+      const cookieValue = 'exp1:0,,:invalid,exp3:2'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -167,7 +167,7 @@ describe('overrides.ts', () => {
     })
 
     it('should handle special characters in experiment names', () => {
-      const cookieValue = 'test%20exp%20%2B%20special:1;normal:2'
+      const cookieValue = 'test%20exp%20%2B%20special:1,normal:2'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides).toEqual({
@@ -185,7 +185,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides)
-      expect(result).toBe('experiment1:0;experiment2:1')
+      expect(result).toBe('experiment1:0,experiment2:1')
     })
 
     it('should serialize development experiments with env', () => {
@@ -201,7 +201,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides)
-      expect(result).toBe('experiment1:0,1;experiment2:1,1')
+      expect(result).toBe('experiment1:0.1,experiment2:1.1')
     })
 
     it('should serialize API fetch experiments with full format', () => {
@@ -219,7 +219,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides)
-      expect(result).toBe('experiment1:0,2,123;experiment2:1,2,456')
+      expect(result).toBe('experiment1:0.2.123,experiment2:1.2.456')
     })
 
     it('should handle mixed experiment types', () => {
@@ -237,7 +237,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides)
-      expect(result).toBe('running:0;development:1,1;api_fetch:2,2,789')
+      expect(result).toBe('running:0,development:1.1,api_fetch:2.2.789')
     })
 
     it('should include dev environment prefix when provided', () => {
@@ -247,7 +247,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides, 'development')
-      expect(result).toBe('devEnv=development|experiment1:0;experiment2:1')
+      expect(result).toBe('devEnv=development|experiment1:0,experiment2:1')
     })
 
     it('should URL encode dev environment names', () => {
@@ -266,7 +266,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides)
-      expect(result).toBe('test%20exp%20%2B%20special:1;normal:2')
+      expect(result).toBe('test%20exp%20%2B%20special:1,normal:2')
     })
 
     it('should handle object experiments with production env as simple format', () => {
@@ -290,7 +290,7 @@ describe('overrides.ts', () => {
       }
 
       const result = serializeToCookieFormat(overrides)
-      expect(result).toBe('experiment1:1,1')
+      expect(result).toBe('experiment1:1.1')
     })
 
     it('should return empty string for empty overrides without dev env', () => {
@@ -433,7 +433,7 @@ describe('overrides.ts', () => {
       const script = setCookieOverridesScript(overrides)
 
       expect(script).toContain(OVERRIDES_COOKIE_NAME)
-      expect(script).toContain('experiment1:0;experiment2:1')
+      expect(script).toContain('experiment1:0,experiment2:1')
       expect(script).toContain('document.cookie')
     })
 
@@ -460,7 +460,7 @@ describe('overrides.ts', () => {
       const script = setCookieOverridesScript(overrides)
 
       expect(script).toContain('enabled:1')
-      expect(script).toContain('object_enabled:2,1')
+      expect(script).toContain('object_enabled:2.1')
       expect(script).not.toContain('disabled')
       expect(script).not.toContain('-1')
     })
@@ -491,7 +491,7 @@ describe('overrides.ts', () => {
     })
 
     it('should handle invalid numeric values gracefully', () => {
-      const cookieValue = 'exp1:invalid;exp2:1'
+      const cookieValue = 'exp1:invalid,exp2:1'
       const result = parseCookieFormat(cookieValue)
 
       expect(result.overrides.exp1).toBeNaN()
@@ -499,7 +499,7 @@ describe('overrides.ts', () => {
     })
 
     it('should handle empty experiment names', () => {
-      const cookieValue = ':1;exp2:2'
+      const cookieValue = ':1,exp2:2'
       const result = parseCookieFormat(cookieValue)
 
       // Should skip empty names
@@ -509,7 +509,7 @@ describe('overrides.ts', () => {
     })
 
     it('should handle empty values', () => {
-      const cookieValue = 'exp1:;exp2:1'
+      const cookieValue = 'exp1:,exp2:1'
       const result = parseCookieFormat(cookieValue)
 
       // Should skip empty values

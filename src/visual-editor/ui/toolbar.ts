@@ -24,116 +24,134 @@ export class Toolbar {
   }
 
   create(): void {
-    if (this.toolbar) return
+    console.log('[Toolbar] Creating toolbar')
+    console.error('[Toolbar] Create called - this should appear in console')
+    console.trace('[Toolbar] Create called from:')
+
+    // Also add a visual indicator that this code ran
+    const debugMarker = document.createElement('div')
+    debugMarker.id = 'absmartly-toolbar-debug-marker'
+    debugMarker.textContent = 'Toolbar create() was called at ' + new Date().toISOString()
+    debugMarker.style.display = 'none'
+    document.body.appendChild(debugMarker)
+
+    if (this.toolbar) {
+      console.log('[Toolbar] Toolbar already exists, removing old one')
+      this.toolbar.remove()
+      this.toolbar = null
+    }
 
     this.toolbar = document.createElement('div')
     this.toolbar.className = 'absmartly-toolbar'
-    this.toolbar.style.cssText = `
-      position: fixed !important;
-      top: 20px !important;
-      right: 20px !important;
-      background: white !important;
-      border: 2px solid #3b82f6 !important;
-      border-radius: 12px !important;
-      padding: 12px !important;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-      z-index: 2147483646 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 8px !important;
-      font-family: system-ui, -apple-system, sans-serif !important;
-      font-size: 14px !important;
-      max-width: 320px !important;
-      pointer-events: auto !important;
-      user-select: none !important;
-    `
+    this.toolbar.id = 'absmartly-visual-editor-toolbar'
+    this.toolbar.setAttribute('data-absmartly', 'toolbar')
+
+    // Apply styles directly without !important
+    this.toolbar.style.position = 'fixed'
+    this.toolbar.style.top = '20px'
+    this.toolbar.style.right = '20px'
+    this.toolbar.style.background = 'white'
+    this.toolbar.style.border = '2px solid #3b82f6'
+    this.toolbar.style.borderRadius = '12px'
+    this.toolbar.style.padding = '12px'
+    this.toolbar.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)'
+    this.toolbar.style.display = 'flex'
+    this.toolbar.style.flexDirection = 'column'
+    this.toolbar.style.gap = '8px'
+    this.toolbar.style.fontFamily = 'system-ui, -apple-system, sans-serif'
+    this.toolbar.style.fontSize = '14px'
+    this.toolbar.style.maxWidth = '320px'
+    this.toolbar.style.minWidth = '280px'
+    this.toolbar.style.pointerEvents = 'auto'
+    this.toolbar.style.userSelect = 'none'
+    this.toolbar.style.zIndex = '2147483647'
 
     const config = this.stateManager.getConfig()
 
     this.toolbar.innerHTML = `
       <div class="absmartly-toolbar-header" style="
-        font-weight: 600 !important;
-        padding: 4px 8px !important;
-        border-bottom: 1px solid #e5e7eb !important;
-        margin-bottom: 4px !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       ">
         <span>Visual Editor</span>
         <span class="absmartly-changes-count" style="
-          background: #3b82f6 !important;
-          color: white !important;
-          padding: 2px 8px !important;
-          border-radius: 12px !important;
-          font-size: 12px !important;
-          font-weight: 500 !important;
+          background: #3b82f6;
+          color: white;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 500;
         ">0</span>
       </div>
       <div class="absmartly-toolbar-instructions" style="
-        background: #eff6ff !important;
-        padding: 10px !important;
-        border-radius: 6px !important;
-        font-size: 12px !important;
-        line-height: 1.6 !important;
-        color: #1e40af !important;
-        border: 1px solid #93c5fd !important;
+        background: #eff6ff;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #1e40af;
+        border: 1px solid #93c5fd;
       ">
-        <strong style="color: #1e3a8a !important; font-weight: 600 !important;">How to use:</strong><br>
-        • <strong style="color: #1e3a8a !important; font-weight: 600 !important;">Click</strong> any element to select & edit<br>
+        <strong style="color: #1e3a8a; font-weight: 600;">How to use:</strong><br>
+        • <strong style="color: #1e3a8a; font-weight: 600;">Click</strong> any element to select & edit<br>
         • Menu opens automatically on selection<br>
         • Selected elements have blue outline<br>
-        • Press <strong style="color: #1e3a8a !important; font-weight: 600 !important;">ESC</strong> to deselect
+        • Press <strong style="color: #1e3a8a; font-weight: 600;">ESC</strong> to deselect
       </div>
       <button class="absmartly-toolbar-button" data-action="undo" style="
-        padding: 8px 12px !important;
-        background: #f3f4f6 !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 6px !important;
-        cursor: pointer !important;
-        text-align: center !important;
-        transition: all 0.15s !important;
-        color: #1f2937 !important;
+        padding: 8px 12px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
+        color: #1f2937;
       ">↶ Undo Last Change</button>
       <button class="absmartly-toolbar-button" data-action="redo" style="
-        padding: 8px 12px !important;
-        background: #f3f4f6 !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 6px !important;
-        cursor: pointer !important;
-        text-align: center !important;
-        transition: all 0.15s !important;
-        color: #1f2937 !important;
+        padding: 8px 12px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
+        color: #1f2937;
       ">↷ Redo Change</button>
       <button class="absmartly-toolbar-button" data-action="clear" style="
-        padding: 8px 12px !important;
-        background: #f3f4f6 !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 6px !important;
-        cursor: pointer !important;
-        text-align: center !important;
-        transition: all 0.15s !important;
-        color: #1f2937 !important;
+        padding: 8px 12px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
+        color: #1f2937;
       ">Clear All Changes</button>
       <button class="absmartly-toolbar-button primary" data-action="save" style="
-        padding: 8px 12px !important;
-        background: #3b82f6 !important;
-        color: white !important;
-        border: 1px solid #3b82f6 !important;
-        border-radius: 6px !important;
-        cursor: pointer !important;
-        text-align: center !important;
-        transition: all 0.15s !important;
+        padding: 8px 12px;
+        background: #3b82f6;
+        color: white;
+        border: 1px solid #3b82f6;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
       ">Save Changes</button>
       <button class="absmartly-toolbar-button danger" data-action="exit" style="
-        padding: 8px 12px !important;
-        background: #ef4444 !important;
-        color: white !important;
-        border: 1px solid #ef4444 !important;
-        border-radius: 6px !important;
-        cursor: pointer !important;
-        text-align: center !important;
-        transition: all 0.15s !important;
+        padding: 8px 12px;
+        background: #ef4444;
+        color: white;
+        border: 1px solid #ef4444;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
       ">Exit Editor</button>
     `
 
@@ -142,34 +160,76 @@ export class Toolbar {
     this.undoButton = this.toolbar.querySelector('[data-action="undo"]')
     this.redoButton = this.toolbar.querySelector('[data-action="redo"]')
 
-    // Add hover effects via CSS
-    const style = document.createElement('style')
-    style.textContent = `
-      .absmartly-toolbar-button:hover {
-        background: #e5e7eb !important;
-      }
-      .absmartly-toolbar-button.primary:hover {
-        background: #2563eb !important;
-      }
-      .absmartly-toolbar-button.danger:hover {
-        background: #dc2626 !important;
-      }
-    `
-    document.head.appendChild(style)
+    // Add hover effects via CSS with unique ID to avoid duplicates
+    if (!document.getElementById('absmartly-toolbar-styles')) {
+      const style = document.createElement('style')
+      style.id = 'absmartly-toolbar-styles'
+      style.textContent = `
+        .absmartly-toolbar-button:hover {
+          background: #e5e7eb;
+        }
+        .absmartly-toolbar-button.primary:hover {
+          background: #2563eb;
+        }
+        .absmartly-toolbar-button.danger:hover {
+          background: #dc2626;
+        }
+      `
+      document.head.appendChild(style)
+    }
 
+    // Append toolbar directly to body
     document.body.appendChild(this.toolbar)
+    console.log('[Toolbar] Toolbar added to DOM')
+
+    // Verify toolbar is actually in DOM and visible
+    const verifyToolbar = document.querySelector('.absmartly-toolbar') as HTMLElement
+    if (verifyToolbar) {
+      console.log('[Toolbar] Verified: Toolbar found in DOM')
+      const rect = verifyToolbar.getBoundingClientRect()
+      console.log('[Toolbar] Position:', rect)
+      console.log('[Toolbar] Computed styles:', {
+        display: window.getComputedStyle(verifyToolbar).display,
+        visibility: window.getComputedStyle(verifyToolbar).visibility,
+        opacity: window.getComputedStyle(verifyToolbar).opacity,
+        zIndex: window.getComputedStyle(verifyToolbar).zIndex
+      })
+
+      // Check if toolbar is actually visible
+      if (rect.width === 0 || rect.height === 0) {
+        console.error('[Toolbar] ERROR: Toolbar has zero dimensions!')
+      }
+      if (window.getComputedStyle(verifyToolbar).display === 'none') {
+        console.error('[Toolbar] ERROR: Toolbar display is none!')
+      }
+      if (window.getComputedStyle(verifyToolbar).visibility === 'hidden') {
+        console.error('[Toolbar] ERROR: Toolbar visibility is hidden!')
+      }
+    } else {
+      console.error('[Toolbar] ERROR: Toolbar not found in DOM after appendChild!')
+    }
 
     // Add event listeners
     this.toolbar.addEventListener('click', this.handleToolbarClick)
+    console.log('[Toolbar] Event listeners attached')
   }
 
   remove(): void {
+    console.log('[Toolbar] Remove called')
+    console.trace('[Toolbar] Remove stack trace:')
+
     if (this.toolbar) {
       this.toolbar.remove()
       this.toolbar = null
       this.changesCounter = null
       this.undoButton = null
       this.redoButton = null
+    }
+
+    // Also remove styles
+    const style = document.getElementById('absmartly-toolbar-styles')
+    if (style) {
+      style.remove()
     }
   }
 
@@ -191,12 +251,14 @@ export class Toolbar {
   }
 
   private handleToolbarClick = (e: MouseEvent) => {
+    console.log('[Toolbar] Click detected on:', e.target)
     e.preventDefault()
     e.stopPropagation()
     e.stopImmediatePropagation()
 
     const target = e.target as HTMLElement
     const action = target.getAttribute('data-action')
+    console.log('[Toolbar] Action:', action)
 
     switch (action) {
       case 'undo':

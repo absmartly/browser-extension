@@ -20,7 +20,7 @@ import "~style.css"
 
 type View = 'list' | 'detail' | 'settings' | 'create' | 'edit'
 
-function IndexPopupContent() {
+function SidebarContent() {
   const [view, setView] = useState<View>('list')
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
@@ -148,14 +148,14 @@ function IndexPopupContent() {
     }
   }, [config, view, applications.length])
 
-  // Restore popup state and filters when component mounts
+  // Restore sidebar state and filters when component mounts
   useEffect(() => {
     const storage = new Storage({ area: "local" })
     
-    // Restore popup state
-    storage.get('popupState').then(result => {
+    // Restore sidebar state
+    storage.get('sidebarState').then(result => {
       if (result) {
-        debugLog('Restoring popup state:', result)
+        debugLog('Restoring sidebar state:', result)
         const state = result
         if (state.view) setView(state.view)
         if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment)
@@ -196,7 +196,7 @@ function IndexPopupContent() {
     }
   }, [])
 
-  // Save popup state whenever view or selectedExperiment changes
+  // Save sidebar state whenever view or selectedExperiment changes
   useEffect(() => {
     const storage = new Storage({ area: "local" })
     const state = {
@@ -204,8 +204,8 @@ function IndexPopupContent() {
       selectedExperiment,
       timestamp: Date.now()
     }
-    storage.set('popupState', state)
-    debugLog('Saved popup state:', state)
+    storage.set('sidebarState', state)
+    debugLog('Saved sidebar state:', state)
   }, [view, selectedExperiment])
 
   // Reset to first page when switching to list view
@@ -603,22 +603,67 @@ function IndexPopupContent() {
   const handleLoginRedirect = async () => {
     try {
       setExperimentsLoading(true)
+      setError(null)
 
-      // openLogin now checks auth status before redirecting
-      const result = await client.openLogin()
+      // First, always try to refresh experiments
+      // This will verify if the session is still valid
+      debugLog('Attempting to refresh experiments before login redirect...')
 
-      if (result?.authenticated) {
-        // User is already authenticated, just reload experiments
-        debugLog('User is already authenticated, reloading experiments')
+      // Try to fetch experiments directly to check if session is valid
+      const params: any = {
+        page: 1,
+        items: pageSize,
+        iterations: 1,
+        previews: 1,
+        type: 'test'
+      }
+
+      // Apply current filters
+      if (filters?.state && filters.state.length > 0) {
+        params.state = filters.state.join(',')
+      }
+
+      try {
+        const response = await getExperiments(params)
+        // If we got here, the session is valid
+        debugLog('Session is still valid, refreshing experiments')
         setIsAuthExpired(false)
         setError(null)
-        loadExperiments(true) // Force refresh
-      } else {
-        // Login page was opened, close the popup
-        window.close()
+
+        // Update the experiments state with the fresh data
+        const experiments = response.experiments || []
+        setExperiments(experiments)
+        setFilteredExperiments(experiments)
+        setTotalExperiments(response.total)
+        setHasMore(response.hasMore || false)
+        setCurrentPage(1)
+
+        // Cache the results
+        try {
+          await setExperimentsCache(experiments)
+        } catch (cacheError) {
+          debugWarn('Failed to cache experiments:', cacheError)
+        }
+      } catch (err: any) {
+        // Check if this is an authentication error
+        if (err.isAuthError || err.message === 'AUTH_EXPIRED') {
+          debugLog('Session is expired, opening login page')
+          // Open login page directly - the background script will check auth first
+          const result = await client.openLogin()
+
+          if (!result?.authenticated) {
+            // Login page was opened
+            // No need to close window - we're in a sidebar now
+          }
+          // If authenticated, the error state remains to show the user
+        } else {
+          // Non-auth error
+          setError('Failed to load experiments. Please check your connection.')
+        }
       }
     } catch (err) {
       debugError('Failed to handle login:', err)
+      setError('Failed to handle login. Please try again.')
     } finally {
       setExperimentsLoading(false)
     }
@@ -849,6 +894,6 @@ function IndexPopupContent() {
   )
 }
 
-export default function IndexPopup() {
-  return <IndexPopupContent />
+export default function ExtensionSidebar() {
+  return <SidebarContent />
 }
