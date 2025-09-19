@@ -262,6 +262,9 @@ window.addEventListener('message', (event) => {
     // Stop the visual editor
     if (currentEditor) {
       const changes = currentEditor.getChanges()
+      const experimentName = currentEditor.experimentName
+      const variantName = currentEditor.variantName
+
       currentEditor.destroy()
       currentEditor = null
       isVisualEditorActive = false
@@ -272,6 +275,11 @@ window.addEventListener('message', (event) => {
         type: 'VISUAL_EDITOR_STOPPED',
         changes: changes
       })
+
+      // Restore the preview header since preview is still active
+      if (experimentName && variantName) {
+        createPreviewHeader(experimentName, variantName)
+      }
     }
   }
 })
