@@ -1,6 +1,27 @@
 import { test as base, chromium, type BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
+import { ensureExtensionBuilt } from './setup'
+
+// Ensure seed.html is copied to build directory before tests run
+function ensureSeedFileExists() {
+  const seedSource = path.join(__dirname, '..', 'seed.html')
+  const buildDir = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+  const seedDest = path.join(buildDir, 'tests', 'seed.html')
+  const seedDestDir = path.dirname(seedDest)
+
+  // Create tests directory if it doesn't exist
+  if (!fs.existsSync(seedDestDir)) {
+    fs.mkdirSync(seedDestDir, { recursive: true })
+  }
+
+  // Copy seed.html if it doesn't exist or is outdated
+  if (!fs.existsSync(seedDest) ||
+      fs.statSync(seedSource).mtime > fs.statSync(seedDest).mtime) {
+    fs.copyFileSync(seedSource, seedDest)
+    console.log('Copied seed.html to build directory')
+  }
+}
 
 type ExtFixtures = {
   context: BrowserContext
@@ -13,12 +34,18 @@ type ExtFixtures = {
 
 export const test = base.extend<ExtFixtures>({
   context: async ({}, use) => {
+    // Ensure extension is built (will build if needed)
+    ensureExtensionBuilt()
+
     const extPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
 
-    // Verify extension is built
+    // Verify extension was built successfully
     if (!fs.existsSync(extPath)) {
-      throw new Error(`Extension not built! Run 'npm run build' first. Path: ${extPath}`)
+      throw new Error(`Extension build directory not found: ${extPath}`)
     }
+
+    // Ensure seed.html is in the build directory
+    ensureSeedFileExists()
 
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
