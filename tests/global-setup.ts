@@ -27,18 +27,26 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Extension already built')
   }
 
-  // 2. Copy seed.html to build directory
-  const seedSource = path.join(__dirname, 'seed.html')
-  const seedDestDir = path.join(buildDir, 'tests')
-  const seedDest = path.join(seedDestDir, 'seed.html')
-
-  if (!fs.existsSync(seedDestDir)) {
-    fs.mkdirSync(seedDestDir, { recursive: true })
+  // 2. Copy test files to build directory
+  const testsDir = path.join(buildDir, 'tests')
+  if (!fs.existsSync(testsDir)) {
+    fs.mkdirSync(testsDir, { recursive: true })
   }
 
+  // Copy seed.html
+  const seedSource = path.join(__dirname, 'seed.html')
+  const seedDest = path.join(testsDir, 'seed.html')
   if (fs.existsSync(seedSource)) {
     fs.copyFileSync(seedSource, seedDest)
     console.log('✅ Copied seed.html to build directory')
+  }
+
+  // Copy local test page
+  const testPageSource = path.join(__dirname, 'local-test-page.html')
+  const testPageDest = path.join(buildDir, 'local-test-page.html')
+  if (fs.existsSync(testPageSource)) {
+    fs.copyFileSync(testPageSource, testPageDest)
+    console.log('✅ Copied local-test-page.html to build directory')
   }
 
   // 3. Load environment variables if .env.local exists
