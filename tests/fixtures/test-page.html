@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABsmartly Visual Editor Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+        }
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            margin: 20px 0;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .button-primary {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .button-secondary {
+            background-color: #6b7280;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .button-danger {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #374151;
+        }
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .form-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: white;
+        }
+        .form-textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 16px;
+            min-height: 100px;
+            resize: vertical;
+        }
+        .bg-red { background-color: #fecaca; }
+        .bg-green { background-color: #bbf7d0; }
+        .bg-blue { background-color: #bfdbfe; }
+        .bg-yellow { background-color: #fef3c7; }
+        .bg-purple { background-color: #e9d5ff; }
+        .text-large { font-size: 24px; }
+        .text-small { font-size: 12px; }
+        .text-bold { font-weight: bold; }
+        .text-italic { font-style: italic; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .nav-item {
+            background-color: #f3f4f6;
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+        .nav-link {
+            text-decoration: none;
+            color: #1f2937;
+            font-weight: 500;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .product-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: white;
+        }
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .product-info {
+            padding: 15px;
+        }
+        .long-text {
+            max-width: 500px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background-color: #f9fafb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .nested-container {
+            border: 2px solid #e5e7eb;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 6px;
+        }
+        .deeply-nested {
+            border: 1px solid #d1d5db;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #f9fafb;
+        }
+        .footer {
+            background-color: #1f2937;
+            color: white;
+            padding: 30px;
+            margin: 40px -20px -20px -20px;
+            border-radius: 0 0 8px 8px;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header class="header">
+            <h1 id="main-title" class="text-center">ABsmartly Visual Editor Test Page</h1>
+            <p id="main-subtitle" class="text-center">Comprehensive testing ground for visual DOM changes</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#section1" class="nav-link" id="nav-home">Home</a></li>
+                <li class="nav-item"><a href="#section2" class="nav-link" id="nav-products">Products</a></li>
+                <li class="nav-item"><a href="#section3" class="nav-link" id="nav-about">About</a></li>
+                <li class="nav-item"><a href="#section4" class="nav-link" id="nav-contact">Contact</a></li>
+            </ul>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="hero-section" id="hero-section">
+            <h2 id="hero-title" class="text-large">Welcome to Our Amazing Platform</h2>
+            <p id="hero-description">Experience the future of A/B testing with our visual editor. Make changes without writing a single line of code.</p>
+            <button class="button-primary" id="hero-cta">Get Started Now</button>
+            <button class="button-secondary" id="hero-learn-more">Learn More</button>
+        </section>
+
+        <!-- Main Content Grid -->
+        <div class="content-grid">
+            <!-- Main Content -->
+            <main>
+                <!-- Text Elements Section -->
+                <section id="section1" class="card">
+                    <h2 id="text-section-title" class="text-bold">Text Elements Testing</h2>
+                    <h3 id="subheading1" class="text-italic">Various Heading Styles</h3>
+                    <h4 id="subheading2">Subheading Level 4</h4>
+                    <h5 id="subheading3">Subheading Level 5</h5>
+                    <h6 id="subheading4">Subheading Level 6</h6>
+
+                    <p id="paragraph1" class="text-large">This is a large paragraph with some <strong id="bold-text">bold text</strong> and <em id="italic-text">italic text</em>. It also contains a <a href="#" id="inline-link">clickable link</a> for testing purposes.</p>
+
+                    <p id="paragraph2">This is a normal paragraph with regular text. It contains enough content to test text changes and modifications.</p>
+
+                    <p id="paragraph3" class="text-small">This is a small paragraph that demonstrates how smaller text appears in the visual editor.</p>
+
+                    <span id="span1" class="text-bold">Bold span element</span> |
+                    <span id="span2" class="text-italic">Italic span element</span> |
+                    <span id="span3">Regular span element</span>
+
+                    <div class="long-text" id="long-text">
+                        This is a very long text that will overflow its container to test how the visual editor handles text overflow and ellipsis scenarios in different situations and contexts.
+                    </div>
+                </section>
+
+                <!-- Buttons Section -->
+                <section id="section2" class="card">
+                    <h3 id="buttons-title">Button Testing</h3>
+                    <div>
+                        <button class="button-primary" id="btn-primary">Primary Button</button>
+                        <button class="button-secondary" id="btn-secondary">Secondary Button</button>
+                        <button class="button-danger" id="btn-danger">Danger Button</button>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <button id="btn-custom" style="background-color: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px;">Custom Style Button</button>
+                        <button id="btn-disabled" disabled style="background-color: #9ca3af; color: white; border: none; padding: 10px 20px; border-radius: 6px;">Disabled Button</button>
+                    </div>
+                </section>
+
+                <!-- Images Section -->
+                <section id="section3" class="card">
+                    <h3 id="images-title">Images and Media</h3>
+                    <img id="test-image1" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200' viewBox='0 0 300 200'%3E%3Crect width='300' height='200' fill='%23f3f4f6'/%3E%3Ctext x='150' y='100' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ETest Image 1%3C/text%3E%3C/svg%3E" alt="Test Image 1" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;">
+
+                    <img id="test-image2" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='150' viewBox='0 0 250 150'%3E%3Crect width='250' height='150' fill='%23ddd6fe'/%3E%3Ctext x='125' y='75' text-anchor='middle' dy='.3em' fill='%235b21b6' font-family='Arial' font-size='14'%3ETest Image 2%3C/text%3E%3C/svg%3E" alt="Test Image 2" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;">
+                </section>
+
+                <!-- Links Section -->
+                <section id="section4" class="card">
+                    <h3 id="links-title">Links and Navigation</h3>
+                    <p>
+                        <a href="https://example.com" id="external-link" target="_blank">External Link</a> |
+                        <a href="#section1" id="internal-link">Internal Link</a> |
+                        <a href="mailto:test@example.com" id="email-link">Email Link</a> |
+                        <a href="tel:+1234567890" id="phone-link">Phone Link</a>
+                    </p>
+                    <ul>
+                        <li><a href="#link1" id="list-link1">Navigation Link 1</a></li>
+                        <li><a href="#link2" id="list-link2">Navigation Link 2</a></li>
+                        <li><a href="#link3" id="list-link3">Navigation Link 3</a></li>
+                    </ul>
+                </section>
+
+                <!-- Lists Section -->
+                <section id="section5" class="card">
+                    <h3 id="lists-title">Lists Testing</h3>
+
+                    <h4 id="unordered-list-title">Unordered List</h4>
+                    <ul id="test-ul">
+                        <li id="ul-item1">First unordered item</li>
+                        <li id="ul-item2">Second unordered item with <strong>bold text</strong></li>
+                        <li id="ul-item3">Third unordered item</li>
+                        <li id="ul-item4">Fourth item with a <a href="#" id="ul-link">link inside</a></li>
+                    </ul>
+
+                    <h4 id="ordered-list-title">Ordered List</h4>
+                    <ol id="test-ol">
+                        <li id="ol-item1">First ordered item</li>
+                        <li id="ol-item2">Second ordered item</li>
+                        <li id="ol-item3">Third ordered item with additional text</li>
+                        <li id="ol-item4">Fourth ordered item</li>
+                    </ol>
+                </section>
+
+                <!-- Form Elements Section -->
+                <section id="section6" class="card">
+                    <h3 id="form-title">Form Elements Testing</h3>
+                    <form id="test-form">
+                        <div class="form-group">
+                            <label for="text-input" class="form-label" id="text-input-label">Text Input</label>
+                            <input type="text" id="text-input" name="text-input" class="form-input" placeholder="Enter some text">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email-input" class="form-label" id="email-input-label">Email Input</label>
+                            <input type="email" id="email-input" name="email-input" class="form-input" placeholder="Enter your email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password-input" class="form-label" id="password-input-label">Password Input</label>
+                            <input type="password" id="password-input" name="password-input" class="form-input" placeholder="Enter password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="select-input" class="form-label" id="select-input-label">Select Dropdown</label>
+                            <select id="select-input" name="select-input" class="form-select">
+                                <option value="">Choose an option</option>
+                                <option value="option1" id="select-option1">Option 1</option>
+                                <option value="option2" id="select-option2">Option 2</option>
+                                <option value="option3" id="select-option3">Option 3</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="textarea-input" class="form-label" id="textarea-input-label">Textarea</label>
+                            <textarea id="textarea-input" name="textarea-input" class="form-textarea" placeholder="Enter your message here..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Checkboxes</label>
+                            <div>
+                                <input type="checkbox" id="checkbox1" name="checkbox1" value="1">
+                                <label for="checkbox1" id="checkbox1-label" style="display: inline; margin-left: 5px;">Checkbox Option 1</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="checkbox2" name="checkbox2" value="2">
+                                <label for="checkbox2" id="checkbox2-label" style="display: inline; margin-left: 5px;">Checkbox Option 2</label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Radio Buttons</label>
+                            <div>
+                                <input type="radio" id="radio1" name="radio-group" value="1">
+                                <label for="radio1" id="radio1-label" style="display: inline; margin-left: 5px;">Radio Option 1</label>
+                            </div>
+                            <div>
+                                <input type="radio" id="radio2" name="radio-group" value="2">
+                                <label for="radio2" id="radio2-label" style="display: inline; margin-left: 5px;">Radio Option 2</label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="button-primary" id="form-submit">Submit Form</button>
+                        <button type="reset" class="button-secondary" id="form-reset">Reset Form</button>
+                    </form>
+                </section>
+            </main>
+
+            <!-- Sidebar -->
+            <aside>
+                <!-- Colored Divs Section -->
+                <section class="card">
+                    <h3 id="colors-title">Colored Elements</h3>
+                    <div id="red-box" class="bg-red" style="padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <p id="red-text">Red background div with text content</p>
+                    </div>
+                    <div id="green-box" class="bg-green" style="padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <p id="green-text">Green background div with text content</p>
+                    </div>
+                    <div id="blue-box" class="bg-blue" style="padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <p id="blue-text">Blue background div with text content</p>
+                    </div>
+                    <div id="yellow-box" class="bg-yellow" style="padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <p id="yellow-text">Yellow background div with text content</p>
+                    </div>
+                    <div id="purple-box" class="bg-purple" style="padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <p id="purple-text">Purple background div with text content</p>
+                    </div>
+                </section>
+
+                <!-- Text Alignment Section -->
+                <section class="card">
+                    <h3 id="alignment-title">Text Alignment</h3>
+                    <p id="text-left" style="text-align: left;">Left aligned text content</p>
+                    <p id="text-center-2" class="text-center">Center aligned text content</p>
+                    <p id="text-right-2" class="text-right">Right aligned text content</p>
+                </section>
+
+                <!-- Widget Section -->
+                <section class="card">
+                    <h3 id="widget-title">Widget Area</h3>
+                    <div id="widget-content">
+                        <p id="widget-text">This is widget content that can be modified for A/B testing.</p>
+                        <button class="button-primary" id="widget-button">Widget Action</button>
+                    </div>
+                </section>
+            </aside>
+        </div>
+
+        <!-- Product Grid Section -->
+        <section id="products-section">
+            <h2 id="products-section-title" class="text-center text-large">Featured Products</h2>
+            <div class="product-grid">
+                <div class="product-card" id="product1">
+                    <div class="product-image" id="product1-image">Product Image 1</div>
+                    <div class="product-info">
+                        <h4 id="product1-title">Amazing Product 1</h4>
+                        <p id="product1-description">This is a fantastic product that will change your life.</p>
+                        <p id="product1-price" class="text-bold" style="color: #059669; font-size: 18px;">$99.99</p>
+                        <button class="button-primary" id="product1-buy">Buy Now</button>
+                    </div>
+                </div>
+
+                <div class="product-card" id="product2">
+                    <div class="product-image" id="product2-image">Product Image 2</div>
+                    <div class="product-info">
+                        <h4 id="product2-title">Incredible Product 2</h4>
+                        <p id="product2-description">An even better product with amazing features.</p>
+                        <p id="product2-price" class="text-bold" style="color: #059669; font-size: 18px;">$149.99</p>
+                        <button class="button-primary" id="product2-buy">Buy Now</button>
+                    </div>
+                </div>
+
+                <div class="product-card" id="product3">
+                    <div class="product-image" id="product3-image">Product Image 3</div>
+                    <div class="product-info">
+                        <h4 id="product3-title">Ultimate Product 3</h4>
+                        <p id="product3-description">The ultimate solution for all your needs.</p>
+                        <p id="product3-price" class="text-bold" style="color: #059669; font-size: 18px;">$199.99</p>
+                        <button class="button-primary" id="product3-buy">Buy Now</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Nested Elements Section -->
+        <section id="nested-section" class="card">
+            <h2 id="nested-title">Nested Elements Testing</h2>
+            <div class="nested-container" id="level1-container">
+                <h3 id="level1-title">Level 1 Container</h3>
+                <p id="level1-text">This is content in the first level container.</p>
+
+                <div class="deeply-nested" id="level2-container">
+                    <h4 id="level2-title">Level 2 Nested Container</h4>
+                    <p id="level2-text">This is content in the second level nested container.</p>
+
+                    <div class="deeply-nested" id="level3-container" style="background-color: #fef3c7;">
+                        <h5 id="level3-title">Level 3 Deeply Nested Container</h5>
+                        <p id="level3-text">This is content in the third level deeply nested container.</p>
+                        <span id="nested-span">Nested span element</span>
+                        <button class="button-secondary" id="nested-button">Nested Button</button>
+
+                        <ul id="nested-list">
+                            <li id="nested-item1">Nested list item 1</li>
+                            <li id="nested-item2">Nested list item 2</li>
+                            <li id="nested-item3">Nested list item 3</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Table Section -->
+        <section id="table-section" class="card">
+            <h2 id="table-title">Table Testing</h2>
+            <table id="test-table" style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
+                <thead>
+                    <tr style="background-color: #f9fafb;">
+                        <th id="table-header1" style="border: 1px solid #e5e7eb; padding: 12px; text-align: left;">Name</th>
+                        <th id="table-header2" style="border: 1px solid #e5e7eb; padding: 12px; text-align: left;">Email</th>
+                        <th id="table-header3" style="border: 1px solid #e5e7eb; padding: 12px; text-align: left;">Role</th>
+                        <th id="table-header4" style="border: 1px solid #e5e7eb; padding: 12px; text-align: left;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="table-row1">
+                        <td id="table-cell1-1" style="border: 1px solid #e5e7eb; padding: 12px;">John Doe</td>
+                        <td id="table-cell1-2" style="border: 1px solid #e5e7eb; padding: 12px;">john@example.com</td>
+                        <td id="table-cell1-3" style="border: 1px solid #e5e7eb; padding: 12px;">Admin</td>
+                        <td id="table-cell1-4" style="border: 1px solid #e5e7eb; padding: 12px;">
+                            <button class="button-secondary" id="table-edit1">Edit</button>
+                        </td>
+                    </tr>
+                    <tr id="table-row2" style="background-color: #f9fafb;">
+                        <td id="table-cell2-1" style="border: 1px solid #e5e7eb; padding: 12px;">Jane Smith</td>
+                        <td id="table-cell2-2" style="border: 1px solid #e5e7eb; padding: 12px;">jane@example.com</td>
+                        <td id="table-cell2-3" style="border: 1px solid #e5e7eb; padding: 12px;">User</td>
+                        <td id="table-cell2-4" style="border: 1px solid #e5e7eb; padding: 12px;">
+                            <button class="button-secondary" id="table-edit2">Edit</button>
+                        </td>
+                    </tr>
+                    <tr id="table-row3">
+                        <td id="table-cell3-1" style="border: 1px solid #e5e7eb; padding: 12px;">Bob Johnson</td>
+                        <td id="table-cell3-2" style="border: 1px solid #e5e7eb; padding: 12px;">bob@example.com</td>
+                        <td id="table-cell3-3" style="border: 1px solid #e5e7eb; padding: 12px;">Editor</td>
+                        <td id="table-cell3-4" style="border: 1px solid #e5e7eb; padding: 12px;">
+                            <button class="button-secondary" id="table-edit3">Edit</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-grid">
+                <div>
+                    <h4 id="footer-title1">Company</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="#" id="footer-link1" style="color: #d1d5db; text-decoration: none;">About Us</a></li>
+                        <li><a href="#" id="footer-link2" style="color: #d1d5db; text-decoration: none;">Careers</a></li>
+                        <li><a href="#" id="footer-link3" style="color: #d1d5db; text-decoration: none;">Contact</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 id="footer-title2">Products</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="#" id="footer-link4" style="color: #d1d5db; text-decoration: none;">A/B Testing</a></li>
+                        <li><a href="#" id="footer-link5" style="color: #d1d5db; text-decoration: none;">Analytics</a></li>
+                        <li><a href="#" id="footer-link6" style="color: #d1d5db; text-decoration: none;">Optimization</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 id="footer-title3">Support</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="#" id="footer-link7" style="color: #d1d5db; text-decoration: none;">Documentation</a></li>
+                        <li><a href="#" id="footer-link8" style="color: #d1d5db; text-decoration: none;">Help Center</a></li>
+                        <li><a href="#" id="footer-link9" style="color: #d1d5db; text-decoration: none;">Contact Support</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #374151;">
+                <p id="footer-copyright" style="color: #9ca3af;">© 2024 ABsmartly Test Page. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Add some interactivity for testing
+        document.addEventListener('DOMContentLoaded', function() {
+            // Button click handlers
+            document.querySelectorAll('button').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Button clicked:', this.id || this.textContent);
+                });
+            });
+
+            // Form submission handler
+            document.getElementById('test-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                console.log('Form submitted');
+            });
+
+            // Link click handlers
+            document.querySelectorAll('a[href^="#"]').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Internal link clicked:', this.href);
+                });
+            });
+
+            // Add dynamic content for testing
+            const dynamicContent = document.createElement('div');
+            dynamicContent.id = 'dynamic-content';
+            dynamicContent.style.cssText = 'background-color: #ecfdf5; border: 2px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 8px;';
+            dynamicContent.innerHTML = '<h3 id="dynamic-title">Dynamically Added Content</h3><p id="dynamic-text">This content was added via JavaScript to test dynamic element selection.</p>';
+
+            const container = document.querySelector('.container');
+            container.insertBefore(dynamicContent, container.querySelector('.footer'));
+        });
+    </script>
+</body>
+</html>

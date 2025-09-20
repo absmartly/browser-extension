@@ -22,11 +22,16 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        headless: false
+        headless: false,
+        launchOptions: {
+          slowMo: 1000 // Slow down by 1 second between actions
+        }
       },
       testMatch: [
         // Include all E2E tests
         'e2e/**/*.spec.ts',
+        // Include tests in root tests directory
+        '*.spec.ts',
         // Specifically include Monaco tests
         'e2e/monaco-automated.spec.ts'
       ]
