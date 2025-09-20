@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABsmartly Visual Editor Test Page</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 60px 20px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: 48px;
+      font-weight: 700;
+    }
+    .tagline {
+      font-size: 20px;
+      margin-top: 10px;
+      opacity: 0.9;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .hero-buttons {
+      margin-top: 30px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 30px;
+      margin: 0 10px;
+      background: white;
+      color: #667eea;
+      text-decoration: none;
+      border-radius: 50px;
+      font-weight: 600;
+      transition: transform 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: transparent;
+      border: 2px solid white;
+      color: white;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-top: 60px;
+    }
+    .feature {
+      padding: 30px;
+      background: #f7f7f7;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .feature h3 {
+      color: #333;
+      margin-bottom: 15px;
+    }
+    .feature p {
+      color: #666;
+      line-height: 1.6;
+    }
+    .testimonial {
+      background: #fff;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      margin: 40px 0;
+      text-align: center;
+    }
+    .testimonial p {
+      font-size: 20px;
+      font-style: italic;
+      color: #555;
+    }
+    .testimonial .author {
+      margin-top: 20px;
+      font-weight: 600;
+      color: #667eea;
+    }
+    footer {
+      background: #333;
+      color: white;
+      text-align: center;
+      padding: 40px 20px;
+      margin-top: 60px;
+    }
+    footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    .list-section {
+      margin: 40px 0;
+    }
+    .list-section ul {
+      list-style: none;
+      padding: 0;
+    }
+    .list-section li {
+      padding: 15px;
+      margin: 10px 0;
+      background: #f0f0f0;
+      border-left: 4px solid #667eea;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="main-heading">Visual Editor Test Page</h1>
+    <p class="tagline">Perfect for testing DOM manipulation</p>
+    <div class="hero-buttons">
+      <a href="#" class="btn" id="get-started-btn">Get Started</a>
+      <a href="#" class="btn btn-secondary" id="learn-more-btn">Learn More</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <section>
+      <h2 id="features-heading">Key Features</h2>
+      <p id="features-description">This page contains various elements perfect for testing the visual editor's context menu actions.</p>
+
+      <div class="features">
+        <div class="feature" id="feature-1">
+          <h3>Edit Text</h3>
+          <p>Test the ability to edit text content directly on the page using the visual editor.</p>
+        </div>
+        <div class="feature" id="feature-2">
+          <h3>Change Styles</h3>
+          <p>Modify CSS properties like colors, sizes, and spacing with the style editor.</p>
+        </div>
+        <div class="feature" id="feature-3">
+          <h3>Manage Classes</h3>
+          <p>Add, remove, or toggle CSS classes on any element for instant styling changes.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="list-section">
+      <h2 id="list-heading">Test List Items</h2>
+      <ul id="test-list">
+        <li id="list-item-1">First item - can be rearranged</li>
+        <li id="list-item-2">Second item - can be hidden</li>
+        <li id="list-item-3">Third item - can be deleted</li>
+        <li id="list-item-4">Fourth item - can be styled</li>
+        <li id="list-item-5">Fifth item - can be edited</li>
+      </ul>
+    </section>
+
+    <div class="testimonial" id="testimonial-block">
+      <p id="testimonial-text">"This visual editor makes A/B testing incredibly easy. No coding required!"</p>
+      <div class="author" id="testimonial-author">- Happy Customer</div>
+    </div>
+
+    <section>
+      <h2 id="cta-heading">Ready to Start Testing?</h2>
+      <p id="cta-description">Join thousands of companies optimizing their websites with ABsmartly.</p>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="#" class="btn" id="signup-btn" style="font-size: 18px; padding: 15px 40px;">Sign Up Now</a>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <p>&copy; 2024 Test Page. Built for testing the <a href="#">ABsmartly Visual Editor</a></p>
+  </footer>
+</body>
+</html>
