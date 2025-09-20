@@ -58,6 +58,8 @@ export const test = base.extend<ExtFixtures>({
       ],
       // Add slow motion for debugging if needed
       slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : undefined,
+      // Use larger viewport for better testing
+      viewport: { width: 1920, height: 1080 },
     })
 
     await use(context)
