@@ -1,0 +1,82 @@
+{
+  "id": 12345,
+  "name": "visual_editor_test_experiment",
+  "display_name": "Visual Editor Test Experiment",
+  "description": "A comprehensive test experiment for visual editor functionality",
+  "state": "ready",
+  "percentage_of_traffic": 100,
+  "nr_variants": 2,
+  "percentages": "50/50",
+  "unit_type": {
+    "unit_type_id": 1,
+    "name": "user_id"
+  },
+  "applications": [
+    {
+      "application_id": 1,
+      "application_name": "test-app",
+      "application_version": "1.0.0"
+    }
+  ],
+  "variants": [
+    {
+      "variant": 0,
+      "name": "control",
+      "config": "{}"
+    },
+    {
+      "variant": 1,
+      "name": "test-variant",
+      "config": "{\"dom_changes\": [{\"selector\": \"#main-title\", \"type\": \"text\", \"value\": \"Modified Test Page Title\", \"enabled\": true}, {\"selector\": \"#hero-cta\", \"type\": \"style\", \"value\": {\"backgroundColor\": \"#dc2626\", \"color\": \"white\"}, \"enabled\": true}, {\"selector\": \".button-primary\", \"type\": \"class\", \"add\": [\"rounded-lg\"], \"enabled\": true}]}"
+    }
+  ],
+  "variables": [
+    {
+      "name": "dom_changes",
+      "type": "json",
+      "defaultValue": "[]",
+      "variants": {
+        "0": "[]",
+        "1": "[{\"selector\": \"#main-title\", \"type\": \"text\", \"value\": \"Modified Test Page Title\", \"enabled\": true}, {\"selector\": \"#hero-cta\", \"type\": \"style\", \"value\": {\"backgroundColor\": \"#dc2626\", \"color\": \"white\"}, \"enabled\": true}, {\"selector\": \".button-primary\", \"type\": \"class\", \"add\": [\"rounded-lg\"], \"enabled\": true}]"
+      }
+    },
+    {
+      "name": "button_text",
+      "type": "string",
+      "defaultValue": "Get Started Now",
+      "variants": {
+        "0": "Get Started Now",
+        "1": "Start Your Journey"
+      }
+    },
+    {
+      "name": "hero_description",
+      "type": "string",
+      "defaultValue": "Experience the future of A/B testing",
+      "variants": {
+        "0": "Experience the future of A/B testing with our visual editor. Make changes without writing a single line of code.",
+        "1": "Transform your website with our powerful visual editor. Create experiments in minutes, not hours."
+      }
+    }
+  ],
+  "created_at": "2024-09-19T10:00:00Z",
+  "updated_at": "2024-09-19T15:30:00Z",
+  "created_by": "test-user@absmartly.com",
+  "tags": ["visual-editor", "e2e-test", "automation"],
+  "audience": {
+    "filter": "{}",
+    "percentage": 100
+  },
+  "goals": [
+    {
+      "name": "click_conversion",
+      "display_name": "Click Conversion Rate",
+      "type": "conversion"
+    },
+    {
+      "name": "engagement_time",
+      "display_name": "Page Engagement Time",
+      "type": "numeric"
+    }
+  ]
+}

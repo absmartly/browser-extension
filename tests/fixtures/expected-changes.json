@@ -1,0 +1,470 @@
+{
+  "contextMenuActions": {
+    "editText": {
+      "description": "Change text content of an element",
+      "selector": "#main-title",
+      "expectedChange": {
+        "selector": "#main-title",
+        "type": "text",
+        "value": "New Text Content",
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#main-title",
+          "originalText": "ABsmartly Visual Editor Test Page",
+          "newText": "Modified Title via Visual Editor",
+          "expected": {
+            "selector": "#main-title",
+            "type": "text",
+            "value": "Modified Title via Visual Editor",
+            "enabled": true
+          }
+        },
+        {
+          "element": "#hero-description",
+          "originalText": "Experience the future of A/B testing with our visual editor. Make changes without writing a single line of code.",
+          "newText": "Transform your experiments with our powerful visual editor.",
+          "expected": {
+            "selector": "#hero-description",
+            "type": "text",
+            "value": "Transform your experiments with our powerful visual editor.",
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "editHtml": {
+      "description": "Change HTML content of an element",
+      "selector": "#paragraph1",
+      "expectedChange": {
+        "selector": "#paragraph1",
+        "type": "html",
+        "value": "<strong>Bold HTML content</strong> with <em>emphasis</em>",
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#paragraph1",
+          "newHtml": "<strong>Updated paragraph</strong> with <a href='#'>new link</a>",
+          "expected": {
+            "selector": "#paragraph1",
+            "type": "html",
+            "value": "<strong>Updated paragraph</strong> with <a href='#'>new link</a>",
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "changeStyle": {
+      "description": "Modify CSS styles of an element",
+      "selector": "#hero-cta",
+      "expectedChange": {
+        "selector": "#hero-cta",
+        "type": "style",
+        "value": {
+          "backgroundColor": "#dc2626",
+          "color": "white",
+          "borderRadius": "8px",
+          "padding": "12px 24px"
+        },
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#hero-cta",
+          "styles": {
+            "backgroundColor": "#059669",
+            "color": "white",
+            "fontSize": "18px"
+          },
+          "expected": {
+            "selector": "#hero-cta",
+            "type": "style",
+            "value": {
+              "backgroundColor": "#059669",
+              "color": "white",
+              "fontSize": "18px"
+            },
+            "enabled": true
+          }
+        },
+        {
+          "element": "#red-box",
+          "styles": {
+            "backgroundColor": "#3b82f6",
+            "border": "2px solid #1e40af",
+            "borderRadius": "12px"
+          },
+          "expected": {
+            "selector": "#red-box",
+            "type": "style",
+            "value": {
+              "backgroundColor": "#3b82f6",
+              "border": "2px solid #1e40af",
+              "borderRadius": "12px"
+            },
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "addClass": {
+      "description": "Add CSS classes to an element",
+      "selector": ".button-primary",
+      "expectedChange": {
+        "selector": ".button-primary",
+        "type": "class",
+        "add": ["rounded-lg", "shadow-md"],
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#hero-cta",
+          "classesToAdd": ["btn-large", "btn-animated"],
+          "expected": {
+            "selector": "#hero-cta",
+            "type": "class",
+            "add": ["btn-large", "btn-animated"],
+            "enabled": true
+          }
+        },
+        {
+          "element": ".product-card",
+          "classesToAdd": ["card-highlighted", "border-blue"],
+          "expected": {
+            "selector": ".product-card",
+            "type": "class",
+            "add": ["card-highlighted", "border-blue"],
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "removeClass": {
+      "description": "Remove CSS classes from an element",
+      "selector": "#hero-section",
+      "expectedChange": {
+        "selector": "#hero-section",
+        "type": "class",
+        "remove": ["hero-section"],
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#main-title",
+          "classesToRemove": ["text-center"],
+          "expected": {
+            "selector": "#main-title",
+            "type": "class",
+            "remove": ["text-center"],
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "changeAttribute": {
+      "description": "Modify attributes of an element",
+      "selector": "#external-link",
+      "expectedChange": {
+        "selector": "#external-link",
+        "type": "attribute",
+        "name": "href",
+        "value": "https://new-url.com",
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#external-link",
+          "attributeName": "href",
+          "attributeValue": "https://absmartly.com",
+          "expected": {
+            "selector": "#external-link",
+            "type": "attribute",
+            "name": "href",
+            "value": "https://absmartly.com",
+            "enabled": true
+          }
+        },
+        {
+          "element": "#test-image1",
+          "attributeName": "alt",
+          "attributeValue": "Updated alt text for accessibility",
+          "expected": {
+            "selector": "#test-image1",
+            "type": "attribute",
+            "name": "alt",
+            "value": "Updated alt text for accessibility",
+            "enabled": true
+          }
+        },
+        {
+          "element": "#text-input",
+          "attributeName": "placeholder",
+          "attributeValue": "Enter your name here",
+          "expected": {
+            "selector": "#text-input",
+            "type": "attribute",
+            "name": "placeholder",
+            "value": "Enter your name here",
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "hideElement": {
+      "description": "Hide an element by setting display to none",
+      "selector": "#hero-learn-more",
+      "expectedChange": {
+        "selector": "#hero-learn-more",
+        "type": "style",
+        "value": {
+          "display": "none"
+        },
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#hero-learn-more",
+          "expected": {
+            "selector": "#hero-learn-more",
+            "type": "style",
+            "value": {
+              "display": "none"
+            },
+            "enabled": true
+          }
+        },
+        {
+          "element": "#widget-content",
+          "expected": {
+            "selector": "#widget-content",
+            "type": "style",
+            "value": {
+              "display": "none"
+            },
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "showElement": {
+      "description": "Show a hidden element by setting display to block/inline",
+      "selector": "#hidden-element",
+      "expectedChange": {
+        "selector": "#hidden-element",
+        "type": "style",
+        "value": {
+          "display": "block"
+        },
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#btn-disabled",
+          "expected": {
+            "selector": "#btn-disabled",
+            "type": "style",
+            "value": {
+              "display": "block"
+            },
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "removeElement": {
+      "description": "Completely remove an element from the DOM",
+      "selector": "#hero-learn-more",
+      "expectedChange": {
+        "selector": "#hero-learn-more",
+        "type": "remove",
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "element": "#hero-learn-more",
+          "expected": {
+            "selector": "#hero-learn-more",
+            "type": "remove",
+            "enabled": true
+          }
+        },
+        {
+          "element": "#ul-item4",
+          "expected": {
+            "selector": "#ul-item4",
+            "type": "remove",
+            "enabled": true
+          }
+        }
+      ]
+    },
+    "executeJavaScript": {
+      "description": "Execute custom JavaScript code",
+      "selector": "body",
+      "expectedChange": {
+        "selector": "body",
+        "type": "javascript",
+        "value": "console.log('Visual editor test executed');",
+        "enabled": true
+      },
+      "testCases": [
+        {
+          "code": "document.getElementById('main-title').style.color = 'red';",
+          "expected": {
+            "selector": "body",
+            "type": "javascript",
+            "value": "document.getElementById('main-title').style.color = 'red';",
+            "enabled": true
+          }
+        },
+        {
+          "code": "alert('A/B test variant loaded');",
+          "expected": {
+            "selector": "body",
+            "type": "javascript",
+            "value": "alert('A/B test variant loaded');",
+            "enabled": true
+          }
+        },
+        {
+          "code": "window.dataLayer = window.dataLayer || []; window.dataLayer.push({'event': 'ab_test_variant'});",
+          "expected": {
+            "selector": "body",
+            "type": "javascript",
+            "value": "window.dataLayer = window.dataLayer || []; window.dataLayer.push({'event': 'ab_test_variant'});",
+            "enabled": true
+          }
+        }
+      ]
+    }
+  },
+  "complexScenarios": {
+    "multipleChanges": {
+      "description": "Multiple DOM changes applied together",
+      "changes": [
+        {
+          "selector": "#main-title",
+          "type": "text",
+          "value": "A/B Testing Made Easy",
+          "enabled": true
+        },
+        {
+          "selector": "#hero-cta",
+          "type": "style",
+          "value": {
+            "backgroundColor": "#059669",
+            "fontSize": "20px",
+            "padding": "15px 30px"
+          },
+          "enabled": true
+        },
+        {
+          "selector": ".button-primary",
+          "type": "class",
+          "add": ["btn-enhanced", "shadow-lg"],
+          "enabled": true
+        },
+        {
+          "selector": "#hero-description",
+          "type": "html",
+          "value": "Create <strong>powerful experiments</strong> with our <em>visual editor</em>",
+          "enabled": true
+        }
+      ]
+    },
+    "conditionalChanges": {
+      "description": "Changes that depend on element state or conditions",
+      "changes": [
+        {
+          "selector": "#product1",
+          "type": "style",
+          "value": {
+            "border": "3px solid #059669",
+            "transform": "scale(1.05)"
+          },
+          "enabled": true,
+          "waitForElement": true
+        },
+        {
+          "selector": ".nav-link:hover",
+          "type": "styleRules",
+          "states": {
+            "hover": {
+              "color": "#dc2626",
+              "textDecoration": "underline"
+            }
+          },
+          "enabled": true
+        }
+      ]
+    },
+    "nestedElements": {
+      "description": "Changes applied to deeply nested elements",
+      "changes": [
+        {
+          "selector": "#level3-container #nested-button",
+          "type": "text",
+          "value": "Nested Action",
+          "enabled": true
+        },
+        {
+          "selector": "#level2-container",
+          "type": "style",
+          "value": {
+            "backgroundColor": "#fef3c7",
+            "border": "2px dashed #f59e0b"
+          },
+          "enabled": true
+        }
+      ]
+    }
+  },
+  "edgeCases": {
+    "invalidSelectors": {
+      "description": "Test handling of invalid CSS selectors",
+      "testCases": [
+        {
+          "selector": "#non-existent-element",
+          "expectedBehavior": "Should not throw error, change should be ignored"
+        },
+        {
+          "selector": "invalid>>selector",
+          "expectedBehavior": "Should handle invalid selector gracefully"
+        }
+      ]
+    },
+    "dynamicContent": {
+      "description": "Changes applied to dynamically added content",
+      "changes": [
+        {
+          "selector": "#dynamic-title",
+          "type": "text",
+          "value": "Dynamic Content Modified",
+          "enabled": true,
+          "waitForElement": true,
+          "observerRoot": "body"
+        }
+      ]
+    },
+    "performanceTest": {
+      "description": "Large number of changes to test performance",
+      "changes": Array.from({ length: 50 }, (_, i) => ({
+        "selector": `#performance-test-${i}`,
+        "type": "style",
+        "value": {
+          "backgroundColor": `hsl(${i * 7}, 70%, 50%)`,
+          "padding": "10px"
+        },
+        "enabled": true
+      }))
+    }
+  },
+  "validationRules": {
+    "requiredFields": ["selector", "type", "enabled"],
+    "allowedTypes": ["text", "html", "style", "styleRules", "class", "attribute", "javascript", "move", "remove", "insert", "create"],
+    "selectorFormat": "Valid CSS selector string",
+    "enabledDefault": true
+  }
+}
