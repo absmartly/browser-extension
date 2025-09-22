@@ -43,3 +43,15 @@ dist/
 .tsbuildinfo
 tsconfig.tsbuildinfo
 injected-bundles/
+
+# Temporary test files and screenshots
+test-*.html
+*-test-*.html
+preview-*.png
+*-preview-*.png
+visual-editor-*.png
+*-test-result*.png
+*-screenshot-*.png
+tests/e2e/*-mock.spec.ts
+tests/e2e/*-real.spec.ts
+tests/e2e/*-temp.spec.ts
