@@ -27,6 +27,8 @@ export interface VisualEditorOptions {
 export class VisualEditor {
   private readonly VERSION = '3.0-UNIFIED'
   private isActive = false
+  private hasUnsavedChanges = false  // Track if there are unsaved changes since last save
+  private lastSavedChangesCount = 0  // Track the number of changes at last save
 
   // Core modules
   private stateManager: StateManager
@@ -49,6 +51,10 @@ export class VisualEditor {
     this.options = options
     this.changes = options.initialChanges || []
 
+    // Set initial saved state
+    this.lastSavedChangesCount = this.changes.length
+    this.hasUnsavedChanges = false  // No unsaved changes on start
+
     // Initialize state manager with converted config
     const config: VisualEditorConfig = {
       variantName: options.variantName,
@@ -67,6 +73,12 @@ export class VisualEditor {
     this.cleanup = new Cleanup(this.stateManager)
     // Removed toolbar - using UIComponents banner instead
     this.notifications = new Notifications()
+
+    // Set the addChange callback for EditModes to track move/resize changes
+    this.editModes.setAddChangeCallback((change) => {
+      console.log('[VisualEditor] EditModes addChange callback triggered with:', change)
+      this.addChange(change)
+    })
 
     // Initialize element actions
     this.elementActions = new ElementActions(
@@ -174,16 +186,37 @@ export class VisualEditor {
   stop(): void {
     if (!this.isActive) return
 
+    // Check for unsaved changes
+    if (this.hasUnsavedChanges) {
+      const confirmExit = window.confirm(
+        'You have unsaved changes. Are you sure you want to exit?\n\n' +
+        'Click "Cancel" to go back and save your changes.'
+      )
+      if (!confirmExit) {
+        console.log('[ABSmartly] User cancelled exit due to unsaved changes')
+        return
+      }
+    }
+
     console.log('[ABSmartly] Stopping unified visual editor')
     console.trace('[ABSmartly] Stop called from:')
 
     this.isActive = false
     ;(window as any).__absmartlyVisualEditorActive = false
 
-    // Save final changes from state manager
+    // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []
     console.log('[ABSmartly] Final changes on exit:', finalChanges.length)
-    this.options.onChangesUpdate(finalChanges)
+
+    // Only send changes if we have unsaved changes (user chose to discard)
+    // If changes were saved, they've already been sent
+    if (this.hasUnsavedChanges) {
+      console.log('[ABSmartly] Discarding unsaved changes on exit')
+      // Don't send the unsaved changes - user chose to discard them
+    } else {
+      // Changes were already saved and sent
+      console.log('[ABSmartly] Changes were already saved')
+    }
 
     // Use coordinator to teardown all modules
     this.coordinator.teardownAll()
@@ -341,6 +374,10 @@ export class VisualEditor {
       })
     }
 
+    // Mark that we have unsaved changes
+    this.hasUnsavedChanges = true
+    console.log('[VisualEditor] Marked as having unsaved changes')
+
     console.log('[VisualEditor] New changes count:', this.changes.length)
     console.log('[VisualEditor] Updating state manager with changes')
 
@@ -366,9 +403,14 @@ export class VisualEditor {
     } catch (error) {
       console.error('Error in onChangesUpdate callback:', error)
     }
+
+    // Mark changes as saved
+    this.hasUnsavedChanges = false
+    this.lastSavedChangesCount = currentChanges.length
+
     this.notifications.show(`${currentChanges.length} changes saved`, '', 'success')
 
-    // Exit the visual editor after saving (but keep preview active)
+    // Exit the visual editor after saving
     setTimeout(() => {
       this.stop()
     }, 500) // Small delay to show success message

@@ -25,12 +25,14 @@
   const INJECT_VERSION = '1.0.7';
   debugLog('[ABsmartly Extension] Inject SDK Plugin version:', INJECT_VERSION);
 
-  // Check if already injected
+  // Check if already injected - but still need to set up message listener
   if (window.__absmartlyExtensionInjected) {
-    debugLog('[ABsmartly Extension] Already injected, skipping');
-    return;
+    debugLog('[ABsmartly Extension] Already injected, but ensuring message listener is active');
+    // Don't return here - we still need to set up the message listener
+    // in case it was lost (e.g., after navigation or re-injection)
+  } else {
+    window.__absmartlyExtensionInjected = true;
   }
-  window.__absmartlyExtensionInjected = true;
   
   // Track initialization state
   let isInitializing = false;
@@ -729,8 +731,11 @@
     checkAndInit();
   }
 
-  // Listen for messages from content script
-  window.addEventListener('message', (event) => {
+  // Listen for messages from content script (only set up once)
+  if (!window.__absmartlyMessageListenerSet) {
+    window.__absmartlyMessageListenerSet = true;
+    debugLog('[ABsmartly Extension] Setting up message listener for extension messages');
+    window.addEventListener('message', (event) => {
     if (event.data && event.data.source === 'absmartly-extension') {
       debugLog('[ABsmartly Page] Received message from extension:', event.data);
 
@@ -1376,7 +1381,8 @@
         debugLog('[ABsmartly Extension] INJECT_CUSTOM_CODE message received but not used');
       }
     }
-  });
+    });
+  }
 
   // Expose a function to get variant assignments for the extension
   window.__absmartlyGetVariantAssignments = async function(experimentNames) {

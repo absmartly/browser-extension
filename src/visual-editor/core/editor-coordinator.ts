@@ -113,22 +113,43 @@ export class EditorCoordinator {
   }
 
   setupStateListeners(): void {
+    // Track previous values to detect actual changes
+    let previousChangesLength = 0
+    let previousUndoStackLength = 0
+    let previousRedoStackLength = 0
+
     // Listen to state changes and sync with local state
     this.stateManager.onStateChange((state: VisualEditorState) => {
+      // Always update these for internal tracking
       this.selectedElement = state.selectedElement as HTMLElement | null
       this.hoveredElement = state.hoveredElement as HTMLElement | null
       this.changes = state.changes || []
 
-      console.log('[EditorCoordinator] State changed - total changes:', this.changes.length)
-      console.log('[EditorCoordinator] Session changes (undo stack):', state.undoStack.length)
-      console.log('[EditorCoordinator] Redo stack length:', state.redoStack.length)
+      // Only update banner and log if undo/redo/changes actually changed
+      const changesLength = this.changes.length
+      const undoStackLength = state.undoStack.length
+      const redoStackLength = state.redoStack.length
 
-      // Update banner - changes counter shows session changes (undo stack)
-      this.uiComponents.updateBanner({
-        changesCount: state.undoStack.length,  // Session changes, not total
-        canUndo: state.undoStack.length > 0,
-        canRedo: state.redoStack.length > 0
-      })
+      if (changesLength !== previousChangesLength ||
+          undoStackLength !== previousUndoStackLength ||
+          redoStackLength !== previousRedoStackLength) {
+
+        console.log('[EditorCoordinator] Changes/Undo/Redo updated - total changes:', changesLength)
+        console.log('[EditorCoordinator] Session changes (undo stack):', undoStackLength)
+        console.log('[EditorCoordinator] Redo stack length:', redoStackLength)
+
+        // Update banner - changes counter shows session changes (undo stack)
+        this.uiComponents.updateBanner({
+          changesCount: undoStackLength,  // Session changes, not total
+          canUndo: undoStackLength > 0,
+          canRedo: redoStackLength > 0
+        })
+
+        // Update tracked values
+        previousChangesLength = changesLength
+        previousUndoStackLength = undoStackLength
+        previousRedoStackLength = redoStackLength
+      }
     })
   }
 
