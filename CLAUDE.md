@@ -36,6 +36,10 @@ npx prettier --write .   # Format code with Prettier
   - `ExperimentDetail.tsx` - Detailed experiment view
   - `DOMChangesInlineEditor.tsx` - Visual DOM changes editor
   - `DOMChangesJSONEditor.tsx` - JSON editor for DOM changes
+- **src/visual-editor/** - Modular visual editor for DOM manipulation (see [README](src/visual-editor/README.md))
+  - 16 TypeScript modules organized into core, UI, utils, and types
+  - Provides drag & drop, resize, and inline editing capabilities
+  - Shadow DOM isolation and robust selector generation
 - **src/lib/** - API client and core utilities
   - `absmartly-api.ts` - ABsmartly API client
   - `storage.ts` - Extension storage management
