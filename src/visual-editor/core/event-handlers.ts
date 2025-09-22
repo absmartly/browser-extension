@@ -35,7 +35,7 @@ export class EventHandlers {
     }
 
     target.classList.add('absmartly-hover')
-    this.stateManager.setHoveredElement(target)
+    // Don't update state on hover - it's just a visual effect!
 
     // Show tooltip with element selector
     if (this.hoverTooltip) {
@@ -83,7 +83,7 @@ export class EventHandlers {
   handleMouseOut = (e: MouseEvent): void => {
     if (this.isEditing) return
     ;(e.target as Element).classList.remove('absmartly-hover')
-    this.stateManager.setHoveredElement(null)
+    // Don't update state on hover - it's just a visual effect!
 
     // Remove tooltip
     if (this.hoverTooltip) {

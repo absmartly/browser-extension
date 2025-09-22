@@ -1546,16 +1546,50 @@ export function DOMChangesInlineEditor({
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
         debugLog('📡 Visual editor changes received:', message.changes)
 
-        // Update parent component with visual editor changes
-        if (message.changes && message.changes.length > 0) {
-          onChange(message.changes)
-          
+        // The visual editor sends its current changes when Save Changes is clicked
+        // We should merge these with existing changes (avoiding duplicates)
+        if (message.changes && Array.isArray(message.changes)) {
+          debugLog('📝 Merging visual editor changes with existing changes')
+
+          // Get current changes from parent
+          const currentChanges = changes || []
+
+          // Create a map to track unique changes by selector and type
+          const changesMap = new Map()
+
+          // Add existing changes to map
+          currentChanges.forEach((change, index) => {
+            const key = `${change.selector}-${change.type}`
+            changesMap.set(key, { ...change, originalIndex: index })
+          })
+
+          // Add/update with visual editor changes (these override existing ones with same selector+type)
+          message.changes.forEach((change) => {
+            const key = `${change.selector}-${change.type}`
+            changesMap.set(key, change)
+          })
+
+          // Convert map back to array
+          const mergedChanges = Array.from(changesMap.values())
+          debugLog('📝 Merged changes:', mergedChanges)
+
+          onChange(mergedChanges)
+
           // Store in session storage for persistence
           const storage = new Storage({ area: "session" })
           await storage.set('visualEditorChanges', {
             variantName,
-            changes: message.changes
+            changes: mergedChanges
           })
+
+          // Show success notification
+          const newChangeCount = message.changes.length
+          const totalChangeCount = mergedChanges.length
+          const toast = document.createElement('div')
+          toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50 animate-slide-in'
+          toast.textContent = `✅ Added ${newChangeCount} change${newChangeCount !== 1 ? 's' : ''} from Visual Editor (Total: ${totalChangeCount})`
+          document.body.appendChild(toast)
+          setTimeout(() => toast.remove(), 3000)
         }
       } else if (message.type === 'PREVIEW_STATE_CHANGED') {
         // Update preview toggle state when visual editor disables it
@@ -1566,26 +1600,49 @@ export function DOMChangesInlineEditor({
         }
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
         debugLog('✅ Visual Editor Complete - Received changes:', message)
-        
+
         if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
-          // Merge new changes with existing ones
-          const mergedChanges = [...changes, ...message.changes]
-          debugLog('📝 Merged changes:', mergedChanges)
-          
+          // Merge visual editor changes with existing ones
+          debugLog('📝 Merging final visual editor changes with existing changes')
+
+          // Get current changes from parent
+          const currentChanges = changes || []
+
+          // Create a map to track unique changes by selector and type
+          const changesMap = new Map()
+
+          // Add existing changes to map
+          currentChanges.forEach((change, index) => {
+            const key = `${change.selector}-${change.type}`
+            changesMap.set(key, { ...change, originalIndex: index })
+          })
+
+          // Add/update with visual editor changes (these override existing ones with same selector+type)
+          message.changes.forEach((change) => {
+            const key = `${change.selector}-${change.type}`
+            changesMap.set(key, change)
+          })
+
+          // Convert map back to array
+          const mergedChanges = Array.from(changesMap.values())
+          debugLog('📝 Final merged changes:', mergedChanges)
+
           // Update the parent component
           onChange(mergedChanges)
-          
+
           // Store in session storage for persistence
           const storage = new Storage({ area: "session" })
           await storage.set('visualEditorChanges', {
             variantName,
             changes: mergedChanges
           })
-          
+
           // Show success toast
+          const newChangeCount = message.changes.length
+          const totalChangeCount = mergedChanges.length
           const toast = document.createElement('div')
           toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50 animate-slide-in'
-          toast.textContent = `✅ Added ${message.totalChanges} changes from Visual Editor`
+          toast.textContent = `✅ Visual Editor closed - Added ${newChangeCount} change${newChangeCount !== 1 ? 's' : ''} (Total: ${totalChangeCount})`
           document.body.appendChild(toast)
           setTimeout(() => toast.remove(), 3000)
         }
@@ -1596,7 +1653,7 @@ export function DOMChangesInlineEditor({
     return () => {
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
     }
-  }, [variantName, changes, onChange])
+  }, [variantName, onChange, changes])
 
   const handleLaunchVisualEditor = async () => {
     debugLog('🎨 Launching Visual Editor')
@@ -1604,19 +1661,7 @@ export function DOMChangesInlineEditor({
     debugLog('Variant name:', variantName)
     debugLog('Existing changes:', changes.length)
 
-    // If preview is already enabled with existing changes, we need to disable it first
-    // to restore the original state, then re-enable it to capture the true original values
-    if (previewEnabled && changes.length > 0) {
-      debugLog('🔄 Preview active with existing changes - resetting to capture true original state')
-      onPreviewToggle(false)
-      await new Promise(resolve => setTimeout(resolve, 200))
-    }
-
-    // Now enable preview for visual editor (with flag to prevent header)
-    debugLog('🔄 Enabling preview for visual editor')
-    debugLog('Calling onPreviewToggle(true) for variant:', variantName)
-
-    // Set a flag to prevent preview header from showing
+    // Set a flag to prevent preview header from showing FIRST
     await chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
         chrome.tabs.sendMessage(tabs[0].id, {
@@ -1626,10 +1671,13 @@ export function DOMChangesInlineEditor({
       }
     })
 
-    onPreviewToggle(true)
-
-    // Give preview a moment to activate before starting visual editor
-    await new Promise(resolve => setTimeout(resolve, 300))
+    // If preview is not enabled, enable it
+    if (!previewEnabled) {
+      debugLog('🔄 Enabling preview for visual editor')
+      onPreviewToggle(true)
+    } else {
+      debugLog('✅ Preview already active with changes applied')
+    }
     debugLog('Preview activation complete, starting visual editor...')
     
     // Save current state
