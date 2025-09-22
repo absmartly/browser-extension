@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Editor Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #4299e1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3182ce;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #718096;
+            color: white;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .card {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .card-content {
+            color: #718096;
+            line-height: 1.6;
+        }
+
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .image-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .image-card:hover .image-caption {
+            transform: translateY(0);
+        }
+
+        .list-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .list-section li {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f7fafc;
+            border-left: 4px solid #4299e1;
+            border-radius: 4px;
+        }
+
+        .table-section table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .table-section th,
+        .table-section td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .table-section th {
+            background: #edf2f7;
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .table-section tr:hover {
+            background: #f7fafc;
+        }
+
+        .form-section {
+            max-width: 500px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-new {
+            background: #f6e05e;
+            color: #744210;
+        }
+
+        .badge-hot {
+            background: #fc8181;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            background: #2d3748;
+            color: white;
+            margin-top: 40px;
+        }
+
+        .social-links {
+            margin-top: 20px;
+        }
+
+        .social-links a {
+            color: white;
+            text-decoration: none;
+            margin: 0 10px;
+            font-size: 18px;
+        }
+
+        .testimonial {
+            font-style: italic;
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #805ad5;
+        }
+
+        .testimonial-author {
+            text-align: right;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+
+        .alert-info {
+            background: #bee3f8;
+            color: #2c5282;
+            border: 1px solid #90cdf4;
+        }
+
+        .alert-warning {
+            background: #fef5e7;
+            color: #8b6914;
+            border: 1px solid #f6e05e;
+        }
+    </style>
+</head>
+<body>
+    <header id="main-header">
+        <h1 id="main-title">Visual Editor Test Page</h1>
+        <p class="tagline" id="tagline">Test all visual editor features with these elements</p>
+    </header>
+
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="section" id="hero-section">
+            <h2 id="hero-title">Welcome to the Test Environment</h2>
+            <p id="hero-description">This page contains various HTML elements designed to test all the capabilities of the visual editor. Each element can be modified using the context menu to test different actions like editing text, changing styles, hiding elements, and more.</p>
+
+            <div class="alert alert-info" id="info-alert">
+                <strong>Tip:</strong> Right-click on any element to see the visual editor context menu options.
+            </div>
+        </section>
+
+        <!-- Buttons Section -->
+        <section class="section" id="buttons-section">
+            <h2>Interactive Buttons</h2>
+            <p>Test style changes, text edits, and visibility toggles on these buttons:</p>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="btn-primary">Primary Button</button>
+                <button class="btn btn-secondary" id="btn-secondary">Secondary Button</button>
+                <button class="btn btn-success" id="btn-success">Success Button</button>
+                <button class="btn btn-danger" id="btn-danger">Danger Button</button>
+            </div>
+        </section>
+
+        <!-- Cards Section -->
+        <section class="section" id="cards-section">
+            <h2>Content Cards</h2>
+            <div class="card" id="card-1">
+                <div class="card-title" id="card-title-1">Feature Card #1 <span class="badge badge-new">NEW</span></div>
+                <div class="card-content" id="card-content-1">
+                    This is a sample card with rich content. You can test editing text, changing colors, or modifying the structure of this element using the visual editor.
+                </div>
+            </div>
+
+            <div class="card" id="card-2">
+                <div class="card-title" id="card-title-2">Feature Card #2 <span class="badge badge-hot">HOT</span></div>
+                <div class="card-content" id="card-content-2">
+                    Another card with different content. Try changing the background color, border styles, or even the padding and margins to see how the visual editor handles style modifications.
+                </div>
+            </div>
+        </section>
+
+        <!-- Images Section -->
+        <section class="section" id="images-section">
+            <h2>Image Gallery</h2>
+            <div class="image-gallery">
+                <div class="image-card" id="image-card-1">
+                    <img src="https://via.placeholder.com/400x300/667eea/ffffff?text=Image+1" alt="Placeholder 1" id="img-1">
+                    <div class="image-caption" id="caption-1">Beautiful Landscape</div>
+                </div>
+                <div class="image-card" id="image-card-2">
+                    <img src="https://via.placeholder.com/400x300/764ba2/ffffff?text=Image+2" alt="Placeholder 2" id="img-2">
+                    <div class="image-caption" id="caption-2">City Skyline</div>
+                </div>
+                <div class="image-card" id="image-card-3">
+                    <img src="https://via.placeholder.com/400x300/f093fb/ffffff?text=Image+3" alt="Placeholder 3" id="img-3">
+                    <div class="image-caption" id="caption-3">Abstract Art</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- List Section -->
+        <section class="section list-section" id="list-section">
+            <h2>Feature List</h2>
+            <ul id="feature-list">
+                <li id="list-item-1">✓ Edit text content directly</li>
+                <li id="list-item-2">✓ Change background and text colors</li>
+                <li id="list-item-3">✓ Modify padding and margins</li>
+                <li id="list-item-4">✓ Hide or show elements</li>
+                <li id="list-item-5">✓ Delete elements from the page</li>
+            </ul>
+        </section>
+
+        <!-- Table Section -->
+        <section class="section table-section" id="table-section">
+            <h2>Data Table</h2>
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th id="th-feature">Feature</th>
+                        <th id="th-status">Status</th>
+                        <th id="th-progress">Progress</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="row-1">
+                        <td id="cell-1-1">Text Editing</td>
+                        <td id="cell-1-2">Active</td>
+                        <td id="cell-1-3">100%</td>
+                    </tr>
+                    <tr id="row-2">
+                        <td id="cell-2-1">Style Changes</td>
+                        <td id="cell-2-2">Active</td>
+                        <td id="cell-2-3">95%</td>
+                    </tr>
+                    <tr id="row-3">
+                        <td id="cell-3-1">Element Hiding</td>
+                        <td id="cell-3-2">Testing</td>
+                        <td id="cell-3-3">80%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Form Section -->
+        <section class="section form-section" id="form-section">
+            <h2>Contact Form</h2>
+            <form id="contact-form">
+                <div class="form-group">
+                    <label for="name" id="label-name">Your Name</label>
+                    <input type="text" id="name" name="name" placeholder="John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label for="email" id="label-email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="john@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="subject" id="label-subject">Subject</label>
+                    <select id="subject" name="subject">
+                        <option>General Inquiry</option>
+                        <option>Technical Support</option>
+                        <option>Feedback</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="message" id="label-message">Message</label>
+                    <textarea id="message" name="message" placeholder="Your message here..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submit-btn">Send Message</button>
+            </form>
+        </section>
+
+        <!-- Testimonial Section -->
+        <section class="section" id="testimonial-section">
+            <h2>Customer Testimonials</h2>
+            <div class="testimonial" id="testimonial-1">
+                <p id="testimonial-text">"The visual editor makes it incredibly easy to modify any element on the page. No coding required!"</p>
+                <div class="testimonial-author" id="testimonial-author">- Happy Customer</div>
+            </div>
+
+            <div class="alert alert-warning" id="warning-alert">
+                <strong>Note:</strong> All changes made with the visual editor can be saved and applied to your variants.
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer" id="main-footer">
+        <p id="footer-text">© 2024 Visual Editor Test Page</p>
+        <div class="social-links" id="social-links">
+            <a href="#" id="link-twitter">Twitter</a>
+            <a href="#" id="link-facebook">Facebook</a>
+            <a href="#" id="link-linkedin">LinkedIn</a>
+            <a href="#" id="link-github">GitHub</a>
+        </div>
+    </footer>
+</body>
+</html>
