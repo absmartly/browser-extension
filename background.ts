@@ -43,20 +43,32 @@ async function initializeConfig() {
   const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
   const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
   const envApplicationId = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
-  
+  const envAuthMethod = process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
+
   debugLog('[Background] Environment variables:', {
     hasApiKey: !!envApiKey,
     apiEndpoint: envApiEndpoint,
-    applicationId: envApplicationId
+    applicationId: envApplicationId,
+    authMethod: envAuthMethod
   })
-  
+
   // Only update if we have env vars and stored values are empty
   let updated = false
+  // Determine default auth method
+  // Priority: 1. Stored config, 2. Environment variable, 3. Default to 'jwt'
+  let defaultAuthMethod: 'jwt' | 'apikey' = 'jwt'
+
+  // Check for environment variable override (for testing)
+  if (envAuthMethod) {
+    defaultAuthMethod = envAuthMethod as 'jwt' | 'apikey'
+    debugLog('[Background] Using auth method from environment:', envAuthMethod)
+  }
+
   const newConfig: ABsmartlyConfig = {
     apiKey: storedConfig?.apiKey || '',
     apiEndpoint: storedConfig?.apiEndpoint || '',
     applicationId: storedConfig?.applicationId,
-    authMethod: storedConfig?.authMethod || 'jwt', // Default to JWT
+    authMethod: storedConfig?.authMethod || defaultAuthMethod,
     domChangesStorageType: storedConfig?.domChangesStorageType,
     domChangesFieldName: storedConfig?.domChangesFieldName
   }
@@ -78,7 +90,9 @@ async function initializeConfig() {
     updated = true
     debugLog('[Background] Using application ID from environment')
   }
-  
+
+  // Auth method is already handled in the config initialization above
+
   // Save updated config if we made changes
   if (updated) {
     await storage.set("absmartly-config", newConfig)
