@@ -85,9 +85,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     debugLog('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)
 
     // Ensure SDK plugin is injected before starting visual editor
-    ensureSDKPluginInjected()
+    ;(async () => {
+      await ensureSDKPluginInjected()
 
-    try {
+      try {
       // Stop any existing editor
       if (currentEditor) {
         currentEditor.destroy()
@@ -131,8 +132,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       debugError('[Visual Editor Content Script] Error starting visual editor:', error)
       console.error('[Visual Editor Content Script] Full error:', error)
       isVisualEditorActive = false
-      sendResponse({ success: false, error: error.message })
-    }
+        sendResponse({ success: false, error: error.message })
+      }
+    })()
 
     return true // Keep message channel open for async response
   }
@@ -179,59 +181,61 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     // Ensure SDK plugin is injected before handling preview
-    ensureSDKPluginInjected()
+    ;(async () => {
+      await ensureSDKPluginInjected()
 
-    if (message.action === 'apply') {
-      // Create preview header (it will check visual editor state internally)
-      createPreviewHeader(message.experimentName, message.variantName)
-      
-      // Send message to SDK plugin to preview changes
-      window.postMessage({
-        source: 'absmartly-extension',
-        type: 'PREVIEW_CHANGES',
-        payload: {
-          changes: message.changes || [],
-          experimentName: message.experimentName,
-          variantName: message.variantName,
-          experimentId: message.experimentId
+      if (message.action === 'apply') {
+        // Create preview header (it will check visual editor state internally)
+        createPreviewHeader(message.experimentName, message.variantName)
+
+        // Send message to SDK plugin to preview changes
+        window.postMessage({
+          source: 'absmartly-extension',
+          type: 'PREVIEW_CHANGES',
+          payload: {
+            changes: message.changes || [],
+            experimentName: message.experimentName,
+            variantName: message.variantName,
+            experimentId: message.experimentId
+          }
+        }, '*')
+
+        sendResponse({ success: true })
+      } else if (message.action === 'update') {
+        // Update changes WITHOUT recreating the header
+        // Just send the new changes to the SDK plugin with updateMode flag
+        window.postMessage({
+          source: 'absmartly-extension',
+          type: 'PREVIEW_CHANGES',
+          payload: {
+            changes: message.changes || [],
+            experimentName: message.experimentName,
+            variantName: message.variantName,
+            experimentId: message.experimentId,
+            updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
+          }
+        }, '*')
+
+        sendResponse({ success: true })
+      } else if (message.action === 'remove') {
+        // Only remove preview header if visual editor is NOT active
+        if (!isVisualEditorActive) {
+          removePreviewHeader()
         }
-      }, '*')
-      
-      sendResponse({ success: true })
-    } else if (message.action === 'update') {
-      // Update changes WITHOUT recreating the header
-      // Just send the new changes to the SDK plugin with updateMode flag
-      window.postMessage({
-        source: 'absmartly-extension',
-        type: 'PREVIEW_CHANGES',
-        payload: {
-          changes: message.changes || [],
-          experimentName: message.experimentName,
-          variantName: message.variantName,
-          experimentId: message.experimentId,
-          updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
-        }
-      }, '*')
-      
-      sendResponse({ success: true })
-    } else if (message.action === 'remove') {
-      // Only remove preview header if visual editor is NOT active
-      if (!isVisualEditorActive) {
-        removePreviewHeader()
+
+        // Send message to SDK plugin to remove preview
+        window.postMessage({
+          source: 'absmartly-extension',
+          type: 'REMOVE_PREVIEW',
+          payload: {
+            experimentName: message.experimentName
+          }
+        }, '*')
+
+        sendResponse({ success: true })
       }
-      
-      // Send message to SDK plugin to remove preview
-      window.postMessage({
-        source: 'absmartly-extension',
-        type: 'REMOVE_PREVIEW',
-        payload: {
-          experimentName: message.experimentName
-        }
-      }, '*')
-      
-      sendResponse({ success: true })
-    }
-    
+    })()
+
     return true
   }
 })
@@ -384,59 +388,77 @@ function removePreviewHeader() {
 }
 
 // Inject the SDK plugin initialization script into the page
-async function injectSDKPluginScript() {
-  try {
-    // First try to load the mapping file to get the hashed filename
-    const mappingUrl = chrome.runtime.getURL('inject-sdk-plugin-mapping.json')
-    const response = await fetch(mappingUrl)
-    
-    let scriptFilename = 'inject-sdk-plugin.js' // fallback
-    
-    if (response.ok) {
-      const mapping = await response.json()
-      scriptFilename = mapping.filename
-      debugLog('[Content Script] Loading hashed inject script:', scriptFilename)
-    } else {
-      debugLog('[Content Script] No mapping file found, using default filename')
-    }
-    
-    const script = document.createElement('script')
-    script.src = chrome.runtime.getURL(scriptFilename)
-    script.onload = () => {
-      debugLog('[Content Script] Inject script loaded:', scriptFilename)
-      script.remove()
-    }
-    script.onerror = () => {
-      debugError('[Content Script] Failed to load inject script:', scriptFilename)
-      // Fallback to non-hashed version
-      if (scriptFilename !== 'inject-sdk-plugin.js') {
-        debugLog('[Content Script] Trying fallback: inject-sdk-plugin.js')
-        const fallbackScript = document.createElement('script')
-        fallbackScript.src = chrome.runtime.getURL('inject-sdk-plugin.js')
-        fallbackScript.onload = () => fallbackScript.remove()
-        document.documentElement.appendChild(fallbackScript)
+async function injectSDKPluginScript(): Promise<void> {
+  return new Promise<void>(async (resolve, reject) => {
+    try {
+      // First try to load the mapping file to get the hashed filename
+      const mappingUrl = chrome.runtime.getURL('inject-sdk-plugin-mapping.json')
+      const response = await fetch(mappingUrl)
+
+      let scriptFilename = 'inject-sdk-plugin.js' // fallback
+
+      if (response.ok) {
+        const mapping = await response.json()
+        scriptFilename = mapping.filename
+        debugLog('[Content Script] Loading hashed inject script:', scriptFilename)
+      } else {
+        debugLog('[Content Script] No mapping file found, using default filename')
       }
+
+      const script = document.createElement('script')
+      script.src = chrome.runtime.getURL(scriptFilename)
+      script.onload = () => {
+        debugLog('[Content Script] Inject script loaded:', scriptFilename)
+        script.remove()
+        resolve()
+      }
+      script.onerror = () => {
+        debugError('[Content Script] Failed to load inject script:', scriptFilename)
+        // Fallback to non-hashed version
+        if (scriptFilename !== 'inject-sdk-plugin.js') {
+          debugLog('[Content Script] Trying fallback: inject-sdk-plugin.js')
+          const fallbackScript = document.createElement('script')
+          fallbackScript.src = chrome.runtime.getURL('inject-sdk-plugin.js')
+          fallbackScript.onload = () => {
+            fallbackScript.remove()
+            resolve()
+          }
+          fallbackScript.onerror = () => reject(new Error('Failed to load fallback script'))
+          document.documentElement.appendChild(fallbackScript)
+        } else {
+          reject(new Error('Failed to load inject script'))
+        }
+      }
+      document.documentElement.appendChild(script)
+    } catch (error) {
+      debugError('[Content Script] Error loading inject script:', error)
+      // Fallback to direct load
+      const script = document.createElement('script')
+      script.src = chrome.runtime.getURL('inject-sdk-plugin.js')
+      script.onload = () => {
+        script.remove()
+        resolve()
+      }
+      script.onerror = () => reject(error)
+      document.documentElement.appendChild(script)
     }
-    document.documentElement.appendChild(script)
-  } catch (error) {
-    debugError('[Content Script] Error loading inject script:', error)
-    // Fallback to direct load
-    const script = document.createElement('script')
-    script.src = chrome.runtime.getURL('inject-sdk-plugin.js')
-    script.onload = () => script.remove()
-    document.documentElement.appendChild(script)
-  }
+  })
 }
 
 // Don't automatically inject SDK plugin on every page
 // Only inject when the user actually opens the sidebar or uses extension features
 // This prevents breaking websites that don't need the SDK
 let sdkPluginInjected = false
+let sdkPluginInjecting = false
 
-function ensureSDKPluginInjected() {
-  if (!sdkPluginInjected) {
-    injectSDKPluginScript()
+async function ensureSDKPluginInjected() {
+  if (!sdkPluginInjected && !sdkPluginInjecting) {
+    sdkPluginInjecting = true
+    await injectSDKPluginScript()
     sdkPluginInjected = true
+    sdkPluginInjecting = false
+    // Give the script a moment to set up its message listener
+    await new Promise(resolve => setTimeout(resolve, 50))
   }
 }
 
