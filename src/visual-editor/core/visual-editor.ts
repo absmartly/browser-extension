@@ -426,6 +426,19 @@ export class VisualEditor {
 
     const squashed = Array.from(changeMap.values())
     console.log('[ABSmartly] Squashed to', squashed.length, 'changes')
+
+    // Log move changes to debug missing targetSelector
+    squashed.forEach(change => {
+      if (change.type === 'move') {
+        console.log('[ABSmartly] Move change after squashing:', {
+          selector: change.selector,
+          value: change.value,
+          hasTargetSelector: !!change.value?.targetSelector,
+          hasPosition: !!change.value?.position
+        })
+      }
+    })
+
     return squashed
   }
 
@@ -516,6 +529,14 @@ export class VisualEditor {
 
     // Store original values in DOM for preview toggle functionality
     this.storeOriginalValuesInDOM(squashedChanges)
+
+    // Log what we're sending to sidebar
+    console.log('[ABSmartly] Sending squashed changes to sidebar:')
+    squashedChanges.forEach((change, index) => {
+      if (change.type === 'move') {
+        console.log(`[ABSmartly] Move change ${index}:`, JSON.stringify(change, null, 2))
+      }
+    })
 
     try {
       // Send squashed changes to sidebar

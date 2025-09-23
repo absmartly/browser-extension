@@ -1909,8 +1909,8 @@ export function DOMChangesInlineEditor({
       classAdd: change.type === 'class' ? (change.add || []) : [],
       classRemove: change.type === 'class' ? (change.remove || []) : [],
       classesWithStatus,
-      targetSelector: change.type === 'move' ? change.targetSelector : '',
-      position: change.type === 'move' ? change.position : change.type === 'insert' ? (change as any).position : 'after',
+      targetSelector: change.type === 'move' ? (change.value?.targetSelector || change.targetSelector || '') : '',
+      position: change.type === 'move' ? (change.value?.position || change.position || 'after') : change.type === 'insert' ? (change as any).position : 'after',
       mode: (change as any).mode || 'merge',
       waitForElement: (change as any).waitForElement,
       observerRoot: (change as any).observerRoot
@@ -2027,8 +2027,10 @@ export function DOMChangesInlineEditor({
         domChange = {
           selector: change.selector,
           type: 'move',
-          targetSelector: change.targetSelector || '',
-          position: change.position || 'after',
+          value: {
+            targetSelector: change.targetSelector || '',
+            position: change.position || 'after'
+          },
           enabled: true,
           mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
@@ -2231,15 +2233,17 @@ export function DOMChangesInlineEditor({
           </span>
         )
       case 'move':
-        const positionText = change.position === 'before' ? 'before' : 
-                           change.position === 'after' ? 'after' :
-                           change.position === 'firstChild' ? 'as first child of' :
+        const moveTarget = change.value?.targetSelector || change.targetSelector || ''
+        const movePosition = change.value?.position || change.position || 'after'
+        const positionText = movePosition === 'before' ? 'before' :
+                           movePosition === 'after' ? 'after' :
+                           movePosition === 'firstChild' ? 'as first child of' :
                            'as last child of'
         return (
           <span className="text-gray-600">
             <span className="text-gray-500">Move</span>{' '}
             <span className="text-gray-500">{positionText}</span>{' '}
-            <code className="text-xs font-mono text-blue-600">{change.targetSelector}</code>
+            <code className="text-xs font-mono text-blue-600">{moveTarget}</code>
           </span>
         )
       case 'remove':
