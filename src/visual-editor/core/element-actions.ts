@@ -241,12 +241,26 @@ export class ElementActions {
             break
 
           case 'style':
-            // Remove applied styles
-            if (change.value && typeof change.value === 'object') {
+            // Revert to original styles
+            const styleOrigData = htmlElement.dataset.absmartlyOriginal ?
+              JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            if (styleOrigData?.styles && change.value && typeof change.value === 'object') {
+              // Restore original values for changed properties
+              for (const prop in change.value) {
+                if (styleOrigData.styles[prop] !== undefined) {
+                  (htmlElement.style as any)[prop] = styleOrigData.styles[prop] || ''
+                } else {
+                  // If no original value was stored, clear the property
+                  (htmlElement.style as any)[prop] = ''
+                }
+              }
+              console.log('[ElementActions] Reverted style changes to original values')
+            } else if (change.value && typeof change.value === 'object') {
+              // Fallback: just remove the styles if no original data
               for (const prop in change.value) {
                 (htmlElement.style as any)[prop] = ''
               }
-              console.log('[ElementActions] Removed style changes')
+              console.log('[ElementActions] Removed style changes (no original data)')
             }
             break
 
@@ -259,6 +273,7 @@ export class ElementActions {
               console.log('[ElementActions] Reverted HTML content')
             }
             break
+
         }
       })
     } catch (error) {
@@ -376,6 +391,7 @@ export class ElementActions {
               console.log('[ElementActions] Applied HTML content')
             }
             break
+
         }
       })
     } catch (error) {

@@ -162,29 +162,61 @@ export class EditModes {
 
   enableResizeMode(element: Element): void {
     console.log('[ABSmartly] Enabling resize mode for element:', element)
+    const htmlElement = element as HTMLElement
+
+    // Debug: Check current styles
+    console.log('[ABSmartly] Current element styles:', {
+      width: htmlElement.style.width,
+      height: htmlElement.style.height,
+      computedWidth: window.getComputedStyle(htmlElement).width,
+      computedHeight: window.getComputedStyle(htmlElement).height
+    })
 
     this.stateManager.setResizing(true)
     element.classList.add('absmartly-resize-active')
 
-    // Store original styles
+    // Set global flag to prevent DOM changes from being reapplied during resize
+    ;(window as any).__absmartlyResizingActive = true
+    console.log('[ABSmartly] Set global resize flag to prevent DOM changes reapplication')
+
+    // Store original styles locally for tracking
     const originalStyles = {
-      width: (element as HTMLElement).style.width,
-      height: (element as HTMLElement).style.height,
-      position: (element as HTMLElement).style.position,
-      top: (element as HTMLElement).style.top,
-      left: (element as HTMLElement).style.left
+      width: htmlElement.style.width,
+      height: htmlElement.style.height,
+      position: htmlElement.style.position,
+      top: htmlElement.style.top,
+      left: htmlElement.style.left
+    }
+
+    // Also store original styles in DOM for undo/redo
+    if (!htmlElement.dataset.absmartlyOriginal) {
+      htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
+    }
+
+    const existingData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+    if (!existingData.styles) {
+      // Store current styles before any resize happens
+      const computedStyle = window.getComputedStyle(htmlElement)
+      existingData.styles = {
+        width: htmlElement.style.width || computedStyle.width || '',
+        height: htmlElement.style.height || computedStyle.height || ''
+      }
+      htmlElement.dataset.absmartlyOriginal = JSON.stringify(existingData)
+      console.log('[ABSmartly] Stored original dimensions in DOM:', existingData.styles)
     }
 
     // Create resize handles
     const handles = this.createResizeHandles(element as HTMLElement)
 
     const handleMouseDown = (e: MouseEvent, direction: string) => {
+      console.log('[ABSmartly] Resize handle mousedown:', direction)
       e.preventDefault()
       e.stopPropagation()
 
       const startX = e.clientX
       const startY = e.clientY
       const startRect = element.getBoundingClientRect()
+      console.log('[ABSmartly] Start rect:', startRect)
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         const deltaX = moveEvent.clientX - startX
@@ -208,8 +240,13 @@ export class EditModes {
     // Attach handlers to resize handles
     handles.forEach(handle => {
       const direction = handle.dataset.direction!
-      handle.addEventListener('mousedown', (e) => handleMouseDown(e, direction))
+      console.log('[ABSmartly] Attaching mousedown handler to handle:', direction)
+      handle.addEventListener('mousedown', (e) => {
+        console.log('[ABSmartly] Handle clicked:', direction)
+        handleMouseDown(e, direction)
+      })
     })
+    console.log('[ABSmartly] Created', handles.length, 'resize handles')
 
     // Exit resize mode on Escape or click outside
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -375,6 +412,10 @@ export class EditModes {
   private exitResizeMode(element: HTMLElement, handles: HTMLElement[]): void {
     element.classList.remove('absmartly-resize-active')
     this.stateManager.setResizing(false)
+
+    // Clear global flag to allow DOM changes to be reapplied again
+    ;(window as any).__absmartlyResizingActive = false
+    console.log('[ABSmartly] Cleared global resize flag, DOM changes can be reapplied')
 
     // Remove handles
     handles.forEach(handle => handle.remove())
