@@ -1856,8 +1856,16 @@ export function DOMChangesInlineEditor({
   }
 
   const handleDeleteChange = (index: number) => {
+    debugLog('🗑️ Deleting DOM change at index:', index)
+    const deletedChange = changes[index]
+    debugLog('🗑️ Change being deleted:', deletedChange)
+
     const newChanges = changes.filter((_, i) => i !== index)
+    debugLog('📝 New changes array after deletion:', newChanges)
+
+    // Call onChange which should trigger handleDOMChangesUpdate in parent
     onChange(newChanges)
+    debugLog('💾 onChange called with updated changes - should save to storage')
   }
 
   const handleAddChange = () => {
