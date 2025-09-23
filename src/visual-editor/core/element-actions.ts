@@ -197,63 +197,241 @@ export class ElementActions {
     this.notifications.show('Select relative elements: Coming soon!', '', 'info')
   }
 
+  // Helper to revert a DOM change
+  private revertDOMChange(change: DOMChange): void {
+    console.log('[ElementActions] Reverting DOM change:', change)
+
+    try {
+      const elements = document.querySelectorAll(change.selector)
+
+      elements.forEach(element => {
+        const htmlElement = element as HTMLElement
+
+        switch (change.type) {
+          case 'move':
+            // Revert move by moving element back to original position
+            if (change.value?.originalTargetSelector && change.value?.originalPosition) {
+              const originalTarget = document.querySelector(change.value.originalTargetSelector)
+              if (originalTarget) {
+                const parent = originalTarget.parentElement
+                if (parent) {
+                  if (change.value.originalPosition === 'before') {
+                    parent.insertBefore(htmlElement, originalTarget)
+                  } else if (change.value.originalPosition === 'after') {
+                    parent.insertBefore(htmlElement, originalTarget.nextSibling)
+                  } else if (change.value.originalPosition === 'firstChild') {
+                    originalTarget.insertBefore(htmlElement, originalTarget.firstChild)
+                  } else if (change.value.originalPosition === 'lastChild') {
+                    originalTarget.appendChild(htmlElement)
+                  }
+                  console.log('[ElementActions] Moved element back to original position')
+                }
+              }
+            }
+            break
+
+          case 'text':
+            // Check for original text in dataset
+            const originalData = htmlElement.dataset.absmartlyOriginal ?
+              JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            if (originalData?.text !== undefined) {
+              htmlElement.textContent = originalData.text
+              console.log('[ElementActions] Reverted text content')
+            }
+            break
+
+          case 'style':
+            // Remove applied styles
+            if (change.value && typeof change.value === 'object') {
+              for (const prop in change.value) {
+                (htmlElement.style as any)[prop] = ''
+              }
+              console.log('[ElementActions] Removed style changes')
+            }
+            break
+
+          case 'html':
+            // Revert HTML content
+            const origData = htmlElement.dataset.absmartlyOriginal ?
+              JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            if (origData?.html !== undefined) {
+              htmlElement.innerHTML = origData.html
+              console.log('[ElementActions] Reverted HTML content')
+            }
+            break
+        }
+      })
+    } catch (error) {
+      console.error('[ElementActions] Error reverting DOM change:', error)
+    }
+  }
+
   // Change management methods
   public undoLastChange(): void {
     console.log('[ElementActions] undoLastChange called')
+
+    // Get the current changes from state manager (source of truth)
+    const currentChanges = [...this.stateManager.getState().changes || []]
     const undoItem = this.stateManager.popUndo()
+
     if (!undoItem) {
       console.log('[ElementActions] No undo items available')
+      this.notifications.show('Nothing to undo', '', 'info')
       return
     }
 
     console.log('[ElementActions] Performing undo:', undoItem)
+    console.log('[ElementActions] Current changes before undo:', currentChanges.length)
 
     if (undoItem.type === 'add') {
-      // Remove the added change
-      this.changes.splice(undoItem.index, 1)
+      // Revert the DOM change that was added
+      const changeToRevert = undoItem.change
+      this.revertDOMChange(changeToRevert)
+
+      // Remove the added change from array
+      currentChanges.splice(undoItem.index, 1)
+      // Push to redo stack
+      this.stateManager.pushRedo(undoItem)
     } else if (undoItem.type === 'update') {
-      // Restore the old change
-      this.changes[undoItem.index] = undoItem.change
+      // TODO: Handle update undo (revert to previous version of change)
+      const currentChange = currentChanges[undoItem.index]
+      currentChanges[undoItem.index] = undoItem.change
+      // Push current state to redo with swapped change
+      this.stateManager.pushRedo({
+        ...undoItem,
+        change: currentChange
+      })
     } else if (undoItem.type === 'remove') {
       // Re-add the removed change
-      this.changes.splice(undoItem.index, 0, undoItem.change)
+      currentChanges.splice(undoItem.index, 0, undoItem.change)
+      // Push to redo stack
+      this.stateManager.pushRedo(undoItem)
     }
 
-    console.log('[ElementActions] Changes after undo:', this.changes.length)
-    this.stateManager.setChanges(this.changes)
-    this.options.onChangesUpdate(this.changes)
+    console.log('[ElementActions] Changes after undo:', currentChanges.length)
+
+    // Update both local and state manager changes
+    this.changes = currentChanges
+    this.stateManager.setChanges(currentChanges)
+
+    // Don't call onChangesUpdate here - that would save to sidebar
+    // The visual editor will handle updating the UI
+
     this.notifications.show('Change undone', '', 'success')
+  }
+
+  // Helper to apply a DOM change
+  private applyDOMChange(change: DOMChange): void {
+    console.log('[ElementActions] Applying DOM change:', change)
+
+    try {
+      const elements = document.querySelectorAll(change.selector)
+
+      elements.forEach(element => {
+        const htmlElement = element as HTMLElement
+
+        switch (change.type) {
+          case 'move':
+            // Apply move to target position
+            if (change.value?.targetSelector && change.value?.position) {
+              const target = document.querySelector(change.value.targetSelector)
+              if (target) {
+                const parent = target.parentElement
+                if (parent) {
+                  if (change.value.position === 'before') {
+                    parent.insertBefore(htmlElement, target)
+                  } else if (change.value.position === 'after') {
+                    parent.insertBefore(htmlElement, target.nextSibling)
+                  } else if (change.value.position === 'firstChild') {
+                    target.insertBefore(htmlElement, target.firstChild)
+                  } else if (change.value.position === 'lastChild') {
+                    target.appendChild(htmlElement)
+                  }
+                  console.log('[ElementActions] Moved element to target position')
+                }
+              }
+            }
+            break
+
+          case 'text':
+            if (change.value !== undefined) {
+              htmlElement.textContent = change.value
+              console.log('[ElementActions] Applied text content')
+            }
+            break
+
+          case 'style':
+            // Apply styles
+            if (change.value && typeof change.value === 'object') {
+              for (const prop in change.value) {
+                (htmlElement.style as any)[prop] = change.value[prop]
+              }
+              console.log('[ElementActions] Applied style changes')
+            }
+            break
+
+          case 'html':
+            if (change.value !== undefined) {
+              htmlElement.innerHTML = change.value
+              console.log('[ElementActions] Applied HTML content')
+            }
+            break
+        }
+      })
+    } catch (error) {
+      console.error('[ElementActions] Error applying DOM change:', error)
+    }
   }
 
   public redoChange(): void {
     console.log('[ElementActions] redoChange called')
+
+    // Get the current changes from state manager (source of truth)
+    const currentChanges = [...this.stateManager.getState().changes || []]
     const redoItem = this.stateManager.popRedo()
+
     if (!redoItem) {
       console.log('[ElementActions] No redo items available')
+      this.notifications.show('Nothing to redo', '', 'info')
       return
     }
 
     console.log('[ElementActions] Performing redo:', redoItem)
+    console.log('[ElementActions] Current changes before redo:', currentChanges.length)
 
     if (redoItem.type === 'add') {
-      // Re-add the change
-      this.changes.splice(redoItem.index, 0, redoItem.change)
+      // Re-apply the DOM change
+      this.applyDOMChange(redoItem.change)
+
+      // Re-add the change to array
+      currentChanges.splice(redoItem.index, 0, redoItem.change)
+      // Push to undo stack
+      this.stateManager.pushUndo(redoItem)
     } else if (redoItem.type === 'update') {
-      // Apply the new change
-      const oldChange = { ...this.changes[redoItem.index] }
-      this.changes[redoItem.index] = redoItem.change
-      redoItem.change = oldChange // Swap for next undo
+      // TODO: Handle update redo
+      const currentChange = currentChanges[redoItem.index]
+      currentChanges[redoItem.index] = redoItem.change
+      // Push current state to undo with swapped change
+      this.stateManager.pushUndo({
+        ...redoItem,
+        change: currentChange
+      })
     } else if (redoItem.type === 'remove') {
       // Remove the change again
-      this.changes.splice(redoItem.index, 1)
+      currentChanges.splice(redoItem.index, 1)
+      // Push to undo stack
+      this.stateManager.pushUndo(redoItem)
     }
 
-    // Push back to undo stack
-    this.stateManager.pushUndo(redoItem)
+    console.log('[ElementActions] Changes after redo:', currentChanges.length)
 
-    console.log('[ElementActions] Changes after redo:', this.changes.length)
-    this.stateManager.setChanges(this.changes)
-    this.options.onChangesUpdate(this.changes)
+    // Update both local and state manager changes
+    this.changes = currentChanges
+    this.stateManager.setChanges(currentChanges)
+
+    // Don't call onChangesUpdate here - that would save to sidebar
+    // The visual editor will handle updating the UI
+
     this.notifications.show('Change redone', '', 'success')
   }
 

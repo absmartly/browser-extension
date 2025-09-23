@@ -384,31 +384,151 @@ export class VisualEditor {
     // Update state manager with new changes array
     this.stateManager.setChanges(this.changes)
 
-    // Auto-save changes to the sidebar
-    try {
-      console.log('[VisualEditor] Calling onChangesUpdate callback with', this.changes.length, 'changes')
-      this.options.onChangesUpdate(this.changes)
-    } catch (error) {
-      console.error('Error in onChangesUpdate callback:', error)
+    // DO NOT auto-save to sidebar - wait for explicit save button click
+    console.log('[VisualEditor] Changes updated internally, not saving to sidebar yet')
+  }
+
+  private squashChanges(changes: DOMChange[]): DOMChange[] {
+    console.log('[ABSmartly] Squashing changes from', changes.length, 'to consolidated list')
+
+    // Group changes by selector and type
+    const changeMap = new Map<string, DOMChange>()
+
+    for (const change of changes) {
+      const key = `${change.selector}-${change.type}`
+      const existing = changeMap.get(key)
+
+      if (existing) {
+        // Merge changes of the same type for the same element
+        if (change.type === 'style' && existing.type === 'style') {
+          // Merge style changes
+          existing.value = {
+            ...existing.value,
+            ...change.value
+          }
+        } else if (change.type === 'move' && existing.type === 'move') {
+          // For moves, keep the original position from the first move
+          // but use the final target position from the last move
+          existing.value = {
+            ...change.value,
+            // Preserve original position from first move
+            originalTargetSelector: existing.value.originalTargetSelector,
+            originalPosition: existing.value.originalPosition
+          }
+        } else {
+          // For other types, replace with the latest change
+          changeMap.set(key, change)
+        }
+      } else {
+        changeMap.set(key, change)
+      }
+    }
+
+    const squashed = Array.from(changeMap.values())
+    console.log('[ABSmartly] Squashed to', squashed.length, 'changes')
+    return squashed
+  }
+
+  private storeOriginalValuesInDOM(changes: DOMChange[]): void {
+    console.log('[ABSmartly] Storing original values in DOM for', changes.length, 'changes')
+
+    for (const change of changes) {
+      try {
+        const elements = document.querySelectorAll(change.selector)
+
+        elements.forEach(element => {
+          const htmlElement = element as HTMLElement
+
+          // Initialize or get existing original data
+          if (!htmlElement.dataset.absmartlyOriginal) {
+            htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
+          }
+
+          const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+
+          // Store original values based on change type
+          if (change.type === 'text' && !originalData.text) {
+            originalData.text = htmlElement.textContent || ''
+          } else if (change.type === 'html' && !originalData.html) {
+            originalData.html = htmlElement.innerHTML
+          } else if (change.type === 'style' && !originalData.styles) {
+            // Store original styles
+            const computedStyle = window.getComputedStyle(htmlElement)
+            originalData.styles = {}
+            if (change.value && typeof change.value === 'object') {
+              for (const prop in change.value) {
+                originalData.styles[prop] = htmlElement.style[prop] || computedStyle[prop as any] || ''
+              }
+            }
+          } else if (change.type === 'move' && !originalData.move) {
+            // Store original position for move
+            if (change.value.originalTargetSelector && change.value.originalPosition) {
+              originalData.move = {
+                targetSelector: change.value.originalTargetSelector,
+                position: change.value.originalPosition
+              }
+            } else {
+              // If no original position stored in change, capture current position
+              // This handles the first move of an element
+              const parent = htmlElement.parentElement
+              const nextSibling = htmlElement.nextElementSibling
+              if (parent) {
+                originalData.move = {
+                  parentId: parent.id || '',
+                  parentClass: parent.className || '',
+                  nextSiblingId: nextSibling?.id || '',
+                  nextSiblingClass: nextSibling?.className || ''
+                }
+              }
+            }
+          } else if (change.type === 'attribute' && !originalData.attributes) {
+            originalData.attributes = {}
+            if (change.attributeName) {
+              originalData.attributes[change.attributeName] = htmlElement.getAttribute(change.attributeName) || ''
+            }
+          } else if (change.type === 'class') {
+            if (!originalData.className) {
+              originalData.className = htmlElement.className || ''
+            }
+          }
+
+          // Mark element as modified and store experiment info
+          htmlElement.dataset.absmartlyModified = 'true'
+          htmlElement.dataset.absmartlyExperiment = this.options.experimentName || '__preview__'
+          htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
+
+          console.log('[ABSmartly] Stored original data for', change.selector, ':', originalData)
+        })
+      } catch (error) {
+        console.error('[ABSmartly] Error storing original values for', change.selector, error)
+      }
     }
   }
 
   private saveChanges(): void {
     // Get the latest changes from the state manager
     const currentChanges = this.stateManager.getState().changes || []
-    console.log('[ABSmartly] Saving changes:', currentChanges.length, 'changes')
+    console.log('[ABSmartly] Saving changes - raw count:', currentChanges.length)
+
+    // Squash changes to consolidate multiple operations on same elements
+    const squashedChanges = this.squashChanges(currentChanges)
+    console.log('[ABSmartly] Squashed changes count:', squashedChanges.length)
+
+    // Store original values in DOM for preview toggle functionality
+    this.storeOriginalValuesInDOM(squashedChanges)
 
     try {
-      this.options.onChangesUpdate(currentChanges)
+      // Send squashed changes to sidebar
+      this.options.onChangesUpdate(squashedChanges)
     } catch (error) {
       console.error('Error in onChangesUpdate callback:', error)
     }
 
     // Mark changes as saved
     this.hasUnsavedChanges = false
-    this.lastSavedChangesCount = currentChanges.length
+    this.lastSavedChangesCount = squashedChanges.length
 
-    this.notifications.show(`${currentChanges.length} changes saved`, '', 'success')
+    this.notifications.show(`${squashedChanges.length} changes saved`, '', 'success')
 
     // Exit the visual editor after saving
     setTimeout(() => {
