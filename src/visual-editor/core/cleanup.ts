@@ -156,9 +156,13 @@ export class Cleanup {
         element.textContent = originalData.textContent
       }
 
-      if (originalData.innerHTML !== undefined) {
-        element.innerHTML = originalData.innerHTML
-      }
+      // Only restore innerHTML if it was actually changed by HTML editing
+      // Don't restore it just because it was stored when the element was selected
+      // This prevents corrupting the page with stale HTML content
+      // if (originalData.innerHTML !== undefined && originalData.htmlWasEdited) {
+      //   element.innerHTML = originalData.innerHTML
+      // }
+      // SKIP innerHTML restoration - it's too dangerous and can corrupt the page
 
       // Remove modifications
       ;(element as HTMLElement).style.display = ''
