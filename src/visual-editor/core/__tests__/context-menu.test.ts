@@ -573,7 +573,7 @@ describe('ContextMenu', () => {
         !('divider' in item) && item.action === 'delete'
       )
 
-      expect(editAction?.label).toBe('Edit Element')
+      expect(editAction?.label).toBe('Edit Text')
       expect(deleteAction?.label).toBe('Remove')
     })
 

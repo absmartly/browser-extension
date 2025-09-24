@@ -695,7 +695,7 @@ describe('EditorCoordinator', () => {
       // Mock methods used in handleMenuAction
       jest.spyOn(coordinator, 'handleEditAction').mockImplementation()
       jest.spyOn(coordinator, 'handleEditHtmlAction').mockImplementation()
-      jest.spyOn(coordinator, 'handleInlineEditAction').mockImplementation()
+      jest.spyOn(coordinator, 'handleSelectRelativeElement').mockImplementation()
     })
 
     it('should handle edit action', () => {
@@ -728,9 +728,14 @@ describe('EditorCoordinator', () => {
       expect(mockEditModes.enableResizeMode).toHaveBeenCalledWith(mockElement)
     })
 
-    it('should handle inlineEdit action', () => {
-      coordinator.handleMenuAction('inlineEdit', mockElement)
-      expect(coordinator.handleInlineEditAction).toHaveBeenCalledWith(mockElement, expect.any(Object))
+    it('should handle select-relative action', () => {
+      coordinator.handleMenuAction('select-relative', mockElement)
+      expect(coordinator.handleSelectRelativeElement).toHaveBeenCalledWith(mockElement)
+    })
+
+    it('should handle selectRelative action', () => {
+      coordinator.handleMenuAction('selectRelative', mockElement)
+      expect(coordinator.handleSelectRelativeElement).toHaveBeenCalledWith(mockElement)
     })
 
     it('should handle hide action', () => {
@@ -773,10 +778,6 @@ describe('EditorCoordinator', () => {
       expect(mockCallbacks.insertNewBlock).toHaveBeenCalled()
     })
 
-    it('should handle select-relative action', () => {
-      coordinator.handleMenuAction('select-relative', mockElement)
-      expect(mockCallbacks.showRelativeElementSelector).toHaveBeenCalled()
-    })
 
     it('should handle unknown action with notification', () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -983,89 +984,19 @@ describe('EditorCoordinator', () => {
     })
   })
 
-  describe('handleInlineEditAction', () => {
-    it('should setup element for inline editing', () => {
-      const originalState = {
-        html: mockElement.outerHTML,
-        parent: mockElement.parentElement,
-        nextSibling: mockElement.nextElementSibling,
-        textContent: 'Original content'
-      }
+  describe('handleSelectRelativeElement', () => {
+    it('should show relative element selector panel', () => {
+      const showSelectorSpy = jest.spyOn(coordinator, 'showRelativeElementSelector')
+      coordinator.handleSelectRelativeElement(mockElement)
 
-      coordinator.handleInlineEditAction(mockElement, originalState)
-
-      expect(mockElement.classList.contains('absmartly-editing')).toBe(true)
-      expect(mockElement.contentEditable).toBe('true')
-      expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(true)
+      expect(showSelectorSpy).toHaveBeenCalledWith(mockElement)
     })
 
-    it('should handle blur event and create change', () => {
-      const originalState = {
-        html: mockElement.outerHTML,
-        parent: mockElement.parentElement,
-        nextSibling: mockElement.nextElementSibling,
-        textContent: 'Original content'
-      }
+    it('should remove context menu before showing selector', () => {
+      const removeMenuSpy = jest.spyOn(coordinator, 'removeContextMenu')
+      coordinator.handleSelectRelativeElement(mockElement)
 
-      coordinator.handleInlineEditAction(mockElement, originalState)
-
-      // Simulate text change
-      mockElement.textContent = 'Modified content'
-
-      // Trigger blur event
-      const blurEvent = new Event('blur')
-      mockElement.dispatchEvent(blurEvent)
-
-      expect(mockElement.contentEditable).toBe('false')
-      expect(mockElement.classList.contains('absmartly-editing')).toBe(false)
-      expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(false)
-      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
-        selector: '.mock-selector',
-        type: 'text',
-        value: 'Modified content',
-        originalText: 'Original content',
-        enabled: true
-      })
-    })
-
-    it('should handle Enter key to finish inline editing', () => {
-      const originalState = {
-        html: mockElement.outerHTML,
-        parent: mockElement.parentElement,
-        nextSibling: mockElement.nextElementSibling,
-        textContent: mockElement.textContent
-      }
-
-      coordinator.handleInlineEditAction(mockElement, originalState)
-
-      const blurSpy = jest.spyOn(mockElement, 'blur')
-      const keydownEvent = new KeyboardEvent('keydown', { key: 'Enter' })
-      const preventDefaultSpy = jest.spyOn(keydownEvent, 'preventDefault')
-
-      mockElement.dispatchEvent(keydownEvent)
-
-      expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(blurSpy).toHaveBeenCalled()
-    })
-
-    it('should handle Escape key to finish inline editing', () => {
-      const originalState = {
-        html: mockElement.outerHTML,
-        parent: mockElement.parentElement,
-        nextSibling: mockElement.nextElementSibling,
-        textContent: mockElement.textContent
-      }
-
-      coordinator.handleInlineEditAction(mockElement, originalState)
-
-      const blurSpy = jest.spyOn(mockElement, 'blur')
-      const keydownEvent = new KeyboardEvent('keydown', { key: 'Escape' })
-      const preventDefaultSpy = jest.spyOn(keydownEvent, 'preventDefault')
-
-      mockElement.dispatchEvent(keydownEvent)
-
-      expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(blurSpy).toHaveBeenCalled()
+      expect(removeMenuSpy).toHaveBeenCalled()
     })
   })
 

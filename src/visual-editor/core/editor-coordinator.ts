@@ -248,6 +248,10 @@ export class EditorCoordinator {
   }
 
   handleMenuAction(action: string, element: Element): void {
+    console.log('[MenuAction] Action:', action, 'Element:', element)
+    console.log('[MenuAction] Current selectedElement:', this.selectedElement)
+    console.log('[MenuAction] State selectedElement:', this.stateManager.getState().selectedElement)
+
     const originalState = {
       html: element.outerHTML,
       parent: element.parentElement,
@@ -272,10 +276,6 @@ export class EditorCoordinator {
 
       case 'resize':
         this.editModes.enableResizeMode(element)
-        break
-
-      case 'inlineEdit':
-        this.handleInlineEditAction(element, originalState)
         break
 
       case 'hide':
@@ -308,7 +308,8 @@ export class EditorCoordinator {
         break
 
       case 'select-relative':
-        this.callbacks.showRelativeElementSelector()
+      case 'selectRelative':
+        this.handleSelectRelativeElement(element)
         break
 
       default:
@@ -382,6 +383,18 @@ export class EditorCoordinator {
   async handleEditHtmlAction(element: Element, originalState: any): Promise<void> {
     this.removeContextMenu()
 
+    // Prevent editing body or html elements to avoid page corruption
+    if (element === document.body || element === document.documentElement) {
+      this.notifications.show(
+        'Cannot edit page body or HTML element',
+        'Editing these elements could corrupt the page',
+        'warning'
+      )
+      // Re-enable selection
+      this.eventHandlers.setEditing(false)
+      return
+    }
+
     // Set editing mode to prevent selection while HTML editor is open
     this.eventHandlers.setEditing(true)
 
@@ -406,44 +419,367 @@ export class EditorCoordinator {
     this.eventHandlers.setEditing(false)
   }
 
-  handleInlineEditAction(element: Element, originalState: any): void {
+  handleSelectRelativeElement(element: Element): void {
     this.removeContextMenu()
+    this.showRelativeElementSelector(element)
+  }
 
-    // Set editing mode to prevent selection while inline editing
-    this.eventHandlers.setEditing(true)
+  showRelativeElementSelector(element: Element): void {
+    // Remove any existing selector
+    const existingSelector = document.getElementById('absmartly-relative-selector')
+    if (existingSelector) existingSelector.remove()
 
-    element.classList.add('absmartly-editing')
-    ;(element as HTMLElement).contentEditable = 'true'
-    ;(element as HTMLElement).focus()
+    // Create host element for shadow DOM
+    const selectorHost = document.createElement('div')
+    selectorHost.id = 'absmartly-relative-selector'
+    selectorHost.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2147483647;
+      pointer-events: none;
+    `
 
-    const range = document.createRange()
-    range.selectNodeContents(element)
-    const selection = window.getSelection()
-    selection?.removeAllRanges()
-    selection?.addRange(range)
+    // Attach shadow root
+    const shadow = selectorHost.attachShadow({ mode: 'closed' })
 
-    this.eventHandlers.setEditing(true)
+    // Create styles
+    const style = document.createElement('style')
+    style.textContent = `
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    const finishInlineEdit = () => {
-      ;(element as HTMLElement).contentEditable = 'false'
-      element.classList.remove('absmartly-editing')
-      this.eventHandlers.setEditing(false)
-      this.callbacks.addChange({
-        selector: this.callbacks.getSelector(element as HTMLElement),
-        type: 'text',
-        value: element.textContent || '',
-        originalText: originalState.textContent,
-        enabled: true
+      .backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        pointer-events: auto;
+      }
+
+      .panel {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+        min-width: 400px;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        pointer-events: auto;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: #333;
+      }
+
+      .element-tree {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .element-item {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+      }
+
+      .element-item:hover {
+        border-color: #3b82f6;
+        background: #f0f9ff;
+      }
+
+      .element-item.current {
+        border-color: #10b981;
+        background: #f0fdf4;
+      }
+
+      .element-info {
+        flex: 1;
+      }
+
+      .element-tag {
+        font-weight: 600;
+        color: #1e40af;
+        font-size: 14px;
+      }
+
+      .element-class {
+        color: #059669;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+
+      .element-id {
+        color: #dc2626;
+        font-size: 12px;
+      }
+
+      .element-level {
+        font-size: 11px;
+        color: #6b7280;
+        margin-left: auto;
+        padding: 2px 8px;
+        background: #f3f4f6;
+        border-radius: 4px;
+      }
+
+      .close-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 30px;
+        height: 30px;
+        border: none;
+        background: #f3f4f6;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #6b7280;
+        transition: all 0.2s;
+      }
+
+      .close-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+      }
+
+      .indent {
+        width: 20px;
+        display: inline-block;
+      }
+    `
+    shadow.appendChild(style)
+
+    // Create backdrop
+    const backdrop = document.createElement('div')
+    backdrop.className = 'backdrop'
+
+    // Create panel
+    const panel = document.createElement('div')
+    panel.className = 'panel'
+
+    // Create title
+    const title = document.createElement('div')
+    title.className = 'title'
+    title.textContent = 'Select Element'
+
+    // Create close button
+    const closeBtn = document.createElement('button')
+    closeBtn.className = 'close-btn'
+    closeBtn.textContent = '✕'
+    closeBtn.onclick = () => {
+      // Clean up any temp highlights
+      document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
+        elem.classList.remove('absmartly-temp-highlight')
       })
+      // Clean up temp style
+      document.getElementById('absmartly-temp-highlight-style')?.remove()
+      selectorHost.remove()
     }
 
-    element.addEventListener('blur', finishInlineEdit, { once: true })
-    element.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === 'Escape') {
-        e.preventDefault()
-        ;(element as HTMLElement).blur()
+    // Create element tree
+    const elementTree = document.createElement('div')
+    elementTree.className = 'element-tree'
+
+    // Build parent hierarchy
+    const parents: Element[] = []
+    let currentEl: Element | null = element
+    while (currentEl && currentEl !== document.body && currentEl !== document.documentElement) {
+      parents.unshift(currentEl)
+      currentEl = currentEl.parentElement
+    }
+
+    // Add body and html if needed
+    if (document.body && !parents.includes(document.body)) {
+      parents.unshift(document.body)
+    }
+
+    // Create element items
+    parents.forEach((el, index) => {
+      const item = document.createElement('div')
+      item.className = 'element-item'
+      if (el === element) {
+        item.classList.add('current')
       }
+
+      // Add indentation based on level
+      const indent = document.createElement('span')
+      indent.className = 'indent'
+      indent.style.width = `${index * 20}px`
+
+      const info = document.createElement('div')
+      info.className = 'element-info'
+      info.style.marginLeft = `${index * 20}px`
+
+      const tag = document.createElement('div')
+      tag.className = 'element-tag'
+      tag.textContent = el.tagName.toLowerCase()
+
+      info.appendChild(tag)
+
+      if (el.id) {
+        const id = document.createElement('div')
+        id.className = 'element-id'
+        id.textContent = `#${el.id}`
+        info.appendChild(id)
+      }
+
+      if (el.className && typeof el.className === 'string') {
+        const classes = el.className.split(' ').filter(c => c && !c.startsWith('absmartly'))
+        if (classes.length > 0) {
+          const classDiv = document.createElement('div')
+          classDiv.className = 'element-class'
+          classDiv.textContent = `.${classes.join('.')}`
+          info.appendChild(classDiv)
+        }
+      }
+
+      const level = document.createElement('div')
+      level.className = 'element-level'
+      level.textContent = el === element ? 'Current' : `Level ${index}`
+
+      item.appendChild(info)
+      item.appendChild(level)
+
+      // Add hover handler to highlight element on page
+      item.onmouseenter = () => {
+        // Remove any existing highlights
+        document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
+          elem.classList.remove('absmartly-temp-highlight')
+        })
+        // Add highlight to hovered element
+        el.classList.add('absmartly-temp-highlight')
+
+        // Add a temporary style if it doesn't exist
+        if (!document.getElementById('absmartly-temp-highlight-style')) {
+          const tempStyle = document.createElement('style')
+          tempStyle.id = 'absmartly-temp-highlight-style'
+          tempStyle.textContent = `
+            .absmartly-temp-highlight {
+              outline: 3px solid #3b82f6 !important;
+              outline-offset: 2px !important;
+              background-color: rgba(59, 130, 246, 0.1) !important;
+            }
+          `
+          document.head.appendChild(tempStyle)
+        }
+      }
+
+      item.onmouseleave = () => {
+        // Remove highlight when not hovering
+        el.classList.remove('absmartly-temp-highlight')
+      }
+
+      // Add click handler
+      item.onclick = (e) => {
+        e.stopPropagation()
+        console.log('[RelativeSelector] Clicked element:', el)
+
+        // Clean up any temp highlights and styles
+        document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
+          elem.classList.remove('absmartly-temp-highlight')
+        })
+        document.getElementById('absmartly-temp-highlight-style')?.remove()
+
+        // Remove the selector panel first
+        selectorHost.remove()
+
+        // Clear previous selection
+        const currentSelected = this.stateManager.getState().selectedElement
+        if (currentSelected) {
+          currentSelected.classList.remove('absmartly-selected')
+        }
+
+        // Select the new element and update coordinator's state
+        this.stateManager.setSelectedElement(el as HTMLElement)
+        this.selectedElement = el as HTMLElement  // Important: update coordinator's selectedElement
+        el.classList.add('absmartly-selected')
+
+        console.log('[RelativeSelector] Element selected, selectedElement:', this.selectedElement)
+        console.log('[RelativeSelector] State after selection:', this.stateManager.getState().selectedElement)
+
+        // Store original values for the element (same as in event-handlers.ts)
+        const config = this.stateManager.getConfig()
+        if (!(el as HTMLElement).dataset.absmartlyOriginal) {
+          (el as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
+            textContent: el.textContent
+            // Don't store innerHTML by default - it's too dangerous and can cause corruption
+          })
+          ;(el as HTMLElement).dataset.absmartlyExperiment = config.experimentName || '__preview__'
+        }
+
+        // Get position near the selected element on the page (not the panel)
+        const elementRect = el.getBoundingClientRect()
+        // Position menu to the right of the element if there's space, otherwise to the left
+        let menuX = elementRect.right + 10
+        let menuY = elementRect.top + 10
+
+        // Adjust if menu would go off screen
+        if (menuX + 220 > window.innerWidth) {
+          menuX = Math.max(10, elementRect.left - 230)
+        }
+        if (menuY + 600 > window.innerHeight) {
+          menuY = Math.max(10, window.innerHeight - 610)
+        }
+
+        // Ensure menu position is within viewport
+        menuX = Math.min(Math.max(10, menuX), window.innerWidth - 230)
+        menuY = Math.min(Math.max(10, menuY), window.innerHeight - 610)
+
+        console.log('[RelativeSelector] Showing context menu at', menuX, menuY, 'for element:', el)
+        // Show context menu for the newly selected element
+        this.contextMenu.show(menuX, menuY, el)
+      }
+
+      elementTree.appendChild(item)
     })
+
+    // Assemble panel
+    panel.appendChild(title)
+    panel.appendChild(closeBtn)
+    panel.appendChild(elementTree)
+
+    // Add to shadow DOM
+    shadow.appendChild(backdrop)
+    shadow.appendChild(panel)
+
+    // Add to document
+    document.body.appendChild(selectorHost)
+
+    // Close on backdrop click
+    backdrop.onclick = () => {
+      // Clean up any temp highlights
+      document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
+        elem.classList.remove('absmartly-temp-highlight')
+      })
+      // Clean up temp style
+      document.getElementById('absmartly-temp-highlight-style')?.remove()
+      selectorHost.remove()
+    }
   }
 
   showContextMenu(x: number, y: number): void {
