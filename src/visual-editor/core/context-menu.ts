@@ -33,7 +33,7 @@ export class ContextMenu {
     if (existingHost) existingHost.remove()
 
     // Calculate menu dimensions (approximate based on number of items)
-    const menuItemCount = 20
+    const menuItemCount = 19 // One less item after removing Inline Edit
     const itemHeight = 32
     const dividerHeight = 9
     const dividerCount = 6
@@ -47,22 +47,24 @@ export class ContextMenu {
     const scrollY = window.scrollY
     const scrollX = window.scrollX
 
-    // Calculate optimal position
-    let menuLeft = x + 5
-    let menuTop = y + 5
+    // x and y are now clientX/clientY (viewport-relative), so use them directly for fixed positioning
+    let menuLeft = x + 2 // Small offset from click point
+    let menuTop = y + 2 // Small offset from click point
     let useAbsolutePositioning = false
 
     // Check if menu fits in viewport
     if (estimatedMenuHeight > viewportHeight - 40) {
+      // For very tall menus, use absolute positioning
       useAbsolutePositioning = true
-      menuLeft = x + scrollX + 5
-      menuTop = y + scrollY + 5
+      menuLeft = x + scrollX + 2 // Add scroll for absolute positioning
+      menuTop = y + scrollY + 2 // Add scroll for absolute positioning
     } else {
+      // Keep menu within viewport bounds
       if (menuLeft + estimatedMenuWidth > viewportWidth) {
-        menuLeft = Math.max(10, x - estimatedMenuWidth - 5)
+        menuLeft = Math.max(10, x - estimatedMenuWidth - 2) // Show to the left of cursor
       }
       if (menuTop + estimatedMenuHeight > viewportHeight) {
-        menuTop = Math.max(10, y - estimatedMenuHeight - 5)
+        menuTop = Math.max(10, y - estimatedMenuHeight - 2) // Show above cursor
       }
     }
 
@@ -231,14 +233,13 @@ export class ContextMenu {
 
   private createMenuItems(): MenuItem[] {
     return [
-      { icon: '✏️', label: 'Edit Element', action: 'edit' },
+      { icon: '✏️', label: 'Edit Text', action: 'edit' },
       { icon: '</>', label: 'Edit HTML', action: 'editHtml' },
-      { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
-      { icon: '✂️', label: 'Inline Edit', action: 'inlineEdit' },
       { divider: true },
+      { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
+      { icon: '↔️', label: 'Resize', action: 'resize' },
       { icon: '⬆', label: 'Move up', action: 'moveUp' },
       { icon: '⬇', label: 'Move down', action: 'moveDown' },
-      { icon: '↔️', label: 'Resize', action: 'resize' },
       { divider: true },
       { icon: '📋', label: 'Copy', action: 'copy' },
       { icon: '🔗', label: 'Copy Selector Path', action: 'copySelector', shortcut: '⌘+Shift+C' },

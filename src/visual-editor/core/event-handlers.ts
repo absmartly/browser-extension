@@ -96,6 +96,12 @@ export class EventHandlers {
     const target = e.target as Element
     const config = this.stateManager.getConfig()
 
+    // Prevent selecting body or html elements to avoid page corruption
+    if (target === document.body || target === document.documentElement) {
+      console.warn('[ABSmartly] Cannot select body or html element - this could corrupt the page')
+      return
+    }
+
     // CRITICAL: Check for menu host first (shadow DOM container)
     const menuHost = document.getElementById('absmartly-menu-host')
     if (menuHost && (menuHost === target || menuHost.contains(target))) {
@@ -146,15 +152,17 @@ export class EventHandlers {
     // This ensures we always have the original value before any changes
     if (!(target as HTMLElement).dataset.absmartlyOriginal) {
       (target as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
-        textContent: target.textContent,
-        innerHTML: target.innerHTML
+        textContent: target.textContent
+        // Don't store innerHTML by default - it's too dangerous and can cause corruption
+        // Only store it when actually editing HTML
       })
       ;(target as HTMLElement).dataset.absmartlyExperiment = config.experimentName || '__preview__'
     }
 
     // Show context menu - this will be handled by context-menu module
-    console.log('[EventHandlers] Calling showContextMenu at', e.pageX, e.pageY, 'for element:', target)
-    this.showContextMenu(e.pageX, e.pageY, target)
+    // Use clientX/clientY for fixed positioning (viewport-relative coordinates)
+    console.log('[EventHandlers] Calling showContextMenu at', e.clientX, e.clientY, 'for element:', target)
+    this.showContextMenu(e.clientX, e.clientY, target)
   }
 
   setEditing(editing: boolean): void {
