@@ -1,1 +1,1 @@
-../../absmartly-dom-changes-sdk-plugin/dist/absmartly-dom-changes-core.dev.js
+../../absmartly-sdk-plugins/dist/absmartly-dom-changes-core.dev.js
