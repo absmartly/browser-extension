@@ -2405,27 +2405,7 @@ export function DOMChangesInlineEditor({
         {changes.length === 0 && !editingChange ? (
           <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
             <CursorArrowRaysIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 mb-3">No DOM changes configured</p>
-            <div className="flex gap-2 justify-center">
-              <Button
-                onClick={handleAddChange}
-                size="sm"
-                variant="secondary"
-                className="inline-flex items-center gap-1"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Add DOM Change
-              </Button>
-              <Button
-                onClick={handleLaunchVisualEditor}
-                size="sm"
-                variant="primary"
-                className="inline-flex items-center gap-1"
-              >
-                <PaintBrushIcon className="h-4 w-4" />
-                Visual Editor
-              </Button>
-            </div>
+            <p className="text-sm text-gray-500">No DOM changes configured</p>
           </div>
         ) : (
           <>
@@ -2628,8 +2608,8 @@ export function DOMChangesInlineEditor({
         />
       )}
 
-      {/* Action buttons - only show if we have existing changes and not editing */}
-      {changes.length > 0 && !editingChange && (
+      {/* Action buttons - always show unless editing */}
+      {!editingChange && (
         <div className="flex gap-2">
           <Button
             type="button"
