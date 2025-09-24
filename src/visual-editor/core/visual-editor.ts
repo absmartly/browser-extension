@@ -156,7 +156,6 @@ export class VisualEditor {
 
     // Mark as active
     this.isActive = true
-    ;(window as any).__absmartlyVisualEditorActive = true
 
     // Keep preview header visible when visual editor starts
     // Users should see both the preview header and visual editor UI
@@ -202,7 +201,6 @@ export class VisualEditor {
     console.trace('[ABSmartly] Stop called from:')
 
     this.isActive = false
-    ;(window as any).__absmartlyVisualEditorActive = false
 
     // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []

@@ -101,7 +101,7 @@ if (fs.existsSync(injectScriptSource)) {
 }
 
 // Copy ABsmartly SDK Plugins from sibling directory
-const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-dom-changes-sdk-plugin', 'dist');
+const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-sdk-plugins', 'dist');
 const pluginDevSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.dev.js');
 const pluginProdSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.min.js');
 

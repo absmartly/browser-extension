@@ -1,1 +1,1 @@
-../../absmartly-dom-changes-sdk-plugin/dist/absmartly-overrides-full.dev.js
+../../absmartly-sdk-plugins/dist/absmartly-overrides-full.dev.js

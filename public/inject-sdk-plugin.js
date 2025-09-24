@@ -1129,7 +1129,9 @@
           if (extensionBaseUrl) {
             // Function to load plugin script with error handling
             const loadPlugin = (filename, fallbackFilename) => {
-              const pluginUrl = extensionBaseUrl + filename;
+              // Add cache-busting parameter to force reload
+              const cacheBuster = '?v=' + Date.now();
+              const pluginUrl = extensionBaseUrl + filename + cacheBuster;
               debugLog(`[ABsmartly Extension] Attempting to load plugin from: ${pluginUrl}`);
 
               const script = document.createElement('script');

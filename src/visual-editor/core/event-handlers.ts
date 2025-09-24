@@ -114,14 +114,16 @@ export class EventHandlers {
       return
     }
 
-    // Ignore clicks on our UI (banner, editor hosts, toolbar, and preview header)
+    // Ignore clicks on our UI (banner, editor hosts, toolbar, preview header, and hierarchy panel)
     if (target.id === 'absmartly-visual-editor-banner-host' ||
         target.closest('#absmartly-visual-editor-banner-host') ||
         target.id === 'absmartly-html-editor-host' ||
         target.closest('#absmartly-html-editor-host') ||
         target.closest('.absmartly-toolbar') ||
         target.id === 'absmartly-preview-header' ||
-        target.closest('#absmartly-preview-header')) {
+        target.closest('#absmartly-preview-header') ||
+        target.id === 'absmartly-relative-selector-host' ||
+        target.closest('#absmartly-relative-selector-host')) {
       return
     }
 
@@ -152,16 +154,15 @@ export class EventHandlers {
     // This ensures we always have the original value before any changes
     if (!(target as HTMLElement).dataset.absmartlyOriginal) {
       (target as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
-        textContent: target.textContent
-        // Don't store innerHTML by default - it's too dangerous and can cause corruption
-        // Only store it when actually editing HTML
+        textContent: target.textContent,
+        innerHTML: target.innerHTML
+        // Store both to support both text and HTML editing modes
       })
       ;(target as HTMLElement).dataset.absmartlyExperiment = config.experimentName || '__preview__'
     }
 
     // Show context menu - this will be handled by context-menu module
     // Use clientX/clientY for fixed positioning (viewport-relative coordinates)
-    console.log('[EventHandlers] Calling showContextMenu at', e.clientX, e.clientY, 'for element:', target)
     this.showContextMenu(e.clientX, e.clientY, target)
   }
 

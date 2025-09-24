@@ -88,7 +88,10 @@ export class EditorCoordinator {
 
     // Connect context menu to action handlers
     this.contextMenu.handleAction = (action: string, element: Element) => {
-      this.handleMenuAction(action, element)
+      // IMPORTANT: Always use the currently selected element from state, not the passed element
+      // This ensures actions work on the element selected from the hierarchy panel
+      const currentSelected = this.stateManager.getState().selectedElement || element
+      this.handleMenuAction(action, currentSelected)
     }
 
     // Connect UI components to change tracker
@@ -248,20 +251,24 @@ export class EditorCoordinator {
   }
 
   handleMenuAction(action: string, element: Element): void {
-    console.log('[MenuAction] Action:', action, 'Element:', element)
-    console.log('[MenuAction] Current selectedElement:', this.selectedElement)
-    console.log('[MenuAction] State selectedElement:', this.stateManager.getState().selectedElement)
+    console.log('[handleMenuAction] START - action:', action)
+    console.log('[handleMenuAction] Received element:', element)
+    console.log('[handleMenuAction] Element details - tagName:', element.tagName, 'id:', element.id, 'className:', element.className)
+    console.log('[handleMenuAction] Coordinator selectedElement:', this.selectedElement)
+    console.log('[handleMenuAction] State selectedElement:', this.stateManager.getState().selectedElement)
 
     const originalState = {
       html: element.outerHTML,
       parent: element.parentElement,
       nextSibling: element.nextElementSibling,
-      textContent: element.textContent
+      textContent: element.textContent,
+      innerHTML: element.innerHTML
     }
 
     switch (action) {
       case 'edit':
       case 'edit-element':
+        console.log('[handleMenuAction] Handling edit action for:', element)
         this.handleEditAction(element, originalState)
         break
 
@@ -309,6 +316,7 @@ export class EditorCoordinator {
 
       case 'select-relative':
       case 'selectRelative':
+        console.log('[handleMenuAction] Handling select-relative for element:', element)
         this.handleSelectRelativeElement(element)
         break
 
@@ -319,6 +327,8 @@ export class EditorCoordinator {
   }
 
   handleEditAction(element: Element, originalState: any): void {
+    console.log('[handleEditAction] START for element:', element)
+    console.log('[handleEditAction] Element details:', element.tagName, element.id, element.className)
     this.removeContextMenu()
 
     // Set editing mode to prevent selection while editing text
@@ -356,13 +366,29 @@ export class EditorCoordinator {
       element.removeEventListener('keydown', handleKeyPress)
       element.removeEventListener('click', preventDefault, true)
 
-      this.callbacks.addChange({
-        selector: this.callbacks.getSelector(element as HTMLElement),
-        type: 'text',
-        value: element.textContent || '',
-        originalText: originalState.textContent,
-        enabled: true
-      })
+      // Check if element has child elements (not just text nodes)
+      // If it has HTML children, save as HTML to preserve structure
+      const hasHtmlChildren = Array.from(element.children).length > 0
+
+      if (hasHtmlChildren) {
+        // Save as HTML to preserve inner element structure and styles
+        this.callbacks.addChange({
+          selector: this.callbacks.getSelector(element as HTMLElement),
+          type: 'html',
+          value: element.innerHTML,
+          originalHtml: originalState.innerHTML,
+          enabled: true
+        })
+      } else {
+        // Simple text node, save as text
+        this.callbacks.addChange({
+          selector: this.callbacks.getSelector(element as HTMLElement),
+          type: 'text',
+          value: element.textContent || '',
+          originalText: originalState.textContent,
+          enabled: true
+        })
+      }
     }
 
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -420,18 +446,27 @@ export class EditorCoordinator {
   }
 
   handleSelectRelativeElement(element: Element): void {
+    console.log('[handleSelectRelativeElement] Called with element:', element)
+    console.log('[handleSelectRelativeElement] Element details:', element.tagName, element.id, element.className)
+
+    // Check if we already have a selector open to prevent recursion
+    if (document.getElementById('absmartly-relative-selector-host')) {
+      console.log('[handleSelectRelativeElement] Selector already exists, returning')
+      return
+    }
+
     this.removeContextMenu()
     this.showRelativeElementSelector(element)
   }
 
   showRelativeElementSelector(element: Element): void {
     // Remove any existing selector
-    const existingSelector = document.getElementById('absmartly-relative-selector')
+    const existingSelector = document.getElementById('absmartly-relative-selector-host')
     if (existingSelector) existingSelector.remove()
 
     // Create host element for shadow DOM
     const selectorHost = document.createElement('div')
-    selectorHost.id = 'absmartly-relative-selector'
+    selectorHost.id = 'absmartly-relative-selector-host'
     selectorHost.style.cssText = `
       position: fixed;
       top: 50%;
@@ -697,7 +732,6 @@ export class EditorCoordinator {
       // Add click handler
       item.onclick = (e) => {
         e.stopPropagation()
-        console.log('[RelativeSelector] Clicked element:', el)
 
         // Clean up any temp highlights and styles
         document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
@@ -715,19 +749,18 @@ export class EditorCoordinator {
         }
 
         // Select the new element and update coordinator's state
+
         this.stateManager.setSelectedElement(el as HTMLElement)
         this.selectedElement = el as HTMLElement  // Important: update coordinator's selectedElement
         el.classList.add('absmartly-selected')
-
-        console.log('[RelativeSelector] Element selected, selectedElement:', this.selectedElement)
-        console.log('[RelativeSelector] State after selection:', this.stateManager.getState().selectedElement)
 
         // Store original values for the element (same as in event-handlers.ts)
         const config = this.stateManager.getConfig()
         if (!(el as HTMLElement).dataset.absmartlyOriginal) {
           (el as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
-            textContent: el.textContent
-            // Don't store innerHTML by default - it's too dangerous and can cause corruption
+            textContent: el.textContent,
+            innerHTML: el.innerHTML
+            // Store both to support both text and HTML editing modes
           })
           ;(el as HTMLElement).dataset.absmartlyExperiment = config.experimentName || '__preview__'
         }
@@ -750,9 +783,11 @@ export class EditorCoordinator {
         menuX = Math.min(Math.max(10, menuX), window.innerWidth - 230)
         menuY = Math.min(Math.max(10, menuY), window.innerHeight - 610)
 
-        console.log('[RelativeSelector] Showing context menu at', menuX, menuY, 'for element:', el)
-        // Show context menu for the newly selected element
-        this.contextMenu.show(menuX, menuY, el)
+        // Small delay to ensure DOM cleanup and prevent event conflicts
+        setTimeout(() => {
+          // Show context menu for the newly selected element
+          this.contextMenu.show(menuX, menuY, el)
+        }, 50)
       }
 
       elementTree.appendChild(item)
