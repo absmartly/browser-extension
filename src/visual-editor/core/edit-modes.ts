@@ -176,8 +176,8 @@ export class EditModes {
     element.classList.add('absmartly-resize-active')
 
     // Set global flag to prevent DOM changes from being reapplied during resize
-    ;(window as any).__absmartlyResizingActive = true
-    console.log('[ABSmartly] Set global resize flag to prevent DOM changes reapplication')
+    ;(window as any).__absmartlyVisualEditorModifying = true
+    console.log('[ABSmartly] Set visual editor modifying flag to prevent DOM changes reapplication')
 
     // Store original styles locally for tracking
     const originalStyles = {
@@ -213,6 +213,14 @@ export class EditModes {
       e.preventDefault()
       e.stopPropagation()
 
+      // Set global flag to prevent DOM changes from being reapplied during resize
+      ;(window as any).__absmartlyVisualEditorModifying = true
+      console.log('[ABSmartly] MOUSEDOWN: Set visual editor modifying flag to prevent DOM changes reapplication', {
+        flagValue: (window as any).__absmartlyVisualEditorModifying,
+        timestamp: Date.now(),
+        direction
+      })
+
       const startX = e.clientX
       const startY = e.clientY
       const startRect = element.getBoundingClientRect()
@@ -228,6 +236,13 @@ export class EditModes {
       const handleMouseUp = () => {
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
+
+        // Clear global flag to allow DOM changes to be reapplied again
+        ;(window as any).__absmartlyVisualEditorModifying = false
+        console.log('[ABSmartly] MOUSEUP: Cleared visual editor modifying flag, DOM changes can be reapplied', {
+          flagValue: (window as any).__absmartlyVisualEditorModifying,
+          timestamp: Date.now()
+        })
 
         // Track the change
         this.trackResizeChange(element, originalStyles)
@@ -368,6 +383,17 @@ export class EditModes {
   }
 
   private applyResize(element: HTMLElement, direction: string, deltaX: number, deltaY: number, startRect: DOMRect): void {
+    console.log('[ABSmartly] RESIZE: Applying resize', {
+      direction,
+      deltaX,
+      deltaY,
+      flagValue: (window as any).__absmartlyVisualEditorModifying,
+      timestamp: Date.now(),
+      currentStyles: {
+        width: element.style.width,
+        height: element.style.height
+      }
+    });
     const style = element.style
 
     switch (direction) {
@@ -414,8 +440,8 @@ export class EditModes {
     this.stateManager.setResizing(false)
 
     // Clear global flag to allow DOM changes to be reapplied again
-    ;(window as any).__absmartlyResizingActive = false
-    console.log('[ABSmartly] Cleared global resize flag, DOM changes can be reapplied')
+    ;(window as any).__absmartlyVisualEditorModifying = false
+    console.log('[ABSmartly] Cleared visual editor modifying flag, DOM changes can be reapplied')
 
     // Remove handles
     handles.forEach(handle => handle.remove())

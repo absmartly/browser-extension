@@ -27,7 +27,6 @@ export class ContextMenu {
   }
 
   show(x: number, y: number, element: Element): void {
-    console.log('[ContextMenu] Showing context menu at', x, y, 'for element:', element)
     // Remove any existing menu first
     const existingHost = document.getElementById('absmartly-menu-host')
     if (existingHost) existingHost.remove()
