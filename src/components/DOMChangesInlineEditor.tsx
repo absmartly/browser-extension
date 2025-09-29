@@ -1385,9 +1385,28 @@ export function DOMChangesInlineEditor({
           
           // Apply the selected element to the restored editing state
           if (pickerResult.fieldId === 'selector' && result.editingChange) {
-            setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
+            // For move changes, preserve the original position data
+            if (result.editingChange.type === 'move' && result.editingChange.value && typeof result.editingChange.value === 'object') {
+              setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
+            } else {
+              setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
+            }
           } else if (pickerResult.fieldId === 'targetSelector' && result.editingChange) {
-            setEditingChange({ ...result.editingChange, targetSelector: pickerResult.selector })
+            // When updating target selector, preserve original position if not already set
+            if (result.editingChange.type === 'move' && result.editingChange.value && typeof result.editingChange.value === 'object') {
+              const currentValue = result.editingChange.value as any
+              // Only update the targetSelector, keep original position data intact
+              setEditingChange({
+                ...result.editingChange,
+                targetSelector: pickerResult.selector,
+                value: {
+                  ...currentValue,
+                  targetSelector: pickerResult.selector
+                }
+              })
+            } else {
+              setEditingChange({ ...result.editingChange, targetSelector: pickerResult.selector })
+            }
           }
           
           // Clear the picker result
@@ -1490,9 +1509,28 @@ export function DOMChangesInlineEditor({
 
         // Update current state if we're still open
         if (pickingForField === 'selector' && editingChange) {
-          setEditingChange({ ...editingChange, selector: message.selector })
+          // For move changes, preserve the original position data
+          if (editingChange.type === 'move' && editingChange.value && typeof editingChange.value === 'object') {
+            setEditingChange({ ...editingChange, selector: message.selector })
+          } else {
+            setEditingChange({ ...editingChange, selector: message.selector })
+          }
         } else if (pickingForField === 'targetSelector' && editingChange) {
-          setEditingChange({ ...editingChange, targetSelector: message.selector })
+          // When updating target selector, preserve original position if not already set
+          if (editingChange.type === 'move' && editingChange.value && typeof editingChange.value === 'object') {
+            const currentValue = editingChange.value as any
+            // Only update the targetSelector, keep original position data intact
+            setEditingChange({
+              ...editingChange,
+              targetSelector: message.selector,
+              value: {
+                ...currentValue,
+                targetSelector: message.selector
+              }
+            })
+          } else {
+            setEditingChange({ ...editingChange, targetSelector: message.selector })
+          }
         }
         
         setPickingForField(null)
@@ -1911,6 +1949,8 @@ export function DOMChangesInlineEditor({
       classesWithStatus,
       targetSelector: change.type === 'move' ? (change.value?.targetSelector || change.targetSelector || '') : '',
       position: change.type === 'move' ? (change.value?.position || change.position || 'after') : change.type === 'insert' ? (change as any).position : 'after',
+      // Preserve the entire value object for move changes to keep original position data
+      value: change.type === 'move' && change.value ? change.value : undefined,
       mode: (change as any).mode || 'merge',
       waitForElement: (change as any).waitForElement,
       observerRoot: (change as any).observerRoot
@@ -2024,13 +2064,27 @@ export function DOMChangesInlineEditor({
         }
         break
       case 'move':
+        // Preserve original position data if it exists
+        const moveValue: any = {
+          targetSelector: change.targetSelector || '',
+          position: change.position || 'after'
+        }
+
+        // If we have existing value object with original position data, preserve it
+        if (change.value && typeof change.value === 'object') {
+          const existingValue = change.value as any
+          if (existingValue.originalTargetSelector) {
+            moveValue.originalTargetSelector = existingValue.originalTargetSelector
+          }
+          if (existingValue.originalPosition) {
+            moveValue.originalPosition = existingValue.originalPosition
+          }
+        }
+
         domChange = {
           selector: change.selector,
           type: 'move',
-          value: {
-            targetSelector: change.targetSelector || '',
-            position: change.position || 'after'
-          },
+          value: moveValue,
           enabled: true,
           mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
