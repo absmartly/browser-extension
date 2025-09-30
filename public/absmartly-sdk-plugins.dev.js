@@ -1,1 +1,0 @@
-../../absmartly-sdk-plugins/dist/absmartly-sdk-plugins.dev.js
