@@ -21,9 +21,15 @@ export type MenuItem = MenuAction | MenuDivider
 
 export class ContextMenu {
   private stateManager: StateManager
+  private useShadowDOM: boolean
 
-  constructor(stateManager: StateManager) {
+  constructor(stateManager: StateManager, useShadowDOM?: boolean) {
     this.stateManager = stateManager
+    // Check query string for shadow DOM override
+    const urlParams = new URLSearchParams(window.location.search)
+    const shadowDOMParam = urlParams.get('use_shadow_dom_for_visual_editor_context_menu')
+    const disableShadowDOM = shadowDOMParam === '0'
+    this.useShadowDOM = disableShadowDOM ? false : (useShadowDOM !== false)
   }
 
   show(x: number, y: number, element: Element): void {
@@ -80,8 +86,12 @@ export class ContextMenu {
       pointer-events: none;
     `
 
-    // Attach shadow root with closed mode for complete isolation
-    const shadow = menuHost.attachShadow({ mode: 'closed' })
+    // Check if we should use shadow DOM
+    console.log('🔍 Context Menu - Use Shadow DOM:', this.useShadowDOM)
+
+    // Attach shadow root with closed mode for complete isolation (unless disabled)
+    const shadow = this.useShadowDOM ? menuHost.attachShadow({ mode: 'closed' }) : menuHost
+    console.log('🔍 Shadow container:', this.useShadowDOM ? 'Using shadow DOM' : 'Using menuHost directly')
 
     // Create styles for shadow DOM
     const style = document.createElement('style')
@@ -237,23 +247,18 @@ export class ContextMenu {
       { divider: true },
       { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
       { icon: '↔️', label: 'Resize', action: 'resize' },
-      { icon: '⬆', label: 'Move up', action: 'moveUp' },
-      { icon: '⬇', label: 'Move down', action: 'moveDown' },
+      { divider: true },
+      { icon: '⬆', label: 'Move up', action: 'move-up' },
+      { icon: '⬇', label: 'Move down', action: 'move-down' },
       { divider: true },
       { icon: '📋', label: 'Copy', action: 'copy' },
       { icon: '🔗', label: 'Copy Selector Path', action: 'copySelector', shortcut: '⌘+Shift+C' },
       { divider: true },
       { icon: '🎯', label: 'Select Relative Element', action: 'selectRelative' },
-      { icon: '➕', label: 'Insert new block', action: 'insertBlock' },
-      { divider: true },
-      { icon: '💡', label: 'Suggest Variations', action: 'suggestVariations' },
-      { icon: '💾', label: 'Save to library', action: 'saveToLibrary' },
-      { icon: '✅', label: 'Apply saved modification', action: 'applySaved' },
-      { divider: true },
-      { icon: '🎯', label: 'Track Clicks', action: 'trackClicks' },
+      { icon: '➕', label: 'Insert new block', action: 'insert-block' },
       { divider: true },
       { icon: '👁', label: 'Hide', action: 'hide' },
-      { icon: '🗑', label: 'Remove', action: 'delete', shortcut: 'Delete' }
+      { icon: '🗑', label: 'Delete', action: 'delete', shortcut: 'Delete' }
     ]
   }
 

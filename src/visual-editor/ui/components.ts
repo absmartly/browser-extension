@@ -46,9 +46,23 @@ export class UIComponents {
       pointer-events: none;
     `
 
-    const bannerShadow = bannerHost.attachShadow({ mode: 'closed' })
-    // Store reference to shadow root for updates
-    this.bannerShadowRoot = bannerShadow
+    // Check query string for shadow DOM override (for testing)
+    const urlParams = new URLSearchParams(window.location.search)
+    const shadowDOMParam = urlParams.get('use_shadow_dom_for_visual_editor_context_menu')
+    const useShadowDOM = shadowDOMParam !== '0'
+
+    let bannerContainer: HTMLElement | ShadowRoot
+    if (useShadowDOM) {
+      const bannerShadow = bannerHost.attachShadow({ mode: 'closed' })
+      // Store reference to shadow root for updates
+      this.bannerShadowRoot = bannerShadow
+      bannerContainer = bannerShadow
+      console.log('🔍 Banner - Using Shadow DOM')
+    } else {
+      // For testing, append directly without shadow DOM
+      bannerContainer = bannerHost
+      console.log('🔍 Banner - NOT using Shadow DOM (test mode)')
+    }
 
     const bannerStyle = document.createElement('style')
     bannerStyle.textContent = `
@@ -203,8 +217,8 @@ export class UIComponents {
     banner.appendChild(centerSection)
     banner.appendChild(rightSection)
 
-    bannerShadow.appendChild(bannerStyle)
-    bannerShadow.appendChild(banner)
+    bannerContainer.appendChild(bannerStyle)
+    bannerContainer.appendChild(banner)
 
     document.body.appendChild(bannerHost)
 
