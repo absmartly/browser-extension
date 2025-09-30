@@ -96,11 +96,22 @@ export class Cleanup {
     modifiedElements.forEach(element => {
       try {
         const originalData = JSON.parse((element as HTMLElement).dataset.absmartlyOriginal || '{}')
+        const htmlElement = element as HTMLElement
 
         // Restore text content if it was changed
         if (originalData.textContent !== undefined &&
             element.textContent !== originalData.textContent) {
           element.textContent = originalData.textContent
+        }
+
+        // Restore original styles if they were changed (e.g., from resize operation)
+        if (originalData.styles) {
+          if (originalData.styles.width !== undefined) {
+            htmlElement.style.width = originalData.styles.width
+          }
+          if (originalData.styles.height !== undefined) {
+            htmlElement.style.height = originalData.styles.height
+          }
         }
 
         // Remove our data attributes
@@ -151,9 +162,20 @@ export class Cleanup {
   restoreElement(element: Element): void {
     try {
       const originalData = JSON.parse((element as HTMLElement).dataset.absmartlyOriginal || '{}')
+      const htmlElement = element as HTMLElement
 
       if (originalData.textContent !== undefined) {
         element.textContent = originalData.textContent
+      }
+
+      // Restore original styles if they were changed (e.g., from resize operation)
+      if (originalData.styles) {
+        if (originalData.styles.width !== undefined) {
+          htmlElement.style.width = originalData.styles.width
+        }
+        if (originalData.styles.height !== undefined) {
+          htmlElement.style.height = originalData.styles.height
+        }
       }
 
       // Only restore innerHTML if it was actually changed by HTML editing

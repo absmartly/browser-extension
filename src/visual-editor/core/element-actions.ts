@@ -113,12 +113,34 @@ export class ElementActions {
     if (!this.selectedElement) return
 
     const selector = this.getSelector(this.selectedElement)
+
+    // Store element's HTML and position info for undo
+    const elementHTML = this.selectedElement.outerHTML
+    const parent = this.selectedElement.parentElement
+    const nextSibling = this.selectedElement.nextElementSibling
+
+    // Generate selectors for parent and next sibling for restoration
+    let parentSelector = null
+    let nextSiblingSelector = null
+
+    if (parent) {
+      parentSelector = this.getSelector(parent)
+      if (nextSibling) {
+        nextSiblingSelector = this.getSelector(nextSibling as HTMLElement)
+      }
+    }
+
+    // Now remove the element
     this.selectedElement.remove()
 
     this.addChange({
       selector: selector,
       type: 'delete',
-      value: null,
+      value: {
+        html: elementHTML,
+        parentSelector: parentSelector,
+        nextSiblingSelector: nextSiblingSelector
+      },
       enabled: true
     })
 
@@ -274,8 +296,42 @@ export class ElementActions {
             }
             break
 
+          case 'delete':
+            // Can't revert delete on existing element since it was removed
+            // This case is handled separately below
+            break
         }
       })
+
+      // Special handling for delete - need to restore the element
+      if (change.type === 'delete' && change.value) {
+        const { html, parentSelector, nextSiblingSelector } = change.value
+
+        if (html && parentSelector) {
+          const parent = document.querySelector(parentSelector) as HTMLElement
+
+          if (parent) {
+            // Create a temporary div to parse the HTML
+            const temp = document.createElement('div')
+            temp.innerHTML = html
+            const elementToRestore = temp.firstElementChild as HTMLElement
+
+            if (elementToRestore) {
+              if (nextSiblingSelector) {
+                const nextSibling = document.querySelector(nextSiblingSelector)
+                if (nextSibling && nextSibling.parentElement === parent) {
+                  parent.insertBefore(elementToRestore, nextSibling)
+                } else {
+                  parent.appendChild(elementToRestore)
+                }
+              } else {
+                parent.appendChild(elementToRestore)
+              }
+              console.log('[ElementActions] Restored deleted element')
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('[ElementActions] Error reverting DOM change:', error)
     }
@@ -390,6 +446,12 @@ export class ElementActions {
               htmlElement.innerHTML = change.value
               console.log('[ElementActions] Applied HTML content')
             }
+            break
+
+          case 'delete':
+            // Delete the element
+            htmlElement.remove()
+            console.log('[ElementActions] Deleted element')
             break
 
         }
