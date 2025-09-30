@@ -297,31 +297,6 @@ describe('EditorCoordinator', () => {
       expect(mockCallbacks.stop).toHaveBeenCalled()
     })
 
-    // Toolbar removed - now using UIComponents banner
-    it.skip('should connect toolbar to callbacks', () => {
-      expect(mockToolbar.onUndo).toBeDefined()
-      expect(mockToolbar.onRedo).toBeDefined()
-      expect(mockToolbar.onClear).toBeDefined()
-      expect(mockToolbar.onSave).toBeDefined()
-      expect(mockToolbar.onExit).toBeDefined()
-
-      // Test all toolbar connections
-      mockToolbar.onUndo!()
-      expect(mockCallbacks.undoLastChange).toHaveBeenCalled()
-
-      mockToolbar.onRedo!()
-      expect(mockCallbacks.redoChange).toHaveBeenCalled()
-
-      mockToolbar.onClear!()
-      expect(mockCallbacks.clearAllChanges).toHaveBeenCalled()
-
-      mockToolbar.onSave!()
-      expect(mockCallbacks.saveChanges).toHaveBeenCalled()
-
-      mockToolbar.onExit!()
-      expect(mockCallbacks.stop).toHaveBeenCalled()
-    })
-
     it('should register cleanup handlers', () => {
       // 6 handlers: detachEventListeners, removeEventListeners, stopMutationObserver, makeElementsNonEditable, removeStyles, removeBanner
       expect(mockCleanup.registerEventHandler).toHaveBeenCalledTimes(6)
@@ -445,30 +420,6 @@ describe('EditorCoordinator', () => {
 
       // EventHandlers.detachEventListeners() is called but we're only testing coordinator's direct listeners
       expect(removeEventListenerSpy).toHaveBeenCalledTimes(4)
-    })
-
-    // Outdated - coordinator no longer handles these events directly, they're in EventHandlers module
-    it.skip('should delegate events to event handlers', () => {
-      coordinator.setupEventListeners()
-
-      // Simulate events
-      const clickEvent = new MouseEvent('click')
-      const mouseOverEvent = new MouseEvent('mouseover')
-      const mouseOutEvent = new MouseEvent('mouseout')
-
-      // Dispatch events to trigger the coordinator's event handlers
-      const clickHandler = coordinator['handleElementClick']
-      const mouseOverHandler = coordinator['handleMouseOver']
-      const mouseOutHandler = coordinator['handleMouseOut']
-
-      clickHandler(clickEvent)
-      mouseOverHandler(mouseOverEvent)
-      mouseOutHandler(mouseOutEvent)
-
-      // Verify delegation to the correct methods
-      expect(mockEventHandlers.handleClick).toHaveBeenCalledWith(clickEvent)
-      expect(mockEventHandlers.handleMouseOver).toHaveBeenCalledWith(mouseOverEvent)
-      expect(mockEventHandlers.handleMouseOut).toHaveBeenCalledWith(mouseOutEvent)
     })
 
     it('should handle context menu events by preventing default', () => {
