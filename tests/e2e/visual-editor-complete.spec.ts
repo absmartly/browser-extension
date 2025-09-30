@@ -199,21 +199,55 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Move up works')
     await debugWait()
 
-    // Action 5: Edit HTML
+    // Action 5: Edit HTML with Monaco editor
     console.log('  Testing: Edit HTML on #section-title')
     await testPage.click('#section-title', { force: true })
     await testPage.locator('.menu-container').waitFor({ state: 'visible' })
     await testPage.locator('.menu-item:has-text("Edit HTML")').click()
 
-    // Wait for Monaco editor (textarea fallback) to appear
-    await testPage.locator('textarea#absmartly-html-textarea').waitFor({ state: 'visible' })
+    // Wait for Monaco editor to appear
+    await testPage.locator('.monaco-editor').waitFor({ state: 'visible' })
+    console.log('  ✓ Monaco editor appeared')
     await debugWait()
 
-    // Clear existing content and type new HTML
-    const textarea = testPage.locator('textarea#absmartly-html-textarea')
-    await textarea.click()
-    await textarea.selectText()
-    await textarea.fill('<h2>HTML Edited!</h2>')
+    // Verify Monaco syntax highlighting is present
+    const hasMonacoSyntaxHighlight = await testPage.evaluate(() => {
+      const editor = document.querySelector('.monaco-editor')
+      if (!editor) return false
+
+      // Check for Monaco-specific classes that indicate syntax highlighting
+      const hasViewLines = editor.querySelector('.view-lines')
+      const hasMonacoTokens = editor.querySelector('.mtk1, .mtk2, .mtk3, .mtk4, .mtk5')
+
+      return !!(hasViewLines && hasMonacoTokens)
+    })
+    console.log(`  ${hasMonacoSyntaxHighlight ? '✓' : '✗'} Monaco syntax highlighting: ${hasMonacoSyntaxHighlight}`)
+    expect(hasMonacoSyntaxHighlight).toBeTruthy()
+    await debugWait()
+
+    // Set new HTML content using Monaco API
+    const editorValueSet = await testPage.evaluate(() => {
+      // Monaco editor instance is accessible via the global monaco object
+      const editors = (window as any).monaco?.editor?.getEditors?.()
+      if (editors && editors.length > 0) {
+        const editor = editors[0]
+        editor.setValue('<h2>HTML Edited!</h2>')
+        console.log('[Test] Set Monaco editor value via getEditors()')
+        return true
+      }
+      console.log('[Test] Could not find Monaco editor instance')
+      return false
+    })
+
+    if (editorValueSet) {
+      console.log('  ✓ Updated HTML via Monaco API')
+    } else {
+      console.log('  ⚠️  Failed to set Monaco value, trying keyboard input...')
+      // Fallback: use keyboard to set value
+      await testPage.keyboard.press('Control+A')
+      await testPage.keyboard.type('<h2>HTML Edited!</h2>')
+      console.log('  ✓ Updated HTML via keyboard')
+    }
     await debugWait()
 
     // Click the Save button (no shadow DOM in test mode)
@@ -238,13 +272,13 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     // Wait for editor to close (with 5 second timeout)
     try {
-      await testPage.locator('textarea#absmartly-html-textarea').waitFor({ state: 'hidden', timeout: 5000 })
+      await testPage.locator('.monaco-editor').waitFor({ state: 'hidden', timeout: 5000 })
       console.log('  Editor closed')
     } catch (err) {
       console.log('  ⚠️  Editor did not close within 5 seconds, continuing anyway...')
     }
 
-    console.log('  ✓ Edit HTML works')
+    console.log('  ✓ Edit HTML with Monaco works')
     await debugWait()
 
       console.log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Move up, Edit HTML)')
