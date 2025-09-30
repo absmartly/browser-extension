@@ -6,7 +6,7 @@
 export class Notifications {
   private currentNotification: HTMLElement | null = null
 
-  show(title: string, message: string = '', type: 'success' | 'error' | 'info' = 'info'): void {
+  show(title: string, message: string = '', type: 'success' | 'error' | 'info' | 'warning' = 'info'): void {
     // Remove existing notification
     this.remove()
 
@@ -62,12 +62,14 @@ export class Notifications {
     }
   }
 
-  private getBackgroundColor(type: 'success' | 'error' | 'info'): string {
+  private getBackgroundColor(type: 'success' | 'error' | 'info' | 'warning'): string {
     switch (type) {
       case 'success':
         return '#10b981'
       case 'error':
         return '#ef4444'
+      case 'warning':
+        return '#f59e0b'
       case 'info':
       default:
         return '#3b82f6'
