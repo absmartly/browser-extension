@@ -49,9 +49,8 @@ export const test = base.extend<ExtFixtures>({
 
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      // Note: Extensions may not work properly in headless mode
-      // If tests fail, try headless: false
-      headless: process.env.HEADLESS !== 'false',
+      // Always run with visible browser for extension testing
+      headless: false,
       args: [
         `--disable-extensions-except=${extPath}`,
         `--load-extension=${extPath}`
