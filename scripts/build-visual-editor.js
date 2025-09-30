@@ -25,9 +25,36 @@ try {
   }
 
   // Build the bundle
-  const buildCommand = `npx esbuild "${entryFile}" --bundle --outfile="${outputFile}" --format=iife --global-name=ABSmartlyVisualEditor --platform=browser --target=es2020 --minify-syntax --keep-names --external:chrome`;
+  // Check if PLASMO_PUBLIC_DISABLE_SHADOW_DOM is set and pass it to esbuild
+  const disableShadowDOM = process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM === 'true';
+
+  // Build the esbuild command with define flags
+  // We use '"\\\"true\\\""' to ensure esbuild replaces process.env.X with the STRING "true", not the boolean true
+  const defineFlags = disableShadowDOM
+    ? ['--define:process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM="\\"true\\""']
+    : [];
+
+  const buildCommand = [
+    'npx',
+    'esbuild',
+    `"${entryFile}"`,
+    '--bundle',
+    `--outfile="${outputFile}"`,
+    '--format=iife',
+    '--global-name=ABSmartlyVisualEditor',
+    '--platform=browser',
+    '--target=es2020',
+    '--minify-syntax',
+    '--keep-names',
+    '--external:chrome',
+    ...defineFlags
+  ].join(' ');
 
   console.log('[Visual Editor Build] Running esbuild...');
+  if (disableShadowDOM) {
+    console.log('[Visual Editor Build] Shadow DOM disabled for tests');
+    console.log('[Visual Editor Build] Define flags:', defineFlags);
+  }
   execSync(buildCommand, { stdio: 'inherit' });
 
   // Read the bundled output
