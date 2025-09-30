@@ -11,7 +11,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: [['html'], ['list']],
+  reporter: [['html', { open: process.env.SLOW === '1' ? 'always' : 'never' }], ['list']],
   use: {
     actionTimeout: 0,
     trace: 'on-first-retry',
