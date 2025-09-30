@@ -1121,69 +1121,85 @@
           return;
         }
 
-        // Check if ABsmartlyDOMChangesPlugin is available, if not load it from extension
-        if (typeof window.ABsmartlySDKPlugins === 'undefined') {
-          debugLog('[ABsmartly Extension] DOMChangesPlugin not found, loading from extension...');
+        // Check if plugins are available, if not load them from extension
+        if (typeof window.ABsmartlySDKPlugins === 'undefined' || typeof window.ABsmartlyExtensionPlugin === 'undefined') {
+          debugLog('[ABsmartly Extension] Plugins not found, loading from extension...');
 
           // Use the captured extension URL
           if (extensionBaseUrl) {
-            // Function to load plugin script with error handling
-            const loadPlugin = (filename, fallbackFilename) => {
-              // Add cache-busting parameter to force reload
-              const cacheBuster = '?v=' + Date.now();
-              const pluginUrl = extensionBaseUrl + filename + cacheBuster;
-              debugLog(`[ABsmartly Extension] Attempting to load plugin from: ${pluginUrl}`);
+            // Function to load plugin scripts with error handling
+            const loadPlugins = async () => {
+              try {
+                // Load SDK plugins (Lite version)
+                const sdkPluginUrl = extensionBaseUrl + 'absmartly-sdk-plugins.dev.js?v=' + Date.now();
+                debugLog(`[ABsmartly Extension] Loading SDK plugins from: ${sdkPluginUrl}`);
 
-              const script = document.createElement('script');
-              script.src = pluginUrl;
-              script.onload = () => {
-                debugLog(`[ABsmartly Extension] ${filename} loaded successfully`);
-                debugLog('[ABsmartly Extension] ABsmartlySDKPlugins object:', window.ABsmartlySDKPlugins);
-                debugLog('[ABsmartly Extension] Available properties:', Object.keys(window.ABsmartlySDKPlugins || {}));
+                await new Promise((resolve, reject) => {
+                  const script = document.createElement('script');
+                  script.src = sdkPluginUrl;
+                  script.onload = () => {
+                    debugLog('[ABsmartly Extension] SDK plugins loaded');
+                    resolve();
+                  };
+                  script.onerror = () => {
+                    debugError('[ABsmartly Extension] Failed to load SDK plugins');
+                    reject();
+                  };
+                  document.head.appendChild(script);
+                });
 
-                // The UMD bundle exposes ABsmartlySDKPlugins globally
-                // The plugin now exports both DOMChangesPlugin and OverridesPluginFull/OverridesPluginLite
-                if (window.ABsmartlySDKPlugins) {
-                  // Try to get OverridesPluginFull first (for extensions), fallback to OverridesPlugin
-                  const { DOMChangesPlugin, OverridesPluginFull, OverridesPlugin } = window.ABsmartlySDKPlugins;
-                  const OverridesClass = OverridesPluginFull || OverridesPlugin;
+                // Load Extension plugin wrapper
+                const extPluginUrl = extensionBaseUrl + 'absmartly-extension-plugin.dev.js?v=' + Date.now();
+                debugLog(`[ABsmartly Extension] Loading extension plugin from: ${extPluginUrl}`);
 
-                  if (DOMChangesPlugin && OverridesClass) {
-                    debugLog('[ABsmartly Extension] Plugin classes found, will initialize after config is received');
-                    debugLog('[ABsmartly Extension] Using:', OverridesPluginFull ? 'OverridesPluginFull' : 'OverridesPlugin');
-                    // Store classes for later initialization
-                    window.__absmartlyPluginClasses = { DOMChangesPlugin, OverridesClass };
+                await new Promise((resolve, reject) => {
+                  const script = document.createElement('script');
+                  script.src = extPluginUrl;
+                  script.onload = () => {
+                    debugLog('[ABsmartly Extension] Extension plugin loaded');
+                    resolve();
+                  };
+                  script.onerror = () => {
+                    debugError('[ABsmartly Extension] Failed to load extension plugin');
+                    reject();
+                  };
+                  document.head.appendChild(script);
+                });
+
+                // Verify plugins are loaded
+                if (window.ABsmartlySDKPlugins && window.ABsmartlyExtensionPlugin) {
+                  const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
+                  const { ExtensionDOMPlugin } = window.ABsmartlyExtensionPlugin;
+
+                  if (DOMChangesPluginLite && ExtensionDOMPlugin && OverridesPluginLite) {
+                    debugLog('[ABsmartly Extension] All plugin classes loaded successfully');
+                    window.__absmartlyPluginClasses = {
+                      DOMChangesPluginLite,
+                      ExtensionDOMPlugin,
+                      OverridesPluginLite
+                    };
                   } else {
-                    debugError('[ABsmartly Extension] Could not find required plugin classes in bundle');
-                    debugLog('[ABsmartly Extension] Available exports:', Object.keys(window.ABsmartlySDKPlugins));
+                    debugError('[ABsmartly Extension] Required plugin classes not found');
                   }
                 } else {
-                  debugError('[ABsmartly Extension] ABsmartlyDOMChangesPlugin not loaded');
+                  debugError('[ABsmartly Extension] Plugins not properly loaded');
                 }
-              };
-              script.onerror = () => {
-                debugError(`[ABsmartly Extension] Failed to load ${filename}`);
-                // Try fallback if provided
-                if (fallbackFilename) {
-                  debugLog(`[ABsmartly Extension] Trying fallback: ${fallbackFilename}`);
-                  loadPlugin(fallbackFilename);
-                }
-              };
-              document.head.appendChild(script);
+              } catch (error) {
+                debugError('[ABsmartly Extension] Error loading plugins:', error);
+              }
             };
 
-            // Try dev build first, fallback to production build
-            loadPlugin('absmartly-sdk-plugins.dev.js', 'absmartly-sdk-plugins.min.js');
-            return; // Wait for script to load
+            loadPlugins();
+            return; // Wait for scripts to load
           } else {
-            debugError('[ABsmartly Extension] Cannot determine extension URL to load plugin');
+            debugError('[ABsmartly Extension] Cannot determine extension URL to load plugins');
             return;
           }
         }
         
-        // If plugin is already available, initialize only if not already done by website
-        if (window.ABsmartlySDKPlugins) {
-          debugLog('[ABsmartly Extension] Plugin library already loaded by website');
+        // If plugins are already available, prepare for initialization
+        if (window.ABsmartlySDKPlugins && window.ABsmartlyExtensionPlugin) {
+          debugLog('[ABsmartly Extension] Plugin libraries already loaded');
 
           // Check if already initialized by the website
           if (context.__domPlugin && context.__domPlugin.initialized) {
@@ -1193,16 +1209,19 @@
             return;
           }
 
-          const { DOMChangesPlugin, OverridesPluginFull, OverridesPlugin } = window.ABsmartlySDKPlugins;
-          const OverridesClass = OverridesPluginFull || OverridesPlugin;
+          const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
+          const { ExtensionDOMPlugin } = window.ABsmartlyExtensionPlugin;
 
-          if (DOMChangesPlugin && OverridesClass) {
-            debugLog('[ABsmartly Extension] Initializing plugins with extension config');
+          if (DOMChangesPluginLite && ExtensionDOMPlugin && OverridesPluginLite) {
+            debugLog('[ABsmartly Extension] All plugin classes available, ready for initialization');
             // Store classes for initialization
-            window.__absmartlyPluginClasses = { DOMChangesPlugin, OverridesClass };
-            // Don't initialize here - wait for proper config
+            window.__absmartlyPluginClasses = {
+              DOMChangesPluginLite,
+              ExtensionDOMPlugin,
+              OverridesPluginLite
+            };
           } else {
-            debugError('[ABsmartly Extension] Plugin classes not found in ABsmartlyDOMChangesPlugin');
+            debugError('[ABsmartly Extension] Required plugin classes not found');
           }
         }
 
@@ -1227,22 +1246,18 @@
             }
           }
 
-          // Get plugin classes (stored during script load or from global)
-          const classes = window.__absmartlyPluginClasses || window.ABsmartlySDKPlugins || {};
-          let DOMChangesPlugin, OverridesClass;
+          // Get plugin classes (stored during script load)
+          const classes = window.__absmartlyPluginClasses;
 
-          if (window.__absmartlyPluginClasses) {
-            // Use stored classes
-            DOMChangesPlugin = classes.DOMChangesPlugin;
-            OverridesClass = classes.OverridesClass;
-          } else if (window.ABsmartlySDKPlugins) {
-            // Fallback to global exports
-            DOMChangesPlugin = classes.DOMChangesPlugin;
-            OverridesClass = classes.OverridesPluginFull || classes.OverridesPlugin;
+          if (!classes) {
+            debugError('[ABsmartly Extension] Plugin classes not available');
+            return;
           }
 
-          if (!DOMChangesPlugin || !OverridesClass) {
-            debugError('[ABsmartly Extension] Plugin classes not available');
+          const { DOMChangesPluginLite, ExtensionDOMPlugin, OverridesPluginLite } = classes;
+
+          if (!DOMChangesPluginLite || !ExtensionDOMPlugin || !OverridesPluginLite) {
+            debugError('[ABsmartly Extension] Required plugin classes not available');
             debugLog('[ABsmartly Extension] Available:', Object.keys(classes));
             return;
           }
@@ -1288,28 +1303,39 @@
               });
             }
 
-            const overridesPlugin = new OverridesClass(overridesConfig);
+            const overridesPlugin = new OverridesPluginLite(overridesConfig);
 
             // Apply overrides from cookies
             overridesPlugin.initialize().then(() => {
               debugLog('[ABsmartly Extension] OverridesPlugin initialized, overrides applied');
 
-              // STEP 2: Initialize DOMChangesPlugin SECOND (after overrides)
-              debugLog('[ABsmartly Extension] Initializing DOMChangesPlugin...');
-              const domPlugin = new DOMChangesPlugin({
+              // STEP 2: Initialize DOMChangesPluginLite (base plugin)
+              debugLog('[ABsmartly Extension] Initializing DOMChangesPluginLite...');
+              const baseDOMPlugin = new DOMChangesPluginLite({
                 context: context,
                 autoApply: true,
                 spa: true,
                 visibilityTracking: true,
-                extensionBridge: true,
                 dataSource: 'variable',
                 dataFieldName: '__dom_changes',
                 debug: DEBUG
               });
 
-              // Initialize DOM plugin
+              // STEP 3: Wrap with ExtensionDOMPlugin for extension features
+              debugLog('[ABsmartly Extension] Wrapping with ExtensionDOMPlugin...');
+              const domPlugin = new ExtensionDOMPlugin(baseDOMPlugin, {
+                context: context,
+                autoApply: true,
+                spa: true,
+                visibilityTracking: true,
+                dataSource: 'variable',
+                dataFieldName: '__dom_changes',
+                debug: DEBUG
+              });
+
+              // Initialize extension plugin
               domPlugin.initialize().then(() => {
-                debugLog('[ABsmartly Extension] DOMChangesPlugin initialized successfully');
+                debugLog('[ABsmartly Extension] ExtensionDOMPlugin initialized successfully');
 
                 // The plugin registers itself with context.__domPlugin
                 // We can verify it's registered
