@@ -51,7 +51,8 @@
   "manifest": {
     "host_permissions": [
       "https://*/*",
-      "http://*/*"
+      "http://*/*",
+      "file://*/*"
     ],
     "permissions": [
       "storage",

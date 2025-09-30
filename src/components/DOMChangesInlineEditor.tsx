@@ -1735,7 +1735,7 @@ export function DOMChangesInlineEditor({
     chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
       debugLog('PING response:', response)
     })
-    
+
     chrome.runtime.sendMessage({
       type: 'START_VISUAL_EDITOR',
       variantName,
