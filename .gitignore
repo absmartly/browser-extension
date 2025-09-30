@@ -5,7 +5,7 @@
 .mcp.json.bk
 .mcp.json
 
-public/absmartly-dom-changes.min.js
+public/*.{min,dev}.js
 react.production.min.js
 playwright-report/
 playwright-report/index.html
