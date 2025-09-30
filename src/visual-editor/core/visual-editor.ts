@@ -22,6 +22,7 @@ export interface VisualEditorOptions {
   logoUrl: string
   onChangesUpdate: (changes: DOMChange[]) => void
   initialChanges?: DOMChange[]
+  useShadowDOM?: boolean  // Use shadow DOM for context menu (default: true)
 }
 
 export class VisualEditor {
@@ -66,7 +67,7 @@ export class VisualEditor {
 
     // Initialize all core modules (required by EditorCoordinator)
     this.eventHandlers = new EventHandlers(this.stateManager)
-    this.contextMenu = new ContextMenu(this.stateManager)
+    this.contextMenu = new ContextMenu(this.stateManager, options.useShadowDOM)
     this.changeTracker = new ChangeTracker(this.stateManager)
     this.uiComponents = new UIComponents(this.stateManager)
     this.editModes = new EditModes(this.stateManager)
