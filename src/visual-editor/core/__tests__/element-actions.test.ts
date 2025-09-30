@@ -558,54 +558,6 @@ describe('ElementActions', () => {
 
   // Undo/Redo tests removed - functionality now uses undo stack which is tested in state-manager and integration tests
 
-  describe('Change Management - Undo', () => {
-    it.skip('should undo last change', () => {
-      // Setup some changes
-      const changes: DOMChange[] = [
-        { selector: '#test1', type: 'style', value: { color: 'red' }, enabled: true },
-        { selector: '#test2', type: 'style', value: { color: 'blue' }, enabled: true }
-      ]
-
-      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
-      stateChangeCallback({
-        ...mockStateManager.getState(),
-        changes
-      })
-
-      elementActions.undoLastChange()
-
-      expect(mockStateManager.setChanges).toHaveBeenCalledWith([
-        { selector: '#test1', type: 'style', value: { color: 'red' }, enabled: true }
-      ])
-      expect(mockOptions.onChangesUpdate).toHaveBeenCalled()
-      expect(mockNotifications.show).toHaveBeenCalledWith(
-        'Last change undone',
-        '',
-        'success'
-      )
-    })
-
-    it.skip('should not undo when no changes exist', () => {
-      elementActions.undoLastChange()
-
-      expect(mockStateManager.setChanges).not.toHaveBeenCalled()
-      expect(mockOptions.onChangesUpdate).not.toHaveBeenCalled()
-      expect(mockNotifications.show).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('Change Management - Redo', () => {
-    it.skip('should show placeholder notification for redo', () => {
-      elementActions.redoChange()
-
-      expect(mockNotifications.show).toHaveBeenCalledWith(
-        'Redo: Coming soon!',
-        '',
-        'info'
-      )
-    })
-  })
-
   describe('Clear All Changes', () => {
     it('should clear all changes when confirmed', () => {
       // Setup some changes
