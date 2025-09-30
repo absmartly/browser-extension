@@ -4,11 +4,12 @@
  */
 
 import StateManager from '../core/state-manager'
+import * as monaco from 'monaco-editor'
 
 export class HtmlEditor {
   private stateManager: StateManager
   private editorHost: HTMLElement | null = null
-  private monacoEditor: any = null
+  private monacoEditor: monaco.editor.IStandaloneCodeEditor | null = null
   private editorLoaded: boolean = false
   private useShadowDOM: boolean
   private editorShadowRoot: ShadowRoot | null = null
@@ -19,67 +20,19 @@ export class HtmlEditor {
     const urlParams = new URLSearchParams(window.location.search)
     const shadowDOMParam = urlParams.get('use_shadow_dom_for_visual_editor_context_menu')
     this.useShadowDOM = shadowDOMParam !== '0'
-    // Don't load Monaco on construction - only load when needed
   }
 
   private async loadMonacoIfNeeded(): Promise<void> {
-    // Check if Monaco loader is already available
-    if ((window as any).monaco) {
-      this.editorLoaded = true
+    if (this.editorLoaded) {
       return
     }
 
-    // For now, use a simple textarea fallback instead of Monaco
-    // Monaco requires loading from CDN which violates CSP
-    // TODO: Bundle Monaco locally or use alternative code editor
-    console.log('[HtmlEditor] Using fallback editor (Monaco CDN blocked by CSP)')
+    // Monaco is now bundled, so we can use it directly
+    console.log('[HtmlEditor] Monaco editor ready')
     this.editorLoaded = true
     return
   }
 
-  private configureMonaco(): void {
-    const monaco = (window as any).monaco
-
-    // Register HTML completions
-    monaco.languages.registerCompletionItemProvider('html', {
-      provideCompletionItems: (model: any, position: any) => {
-        const word = model.getWordUntilPosition(position)
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: word.startColumn,
-          endColumn: word.endColumn
-        }
-
-        const suggestions = [
-          // Common HTML tags
-          ...['div', 'span', 'p', 'a', 'button', 'input', 'form', 'img', 'video', 'audio',
-              'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'footer', 'nav', 'main',
-              'section', 'article', 'aside', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'].map(tag => ({
-            label: tag,
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: `<${tag}>$0</${tag}>`,
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: `HTML <${tag}> element`,
-            range: range
-          })),
-
-          // Common attributes
-          ...['class', 'id', 'style', 'href', 'src', 'alt', 'title', 'type', 'value',
-              'placeholder', 'name', 'for', 'data-', 'aria-label', 'role'].map(attr => ({
-            label: attr,
-            kind: monaco.languages.CompletionItemKind.Property,
-            insertText: `${attr}="$0"`,
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: `HTML ${attr} attribute`,
-            range: range
-          }))
-        ]
-
-        return { suggestions }
-      }
-    })
-  }
 
   async show(element: Element, currentHtml: string): Promise<string | null> {
     // Load editor on-demand when show() is called
@@ -240,92 +193,71 @@ export class HtmlEditor {
 
       document.body.appendChild(this.editorHost)
 
-      // Use fallback textarea editor instead of Monaco
+      // Create Monaco editor
       setTimeout(() => {
-        // Create textarea inside the shadow DOM editor container
-        const textarea = document.createElement('textarea')
-        textarea.id = 'absmartly-html-textarea'
-        textarea.value = this.formatHtml(currentHtml)
-        textarea.style.cssText = `
-          width: 100%;
-          height: 100%;
-          background: #1e1e1e;
-          color: #d4d4d4;
-          border: 1px solid #3e3e42;
-          border-radius: 4px;
-          padding: 10px;
-          font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
-          font-size: 14px;
-          line-height: 1.5;
-          resize: none;
-          outline: none;
-        `
+        // Create Monaco editor instance
+        this.monacoEditor = monaco.editor.create(editorContainer, {
+          value: this.formatHtml(currentHtml),
+          language: 'html',
+          theme: 'vs-dark',
+          automaticLayout: true,
+          minimap: { enabled: false },
+          fontSize: 14,
+          lineNumbers: 'on',
+          wordWrap: 'on',
+          formatOnPaste: true,
+          formatOnType: true,
+          scrollBeyondLastLine: false,
+          renderLineHighlight: 'all',
+          folding: true,
+          glyphMargin: true,
+        })
 
-        editorContainer.appendChild(textarea)
-
-        // Store reference to textarea as our "editor"
-        this.monacoEditor = {
-          getValue: () => textarea.value,
-          getSelection: () => ({
-            startLineNumber: 0,
-            startColumn: textarea.selectionStart,
-            endLineNumber: 0,
-            endColumn: textarea.selectionEnd
-          }),
-          getModel: () => ({
-            getValueInRange: () => textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
-          }),
-          executeEdits: (_: any, edits: any[]) => {
-            edits.forEach(edit => {
-              const start = textarea.selectionStart
-              const end = textarea.selectionEnd
-              const before = textarea.value.substring(0, start)
-              const after = textarea.value.substring(end)
-              textarea.value = before + edit.text + after
-            })
-          },
-          getAction: () => null,
-          dispose: () => {}
-        }
-
-        // Focus the textarea
-        textarea.focus()
+        // Focus the editor
+        this.monacoEditor.focus()
       }, 10)
 
       // Handle button clicks
       formatBtn.addEventListener('click', () => {
-        // Format HTML in the textarea
-        const textarea = editorShadow.getElementById('absmartly-html-textarea') as HTMLTextAreaElement
-        if (textarea) {
-          textarea.value = this.formatHtml(textarea.value)
+        if (this.monacoEditor) {
+          const currentValue = this.monacoEditor.getValue()
+          const formatted = this.formatHtml(currentValue)
+          this.monacoEditor.setValue(formatted)
         }
       })
 
       wrapBtn.addEventListener('click', () => {
-        const selection = this.monacoEditor?.getSelection()
-        if (selection) {
-          const selectedText = this.monacoEditor.getModel().getValueInRange(selection)
-          const wrappedText = `<div>\n  ${selectedText}\n</div>`
-          this.monacoEditor.executeEdits('', [{
-            range: selection,
-            text: wrappedText,
-            forceMoveMarkers: true
-          }])
+        if (this.monacoEditor) {
+          const selection = this.monacoEditor.getSelection()
+          if (selection) {
+            const model = this.monacoEditor.getModel()
+            if (model) {
+              const selectedText = model.getValueInRange(selection)
+              const wrappedText = `<div>\n  ${selectedText}\n</div>`
+              this.monacoEditor.executeEdits('', [{
+                range: selection,
+                text: wrappedText,
+                forceMoveMarkers: true
+              }])
+            }
+          }
         }
       })
 
       previewBtn.addEventListener('click', () => {
-        const newHtml = this.monacoEditor?.getValue() || ''
-        // Temporarily update the element to show preview
-        const originalHtml = element.innerHTML
-        element.innerHTML = newHtml
+        if (this.monacoEditor) {
+          const newHtml = this.monacoEditor.getValue()
+          // Temporarily update the element to show preview
+          const originalHtml = element.innerHTML
+          element.innerHTML = newHtml
 
-        setTimeout(() => {
-          const shouldKeep = confirm('Keep these changes?')
-          if (!shouldKeep) {
-            element.innerHTML = originalHtml
-          }
-        }, 100)
+          setTimeout(() => {
+            const shouldKeep = confirm('Keep these changes?')
+            if (!shouldKeep) {
+              element.innerHTML = originalHtml
+            }
+          }, 100)
+        }
       })
 
       cancelBtn.addEventListener('click', (e) => {
