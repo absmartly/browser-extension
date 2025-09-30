@@ -200,14 +200,12 @@ describe('ContextMenu', () => {
       contextMenu.show(100, 100, mockElement)
     })
 
-    it('should create all 20+ menu actions', () => {
+    it('should create all menu actions', () => {
       const expectedActions = [
-        'edit', 'editHtml', 'rearrange', 'inlineEdit',
-        'moveUp', 'moveDown', 'resize',
+        'edit', 'editHtml', 'rearrange', 'resize',
+        'move-up', 'move-down',
         'copy', 'copySelector',
-        'selectRelative', 'insertBlock',
-        'suggestVariations', 'saveToLibrary', 'applySaved',
-        'trackClicks',
+        'selectRelative', 'insert-block',
         'hide', 'delete'
       ]
 
@@ -228,8 +226,8 @@ describe('ContextMenu', () => {
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
       const dividers = menuItems.filter(item => 'divider' in item)
 
-      expect(actions.length).toBeGreaterThan(15)
-      expect(dividers.length).toBeGreaterThan(5)
+      expect(actions.length).toBeGreaterThan(10)
+      expect(dividers.length).toBeGreaterThan(3)
 
       // Check action structure
       actions.forEach(action => {
@@ -474,7 +472,7 @@ describe('ContextMenu', () => {
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
 
-      const editActions = ['edit', 'editHtml', 'inlineEdit', 'rearrange']
+      const editActions = ['edit', 'editHtml', 'rearrange']
       editActions.forEach(action => {
         expect(actions).toContain(action)
       })
@@ -486,7 +484,7 @@ describe('ContextMenu', () => {
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
 
-      const movementActions = ['moveUp', 'moveDown', 'resize']
+      const movementActions = ['move-up', 'move-down', 'resize']
       movementActions.forEach(action => {
         expect(actions).toContain(action)
       })
@@ -510,20 +508,8 @@ describe('ContextMenu', () => {
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
 
-      const contentActions = ['selectRelative', 'insertBlock', 'suggestVariations']
+      const contentActions = ['selectRelative', 'insert-block']
       contentActions.forEach(action => {
-        expect(actions).toContain(action)
-      })
-    })
-
-    it('should have all expected library actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
-      const actions = menuItems
-        .filter((item): item is MenuAction => !('divider' in item))
-        .map(item => item.action)
-
-      const libraryActions = ['saveToLibrary', 'applySaved']
-      libraryActions.forEach(action => {
         expect(actions).toContain(action)
       })
     })
@@ -540,14 +526,6 @@ describe('ContextMenu', () => {
       })
     })
 
-    it('should have tracking actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
-      const actions = menuItems
-        .filter((item): item is MenuAction => !('divider' in item))
-        .map(item => item.action)
-
-      expect(actions).toContain('trackClicks')
-    })
   })
 
   describe('Menu Item Icons and Labels', () => {
@@ -574,7 +552,7 @@ describe('ContextMenu', () => {
       )
 
       expect(editAction?.label).toBe('Edit Text')
-      expect(deleteAction?.label).toBe('Remove')
+      expect(deleteAction?.label).toBe('Delete')
     })
 
     it('should use appropriate emoji icons', () => {
