@@ -11,20 +11,29 @@ async function globalSetup(config: FullConfig) {
   const manifestPath = path.join(buildDir, 'manifest.json')
 
   // 1. Check if extension needs to be built
-  if (!fs.existsSync(manifestPath)) {
+  // Always rebuild the visual editor bundle with test flag for accurate testing
+  const visualEditorBundle = path.join(rootDir, '..', 'absmartly-visual-editor-bundles', 'visual-editor-injection.bundle')
+  const needsRebuild = !fs.existsSync(manifestPath) || !fs.existsSync(visualEditorBundle)
+
+  if (needsRebuild) {
     console.log('📦 Extension not built. Building now...')
     try {
+      // Set environment variable to disable shadow DOM for tests
+      process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM = 'true'
+
       execSync('npm run build', {
         cwd: rootDir,
-        stdio: 'inherit'
+        stdio: 'inherit',
+        env: { ...process.env, PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true' }
       })
-      console.log('✅ Extension built successfully')
+      console.log('✅ Extension built successfully (with shadow DOM disabled for tests)')
     } catch (error) {
       console.error('❌ Failed to build extension:', error)
       throw new Error('Extension build failed. Please fix build errors and try again.')
     }
   } else {
     console.log('✅ Extension already built')
+    console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.')
   }
 
   // 2. Copy test files to build directory

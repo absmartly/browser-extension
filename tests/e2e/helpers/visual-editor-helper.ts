@@ -13,12 +13,13 @@ export class VisualEditorHelper {
    * Load a test page with proper setup
    */
   async loadTestPage(htmlContent?: string) {
+    const queryParam = '?use_shadow_dom_for_visual_editor_context_menu=0'
     if (htmlContent) {
-      await this.page.goto(`data:text/html,${encodeURIComponent(htmlContent)}`)
+      await this.page.goto(`data:text/html,${encodeURIComponent(htmlContent)}${queryParam}`)
     } else {
       // Try localhost server first
       try {
-        await this.page.goto('http://localhost:8000/tests/test-pages/monaco-editor-test.html', {
+        await this.page.goto(`http://localhost:8000/tests/test-pages/monaco-editor-test.html${queryParam}`, {
           waitUntil: 'domcontentloaded',
           timeout: 5000
         })
@@ -27,7 +28,7 @@ export class VisualEditorHelper {
         const testPagePath = path.join(__dirname, '../../../tests/test-pages/monaco-editor-test.html')
         if (fs.existsSync(testPagePath)) {
           const content = fs.readFileSync(testPagePath, 'utf-8')
-          await this.page.goto(`data:text/html,${encodeURIComponent(content)}`)
+          await this.page.goto(`data:text/html,${encodeURIComponent(content)}${queryParam}`)
         } else {
           // Use a simple default test page
           const defaultHTML = `
@@ -42,7 +43,7 @@ export class VisualEditorHelper {
             </body>
             </html>
           `
-          await this.page.goto(`data:text/html,${encodeURIComponent(defaultHTML)}`)
+          await this.page.goto(`data:text/html,${encodeURIComponent(defaultHTML)}${queryParam}`)
         }
       }
     }
