@@ -726,12 +726,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           debugLog('Forwarding START_VISUAL_EDITOR to content script...')
 
           try {
+            // Check if test mode is enabled on the page
+            let isTestMode = false
+            try {
+              debugLog('🔍 Checking for test mode flag on page...')
+              const results = await chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => {
+                  const testMode = (window as any).__absmartlyTestMode
+                  console.log('🔍 [Background Script Check] __absmartlyTestMode =', testMode)
+                  return testMode === true
+                }
+              })
+              debugLog('🔍 Test mode check results:', results)
+              isTestMode = results?.[0]?.result === true
+              debugLog('🧪 Test mode detected:', isTestMode)
+            } catch (e) {
+              debugWarn('Could not check for test mode:', e)
+            }
+
+            debugLog('📤 Sending START_VISUAL_EDITOR to content script with useShadowDOM:', !isTestMode)
+
             // First, send message to content script to setup UI
             const response = await chrome.tabs.sendMessage(tabId, {
               type: 'START_VISUAL_EDITOR',
               variantName: message.variantName,
               experimentName: message.experimentName,
-              changes: message.changes
+              changes: message.changes,
+              useShadowDOM: !isTestMode  // Disable shadow DOM in test mode
             })
 
             debugLog('Content script response:', response)

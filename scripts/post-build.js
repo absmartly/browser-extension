@@ -7,7 +7,10 @@ const { execSync } = require('child_process');
 // Build the visual editor first
 console.log('Building visual editor...');
 try {
-  execSync('node scripts/build-visual-editor.js', { stdio: 'inherit' });
+  execSync('node scripts/build-visual-editor.js', {
+    stdio: 'inherit',
+    env: process.env  // Pass through all environment variables including PLASMO_PUBLIC_DISABLE_SHADOW_DOM
+  });
 } catch (error) {
   console.error('Failed to build visual editor:', error);
 }

@@ -28,6 +28,73 @@ initializeOverrides().then(overrides => {
   debugWarn('[Content Script] Failed to initialize overrides:', error)
 })
 
+/**
+ * Start the visual editor with the given configuration
+ * Shared logic used by both chrome.runtime messages and test messages
+ */
+async function startVisualEditor(config: {
+  variantName: string
+  experimentName?: string
+  changes?: DOMChange[]
+  useShadowDOM?: boolean
+}): Promise<{ success: boolean; error?: string }> {
+  debugLog('[Visual Editor Content Script] Starting visual editor with variant:', config.variantName)
+
+  await ensureSDKPluginInjected()
+
+  try {
+    // Stop any existing editor
+    if (currentEditor) {
+      currentEditor.destroy()
+      currentEditor = null
+    }
+
+    // Mark visual editor as active BEFORE starting
+    isVisualEditorActive = true
+    isVisualEditorStarting = false
+
+    // Get the extension URL for the logo
+    const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
+
+    // Use shadow DOM by default, unless explicitly disabled (for testing)
+    const useShadowDOM = config.useShadowDOM !== false
+    debugLog('[Visual Editor Content Script] Use Shadow DOM:', useShadowDOM)
+
+    // Create and start new editor
+    currentEditor = new VisualEditor({
+      variantName: config.variantName,
+      experimentName: config.experimentName,
+      logoUrl: logoUrl,
+      initialChanges: config.changes || [],
+      useShadowDOM: useShadowDOM,
+      onChangesUpdate: (changes: DOMChange[]) => {
+        debugLog('[Visual Editor Content Script] Changes updated:', changes)
+        // Send changes back to extension
+        chrome.runtime.sendMessage({
+          type: 'VISUAL_EDITOR_CHANGES',
+          variantName: config.variantName,
+          changes: changes
+        })
+      }
+    })
+
+    const result = currentEditor.start()
+    debugLog('[Visual Editor Content Script] Visual editor start result:', result)
+
+    if (!result.success) {
+      throw new Error('Visual editor failed to start')
+    }
+
+    debugLog('[Visual Editor Content Script] Visual editor started successfully')
+    return { success: true }
+  } catch (error) {
+    debugError('[Visual Editor Content Script] Error starting visual editor:', error)
+    console.error('[Visual Editor Content Script] Full error:', error)
+    isVisualEditorActive = false
+    return { success: false, error: error.message }
+  }
+}
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   debugLog('[Visual Editor Content Script] Received message:', message.type)
@@ -82,59 +149,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'START_VISUAL_EDITOR') {
-    debugLog('[Visual Editor Content Script] Starting visual editor with variant:', message.variantName)
-
-    // Ensure SDK plugin is injected before starting visual editor
-    ;(async () => {
-      await ensureSDKPluginInjected()
-
-      try {
-      // Stop any existing editor
-      if (currentEditor) {
-        currentEditor.destroy()
-        currentEditor = null
-      }
-
-      // Mark visual editor as active BEFORE starting
-      isVisualEditorActive = true
-      isVisualEditorStarting = false
-
-      // Get the extension URL for the logo
-      const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
-
-      // Create and start new editor
-      currentEditor = new VisualEditor({
-        variantName: message.variantName,
-        experimentName: message.experimentName,
-        logoUrl: logoUrl,
-        initialChanges: message.changes || [],
-        onChangesUpdate: (changes: DOMChange[]) => {
-          debugLog('[Visual Editor Content Script] Changes updated:', changes)
-          // Send changes back to extension
-          chrome.runtime.sendMessage({
-            type: 'VISUAL_EDITOR_CHANGES',
-            variantName: message.variantName,
-            changes: changes
-          })
-        }
-      })
-
-      const result = currentEditor.start()
-      debugLog('[Visual Editor Content Script] Visual editor start result:', result)
-
-      if (!result.success) {
-        throw new Error('Visual editor failed to start')
-      }
-
-      sendResponse({ success: true })
-      debugLog('[Visual Editor Content Script] Visual editor started successfully')
-    } catch (error) {
-      debugError('[Visual Editor Content Script] Error starting visual editor:', error)
-      console.error('[Visual Editor Content Script] Full error:', error)
-      isVisualEditorActive = false
-        sendResponse({ success: false, error: error.message })
-      }
-    })()
+    // Use shared start function
+    startVisualEditor({
+      variantName: message.variantName,
+      experimentName: message.experimentName,
+      changes: message.changes,
+      useShadowDOM: message.useShadowDOM
+    }).then(result => {
+      sendResponse(result)
+    })
 
     return true // Keep message channel open for async response
   }
@@ -255,10 +278,67 @@ document.documentElement.appendChild(debugDiv)
 // Send a message to the page to confirm we're loaded
 window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '*')
 
-// Listen for messages from the visual editor
+// Listen for messages from the visual editor and test messages
 window.addEventListener('message', (event) => {
   // Only handle messages from the same origin
   if (event.source !== window) return
+
+  // Handle test messages for programmatic sidebar control
+  if (event.data.source === 'absmartly-tests') {
+    if (event.data.type === 'TEST_OPEN_SIDEBAR') {
+      debugLog('[Content Script] Received TEST_OPEN_SIDEBAR from tests')
+      // Simulate opening the sidebar - in reality, this would be triggered by the extension
+      // For tests, we just confirm the message was received
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'TEST_SIDEBAR_RESULT',
+        success: true,
+        message: 'Sidebar open message received'
+      }, '*')
+      return
+    }
+
+    if (event.data.type === 'TEST_CLOSE_SIDEBAR') {
+      debugLog('[Content Script] Received TEST_CLOSE_SIDEBAR from tests')
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'TEST_SIDEBAR_RESULT',
+        success: true,
+        message: 'Sidebar close message received'
+      }, '*')
+      return
+    }
+
+    if (event.data.type === 'TEST_START_VISUAL_EDITOR') {
+      debugLog('[Content Script] Received TEST_START_VISUAL_EDITOR from tests')
+      // Use shared start function directly
+      startVisualEditor({
+        variantName: event.data.variantName || 'test-variant',
+        experimentName: event.data.experimentName,
+        changes: event.data.changes || []
+      }).then(result => {
+        window.postMessage({
+          source: 'absmartly-extension',
+          type: 'TEST_SIDEBAR_RESULT',
+          success: result.success,
+          message: result.success ? 'Visual editor started' : `Failed: ${result.error}`
+        }, '*')
+      })
+      return
+    }
+
+    if (event.data.type === 'TEST_STATUS') {
+      debugLog('[Content Script] Received TEST_STATUS from tests')
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'TEST_SIDEBAR_RESULT',
+        success: true,
+        active: isVisualEditorActive,
+        changes: currentEditor?.getChanges() || []
+      }, '*')
+      return
+    }
+  }
 
   if (event.data.type === 'ABSMARTLY_VISUAL_EDITOR_EXIT') {
     debugLog('[Visual Editor Content Script] Received EXIT message from visual editor')
