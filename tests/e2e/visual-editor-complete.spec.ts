@@ -70,8 +70,8 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    // STEP 1: Inject sidebar using the extension's own injection mechanism
-    console.log('\n📂 STEP 1: Injecting sidebar')
+    await test.step('Inject sidebar', async () => {
+      console.log('\n📂 STEP 1: Injecting sidebar')
     await testPage.evaluate((extUrl) => {
       console.log('🔵 ABSmartly Extension Test: Injecting sidebar')
 
@@ -123,15 +123,18 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('🔵 ABSmartly Extension Test: Sidebar injected successfully')
     }, extensionUrl('tabs/sidebar.html'))
 
+      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+
+      // Wait for sidebar iframe to be ready
+      await sidebar.locator('body').waitFor({ timeout: 10000 })
+      console.log('✅ Sidebar visible')
+      await debugWait()
+    })
+
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
-    // Wait for sidebar iframe to be ready
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
-    console.log('✅ Sidebar visible')
-    await debugWait()
-
-    // STEP 2: Create new experiment
-    console.log('\n📋 STEP 2: Creating new experiment')
+    await test.step('Create new experiment', async () => {
+      console.log('\n📋 STEP 2: Creating new experiment')
 
     // Click the plus icon button with title="Create New Experiment"
     await sidebar.locator('button[title="Create New Experiment"]').click()
@@ -143,21 +146,23 @@ test.describe('Visual Editor Complete Workflow', () => {
     await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
     console.log(`  Filled experiment name: ${experimentName}`)
 
-    console.log('✅ Experiment form filled')
-    await debugWait()
+      console.log('✅ Experiment form filled')
+      await debugWait()
+    })
 
-    // STEP 3: Click "Visual Editor" button (will send useShadowDOM: false in test mode)
-    console.log('\n🎨 STEP 3: Clicking Visual Editor button')
+    await test.step('Activate Visual Editor', async () => {
+      console.log('\n🎨 STEP 3: Clicking Visual Editor button')
     const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
     await visualEditorButton.click()
 
     // Wait for visual editor notification to appear
-    await testPage.locator('.absmartly-notification:has-text("Visual Editor Active")').waitFor({ state: 'visible', timeout: 10000 })
-    console.log('✅ Visual editor active')
-    await debugWait()
+      await testPage.locator('.absmartly-notification:has-text("Visual Editor Active")').waitFor({ state: 'visible', timeout: 10000 })
+      console.log('✅ Visual editor active')
+      await debugWait()
+    })
 
-    // STEP 4: Test context menu actions on actual page elements
-    console.log('\n🧪 STEP 4: Testing visual editor context menu actions')
+    await test.step('Test visual editor actions', async () => {
+      console.log('\n🧪 STEP 4: Testing visual editor context menu actions')
 
     // Action 1: Edit Text on paragraph
     console.log('  Testing: Edit Text on #test-paragraph')
@@ -242,11 +247,12 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Edit HTML works')
     await debugWait()
 
-    console.log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Move up, Edit HTML)')
-    await debugWait()
+      console.log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Move up, Edit HTML)')
+      await debugWait()
+    })
 
-    // STEP 5: Click Save button in visual editor header
-    console.log('\n💾 STEP 5: Clicking Save button...')
+    await test.step('Save changes to sidebar', async () => {
+      console.log('\n💾 STEP 5: Clicking Save button...')
 
     // With use_shadow_dom_for_visual_editor_context_menu=0, the banner is not in shadow DOM
     // So we can click it directly
@@ -256,10 +262,11 @@ test.describe('Visual Editor Complete Workflow', () => {
     } catch (err) {
       console.log('⚠️  Save button not found or not clickable within 5 seconds')
     }
-    await debugWait()
+      await debugWait()
+    })
 
-    // STEP 6: Verify changes appear in sidebar
-    console.log('\n📝 STEP 6: Verifying changes in sidebar...')
+    await test.step('Verify changes in sidebar', async () => {
+      console.log('\n📝 STEP 6: Verifying changes in sidebar...')
 
     // Wait for DOM change cards to appear in the sidebar
     // The changes are displayed as cards, not in a Monaco editor
@@ -326,11 +333,12 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  • Edit HTML - Modified heading HTML')
     console.log('  • Save to sidebar - Changes synced to DOM editor')
 
-    // Wait 30 seconds at the end in slow mode to inspect the result
-    if (SLOW_MODE) {
-      console.log('\n⏳ Slow mode: Waiting 30 seconds before test completion...')
-      await debugWait(30000)
-      console.log('✅ Slow wait complete')
-    }
+      // Wait 30 seconds at the end in slow mode to inspect the result
+      if (SLOW_MODE) {
+        console.log('\n⏳ Slow mode: Waiting 30 seconds before test completion...')
+        await debugWait(30000)
+        console.log('✅ Slow wait complete')
+      }
+    })
   })
 })
