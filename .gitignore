@@ -55,3 +55,11 @@ visual-editor-*.png
 tests/e2e/*-mock.spec.ts
 tests/e2e/*-real.spec.ts
 tests/e2e/*-temp.spec.ts
+
+# Debug screenshots and test artifacts
+after-*.png
+before-*.png
+menu-*.png
+tests/e2e/menu-*.png
+tests/e2e/after-*.png
+tests/e2e/before-*.png
