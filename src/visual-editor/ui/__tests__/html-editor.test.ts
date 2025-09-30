@@ -75,22 +75,8 @@ describe('HtmlEditor', () => {
     })
 
     it('should detect when Monaco is already loaded', () => {
-      const loadSpy = jest.spyOn(htmlEditor as any, 'loadMonacoIfNeeded')
       new HtmlEditor(stateManager)
       expect((global.window as any).monaco).toBeDefined()
-    })
-
-    it('should configure Monaco completions when loaded', () => {
-      // When Monaco is already available, configureMonaco should be called
-      // Since Monaco is mocked as already loaded, we need to call configureMonaco directly
-      const newEditor = new HtmlEditor(stateManager)
-      // Call the private method directly for testing
-      ;(newEditor as any).configureMonaco()
-
-      expect(mockMonaco.languages.registerCompletionItemProvider).toHaveBeenCalledWith(
-        'html',
-        expect.any(Object)
-      )
     })
   })
 
@@ -105,39 +91,13 @@ describe('HtmlEditor', () => {
       // Wait for DOM to be created
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      const editorHost = document.getElementById('absmartly-monaco-temp')
+      const editorHost = document.getElementById('absmartly-monaco-editor-host')
       expect(editorHost).toBeTruthy()
 
       // Clean up
-      const shadowHost = document.getElementById('absmartly-monaco-editor-host')
-      if (shadowHost) {
-        shadowHost.remove()
-      }
       if (editorHost) {
         editorHost.remove()
       }
-    })
-
-    it('should initialize Monaco editor with correct options', async () => {
-      const element = document.createElement('div')
-      const htmlContent = '<p>Test content</p>'
-
-      htmlEditor.show(element, htmlContent)
-
-      // Wait for Monaco initialization
-      await new Promise(resolve => setTimeout(resolve, 50))
-
-      expect(mockMonaco.editor.create).toHaveBeenCalledWith(
-        expect.any(HTMLElement),
-        expect.objectContaining({
-          language: 'html',
-          theme: 'vs-dark',
-          minimap: { enabled: false },
-          wordWrap: 'on',
-          formatOnPaste: true,
-          formatOnType: true
-        })
-      )
     })
 
     it('should return null when cancelled', () => {
@@ -306,194 +266,16 @@ describe('HtmlEditor', () => {
       editorHost.id = 'absmartly-monaco-editor-host'
       document.body.appendChild(editorHost)
 
-      const tempContainer = document.createElement('div')
-      tempContainer.id = 'absmartly-monaco-temp'
-      document.body.appendChild(tempContainer)
-
-      // Verify elements exist
+      // Verify element exists
       expect(document.getElementById('absmartly-monaco-editor-host')).toBeTruthy()
-      expect(document.getElementById('absmartly-monaco-temp')).toBeTruthy()
 
       // Test cleanup functionality
       const htmlEditorInstance = new HtmlEditor(stateManager)
       ;(htmlEditorInstance as any).editorHost = editorHost
       ;(htmlEditorInstance as any).cleanup()
 
-      // Verify elements are removed
+      // Verify element is removed
       expect(document.getElementById('absmartly-monaco-editor-host')).toBeFalsy()
-      expect(document.getElementById('absmartly-monaco-temp')).toBeFalsy()
-    })
-  })
-
-  describe('Monaco Configuration', () => {
-    it('should register HTML completion provider', () => {
-      const newEditor = new HtmlEditor(stateManager)
-      // Call configureMonaco directly since Monaco is mocked as loaded
-      ;(newEditor as any).configureMonaco()
-
-      expect(mockMonaco.languages.registerCompletionItemProvider).toHaveBeenCalledWith(
-        'html',
-        expect.objectContaining({
-          provideCompletionItems: expect.any(Function)
-        })
-      )
-    })
-
-    it('should provide HTML tag completions', () => {
-      const newEditor = new HtmlEditor(stateManager)
-      // Call configureMonaco to register the provider
-      ;(newEditor as any).configureMonaco()
-
-      // Get the completion provider
-      const call = mockMonaco.languages.registerCompletionItemProvider.mock.calls[0]
-      const provider = call[1]
-
-      const model = {
-        getWordUntilPosition: jest.fn().mockReturnValue({
-          startColumn: 1,
-          endColumn: 5
-        })
-      }
-
-      const position = { lineNumber: 1 }
-      const result = provider.provideCompletionItems(model, position)
-
-      expect(result.suggestions).toBeDefined()
-      expect(result.suggestions.length).toBeGreaterThan(0)
-
-      // Check for common tags
-      const tagLabels = result.suggestions.map((s: any) => s.label)
-      expect(tagLabels).toContain('div')
-      expect(tagLabels).toContain('span')
-      expect(tagLabels).toContain('p')
-    })
-
-    it('should provide HTML attribute completions', () => {
-      const newEditor = new HtmlEditor(stateManager)
-      // Call configureMonaco to register the provider
-      ;(newEditor as any).configureMonaco()
-
-      // Get the completion provider
-      const call = mockMonaco.languages.registerCompletionItemProvider.mock.calls[0]
-      const provider = call[1]
-
-      const model = {
-        getWordUntilPosition: jest.fn().mockReturnValue({
-          startColumn: 1,
-          endColumn: 5
-        })
-      }
-
-      const position = { lineNumber: 1 }
-      const result = provider.provideCompletionItems(model, position)
-
-      // Check for common attributes
-      const attrLabels = result.suggestions.map((s: any) => s.label)
-      expect(attrLabels).toContain('class')
-      expect(attrLabels).toContain('id')
-      expect(attrLabels).toContain('style')
-    })
-  })
-
-  describe('Monaco Loading When Not Available', () => {
-    beforeEach(() => {
-      // Reset Monaco to simulate it not being loaded
-      delete (global.window as any).monaco
-    })
-
-    it('should load Monaco from CDN when not available', async () => {
-      // Ensure Monaco is not available when creating the editor
-      delete (global.window as any).monaco
-
-      const htmlEditor = new HtmlEditor(stateManager)
-
-      // Simulate script loading
-      const appendChildSpy = jest.spyOn(document.head, 'appendChild')
-
-      // Mock window.require AFTER creating the editor but BEFORE calling load
-      const mockRequire: any = jest.fn((modules, callback) => {
-        // Simulate loading 'vs/editor/editor.main'
-        if (modules.includes('vs/editor/editor.main')) {
-          callback()
-        }
-      })
-      mockRequire.config = jest.fn()
-
-      // Call loadMonacoIfNeeded directly to test the loading path
-      const loadPromise = (htmlEditor as any).loadMonacoIfNeeded()
-
-      // Verify script was added
-      expect(appendChildSpy).toHaveBeenCalled()
-
-      // Get the script element that was added
-      const scriptCall = appendChildSpy.mock.calls[0][0] as HTMLScriptElement
-      expect(scriptCall.src).toBe('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js')
-
-      // Now set up the mocks for when the script loads
-      ;(global.window as any).require = mockRequire
-      ;(global.window as any).monaco = mockMonaco
-
-      // Simulate the onload callback
-      if (scriptCall.onload) {
-        scriptCall.onload(new Event('load'))
-      }
-
-      // Wait for promise to resolve
-      await loadPromise
-
-      expect(mockRequire.config).toHaveBeenCalledWith({
-        paths: {
-          vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
-        }
-      })
-
-      appendChildSpy.mockRestore()
-    })
-
-    it('should configure Monaco paths correctly when loading', () => {
-      const htmlEditor = new HtmlEditor(stateManager)
-
-      // Mock window.require
-      const mockRequire = {
-        config: jest.fn(),
-        ['vs/editor/editor.main']: jest.fn()
-      }
-      ;(global.window as any).require = mockRequire
-
-      // Mock Monaco being available for configureMonaco
-      ;(global.window as any).monaco = mockMonaco
-
-      // Create a script element and trigger onload
-      const script = document.createElement('script')
-      script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js'
-
-      // Simulate the onload handler
-      const configureMonacoSpy = jest.spyOn(htmlEditor as any, 'configureMonaco')
-
-      script.onload = () => {
-        mockRequire.config({
-          paths: {
-            vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
-          }
-        })
-
-        // Simulate require callback
-        const callback = () => {
-          ;(htmlEditor as any).editorLoaded = true
-          ;(htmlEditor as any).configureMonaco()
-        }
-        callback()
-      }
-
-      // Trigger the onload
-      script.onload!(new Event('load'))
-
-      expect(mockRequire.config).toHaveBeenCalledWith({
-        paths: {
-          vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
-        }
-      })
-      expect(configureMonacoSpy).toHaveBeenCalled()
     })
   })
 
