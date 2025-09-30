@@ -192,6 +192,7 @@ describe('EditorCoordinator', () => {
 
     // Mock UI components
     mockUIComponents.removeBanner = jest.fn()
+    mockUIComponents.updateBanner = jest.fn()
 
     // Mock EventHandlers methods
     mockEventHandlers.handleClick = jest.fn()
@@ -230,7 +231,7 @@ describe('EditorCoordinator', () => {
       expect(coordinator['uiComponents']).toBe(mockUIComponents)
       expect(coordinator['editModes']).toBe(mockEditModes)
       expect(coordinator['cleanup']).toBe(mockCleanup)
-      expect(coordinator['toolbar']).toBe(mockToolbar)
+      // expect(coordinator['toolbar']).toBe(mockToolbar) // removed - using UIComponents banner
       expect(coordinator['notifications']).toBe(mockNotifications)
       expect(coordinator['callbacks']).toBe(mockCallbacks)
     })
@@ -263,25 +264,41 @@ describe('EditorCoordinator', () => {
       // Mock handleMenuAction
       const handleMenuActionSpy = jest.spyOn(coordinator, 'handleMenuAction')
 
-      // Test the connection
-      mockContextMenu.handleAction!('edit', mockElement)
-      expect(handleMenuActionSpy).toHaveBeenCalledWith('edit', mockElement)
+      // Test the connection - uses selectedElement from state
+      mockContextMenu.handleAction!('edit', mockSelectedElement)
+      expect(handleMenuActionSpy).toHaveBeenCalledWith('edit', mockSelectedElement)
     })
 
-    it('should connect UI components to change tracker', () => {
+    it('should connect UI components to callbacks', () => {
       expect(mockUIComponents.onUndo).toBeDefined()
       expect(mockUIComponents.onRedo).toBeDefined()
+      expect(mockUIComponents.onClear).toBeDefined()
+      expect(mockUIComponents.onSave).toBeDefined()
+      expect(mockUIComponents.onExit).toBeDefined()
 
       // Test undo connection
       mockUIComponents.onUndo!()
-      expect(mockChangeTracker.performUndo).toHaveBeenCalled()
+      expect(mockCallbacks.undoLastChange).toHaveBeenCalled()
 
       // Test redo connection
       mockUIComponents.onRedo!()
-      expect(mockChangeTracker.performRedo).toHaveBeenCalled()
+      expect(mockCallbacks.redoChange).toHaveBeenCalled()
+
+      // Test clear connection
+      mockUIComponents.onClear!()
+      expect(mockCallbacks.clearAllChanges).toHaveBeenCalled()
+
+      // Test save connection
+      mockUIComponents.onSave!()
+      expect(mockCallbacks.saveChanges).toHaveBeenCalled()
+
+      // Test exit connection
+      mockUIComponents.onExit!()
+      expect(mockCallbacks.stop).toHaveBeenCalled()
     })
 
-    it('should connect toolbar to callbacks', () => {
+    // Toolbar removed - now using UIComponents banner
+    it.skip('should connect toolbar to callbacks', () => {
       expect(mockToolbar.onUndo).toBeDefined()
       expect(mockToolbar.onRedo).toBeDefined()
       expect(mockToolbar.onClear).toBeDefined()
@@ -306,25 +323,22 @@ describe('EditorCoordinator', () => {
     })
 
     it('should register cleanup handlers', () => {
-      expect(mockCleanup.registerEventHandler).toHaveBeenCalledTimes(7)
+      // 6 handlers: detachEventListeners, removeEventListeners, stopMutationObserver, makeElementsNonEditable, removeStyles, removeBanner
+      expect(mockCleanup.registerEventHandler).toHaveBeenCalledTimes(6)
 
       // Verify cleanup handlers are registered
       const cleanupCalls = mockCleanup.registerEventHandler.mock.calls
-      expect(cleanupCalls).toHaveLength(7)
+      expect(cleanupCalls).toHaveLength(6)
 
       // Test each cleanup handler
       const handlers = cleanupCalls.map(call => call[0])
 
-      // Test event handlers cleanup
+      // Test event handlers cleanup (first handler)
       handlers[0]()
       expect(mockEventHandlers.detachEventListeners).toHaveBeenCalled()
 
-      // Test toolbar cleanup
+      // Test UI components cleanup (last handler - index 5)
       handlers[5]()
-      expect(mockToolbar.remove).toHaveBeenCalled()
-
-      // Test UI components cleanup
-      handlers[6]()
       expect(mockUIComponents.removeBanner).toHaveBeenCalled()
     })
   })
@@ -383,8 +397,12 @@ describe('EditorCoordinator', () => {
 
       stateChangeCallback(newState)
 
-      expect(mockToolbar.updateChangesCount).toHaveBeenCalledWith(1)
-      expect(mockToolbar.updateUndoRedoButtons).toHaveBeenCalledWith(true, false)
+      // Now uses UIComponents.updateBanner instead of toolbar methods
+      expect(mockUIComponents.updateBanner).toHaveBeenCalledWith({
+        changesCount: 1,  // undoStack length
+        canUndo: true,
+        canRedo: false
+      })
     })
   })
 
@@ -405,33 +423,32 @@ describe('EditorCoordinator', () => {
     it('should setup all event listeners', () => {
       coordinator.setupEventListeners()
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function), true)
+      // Coordinator only registers these 4 - EventHandlers module handles click, mouseover, mouseout
       expect(addEventListenerSpy).toHaveBeenCalledWith('contextmenu', expect.any(Function), true)
       expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
       expect(addEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
       expect(addEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
-      expect(addEventListenerSpy).toHaveBeenCalledWith('mouseover', expect.any(Function), true)
-      expect(addEventListenerSpy).toHaveBeenCalledWith('mouseout', expect.any(Function), true)
 
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(7)
+      // EventHandlers.attachEventListeners() is called but we're only testing coordinator's direct listeners
+      expect(addEventListenerSpy).toHaveBeenCalledTimes(4)
     })
 
     it('should remove all event listeners', () => {
       coordinator.setupEventListeners()
       coordinator.removeEventListeners()
 
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function), true)
+      // Coordinator only removes its 4 listeners - EventHandlers module handles the rest
       expect(removeEventListenerSpy).toHaveBeenCalledWith('contextmenu', expect.any(Function), true)
       expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseover', expect.any(Function), true)
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseout', expect.any(Function), true)
 
-      expect(removeEventListenerSpy).toHaveBeenCalledTimes(7)
+      // EventHandlers.detachEventListeners() is called but we're only testing coordinator's direct listeners
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(4)
     })
 
-    it('should delegate events to event handlers', () => {
+    // Outdated - coordinator no longer handles these events directly, they're in EventHandlers module
+    it.skip('should delegate events to event handlers', () => {
       coordinator.setupEventListeners()
 
       // Simulate events
@@ -1294,8 +1311,12 @@ describe('EditorCoordinator', () => {
       stateChangeCallback(newState)
 
       expect(coordinator['changes']).toEqual(newState.changes)
-      expect(mockToolbar.updateChangesCount).toHaveBeenCalledWith(1)
-      expect(mockToolbar.updateUndoRedoButtons).toHaveBeenCalledWith(true, false)
+      // Now uses UIComponents.updateBanner instead of toolbar methods
+      expect(mockUIComponents.updateBanner).toHaveBeenCalledWith({
+        changesCount: 1,  // undoStack length
+        canUndo: true,
+        canRedo: false
+      })
     })
   })
 
