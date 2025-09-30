@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Visual Editor Test Page</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
+    h1 { color: #333; font-size: 32px; margin-bottom: 20px; }
+    .test-paragraph { font-size: 18px; line-height: 1.6; margin: 20px 0; color: #666; }
+    .test-button {
+      padding: 12px 24px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    .test-list { margin: 20px 0; }
+    .test-list li { padding: 10px 0; border-bottom: 1px solid #eee; }
+    .test-container {
+      padding: 20px;
+      border: 2px solid #e5e7eb;
+      margin: 20px 0;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="main-title">Visual Editor Test Page</h1>
+
+    <p id="test-paragraph" class="test-paragraph">
+      This is a test paragraph that we will edit with the visual editor.
+    </p>
+
+    <button id="button-1" class="test-button">First Button</button>
+    <button id="button-2" class="test-button">Second Button</button>
+    <button id="button-3" class="test-button">Third Button</button>
+
+    <div id="test-container" class="test-container">
+      <h2 id="section-title">Section Title</h2>
+      <p id="section-text">Section content that can be modified.</p>
+    </div>
+
+    <ul id="test-list" class="test-list">
+      <li id="item-1">First list item</li>
+      <li id="item-2">Second list item</li>
+      <li id="item-3">Third list item</li>
+    </ul>
+  </div>
+</body>
+</html>
