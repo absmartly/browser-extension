@@ -94,10 +94,6 @@ export class EditorCoordinator {
       this.handleMenuAction(action, currentSelected)
     }
 
-    // Connect UI components to change tracker
-    this.uiComponents.onUndo = () => this.changeTracker.performUndo()
-    this.uiComponents.onRedo = () => this.changeTracker.performRedo()
-
     // Connect UI components banner actions
     this.uiComponents.onUndo = () => this.callbacks.undoLastChange()
     this.uiComponents.onRedo = () => this.callbacks.redoChange()
