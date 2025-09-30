@@ -49,8 +49,9 @@ export const test = base.extend<ExtFixtures>({
 
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      // Always run with visible browser for extension testing
-      headless: false,
+      // Don't specify headless - let Playwright handle it via --headed flag
+      // Run with SLOW=1 to enable headed mode via env var
+      ...(process.env.SLOW === '1' ? { headless: false } : {}),
       args: [
         `--disable-extensions-except=${extPath}`,
         `--load-extension=${extPath}`
