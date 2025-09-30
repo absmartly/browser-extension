@@ -8,6 +8,7 @@
     "dev": "plasmo dev --src-path=. & node scripts/dev-build.js --watch",
     "build": "plasmo build --src-path=. && node scripts/post-build.js",
     "package": "plasmo package --src-path=.",
+    "bundle-plugin": "node scripts/bundle-extension-plugin.js",
     "test": "npm run test:unit && npm run test:e2e",
     "test:quick": "npm run test:unit && npm run test:e2e:visual-editor",
     "test:e2e": "playwright test",
@@ -78,7 +79,10 @@
           "absmartly-dom-changes.dev.js.map",
           "absmartly-sdk-plugins.dev.js",
           "absmartly-sdk-plugins.dev.js.map",
-          "absmartly-sdk-plugins.min.js"
+          "absmartly-sdk-plugins.min.js",
+          "absmartly-extension-plugin.dev.js",
+          "absmartly-extension-plugin.dev.js.map",
+          "absmartly-extension-plugin.min.js"
         ],
         "matches": [
           "<all_urls>"
