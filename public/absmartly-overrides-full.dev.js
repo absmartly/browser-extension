@@ -1,1 +1,0 @@
-../../absmartly-sdk-plugins/dist/absmartly-overrides-full.dev.js
