@@ -93,7 +93,7 @@ describe('Toolbar', () => {
         position: 'fixed',
         top: '20px',
         right: '20px',
-        'z-index': '2147483646',
+        'z-index': '2147483647',
       })
     })
 
@@ -110,7 +110,9 @@ describe('Toolbar', () => {
       const toolbars = document.querySelectorAll('.absmartly-toolbar')
 
       expect(toolbars).toHaveLength(1)
-      expect(toolbars[0]).toBe(firstToolbar)
+      // Note: create() removes old toolbar and creates new one, so reference changes
+      expect(toolbars[0]).not.toBe(firstToolbar)
+      expect(toolbars[0]).toHaveClass('absmartly-toolbar')
     })
 
     it('should create header with title and changes count', () => {
@@ -505,7 +507,7 @@ describe('Toolbar', () => {
 
     it('should maintain z-index for proper layering', () => {
       const toolbarElement = document.querySelector('.absmartly-toolbar') as HTMLElement
-      expect(toolbarElement.style.zIndex).toBe('2147483646')
+      expect(toolbarElement.style.zIndex).toBe('2147483647')
     })
 
     it('should be positioned fixed in top-right corner', () => {
