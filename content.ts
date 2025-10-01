@@ -62,6 +62,11 @@ async function startVisualEditor(config: {
     const useShadowDOM = config.useShadowDOM !== false
     debugLog('[Visual Editor Content Script] Use Shadow DOM:', useShadowDOM)
 
+    // Check if we're in test mode (same query param used for shadow DOM)
+    const urlParams = new URLSearchParams(window.location.search)
+    const isTestMode = urlParams.get('use_shadow_dom_for_visual_editor_context_menu') === '0'
+    debugLog('[Visual Editor Content Script] Test mode:', isTestMode)
+
     // Create and start new editor
     currentEditor = new VisualEditor({
       variantName: config.variantName,
@@ -72,17 +77,29 @@ async function startVisualEditor(config: {
       onChangesUpdate: (changes: DOMChange[]) => {
         debugLog('[Visual Editor Content Script] Changes updated:', changes)
         console.log('[Content] 📤 Sending VISUAL_EDITOR_CHANGES message with', changes.length, 'changes to extension')
-        // Send changes back to extension
-        chrome.runtime.sendMessage({
-          type: 'VISUAL_EDITOR_CHANGES',
-          variantName: config.variantName,
-          changes: changes
-        }, (response) => {
-          console.log('[Content] ✅ Message sent, got response:', response)
-          if (chrome.runtime.lastError) {
-            console.error('[Content] ❌ Error:', chrome.runtime.lastError.message)
-          }
-        })
+
+        if (isTestMode) {
+          // In test mode, use window.postMessage to communicate with sidebar iframe
+          console.log('[Content] 📤 Test mode: Using window.postMessage')
+          window.postMessage({
+            source: 'absmartly-visual-editor',
+            type: 'VISUAL_EDITOR_CHANGES',
+            variantName: config.variantName,
+            changes: changes
+          }, '*')
+        } else {
+          // In production, use chrome.runtime.sendMessage
+          chrome.runtime.sendMessage({
+            type: 'VISUAL_EDITOR_CHANGES',
+            variantName: config.variantName,
+            changes: changes
+          }, (response) => {
+            console.log('[Content] ✅ Message sent, got response:', response)
+            if (chrome.runtime.lastError) {
+              console.error('[Content] ❌ Error:', chrome.runtime.lastError.message)
+            }
+          })
+        }
       }
     })
 
