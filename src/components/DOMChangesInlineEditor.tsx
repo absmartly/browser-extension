@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { all as knownCSSProperties } from 'known-css-properties'
 
+// Module-level flag to prevent concurrent VE launches from multiple variant instances
+let isLaunchingVisualEditor = false
+
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
@@ -38,6 +41,10 @@ interface DOMChangesInlineEditorProps {
   onChange: (changes: DOMChange[]) => void
   previewEnabled: boolean
   onPreviewToggle: (enabled: boolean) => void
+  activeVEVariant: string | null
+  onVEStart: () => void
+  onVEStop: () => void
+  activePreviewVariantName: string | null
 }
 
 interface EditingDOMChange {
@@ -1286,7 +1293,11 @@ export function DOMChangesInlineEditor({
   changes,
   onChange,
   previewEnabled,
-  onPreviewToggle
+  onPreviewToggle,
+  activeVEVariant,
+  onVEStart,
+  onVEStop,
+  activePreviewVariantName
 }: DOMChangesInlineEditorProps) {
   const [editingChange, setEditingChange] = useState<EditingDOMChange | null>(null)
   const [pickingForField, setPickingForField] = useState<string | null>(null)
@@ -1639,6 +1650,9 @@ export function DOMChangesInlineEditor({
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
         debugLog('✅ Visual Editor Complete - Received changes:', message)
 
+        // Mark VE as stopped for this variant
+        onVEStop()
+
         if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
           // Merge visual editor changes with existing ones
           debugLog('📝 Merging final visual editor changes with existing changes')
@@ -1694,20 +1708,38 @@ export function DOMChangesInlineEditor({
   }, [variantName, onChange, changes])
 
   const handleLaunchVisualEditor = async () => {
-    debugLog('🎨 Launching Visual Editor')
-    debugLog('Current preview state:', previewEnabled)
-    debugLog('Variant name:', variantName)
-    debugLog('Existing changes:', changes.length)
+    debugLog('🎨 Launch requested for variant:', variantName)
 
-    // Set a flag to prevent preview header from showing FIRST
-    await chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    // Check if another variant already has VE active
+    if (activeVEVariant && activeVEVariant !== variantName) {
+      alert(`Visual Editor is already active for variant "${activeVEVariant}". Please close it first.`)
+      return
+    }
+
+    // Prevent concurrent launches from multiple variant instances
+    // Use atomic check-and-set pattern
+    if (isLaunchingVisualEditor) {
+      debugLog('⏭️ Visual Editor already launching, skipping duplicate launch for:', variantName)
+      return
+    }
+    isLaunchingVisualEditor = true
+
+    try {
+      debugLog('🎨 Launching Visual Editor for variant:', variantName)
+      debugLog('Current preview state:', previewEnabled)
+      debugLog('Existing changes:', changes.length)
+
+      // Mark this variant as having active VE
+      onVEStart()
+
+      // Set a flag to prevent preview header from showing FIRST
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
+        await chrome.tabs.sendMessage(tabs[0].id, {
           type: 'SET_VISUAL_EDITOR_STARTING',
           starting: true
         })
       }
-    })
 
     // If preview is not enabled, enable it
     if (!previewEnabled) {
@@ -1756,7 +1788,15 @@ export function DOMChangesInlineEditor({
         debugLog('✅ Visual editor started successfully:', response)
         // Visual editor started in sidebar
       }
+      // Reset flag after message is sent
+      isLaunchingVisualEditor = false
     })
+    } finally {
+      // Reset flag if any error occurs
+      setTimeout(() => {
+        isLaunchingVisualEditor = false
+      }, 1000)
+    }
   }
 
   const handleStartDragDrop = async () => {
@@ -2682,6 +2722,12 @@ export function DOMChangesInlineEditor({
             size="sm"
             variant="primary"
             className="flex-1"
+            disabled={activeVEVariant !== null && activeVEVariant !== variantName}
+            title={
+              activeVEVariant && activeVEVariant !== variantName
+                ? `Visual Editor is active for variant "${activeVEVariant}"`
+                : 'Launch Visual Editor'
+            }
           >
             <PaintBrushIcon className="h-4 w-4 mr-1" />
             Visual Editor

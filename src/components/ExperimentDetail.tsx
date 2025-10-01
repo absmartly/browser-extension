@@ -46,6 +46,7 @@ export function ExperimentDetail({
   const [variantData, setVariantData] = useState<Record<string, VariantData>>({})
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [activePreviewVariant, setActivePreviewVariant] = useState<string | null>(null)
+  const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
@@ -990,10 +991,21 @@ export function ExperimentDetail({
                       previewEnabled={previewEnabled && activePreviewVariant === variantKey}
                       onPreviewToggle={(enabled) => {
                         debugLog('🔘 Preview toggle clicked:', { enabled, variantKey, currentPreviewEnabled: previewEnabled, currentActiveVariant: activePreviewVariant })
+
+                        // Check if another variant has VE active
+                        if (activeVEVariant && activeVEVariant !== variantKey) {
+                          alert(`Visual Editor is active for variant "${activeVEVariant}". Please close it first.`)
+                          return
+                        }
+
                         setActivePreviewVariant(variantKey)
                         // Use the variantKey directly instead of waiting for state update
                         handlePreviewToggleForVariant(enabled, variantKey)
                       }}
+                      activeVEVariant={activeVEVariant}
+                      onVEStart={() => setActiveVEVariant(variantKey)}
+                      onVEStop={() => setActiveVEVariant(null)}
+                      activePreviewVariantName={activePreviewVariant}
                     />
                   </div>
                 </div>
