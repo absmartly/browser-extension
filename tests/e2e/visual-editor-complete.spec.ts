@@ -297,26 +297,26 @@ test.describe('Visual Editor Complete Workflow', () => {
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
         const sectionTitle = document.querySelector('#section-title')
-        
+
         return {
           paragraphText: paragraph?.textContent?.trim(),
           button1Display: button1 ? window.getComputedStyle(button1).display : null,
-          button2Exists: !!button2,
+          button2Display: button2 ? window.getComputedStyle(button2).display : null,
           sectionTitleHTML: sectionTitle?.innerHTML
         }
       })
-      
+
       console.log('  Applied changes:', appliedChanges)
-      
+
       // Verify each specific change
       expect(appliedChanges.paragraphText).toBe('Modified text!')
       console.log('  ✓ Text change applied: paragraph text is "Modified text!"')
-      
+
       expect(appliedChanges.button1Display).toBe('none')
       console.log('  ✓ Hide change applied: button-1 is display:none')
-      
-      expect(appliedChanges.button2Exists).toBe(false)
-      console.log('  ✓ Delete change applied: button-2 was removed from DOM')
+
+      expect(appliedChanges.button2Display).toBe('none')
+      console.log('  ✓ Delete change applied: button-2 is hidden (display:none)')
       
       expect(appliedChanges.sectionTitleHTML).toBe('<h2>HTML Edited!</h2>')
       console.log('  ✓ HTML change applied: section-title has new HTML')
@@ -415,8 +415,57 @@ test.describe('Visual Editor Complete Workflow', () => {
       }
     })
 
+    await test.step('Verify changes and markers after VE exit', async () => {
+      console.log('\n🔍 STEP 6.5: Verifying changes and markers after VE exit')
+
+      const postVEState = await testPage.evaluate(() => {
+        const paragraph = document.querySelector('#test-paragraph')
+        const button1 = document.querySelector('#button-1')
+        const button2 = document.querySelector('#button-2')
+        const sectionTitle = document.querySelector('#section-title')
+
+        // Count elements with markers
+        const markedElements = document.querySelectorAll('[data-absmartly-experiment]')
+        const elementsWithOriginals = document.querySelectorAll('[data-absmartly-original]')
+
+        return {
+          // Verify changes are still applied
+          paragraphText: paragraph?.textContent?.trim(),
+          button1Display: button1 ? window.getComputedStyle(button1).display : null,
+          button2Display: button2 ? window.getComputedStyle(button2).display : null,
+          sectionTitleHTML: sectionTitle?.innerHTML,
+          // Verify markers are present
+          markedElementsCount: markedElements.length,
+          elementsWithOriginalsCount: elementsWithOriginals.length,
+          // Get marker details for debugging
+          experimentNames: Array.from(markedElements).map(el =>
+            (el as HTMLElement).dataset.absmartlyExperiment
+          )
+        }
+      })
+
+      console.log('  Post-VE state:', postVEState)
+
+      // Verify changes are still applied
+      expect(postVEState.paragraphText).toBe('Modified text!')
+      expect(postVEState.button1Display).toBe('none')
+      expect(postVEState.button2Display).toBe('none')
+      expect(postVEState.sectionTitleHTML).toBe('<h2>HTML Edited!</h2>')
+      console.log('  ✓ All changes still applied after VE exit')
+
+      // Verify markers are present (preview mode is still active)
+      expect(postVEState.markedElementsCount).toBeGreaterThan(0)
+      console.log(`  ✓ Preview markers present: ${postVEState.markedElementsCount} elements marked`)
+
+      // Verify original values are preserved
+      expect(postVEState.elementsWithOriginalsCount).toBeGreaterThan(0)
+      console.log(`  ✓ Original values preserved: ${postVEState.elementsWithOriginalsCount} elements with data-absmartly-original`)
+
+      await debugWait()
+    })
+
     await test.step('Test preview mode toggle', async () => {
-      console.log('👁️ STEP 7: Testing preview mode removal')
+      console.log('\n👁️ STEP 7: Testing preview mode removal')
 
       // NOTE: Preview is already enabled after using the visual editor in step 4
       // So the first click will DISABLE preview, and second click will re-enable it
@@ -460,7 +509,7 @@ test.describe('Visual Editor Complete Workflow', () => {
           paragraphText: paragraph?.textContent,
           paragraphVisible: paragraph ? window.getComputedStyle(paragraph).display !== 'none' : false,
           button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
-          button2Exists: !!button2,
+          button2Visible: button2 ? window.getComputedStyle(button2).display !== 'none' : false,
           sectionTitleHTML: sectionTitle?.innerHTML
         }
       })
@@ -485,7 +534,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         return {
           paragraphText: paragraph?.textContent,
           button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
-          button2Exists: !!button2,
+          button2Visible: button2 ? window.getComputedStyle(button2).display !== 'none' : false,
           sectionTitleHTML: sectionTitle?.innerHTML,
           stillModifiedCount: stillModified,
           experimentMarkersCount: experimentMarkers
@@ -501,11 +550,20 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(disabledStates.experimentMarkersCount).toBe(0)
       console.log('  ✓ All data-absmartly attributes removed')
 
-      // Verify elements still have the changes (disabling preview doesn't revert DOM changes)
-      expect(disabledStates.paragraphText).toBe(previewEnabledStates.paragraphText)
-      expect(disabledStates.button1Visible).toBe(previewEnabledStates.button1Visible)
-      expect(disabledStates.sectionTitleHTML).toBe(previewEnabledStates.sectionTitleHTML)
-      console.log('  ✓ Elements retained their modified states (changes not reverted)')
+      // Verify elements were reverted to original state (preview OFF should revert changes)
+      expect(disabledStates.paragraphText).not.toBe('Modified text!')
+      console.log(`  ✓ Paragraph reverted to original: "${disabledStates.paragraphText}"`)
+
+      expect(disabledStates.button1Visible).toBe(true)
+      console.log('  ✓ Button-1 is visible again (display restored)')
+
+      expect(disabledStates.button2Visible).toBe(true)
+      console.log('  ✓ Button-2 is visible again (restored from delete)')
+
+      expect(disabledStates.sectionTitleHTML).not.toBe('<h2>HTML Edited!</h2>')
+      console.log(`  ✓ Section title reverted: "${disabledStates.sectionTitleHTML}"`)
+
+      console.log('  ✓ All changes reverted when preview disabled')
       await debugWait()
 
       // Second click: RE-ENABLE preview (add markers back)
@@ -514,26 +572,51 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  ✓ Preview mode re-enabled')
       await debugWait(2000)
 
-      // Verify markers were added back
+      // Verify changes were re-applied AND markers were added back
       const reEnabledStates = await testPage.evaluate(() => {
+        const paragraph = document.querySelector('#test-paragraph')
+        const button1 = document.querySelector('#button-1')
+        const button2 = document.querySelector('#button-2')
+        const sectionTitle = document.querySelector('#section-title')
+
         return {
+          // Verify changes are re-applied
+          paragraphText: paragraph?.textContent?.trim(),
+          button1Display: button1 ? window.getComputedStyle(button1).display : null,
+          button2Display: button2 ? window.getComputedStyle(button2).display : null,
+          sectionTitleHTML: sectionTitle?.innerHTML,
+          // Verify markers are back
           modifiedElementsCount: document.querySelectorAll('[data-absmartly-modified]').length,
-          experimentMarkersCount: document.querySelectorAll('[data-absmartly-experiment]').length
+          experimentMarkersCount: document.querySelectorAll('[data-absmartly-experiment]').length,
+          elementsWithOriginalsCount: document.querySelectorAll('[data-absmartly-original]').length
         }
       })
 
-      console.log(`  Modified elements after re-enable: ${reEnabledStates.modifiedElementsCount}`)
-      console.log(`  Experiment markers after re-enable: ${reEnabledStates.experimentMarkersCount}`)
+      console.log('  Re-enabled state:', reEnabledStates)
 
+      // Verify changes are re-applied
+      expect(reEnabledStates.paragraphText).toBe('Modified text!')
+      console.log('  ✓ Paragraph text re-applied: "Modified text!"')
+
+      expect(reEnabledStates.button1Display).toBe('none')
+      console.log('  ✓ Button-1 hidden again (display: none)')
+
+      expect(reEnabledStates.button2Display).toBe('none')
+      console.log('  ✓ Button-2 hidden again (delete re-applied)')
+
+      expect(reEnabledStates.sectionTitleHTML).toBe('<h2>HTML Edited!</h2>')
+      console.log('  ✓ Section title HTML re-applied')
+
+      // Verify markers are back
       expect(reEnabledStates.modifiedElementsCount).toBeGreaterThan(0)
       expect(reEnabledStates.experimentMarkersCount).toBeGreaterThan(0)
-      console.log('  ✓ Preview markers added back')
+      expect(reEnabledStates.elementsWithOriginalsCount).toBeGreaterThan(0)
+      console.log(`  ✓ Preview markers restored: ${reEnabledStates.experimentMarkersCount} elements marked`)
 
       console.log('✅ Preview mode toggle test PASSED!')
       console.log('  • Preview was enabled after visual editor usage')
-      console.log('  • Disabling preview removed all markers')
-      console.log('  • Elements retained modifications without markers')
-      console.log('  • Re-enabling preview added markers back')
+      console.log('  • Disabling preview reverted all changes and removed markers')
+      console.log('  • Re-enabling preview re-applied changes and added markers back')
       await debugWait()
     })
   })

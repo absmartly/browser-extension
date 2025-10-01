@@ -363,21 +363,18 @@ window.addEventListener('message', (event) => {
       })
 
       // Restore the preview header since preview is still active
+      // Store VE changes for restoration when preview is toggled
+      // Note: VE changes include physically removed elements (delete operations),
+      // so we need to track them separately for restoration
       if (experimentName && variantName) {
-        createPreviewHeader(experimentName, variantName)
+        // Store VE changes globally for preview toggle handling
+        ;(window as any).__absmartlyVEChanges = {
+          experimentName,
+          changes
+        }
+        debugLog('[Content Script] Stored VE changes for preview toggle', { experimentName, changeCount: changes.length })
 
-        // Re-apply the preview changes to the DOM
-        // The visual editor applies changes directly, but when it exits
-        // we need to re-apply them with preview markers
-        window.postMessage({
-          source: 'absmartly-extension',
-          type: 'PREVIEW_CHANGES',
-          payload: {
-            changes: changes || [],
-            experimentName: experimentName,
-            variantName: variantName
-          }
-        }, '*')
+        createPreviewHeader(experimentName, variantName)
       }
     }
   }
