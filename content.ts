@@ -365,6 +365,19 @@ window.addEventListener('message', (event) => {
       // Restore the preview header since preview is still active
       if (experimentName && variantName) {
         createPreviewHeader(experimentName, variantName)
+
+        // Re-apply the preview changes to the DOM
+        // The visual editor applies changes directly, but when it exits
+        // we need to re-apply them with preview markers
+        window.postMessage({
+          source: 'absmartly-extension',
+          type: 'PREVIEW_CHANGES',
+          payload: {
+            changes: changes || [],
+            experimentName: experimentName,
+            variantName: variantName
+          }
+        }, '*')
       }
     }
   }
