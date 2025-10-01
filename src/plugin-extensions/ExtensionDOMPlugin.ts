@@ -96,7 +96,8 @@ export class ExtensionDOMPlugin {
       'preview-changes'
     ])
 
-    // Register with context
+    // Register with context (MUST be after base plugin initialization)
+    // This ensures we override any registration from the base plugin
     if (this.config.context) {
       this.config.context.__domPlugin = {
         instance: this,
@@ -105,12 +106,20 @@ export class ExtensionDOMPlugin {
         capabilities: ['state-management', 'change-reversion'],
         timestamp: Date.now()
       }
+
+      // Also store globally for easier access
+      if (typeof window !== 'undefined') {
+        ;(window as any).__absmartlyPlugin = this
+        ;(window as any).__absmartlyDOMChangesPlugin = this
+      }
     }
 
     this.initialized = true
 
     if (this.config.debug) {
       console.log('[ExtensionDOMPlugin] Initialized successfully')
+      console.log('[ExtensionDOMPlugin] Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(this)).filter(name => typeof (this as any)[name] === 'function'))
+      console.log('[ExtensionDOMPlugin] removeChanges is function:', typeof this.removeChanges === 'function')
     }
   }
 
@@ -143,13 +152,9 @@ export class ExtensionDOMPlugin {
         // Store original state before modification
         const originalState = this.stateManager.storeState(element, experimentName)
 
-        // Apply the change using base plugin if available
-        if (this.basePlugin.domManipulator?.applyChange) {
-          this.basePlugin.domManipulator.applyChange(change, experimentName)
-        } else {
-          // Fallback to manual application
-          this.applyChangeManually(element as HTMLElement, change, experimentName)
-        }
+        // Apply the change manually (we handle all preview changes ourselves)
+        // The base plugin (Lite) only handles automatic application from context
+        this.applyChangeManually(element as HTMLElement, change, experimentName)
 
         // Track the applied change
         this.stateManager.trackChange({
@@ -159,6 +164,14 @@ export class ExtensionDOMPlugin {
           element,
           originalState
         })
+
+        if (this.config.debug) {
+          console.log(`[ExtensionDOMPlugin] Applied ${change.type} change to element:`, {
+            selector: change.selector,
+            experimentName,
+            element
+          })
+        }
       } catch (error) {
         console.error('[ExtensionDOMPlugin] Error applying change:', error)
         success = false
