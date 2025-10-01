@@ -1650,9 +1650,6 @@ export function DOMChangesInlineEditor({
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
         debugLog('✅ Visual Editor Complete - Received changes:', message)
 
-        // Mark VE as stopped for this variant
-        onVEStop()
-
         if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
           // Merge visual editor changes with existing ones
           debugLog('📝 Merging final visual editor changes with existing changes')
@@ -1698,12 +1695,28 @@ export function DOMChangesInlineEditor({
           document.body.appendChild(toast)
           setTimeout(() => toast.remove(), 3000)
         }
+
+        // Mark VE as stopped for this variant after processing changes
+        onVEStop()
       }
     }
     
     chrome.runtime.onMessage.addListener(handleVisualEditorChanges)
+
+    // Also listen for window.postMessage in test mode
+    const handleWindowMessage = (event: MessageEvent) => {
+      if (event.data?.source === 'absmartly-visual-editor' && event.data?.type === 'VISUAL_EDITOR_CHANGES') {
+        debugLog('📡 Received window.postMessage from visual editor:', event.data)
+        // Process the message the same way as chrome.runtime messages
+        void handleVisualEditorChanges(event.data, {} as chrome.runtime.MessageSender, () => {})
+      }
+    }
+
+    window.addEventListener('message', handleWindowMessage)
+
     return () => {
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
+      window.removeEventListener('message', handleWindowMessage)
     }
   }, [variantName, onChange, changes])
 
