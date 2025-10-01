@@ -17,8 +17,8 @@ export class Cleanup {
     this.eventHandlers.push(handler)
   }
 
-  cleanupVisualEditor(): void {
-    console.log('[ABSmartly] Starting visual editor cleanup...')
+  cleanupVisualEditor(restoreOriginalValues: boolean = true): void {
+    console.log('[ABSmartly] Starting visual editor cleanup...', { restoreOriginalValues })
 
     // 1. Remove visual editor CSS classes from all elements
     this.removeVisualEditorClasses()
@@ -26,8 +26,14 @@ export class Cleanup {
     // 2. Remove visual editor DOM elements
     this.removeVisualEditorElements()
 
-    // 3. Restore original values where possible
-    this.restoreOriginalValues()
+    // 3. Restore original values where possible (only if requested)
+    // When preview mode is active, we want to keep the changes applied
+    if (restoreOriginalValues) {
+      this.restoreOriginalValues()
+    } else {
+      // Just remove the data attributes without reverting changes
+      this.removeDataAttributesOnly()
+    }
 
     // 4. Remove event listeners
     this.removeEventListeners()
@@ -87,6 +93,18 @@ export class Cleanup {
     // Remove resize handles
     const resizeHandles = document.querySelectorAll('[data-absmartly-resize-handle]')
     resizeHandles.forEach(handle => handle.remove())
+  }
+
+  private removeDataAttributesOnly(): void {
+    // Remove data attributes without reverting changes (for preview mode)
+    const modifiedElements = document.querySelectorAll('[data-absmartly-original], [data-absmartly-modified], [data-absmartly-experiment]')
+
+    modifiedElements.forEach(element => {
+      const htmlElement = element as HTMLElement
+      delete htmlElement.dataset.absmartlyOriginal
+      delete htmlElement.dataset.absmartlyModified
+      delete htmlElement.dataset.absmartlyExperiment
+    })
   }
 
   private restoreOriginalValues(): void {

@@ -925,11 +925,11 @@ export class EditorCoordinator {
   }
 
   // Teardown all integrations and handlers
-  teardownAll(): void {
-    console.log('[EditorCoordinator] Starting teardownAll')
+  teardownAll(restoreOriginalValues: boolean = true): void {
+    console.log('[EditorCoordinator] Starting teardownAll', { restoreOriginalValues })
 
     // Call all registered cleanup handlers (includes removeBanner)
-    this.cleanup.cleanupVisualEditor()
+    this.cleanup.cleanupVisualEditor(restoreOriginalValues)
 
     // Additional cleanup
     this.removeEventListeners()

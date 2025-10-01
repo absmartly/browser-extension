@@ -220,7 +220,11 @@ export class VisualEditor {
     }
 
     // Use coordinator to teardown all modules
-    this.coordinator.teardownAll()
+    // If changes were saved, DON'T restore original values (preview mode will re-apply with markers)
+    // If changes were discarded, DO restore original values
+    const shouldRestoreOriginalValues = this.hasUnsavedChanges
+    console.log('[ABSmartly] Teardown with restoreOriginalValues:', shouldRestoreOriginalValues)
+    this.coordinator.teardownAll(shouldRestoreOriginalValues)
 
     // Remove styles
     this.removeStyles()
