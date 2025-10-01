@@ -15,14 +15,6 @@ try {
   console.error('Failed to build visual editor:', error);
 }
 
-// Build extension plugin
-console.log('Building extension plugin...');
-try {
-  execSync('node scripts/bundle-extension-plugin.js', { stdio: 'inherit' });
-} catch (error) {
-  console.error('Failed to build extension plugin:', error);
-}
-
 const buildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-prod');
 const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
 const tabsDir = path.join(buildDir, 'tabs');
@@ -157,36 +149,6 @@ if (fs.existsSync(pluginSource)) {
     }
   }
 }
-
-// Copy extension plugin bundle
-const extPluginDevSource = path.join(publicDir, 'absmartly-extension-plugin.dev.js');
-const extPluginProdSource = path.join(publicDir, 'absmartly-extension-plugin.min.js');
-
-[buildDir, devBuildDir].forEach(targetDir => {
-  if (fs.existsSync(targetDir)) {
-    // Copy dev build
-    if (fs.existsSync(extPluginDevSource)) {
-      const extPluginDest = path.join(targetDir, 'absmartly-extension-plugin.dev.js');
-      fs.copyFileSync(extPluginDevSource, extPluginDest);
-      console.log(`Copied absmartly-extension-plugin.dev.js to ${targetDir}`);
-
-      // Copy source map
-      const mapSource = extPluginDevSource + '.map';
-      if (fs.existsSync(mapSource)) {
-        const mapDest = path.join(targetDir, 'absmartly-extension-plugin.dev.js.map');
-        fs.copyFileSync(mapSource, mapDest);
-        console.log(`Copied absmartly-extension-plugin.dev.js.map to ${targetDir}`);
-      }
-    }
-
-    // Copy prod build
-    if (fs.existsSync(extPluginProdSource)) {
-      const extPluginDest = path.join(targetDir, 'absmartly-extension-plugin.min.js');
-      fs.copyFileSync(extPluginProdSource, extPluginDest);
-      console.log(`Copied absmartly-extension-plugin.min.js to ${targetDir}`);
-    }
-  }
-});
 
 // Copy visual editor bundled script
 if (fs.existsSync(visualEditorSource)) {
