@@ -49,6 +49,8 @@ export class VisualEditor {
   private changes: DOMChange[] = []
 
   constructor(options: VisualEditorOptions) {
+    console.log('[VisualEditor] Constructor called with options:', options)
+    console.log('[VisualEditor] Experiment name from options:', options.experimentName)
     this.options = options
     this.changes = options.initialChanges || []
 
