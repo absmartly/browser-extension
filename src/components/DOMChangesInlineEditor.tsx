@@ -1729,6 +1729,7 @@ export function DOMChangesInlineEditor({
     // Send message to background script to start visual editor
     debugLog('🚀 Sending START_VISUAL_EDITOR message to background')
     debugLog('Variant:', variantName)
+    debugLog('Experiment name:', experimentName)
     debugLog('Changes:', changes)
     
     // Test if we can send any message at all

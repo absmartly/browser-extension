@@ -364,6 +364,8 @@ export function ExperimentEditor({
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="my_experiment_name"
                   required
+                  disabled={previewEnabled}
+                  title={previewEnabled ? "Cannot change experiment name while preview is active" : ""}
                 />
               </div>
 
@@ -573,6 +575,7 @@ export function ExperimentEditor({
                   {/* DOM Changes Section */}
                   <DOMChangesInlineEditor
                     variantName={variant.name}
+                    experimentName={formData.name}
                     changes={variant.dom_changes}
                     onChange={(changes) => updateVariantDOMChanges(index, changes)}
                     previewEnabled={previewEnabled && activePreviewVariant === index}

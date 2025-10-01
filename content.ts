@@ -38,7 +38,9 @@ async function startVisualEditor(config: {
   changes?: DOMChange[]
   useShadowDOM?: boolean
 }): Promise<{ success: boolean; error?: string }> {
-  debugLog('[Visual Editor Content Script] Starting visual editor with variant:', config.variantName)
+  debugLog('[Visual Editor Content Script] Starting visual editor with config:', config)
+  debugLog('[Visual Editor Content Script] Variant:', config.variantName)
+  debugLog('[Visual Editor Content Script] Experiment name:', config.experimentName)
 
   await ensureSDKPluginInjected()
 
