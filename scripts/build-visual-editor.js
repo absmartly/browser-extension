@@ -47,6 +47,9 @@ try {
     '--minify-syntax',
     '--keep-names',
     '--external:chrome',
+    '--loader:.ttf=dataurl',
+    '--loader:.woff=dataurl',
+    '--loader:.woff2=dataurl',
     ...defineFlags
   ].join(' ');
 
