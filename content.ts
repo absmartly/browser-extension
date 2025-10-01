@@ -71,11 +71,17 @@ async function startVisualEditor(config: {
       useShadowDOM: useShadowDOM,
       onChangesUpdate: (changes: DOMChange[]) => {
         debugLog('[Visual Editor Content Script] Changes updated:', changes)
+        console.log('[Content] 📤 Sending VISUAL_EDITOR_CHANGES message with', changes.length, 'changes to extension')
         // Send changes back to extension
         chrome.runtime.sendMessage({
           type: 'VISUAL_EDITOR_CHANGES',
           variantName: config.variantName,
           changes: changes
+        }, (response) => {
+          console.log('[Content] ✅ Message sent, got response:', response)
+          if (chrome.runtime.lastError) {
+            console.error('[Content] ❌ Error:', chrome.runtime.lastError.message)
+          }
         })
       }
     })

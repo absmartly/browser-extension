@@ -345,21 +345,21 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Wait for DOM change cards to appear in the sidebar
     // The changes are displayed as cards, not in a Monaco editor
     try {
-      await sidebar.locator('.border').first().waitFor({ timeout: 5000 })
+      await sidebar.locator('.dom-change-card').first().waitFor({ timeout: 5000 })
     } catch (err) {
       console.log('⚠️  DOM change cards did not appear within 5 seconds')
       throw err // Re-throw to fail the test
     }
 
     // Count the number of DOM change cards
-    const changeCards = await sidebar.locator('.border').count()
+    const changeCards = await sidebar.locator('.dom-change-card').count()
     console.log(`Found ${changeCards} DOM change cards in sidebar`)
 
     // Verify we have the expected 5 changes (text, hide, delete, move, html)
     expect(changeCards).toBeGreaterThanOrEqual(5)
 
     // Get the text content of all cards to verify change types
-    const cardsText = await sidebar.locator('.border').allTextContents()
+    const cardsText = await sidebar.locator('.dom-change-card').allTextContents()
     const allText = cardsText.join(' ')
 
     console.log('DOM Change cards content:', allText.substring(0, 400))

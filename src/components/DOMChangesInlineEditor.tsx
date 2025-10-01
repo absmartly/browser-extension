@@ -2580,7 +2580,7 @@ export function DOMChangesInlineEditor({
                     setDraggedIndex(null)
                   }}
                   className={`
-                    relative border rounded-lg cursor-move hover:shadow-md
+                    dom-change-card relative border rounded-lg cursor-move hover:shadow-md
                     ${isDisabled 
                       ? 'border-gray-200 bg-gray-50 opacity-60' 
                       : 'border-gray-300 bg-white hover:border-blue-300 hover:shadow-sm'
