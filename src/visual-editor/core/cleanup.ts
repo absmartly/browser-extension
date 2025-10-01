@@ -96,15 +96,14 @@ export class Cleanup {
   }
 
   private removeDataAttributesOnly(): void {
-    // Remove data attributes without reverting changes (for preview mode)
-    const modifiedElements = document.querySelectorAll('[data-absmartly-original], [data-absmartly-modified], [data-absmartly-experiment]')
-
-    modifiedElements.forEach(element => {
-      const htmlElement = element as HTMLElement
-      delete htmlElement.dataset.absmartlyOriginal
-      delete htmlElement.dataset.absmartlyModified
-      delete htmlElement.dataset.absmartlyExperiment
-    })
+    // When preview mode is active, DON'T remove any data attributes!
+    // The SDK plugin owns these attributes and needs them to revert changes when preview is disabled:
+    // - data-absmartly-original: stores original values for restoration
+    // - data-absmartly-modified: marks elements as modified (SDK uses this to find elements to clean)
+    // - data-absmartly-experiment: identifies which experiment modified the element
+    //
+    // We only remove VE UI elements and classes, but leave all data attributes intact.
+    console.log('[Cleanup] Preview mode active - preserving all data attributes for SDK plugin')
   }
 
   private restoreOriginalValues(): void {

@@ -95,9 +95,26 @@ export class ElementActions {
     if (!this.selectedElement) return
 
     try {
-      this.selectedElement.style.display = 'none'
+      const htmlElement = this.selectedElement as HTMLElement
+
+      // Store original display value before hiding
+      if (!htmlElement.dataset.absmartlyOriginal) {
+        htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
+      }
+      const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+      if (!originalData.styles) {
+        originalData.styles = {}
+      }
+      if (!originalData.styles.display) {
+        const computedStyle = window.getComputedStyle(htmlElement)
+        originalData.styles.display = htmlElement.style.display || computedStyle.display || ''
+        htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
+        console.log('[ElementActions] Stored original display value:', originalData.styles.display)
+      }
+
+      htmlElement.style.display = 'none'
       this.addChange({
-        selector: this.getSelector(this.selectedElement),
+        selector: this.getSelector(htmlElement),
         type: 'style',
         value: { display: 'none' },
         enabled: true
@@ -113,34 +130,39 @@ export class ElementActions {
     if (!this.selectedElement) return
 
     const selector = this.getSelector(this.selectedElement)
+    const htmlElement = this.selectedElement as HTMLElement
 
-    // Store element's HTML and position info for undo
-    const elementHTML = this.selectedElement.outerHTML
-    const parent = this.selectedElement.parentElement
-    const nextSibling = this.selectedElement.nextElementSibling
+    // Store original display value for restoration
+    const computedStyle = window.getComputedStyle(htmlElement)
+    const originalDisplay = htmlElement.style.display || computedStyle.display || ''
 
-    // Generate selectors for parent and next sibling for restoration
-    let parentSelector = null
-    let nextSiblingSelector = null
-
-    if (parent) {
-      parentSelector = this.getSelector(parent)
-      if (nextSibling) {
-        nextSiblingSelector = this.getSelector(nextSibling as HTMLElement)
-      }
+    // Store original value in data attribute if not already stored
+    if (!htmlElement.dataset.absmartlyOriginal) {
+      htmlElement.dataset.absmartlyOriginal = JSON.stringify({
+        textContent: htmlElement.textContent,
+        innerHTML: htmlElement.innerHTML
+      })
     }
 
-    // Now remove the element
-    this.selectedElement.remove()
+    const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+    if (!originalData.styles) {
+      originalData.styles = {}
+    }
+    if (!originalData.styles.display) {
+      originalData.styles.display = originalDisplay
+    }
+    htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
 
+    // MIMIC delete by hiding the element (in VE/preview mode)
+    // In production, the DOM Changes plugin will actually remove it
+    htmlElement.style.display = 'none'
+
+    // Still create a 'delete' type change (for production)
+    // But in preview/VE we just hide it
     this.addChange({
       selector: selector,
       type: 'delete',
-      value: {
-        html: elementHTML,
-        parentSelector: parentSelector,
-        nextSiblingSelector: nextSiblingSelector
-      },
+      value: {},
       enabled: true
     })
 
@@ -401,6 +423,12 @@ export class ElementActions {
       elements.forEach(element => {
         const htmlElement = element as HTMLElement
 
+        // Initialize data-absmartly-original if not present
+        if (!htmlElement.dataset.absmartlyOriginal) {
+          htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
+        }
+        const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+
         switch (change.type) {
           case 'move':
             // Apply move to target position
@@ -426,6 +454,12 @@ export class ElementActions {
 
           case 'text':
             if (change.value !== undefined) {
+              // Store original textContent if not already stored
+              if (!originalData.textContent) {
+                originalData.textContent = htmlElement.textContent
+                htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
+                console.log('[ElementActions] Stored original textContent:', originalData.textContent)
+              }
               htmlElement.textContent = change.value
               console.log('[ElementActions] Applied text content')
             }
@@ -434,15 +468,30 @@ export class ElementActions {
           case 'style':
             // Apply styles
             if (change.value && typeof change.value === 'object') {
+              // Store original styles if not already stored
+              if (!originalData.styles) {
+                originalData.styles = {}
+              }
               for (const prop in change.value) {
+                if (!originalData.styles[prop]) {
+                  originalData.styles[prop] = (htmlElement.style as any)[prop] || ''
+                  console.log(`[ElementActions] Stored original style.${prop}:`, originalData.styles[prop])
+                }
                 (htmlElement.style as any)[prop] = change.value[prop]
               }
+              htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
               console.log('[ElementActions] Applied style changes')
             }
             break
 
           case 'html':
             if (change.value !== undefined) {
+              // Store original innerHTML if not already stored
+              if (!originalData.innerHTML) {
+                originalData.innerHTML = htmlElement.innerHTML
+                htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
+                console.log('[ElementActions] Stored original innerHTML')
+              }
               htmlElement.innerHTML = change.value
               console.log('[ElementActions] Applied HTML content')
             }

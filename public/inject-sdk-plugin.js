@@ -117,6 +117,12 @@
             element.setAttribute(change.attribute, change.value);
           }
           break;
+
+        case 'delete':
+          // In preview mode, mimic delete by hiding (display: none)
+          element.style.display = 'none';
+          debugLog('[ABsmartly Page] Mimicking delete by hiding element (old code path)');
+          break;
       }
 
       debugLog('[ABsmartly Page] Applied change to element:', element);
@@ -181,6 +187,58 @@
       `[data-absmartly-experiment="${experimentName}"], [data-absmartly-experiment="__preview__"]`
     );
     markedElements.forEach(element => {
+      // If element has data-absmartly-original, restore from it (VE-modified elements)
+      if (element.dataset.absmartlyOriginal) {
+        try {
+          const originalData = JSON.parse(element.dataset.absmartlyOriginal);
+          debugLog('[ABsmartly Page] Original data for element:', {
+            tagName: element.tagName,
+            id: element.id,
+            textContent: originalData.textContent?.substring(0, 100),
+            innerHTML: originalData.innerHTML?.substring(0, 100),
+            hasStyles: !!originalData.styles
+          });
+
+          // Restore innerHTML (which also restores textContent)
+          // We prioritize innerHTML because it contains the complete structure
+          // and textContent would be overwritten by innerHTML anyway
+          if (originalData.innerHTML !== undefined) {
+            element.innerHTML = originalData.innerHTML;
+            debugLog('[ABsmartly Page] Restored innerHTML from VE original');
+          } else if (originalData.textContent !== undefined) {
+            // Fallback to textContent if innerHTML not available
+            element.textContent = originalData.textContent;
+            debugLog('[ABsmartly Page] Restored text content from VE original');
+          }
+
+          // Restore styles
+          if (originalData.styles) {
+            Object.keys(originalData.styles).forEach(prop => {
+              element.style[prop] = originalData.styles[prop];
+            });
+            debugLog('[ABsmartly Page] Restored styles from VE original');
+          }
+
+          // Restore attributes
+          if (originalData.attributes) {
+            Object.keys(originalData.attributes).forEach(attr => {
+              if (originalData.attributes[attr] !== null) {
+                element.setAttribute(attr, originalData.attributes[attr]);
+              } else {
+                element.removeAttribute(attr);
+              }
+            });
+            debugLog('[ABsmartly Page] Restored attributes from VE original');
+          }
+        } catch (e) {
+          console.warn('[ABsmartly Page] Failed to restore element from data-absmartly-original:', e);
+        }
+
+        // DON'T remove data-absmartly-original!
+        // VE stores original values here and we need them when preview is re-enabled.
+        // We only remove the markers that indicate the element is currently modified.
+      }
+
       element.removeAttribute('data-absmartly-experiment');
       element.removeAttribute('data-absmartly-modified');
       restoredCount++;
@@ -404,7 +462,22 @@
                 element.classList.toggle(change.className);
               }
               break;
-              
+
+            case 'delete':
+              // In preview mode, mimic delete by hiding (display: none)
+              // In production, the DOM Changes plugin will actually remove the element
+              if (!originalData.styles) {
+                originalData.styles = {};
+              }
+              if (!originalData.styles.display) {
+                const computedStyle = window.getComputedStyle(element);
+                originalData.styles.display = element.style.display || computedStyle.display || '';
+              }
+              debugLog(`[ABsmartly Page] 🗑️ Mimicking delete by hiding element (display: none)`);
+              element.style.display = 'none';
+              element.dataset.absmartlyModified = 'true';
+              break;
+
             default:
               debugWarn(`[ABsmartly Page] Unknown change type: ${change.type}`);
           }
