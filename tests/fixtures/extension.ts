@@ -34,8 +34,8 @@ type ExtFixtures = {
 
 export const test = base.extend<ExtFixtures>({
   context: async ({}, use) => {
-    // Ensure extension is built (will build if needed)
-    ensureExtensionBuilt()
+    // Extension build is already ensured in global setup
+    // Don't rebuild here to avoid multiple rebuilds per test
 
     const extPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
 
