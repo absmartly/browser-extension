@@ -289,6 +289,39 @@ test.describe('Visual Editor Complete Workflow', () => {
     await debugWait()
 
       console.log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Move up, Edit HTML)')
+      
+      // Verify the actual DOM changes were applied
+      console.log('\n✓ Verifying DOM changes were actually applied...')
+      const appliedChanges = await testPage.evaluate(() => {
+        const paragraph = document.querySelector('#test-paragraph')
+        const button1 = document.querySelector('#button-1')
+        const button2 = document.querySelector('#button-2')
+        const sectionTitle = document.querySelector('#section-title')
+        
+        return {
+          paragraphText: paragraph?.textContent?.trim(),
+          button1Display: button1 ? window.getComputedStyle(button1).display : null,
+          button2Exists: !!button2,
+          sectionTitleHTML: sectionTitle?.innerHTML
+        }
+      })
+      
+      console.log('  Applied changes:', appliedChanges)
+      
+      // Verify each specific change
+      expect(appliedChanges.paragraphText).toBe('Modified text!')
+      console.log('  ✓ Text change applied: paragraph text is "Modified text!"')
+      
+      expect(appliedChanges.button1Display).toBe('none')
+      console.log('  ✓ Hide change applied: button-1 is display:none')
+      
+      expect(appliedChanges.button2Exists).toBe(false)
+      console.log('  ✓ Delete change applied: button-2 was removed from DOM')
+      
+      expect(appliedChanges.sectionTitleHTML).toBe('<h2>HTML Edited!</h2>')
+      console.log('  ✓ HTML change applied: section-title has new HTML')
+      
+      console.log('✅ All DOM changes verified and applied correctly')
       await debugWait()
     })
 
