@@ -38,7 +38,214 @@
   let isInitializing = false;
   let isInitialized = false;
   let cachedContext = null; // Cache the context to avoid repeated detection
+  
+  // State tracking for preview changes (so we can revert them)
+  const previewStateMap = new Map(); // Map<Element, {experimentName, originalState}>
   let contextPropertyPath = null; // Store WHERE the context is found
+
+  /**
+   * Apply a single preview change and track it for reversion
+   */
+  function applyPreviewChange(change, experimentName) {
+    if (!change.selector || !change.type) {
+      debugWarn('[ABsmartly Page] Invalid change, missing selector or type');
+      return false;
+    }
+
+    // Skip disabled changes
+    if (change.enabled === false) {
+      debugLog('[ABsmartly Page] Skipping disabled change:', change.selector);
+      return false;
+    }
+
+    const elements = document.querySelectorAll(change.selector);
+    
+    if (elements.length === 0) {
+      debugWarn('[ABsmartly Page] No elements found for selector:', change.selector);
+      return false;
+    }
+
+    debugLog(`[ABsmartly Page] Applying preview change to ${elements.length} element(s):`, change.selector, change.type);
+
+    elements.forEach((element) => {
+      // Store original state if not already stored for this experiment
+      if (!previewStateMap.has(element) || previewStateMap.get(element).experimentName !== experimentName) {
+        const originalState = captureElementState(element);
+        previewStateMap.set(element, {
+          experimentName,
+          originalState,
+          selector: change.selector,
+          changeType: change.type
+        });
+        debugLog('[ABsmartly Page] Stored original state for element:', element);
+      }
+
+      // Mark element with experiment
+      element.setAttribute('data-absmartly-experiment', experimentName);
+      element.setAttribute('data-absmartly-modified', 'true');
+
+      // Apply the change based on type
+      switch (change.type) {
+        case 'text':
+          element.textContent = change.value;
+          break;
+
+        case 'html':
+          element.innerHTML = change.value;
+          break;
+
+        case 'style':
+        case 'styles':
+          const styles = change.styles || change.value;
+          if (typeof styles === 'object') {
+            Object.entries(styles).forEach(([prop, value]) => {
+              element.style[prop] = value;
+            });
+          } else if (typeof styles === 'string') {
+            element.setAttribute('style', styles);
+          }
+          break;
+
+        case 'class':
+          if (change.className) {
+            element.classList.add(change.className);
+          }
+          break;
+
+        case 'attribute':
+          if (change.attribute && change.value !== undefined) {
+            element.setAttribute(change.attribute, change.value);
+          }
+          break;
+      }
+
+      debugLog('[ABsmartly Page] Applied change to element:', element);
+    });
+
+    return true;
+  }
+
+  /**
+   * Capture the current state of an element
+   */
+  function captureElementState(element) {
+    const state = {
+      textContent: element.textContent,
+      innerHTML: element.innerHTML,
+      attributes: {},
+      styles: {},
+      classList: Array.from(element.classList)
+    };
+
+    // Capture all attributes
+    for (const attr of Array.from(element.attributes)) {
+      state.attributes[attr.name] = attr.value;
+    }
+
+    // Capture inline styles
+    if (element.style.length > 0) {
+      for (let i = 0; i < element.style.length; i++) {
+        const prop = element.style[i];
+        state.styles[prop] = element.style.getPropertyValue(prop);
+      }
+    }
+
+    return state;
+  }
+
+  /**
+   * Remove all preview changes for an experiment
+   */
+  function removePreviewChanges(experimentName) {
+    debugLog('[ABsmartly Page] Removing preview changes for experiment:', experimentName);
+
+    let restoredCount = 0;
+    const elementsToRemove = [];
+
+    // First, restore elements we tracked in previewStateMap
+    previewStateMap.forEach((data, element) => {
+      if (data.experimentName === experimentName) {
+        // Restore element to original state
+        restoreElementState(element, data.originalState);
+        elementsToRemove.push(element);
+        restoredCount++;
+      }
+    });
+
+    // Clean up the map
+    elementsToRemove.forEach(element => previewStateMap.delete(element));
+
+    // Also remove markers from any elements with this experiment (e.g., from visual editor)
+    // Try both the actual experiment name and __preview__ (visual editor default)
+    const markedElements = document.querySelectorAll(
+      `[data-absmartly-experiment="${experimentName}"], [data-absmartly-experiment="__preview__"]`
+    );
+    markedElements.forEach(element => {
+      element.removeAttribute('data-absmartly-experiment');
+      element.removeAttribute('data-absmartly-modified');
+      restoredCount++;
+    });
+
+    debugLog(`[ABsmartly Page] Removed preview changes, cleaned ${restoredCount} elements`);
+    return restoredCount > 0;
+  }
+
+  /**
+   * Restore an element to its original state
+   */
+  function restoreElementState(element, originalState) {
+    try {
+      // Restore text content
+      if (originalState.textContent !== undefined) {
+        element.textContent = originalState.textContent;
+      }
+
+      // Restore innerHTML
+      if (originalState.innerHTML !== undefined) {
+        element.innerHTML = originalState.innerHTML;
+      }
+
+      // Restore attributes
+      if (originalState.attributes) {
+        // First, remove all current attributes except data-* ones we want to clean
+        const currentAttrs = Array.from(element.attributes);
+        currentAttrs.forEach(attr => {
+          if (!originalState.attributes.hasOwnProperty(attr.name)) {
+            element.removeAttribute(attr.name);
+          }
+        });
+
+        // Then restore original attributes
+        Object.entries(originalState.attributes).forEach(([name, value]) => {
+          element.setAttribute(name, value);
+        });
+      }
+
+      // Restore styles
+      if (originalState.styles) {
+        // Clear all inline styles first
+        element.removeAttribute('style');
+        
+        // Restore original styles
+        Object.entries(originalState.styles).forEach(([prop, value]) => {
+          element.style.setProperty(prop, value);
+        });
+      }
+
+      // Restore class list
+      if (originalState.classList) {
+        element.className = originalState.classList.join(' ');
+      }
+
+      // Remove tracking attributes
+      element.removeAttribute('data-absmartly-experiment');
+      element.removeAttribute('data-absmartly-modified');
+
+      debugLog('[ABsmartly Page] Restored element to original state:', element);
+    } catch (error) {
+      debugError('[ABsmartly Page] Error restoring element:', error);
+    }
+  }
 
   // Capture the extension URL from the current script (must be done synchronously at script load)
   const scriptSrc = document.currentScript ? document.currentScript.src : null;
@@ -755,307 +962,39 @@
         return;
       }
 
-      // Handle preview changes
+      // Handle preview changes - we do this ourselves, not relying on any plugin
       if (event.data.type === 'PREVIEW_CHANGES') {
         debugLog('[ABsmartly Page] Handling PREVIEW_CHANGES message');
-        const { changes, updateMode } = event.data.payload || {};
+        const { changes, experimentName } = event.data.payload || {};
+        const expName = experimentName || '__preview__';
         
-        // Try to get the plugin instance - check all possible locations
-        let plugin = null;
+        debugLog('[ABsmartly Page] Applying preview changes for experiment:', expName);
+        debugLog('[ABsmartly Page] Changes to apply:', changes);
         
-        // First try from context
-        if (cachedContext && cachedContext.__domPlugin && cachedContext.__domPlugin.instance) {
-          plugin = cachedContext.__domPlugin.instance;
-          debugLog('[ABsmartly Page] Got plugin from context.__domPlugin');
-        }
-        // Don't use window reference - only use context.__domPlugin
-        // Try site's own plugin instances
-        else if (window.__absmartlyPlugin) {
-          plugin = window.__absmartlyPlugin;
-          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyPlugin');
-        }
-        else if (window.__absmartlyDOMChangesPlugin) {
-          plugin = window.__absmartlyDOMChangesPlugin;
-          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyDOMChangesPlugin');
-        }
-        // If still no plugin, try to detect it
-        else {
-          const existingPlugin = isPluginAlreadyLoaded();
-          if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
-            plugin = existingPlugin;
-            debugLog('[ABsmartly Page] Got plugin from isPluginAlreadyLoaded()');
-          }
+        // First, remove any existing preview changes for this experiment
+        removePreviewChanges(expName);
+        
+        // Now apply the new changes and track them
+        if (changes && Array.isArray(changes)) {
+          changes.forEach((change) => {
+            applyPreviewChange(change, expName);
+          });
         }
         
-        if (plugin) {
-          const { experimentName } = event.data.payload || {};
-          const expName = experimentName || '__preview__';
-          debugLog('[ABsmartly Page] Applying preview changes for experiment:', expName);
-          debugLog('[ABsmartly Page] Update mode:', updateMode);
-          debugLog('[ABsmartly Page] Changes to apply:', changes);
-          
-          try {
-            // Always remove all changes first for now
-            // The plugin doesn't have a way to remove individual changes yet
-            if (typeof plugin.removeChanges === 'function') {
-              plugin.removeChanges(expName);
-              debugLog('[ABsmartly Page] Removed existing changes for experiment:', expName);
-            }
-            
-            // Apply changes using the public applyChange method
-            if (typeof plugin.applyChange === 'function') {
-              let appliedCount = 0;
-              for (const change of (changes || [])) {
-                if (plugin.applyChange(change, expName)) {
-                  appliedCount++;
-                  debugLog('[ABsmartly Page] Applied change:', change.selector, change.type);
-                } else {
-                  debugLog('[ABsmartly Page] Failed to apply change:', change.selector, change.type);
-                }
-              }
-              debugLog('[ABsmartly Page] Successfully applied', appliedCount, 'of', (changes || []).length, 'changes via applyChange');
-            } else if (plugin.domManipulator && typeof plugin.domManipulator.applyChange === 'function') {
-              // Fallback to domManipulator for older plugin versions
-              debugLog('[ABsmartly Page] Using domManipulator fallback (older plugin version)');
-              let appliedCount = 0;
-              for (const change of (changes || [])) {
-                if (plugin.domManipulator.applyChange(change, expName)) {
-                  appliedCount++;
-                  debugLog('[ABsmartly Page] Applied change:', change.selector, change.type);
-                } else {
-                  debugLog('[ABsmartly Page] Failed to apply change:', change.selector, change.type);
-                }
-              }
-              debugLog('[ABsmartly Page] Successfully applied', appliedCount, 'of', (changes || []).length, 'changes via domManipulator');
-            } else {
-              debugLog('[ABsmartly Page] ERROR: No applyChange method available on plugin');
-            }
-            
-            debugLog('[ABsmartly Page] Successfully applied preview changes');
-            
-            // IMMEDIATE DOM INSPECTION
-            debugLog('[ABsmartly Page] 🔍 IMMEDIATE DOM CHECK:');
-            if (changes && changes.length > 0) {
-              changes.forEach((change) => {
-                if (change.selector === 'div:nth-of-type(1) > div:nth-of-type(1) > div > h1') {
-                  const h1Elements = document.querySelectorAll(change.selector);
-                  h1Elements.forEach((el) => {
-                    const computed = window.getComputedStyle(el);
-                    debugLog('[ABsmartly Page] 🔍 H1 Element State:', {
-                      text: el.textContent,
-                      inlineStyles: el.getAttribute('style'),
-                      backgroundColor: computed.backgroundColor,
-                      border: computed.border,
-                      borderRadius: computed.borderRadius,
-                      parentBg: el.parentElement ? window.getComputedStyle(el.parentElement).backgroundColor : 'none'
-                    });
-                  });
-                }
-              });
-            }
-            
-            // Immediately inspect DOM state after plugin applies changes
-            if (changes && changes.length > 0) {
-              debugLog('[ABsmartly Page] 🔍 DEBUG: Inspecting DOM state after plugin changes - Version 1.0.3');
-              debugLog('[ABsmartly Page] 🔍 Changes to inspect:', changes);
-              changes.forEach((change, index) => {
-                if (change.selector) {
-                  const elements = document.querySelectorAll(change.selector);
-                  elements.forEach((element, elemIndex) => {
-                    const computedStyle = window.getComputedStyle(element);
-                    debugLog(`[ABsmartly Page] 🔍 Element after plugin change ${index + 1}:`, {
-                      selector: change.selector,
-                      changeType: change.type,
-                      enabled: change.enabled !== false,
-                      element: element,
-                      tagName: element.tagName,
-                      id: element.id || 'no-id',
-                      className: element.className || 'no-class',
-                      textContent: element.textContent?.substring(0, 100),
-                      inlineStyles: element.getAttribute('style') || 'no-inline-styles',
-                      dataAttributes: {
-                        absmartlyExperiment: element.dataset.absmartlyExperiment,
-                        absmartlyOriginal: element.dataset.absmartlyOriginal?.substring(0, 100),
-                        absmartlyModified: element.dataset.absmartlyModified
-                      },
-                      computedStyles: {
-                        backgroundColor: computedStyle.backgroundColor,
-                        border: computedStyle.border,
-                        borderRadius: computedStyle.borderRadius,
-                        padding: computedStyle.padding,
-                        boxShadow: computedStyle.boxShadow,
-                        display: computedStyle.display
-                      },
-                      outerHTML: element.outerHTML.substring(0, 500)
-                    });
-                  });
-                }
-              });
-            }
-          } catch (error) {
-            debugError('[ABsmartly Page] Error applying preview changes:', error);
-          }
-        } else if (plugin) {
-          debugError('[ABsmartly Page] Plugin found but required methods not available. Plugin:', plugin);
-          debugLog('[ABsmartly Page] Available plugin methods:', Object.keys(plugin).filter(k => typeof plugin[k] === 'function'));
-          
-          // Try to apply changes manually as last resort
-          if (changes && changes.length > 0) {
-            debugLog('[ABsmartly Page] Attempting manual DOM changes application');
-            applyDOMChangesManually(changes);
-          }
-        } else {
-          debugError('[ABsmartly Page] Plugin not found. Checking available objects...');
-          debugLog('[ABsmartly Page] window.__absmartlyPlugin:', window.__absmartlyPlugin);
-          debugLog('[ABsmartly Page] cachedContext:', cachedContext);
-          debugLog('[ABsmartly Page] cachedContext.__domPlugin:', cachedContext ? cachedContext.__domPlugin : 'no context');
-          
-          // Try to apply changes manually as last resort
-          if (changes && changes.length > 0) {
-            debugLog('[ABsmartly Page] Attempting manual DOM changes application without plugin');
-            applyDOMChangesManually(changes);
-          }
-        }
+        debugLog('[ABsmartly Page] Successfully applied preview changes');
         return;
       }
 
-      // Handle remove preview
+      // Handle remove preview - we do this ourselves, not relying on any plugin
       if (event.data.type === 'REMOVE_PREVIEW') {
         debugLog('[ABsmartly Page] Handling REMOVE_PREVIEW message');
+        const { experimentName } = event.data.payload || {};
+        const expName = experimentName || '__preview__';
         
-        // Try to get the plugin instance - check all possible locations
-        let plugin = null;
+        debugLog('[ABsmartly Page] Removing preview changes for experiment:', expName);
+        removePreviewChanges(expName);
         
-        // First try from context
-        if (cachedContext && cachedContext.__domPlugin && cachedContext.__domPlugin.instance) {
-          plugin = cachedContext.__domPlugin.instance;
-          debugLog('[ABsmartly Page] Got plugin from context.__domPlugin');
-        }
-        // Don't use window reference - only use context.__domPlugin
-        // Try site's own plugin instances
-        else if (window.__absmartlyPlugin) {
-          plugin = window.__absmartlyPlugin;
-          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyPlugin');
-        }
-        else if (window.__absmartlyDOMChangesPlugin) {
-          plugin = window.__absmartlyDOMChangesPlugin;
-          debugLog('[ABsmartly Page] Got plugin from window.__absmartlyDOMChangesPlugin');
-        }
-        // If still no plugin, try to detect it
-        else {
-          const existingPlugin = isPluginAlreadyLoaded();
-          if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
-            plugin = existingPlugin;
-            debugLog('[ABsmartly Page] Got plugin from isPluginAlreadyLoaded()');
-          }
-        }
-        
-        if (plugin && typeof plugin.removeChanges === 'function') {
-          const { experimentName } = event.data.payload || {};
-          const expName = experimentName || '__preview__';
-          debugLog('[ABsmartly Page] Removing preview changes using removeChanges for experiment:', expName);
-          
-          // Check H1 state BEFORE removal
-          const h1BeforeRemoval = document.querySelector('div:nth-of-type(1) > div:nth-of-type(1) > div > h1');
-          if (h1BeforeRemoval) {
-            const computedBefore = window.getComputedStyle(h1BeforeRemoval);
-            debugLog('[ABsmartly Page] 🔍 H1 BEFORE removal:', {
-              text: h1BeforeRemoval.textContent,
-              inlineStyles: h1BeforeRemoval.getAttribute('style'),
-              backgroundColor: computedBefore.backgroundColor,
-              border: computedBefore.border,
-              borderRadius: computedBefore.borderRadius
-            });
-          }
-          
-          // First, capture state of elements BEFORE removal
-          debugLog('[ABsmartly Page] 🔍 DEBUG: Capturing state BEFORE removal');
-          const elementsBeforeRemoval = [];
-          // Find all elements with preview changes
-          const previewElements = document.querySelectorAll('[data-absmartly-experiment="__preview__"]');
-          previewElements.forEach((element) => {
-            const computedStyle = window.getComputedStyle(element);
-            elementsBeforeRemoval.push({
-              element: element,
-              tagName: element.tagName,
-              textContent: element.textContent?.substring(0, 100),
-              inlineStyles: element.getAttribute('style') || 'no-inline-styles',
-              computedStyles: {
-                backgroundColor: computedStyle.backgroundColor,
-                border: computedStyle.border,
-                borderRadius: computedStyle.borderRadius
-              }
-            });
-          });
-          debugLog('[ABsmartly Page] Elements before removal:', elementsBeforeRemoval);
-          
-          try {
-            // Use removeChanges to remove all changes for this experiment
-            plugin.removeChanges(expName);
-            debugLog('[ABsmartly Page] Successfully called plugin.removeChanges for:', expName);
-            
-            // Check H1 state AFTER removal
-            setTimeout(() => {
-              const h1AfterRemoval = document.querySelector('div:nth-of-type(1) > div:nth-of-type(1) > div > h1');
-              if (h1AfterRemoval) {
-                const computedAfter = window.getComputedStyle(h1AfterRemoval);
-                debugLog('[ABsmartly Page] 🔍 H1 AFTER removal:', {
-                  text: h1AfterRemoval.textContent,
-                  inlineStyles: h1AfterRemoval.getAttribute('style'),
-                  backgroundColor: computedAfter.backgroundColor,
-                  border: computedAfter.border,
-                  borderRadius: computedAfter.borderRadius,
-                  dataset: h1AfterRemoval.dataset
-                });
-              }
-            }, 100);
-            
-            // Now inspect the same elements AFTER removal
-            debugLog('[ABsmartly Page] 🔍 DEBUG: Inspecting DOM state AFTER removal');
-            elementsBeforeRemoval.forEach((beforeState, index) => {
-              const element = beforeState.element;
-              const computedStyleAfter = window.getComputedStyle(element);
-              debugLog(`[ABsmartly Page] 🔍 Element ${index + 1} after removal:`, {
-                tagName: element.tagName,
-                id: element.id || 'no-id',
-                className: element.className || 'no-class',
-                textContentBefore: beforeState.textContent,
-                textContentAfter: element.textContent?.substring(0, 100),
-                inlineStylesBefore: beforeState.inlineStyles,
-                inlineStylesAfter: element.getAttribute('style') || 'no-inline-styles',
-                dataAttributes: {
-                  absmartlyExperiment: element.dataset.absmartlyExperiment,
-                  absmartlyOriginal: element.dataset.absmartlyOriginal?.substring(0, 100),
-                  absmartlyModified: element.dataset.absmartlyModified
-                },
-                computedStylesBefore: beforeState.computedStyles,
-                computedStylesAfter: {
-                  backgroundColor: computedStyleAfter.backgroundColor,
-                  border: computedStyleAfter.border,
-                  borderRadius: computedStyleAfter.borderRadius,
-                  padding: computedStyleAfter.padding,
-                  boxShadow: computedStyleAfter.boxShadow
-                },
-                outerHTML: element.outerHTML.substring(0, 500)
-              });
-            });
-          } catch (error) {
-            debugError('[ABsmartly Page] Error removing preview:', error);
-          }
-        } else if (plugin && typeof plugin.revertChanges === 'function') {
-          // Fallback: try revertChanges method
-          debugLog('[ABsmartly Page] Using revertChanges as fallback for removing preview');
-          try {
-            plugin.revertChanges();
-            debugLog('[ABsmartly Page] Successfully reverted changes via revertChanges');
-          } catch (error) {
-            debugError('[ABsmartly Page] Error reverting changes:', error);
-          }
-        } else {
-          // Fallback to manual removal
-          debugLog('[ABsmartly Page] Using manual DOM changes removal as fallback');
-          removeDOMChangesManually();
-        }
+        debugLog('[ABsmartly Page] Successfully removed preview changes');
         return;
       }
 
@@ -1148,41 +1087,21 @@
                   document.head.appendChild(script);
                 });
 
-                // Load Extension plugin wrapper
-                const extPluginUrl = extensionBaseUrl + 'absmartly-extension-plugin.dev.js?v=' + Date.now();
-                debugLog(`[ABsmartly Extension] Loading extension plugin from: ${extPluginUrl}`);
-
-                await new Promise((resolve, reject) => {
-                  const script = document.createElement('script');
-                  script.src = extPluginUrl;
-                  script.onload = () => {
-                    debugLog('[ABsmartly Extension] Extension plugin loaded');
-                    resolve();
-                  };
-                  script.onerror = () => {
-                    debugError('[ABsmartly Extension] Failed to load extension plugin');
-                    reject();
-                  };
-                  document.head.appendChild(script);
-                });
-
-                // Verify plugins are loaded
-                if (window.ABsmartlySDKPlugins && window.ABsmartlyExtensionPlugin) {
+                // Verify SDK plugins are loaded
+                if (window.ABsmartlySDKPlugins) {
                   const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
-                  const { ExtensionDOMPlugin } = window.ABsmartlyExtensionPlugin;
 
-                  if (DOMChangesPluginLite && ExtensionDOMPlugin && OverridesPluginLite) {
-                    debugLog('[ABsmartly Extension] All plugin classes loaded successfully');
+                  if (DOMChangesPluginLite && OverridesPluginLite) {
+                    debugLog('[ABsmartly Extension] SDK plugin classes loaded successfully');
                     window.__absmartlyPluginClasses = {
                       DOMChangesPluginLite,
-                      ExtensionDOMPlugin,
                       OverridesPluginLite
                     };
                   } else {
                     debugError('[ABsmartly Extension] Required plugin classes not found');
                   }
                 } else {
-                  debugError('[ABsmartly Extension] Plugins not properly loaded');
+                  debugError('[ABsmartly Extension] SDK plugins not properly loaded');
                 }
               } catch (error) {
                 debugError('[ABsmartly Extension] Error loading plugins:', error);
@@ -1198,7 +1117,7 @@
         }
         
         // If plugins are already available, prepare for initialization
-        if (window.ABsmartlySDKPlugins && window.ABsmartlyExtensionPlugin) {
+        if (window.ABsmartlySDKPlugins) {
           debugLog('[ABsmartly Extension] Plugin libraries already loaded');
 
           // Check if already initialized by the website
@@ -1210,14 +1129,12 @@
           }
 
           const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
-          const { ExtensionDOMPlugin } = window.ABsmartlyExtensionPlugin;
 
-          if (DOMChangesPluginLite && ExtensionDOMPlugin && OverridesPluginLite) {
+          if (DOMChangesPluginLite && OverridesPluginLite) {
             debugLog('[ABsmartly Extension] All plugin classes available, ready for initialization');
             // Store classes for initialization
             window.__absmartlyPluginClasses = {
               DOMChangesPluginLite,
-              ExtensionDOMPlugin,
               OverridesPluginLite
             };
           } else {
@@ -1254,9 +1171,9 @@
             return;
           }
 
-          const { DOMChangesPluginLite, ExtensionDOMPlugin, OverridesPluginLite } = classes;
+          const { DOMChangesPluginLite, OverridesPluginLite } = classes;
 
-          if (!DOMChangesPluginLite || !ExtensionDOMPlugin || !OverridesPluginLite) {
+          if (!DOMChangesPluginLite || !OverridesPluginLite) {
             debugError('[ABsmartly Extension] Required plugin classes not available');
             debugLog('[ABsmartly Extension] Available:', Object.keys(classes));
             return;
@@ -1309,9 +1226,9 @@
             overridesPlugin.initialize().then(() => {
               debugLog('[ABsmartly Extension] OverridesPlugin initialized, overrides applied');
 
-              // STEP 2: Initialize DOMChangesPluginLite (base plugin)
+              // STEP 2: Initialize DOMChangesPluginLite
               debugLog('[ABsmartly Extension] Initializing DOMChangesPluginLite...');
-              const baseDOMPlugin = new DOMChangesPluginLite({
+              const domPlugin = new DOMChangesPluginLite({
                 context: context,
                 autoApply: true,
                 spa: true,
@@ -1321,28 +1238,9 @@
                 debug: DEBUG
               });
 
-              // STEP 3: Wrap with ExtensionDOMPlugin for extension features
-              debugLog('[ABsmartly Extension] Wrapping with ExtensionDOMPlugin...');
-              const domPlugin = new ExtensionDOMPlugin(baseDOMPlugin, {
-                context: context,
-                autoApply: true,
-                spa: true,
-                visibilityTracking: true,
-                dataSource: 'variable',
-                dataFieldName: '__dom_changes',
-                debug: DEBUG
-              });
-
-              // Initialize extension plugin
+              // Initialize DOM plugin
               domPlugin.initialize().then(() => {
-                debugLog('[ABsmartly Extension] ExtensionDOMPlugin initialized successfully');
-
-                // The plugin registers itself with context.__domPlugin
-                // We can verify it's registered
-                if (context.__domPlugin && context.__domPlugin.instance === domPlugin) {
-                  debugLog('[ABsmartly Extension] Plugin successfully registered with context.__domPlugin');
-                  debugLog('[ABsmartly Extension] Plugin methods available:', Object.keys(domPlugin).filter(k => typeof domPlugin[k] === 'function'));
-                }
+                debugLog('[ABsmartly Extension] DOMChangesPluginLite initialized successfully');
 
                 // Inject custom code if provided
                 if (customCode) {
@@ -1351,13 +1249,7 @@
                     // Parse the custom code object
                     const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
 
-                    // Call the plugin's injectCode method for HTML/CSS
-                    if (domPlugin.injectCode && typeof domPlugin.injectCode === 'function') {
-                      domPlugin.injectCode(codeData);
-                      debugLog('[ABsmartly Extension] Custom code injected via plugin.injectCode');
-                    }
-
-                    // ALWAYS execute scripts manually since the plugin's injection doesn't execute them
+                    // Execute scripts for each location
                     ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
                       if (codeData[location]) {
                         debugLog(`[ABsmartly Extension] Executing scripts for ${location}`);
@@ -1374,8 +1266,8 @@
                   source: 'absmartly-page',
                   type: 'PLUGIN_INITIALIZED',
                   payload: {
-                    version: context.__domPlugin ? context.__domPlugin.version : '1.0.0',
-                    capabilities: context.__domPlugin ? context.__domPlugin.capabilities : []
+                    version: '1.0.0-lite',
+                    capabilities: ['auto-apply', 'overrides']
                   }
                 }, '*');
 

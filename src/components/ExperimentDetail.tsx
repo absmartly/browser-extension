@@ -989,6 +989,7 @@ export function ExperimentDetail({
                       onChange={(changes) => handleDOMChangesUpdate(variantKey, changes)}
                       previewEnabled={previewEnabled && activePreviewVariant === variantKey}
                       onPreviewToggle={(enabled) => {
+                        debugLog('🔘 Preview toggle clicked:', { enabled, variantKey, currentPreviewEnabled: previewEnabled, currentActiveVariant: activePreviewVariant })
                         setActivePreviewVariant(variantKey)
                         // Use the variantKey directly instead of waiting for state update
                         handlePreviewToggleForVariant(enabled, variantKey)

@@ -17,15 +17,6 @@ function buildVisualEditor() {
   }
 }
 
-function buildExtensionPlugin() {
-  console.log('[Dev Build] Building extension plugin...');
-  try {
-    execSync('node scripts/bundle-extension-plugin.js', { stdio: 'inherit' });
-  } catch (error) {
-    console.error('[Dev Build] Failed to build extension plugin:', error);
-  }
-}
-
 function copyWithHash() {
   if (!fs.existsSync(devBuildDir)) {
     // Dev build directory doesn't exist yet, wait
@@ -35,9 +26,6 @@ function copyWithHash() {
 
   // Build visual editor first
   buildVisualEditor();
-
-  // Build extension plugin
-  buildExtensionPlugin();
 
   // Copy SDK plugins bundle - use development build for dev builds (Lite version)
   const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-sdk-plugins', 'dist');
@@ -68,30 +56,6 @@ function copyWithHash() {
         console.log(`[Dev Build] Copied ${pluginFilename}.map`);
       }
     }
-  }
-
-  // Copy extension plugin bundle
-  const extPluginDevSource = path.join(publicDir, 'absmartly-extension-plugin.dev.js');
-  const extPluginProdSource = path.join(publicDir, 'absmartly-extension-plugin.min.js');
-
-  if (fs.existsSync(extPluginDevSource)) {
-    const extPluginDest = path.join(devBuildDir, 'absmartly-extension-plugin.dev.js');
-    fs.copyFileSync(extPluginDevSource, extPluginDest);
-    console.log('[Dev Build] Copied absmartly-extension-plugin.dev.js');
-
-    // Copy source map
-    const mapSource = extPluginDevSource + '.map';
-    if (fs.existsSync(mapSource)) {
-      const mapDest = path.join(devBuildDir, 'absmartly-extension-plugin.dev.js.map');
-      fs.copyFileSync(mapSource, mapDest);
-      console.log('[Dev Build] Copied absmartly-extension-plugin.dev.js.map');
-    }
-  }
-
-  if (fs.existsSync(extPluginProdSource)) {
-    const extPluginDest = path.join(devBuildDir, 'absmartly-extension-plugin.min.js');
-    fs.copyFileSync(extPluginProdSource, extPluginDest);
-    console.log('[Dev Build] Copied absmartly-extension-plugin.min.js');
   }
 
   if (fs.existsSync(injectScriptSource)) {

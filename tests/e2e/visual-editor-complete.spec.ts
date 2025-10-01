@@ -369,10 +369,132 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Wait 30 seconds at the end in slow mode to inspect the result
       if (SLOW_MODE) {
-        console.log('\n⏳ Slow mode: Waiting 30 seconds before test completion...')
+        console.log('⏳ Slow mode: Waiting 30 seconds before test completion...')
         await debugWait(30000)
         console.log('✅ Slow wait complete')
       }
+    })
+
+    await test.step('Test preview mode toggle', async () => {
+      console.log('👁️ STEP 7: Testing preview mode removal')
+
+      // NOTE: Preview is already enabled after using the visual editor in step 4
+      // So the first click will DISABLE preview, and second click will re-enable it
+
+      // Listen for console messages from the page to debug
+      testPage.on('console', msg => {
+        if (msg.text().includes('[ABsmartly Page]') || msg.text().includes('PREVIEW')) {
+          console.log(`  [Page Console] ${msg.text()}`)
+        }
+      })
+
+      const previewToggle = sidebar.locator('label:has-text("Preview:") button').first()
+
+      // Verify preview is currently enabled (from visual editor usage)
+      console.log('  Verifying preview is currently enabled...')
+      const initialPreviewState = await testPage.evaluate(() => {
+        const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
+        const experimentNames = new Set()
+        modifiedElements.forEach(el => {
+          const expName = el.getAttribute('data-absmartly-experiment')
+          if (expName) experimentNames.add(expName)
+        })
+        return {
+          modifiedElementsCount: modifiedElements.length,
+          experimentNames: Array.from(experimentNames)
+        }
+      })
+      expect(initialPreviewState.modifiedElementsCount).toBeGreaterThan(0)
+      console.log(`  ✓ Preview is enabled (${initialPreviewState.modifiedElementsCount} elements marked)`)
+      console.log(`  Experiment names in markers: ${initialPreviewState.experimentNames.join(', ')}`)
+
+      // Capture current state while preview is enabled
+      console.log('  Capturing element states with preview enabled...')
+      const previewEnabledStates = await testPage.evaluate(() => {
+        const paragraph = document.querySelector('#test-paragraph')
+        const button1 = document.querySelector('#button-1')
+        const button2 = document.querySelector('#button-2')
+        const sectionTitle = document.querySelector('#section-title')
+
+        return {
+          paragraphText: paragraph?.textContent,
+          paragraphVisible: paragraph ? window.getComputedStyle(paragraph).display !== 'none' : false,
+          button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
+          button2Exists: !!button2,
+          sectionTitleHTML: sectionTitle?.innerHTML
+        }
+      })
+      console.log('  States captured:', previewEnabledStates)
+
+      // First click: DISABLE preview (remove preview markers)
+      console.log('  Disabling preview mode...')
+      await previewToggle.click({ timeout: 5000 })
+      console.log('  ✓ Preview mode disabled')
+      await debugWait(2000) // Wait for changes to revert
+
+      // Verify all preview markers were removed (preview was disabled)
+      console.log('  Verifying all preview markers were removed...')
+      const disabledStates = await testPage.evaluate(() => {
+        const paragraph = document.querySelector('#test-paragraph')
+        const button1 = document.querySelector('#button-1')
+        const button2 = document.querySelector('#button-2')
+        const sectionTitle = document.querySelector('#section-title')
+        const stillModified = document.querySelectorAll('[data-absmartly-modified]').length
+        const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]').length
+
+        return {
+          paragraphText: paragraph?.textContent,
+          button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
+          button2Exists: !!button2,
+          sectionTitleHTML: sectionTitle?.innerHTML,
+          stillModifiedCount: stillModified,
+          experimentMarkersCount: experimentMarkers
+        }
+      })
+
+      console.log('  States after disabling:', disabledStates)
+      console.log(`  Modified elements remaining: ${disabledStates.stillModifiedCount}`)
+      console.log(`  Experiment markers remaining: ${disabledStates.experimentMarkersCount}`)
+
+      // Verify all modification markers are removed
+      expect(disabledStates.stillModifiedCount).toBe(0)
+      expect(disabledStates.experimentMarkersCount).toBe(0)
+      console.log('  ✓ All data-absmartly attributes removed')
+
+      // Verify elements still have the changes (disabling preview doesn't revert DOM changes)
+      expect(disabledStates.paragraphText).toBe(previewEnabledStates.paragraphText)
+      expect(disabledStates.button1Visible).toBe(previewEnabledStates.button1Visible)
+      expect(disabledStates.sectionTitleHTML).toBe(previewEnabledStates.sectionTitleHTML)
+      console.log('  ✓ Elements retained their modified states (changes not reverted)')
+      await debugWait()
+
+      // Second click: RE-ENABLE preview (add markers back)
+      console.log('  Re-enabling preview mode...')
+      await previewToggle.click()
+      console.log('  ✓ Preview mode re-enabled')
+      await debugWait(2000)
+
+      // Verify markers were added back
+      const reEnabledStates = await testPage.evaluate(() => {
+        return {
+          modifiedElementsCount: document.querySelectorAll('[data-absmartly-modified]').length,
+          experimentMarkersCount: document.querySelectorAll('[data-absmartly-experiment]').length
+        }
+      })
+
+      console.log(`  Modified elements after re-enable: ${reEnabledStates.modifiedElementsCount}`)
+      console.log(`  Experiment markers after re-enable: ${reEnabledStates.experimentMarkersCount}`)
+
+      expect(reEnabledStates.modifiedElementsCount).toBeGreaterThan(0)
+      expect(reEnabledStates.experimentMarkersCount).toBeGreaterThan(0)
+      console.log('  ✓ Preview markers added back')
+
+      console.log('✅ Preview mode toggle test PASSED!')
+      console.log('  • Preview was enabled after visual editor usage')
+      console.log('  • Disabling preview removed all markers')
+      console.log('  • Elements retained modifications without markers')
+      console.log('  • Re-enabling preview added markers back')
+      await debugWait()
     })
   })
 })
