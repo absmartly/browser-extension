@@ -151,7 +151,14 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     await test.step('Activate Visual Editor', async () => {
-      console.log('\n🎨 STEP 3: Clicking Visual Editor button')
+      console.log('🎨 STEP 3: Clicking Visual Editor button')
+      
+      // Listen for console messages from the page to debug
+      testPage.on('console', msg => {
+        if (msg.text().includes('[ABsmartly') || msg.text().includes('[Visual') || msg.text().includes('PREVIEW')) {
+          console.log(`  [Page Console] ${msg.text()}`)
+        }
+      })
     const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
     await visualEditorButton.click()
 
@@ -383,7 +390,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Listen for console messages from the page to debug
       testPage.on('console', msg => {
-        if (msg.text().includes('[ABsmartly Page]') || msg.text().includes('PREVIEW')) {
+        if (msg.text().includes('[ABsmartly Page]') || msg.text().includes('PREVIEW') || msg.text().includes('[VisualEditor]') || msg.text().includes('Visual Editor Content Script')) {
           console.log(`  [Page Console] ${msg.text()}`)
         }
       })
