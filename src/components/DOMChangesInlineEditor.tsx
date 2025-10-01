@@ -1701,18 +1701,24 @@ export function DOMChangesInlineEditor({
       }
     }
     
+    console.log('[DOMChangesInlineEditor] Setting up message listeners for variant:', variantName)
     chrome.runtime.onMessage.addListener(handleVisualEditorChanges)
 
     // Also listen for window.postMessage in test mode
     const handleWindowMessage = (event: MessageEvent) => {
+      console.log('[DOMChangesInlineEditor] Received window message:', event.data?.type)
       if (event.data?.source === 'absmartly-visual-editor' && event.data?.type === 'VISUAL_EDITOR_CHANGES') {
+        console.log('[DOMChangesInlineEditor] Processing VISUAL_EDITOR_CHANGES from window.postMessage')
         debugLog('📡 Received window.postMessage from visual editor:', event.data)
         // Process the message the same way as chrome.runtime messages
         void handleVisualEditorChanges(event.data, {} as chrome.runtime.MessageSender, () => {})
+        console.log('[DOMChangesInlineEditor] Finished processing window message')
       }
     }
 
+    console.log('[DOMChangesInlineEditor] Adding window message listener')
     window.addEventListener('message', handleWindowMessage)
+    console.log('[DOMChangesInlineEditor] Message listeners ready')
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
