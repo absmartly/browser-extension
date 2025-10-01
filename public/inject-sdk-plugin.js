@@ -234,9 +234,8 @@
           console.warn('[ABsmartly Page] Failed to restore element from data-absmartly-original:', e);
         }
 
-        // DON'T remove data-absmartly-original!
-        // VE stores original values here and we need them when preview is re-enabled.
-        // We only remove the markers that indicate the element is currently modified.
+        // Remove the original data attribute - we're back at original state now
+        element.removeAttribute('data-absmartly-original');
       }
 
       element.removeAttribute('data-absmartly-experiment');
