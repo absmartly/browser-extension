@@ -568,10 +568,17 @@ var ABsmartlyExtensionPlugin = (() => {
           capabilities: ["state-management", "change-reversion"],
           timestamp: Date.now()
         };
+        if (typeof window !== "undefined") {
+          ;
+          window.__absmartlyPlugin = this;
+          window.__absmartlyDOMChangesPlugin = this;
+        }
       }
       this.initialized = true;
       if (this.config.debug) {
         console.log("[ExtensionDOMPlugin] Initialized successfully");
+        console.log("[ExtensionDOMPlugin] Available methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this)).filter((name) => typeof this[name] === "function"));
+        console.log("[ExtensionDOMPlugin] removeChanges is function:", typeof this.removeChanges === "function");
       }
     }
     /**
@@ -595,11 +602,7 @@ var ABsmartlyExtensionPlugin = (() => {
       elements.forEach((element) => {
         try {
           const originalState = this.stateManager.storeState(element, experimentName);
-          if (this.basePlugin.domManipulator?.applyChange) {
-            this.basePlugin.domManipulator.applyChange(change, experimentName);
-          } else {
-            this.applyChangeManually(element, change, experimentName);
-          }
+          this.applyChangeManually(element, change, experimentName);
           this.stateManager.trackChange({
             experimentName,
             selector: change.selector,
@@ -607,6 +610,13 @@ var ABsmartlyExtensionPlugin = (() => {
             element,
             originalState
           });
+          if (this.config.debug) {
+            console.log(`[ExtensionDOMPlugin] Applied ${change.type} change to element:`, {
+              selector: change.selector,
+              experimentName,
+              element
+            });
+          }
         } catch (error) {
           console.error("[ExtensionDOMPlugin] Error applying change:", error);
           success = false;
