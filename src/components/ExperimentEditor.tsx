@@ -580,6 +580,10 @@ export function ExperimentEditor({
                     onChange={(changes) => updateVariantDOMChanges(index, changes)}
                     previewEnabled={previewEnabled && activePreviewVariant === index}
                     onPreviewToggle={(enabled) => handlePreviewToggleForVariant(enabled, index)}
+                    activeVEVariant={null}
+                    onVEStart={() => {}}
+                    onVEStop={() => {}}
+                    activePreviewVariantName={activePreviewVariant !== null ? formData.variants[activePreviewVariant]?.name : null}
                   />
                 </div>
               </div>

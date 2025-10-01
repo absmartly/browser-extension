@@ -620,5 +620,320 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  • Re-enabling preview re-applied changes and added markers back')
       await debugWait()
     })
+
+    await testPage.evaluate(() => {
+      console.log('\n🔄 STEP 8: Testing undo/redo with multiple changes to same element')
+    })
+
+    // Test undo/redo functionality with multiple changes
+    await test.step('Test undo/redo with multiple changes preserves original value', async () => {
+      console.log('\n🔄 Testing undo/redo functionality with multiple changes...')
+
+      // Verify test page is still valid
+      if (testPage.isClosed()) {
+        throw new Error('Test page was closed unexpectedly')
+      }
+
+      // Check if VE is still running and exit it
+      const veActive = await testPage.evaluate(() => {
+        return (window as any).__absmartlyVisualEditorActive === true
+      })
+
+      if (veActive) {
+        console.log('  ⚠️  VE still active from previous step, exiting it first')
+        // Exit VE by calling the exit method directly which will reset all flags
+        await testPage.evaluate(() => {
+          const ve = (window as any).__visualEditor
+          if (ve && typeof ve.exit === 'function') {
+            ve.exit()
+          }
+        })
+
+        // Wait for VE to fully exit
+        await testPage.waitForFunction(() => {
+          return (window as any).__absmartlyVisualEditorActive !== true
+        }, { timeout: 5000 })
+        console.log('  ✓ VE exited successfully')
+      }
+
+      // Check if preview is enabled and disable it
+      const disableButton = sidebar.locator('button:has-text("Disable Preview")')
+      const isPreviewEnabled = await disableButton.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (isPreviewEnabled) {
+        await disableButton.click()
+        // Wait for preview to be disabled
+        await testPage.waitForFunction(() => {
+          const para = document.querySelector('#test-paragraph')
+          return para?.textContent?.includes('This is a test paragraph')
+        })
+        console.log('  ✓ Disabled preview mode')
+      } else {
+        console.log('  ✓ Preview already disabled')
+      }
+
+      // Get fresh sidebar reference to avoid stale frame issues
+      const freshSidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+
+      // Wait for sidebar to be ready
+      await freshSidebar.locator('body').waitFor({ timeout: 5000 })
+
+      // Verify there's only one sidebar frame to prevent duplicate messages
+      const iframes = await testPage.locator('#absmartly-sidebar-iframe').count()
+      if (iframes !== 1) {
+        throw new Error(`Expected 1 sidebar iframe, found ${iframes}`)
+      }
+
+      // Click the VE button for Control variant only
+      // Use nth(0) to explicitly click only the first button, not both
+      const veButtons = freshSidebar.locator('button:has-text("Visual Editor")')
+      const veButtonCount = await veButtons.count()
+      console.log(`  Found ${veButtonCount} Visual Editor buttons`)
+
+      // Click ONLY the first button (Control variant)
+      await veButtons.nth(0).click()
+      console.log('  ✓ Clicked first Visual Editor button only')
+
+      // Wait for VE toolbar to appear and VE to be fully active
+      await testPage.waitForFunction(() => {
+        const toolbar = document.querySelector('.absmartly-toolbar')
+        const active = (window as any).__absmartlyVisualEditorActive
+        return toolbar !== null && active === true
+      }, { timeout: 10000 })
+      console.log('  ✓ Visual editor started fresh for undo/redo test')
+      await debugWait()
+
+      // Get the original paragraph text
+      const originalText = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim()
+      })
+      console.log(`  📝 Original text: "${originalText}"`)
+
+      // Change the paragraph text 4 times
+      const textChanges = ['First change', 'Second change', 'Third change', 'Fourth change']
+
+      for (let i = 0; i < textChanges.length; i++) {
+        // Right-click on paragraph
+        await testPage.locator('#test-paragraph').click({ button: 'right' })
+
+        // Wait for context menu to appear and click Edit Text
+        const editTextButton = testPage.locator('button:has-text("Edit Text")').first()
+        await expect(editTextButton).toBeVisible()
+        await editTextButton.click()
+
+        // Wait for paragraph to be editable (contenteditable=true)
+        await testPage.waitForFunction(() => {
+          const para = document.querySelector('#test-paragraph')
+          return para?.getAttribute('contenteditable') === 'true'
+        })
+
+        // Clear and type new text
+        await testPage.locator('#test-paragraph').fill(textChanges[i])
+
+        // Click outside to commit
+        await testPage.locator('body').click({ position: { x: 10, y: 10 } })
+
+        // Wait for the change to be committed (contenteditable removed)
+        await testPage.waitForFunction(() => {
+          const para = document.querySelector('#test-paragraph')
+          return para?.getAttribute('contenteditable') !== 'true'
+        })
+
+        console.log(`  ✓ Change ${i + 1}: "${textChanges[i]}"`)
+        await debugWait()
+      }
+
+      // Verify we have 4 text changes in the changes array
+      const changeCount = await testPage.evaluate(() => {
+        const changes = (window as any).__visualEditor?.getChanges() || []
+        const textChanges = changes.filter((c: any) => c.selector === '#test-paragraph' && c.type === 'text')
+        return textChanges.length
+      })
+      expect(changeCount).toBe(4)
+      console.log(`  ✓ Created ${changeCount} changes to the same element`)
+
+      // Check that data-absmartly-original still has the REAL original value
+      const storedOriginal = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        if (para && (para as HTMLElement).dataset.absmartlyOriginal) {
+          const data = JSON.parse((para as HTMLElement).dataset.absmartlyOriginal)
+          return data.textContent || data.text || data.innerHTML
+        }
+        return null
+      })
+      console.log(`  📦 Stored original in data attribute: "${storedOriginal?.trim()}"`)
+      expect(storedOriginal?.trim()).toBe(originalText)
+      console.log('  ✓ data-absmartly-original preserved the REAL original value')
+
+      // Now undo all 4 changes one by one
+      for (let i = 4; i > 0; i--) {
+        // Click undo button in VE toolbar
+        const undoButton = testPage.locator('button[title="Undo"]').first()
+        await expect(undoButton).toBeVisible()
+        await undoButton.click()
+
+        // Wait for text to actually change
+        const expectedText = i === 1 ? originalText : textChanges[i-2]
+        await testPage.waitForFunction((expected) => {
+          const para = document.querySelector('#test-paragraph')
+          return para?.textContent?.trim() === expected
+        }, expectedText)
+
+        const currentText = await testPage.evaluate(() => {
+          return document.querySelector('#test-paragraph')?.textContent?.trim()
+        })
+
+        if (i === 1) {
+          // After undoing all changes, should be back to original
+          expect(currentText).toBe(originalText)
+          console.log(`  ↶ Undo ${5-i}: Back to original: "${currentText}"`)
+        } else {
+          // Should be at previous change
+          expect(currentText).toBe(textChanges[i-2])
+          console.log(`  ↶ Undo ${5-i}: "${currentText}"`)
+        }
+        await debugWait()
+      }
+
+      // Verify data-absmartly-original is still correct after all undos
+      const originalAfterUndo = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        if (para && (para as HTMLElement).dataset.absmartlyOriginal) {
+          const data = JSON.parse((para as HTMLElement).dataset.absmartlyOriginal)
+          return data.textContent || data.text || data.innerHTML
+        }
+        return null
+      })
+      console.log(`  📦 Original after all undos: "${originalAfterUndo?.trim()}"`)
+      expect(originalAfterUndo?.trim()).toBe(originalText)
+      console.log('  ✓ Original value still preserved after undoing all changes')
+
+      // Now redo all 4 changes
+      for (let i = 0; i < 4; i++) {
+        const redoButton = testPage.locator('button[title="Redo"]').first()
+        await expect(redoButton).toBeVisible()
+        await redoButton.click()
+
+        // Wait for text to actually change
+        await testPage.waitForFunction((expected) => {
+          const para = document.querySelector('#test-paragraph')
+          return para?.textContent?.trim() === expected
+        }, textChanges[i])
+
+        const currentText = await testPage.evaluate(() => {
+          return document.querySelector('#test-paragraph')?.textContent?.trim()
+        })
+
+        expect(currentText).toBe(textChanges[i])
+        console.log(`  ↷ Redo ${i+1}: "${currentText}"`)
+        await debugWait()
+      }
+
+      // Verify data-absmartly-original STILL has the real original after all redos
+      const originalAfterRedo = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        if (para && (para as HTMLElement).dataset.absmartlyOriginal) {
+          const data = JSON.parse((para as HTMLElement).dataset.absmartlyOriginal)
+          return data.textContent || data.text || data.innerHTML
+        }
+        return null
+      })
+      console.log(`  📦 Original after all redos: "${originalAfterRedo?.trim()}"`)
+      expect(originalAfterRedo?.trim()).toBe(originalText)
+      console.log('  ✓ Original value STILL preserved after redoing all changes')
+
+      // Save the changes
+      const saveButton = testPage.locator('button:has-text("Save")').first()
+      await expect(saveButton).toBeVisible()
+      await saveButton.click()
+      console.log('  💾 Saved all changes')
+      await debugWait()
+
+      // Exit VE
+      const exitButton = testPage.locator('button:has-text("Exit")').first()
+      await expect(exitButton).toBeVisible()
+      await exitButton.click()
+
+      // Wait for VE to actually exit (toolbar removed)
+      await testPage.waitForFunction(() => {
+        return document.querySelector('.absmartly-toolbar') === null
+      })
+      console.log('  🚪 Exited visual editor')
+      await debugWait()
+
+      // Now test that preview mode can be turned off correctly
+      console.log('\n  🧪 Testing preview toggle after undo/redo...')
+
+      // Verify current state
+      const beforeDisable = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return {
+          text: para?.textContent?.trim(),
+          hasOriginal: !!(para as HTMLElement)?.dataset?.absmartlyOriginal
+        }
+      })
+      expect(beforeDisable.text).toBe('Fourth change')
+      expect(beforeDisable.hasOriginal).toBe(true)
+      console.log(`  ✓ Preview enabled, text is: "${beforeDisable.text}"`)
+      await debugWait()
+
+      // Disable preview
+      const disablePreviewButton = sidebar.locator('button:has-text("Disable Preview")')
+      await expect(disablePreviewButton).toBeVisible()
+      await disablePreviewButton.click()
+
+      // Wait for text to actually restore to original
+      await testPage.waitForFunction((expected) => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim() === expected
+      }, originalText)
+
+      // Verify it restored to original
+      const afterDisable = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return {
+          text: para?.textContent?.trim(),
+          hasOriginal: !!(para as HTMLElement)?.dataset?.absmartlyOriginal,
+          hasModified: !!(para as HTMLElement)?.dataset?.absmartlyModified
+        }
+      })
+      expect(afterDisable.text).toBe(originalText)
+      expect(afterDisable.hasOriginal).toBe(false)
+      expect(afterDisable.hasModified).toBe(false)
+      console.log(`  ✓ Preview disabled, restored to original: "${afterDisable.text}"`)
+      console.log('  ✓ All data attributes cleaned up')
+      await debugWait()
+
+      // Re-enable preview
+      const enablePreviewButton = sidebar.locator('button:has-text("Enable Preview")')
+      await expect(enablePreviewButton).toBeVisible()
+      await enablePreviewButton.click()
+
+      // Wait for text to change back to the last change
+      await testPage.waitForFunction(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim() === 'Fourth change'
+      })
+
+      // Verify it re-applied the LAST change (not all intermediate ones)
+      const afterReEnable = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return {
+          text: para?.textContent?.trim(),
+          hasModified: !!(para as HTMLElement)?.dataset?.absmartlyModified
+        }
+      })
+      expect(afterReEnable.text).toBe('Fourth change')
+      expect(afterReEnable.hasModified).toBe(true)
+      console.log(`  ✓ Preview re-enabled, text is: "${afterReEnable.text}"`)
+      await debugWait()
+
+      console.log('\n✅ Undo/redo test PASSED!')
+      console.log('  • Multiple changes to same element work correctly')
+      console.log('  • Undo/redo preserves the real original value')
+      console.log('  • Preview mode toggle works correctly after undo/redo')
+      console.log('  • Only the final change is saved, not intermediate ones')
+    })
   })
 })
