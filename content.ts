@@ -75,18 +75,27 @@ async function startVisualEditor(config: {
       initialChanges: config.changes || [],
       useShadowDOM: useShadowDOM,
       onChangesUpdate: (changes: DOMChange[]) => {
-        debugLog('[Visual Editor Content Script] Changes updated:', changes)
-        console.log('[Content] 📤 Sending VISUAL_EDITOR_CHANGES message with', changes.length, 'changes to extension')
+        console.log('[Visual Editor Content Script] CALLBACK START')
+        debugLog('[Visual Editor Content Script] Changes updated:', changes?.length)
+        console.log('[Visual Editor Content Script] AFTER debugLog - about to send message')
+        console.log('[Visual Editor Content Script] NOW SENDING VISUAL_EDITOR_CHANGES message with', changes.length, 'changes to extension')
 
         if (isTestMode) {
-          // In test mode, use window.postMessage to communicate with sidebar iframe
-          console.log('[Content] 📤 Test mode: Using window.postMessage')
-          window.postMessage({
-            source: 'absmartly-visual-editor',
-            type: 'VISUAL_EDITOR_CHANGES',
-            variantName: config.variantName,
-            changes: changes
-          }, '*')
+          // In test mode, find the sidebar iframe and post message to it
+          console.log('[Visual Editor Content Script] Test mode: Finding sidebar iframe')
+          const iframe = document.querySelector('#absmartly-sidebar-iframe') as HTMLIFrameElement
+          if (iframe && iframe.contentWindow) {
+            console.log('[Visual Editor Content Script] Found iframe, posting message to contentWindow')
+            iframe.contentWindow.postMessage({
+              source: 'absmartly-visual-editor',
+              type: 'VISUAL_EDITOR_CHANGES',
+              variantName: config.variantName,
+              changes: changes
+            }, '*')
+            console.log('[Visual Editor Content Script] Posted message to iframe with', changes.length, 'changes')
+          } else {
+            console.error('[Visual Editor Content Script] Sidebar iframe not found!')
+          }
         } else {
           // In production, use chrome.runtime.sendMessage
           chrome.runtime.sendMessage({
