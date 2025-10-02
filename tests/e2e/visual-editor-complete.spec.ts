@@ -517,6 +517,61 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log(`  • 3 redos: "Modified text!" -> "Undo test 1" -> "Undo test 2" -> "Undo test 3"`)
     })
 
+    await test.step('Test undo/redo button disabled states', async () => {
+      console.log('\n🔘 Testing undo/redo button states...')
+
+      // After all redos, we should be at "Undo test 3"
+      // Now undo ALL changes including the original 5 (text, hide, delete, move, html)
+      // We need to undo 3 text changes + 4 other changes = 7 total undos
+
+      // We already did 3 undos and 3 redos, so we're back at "Undo test 3"
+      // Let's undo ALL 8 changes (3 text + 5 original changes)
+      console.log('  ⏪ Undoing all changes to test undo button disabled state...')
+
+      // Track how many undos we can do
+      let undoCount = 0
+      let undoButton = testPage.locator('[data-action="undo"]')
+
+      while (undoCount < 20) { // Safety limit
+        const isDisabled = await undoButton.isDisabled()
+        if (isDisabled) {
+          console.log(`  ✓ Undo button became disabled after ${undoCount} undos`)
+          break
+        }
+        await undoButton.click()
+        await testPage.waitForTimeout(200)
+        undoCount++
+      }
+
+      // Verify undo button is disabled
+      await expect(undoButton).toBeDisabled()
+      console.log('  ✓ Undo button is disabled when no more changes to undo')
+
+      // Now redo ALL changes
+      console.log('\n  ⏩ Redoing all changes to test redo button disabled state...')
+      let redoCount = 0
+      let redoButton = testPage.locator('[data-action="redo"]')
+
+      while (redoCount < 20) { // Safety limit
+        const isDisabled = await redoButton.isDisabled()
+        if (isDisabled) {
+          console.log(`  ✓ Redo button became disabled after ${redoCount} redos`)
+          break
+        }
+        await redoButton.click()
+        await testPage.waitForTimeout(200)
+        redoCount++
+      }
+
+      // Verify redo button is disabled
+      await expect(redoButton).toBeDisabled()
+      console.log('  ✓ Redo button is disabled when no more changes to redo')
+
+      console.log('\n✅ Undo/redo button states test PASSED!')
+      console.log(`  • Undo button disabled after ${undoCount} undos (no more history)`)
+      console.log(`  • Redo button disabled after ${redoCount} redos (caught up to current state)`)
+    })
+
     await test.step('Save changes to sidebar', async () => {
       console.log('\n💾 STEP 5: Clicking Save button...')
 
