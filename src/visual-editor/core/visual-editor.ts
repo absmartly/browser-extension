@@ -363,20 +363,23 @@ export class VisualEditor {
         this.changes[existingIndex] = change
       }
 
-      // Add to undo stack
-      this.stateManager.pushUndo({
-        type: 'update',
-        change: oldChange,
-        index: existingIndex
+      // Track change for undo/redo using changeTracker
+      this.changeTracker.trackChange('edit', null, {
+        selector: change.selector,
+        type: change.type,
+        newValue: change.value,
+        oldValue: oldChange.value || oldChange.originalText || oldChange.originalHtml
       })
     } else {
       this.changes.push(change)
 
-      // Add to undo stack
-      this.stateManager.pushUndo({
-        type: 'add',
-        change: change,
-        index: this.changes.length - 1
+      // Track change for undo/redo using changeTracker
+      // For first change to an element, use originalText/originalHtml if available
+      this.changeTracker.trackChange('edit', null, {
+        selector: change.selector,
+        type: change.type,
+        newValue: change.value,
+        oldValue: change.originalText || change.originalHtml || null
       })
     }
 
