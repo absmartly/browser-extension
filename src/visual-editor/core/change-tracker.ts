@@ -4,6 +4,8 @@
  */
 
 import StateManager from './state-manager'
+import UndoRedoManager from './undo-redo-manager'
+import type { DOMChange } from '../types/dom-changes'
 
 export interface ChangeAction {
   type: 'edit' | 'editHtml' | 'hide' | 'delete' | 'move' | 'resize' | 'insert'
@@ -21,33 +23,43 @@ export interface UndoRedoAction {
 
 export class ChangeTracker {
   private stateManager: StateManager
+  private undoRedoManager: UndoRedoManager
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
+    this.undoRedoManager = new UndoRedoManager()
   }
 
   trackChange(type: ChangeAction['type'], element: Element | null, data: any): void {
-    const change: ChangeAction = {
-      type,
-      element,
-      data,
-      timestamp: Date.now(),
-      id: this.generateChangeId()
+    // Convert the change data to DOMChange format for UndoRedoManager
+    if (data.selector && data.type && data.newValue !== undefined && data.oldValue !== undefined) {
+      const domChange: DOMChange = {
+        selector: data.selector,
+        type: data.type,
+        value: data.newValue,
+        enabled: true
+      }
+
+      // Add to UndoRedoManager with old value
+      this.undoRedoManager.addChange(domChange, data.oldValue)
+
+      // Add to changes list for tracking
+      const change: ChangeAction = {
+        type,
+        element,
+        data,
+        timestamp: Date.now(),
+        id: this.generateChangeId()
+      }
+      this.stateManager.addChange(change)
+
+      // Update UI counters
+      this.updateChangesCounter()
+      this.updateUndoRedoButtons()
+
+      // Send change to extension background for persistence
+      this.sendChangeToExtension(change)
     }
-
-    // Add to changes list
-    this.stateManager.addChange(change)
-
-    // Create undo action
-    const undoAction = this.createUndoAction(type, element, data)
-    this.stateManager.pushUndo(undoAction)
-
-    // Update UI counters
-    this.updateChangesCounter()
-    this.updateUndoRedoButtons()
-
-    // Send change to extension background for persistence
-    this.sendChangeToExtension(change)
   }
 
   private createUndoAction(type: ChangeAction['type'], element: Element | null, data: any): UndoRedoAction {
@@ -105,147 +117,66 @@ export class ChangeTracker {
       originalAction: {
         type,
         element,
-        data,
+        data: JSON.parse(JSON.stringify(data)), // Deep copy to avoid reference issues
         timestamp: Date.now(),
         id: this.generateChangeId()
       },
-      undoData
+      undoData: JSON.parse(JSON.stringify(undoData)) // Deep copy undoData too
     }
   }
 
   private createRedoAction(undoAction: UndoRedoAction): UndoRedoAction {
     return {
       type: 'redo',
-      originalAction: undoAction.originalAction,
-      undoData: undoAction.originalAction.data
+      originalAction: JSON.parse(JSON.stringify(undoAction.originalAction)), // Deep copy
+      undoData: JSON.parse(JSON.stringify(undoAction.originalAction.data)) // Deep copy
     }
   }
 
   performUndo(): void {
-    const undoAction = this.stateManager.popUndo()
-    if (!undoAction) {
+    const record = this.undoRedoManager.undo()
+    if (!record) {
       return
     }
 
-    const { originalAction, undoData } = undoAction
+    const { change, oldValue } = record
 
-    switch (originalAction.type) {
-      case 'edit':
-        // Handle DOMChange-based undo (from visual-editor.ts addChange)
-        if (undoData.selector) {
-          const elements = document.querySelectorAll(undoData.selector)
-          elements.forEach(element => {
-            const htmlElement = element as HTMLElement
-            if (undoData.type === 'text' && undoData.oldValue !== null) {
-              htmlElement.textContent = undoData.oldValue
-            } else if (undoData.type === 'html' && undoData.oldValue !== null) {
-              htmlElement.innerHTML = undoData.oldValue
-            } else if (undoData.type === 'style' && undoData.oldValue) {
-              Object.assign(htmlElement.style, undoData.oldValue)
-            }
-          })
-        }
-        // Legacy: Handle element-based undo (for backwards compatibility)
-        else if (undoData.element && undoData.restoreText !== undefined) {
-          ;(undoData.element as HTMLElement).textContent = undoData.restoreText
-        }
-        break
-
-      case 'editHtml':
-        if (undoData.element && undoData.restoreHtml) {
-          const tempDiv = document.createElement('div')
-          tempDiv.innerHTML = undoData.restoreHtml
-          const restoredElement = tempDiv.firstElementChild
-          if (restoredElement) {
-            undoData.element.replaceWith(restoredElement)
-          }
-        }
-        break
-
-      case 'hide':
-        if (undoData.element) {
-          ;(undoData.element as HTMLElement).style.display = undoData.restoreDisplay
-        }
-        break
-
-      case 'delete':
-        if (undoData.restoreHtml && undoData.parentElement) {
-          const tempDiv = document.createElement('div')
-          tempDiv.innerHTML = undoData.restoreHtml
-          const restoredElement = tempDiv.firstElementChild
-          if (restoredElement) {
-            if (undoData.nextSibling) {
-              undoData.parentElement.insertBefore(restoredElement, undoData.nextSibling)
-            } else {
-              undoData.parentElement.appendChild(restoredElement)
-            }
-          }
-        }
-        break
-
-      case 'move':
-        if (undoData.element && undoData.originalParent) {
-          if (undoData.originalNextSibling) {
-            undoData.originalParent.insertBefore(undoData.element, undoData.originalNextSibling)
-          } else {
-            undoData.originalParent.appendChild(undoData.element)
-          }
-        }
-        break
-
-      case 'resize':
-        if (undoData.element && undoData.originalStyles) {
-          Object.assign((undoData.element as HTMLElement).style, undoData.originalStyles)
-        }
-        break
-
-      case 'insert':
-        if (undoData.insertedElement) {
-          undoData.insertedElement.remove()
-        }
-        break
-    }
-
-    // Push to redo stack
-    const redoAction = this.createRedoAction(undoAction)
-    this.stateManager.pushRedo(redoAction)
+    // Apply the undo by reverting to old value
+    const elements = document.querySelectorAll(change.selector)
+    elements.forEach(element => {
+      const htmlElement = element as HTMLElement
+      if (change.type === 'text' && oldValue !== null) {
+        htmlElement.textContent = oldValue
+      } else if (change.type === 'html' && oldValue !== null) {
+        htmlElement.innerHTML = oldValue
+      } else if (change.type === 'style' && oldValue) {
+        Object.assign(htmlElement.style, oldValue)
+      }
+    })
 
     this.updateUndoRedoButtons()
   }
 
   performRedo(): void {
-    const redoAction = this.stateManager.popRedo()
-    if (!redoAction) {
+    const record = this.undoRedoManager.redo()
+    if (!record) {
       return
     }
 
-    const { originalAction, undoData } = redoAction
+    const { change } = record
 
-    // DEBUG: Log what we're about to redo
-    document.body.setAttribute('data-redo-newvalue', String(originalAction.data.newValue || 'undefined'))
-
-    // Re-apply the change from originalAction.data (which contains the NEW values)
-    if (originalAction.type === 'edit' && originalAction.data.selector) {
-      const elements = document.querySelectorAll(originalAction.data.selector)
-      elements.forEach(element => {
-        const htmlElement = element as HTMLElement
-        if (originalAction.data.type === 'text' && originalAction.data.newValue !== undefined) {
-          htmlElement.textContent = originalAction.data.newValue
-        } else if (originalAction.data.type === 'html' && originalAction.data.newValue !== undefined) {
-          htmlElement.innerHTML = originalAction.data.newValue
-        } else if (originalAction.data.type === 'style' && originalAction.data.newValue) {
-          Object.assign(htmlElement.style, originalAction.data.newValue)
-        }
-      })
-    }
-    // Legacy: Re-apply the original action for element-based redo
-    else {
-      this.reapplyAction(originalAction)
-    }
-
-    // Push back to undo stack
-    const undoAction = this.createUndoAction(originalAction.type, originalAction.element, originalAction.data)
-    this.stateManager.pushUndo(undoAction)
+    // Re-apply the change
+    const elements = document.querySelectorAll(change.selector)
+    elements.forEach(element => {
+      const htmlElement = element as HTMLElement
+      if (change.type === 'text' && change.value !== undefined) {
+        htmlElement.textContent = change.value
+      } else if (change.type === 'html' && change.value !== undefined) {
+        htmlElement.innerHTML = change.value
+      } else if (change.type === 'style' && change.value) {
+        Object.assign(htmlElement.style, change.value)
+      }
+    })
 
     this.updateUndoRedoButtons()
   }
@@ -286,8 +217,6 @@ export class ChangeTracker {
   }
 
   private updateUndoRedoButtons(): void {
-    const state = this.stateManager.getState()
-
     // Find undo/redo buttons in the banner
     const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
     if (!bannerHost?.shadowRoot) return
@@ -296,10 +225,10 @@ export class ChangeTracker {
     const redoBtn = bannerHost.shadowRoot.querySelector('[data-action="redo"]') as HTMLButtonElement
 
     if (undoBtn) {
-      undoBtn.disabled = state.undoStack.length === 0
+      undoBtn.disabled = !this.undoRedoManager.canUndo()
     }
     if (redoBtn) {
-      redoBtn.disabled = state.redoStack.length === 0
+      redoBtn.disabled = !this.undoRedoManager.canRedo()
     }
   }
 

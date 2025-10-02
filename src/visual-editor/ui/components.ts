@@ -142,7 +142,7 @@ export class UIComponents {
     const undoBtn = document.createElement('button')
     undoBtn.className = 'banner-button'
     undoBtn.dataset.action = 'undo'
-    undoBtn.title = 'Undo (Ctrl+Z)'
+    undoBtn.title = 'Undo'
     undoBtn.disabled = !canUndo
     undoBtn.innerHTML = '<span class="banner-button-icon">↶</span>Undo'
 
@@ -150,7 +150,7 @@ export class UIComponents {
     const redoBtn = document.createElement('button')
     redoBtn.className = 'banner-button'
     redoBtn.dataset.action = 'redo'
-    redoBtn.title = 'Redo (Ctrl+Y)'
+    redoBtn.title = 'Redo'
     redoBtn.disabled = !canRedo
     redoBtn.innerHTML = '<span class="banner-button-icon">↷</span>Redo'
 

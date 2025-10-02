@@ -110,7 +110,8 @@ class StateManager {
     const undoStack = [...this.state.undoStack]
     const action = undoStack.pop()
     this.updateState({ undoStack })
-    return action
+    // Return a deep copy to prevent mutations
+    return JSON.parse(JSON.stringify(action))
   }
 
   popRedo(): any | null {
@@ -119,7 +120,8 @@ class StateManager {
     const redoStack = [...this.state.redoStack]
     const action = redoStack.pop()
     this.updateState({ redoStack })
-    return action
+    // Return a deep copy to prevent mutations
+    return JSON.parse(JSON.stringify(action))
   }
 
   setOriginalValue(key: string, value: any): void {
