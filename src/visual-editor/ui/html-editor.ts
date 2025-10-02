@@ -11,15 +11,9 @@ export class HtmlEditor {
   private editorHost: HTMLElement | null = null
   private monacoEditor: monaco.editor.IStandaloneCodeEditor | null = null
   private editorLoaded: boolean = false
-  private useShadowDOM: boolean
-  private editorShadowRoot: ShadowRoot | null = null
-
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
-    // Check query string for shadow DOM override (for testing)
-    const urlParams = new URLSearchParams(window.location.search)
-    const shadowDOMParam = urlParams.get('use_shadow_dom_for_visual_editor_context_menu')
-    this.useShadowDOM = shadowDOMParam !== '0'
+    // Monaco Editor doesn't work well with Shadow DOM, so we never use it for the HTML editor
   }
 
   private async loadMonacoIfNeeded(): Promise<void> {
@@ -41,32 +35,24 @@ export class HtmlEditor {
     }
 
     return new Promise((resolve) => {
-      // Create editor host with Shadow DOM
+      // Create editor host in regular DOM (no Shadow DOM for Monaco compatibility)
       this.editorHost = document.createElement('div')
       this.editorHost.id = 'absmartly-monaco-editor-host'
-      // Don't set pointer-events: none on the host when not using shadow DOM
-      // because it would block clicks on all children
       this.editorHost.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
-        width: ${this.useShadowDOM ? '0' : '100vw'};
-        height: ${this.useShadowDOM ? '0' : '100vh'};
+        width: 100vw;
+        height: 100vh;
         z-index: 2147483648;
-        pointer-events: ${this.useShadowDOM ? 'none' : 'auto'};
+        pointer-events: auto;
       `
-
-      const editorShadow = this.useShadowDOM ? this.editorHost.attachShadow({ mode: 'closed' }) : this.editorHost
-      this.editorShadowRoot = this.useShadowDOM ? editorShadow as ShadowRoot : null
 
       const editorStyle = document.createElement('style')
       editorStyle.id = 'absmartly-html-editor-styles'
       editorStyle.textContent = this.getEditorStyles()
-
-      // If not using shadow DOM, add styles to document head instead
-      if (!this.useShadowDOM) {
-        document.head.appendChild(editorStyle)
-      }
+      // Add styles to document head (no Shadow DOM)
+      document.head.appendChild(editorStyle)
 
       // Create editor elements
       const backdrop = document.createElement('div')
@@ -128,52 +114,6 @@ export class HtmlEditor {
       const saveBtn = document.createElement('button')
       saveBtn.className = 'editor-button editor-button-save'
       saveBtn.innerHTML = '<span>✓</span> Apply Changes'
-      // Add inline styles to ensure it's clickable when not using shadow DOM
-      if (!this.useShadowDOM) {
-        saveBtn.style.cssText = `
-          padding: 8px 20px;
-          border-radius: 4px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          border: none;
-          outline: none;
-          background: #007acc;
-          color: white;
-          pointer-events: auto;
-        `
-        cancelBtn.style.cssText = `
-          padding: 8px 20px;
-          border-radius: 4px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          border: 1px solid #555;
-          outline: none;
-          background: #3c3c3c;
-          color: #cccccc;
-          pointer-events: auto;
-        `
-        buttons.style.cssText = `
-          padding: 16px 20px;
-          border-top: 1px solid #3e3e42;
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          background: #252526;
-          pointer-events: auto;
-        `
-      }
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -185,34 +125,9 @@ export class HtmlEditor {
       container.appendChild(buttons)
       backdrop.appendChild(container)
 
-      // Only append style to shadow root if using shadow DOM (already in head otherwise)
-      if (this.useShadowDOM) {
-        editorShadow.appendChild(editorStyle)
-      }
-      editorShadow.appendChild(backdrop)
-
+      // Append directly to the host element (no Shadow DOM)
+      this.editorHost.appendChild(backdrop)
       document.body.appendChild(this.editorHost)
-
-      // IMPORTANT: When using Shadow DOM, Monaco needs to render in regular DOM
-      // Move the editor container out of shadow DOM after initial setup
-      if (this.useShadowDOM) {
-        // Remove from shadow DOM
-        editorContainer.remove()
-        // Append directly to the host element (regular DOM)
-        this.editorHost.appendChild(editorContainer)
-        // Position it absolutely to overlay the shadow DOM placeholder
-        editorContainer.style.cssText = `
-          position: fixed;
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          width: calc(80vw - 80px);
-          max-width: 720px;
-          height: 400px;
-          z-index: 2147483649;
-          pointer-events: auto;
-        `
-      }
 
       // Create Monaco editor
       setTimeout(() => {
@@ -390,12 +305,10 @@ export class HtmlEditor {
       this.monacoEditor = null
     }
 
-    // Remove styles from document head if not using shadow DOM
-    if (!this.useShadowDOM) {
-      const styleEl = document.getElementById('absmartly-html-editor-styles')
-      if (styleEl) {
-        styleEl.remove()
-      }
+    // Remove styles from document head
+    const styleEl = document.getElementById('absmartly-html-editor-styles')
+    if (styleEl) {
+      styleEl.remove()
     }
 
     if (this.editorHost) {
