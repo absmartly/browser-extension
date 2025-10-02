@@ -438,113 +438,37 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(afterChanges).toBe('Undo test 3')
       console.log(`  ✓ Final text after changes: "${afterChanges}"`)
 
-      // Now test undo - should go back through: "Undo test 3" -> "Undo test 2" -> "Undo test 1" -> "Modified text!"
-      console.log('\n  ⏪ Testing undo...')
+      // Now test undo - with change squashing, all 3 changes are squashed into 1 undo entry
+      // So one undo should revert from "Undo test 3" back to "Modified text!"
+      console.log('\n  ⏪ Testing undo with change squashing...')
 
-      // DEBUG: Check undo stack before undoing
-      const undoStackBefore = await testPage.evaluate(() => {
-        const win = window as any
-        if (win.__visualEditorInstance?.changeTracker?.stateManager) {
-          const state = win.__visualEditorInstance.changeTracker.stateManager.getState()
-          return state.undoStack.map((action: any, i: number) => ({
-            index: i,
-            newValue: action.originalAction?.data?.newValue
-          }))
-        }
-        return []
-      })
-      console.log('\n  🔍 Undo stack before undoing:', JSON.stringify(undoStackBefore, null, 2))
-
-      // Undo to "Undo test 2"
-      await testPage.keyboard.press('Control+z')
+      // Undo - with change squashing, this should revert directly to "Modified text!"
+      await testPage.locator('[data-action="undo"]').click()
       await testPage.waitForTimeout(500)
       const afterUndo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
-        return {
-          text: para?.textContent?.trim(),
-          undoNewValue: document.body.getAttribute('data-undo-originalaction-newvalue'),
-          redoCreatedNewValue: document.body.getAttribute('data-redo-created-newvalue'),
-          undoOldValue: document.body.getAttribute('data-undo-originalaction-oldvalue')
-        }
-      })
-      console.log(`  ✓ Undo 1: Text is now "${afterUndo1.text}" (undo had newValue: ${afterUndo1.undoNewValue}, oldValue: ${afterUndo1.undoOldValue}, redo created with: ${afterUndo1.redoCreatedNewValue})`)
-
-      // Undo to "Undo test 1"
-      await testPage.keyboard.press('Control+z')
-      await testPage.waitForTimeout(500)
-      const afterUndo2 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return {
-          text: para?.textContent?.trim(),
-          undoNewValue: document.body.getAttribute('data-undo-originalaction-newvalue'),
-          redoCreatedNewValue: document.body.getAttribute('data-redo-created-newvalue')
-        }
-      })
-      console.log(`  ✓ Undo 2: Text is now "${afterUndo2.text}" (undo had newValue: ${afterUndo2.undoNewValue}, redo created with: ${afterUndo2.redoCreatedNewValue})`)
-
-      // Undo to "Modified text!" (the original from the first edit)
-      await testPage.keyboard.press('Control+z')
-      await testPage.waitForTimeout(500)
-      const afterUndo3 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
       })
-      console.log(`  ✓ Undo 3: Text is now "${afterUndo3}"`)
+      console.log(`  ✓ Undo (squashed): Text is now "${afterUndo1}"`)
+      expect(afterUndo1).toBe('Modified text!')
 
-      // DEBUG: Check what's in the redo stack before redoing
-      const redoStackDebug = await testPage.evaluate(() => {
-        const win = window as any
-        if (win.__visualEditorInstance?.changeTracker?.stateManager) {
-          const state = win.__visualEditorInstance.changeTracker.stateManager.getState()
-          return state.redoStack.map((action: any, i: number) => ({
-            index: i,
-            newValue: action.originalAction?.data?.newValue
-          }))
-        }
-        return []
-      })
-      console.log('\n  🔍 Redo stack before redoing:', JSON.stringify(redoStackDebug, null, 2))
-
-      // Now test redo
+      // Now test redo - should redo the squashed change back to "Undo test 3"
       console.log('\n  ⏩ Testing redo...')
 
-      // Redo
-      await testPage.keyboard.press('Control+y')
+      // Redo - Click redo button in banner
+      await testPage.locator('[data-action="redo"]').click()
       await testPage.waitForTimeout(500)
-      const redo1Debug = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return {
-          text: para?.textContent?.trim(),
-          poppedNewValue: document.body.getAttribute('data-redo-popped-newvalue'),
-          newValue: document.body.getAttribute('data-redo-newvalue')
-        }
-      })
-      console.log(`  🔍 Redo 1 popped: ${redo1Debug.poppedNewValue}, using: ${redo1Debug.newValue}`)
-      console.log(`  ✓ Redo 1: Text is now "${redo1Debug.text}"`)
-
-      // Redo
-      await testPage.keyboard.press('Control+y')
-      await testPage.waitForTimeout(500)
-      const afterRedo2 = await testPage.evaluate(() => {
+      const afterRedo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
       })
-      console.log(`  ✓ Redo 2: Text is now "${afterRedo2}"`)
+      console.log(`  ✓ Redo (squashed): Text is now "${afterRedo1}"`)
+      expect(afterRedo1).toBe('Undo test 3')
 
-      // Redo
-      await testPage.keyboard.press('Control+y')
-      await testPage.waitForTimeout(500)
-      const afterRedo3 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Redo 3: Text is now "${afterRedo3}"`)
-
-      console.log('\n⚠️  Undo/redo test completed with unexpected results!')
-      console.log(`  • Undo sequence: "Undo test 3" -> "${afterUndo1}" -> "${afterUndo2}" -> "${afterUndo3}"`)
-      console.log(`  • Redo sequence: "${afterUndo3}" -> "${afterRedo1}" -> "${afterRedo2}" -> "${afterRedo3}"`)
-      console.log('  • Note: Undo/redo not working as expected when editing same element multiple times')
-      console.log('  • This is a known VE issue that needs investigation')
+      console.log('\n✅ Undo/redo with change squashing working correctly!')
+      console.log(`  • Undo (squashed): "Undo test 3" -> "${afterUndo1}"`)
+      console.log(`  • Redo (squashed): "${afterUndo1}" -> "${afterRedo1}"`)
+      console.log('  • Multiple changes to same element are automatically squashed into one undo entry')
     })
 
     await test.step('Save changes to sidebar', async () => {
