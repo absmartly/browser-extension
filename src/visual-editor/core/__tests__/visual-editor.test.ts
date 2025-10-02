@@ -133,7 +133,8 @@ describe('VisualEditor', () => {
     // Create real UndoRedoManager instance
     undoRedoManager = new UndoRedoManager()
     MockUIComponents.mockImplementation(() => ({
-      createBanner: jest.fn()
+      createBanner: jest.fn(),
+      updateBanner: jest.fn()
     } as any))
     MockEditModes.mockImplementation(() => ({
       setAddChangeCallback: jest.fn()
@@ -534,24 +535,32 @@ describe('VisualEditor', () => {
     })
 
     it('should save changes when saveChanges is called', () => {
+      const visualEditor = new VisualEditor(mockOptions)
+
       const testChanges: DOMChange[] = [
         { selector: '.test1', type: 'text', value: 'Text 1' },
         { selector: '.test2', type: 'style', value: { color: 'red' } }
       ]
 
-      // Add changes to undoRedoManager
+      // Add changes to visualEditor's undoRedoManager (accessed via private property)
       testChanges.forEach(change => {
-        undoRedoManager.addChange(change, null)
+        ;(visualEditor as any).undoRedoManager.addChange(change, null)
       })
 
-      const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
-      const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
-
       // Call save - should squash changes and call onChangesUpdate
-      callbacks.saveChanges()
+      ;(visualEditor as any).saveChanges()
 
-      // Now onChangesUpdate should be called with squashed changes
-      expect(mockOnChangesUpdate).toHaveBeenCalledWith(testChanges)
+      // onChangesUpdate should be called with the squashed changes
+      // Since changes are to different selectors, they won't be consolidated
+      expect(mockOnChangesUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ selector: '.test1', type: 'text', value: 'Text 1' }),
+          expect.objectContaining({ selector: '.test2', type: 'style', value: { color: 'red' } })
+        ])
+      )
+      expect(mockOnChangesUpdate).toHaveBeenCalledTimes(1)
+
+      visualEditor.stop()
     })
 
     it('should handle multiple change types', () => {

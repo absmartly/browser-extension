@@ -115,6 +115,8 @@ export class VisualEditor {
       showRelativeElementSelector: () => this.elementActions.showRelativeElementSelector(),
       undoLastChange: () => this.undoLastChange(),
       redoChange: () => this.redoChange(),
+      undo: () => this.undoLastChange(),
+      redo: () => this.redoChange(),
       clearAllChanges: () => this.elementActions.clearAllChanges(),
       saveChanges: () => this.saveChanges(),
       stop: () => this.stop()
@@ -200,6 +202,7 @@ export class VisualEditor {
     console.trace('[ABSmartly] Stop called from:')
 
     this.isActive = false
+    ;(window as any).__absmartlyVisualEditorActive = false
 
     // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []

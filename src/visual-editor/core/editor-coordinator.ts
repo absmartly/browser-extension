@@ -29,6 +29,8 @@ export interface EditorCoordinatorCallbacks {
   showRelativeElementSelector: () => void
   undoLastChange: () => void
   redoChange: () => void
+  undo: () => void
+  redo: () => void
   clearAllChanges: () => void
   saveChanges: () => void
   stop: () => void
@@ -125,28 +127,28 @@ export class EditorCoordinator {
 
       // Only update banner and log if undo/redo/changes actually changed
       const changesLength = this.changes.length
-      const undoStackLength = state.undoStack.length
-      const redoStackLength = state.redoStack.length
+      const undoCount = this.undoRedoManager.getUndoCount()
+      const redoCount = this.undoRedoManager.getRedoCount()
 
       if (changesLength !== previousChangesLength ||
-          undoStackLength !== previousUndoStackLength ||
-          redoStackLength !== previousRedoStackLength) {
+          undoCount !== previousUndoStackLength ||
+          redoCount !== previousRedoStackLength) {
 
         console.log('[EditorCoordinator] Changes/Undo/Redo updated - total changes:', changesLength)
-        console.log('[EditorCoordinator] Session changes (undo stack):', undoStackLength)
-        console.log('[EditorCoordinator] Redo stack length:', redoStackLength)
+        console.log('[EditorCoordinator] Session changes (undo count):', undoCount)
+        console.log('[EditorCoordinator] Redo count:', redoCount)
 
-        // Update banner - changes counter shows session changes (undo stack)
+        // Update banner - changes counter shows session changes (undo count)
         this.uiComponents.updateBanner({
-          changesCount: undoStackLength,  // Session changes, not total
-          canUndo: undoStackLength > 0,
-          canRedo: redoStackLength > 0
+          changesCount: undoCount,
+          canUndo: this.undoRedoManager.canUndo(),
+          canRedo: this.undoRedoManager.canRedo()
         })
 
         // Update tracked values
         previousChangesLength = changesLength
-        previousUndoStackLength = undoStackLength
-        previousRedoStackLength = redoStackLength
+        previousUndoStackLength = undoCount
+        previousRedoStackLength = redoCount
       }
     })
   }
@@ -156,7 +158,6 @@ export class EditorCoordinator {
     this.eventHandlers.attachEventListeners()
 
     // Add coordinator-specific event listeners
-    document.addEventListener('contextmenu', this.handleContextMenu, true)
     document.addEventListener('keydown', this.handleKeyDown, true)
     document.addEventListener('mousedown', this.handleMouseDown, true)
     document.addEventListener('mouseup', this.handleMouseUp, true)
@@ -167,7 +168,6 @@ export class EditorCoordinator {
     this.eventHandlers.detachEventListeners()
 
     // Remove coordinator-specific event listeners
-    document.removeEventListener('contextmenu', this.handleContextMenu, true)
     document.removeEventListener('keydown', this.handleKeyDown, true)
     document.removeEventListener('mousedown', this.handleMouseDown, true)
     document.removeEventListener('mouseup', this.handleMouseUp, true)
@@ -191,6 +191,21 @@ export class EditorCoordinator {
             this.notifications.show(`Selector copied: ${selector}`, '', 'success')
           })
         }
+      }
+
+      // Undo: Ctrl+Z (Cmd+Z on Mac)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault()
+        this.callbacks.undo()
+      }
+
+      // Redo: Ctrl+Y (Cmd+Y on Mac) or Ctrl+Shift+Z (Cmd+Shift+Z on Mac)
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === 'y') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')
+      ) {
+        e.preventDefault()
+        this.callbacks.redo()
       }
 
       // Delete: Delete key
@@ -871,11 +886,7 @@ export class EditorCoordinator {
   }
 
   // Event handlers bound to this class
-  private handleContextMenu = (e: Event) => {
-    // Context menu handling - for now, prevent default
-    e.preventDefault()
-    e.stopPropagation()
-  }
+
 
   private handleKeyDown = (e: Event) => {
     // Key handling is done in setupKeyboardHandlers, this is just a placeholder
