@@ -1591,8 +1591,12 @@ export function DOMChangesInlineEditor({
 
   // Listen for visual editor changes
   useEffect(() => {
-    const handleVisualEditorChanges = async (message: any) => {
+    const handleVisualEditorChanges = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+      console.log('[DOMChangesInlineEditor] Received message:', message.type, 'for variant:', message.variantName, 'my variant:', variantName)
+
+      // Handle async operations
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
+        (async () => {
         debugLog('📡 Visual editor changes received:', message.changes)
 
         // The visual editor sends its current changes when Save Changes is clicked
@@ -1640,6 +1644,8 @@ export function DOMChangesInlineEditor({
           document.body.appendChild(toast)
           setTimeout(() => toast.remove(), 3000)
         }
+        })() // Execute async function immediately
+        return true // Indicate we will respond asynchronously
       } else if (message.type === 'PREVIEW_STATE_CHANGED') {
         // Update preview toggle state when visual editor disables it
         debugLog('📡 Preview state changed:', message.enabled)
@@ -1648,6 +1654,7 @@ export function DOMChangesInlineEditor({
           onPreviewToggle(false)
         }
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
+        (async () => {
         debugLog('✅ Visual Editor Complete - Received changes:', message)
 
         if (message.changes && Array.isArray(message.changes) && message.changes.length > 0) {
@@ -1698,31 +1705,57 @@ export function DOMChangesInlineEditor({
 
         // Mark VE as stopped for this variant after processing changes
         onVEStop()
+        })() // Execute async function immediately
+        return true // Indicate we will respond asynchronously
       }
     }
     
     console.log('[DOMChangesInlineEditor] Setting up message listeners for variant:', variantName)
+
+    // Listen for chrome.runtime messages (production mode)
     chrome.runtime.onMessage.addListener(handleVisualEditorChanges)
 
-    // Also listen for window.postMessage in test mode
+    // Also listen for window.postMessage (test mode)
     const handleWindowMessage = (event: MessageEvent) => {
-      console.log('[DOMChangesInlineEditor] Received window message:', event.data?.type)
-      if (event.data?.source === 'absmartly-visual-editor' && event.data?.type === 'VISUAL_EDITOR_CHANGES') {
-        console.log('[DOMChangesInlineEditor] Processing VISUAL_EDITOR_CHANGES from window.postMessage')
-        debugLog('📡 Received window.postMessage from visual editor:', event.data)
-        // Process the message the same way as chrome.runtime messages
-        void handleVisualEditorChanges(event.data, {} as chrome.runtime.MessageSender, () => {})
-        console.log('[DOMChangesInlineEditor] Finished processing window message')
+      console.log('[DOMChangesInlineEditor] Window message received from:', event.origin, 'data:', event.data)
+      // Only process messages from our visual editor
+      if (event.data && event.data.source === 'absmartly-visual-editor') {
+        console.log('[DOMChangesInlineEditor] ✅ Processing visual editor window message:', event.data.type, 'variant:', event.data.variantName)
+        // Add visual indicator
+        document.body.style.border = '5px solid lime'
+        setTimeout(() => { document.body.style.border = '' }, 2000)
+        handleVisualEditorChanges(event.data, {} as chrome.runtime.MessageSender, () => {})
+      }
+    }
+    console.log('[DOMChangesInlineEditor] Adding window message listener')
+    window.addEventListener('message', handleWindowMessage)
+
+    // Also listen for chrome.storage.session changes in test mode
+    const handleStorageChange = (changes: {[key: string]: chrome.storage.StorageChange}) => {
+      console.log('[DOMChangesInlineEditor] Storage change detected:', Object.keys(changes))
+      if (changes.visualEditorChanges) {
+        const newValue = changes.visualEditorChanges.newValue
+        console.log('[DOMChangesInlineEditor] Visual editor changes updated in storage:', newValue)
+        if (newValue && newValue.variantName === variantName) {
+          console.log('[DOMChangesInlineEditor] Processing changes from storage for variant:', variantName)
+          // DEBUG: Add visual indicator
+          document.body.style.border = '5px solid green'
+          void handleVisualEditorChanges({
+            type: 'VISUAL_EDITOR_CHANGES',
+            variantName: newValue.variantName,
+            changes: newValue.changes
+          }, {} as chrome.runtime.MessageSender, () => {})
+        }
       }
     }
 
-    console.log('[DOMChangesInlineEditor] Adding window message listener')
-    window.addEventListener('message', handleWindowMessage)
-    console.log('[DOMChangesInlineEditor] Message listeners ready')
+    console.log('[DOMChangesInlineEditor] Adding storage change listener')
+    chrome.storage.session.onChanged.addListener(handleStorageChange)
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
       window.removeEventListener('message', handleWindowMessage)
+      chrome.storage.session.onChanged.removeListener(handleStorageChange)
     }
   }, [variantName, onChange, changes])
 

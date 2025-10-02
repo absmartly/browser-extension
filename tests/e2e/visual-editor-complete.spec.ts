@@ -128,10 +128,20 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Wait for sidebar iframe to be ready
       await sidebar.locator('body').waitFor({ timeout: 10000 })
       console.log('✅ Sidebar visible')
+
+      // Listen for console messages from the sidebar iframe
+      testPage.on('console', msg => {
+        const msgText = msg.text()
+        if (msgText.includes('[DOMChanges') || msgText.includes('Window message') || msgText.includes('index.tsx')) {
+          console.log(`  [Sidebar Console] ${msgText}`)
+        }
+      })
+
       await debugWait()
     })
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+    let experimentName: string
 
     await test.step('Create new experiment', async () => {
       console.log('\n📋 STEP 2: Creating new experiment')
@@ -142,7 +152,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     await debugWait()
 
     // Fill experiment name in the form
-    const experimentName = `E2E Test Experiment ${Date.now()}`
+    experimentName = `E2E Test Experiment ${Date.now()}`
     await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
     console.log(`  Filled experiment name: ${experimentName}`)
 
@@ -165,6 +175,11 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Wait for visual editor notification to appear
       await testPage.locator('.absmartly-notification:has-text("Visual Editor Active")').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ Visual editor active')
+
+      // Take screenshot to see sidebar state after VE activates
+      await testPage.screenshot({ path: 'test-results/sidebar-after-ve-launch.png', fullPage: true })
+      console.log('  Screenshot saved: sidebar-after-ve-launch.png')
+
       await debugWait()
     })
 
@@ -339,15 +354,44 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
+    await test.step('Wait for sidebar to update', async () => {
+      console.log('\n⏳ STEP 6: Waiting for sidebar to update after visual editor closes...')
+
+      // After the visual editor closes, wait for the sidebar to update
+      // The DOM changes should now be visible in the variant editor
+
+      // Wait a bit for the sidebar to process the changes
+      await testPage.waitForTimeout(2000)
+
+      await debugWait()
+    })
+
     await test.step('Verify changes in sidebar', async () => {
-      console.log('\n📝 STEP 6: Verifying changes in sidebar...')
+      console.log('\n📝 STEP 7: Verifying changes in sidebar...')
+
+      // Take a screenshot of the entire page to see the sidebar
+      await testPage.screenshot({ path: 'test-results/sidebar-after-save.png', fullPage: true })
+      console.log('  Screenshot saved to test-results/sidebar-after-save.png')
+
+      // Debug: Check if DOM changes InlineEditor component is even mounted
+      const inlineEditorExists = await sidebar.locator('[data-testid="dom-changes-inline-editor"], .dom-changes-editor').count()
+      console.log(`  Inline editor exists: ${inlineEditorExists > 0}`)
+
+      // Debug: Check the sidebar HTML structure
+      const sidebarHTML = await sidebar.locator('body').innerHTML()
+      console.log(`  Sidebar HTML length: ${sidebarHTML.length} characters`)
+      console.log(`  Sidebar HTML: ${sidebarHTML.substring(0, 500)}...`)
+
+      // Debug: Look for any elements that might contain changes
+      const anyChangeElements = await sidebar.locator('[class*="change"], [class*="card"]').count()
+      console.log(`  Elements with 'change' or 'card' in class: ${anyChangeElements}`)
 
     // Wait for DOM change cards to appear in the sidebar
     // The changes are displayed as cards, not in a Monaco editor
     try {
       await sidebar.locator('.dom-change-card').first().waitFor({ timeout: 5000 })
     } catch (err) {
-      console.log('⚠️  DOM change cards did not appear within 5 seconds')
+      console.log('⚠️  DOM change cards did not appear within 5000ms')
       throw err // Re-throw to fail the test
     }
 
