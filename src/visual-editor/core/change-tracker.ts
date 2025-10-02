@@ -5,7 +5,7 @@
 
 import StateManager from './state-manager'
 import UndoRedoManager from './undo-redo-manager'
-import type { DOMChange } from '../types/dom-changes'
+import type { DOMChange } from '../types/visual-editor'
 
 export interface ChangeAction {
   type: 'edit' | 'editHtml' | 'hide' | 'delete' | 'move' | 'resize' | 'insert'
