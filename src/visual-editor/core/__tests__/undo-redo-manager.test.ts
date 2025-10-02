@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import UndoRedoManager, { ChangeRecord } from '../undo-redo-manager'
-import { DOMChange } from '../../types/dom-changes'
+import { DOMChange } from '../../types/visual-editor'
 
 describe('UndoRedoManager', () => {
   let manager: UndoRedoManager
@@ -58,6 +57,104 @@ describe('UndoRedoManager', () => {
     })
   })
 
+  describe('Change squashing', () => {
+    it('should squash multiple changes to same element', () => {
+      const change1: DOMChange = {
+        selector: '#test',
+        type: 'text',
+        value: 'text 1',
+        enabled: true
+      }
+      const change2: DOMChange = {
+        selector: '#test',
+        type: 'text',
+        value: 'text 2',
+        enabled: true
+      }
+      const change3: DOMChange = {
+        selector: '#test',
+        type: 'text',
+        value: 'text 3',
+        enabled: true
+      }
+
+      manager.addChange(change1, 'original')
+      manager.addChange(change2, 'text 1')
+      manager.addChange(change3, 'text 2')
+
+      // Should only have 1 change in undo stack (squashed)
+      expect(manager.getUndoCount()).toBe(1)
+
+      const record = manager.undo()
+      expect(record!.change.value).toBe('text 3') // Latest value
+      expect(record!.oldValue).toBe('original')    // Original old value
+    })
+
+    it('should not squash changes to different selectors', () => {
+      const change1: DOMChange = {
+        selector: '#test1',
+        type: 'text',
+        value: 'text 1',
+        enabled: true
+      }
+      const change2: DOMChange = {
+        selector: '#test2',
+        type: 'text',
+        value: 'text 2',
+        enabled: true
+      }
+
+      manager.addChange(change1, 'old1')
+      manager.addChange(change2, 'old2')
+
+      expect(manager.getUndoCount()).toBe(2)
+    })
+
+    it('should not squash changes to different types', () => {
+      const change1: DOMChange = {
+        selector: '#test',
+        type: 'text',
+        value: 'new text',
+        enabled: true
+      }
+      const change2: DOMChange = {
+        selector: '#test',
+        type: 'html',
+        value: '<div>new html</div>',
+        enabled: true
+      }
+
+      manager.addChange(change1, 'old text')
+      manager.addChange(change2, 'old html')
+
+      expect(manager.getUndoCount()).toBe(2)
+    })
+
+    it('should squash style changes correctly', () => {
+      const change1: DOMChange = {
+        selector: '#test',
+        type: 'style',
+        value: { color: 'red' },
+        enabled: true
+      }
+      const change2: DOMChange = {
+        selector: '#test',
+        type: 'style',
+        value: { color: 'blue', fontSize: '16px' },
+        enabled: true
+      }
+
+      manager.addChange(change1, { color: 'black' })
+      manager.addChange(change2, { color: 'red' })
+
+      expect(manager.getUndoCount()).toBe(1)
+
+      const record = manager.undo()
+      expect(record!.change.value).toEqual({ color: 'blue', fontSize: '16px' })
+      expect(record!.oldValue).toEqual({ color: 'black' })
+    })
+  })
+
   describe('Undo functionality', () => {
     it('should undo a single change', () => {
       const change: DOMChange = {
@@ -79,26 +176,23 @@ describe('UndoRedoManager', () => {
 
     it('should undo multiple changes in correct order', () => {
       const changes = [
-        { selector: '#test', type: 'text' as const, value: 'text 1', enabled: true },
-        { selector: '#test', type: 'text' as const, value: 'text 2', enabled: true },
-        { selector: '#test', type: 'text' as const, value: 'text 3', enabled: true }
+        { selector: '#test1', type: 'text' as const, value: 'text 1', enabled: true },
+        { selector: '#test2', type: 'text' as const, value: 'text 2', enabled: true },
+        { selector: '#test3', type: 'text' as const, value: 'text 3', enabled: true }
       ]
 
-      manager.addChange(changes[0], 'original')
-      manager.addChange(changes[1], 'text 1')
-      manager.addChange(changes[2], 'text 2')
+      manager.addChange(changes[0], 'original1')
+      manager.addChange(changes[1], 'original2')
+      manager.addChange(changes[2], 'original3')
 
       const undo1 = manager.undo()
-      expect(undo1!.change.value).toBe('text 3')
-      expect(undo1!.oldValue).toBe('text 2')
+      expect(undo1!.change.selector).toBe('#test3')
 
       const undo2 = manager.undo()
-      expect(undo2!.change.value).toBe('text 2')
-      expect(undo2!.oldValue).toBe('text 1')
+      expect(undo2!.change.selector).toBe('#test2')
 
       const undo3 = manager.undo()
-      expect(undo3!.change.value).toBe('text 1')
-      expect(undo3!.oldValue).toBe('original')
+      expect(undo3!.change.selector).toBe('#test1')
 
       expect(manager.canUndo()).toBe(false)
     })
@@ -132,14 +226,14 @@ describe('UndoRedoManager', () => {
 
     it('should redo multiple changes in correct order', () => {
       const changes = [
-        { selector: '#test', type: 'text' as const, value: 'text 1', enabled: true },
-        { selector: '#test', type: 'text' as const, value: 'text 2', enabled: true },
-        { selector: '#test', type: 'text' as const, value: 'text 3', enabled: true }
+        { selector: '#test1', type: 'text' as const, value: 'text 1', enabled: true },
+        { selector: '#test2', type: 'text' as const, value: 'text 2', enabled: true },
+        { selector: '#test3', type: 'text' as const, value: 'text 3', enabled: true }
       ]
 
-      manager.addChange(changes[0], 'original')
-      manager.addChange(changes[1], 'text 1')
-      manager.addChange(changes[2], 'text 2')
+      manager.addChange(changes[0], 'original1')
+      manager.addChange(changes[1], 'original2')
+      manager.addChange(changes[2], 'original3')
 
       // Undo all
       manager.undo()
@@ -148,16 +242,13 @@ describe('UndoRedoManager', () => {
 
       // Redo all
       const redo1 = manager.redo()
-      expect(redo1!.change.value).toBe('text 1')
-      expect(redo1!.oldValue).toBe('original')
+      expect(redo1!.change.selector).toBe('#test1')
 
       const redo2 = manager.redo()
-      expect(redo2!.change.value).toBe('text 2')
-      expect(redo2!.oldValue).toBe('text 1')
+      expect(redo2!.change.selector).toBe('#test2')
 
       const redo3 = manager.redo()
-      expect(redo3!.change.value).toBe('text 3')
-      expect(redo3!.oldValue).toBe('text 2')
+      expect(redo3!.change.selector).toBe('#test3')
 
       expect(manager.canRedo()).toBe(false)
     })
@@ -165,6 +256,76 @@ describe('UndoRedoManager', () => {
     it('should return null when redo stack is empty', () => {
       const record = manager.redo()
       expect(record).toBeNull()
+    })
+  })
+
+  describe('Undo/Redo with squashing', () => {
+    it('should handle undo/redo correctly with squashed changes', () => {
+      // Add 3 changes to same element (will be squashed)
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'text 1', enabled: true },
+        'original'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'text 2', enabled: true },
+        'text 1'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'text 3', enabled: true },
+        'text 2'
+      )
+
+      // Should have 1 squashed change
+      expect(manager.getUndoCount()).toBe(1)
+
+      // Undo should revert to original
+      const undoRecord = manager.undo()
+      expect(undoRecord!.change.value).toBe('text 3')
+      expect(undoRecord!.oldValue).toBe('original')
+
+      // Redo should apply the final squashed value
+      const redoRecord = manager.redo()
+      expect(redoRecord!.change.value).toBe('text 3')
+      expect(redoRecord!.oldValue).toBe('original')
+    })
+
+    it('should handle mixed squashed and non-squashed changes', () => {
+      // Changes to #test1 (will be squashed)
+      manager.addChange(
+        { selector: '#test1', type: 'text', value: 'A', enabled: true },
+        'original'
+      )
+      manager.addChange(
+        { selector: '#test1', type: 'text', value: 'B', enabled: true },
+        'A'
+      )
+
+      // Change to #test2 (different element)
+      manager.addChange(
+        { selector: '#test2', type: 'text', value: 'X', enabled: true },
+        'oldX'
+      )
+
+      // Another change to #test1 (will squash with previous #test1 changes)
+      manager.addChange(
+        { selector: '#test1', type: 'text', value: 'C', enabled: true },
+        'B'
+      )
+
+      // Should have 2 changes (#test1 squashed, #test2 separate)
+      expect(manager.getUndoCount()).toBe(2)
+
+      // Undo last added (which is #test2)
+      const undo1 = manager.undo()
+      expect(undo1!.change.selector).toBe('#test2')
+      expect(undo1!.change.value).toBe('X')
+      expect(undo1!.oldValue).toBe('oldX')
+
+      // Undo #test1 (squashed)
+      const undo2 = manager.undo()
+      expect(undo2!.change.selector).toBe('#test1')
+      expect(undo2!.change.value).toBe('C')
+      expect(undo2!.oldValue).toBe('original')
     })
   })
 
@@ -232,7 +393,7 @@ describe('UndoRedoManager', () => {
 
       for (let i = 0; i < 5; i++) {
         const change: DOMChange = {
-          selector: '#test',
+          selector: `#test${i}`,
           type: 'text',
           value: `text ${i}`,
           enabled: true
@@ -253,6 +414,36 @@ describe('UndoRedoManager', () => {
       expect(undo3!.change.value).toBe('text 2')
 
       expect(smallManager.canUndo()).toBe(false)
+    })
+
+    it('should not exceed max size with squashing', () => {
+      const smallManager = new UndoRedoManager(2)
+
+      // Add many changes to same element (will squash to 1)
+      for (let i = 0; i < 10; i++) {
+        smallManager.addChange(
+          { selector: '#test', type: 'text', value: `text ${i}`, enabled: true },
+          i === 0 ? 'original' : `text ${i - 1}`
+        )
+      }
+
+      expect(smallManager.getUndoCount()).toBe(1)
+
+      // Add change to different element
+      smallManager.addChange(
+        { selector: '#other', type: 'text', value: 'other', enabled: true },
+        'old other'
+      )
+
+      expect(smallManager.getUndoCount()).toBe(2)
+
+      // Add one more to different element (should remove oldest)
+      smallManager.addChange(
+        { selector: '#another', type: 'text', value: 'another', enabled: true },
+        'old another'
+      )
+
+      expect(smallManager.getUndoCount()).toBe(2)
     })
   })
 
@@ -280,7 +471,7 @@ describe('UndoRedoManager', () => {
     })
   })
 
-  describe('Complex undo/redo scenarios', () => {
+  describe('Complex scenarios', () => {
     it('should handle alternating undo/redo operations', () => {
       const changes = [
         { selector: '#test', type: 'text' as const, value: 'A', enabled: true },
@@ -292,25 +483,25 @@ describe('UndoRedoManager', () => {
       manager.addChange(changes[1], 'A')
       manager.addChange(changes[2], 'B')
 
+      // All squashed to 1 change
+      expect(manager.getUndoCount()).toBe(1)
+
       // Undo -> Redo -> Undo -> Redo pattern
-      manager.undo() // C -> B
-      expect(manager.getUndoCount()).toBe(2)
+      manager.undo() // C -> original
+      expect(manager.getUndoCount()).toBe(0)
       expect(manager.getRedoCount()).toBe(1)
 
-      manager.redo() // B -> C
-      expect(manager.getUndoCount()).toBe(3)
+      manager.redo() // original -> C
+      expect(manager.getUndoCount()).toBe(1)
       expect(manager.getRedoCount()).toBe(0)
 
-      manager.undo() // C -> B
-      manager.undo() // B -> A
-      expect(manager.getUndoCount()).toBe(1)
-      expect(manager.getRedoCount()).toBe(2)
+      manager.undo() // C -> original
+      expect(manager.getUndoCount()).toBe(0)
+      expect(manager.getRedoCount()).toBe(1)
 
-      const redo1 = manager.redo() // A -> B
-      expect(redo1!.change.value).toBe('B')
-
-      const redo2 = manager.redo() // B -> C
-      expect(redo2!.change.value).toBe('C')
+      const redo1 = manager.redo() // original -> C
+      expect(redo1!.change.value).toBe('C')
+      expect(redo1!.oldValue).toBe('original')
     })
   })
 })

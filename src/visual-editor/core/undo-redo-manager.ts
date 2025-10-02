@@ -2,7 +2,8 @@
  * UndoRedoManager - Manages undo/redo functionality for the visual editor
  *
  * This class maintains separate stacks for undo and redo operations.
- * It stores DOMChanges with their old and new values.
+ * It automatically squashes changes to the same element to prevent
+ * intermediate steps from cluttering the undo stack.
  */
 
 import { DOMChange } from '../types/visual-editor'
@@ -23,19 +24,36 @@ export class UndoRedoManager {
 
   /**
    * Add a change to the undo stack
+   * Automatically squashes changes to the same selector+type combination
    */
   addChange(change: DOMChange, oldValue: any): void {
     // Deep copy to prevent reference issues
-    const record: ChangeRecord = {
-      change: JSON.parse(JSON.stringify(change)),
-      oldValue: JSON.parse(JSON.stringify(oldValue))
-    }
+    const newChange: DOMChange = JSON.parse(JSON.stringify(change))
+    const newOldValue = JSON.parse(JSON.stringify(oldValue))
 
-    this.undoStack.push(record)
+    // Check if we're updating an existing change (squashing)
+    const existingIndex = this.undoStack.findIndex(
+      record => record.change.selector === newChange.selector &&
+                record.change.type === newChange.type
+    )
 
-    // Limit stack size
-    if (this.undoStack.length > this.maxStackSize) {
-      this.undoStack.shift()
+    if (existingIndex >= 0) {
+      // Squash: Keep the original oldValue, update to new value
+      this.undoStack[existingIndex].change.value = newChange.value
+      // Note: We keep the original oldValue from the first change
+    } else {
+      // New change: add to stack
+      const record: ChangeRecord = {
+        change: newChange,
+        oldValue: newOldValue
+      }
+
+      this.undoStack.push(record)
+
+      // Limit stack size
+      if (this.undoStack.length > this.maxStackSize) {
+        this.undoStack.shift()
+      }
     }
 
     // Clear redo stack when new change is made

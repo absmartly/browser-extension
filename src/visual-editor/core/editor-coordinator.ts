@@ -7,7 +7,7 @@ import { generateRobustSelector } from '../utils/selector-generator'
 import StateManager, { VisualEditorState } from './state-manager'
 import EventHandlers from './event-handlers'
 import ContextMenu from './context-menu'
-import ChangeTracker from './change-tracker'
+import UndoRedoManager from './undo-redo-manager'
 import UIComponents from '../ui/components'
 import EditModes from './edit-modes'
 import Cleanup from './cleanup'
@@ -39,7 +39,7 @@ export class EditorCoordinator {
   private stateManager: StateManager
   private eventHandlers: EventHandlers
   private contextMenu: ContextMenu
-  private changeTracker: ChangeTracker
+  private undoRedoManager: UndoRedoManager
   private uiComponents: UIComponents
   private editModes: EditModes
   private cleanup: Cleanup
@@ -59,7 +59,7 @@ export class EditorCoordinator {
     stateManager: StateManager,
     eventHandlers: EventHandlers,
     contextMenu: ContextMenu,
-    changeTracker: ChangeTracker,
+    undoRedoManager: UndoRedoManager,
     uiComponents: UIComponents,
     editModes: EditModes,
     cleanup: Cleanup,
@@ -70,7 +70,7 @@ export class EditorCoordinator {
     this.stateManager = stateManager
     this.eventHandlers = eventHandlers
     this.contextMenu = contextMenu
-    this.changeTracker = changeTracker
+    this.undoRedoManager = undoRedoManager
     this.uiComponents = uiComponents
     this.editModes = editModes
     this.cleanup = cleanup

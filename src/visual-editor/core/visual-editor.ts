@@ -6,7 +6,7 @@
 import StateManager, { VisualEditorConfig } from './state-manager'
 import EventHandlers from './event-handlers'
 import ContextMenu from './context-menu'
-import ChangeTracker from './change-tracker'
+import UndoRedoManager from './undo-redo-manager'
 import UIComponents from '../ui/components'
 import EditModes from './edit-modes'
 import Cleanup from './cleanup'
@@ -35,7 +35,7 @@ export class VisualEditor {
   private stateManager: StateManager
   private eventHandlers: EventHandlers
   private contextMenu: ContextMenu
-  private changeTracker: ChangeTracker
+  private undoRedoManager: UndoRedoManager
   private uiComponents: UIComponents
   private editModes: EditModes
   private cleanup: Cleanup
@@ -70,7 +70,7 @@ export class VisualEditor {
     // Initialize all core modules (required by EditorCoordinator)
     this.eventHandlers = new EventHandlers(this.stateManager)
     this.contextMenu = new ContextMenu(this.stateManager, options.useShadowDOM)
-    this.changeTracker = new ChangeTracker(this.stateManager)
+    this.undoRedoManager = new UndoRedoManager()
     this.uiComponents = new UIComponents(this.stateManager)
     this.editModes = new EditModes(this.stateManager)
     this.cleanup = new Cleanup(this.stateManager)
@@ -118,8 +118,8 @@ export class VisualEditor {
       moveElement: (direction: 'up' | 'down') => this.elementActions.moveElement(direction),
       insertNewBlock: () => this.elementActions.insertNewBlock(),
       showRelativeElementSelector: () => this.elementActions.showRelativeElementSelector(),
-      undoLastChange: () => this.elementActions.undoLastChange(),
-      redoChange: () => this.elementActions.redoChange(),
+      undoLastChange: () => this.undoLastChange(),
+      redoChange: () => this.redoChange(),
       clearAllChanges: () => this.elementActions.clearAllChanges(),
       saveChanges: () => this.saveChanges(),
       stop: () => this.stop()
@@ -130,7 +130,7 @@ export class VisualEditor {
       this.stateManager,
       this.eventHandlers,
       this.contextMenu,
-      this.changeTracker,
+      this.undoRedoManager,
       this.uiComponents,
       this.editModes,
       this.cleanup,
@@ -363,24 +363,32 @@ export class VisualEditor {
         this.changes[existingIndex] = { ...change } // Create a copy to avoid reference issues
       }
 
-      // Track change for undo/redo using changeTracker
-      this.changeTracker.trackChange('edit', null, {
-        selector: change.selector,
-        type: change.type,
-        newValue: change.value,
-        oldValue: oldChange.value || oldChange.originalText || oldChange.originalHtml
-      })
+      // Track change for undo/redo using undoRedoManager
+      this.undoRedoManager.addChange(
+        {
+          selector: change.selector,
+          type: change.type as any,
+          value: change.value,
+          enabled: true
+        },
+        oldChange.value || oldChange.originalText || oldChange.originalHtml
+      )
+      this.updateBannerState()
     } else {
       this.changes.push({ ...change }) // Create a copy to avoid reference issues
 
-      // Track change for undo/redo using changeTracker
+      // Track change for undo/redo using undoRedoManager
       // For first change to an element, use originalText/originalHtml if available
-      this.changeTracker.trackChange('edit', null, {
-        selector: change.selector,
-        type: change.type,
-        newValue: change.value,
-        oldValue: change.originalText || change.originalHtml || null
-      })
+      this.undoRedoManager.addChange(
+        {
+          selector: change.selector,
+          type: change.type as any,
+          value: change.value,
+          enabled: true
+        },
+        change.originalText || change.originalHtml || null
+      )
+      this.updateBannerState()
     }
 
     // Mark that we have unsaved changes
@@ -564,6 +572,68 @@ export class VisualEditor {
     setTimeout(() => {
       this.stop()
     }, 500) // Small delay to show success message
+  }
+
+  private undoLastChange(): void {
+    const record = this.undoRedoManager.undo()
+    if (!record) {
+      this.notifications.show('Nothing to undo', '', 'info')
+      return
+    }
+
+    const { change, oldValue } = record
+
+    // Apply the undo by reverting to old value
+    const elements = document.querySelectorAll(change.selector)
+    elements.forEach(element => {
+      const htmlElement = element as HTMLElement
+      if (change.type === 'text' && oldValue !== null) {
+        htmlElement.textContent = oldValue
+      } else if (change.type === 'html' && oldValue !== null) {
+        htmlElement.innerHTML = oldValue
+      } else if (change.type === 'style' && oldValue) {
+        Object.assign(htmlElement.style, oldValue)
+      }
+    })
+
+    // Update UI
+    this.updateBannerState()
+    this.notifications.show('Change undone', '', 'success')
+  }
+
+  private redoChange(): void {
+    const record = this.undoRedoManager.redo()
+    if (!record) {
+      this.notifications.show('Nothing to redo', '', 'info')
+      return
+    }
+
+    const { change } = record
+
+    // Re-apply the change
+    const elements = document.querySelectorAll(change.selector)
+    elements.forEach(element => {
+      const htmlElement = element as HTMLElement
+      if (change.type === 'text' && change.value !== undefined) {
+        htmlElement.textContent = change.value
+      } else if (change.type === 'html' && change.value !== undefined) {
+        htmlElement.innerHTML = change.value
+      } else if (change.type === 'style' && change.value) {
+        Object.assign(htmlElement.style, change.value)
+      }
+    })
+
+    // Update UI
+    this.updateBannerState()
+    this.notifications.show('Change redone', '', 'success')
+  }
+
+  private updateBannerState(): void {
+    this.uiComponents.updateBanner({
+      changesCount: this.undoRedoManager.getUndoCount(),
+      canUndo: this.undoRedoManager.canUndo(),
+      canRedo: this.undoRedoManager.canRedo()
+    })
   }
 }
 
