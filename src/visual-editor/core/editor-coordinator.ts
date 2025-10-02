@@ -177,18 +177,6 @@ export class EditorCoordinator {
 
   setupKeyboardHandlers(): void {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo: Ctrl+Z (Cmd+Z on Mac)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault()
-        this.changeTracker.performUndo()
-      }
-
-      // Redo: Ctrl+Y or Ctrl+Shift+Z (Cmd+Y or Cmd+Shift+Z on Mac)
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault()
-        this.changeTracker.performRedo()
-      }
-
       // Copy selector: Ctrl+Shift+C (Cmd+Shift+C on Mac)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'c') {
         e.preventDefault()

@@ -422,7 +422,12 @@ test.describe('Visual Editor Complete Workflow', () => {
           return para?.textContent?.trim() === expectedText
         }, textChanges[i])
 
-        console.log(`  ✓ Change ${i + 1} applied: "${textChanges[i]}"`)
+        // DEBUG: Check what was stored in undo action
+        const debug = await testPage.evaluate(() => ({
+          trackChange: document.body.getAttribute('data-trackchange-newvalue'),
+          undoAction: document.body.getAttribute('data-undoaction-newvalue')
+        }))
+        console.log(`  ✓ Change ${i + 1} applied: "${textChanges[i]}" (trackChange: ${debug.trackChange}, undoAction: ${debug.undoAction})`)
       }
 
       // Verify we're on the last change
@@ -436,23 +441,46 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Now test undo - should go back through: "Undo test 3" -> "Undo test 2" -> "Undo test 1" -> "Modified text!"
       console.log('\n  ⏪ Testing undo...')
 
+      // DEBUG: Check undo stack before undoing
+      const undoStackBefore = await testPage.evaluate(() => {
+        const win = window as any
+        if (win.__visualEditorInstance?.changeTracker?.stateManager) {
+          const state = win.__visualEditorInstance.changeTracker.stateManager.getState()
+          return state.undoStack.map((action: any, i: number) => ({
+            index: i,
+            newValue: action.originalAction?.data?.newValue
+          }))
+        }
+        return []
+      })
+      console.log('\n  🔍 Undo stack before undoing:', JSON.stringify(undoStackBefore, null, 2))
+
       // Undo to "Undo test 2"
       await testPage.keyboard.press('Control+z')
       await testPage.waitForTimeout(500)
       const afterUndo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
+        return {
+          text: para?.textContent?.trim(),
+          undoNewValue: document.body.getAttribute('data-undo-originalaction-newvalue'),
+          redoCreatedNewValue: document.body.getAttribute('data-redo-created-newvalue'),
+          undoOldValue: document.body.getAttribute('data-undo-originalaction-oldvalue')
+        }
       })
-      console.log(`  ✓ Undo 1: Text is now "${afterUndo1}"`)
+      console.log(`  ✓ Undo 1: Text is now "${afterUndo1.text}" (undo had newValue: ${afterUndo1.undoNewValue}, oldValue: ${afterUndo1.undoOldValue}, redo created with: ${afterUndo1.redoCreatedNewValue})`)
 
       // Undo to "Undo test 1"
       await testPage.keyboard.press('Control+z')
       await testPage.waitForTimeout(500)
       const afterUndo2 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
+        return {
+          text: para?.textContent?.trim(),
+          undoNewValue: document.body.getAttribute('data-undo-originalaction-newvalue'),
+          redoCreatedNewValue: document.body.getAttribute('data-redo-created-newvalue')
+        }
       })
-      console.log(`  ✓ Undo 2: Text is now "${afterUndo2}"`)
+      console.log(`  ✓ Undo 2: Text is now "${afterUndo2.text}" (undo had newValue: ${afterUndo2.undoNewValue}, redo created with: ${afterUndo2.redoCreatedNewValue})`)
 
       // Undo to "Modified text!" (the original from the first edit)
       await testPage.keyboard.press('Control+z')
@@ -462,6 +490,20 @@ test.describe('Visual Editor Complete Workflow', () => {
         return para?.textContent?.trim()
       })
       console.log(`  ✓ Undo 3: Text is now "${afterUndo3}"`)
+
+      // DEBUG: Check what's in the redo stack before redoing
+      const redoStackDebug = await testPage.evaluate(() => {
+        const win = window as any
+        if (win.__visualEditorInstance?.changeTracker?.stateManager) {
+          const state = win.__visualEditorInstance.changeTracker.stateManager.getState()
+          return state.redoStack.map((action: any, i: number) => ({
+            index: i,
+            newValue: action.originalAction?.data?.newValue
+          }))
+        }
+        return []
+      })
+      console.log('\n  🔍 Redo stack before redoing:', JSON.stringify(redoStackDebug, null, 2))
 
       // Now test redo
       console.log('\n  ⏩ Testing redo...')
@@ -473,10 +515,11 @@ test.describe('Visual Editor Complete Workflow', () => {
         const para = document.querySelector('#test-paragraph')
         return {
           text: para?.textContent?.trim(),
+          poppedNewValue: document.body.getAttribute('data-redo-popped-newvalue'),
           newValue: document.body.getAttribute('data-redo-newvalue')
         }
       })
-      console.log(`  🔍 Redo 1 newValue: ${redo1Debug.newValue}`)
+      console.log(`  🔍 Redo 1 popped: ${redo1Debug.poppedNewValue}, using: ${redo1Debug.newValue}`)
       console.log(`  ✓ Redo 1: Text is now "${redo1Debug.text}"`)
 
       // Redo

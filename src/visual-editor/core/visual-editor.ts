@@ -360,7 +360,7 @@ export class VisualEditor {
           ...change.value
         }
       } else {
-        this.changes[existingIndex] = change
+        this.changes[existingIndex] = { ...change } // Create a copy to avoid reference issues
       }
 
       // Track change for undo/redo using changeTracker
@@ -371,7 +371,7 @@ export class VisualEditor {
         oldValue: oldChange.value || oldChange.originalText || oldChange.originalHtml
       })
     } else {
-      this.changes.push(change)
+      this.changes.push({ ...change }) // Create a copy to avoid reference issues
 
       // Track change for undo/redo using changeTracker
       // For first change to an element, use originalText/originalHtml if available
