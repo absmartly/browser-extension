@@ -33,6 +33,58 @@ const sendMessageToExtension = (message: any) => {
   }
 }
 
+// Polyfill chrome.runtime.sendMessage for test mode
+// This handles messages that expect a response (like REQUEST_INJECTION_CODE)
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+  const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
+  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
+  if (sidebarIframe && sidebarIframe.contentWindow) {
+    // We're in test mode - polyfill sendMessage
+    const responseCallbacks = new Map<string, (response: any) => void>()
+
+    // Listen for responses from sidebar
+    window.addEventListener('message', (event) => {
+      if (event.data?.source === 'absmartly-extension' && event.data?.responseId) {
+        const callback = responseCallbacks.get(event.data.responseId)
+        if (callback) {
+          callback(event.data.response)
+          responseCallbacks.delete(event.data.responseId)
+        }
+      }
+    })
+
+    chrome.runtime.sendMessage = function(message: any, callback?: (response: any) => void) {
+      if (callback) {
+        // Generate unique ID for this request
+        const responseId = `${message.type}_${Date.now()}_${Math.random()}`
+        responseCallbacks.set(responseId, callback)
+
+        // Send request to sidebar with response ID
+        sidebarIframe.contentWindow!.postMessage({
+          source: 'absmartly-content-script',
+          responseId: responseId,
+          ...message
+        }, '*')
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (responseCallbacks.has(responseId)) {
+            responseCallbacks.delete(responseId)
+            debugWarn(`No response received for ${message.type} after 5s`)
+          }
+        }, 5000)
+      } else {
+        // No callback, just send the message
+        sidebarIframe.contentWindow!.postMessage({
+          source: 'absmartly-content-script',
+          ...message
+        }, '*')
+      }
+    } as any
+  }
+}
+
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null

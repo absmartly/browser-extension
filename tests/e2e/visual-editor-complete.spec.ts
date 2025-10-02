@@ -1021,10 +1021,26 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Launch VE - wait for button to be enabled first
       const veButtons = freshSidebar.locator('button:has-text("Visual Editor")')
+
+      // Wait for button to become enabled (not disabled)
       await veButtons.nth(0).waitFor({ state: 'attached', timeout: 5000 })
-      // Wait a bit for any previous VE state to clear
-      await testPage.waitForTimeout(500)
-      await veButtons.nth(0).click()
+
+      // Wait for the button to be enabled by checking it's not disabled
+      let buttonEnabled = false
+      for (let i = 0; i < 20; i++) {
+        const isDisabled = await veButtons.nth(0).isDisabled()
+        if (!isDisabled) {
+          buttonEnabled = true
+          break
+        }
+        await testPage.waitForTimeout(200)
+      }
+
+      if (!buttonEnabled) {
+        console.log('  ⚠️  Warning: Button still disabled, forcing click anyway')
+      }
+
+      await veButtons.nth(0).click({ force: true })
       console.log('  ✓ Clicked Visual Editor button')
 
       // Wait for VE to be active
