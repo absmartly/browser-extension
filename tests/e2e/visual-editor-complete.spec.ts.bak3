@@ -23,7 +23,7 @@ async function clickElementInEditor(page: Page, selector: string) {
   await page.waitForTimeout(200)
 }
 
-// Helper to right-click element
+// Helper to right-click element and open context menu
 async function rightClickElement(page: Page, selector: string) {
   await page.click(selector, { button: 'right' })
   await page.waitForTimeout(300)
@@ -379,29 +379,13 @@ test.describe('Visual Editor Complete Workflow', () => {
       for (let i = 0; i < textChanges.length; i++) {
         console.log(`  ✏️  Making change ${i + 1}: "${textChanges[i]}"`)
 
-        // Ensure the paragraph is not in editing mode and is properly reset
-        await testPage.evaluate(() => {
-          const para = document.querySelector('#test-paragraph') as HTMLElement
-          if (para) {
-            para.contentEditable = 'false'
-            para.classList.remove('absmartly-editing', 'absmartly-selected')
-            para.blur()
-          }
-          // Also remove any existing context menu
-          document.getElementById('absmartly-menu-host')?.remove()
-        })
-
-        // Click somewhere else first to deselect the paragraph
-        await testPage.locator('body').click({ position: { x: 5, y: 5 } })
-        await testPage.waitForTimeout(500) // Increased wait time
-
-        // Left-click on paragraph to show context menu
-        await testPage.click('#test-paragraph', { force: true })
-        await testPage.waitForTimeout(100)
+        // Right-click on paragraph
+        await testPage.locator('#test-paragraph').click({ button: 'right' })
 
         // Wait for context menu and click Edit Text
-        await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-        await testPage.locator('.menu-item:has-text("Edit Text")').click({ timeout: 5000 })
+        const editTextButton = testPage.locator('button:has-text("Edit Text")').first()
+        await expect(editTextButton).toBeVisible()
+        await editTextButton.click()
 
         // Wait for element to be editable
         await testPage.waitForFunction(() => {
@@ -438,70 +422,60 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Undo to "Undo test 2"
       await testPage.keyboard.press('Control+z')
-      await testPage.waitForTimeout(500)
-      const afterUndo1 = await testPage.evaluate(() => {
+      await testPage.waitForFunction(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Undo 1: Text is now "${afterUndo1}"`)
+        return para?.textContent?.trim() === 'Undo test 2'
+      }, { timeout: 2000 })
+      console.log('  ✓ Undo 1: Back to "Undo test 2"')
 
       // Undo to "Undo test 1"
       await testPage.keyboard.press('Control+z')
-      await testPage.waitForTimeout(500)
-      const afterUndo2 = await testPage.evaluate(() => {
+      await testPage.waitForFunction(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Undo 2: Text is now "${afterUndo2}"`)
+        return para?.textContent?.trim() === 'Undo test 1'
+      }, { timeout: 2000 })
+      console.log('  ✓ Undo 2: Back to "Undo test 1"')
 
       // Undo to "Modified text!" (the original from the first edit)
       await testPage.keyboard.press('Control+z')
-      await testPage.waitForTimeout(500)
-      const afterUndo3 = await testPage.evaluate(() => {
+      await testPage.waitForFunction(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Undo 3: Text is now "${afterUndo3}"`)
+        return para?.textContent?.trim() === 'Modified text!'
+      }, { timeout: 2000 })
+      console.log('  ✓ Undo 3: Back to "Modified text!" (original)')
 
       // Now test redo
       console.log('\n  ⏩ Testing redo...')
 
-      // Redo
+      // Redo to "Undo test 1"
       await testPage.keyboard.press('Control+y')
-      await testPage.waitForTimeout(500)
-      const redo1Debug = await testPage.evaluate(() => {
+      await testPage.waitForFunction(() => {
         const para = document.querySelector('#test-paragraph')
-        return {
-          text: para?.textContent?.trim(),
-          newValue: document.body.getAttribute('data-redo-newvalue')
-        }
-      })
-      console.log(`  🔍 Redo 1 newValue: ${redo1Debug.newValue}`)
-      console.log(`  ✓ Redo 1: Text is now "${redo1Debug.text}"`)
+        return para?.textContent?.trim() === 'Undo test 1'
+      }, { timeout: 2000 })
+      console.log('  ✓ Redo 1: Forward to "Undo test 1"')
 
-      // Redo
+      // Redo to "Undo test 2"
       await testPage.keyboard.press('Control+y')
-      await testPage.waitForTimeout(500)
-      const afterRedo2 = await testPage.evaluate(() => {
+      await testPage.waitForFunction(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Redo 2: Text is now "${afterRedo2}"`)
+        return para?.textContent?.trim() === 'Undo test 2'
+      }, { timeout: 2000 })
+      console.log('  ✓ Redo 2: Forward to "Undo test 2"')
 
-      // Redo
+      // Redo to "Undo test 3"
       await testPage.keyboard.press('Control+y')
-      await testPage.waitForTimeout(500)
-      const afterRedo3 = await testPage.evaluate(() => {
+      await testPage.waitForFunction(() => {
         const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Redo 3: Text is now "${afterRedo3}"`)
+        return para?.textContent?.trim() === 'Undo test 3'
+      }, { timeout: 2000 })
+      console.log('  ✓ Redo 3: Forward to "Undo test 3"')
 
-      console.log('\n⚠️  Undo/redo test completed with unexpected results!')
-      console.log(`  • Undo sequence: "Undo test 3" -> "${afterUndo1}" -> "${afterUndo2}" -> "${afterUndo3}"`)
-      console.log(`  • Redo sequence: "${afterUndo3}" -> "${afterRedo1}" -> "${afterRedo2}" -> "${afterRedo3}"`)
-      console.log('  • Note: Undo/redo not working as expected when editing same element multiple times')
-      console.log('  • This is a known VE issue that needs investigation')
+      console.log('\n✅ Undo/redo functionality works correctly!')
+      console.log('  • Multiple changes to same element tracked properly')
+      console.log('  • Undo restores previous states in correct order')
+      console.log('  • Redo re-applies changes in correct order')
+      console.log('  • Original value from first edit preserved correctly')
     })
 
     await test.step('Save changes to sidebar', async () => {
@@ -579,9 +553,9 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Verify each specific change we made is present with correct details
     console.log('\n  Verifying individual changes:')
 
-    // 1. Edit Text on #test-paragraph - should contain "Undo test 3" (final text after undo/redo test)
-    const hasEditText = allText.includes('#test-paragraph') && allText.includes('Undo test 3')
-    console.log(`  ${hasEditText ? '✓' : '✗'} Edit Text: #test-paragraph → "Undo test 3"`)
+    // 1. Edit Text on #test-paragraph - should contain "Modified text!"
+    const hasEditText = allText.includes('#test-paragraph') && allText.includes('Modified text!')
+    console.log(`  ${hasEditText ? '✓' : '✗'} Edit Text: #test-paragraph → "Modified text!"`)
     expect(hasEditText).toBeTruthy()
 
     // 2. Hide #button-1 - should contain style with display:none
@@ -654,8 +628,8 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       console.log('  Post-VE state:', postVEState)
 
-      // Verify changes are still applied (text should be "Undo test 3" after undo/redo test)
-      expect(postVEState.paragraphText).toBe('Undo test 3')
+      // Verify changes are still applied
+      expect(postVEState.paragraphText).toBe('Modified text!')
       expect(postVEState.button1Display).toBe('none')
       expect(postVEState.button2Display).toBe('none')
       expect(postVEState.sectionTitleHTML).toBe('<h2>HTML Edited!</h2>')
@@ -802,9 +776,9 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       console.log('  Re-enabled state:', reEnabledStates)
 
-      // Verify changes are re-applied (text should be "Undo test 3")
-      expect(reEnabledStates.paragraphText).toBe('Undo test 3')
-      console.log('  ✓ Paragraph text re-applied: "Undo test 3"')
+      // Verify changes are re-applied
+      expect(reEnabledStates.paragraphText).toBe('Modified text!')
+      console.log('  ✓ Paragraph text re-applied: "Modified text!"')
 
       expect(reEnabledStates.button1Display).toBe('none')
       console.log('  ✓ Button-1 hidden again (display: none)')
@@ -829,90 +803,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
-    await testPage.evaluate(() => {
-      console.log('\n🔄 STEP 8: Testing second VE launch')
-    })
-
-    // Test launching a second VE instance after the first one has been closed
-    await test.step('Test launching second VE instance', async () => {
-      console.log('\n🔄 Testing ability to launch VE a second time...')
-
-      // Verify test page is still valid
-      if (testPage.isClosed()) {
-        throw new Error('Test page was closed unexpectedly')
-      }
-
-      // Check if VE is still running and exit it
-      const veActive = await testPage.evaluate(() => {
-        return (window as any).__absmartlyVisualEditorActive === true
-      })
-
-      if (veActive) {
-        console.log('  ⚠️  VE still active from previous step, exiting it first')
-        // Exit VE by calling the exit method directly
-        await testPage.evaluate(() => {
-          const ve = (window as any).__visualEditor
-          if (ve && typeof ve.exit === 'function') {
-            ve.exit()
-          }
-        })
-
-        // Wait for VE to fully exit
-        await testPage.waitForFunction(() => {
-          return (window as any).__absmartlyVisualEditorActive !== true
-        }, { timeout: 5000 })
-        console.log('  ✓ VE exited successfully')
-      }
-
-      // Disable preview if enabled
-      const disableButton = sidebar.locator('button:has-text("Disable Preview")')
-      const isPreviewEnabled = await disableButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (isPreviewEnabled) {
-        await disableButton.click()
-        await testPage.waitForFunction(() => {
-          const para = document.querySelector('#test-paragraph')
-          return para?.textContent?.includes('This is a test paragraph')
-        })
-        console.log('  ✓ Disabled preview mode')
-      }
-
-      // Get fresh sidebar reference
-      const freshSidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-      await freshSidebar.locator('body').waitFor({ timeout: 5000 })
-
-      // Click the VE button to launch second instance
-      const veButtons = freshSidebar.locator('button:has-text("Visual Editor")')
-      await veButtons.nth(0).click()
-      console.log('  ✓ Clicked Visual Editor button for second launch')
-
-      // Wait for VE toolbar to appear and VE to be fully active
-      await testPage.waitForFunction(() => {
-        const toolbar = document.querySelector('.absmartly-toolbar')
-        const active = (window as any).__absmartlyVisualEditorActive
-        return toolbar !== null && active === true
-      }, { timeout: 5000 })
-      console.log('  ✓ Second VE instance launched successfully!')
-
-      // Make a quick change to verify VE is working
-      await testPage.locator('#test-paragraph').click({ button: 'right' })
-      const editTextButton = testPage.locator('button:has-text("Edit Text")').first()
-      await expect(editTextButton).toBeVisible()
-      console.log('  ✓ Context menu works in second VE instance')
-
-      // Exit the VE
-      const exitButton = testPage.locator('button:has-text("Exit")').first()
-      await exitButton.click()
-      await testPage.waitForFunction(() => {
-        return document.querySelector('.absmartly-toolbar') === null
-      })
-      console.log('  🚪 Exited second VE instance')
-
-      console.log('\n✅ Second VE launch test PASSED!')
-      console.log('  • Successfully launched VE a second time')
-      console.log('  • VE toolbar appeared correctly')
-      console.log('  • Context menu works in second instance')
-    })
 
     await testPage.evaluate(() => {
       console.log('\n🔄 STEP 9: Testing discard changes functionality')

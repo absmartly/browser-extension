@@ -1299,6 +1299,11 @@ export function DOMChangesInlineEditor({
   onVEStop,
   activePreviewVariantName
 }: DOMChangesInlineEditorProps) {
+  // Debug activeVEVariant prop changes
+  useEffect(() => {
+    console.log(`[DOMChangesInlineEditor:${variantName}] activeVEVariant prop changed to:`, activeVEVariant)
+  }, [activeVEVariant, variantName])
+
   const [editingChange, setEditingChange] = useState<EditingDOMChange | null>(null)
   const [pickingForField, setPickingForField] = useState<string | null>(null)
   const [draggedChange, setDraggedChange] = useState<DOMChange | null>(null)
@@ -1707,6 +1712,13 @@ export function DOMChangesInlineEditor({
         onVEStop()
         })() // Execute async function immediately
         return true // Indicate we will respond asynchronously
+      } else if (message.type === 'VISUAL_EDITOR_STOPPED') {
+        // Visual Editor was exited without saving (exit button clicked)
+        debugLog('🛑 Visual Editor Stopped - No changes saved')
+
+        // Mark VE as stopped for this variant - re-enable all VE buttons
+        onVEStop()
+        return true
       }
     }
     
@@ -1760,12 +1772,21 @@ export function DOMChangesInlineEditor({
   }, [variantName, onChange, changes])
 
   const handleLaunchVisualEditor = async () => {
-    debugLog('🎨 Launch requested for variant:', variantName)
+    console.log('[DOMChangesInlineEditor] 🎨 Launch requested for variant:', variantName)
+    console.log('[DOMChangesInlineEditor] 🎨 activeVEVariant state:', activeVEVariant)
+    console.log('[DOMChangesInlineEditor] 🎨 isLaunchingVisualEditor flag:', isLaunchingVisualEditor)
 
-    // Check if another variant already has VE active
-    if (activeVEVariant && activeVEVariant !== variantName) {
-      alert(`Visual Editor is already active for variant "${activeVEVariant}". Please close it first.`)
-      return
+    // Check if VE is already active for ANY variant (including this one)
+    if (activeVEVariant) {
+      if (activeVEVariant === variantName) {
+        // Same variant - VE already active, this is a no-op
+        console.log('[DOMChangesInlineEditor] Visual Editor already active for this variant, ignoring click')
+        return
+      } else {
+        // Different variant - show alert
+        alert(`Visual Editor is already active for variant "${activeVEVariant}". Please close it first.`)
+        return
+      }
     }
 
     // Prevent concurrent launches from multiple variant instances
@@ -1796,12 +1817,16 @@ export function DOMChangesInlineEditor({
     }
 
     try {
-      debugLog('🎨 Launching Visual Editor for variant:', variantName)
-      debugLog('Current preview state:', previewEnabled)
-      debugLog('Existing changes:', changes.length)
+      console.log('[DOMChangesInlineEditor] 🎨 Launching Visual Editor for variant:', variantName)
+      console.log('[DOMChangesInlineEditor] Current preview state:', previewEnabled)
+      console.log('[DOMChangesInlineEditor] Existing changes:', changes.length)
 
       // Mark this variant as having active VE
+      console.log('[DOMChangesInlineEditor] About to call onVEStart()...')
+      console.log('[DOMChangesInlineEditor] onVEStart type:', typeof onVEStart)
+      console.log('[DOMChangesInlineEditor] onVEStart function:', onVEStart.toString())
       onVEStart()
+      console.log('[DOMChangesInlineEditor] Called onVEStart() successfully')
 
       // Set a flag to prevent preview header from showing FIRST
       if (tabs[0]?.id) {
@@ -1828,39 +1853,45 @@ export function DOMChangesInlineEditor({
       active: true
     })
     
-    // Send message to background script to start visual editor
-    debugLog('🚀 Sending START_VISUAL_EDITOR message to background')
+    // Send message directly to content script to start visual editor
+    debugLog('🚀 Sending START_VISUAL_EDITOR message to content script')
     debugLog('Variant:', variantName)
     debugLog('Experiment name:', experimentName)
     debugLog('Changes:', changes)
-    
+
     // Test if we can send any message at all
     chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
       debugLog('PING response:', response)
     })
 
-    chrome.runtime.sendMessage({
-      type: 'START_VISUAL_EDITOR',
-      variantName,
-      experimentName,
-      changes
-    }, (response) => {
-      debugLog('📨 Response received from background:', response)
-      if (chrome.runtime.lastError) {
-        debugError('❌ Chrome runtime error:', chrome.runtime.lastError)
-      } else if (response?.error) {
-        debugError('❌ Error from background:', response.error)
-        // Show user-friendly error
-        if (response.error.includes('browser pages')) {
-          alert('Visual editor cannot run on browser pages. Please navigate to a regular website.')
+    // Send directly to content script (no relay through background)
+    if (tabs[0]?.id) {
+      const tabId = tabs[0].id
+
+      // Let content script detect test mode itself (it checks URL params and window flags)
+      // Don't pass useShadowDOM - let content script decide based on URL param
+      chrome.tabs.sendMessage(tabId, {
+        type: 'START_VISUAL_EDITOR',
+        variantName,
+        experimentName,
+        changes
+      }, (response) => {
+        debugLog('📨 Response received from content script:', response)
+        if (chrome.runtime.lastError) {
+          debugError('❌ Chrome runtime error:', chrome.runtime.lastError)
+        } else if (response?.error) {
+          debugError('❌ Error from content script:', response.error)
+          alert('Failed to start visual editor: ' + response.error)
+        } else {
+          debugLog('✅ Visual editor started successfully:', response)
         }
-      } else {
-        debugLog('✅ Visual editor started successfully:', response)
-        // Visual editor started in sidebar
-      }
-      // Reset flag after message is sent
+        // Reset flag after message is sent
+        isLaunchingVisualEditor = false
+      })
+    } else {
+      debugError('❌ No active tab found')
       isLaunchingVisualEditor = false
-    })
+    }
     } finally {
       // Reset flag if any error occurs
       setTimeout(() => {
@@ -2792,9 +2823,11 @@ export function DOMChangesInlineEditor({
             size="sm"
             variant="primary"
             className="flex-1"
-            disabled={activeVEVariant !== null && activeVEVariant !== variantName}
+            disabled={activeVEVariant !== null}
             title={
-              activeVEVariant && activeVEVariant !== variantName
+              activeVEVariant === variantName
+                ? 'Visual Editor is already active for this variant'
+                : activeVEVariant
                 ? `Visual Editor is active for variant "${activeVEVariant}"`
                 : 'Launch Visual Editor'
             }

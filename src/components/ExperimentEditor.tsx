@@ -91,6 +91,7 @@ export function ExperimentEditor({
   const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(null)
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [activePreviewVariant, setActivePreviewVariant] = useState<number | null>(null)
+  const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
 
   // Load config on mount to get the DOM changes field name
@@ -584,9 +585,15 @@ export function ExperimentEditor({
                     onChange={(changes) => updateVariantDOMChanges(index, changes)}
                     previewEnabled={previewEnabled && activePreviewVariant === index}
                     onPreviewToggle={(enabled) => handlePreviewToggleForVariant(enabled, index)}
-                    activeVEVariant={null}
-                    onVEStart={() => {}}
-                    onVEStop={() => {}}
+                    activeVEVariant={activeVEVariant}
+                    onVEStart={() => {
+                      console.log('[ExperimentEditor] onVEStart called for variant:', variant.name)
+                      setActiveVEVariant(variant.name)
+                    }}
+                    onVEStop={() => {
+                      console.log('[ExperimentEditor] onVEStop called')
+                      setActiveVEVariant(null)
+                    }}
                     activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
                   />
                 </div>

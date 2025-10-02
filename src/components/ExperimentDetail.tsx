@@ -1003,8 +1003,16 @@ export function ExperimentDetail({
                         handlePreviewToggleForVariant(enabled, variantKey)
                       }}
                       activeVEVariant={activeVEVariant}
-                      onVEStart={() => setActiveVEVariant(variantKey)}
-                      onVEStop={() => setActiveVEVariant(null)}
+                      onVEStart={() => {
+                        console.log('[ExperimentDetail] onVEStart called for variant:', variantKey)
+                        console.log('[ExperimentDetail] Setting activeVEVariant to:', variantKey)
+                        setActiveVEVariant(variantKey)
+                      }}
+                      onVEStop={() => {
+                        console.log('[ExperimentDetail] onVEStop called')
+                        console.log('[ExperimentDetail] Setting activeVEVariant to: null')
+                        setActiveVEVariant(null)
+                      }}
                       activePreviewVariantName={activePreviewVariant}
                     />
                   </div>
