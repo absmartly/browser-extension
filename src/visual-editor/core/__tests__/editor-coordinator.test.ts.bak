@@ -152,6 +152,7 @@ describe('EditorCoordinator', () => {
     mockCallbacks = {
       onChangesUpdate: jest.fn(),
       removeStyles: jest.fn(),
+      addChange: jest.fn(),
       getSelector: jest.fn().mockReturnValue('.mock-selector'),
       hideElement: jest.fn(),
       deleteElement: jest.fn(),
@@ -230,7 +231,7 @@ describe('EditorCoordinator', () => {
       expect(coordinator['stateManager']).toBe(mockStateManager)
       expect(coordinator['eventHandlers']).toBe(mockEventHandlers)
       expect(coordinator['contextMenu']).toBe(mockContextMenu)
-      expect(coordinator['undoRedoManager']).toBe(mockUndoRedoManager)
+      expect(coordinator['changeTracker']).toBe(mockUndoRedoManager)
       expect(coordinator['uiComponents']).toBe(mockUIComponents)
       expect(coordinator['editModes']).toBe(mockEditModes)
       expect(coordinator['cleanup']).toBe(mockCleanup)
@@ -562,7 +563,13 @@ describe('EditorCoordinator', () => {
 
       expect(preventDefaultSpy).toHaveBeenCalled()
       expect(removeSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
+      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
+        selector: '.mock-selector',
+        type: 'delete',
+        value: null,
+        originalHtml: mockSelectedElement.outerHTML,
+        enabled: true
+      })
     })
 
     it('should not handle Delete key when in editing mode', () => {
@@ -579,7 +586,7 @@ describe('EditorCoordinator', () => {
       keydownHandler(event)
 
       expect(preventDefaultSpy).not.toHaveBeenCalled()
-      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+      expect(mockCallbacks.addChange).not.toHaveBeenCalled()
     })
 
     it('should not handle shortcuts when no element is selected', () => {
@@ -817,7 +824,13 @@ describe('EditorCoordinator', () => {
       expect(mockElement.classList.contains('absmartly-editing')).toBe(false)
       expect(mockElement.classList.contains('absmartly-selected')).toBe(true)
       expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(false)
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
+      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
+        selector: '.mock-selector',
+        type: 'text',
+        value: 'Modified content',
+        originalText: 'Original content',
+        enabled: true
+      })
     })
 
     it('should handle Enter key to finish editing', () => {
@@ -928,7 +941,13 @@ describe('EditorCoordinator', () => {
       await coordinator.handleEditHtmlAction(mockElement, originalState)
 
       expect(mockHtmlEditor.show).toHaveBeenCalledWith(mockElement, 'Test content')
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
+      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
+        selector: '.mock-selector',
+        type: 'html',
+        value: '<div>Modified HTML</div>',
+        originalHtml: 'Test content',
+        enabled: true
+      })
       expect(mockNotifications.show).toHaveBeenCalledWith(
         'HTML updated successfully',
         '',
@@ -1199,7 +1218,13 @@ describe('EditorCoordinator', () => {
       mockElement.dispatchEvent(new Event('blur'))
 
       // Verify change was created
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
+      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
+        selector: '.mock-selector',
+        type: 'text',
+        value: 'Modified content',
+        originalText: 'Original content',
+        enabled: true
+      })
 
       // Verify editing state is reset
       expect(mockElement.contentEditable).toBe('false')

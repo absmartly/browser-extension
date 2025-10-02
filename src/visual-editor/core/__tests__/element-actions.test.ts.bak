@@ -109,9 +109,9 @@ describe('ElementActions', () => {
       return () => {} // Return unsubscribe function
     })
 
-    // Mock UndoRedoManager
-    const MockedUndoRedoManager = UndoRedoManager as jest.MockedClass<typeof UndoRedoManager>
-    mockUndoRedoManager = new MockedUndoRedoManager() as jest.Mocked<UndoRedoManager>
+    // Mock ChangeTracker
+    const MockedChangeTracker = ChangeTracker as jest.MockedClass<typeof ChangeTracker>
+    mockChangeTracker = new MockedChangeTracker(mockStateManager) as jest.Mocked<ChangeTracker>
 
     // Mock Notifications
     const MockedNotifications = Notifications as jest.MockedClass<typeof Notifications>
@@ -136,7 +136,7 @@ describe('ElementActions', () => {
     // Create ElementActions instance
     elementActions = new ElementActions(
       mockStateManager,
-      mockUndoRedoManager,
+      mockChangeTracker,
       mockNotifications,
       mockOptions
     )
@@ -149,6 +149,7 @@ describe('ElementActions', () => {
 
   describe('Constructor and Initialization', () => {
     it('should initialize with correct dependencies', () => {
+      expect(mockStateManager.getState).toHaveBeenCalled()
       expect(mockStateManager.onStateChange).toHaveBeenCalled()
     })
 
@@ -296,14 +297,16 @@ describe('ElementActions', () => {
       elementActions.hideElement()
 
       expect(testDiv.style.display).toBe('none')
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          selector: '#test-div',
-          type: 'style',
-          value: { display: 'none' },
-          enabled: true
-        }),
-        expect.any(Object)
+      expect(mockStateManager.setChanges).toHaveBeenCalled()
+      expect(mockOptions.onChangesUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            selector: '#test-div',
+            type: 'style',
+            value: { display: 'none' },
+            enabled: true
+          })
+        ])
       )
       expect(mockStateManager.setSelectedElement).toHaveBeenCalledWith(null)
     })
@@ -339,10 +342,22 @@ describe('ElementActions', () => {
 
       elementActions.deleteElement()
 
-      // Delete now hides the element (doesn't remove from DOM)
-      // Coordinator handles adding the delete change when Delete key is pressed
-      expect(parent?.contains(testDiv)).toBe(true)
-      expect(testDiv.style.display).toBe('none')
+      expect(parent?.contains(testDiv)).toBe(false)
+      expect(mockStateManager.setChanges).toHaveBeenCalled()
+      expect(mockOptions.onChangesUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            selector: '#test-div',
+            type: 'delete',
+            value: expect.objectContaining({
+              html: expect.any(String),
+              parentSelector: expect.any(String),
+              nextSiblingSelector: expect.any(String)
+            }),
+            enabled: true
+          })
+        ])
+      )
       expect(mockStateManager.setSelectedElement).toHaveBeenCalledWith(null)
     })
 
@@ -432,14 +447,16 @@ describe('ElementActions', () => {
 
       expect(parent.children[0]).toBe(testChild2)
       expect(parent.children[1]).toBe(testChild1)
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          selector: '#child-2',
-          type: 'move',
-          value: 'up',
-          enabled: true
-        }),
-        'down' // oldValue is opposite direction
+      expect(mockStateManager.setChanges).toHaveBeenCalled()
+      expect(mockOptions.onChangesUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            selector: '#child-2',
+            type: 'move',
+            value: 'up',
+            enabled: true
+          })
+        ])
       )
     })
 
@@ -677,9 +694,145 @@ describe('ElementActions', () => {
     })
   })
 
-  // Note: Change management tests removed as logic moved to UndoRedoManager
-  // Changes are now tracked individually in UndoRedoManager and squashed only when saving
+  describe('Private Methods - Change Management', () => {
+    beforeEach(() => {
+      // Reset changes to empty state
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        changes: []
+      })
+    })
 
+    it('should add new change when none exists', () => {
+      mockGenerateRobustSelector.mockReturnValue('#test-div')
+
+      // Simulate element being selected
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv
+      })
+
+      elementActions.hideElement()
+
+      expect(mockStateManager.setChanges).toHaveBeenCalledWith([
+        {
+          selector: '#test-div',
+          type: 'style',
+          value: { display: 'none' },
+          enabled: true
+        }
+      ])
+    })
+
+    it('should merge style changes for same selector', () => {
+      mockGenerateRobustSelector.mockReturnValue('#test-div')
+
+      // Setup existing style change
+      const existingChanges: DOMChange[] = [
+        {
+          selector: '#test-div',
+          type: 'style',
+          value: { color: 'red' },
+          enabled: true
+        }
+      ]
+
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv,
+        changes: existingChanges
+      })
+
+      elementActions.hideElement()
+
+      expect(mockStateManager.setChanges).toHaveBeenCalledWith([
+        {
+          selector: '#test-div',
+          type: 'style',
+          value: { color: 'red', display: 'none' },
+          enabled: true
+        }
+      ])
+    })
+
+    it('should replace non-style changes for same selector and type', () => {
+      mockGenerateRobustSelector.mockReturnValue('#test-div')
+
+      // Setup existing delete change
+      const existingChanges: DOMChange[] = [
+        {
+          selector: '#test-div',
+          type: 'delete',
+          value: { html: 'old', parentSelector: '#parent', nextSiblingSelector: null },
+          enabled: true
+        }
+      ]
+
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv,
+        changes: existingChanges
+      })
+
+      elementActions.deleteElement()
+
+      // Should replace with new delete change
+      expect(mockStateManager.setChanges).toHaveBeenCalledWith([
+        {
+          selector: '#test-div',
+          type: 'delete',
+          value: expect.objectContaining({
+            html: expect.any(String),
+            parentSelector: expect.any(String),
+            nextSiblingSelector: expect.any(String)
+          }),
+          enabled: true
+        }
+      ])
+    })
+
+    it('should add multiple different changes', () => {
+      mockGenerateRobustSelector.mockReturnValue('#test-div')
+
+      // Setup existing style change
+      const existingChanges: DOMChange[] = [
+        {
+          selector: '#other-element',
+          type: 'style',
+          value: { color: 'blue' },
+          enabled: true
+        }
+      ]
+
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv,
+        changes: existingChanges
+      })
+
+      elementActions.hideElement()
+
+      expect(mockStateManager.setChanges).toHaveBeenCalledWith([
+        {
+          selector: '#other-element',
+          type: 'style',
+          value: { color: 'blue' },
+          enabled: true
+        },
+        {
+          selector: '#test-div',
+          type: 'style',
+          value: { display: 'none' },
+          enabled: true
+        }
+      ])
+    })
+  })
 
   describe('Edge Cases and Error Handling', () => {
     it('should handle element selection with no existing classes', () => {
@@ -886,7 +1039,7 @@ describe('ElementActions', () => {
       // Create a new instance to test subscription
       const newElementActions = new ElementActions(
         mockStateManager,
-        mockUndoRedoManager,
+        mockChangeTracker,
         mockNotifications,
         mockOptions
       )

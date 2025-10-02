@@ -84,7 +84,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       stateManager,
       eventHandlers,
       contextMenu,
-      undoRedoManager,
+      changeTracker,
       uiComponents,
       editModes,
       cleanup,

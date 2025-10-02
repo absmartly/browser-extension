@@ -15,7 +15,6 @@ import type { DOMChange, VisualEditorMessage } from './types/visual-editor'
 export { default as StateManager } from './core/state-manager'
 export { default as EventHandlers } from './core/event-handlers'
 export { default as ContextMenu } from './core/context-menu'
-export { default as ChangeTracker } from './core/change-tracker'
 export { default as EditModes } from './core/edit-modes'
 export { default as Cleanup } from './core/cleanup'
 
