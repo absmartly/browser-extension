@@ -12,6 +12,27 @@ export const config: PlasmoCSConfig = {
   all_frames: false
 }
 
+// Helper function to send messages - handles both test mode (iframe) and production (chrome.runtime)
+const sendMessageToExtension = (message: any) => {
+  // Check if sidebar iframe exists (only in test mode)
+  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
+  if (sidebarIframe && sidebarIframe.contentWindow) {
+    // Test mode: send to sidebar iframe
+    sidebarIframe.contentWindow.postMessage({
+      source: 'absmartly-visual-editor',
+      ...message
+    }, '*')
+    debugLog(`Sent ${message.type} to sidebar iframe (test mode)`)
+  } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    // Production: use chrome.runtime.sendMessage
+    chrome.runtime.sendMessage(message)
+    debugLog(`Sent ${message.type} via chrome.runtime (production mode)`)
+  } else {
+    debugError('No message transport available (neither iframe nor chrome.runtime)')
+  }
+}
+
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
@@ -81,40 +102,11 @@ async function startVisualEditor(config: {
         console.log('[Visual Editor Content Script] AFTER debugLog - about to send message')
         console.log('[Visual Editor Content Script] NOW SENDING VISUAL_EDITOR_CHANGES message with', changes.length, 'changes')
 
-        // Check if we're in test mode by looking for the test query parameter
-        const urlParams = new URLSearchParams(window.location.search)
-        const isTestMode = urlParams.has('use_shadow_dom_for_visual_editor_context_menu')
-        console.log('[Visual Editor Content Script] Test mode:', isTestMode)
-
-        if (isTestMode) {
-          // In test mode, find the sidebar iframe and post message to its contentWindow
-          console.log('[Visual Editor Content Script] Sending message via iframe.contentWindow.postMessage (test mode)')
-          const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-          if (sidebarIframe && sidebarIframe.contentWindow) {
-            sidebarIframe.contentWindow.postMessage({
-              source: 'absmartly-visual-editor',
-              type: 'VISUAL_EDITOR_CHANGES',
-              variantName: config.variantName,
-              changes: changes
-            }, '*')
-            console.log('[Visual Editor Content Script] Message posted to sidebar iframe')
-          } else {
-            console.error('[Visual Editor Content Script] Sidebar iframe not found!')
-          }
-        } else {
-          // In production, use chrome.runtime.sendMessage for extension context
-          console.log('[Visual Editor Content Script] Sending message via chrome.runtime.sendMessage (production mode)')
-          chrome.runtime.sendMessage({
-            type: 'VISUAL_EDITOR_CHANGES',
-            variantName: config.variantName,
-            changes: changes
-          }, (response) => {
-            console.log('[Visual Editor Content Script] Message sent, got response:', response)
-            if (chrome.runtime.lastError) {
-              console.error('[Visual Editor Content Script] Error:', chrome.runtime.lastError.message)
-            }
-          })
-        }
+        sendMessageToExtension({
+          type: 'VISUAL_EDITOR_CHANGES',
+          variantName: config.variantName,
+          changes: changes
+        })
       }
     })
 
@@ -157,7 +149,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     elementPicker.start((selector: string) => {
       debugLog('[Visual Editor Content Script] Element selected:', selector)
       // Send the selected element back to the extension
-      chrome.runtime.sendMessage({
+      sendMessageToExtension({
         type: 'ELEMENT_SELECTED',
         selector: selector
       })
@@ -407,7 +399,7 @@ window.addEventListener('message', (event) => {
       isVisualEditorStarting = false
 
       // Send message to extension that visual editor was stopped
-      chrome.runtime.sendMessage({
+      sendMessageToExtension({
         type: 'VISUAL_EDITOR_STOPPED',
         changes: changes
       })
@@ -502,7 +494,7 @@ function createPreviewHeader(experimentName: string, variantName: string) {
   }
   closeButton.onclick = () => {
     // Send message back to extension to disable preview
-    chrome.runtime.sendMessage({
+    sendMessageToExtension({
       type: 'DISABLE_PREVIEW',
       experimentName: experimentName
     })
