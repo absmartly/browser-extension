@@ -19,7 +19,6 @@ import type { DOMChange } from '../types/visual-editor'
 export interface EditorCoordinatorCallbacks {
   onChangesUpdate: (changes: DOMChange[]) => void
   removeStyles: () => void
-  addChange: (change: DOMChange) => void
   getSelector: (element: HTMLElement) => string
   hideElement: () => void
   deleteElement: () => void
@@ -200,13 +199,17 @@ export class EditorCoordinator {
         if (selectedElement && !this.eventHandlers.isEditingMode) {
           e.preventDefault()
           selectedElement.remove()
-          this.callbacks.addChange({
-            selector: this.callbacks.getSelector(selectedElement as HTMLElement),
-            type: 'delete',
-            value: null,
-            originalHtml: selectedElement.outerHTML,
-            enabled: true
-          })
+          const selector = this.callbacks.getSelector(selectedElement as HTMLElement)
+          const oldValue = selectedElement.outerHTML
+          this.undoRedoManager.addChange(
+            {
+              selector,
+              type: 'delete',
+              value: null,
+              enabled: true
+            },
+            oldValue
+          )
         }
       }
     }
@@ -356,22 +359,32 @@ export class EditorCoordinator {
 
       if (hasHtmlChildren) {
         // Save as HTML to preserve inner element structure and styles
-        this.callbacks.addChange({
-          selector: this.callbacks.getSelector(element as HTMLElement),
-          type: 'html',
-          value: element.innerHTML,
-          originalHtml: originalState.innerHTML,
-          enabled: true
-        })
+        const selector = this.callbacks.getSelector(element as HTMLElement)
+        const newValue = element.innerHTML
+        const oldValue = originalState.innerHTML
+        this.undoRedoManager.addChange(
+          {
+            selector,
+            type: 'html',
+            value: newValue,
+            enabled: true
+          },
+          oldValue
+        )
       } else {
         // Simple text node, save as text
-        this.callbacks.addChange({
-          selector: this.callbacks.getSelector(element as HTMLElement),
-          type: 'text',
-          value: element.textContent || '',
-          originalText: originalState.textContent,
-          enabled: true
-        })
+        const selector = this.callbacks.getSelector(element as HTMLElement)
+        const newValue = element.textContent || ''
+        const oldValue = originalState.textContent
+        this.undoRedoManager.addChange(
+          {
+            selector,
+            type: 'text',
+            value: newValue,
+            enabled: true
+          },
+          oldValue
+        )
       }
     }
 
@@ -414,13 +427,17 @@ export class EditorCoordinator {
     if (newHtml !== null && newHtml !== currentHtml) {
       element.innerHTML = newHtml
 
-      this.callbacks.addChange({
-        selector: this.callbacks.getSelector(element as HTMLElement),
-        type: 'html',
-        value: newHtml,
-        originalHtml: originalState.innerHTML,
-        enabled: true
-      })
+      const selector = this.callbacks.getSelector(element as HTMLElement)
+      const oldValue = originalState.innerHTML
+      this.undoRedoManager.addChange(
+        {
+          selector,
+          type: 'html',
+          value: newHtml,
+          enabled: true
+        },
+        oldValue
+      )
 
       this.notifications.show('HTML updated successfully', '', 'success')
     }

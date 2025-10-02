@@ -1,12 +1,11 @@
 import { generateRobustSelector } from '../utils/selector-generator'
 import StateManager from './state-manager'
-import ChangeTracker from './change-tracker'
+import UndoRedoManager from './undo-redo-manager'
 import { Notifications } from '../ui/notifications'
 import type { DOMChange } from '../types/visual-editor'
 
 export interface ElementActionsOptions {
   onChangesUpdate: (changes: DOMChange[]) => void
-  addChange?: (change: DOMChange) => void
 }
 
 /**
@@ -15,10 +14,9 @@ export interface ElementActionsOptions {
  */
 export class ElementActions {
   private stateManager: StateManager
-  private changeTracker: ChangeTracker
+  private undoRedoManager: UndoRedoManager
   private notifications: Notifications
   private options: ElementActionsOptions
-  private changes: DOMChange[] = []
 
   // UI state
   private selectedElement: HTMLElement | null = null
@@ -27,23 +25,19 @@ export class ElementActions {
 
   constructor(
     stateManager: StateManager,
-    changeTracker: ChangeTracker,
+    undoRedoManager: UndoRedoManager,
     notifications: Notifications,
     options: ElementActionsOptions
   ) {
     this.stateManager = stateManager
-    this.changeTracker = changeTracker
+    this.undoRedoManager = undoRedoManager
     this.notifications = notifications
     this.options = options
-
-    // Initialize changes from state
-    this.changes = stateManager.getState().changes || []
 
     // Listen to state changes to keep local state in sync
     this.stateManager.onStateChange((state) => {
       this.selectedElement = state.selectedElement as HTMLElement | null
       this.hoveredElement = state.hoveredElement as HTMLElement | null
-      this.changes = state.changes || []
     })
   }
 
@@ -112,13 +106,18 @@ export class ElementActions {
         console.log('[ElementActions] Stored original display value:', originalData.styles.display)
       }
 
+      const selector = this.getSelector(htmlElement)
+      const oldValue = originalData.styles.display
       htmlElement.style.display = 'none'
-      this.addChange({
-        selector: this.getSelector(htmlElement),
-        type: 'style',
-        value: { display: 'none' },
-        enabled: true
-      })
+      this.undoRedoManager.addChange(
+        {
+          selector,
+          type: 'style',
+          value: { display: 'none' },
+          enabled: true
+        },
+        { display: oldValue }
+      )
       this.deselectElement()
     } catch (error) {
       console.error('Failed to hide element:', error)
@@ -157,14 +156,8 @@ export class ElementActions {
     // In production, the DOM Changes plugin will actually remove it
     htmlElement.style.display = 'none'
 
-    // Still create a 'delete' type change (for production)
-    // But in preview/VE we just hide it
-    this.addChange({
-      selector: selector,
-      type: 'delete',
-      value: {},
-      enabled: true
-    })
+    // Note: The coordinator already handles adding the delete change to undoRedoManager
+    // when Delete key is pressed, so we don't add it here to avoid duplication
 
     this.deselectElement()
   }
@@ -217,18 +210,25 @@ export class ElementActions {
     const parent = this.selectedElement.parentElement
     if (!parent) return
 
+    // Capture original position before moving
+    const selector = this.getSelector(this.selectedElement)
+    const oldDirection = direction === 'up' ? 'down' : 'up' // opposite direction for undo
+
     if (direction === 'up' && this.selectedElement.previousElementSibling) {
       parent.insertBefore(this.selectedElement, this.selectedElement.previousElementSibling)
     } else if (direction === 'down' && this.selectedElement.nextElementSibling) {
       parent.insertBefore(this.selectedElement.nextElementSibling, this.selectedElement)
     }
 
-    this.addChange({
-      selector: this.getSelector(this.selectedElement),
-      type: 'move',
-      value: direction,
-      enabled: true
-    })
+    this.undoRedoManager.addChange(
+      {
+        selector,
+        type: 'move',
+        value: direction,
+        enabled: true
+      },
+      oldDirection
+    )
   }
 
   public insertNewBlock(): void {
@@ -403,8 +403,7 @@ export class ElementActions {
 
     console.log('[ElementActions] Changes after undo:', currentChanges.length)
 
-    // Update both local and state manager changes
-    this.changes = currentChanges
+    // Update state manager changes
     this.stateManager.setChanges(currentChanges)
 
     // Don't call onChangesUpdate here - that would save to sidebar
@@ -552,8 +551,7 @@ export class ElementActions {
 
     console.log('[ElementActions] Changes after redo:', currentChanges.length)
 
-    // Update both local and state manager changes
-    this.changes = currentChanges
+    // Update state manager changes
     this.stateManager.setChanges(currentChanges)
 
     // Don't call onChangesUpdate here - that would save to sidebar
@@ -564,9 +562,9 @@ export class ElementActions {
 
   public clearAllChanges(): void {
     if (confirm('Are you sure you want to clear all changes?')) {
-      this.changes = []
-      this.stateManager.setChanges(this.changes)
-      this.options.onChangesUpdate(this.changes)
+      this.undoRedoManager.clear()
+      this.stateManager.setChanges([])
+      this.options.onChangesUpdate([])
       this.notifications.show('All changes cleared', '', 'success')
     }
   }
@@ -598,60 +596,4 @@ export class ElementActions {
     return false
   }
 
-  // Private methods
-  private addChange(change: DOMChange): void {
-    console.log('[ElementActions] addChange called with:', change)
-
-    // If we have an addChange callback from visual editor, use it
-    // This ensures proper undo/redo stack management
-    if (this.options.addChange) {
-      console.log('[ElementActions] Delegating to visual editor addChange')
-      this.options.addChange(change)
-    } else {
-      // Fallback: manage changes locally (for standalone use)
-      console.log('[ElementActions] Managing change locally')
-      console.log('[ElementActions] Current changes count:', this.changes.length)
-
-      const existingIndex = this.changes.findIndex(c =>
-        c.selector === change.selector && c.type === change.type
-      )
-
-      if (existingIndex >= 0) {
-        // Store old change for undo
-        const oldChange = { ...this.changes[existingIndex] }
-
-        if (change.type === 'style' && this.changes[existingIndex].type === 'style') {
-          this.changes[existingIndex].value = {
-            ...this.changes[existingIndex].value,
-            ...change.value
-          }
-        } else {
-          this.changes[existingIndex] = change
-        }
-
-        // Add to undo stack
-        this.stateManager.pushUndo({
-          type: 'update',
-          change: oldChange,
-          index: existingIndex
-        })
-      } else {
-        this.changes.push(change)
-
-        // Add to undo stack
-        this.stateManager.pushUndo({
-          type: 'add',
-          change: change,
-          index: this.changes.length - 1
-        })
-      }
-
-      console.log('[ElementActions] New changes count:', this.changes.length)
-      console.log('[ElementActions] Setting changes in state manager')
-      this.stateManager.setChanges(this.changes)
-
-      console.log('[ElementActions] Calling onChangesUpdate callback')
-      this.options.onChangesUpdate(this.changes)
-    }
-  }
 }
