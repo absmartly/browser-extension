@@ -2,8 +2,8 @@
  * UndoRedoManager - Manages undo/redo functionality for the visual editor
  *
  * This class maintains separate stacks for undo and redo operations.
- * It automatically squashes changes to the same element to prevent
- * intermediate steps from cluttering the undo stack.
+ * Each change is tracked individually to allow step-by-step undo/redo.
+ * Changes can be squashed when saving via the squashChanges() method.
  */
 
 import { DOMChange } from '../types/visual-editor'
@@ -24,36 +24,24 @@ export class UndoRedoManager {
 
   /**
    * Add a change to the undo stack
-   * Automatically squashes changes to the same selector+type combination
+   * Each change is tracked individually for undo/redo
    */
   addChange(change: DOMChange, oldValue: any): void {
     // Deep copy to prevent reference issues
     const newChange: DOMChange = JSON.parse(JSON.stringify(change))
     const newOldValue = JSON.parse(JSON.stringify(oldValue))
 
-    // Check if we're updating an existing change (squashing)
-    const existingIndex = this.undoStack.findIndex(
-      record => record.change.selector === newChange.selector &&
-                record.change.type === newChange.type
-    )
+    // Simply add the change to the stack without squashing
+    const record: ChangeRecord = {
+      change: newChange,
+      oldValue: newOldValue
+    }
 
-    if (existingIndex >= 0) {
-      // Squash: Keep the original oldValue, update to new value
-      this.undoStack[existingIndex].change.value = newChange.value
-      // Note: We keep the original oldValue from the first change
-    } else {
-      // New change: add to stack
-      const record: ChangeRecord = {
-        change: newChange,
-        oldValue: newOldValue
-      }
+    this.undoStack.push(record)
 
-      this.undoStack.push(record)
-
-      // Limit stack size
-      if (this.undoStack.length > this.maxStackSize) {
-        this.undoStack.shift()
-      }
+    // Limit stack size
+    if (this.undoStack.length > this.maxStackSize) {
+      this.undoStack.shift()
     }
 
     // Clear redo stack when new change is made
@@ -126,6 +114,47 @@ export class UndoRedoManager {
   clear(): void {
     this.undoStack = []
     this.redoStack = []
+  }
+
+  /**
+   * Squash changes by consolidating multiple changes to the same element
+   * Used when saving to reduce redundant operations
+   *
+   * For each unique selector+type combination, keeps only the final value
+   * while preserving the original oldValue from the first change
+   *
+   * @returns Array of squashed DOMChange objects ready for saving
+   */
+  squashChanges(): DOMChange[] {
+    if (this.undoStack.length === 0) {
+      return []
+    }
+
+    // Map to track changes by selector+type combination
+    const changeMap = new Map<string, { change: DOMChange; oldValue: any }>()
+
+    // Process changes in order, keeping track of first oldValue and last change
+    for (const record of this.undoStack) {
+      const key = `${record.change.selector}-${record.change.type}`
+
+      if (changeMap.has(key)) {
+        // Update to latest change value, but keep original oldValue
+        const existing = changeMap.get(key)!
+        changeMap.set(key, {
+          change: record.change,
+          oldValue: existing.oldValue // Keep the original oldValue
+        })
+      } else {
+        // First change for this selector+type
+        changeMap.set(key, {
+          change: record.change,
+          oldValue: record.oldValue
+        })
+      }
+    }
+
+    // Convert map to array of DOMChange objects
+    return Array.from(changeMap.values()).map(({ change }) => change)
   }
 }
 

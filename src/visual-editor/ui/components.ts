@@ -60,6 +60,8 @@ export class UIComponents {
       console.log('🔍 Banner - Using Shadow DOM')
     } else {
       // For testing, append directly without shadow DOM
+      // Store reference to banner host for updates
+      this.bannerShadowRoot = bannerHost as any
       bannerContainer = bannerHost
       console.log('🔍 Banner - NOT using Shadow DOM (test mode)')
     }
