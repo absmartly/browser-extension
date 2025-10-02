@@ -32,7 +32,15 @@ export class ChangeTracker {
 
   trackChange(type: ChangeAction['type'], element: Element | null, data: any): void {
     // Convert the change data to DOMChange format for UndoRedoManager
-    if (data.selector && data.type && data.newValue !== undefined && data.oldValue !== undefined) {
+    console.log('[ChangeTracker] trackChange called with data:', data)
+    console.log('[ChangeTracker] Checks:', {
+      hasSelector: !!data.selector,
+      hasType: !!data.type,
+      hasNewValue: 'newValue' in data,
+      hasOldValue: 'oldValue' in data
+    })
+
+    if (data.selector && data.type && 'newValue' in data && 'oldValue' in data) {
       const domChange: DOMChange = {
         selector: data.selector,
         type: data.type,
@@ -40,6 +48,7 @@ export class ChangeTracker {
         enabled: true
       }
 
+      console.log('[ChangeTracker] Adding change to UndoRedoManager:', domChange, 'oldValue:', data.oldValue)
       // Add to UndoRedoManager with old value
       this.undoRedoManager.addChange(domChange, data.oldValue)
 
