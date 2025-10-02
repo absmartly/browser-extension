@@ -6,10 +6,11 @@
 import { VisualEditor, VisualEditorOptions, initVisualEditor } from '../visual-editor'
 import type { DOMChange } from '../../types/visual-editor'
 
-// Mock all dependencies except UndoRedoManager (use real implementation)
+// Mock all dependencies
 jest.mock('../state-manager')
 jest.mock('../event-handlers')
 jest.mock('../context-menu')
+jest.mock('../undo-redo-manager')
 jest.mock('../../ui/components')
 jest.mock('../edit-modes')
 jest.mock('../cleanup')
@@ -49,10 +50,11 @@ import { Notifications } from '../../ui/notifications'
 import { ElementActions } from '../element-actions'
 import { EditorCoordinator, EditorCoordinatorCallbacks } from '../editor-coordinator'
 
-// Mock implementations (UndoRedoManager uses real class)
+// Mock implementations
 const MockStateManager = StateManager as jest.MockedClass<typeof StateManager>
 const MockEventHandlers = EventHandlers as jest.MockedClass<typeof EventHandlers>
 const MockContextMenu = ContextMenu as jest.MockedClass<typeof ContextMenu>
+const MockUndoRedoManager = UndoRedoManager as jest.MockedClass<typeof UndoRedoManager>
 const MockUIComponents = UIComponents as jest.MockedClass<typeof UIComponents>
 const MockEditModes = EditModes as jest.MockedClass<typeof EditModes>
 const MockCleanup = Cleanup as jest.MockedClass<typeof Cleanup>
@@ -69,7 +71,6 @@ describe('VisualEditor', () => {
   let mockElementActions: jest.Mocked<ElementActions>
   let mockCoordinator: jest.Mocked<EditorCoordinator>
   let mockNotifications: jest.Mocked<Notifications>
-  let undoRedoManager: UndoRedoManager
 
   beforeEach(() => {
     // Reset all mocks
@@ -129,9 +130,17 @@ describe('VisualEditor', () => {
     // Mock other classes with minimal implementations
     MockEventHandlers.mockImplementation(() => ({} as any))
     MockContextMenu.mockImplementation(() => ({} as any))
-
-    // Create real UndoRedoManager instance
-    undoRedoManager = new UndoRedoManager()
+    MockUndoRedoManager.mockImplementation(() => ({
+      addChange: jest.fn(),
+      undo: jest.fn(),
+      redo: jest.fn(),
+      canUndo: jest.fn().mockReturnValue(false),
+      canRedo: jest.fn().mockReturnValue(false),
+      getUndoCount: jest.fn().mockReturnValue(0),
+      getRedoCount: jest.fn().mockReturnValue(0),
+      clear: jest.fn(),
+      squashChanges: jest.fn().mockReturnValue([])
+    } as any))
     MockUIComponents.mockImplementation(() => ({
       createBanner: jest.fn()
     } as any))
@@ -195,7 +204,7 @@ describe('VisualEditor', () => {
       expect(MockStateManager).toHaveBeenCalled()
       expect(MockEventHandlers).toHaveBeenCalledWith(mockStateManager)
       expect(MockContextMenu).toHaveBeenCalledWith(mockStateManager, undefined)  // Second param is useShadowDOM
-      // UndoRedoManager is now a real instance, not mocked
+      expect(MockUndoRedoManager).toHaveBeenCalledWith(mockStateManager)
       expect(MockUIComponents).toHaveBeenCalledWith(mockStateManager)
       expect(MockEditModes).toHaveBeenCalledWith(mockStateManager)
       expect(MockCleanup).toHaveBeenCalledWith(mockStateManager)
@@ -211,7 +220,8 @@ describe('VisualEditor', () => {
         expect.any(Object), // UndoRedoManager instance
         expect.any(Object), // Notifications instance
         {
-          onChangesUpdate: expect.any(Function)
+          onChangesUpdate: expect.any(Function),
+          addChange: expect.any(Function)
         }
       )
     })
@@ -232,6 +242,7 @@ describe('VisualEditor', () => {
         expect.objectContaining({
           onChangesUpdate: mockOnChangesUpdate,
           removeStyles: expect.any(Function),
+          addChange: expect.any(Function),
           getSelector: expect.any(Function),
           hideElement: expect.any(Function),
           deleteElement: expect.any(Function),
@@ -502,34 +513,35 @@ describe('VisualEditor', () => {
       editor = new VisualEditor(mockOptions)
     })
 
-    it('should add text change to undoRedoManager but not auto-save', () => {
+    it('should add text change and update state but not auto-save', () => {
       const change: DOMChange = {
         selector: '.test-element',
         type: 'text',
         value: 'New text content'
       }
 
-      // Changes are now added directly to undoRedoManager
-      undoRedoManager.addChange(change, null)
+      const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
+      const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
+      callbacks.addChange(change)
 
-      // Changes tracked in undoRedoManager
-      expect(undoRedoManager.canUndo()).toBe(true)
+      // Should update state manager
+      expect(mockStateManager.setChanges).toHaveBeenCalled()
       // Should NOT call onChangesUpdate yet (explicit save required)
       expect(mockOnChangesUpdate).not.toHaveBeenCalled()
     })
 
-    it('should add style change to undoRedoManager but not auto-save', () => {
+    it('should add style change and update state but not auto-save', () => {
       const change: DOMChange = {
         selector: '.test-element',
         type: 'style',
         value: { color: 'red', fontSize: '16px' }
       }
 
-      // Changes are now added directly to undoRedoManager
-      undoRedoManager.addChange(change, null)
+      const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
+      const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
+      callbacks.addChange(change)
 
-      // Changes tracked in undoRedoManager
-      expect(undoRedoManager.canUndo()).toBe(true)
+      expect(mockStateManager.setChanges).toHaveBeenCalled()
       expect(mockOnChangesUpdate).not.toHaveBeenCalled()
     })
 
@@ -539,18 +551,27 @@ describe('VisualEditor', () => {
         { selector: '.test2', type: 'style', value: { color: 'red' } }
       ]
 
-      // Add changes to undoRedoManager
-      testChanges.forEach(change => {
-        undoRedoManager.addChange(change, null)
+      // Mock stateManager to return test changes
+      mockStateManager.getState.mockReturnValue({
+        changes: testChanges,
+        undoStack: [],
+        redoStack: [],
+        selectedElement: null,
+        hoveredElement: null,
+        originalValues: new Map(),
+        isRearranging: false,
+        isResizing: false,
+        draggedElement: null,
+        isActive: true
       })
 
       const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
       const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
 
-      // Call save - should squash changes and call onChangesUpdate
+      // Call save
       callbacks.saveChanges()
 
-      // Now onChangesUpdate should be called with squashed changes
+      // Now onChangesUpdate should be called
       expect(mockOnChangesUpdate).toHaveBeenCalledWith(testChanges)
     })
 
@@ -561,13 +582,15 @@ describe('VisualEditor', () => {
         { selector: '.style-el', type: 'style', value: { color: 'red' } }
       ]
 
-      // Changes are now added directly to undoRedoManager
+      const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
+      const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
+
       changes.forEach(change => {
-        undoRedoManager.addChange(change, null)
+        callbacks.addChange(change)
       })
 
-      // Changes tracked in undoRedoManager
-      expect(undoRedoManager.canUndo()).toBe(true)
+      // Each change updates state
+      expect(mockStateManager.setChanges).toHaveBeenCalledTimes(changes.length)
       // But NOT saved until explicit save
       expect(mockOnChangesUpdate).not.toHaveBeenCalled()
     })
@@ -662,17 +685,11 @@ describe('VisualEditor', () => {
       callbacks.showRelativeElementSelector()
       expect(mockElementActions.showRelativeElementSelector).toHaveBeenCalled()
 
-      // Add a change first so undo/redo have something to work with
-      editor['undoRedoManager'].addChange({ selector: '.test', type: 'text', value: 'test' }, null)
-
-      const undoSpy = jest.spyOn(editor as any, 'undoLastChange')
-      const redoSpy = jest.spyOn(editor as any, 'redoChange')
-
       callbacks.undoLastChange()
-      expect(undoSpy).toHaveBeenCalled()
+      expect(mockElementActions.undoLastChange).toHaveBeenCalled()
 
       callbacks.redoChange()
-      expect(redoSpy).toHaveBeenCalled()
+      expect(mockElementActions.redoChange).toHaveBeenCalled()
 
       callbacks.clearAllChanges()
       expect(mockElementActions.clearAllChanges).toHaveBeenCalled()
@@ -705,12 +722,14 @@ describe('VisualEditor', () => {
 
       expect(callbacks).toHaveProperty('onChangesUpdate', mockOnChangesUpdate)
       expect(callbacks).toHaveProperty('removeStyles')
+      expect(callbacks).toHaveProperty('addChange')
       expect(callbacks).toHaveProperty('getSelector')
       expect(callbacks).toHaveProperty('saveChanges')
       expect(callbacks).toHaveProperty('stop')
 
       // Test that callbacks are functions
       expect(typeof callbacks.removeStyles).toBe('function')
+      expect(typeof callbacks.addChange).toBe('function')
       expect(typeof callbacks.getSelector).toBe('function')
       expect(typeof callbacks.saveChanges).toBe('function')
       expect(typeof callbacks.stop).toBe('function')
@@ -748,6 +767,36 @@ describe('VisualEditor', () => {
       })
 
       expect(() => editor.stop()).not.toThrow()
+    })
+
+    it('should handle invalid change objects', () => {
+      const invalidChange = {
+        selector: '',
+        type: 'invalid-type' as any,
+        value: undefined
+      }
+
+      const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
+      const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
+
+      expect(() => callbacks.addChange(invalidChange)).not.toThrow()
+    })
+
+    it('should handle onChangesUpdate callback errors', () => {
+      mockOnChangesUpdate.mockImplementation(() => {
+        throw new Error('Callback error')
+      })
+
+      const change: DOMChange = {
+        selector: '.test',
+        type: 'text',
+        value: 'Test'
+      }
+
+      const coordinatorCallArgs = MockEditorCoordinator.mock.calls[0]
+      const callbacks = coordinatorCallArgs[coordinatorCallArgs.length - 1] as EditorCoordinatorCallbacks
+
+      expect(() => callbacks.addChange(change)).not.toThrow()
     })
 
     it('should handle multiple start calls gracefully', () => {

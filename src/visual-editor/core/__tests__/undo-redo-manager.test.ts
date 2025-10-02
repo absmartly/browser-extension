@@ -526,3 +526,81 @@ describe('UndoRedoManager', () => {
     })
   })
 })
+
+  describe('E2E scenario simulation', () => {
+    it('should handle the exact E2E test flow: 3 text changes, 3 undos, 3 redos', () => {
+      const manager = new UndoRedoManager()
+
+      // Simulate the E2E test flow: three text changes to the same element
+      // Change 1: "Modified text!" -> "Undo test 1"
+      manager.addChange(
+        { selector: '#test-paragraph', type: 'text', value: 'Undo test 1', enabled: true },
+        'Modified text!'
+      )
+
+      // Change 2: "Undo test 1" -> "Undo test 2"
+      manager.addChange(
+        { selector: '#test-paragraph', type: 'text', value: 'Undo test 2', enabled: true },
+        'Undo test 1'
+      )
+
+      // Change 3: "Undo test 2" -> "Undo test 3"
+      manager.addChange(
+        { selector: '#test-paragraph', type: 'text', value: 'Undo test 3', enabled: true },
+        'Undo test 2'
+      )
+
+      // Should have 3 individual changes
+      expect(manager.getUndoCount()).toBe(3)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // Perform 3 undos (like the E2E test does)
+      // Undo 1: "Undo test 3" -> "Undo test 2"
+      const undo1 = manager.undo()
+      expect(undo1).not.toBeNull()
+      expect(undo1!.change.value).toBe('Undo test 3')
+      expect(undo1!.oldValue).toBe('Undo test 2')
+
+      // Undo 2: "Undo test 2" -> "Undo test 1"
+      const undo2 = manager.undo()
+      expect(undo2).not.toBeNull()
+      expect(undo2!.change.value).toBe('Undo test 2')
+      expect(undo2!.oldValue).toBe('Undo test 1')
+
+      // Undo 3: "Undo test 1" -> "Modified text!"
+      const undo3 = manager.undo()
+      expect(undo3).not.toBeNull()
+      expect(undo3!.change.value).toBe('Undo test 1')
+      expect(undo3!.oldValue).toBe('Modified text!')
+
+      // After 3 undos
+      expect(manager.getUndoCount()).toBe(0)
+      expect(manager.getRedoCount()).toBe(3)
+
+      // Perform 3 redos (like the E2E test does)
+      // Redo 1: "Modified text!" -> "Undo test 1"
+      const redo1 = manager.redo()
+      expect(redo1).not.toBeNull()
+      expect(redo1!.change.value).toBe('Undo test 1')
+      expect(redo1!.oldValue).toBe('Modified text!')
+
+      // Redo 2: "Undo test 1" -> "Undo test 2"
+      const redo2 = manager.redo()
+      expect(redo2).not.toBeNull()
+      expect(redo2!.change.value).toBe('Undo test 2')
+      expect(redo2!.oldValue).toBe('Undo test 1')
+
+      // Redo 3: "Undo test 2" -> "Undo test 3"
+      const redo3 = manager.redo()
+      expect(redo3).not.toBeNull()
+      expect(redo3!.change.value).toBe('Undo test 3')
+      expect(redo3!.oldValue).toBe('Undo test 2')
+
+      // After 3 redos, we should be back to the final state
+      expect(manager.getUndoCount()).toBe(3)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // The final state should be "Undo test 3" (the last redo's change.value)
+      expect(redo3!.change.value).toBe('Undo test 3')
+    })
+  })

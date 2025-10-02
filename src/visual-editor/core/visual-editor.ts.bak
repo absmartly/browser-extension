@@ -46,14 +46,16 @@ export class VisualEditor {
 
   // Configuration
   private options: VisualEditorOptions
+  private changes: DOMChange[] = []
 
   constructor(options: VisualEditorOptions) {
     console.log('[VisualEditor] Constructor called with options:', options)
     console.log('[VisualEditor] Experiment name from options:', options.experimentName)
     this.options = options
+    this.changes = options.initialChanges || []
 
     // Set initial saved state
-    this.lastSavedChangesCount = options.initialChanges?.length || 0
+    this.lastSavedChangesCount = this.changes.length
     this.hasUnsavedChanges = false  // No unsaved changes on start
 
     // Initialize state manager with converted config
@@ -69,14 +71,6 @@ export class VisualEditor {
     this.eventHandlers = new EventHandlers(this.stateManager)
     this.contextMenu = new ContextMenu(this.stateManager, options.useShadowDOM)
     this.undoRedoManager = new UndoRedoManager()
-
-    // Add initial changes to undoRedoManager if provided
-    if (options.initialChanges && options.initialChanges.length > 0) {
-      options.initialChanges.forEach(change => {
-        this.undoRedoManager.addChange(change, null)
-      })
-    }
-
     this.uiComponents = new UIComponents(this.stateManager)
     this.editModes = new EditModes(this.stateManager)
     this.cleanup = new Cleanup(this.stateManager)
@@ -86,7 +80,7 @@ export class VisualEditor {
     // Set the addChange callback for EditModes to track move/resize changes
     this.editModes.setAddChangeCallback((change) => {
       console.log('[VisualEditor] EditModes addChange callback triggered with:', change)
-      this.undoRedoManager.addChange(change, null)
+      this.addChange(change)
     })
 
     // Initialize element actions
@@ -96,7 +90,14 @@ export class VisualEditor {
       this.notifications,
       {
         onChangesUpdate: (changes: DOMChange[]) => {
+          // Sync changes with visual editor's internal state
+          this.changes = changes
           this.options.onChangesUpdate(changes)
+        },
+        addChange: (change: DOMChange) => {
+          // Delegate to visual editor's addChange for proper undo/redo management
+          console.log('[VisualEditor] ElementActions delegating addChange')
+          this.addChange(change)
         }
       }
     )
@@ -105,6 +106,10 @@ export class VisualEditor {
     const callbacks: EditorCoordinatorCallbacks = {
       onChangesUpdate: this.options.onChangesUpdate,
       removeStyles: () => this.removeStyles(),
+      addChange: (change: DOMChange) => {
+        console.log('[VisualEditor] addChange callback called with:', change)
+        this.addChange(change)
+      },
       getSelector: (element: HTMLElement) => this.elementActions.getSelector(element),
       hideElement: () => this.elementActions.hideElement(),
       deleteElement: () => this.elementActions.deleteElement(),
@@ -237,7 +242,7 @@ export class VisualEditor {
   }
 
   getChanges(): DOMChange[] {
-    return this.undoRedoManager.squashChanges()
+    return this.changes
   }
 
   get experimentName(): string {
@@ -337,6 +342,79 @@ export class VisualEditor {
   }
 
   // Change management methods
+  private addChange(change: DOMChange): void {
+    console.log('[VisualEditor] addChange called with:', change)
+    console.log('[VisualEditor] Current changes count before:', this.changes.length)
+
+    const existingIndex = this.changes.findIndex(c =>
+      c.selector === change.selector && c.type === change.type
+    )
+
+    if (existingIndex >= 0) {
+      // Store old change for undo
+      const oldChange = { ...this.changes[existingIndex] }
+      console.log('[VisualEditor] Found existing change at index:', existingIndex)
+      console.log('[VisualEditor] Old change:', oldChange)
+
+      if (change.type === 'style' && this.changes[existingIndex].type === 'style') {
+        this.changes[existingIndex].value = {
+          ...this.changes[existingIndex].value,
+          ...change.value
+        }
+      } else {
+        this.changes[existingIndex] = { ...change } // Create a copy to avoid reference issues
+      }
+
+      // Track change for undo/redo using undoRedoManager
+      // Use the incoming change's originalText/originalHtml which has the correct old value
+      const oldValue = change.originalText || change.originalHtml || oldChange.originalText || oldChange.originalHtml || oldChange.value
+      console.log('[VisualEditor] Adding to undoRedoManager - oldValue:', oldValue)
+      this.undoRedoManager.addChange(
+        {
+          selector: change.selector,
+          type: change.type as any,
+          value: change.value,
+          enabled: true
+        },
+        oldValue
+      )
+      console.log('[VisualEditor] UndoRedoManager state - canUndo:', this.undoRedoManager.canUndo(), 'undoCount:', this.undoRedoManager.getUndoCount())
+      this.updateBannerState()
+    } else {
+      console.log('[VisualEditor] No existing change, adding new one')
+      this.changes.push({ ...change }) // Create a copy to avoid reference issues
+
+      // Track change for undo/redo using undoRedoManager
+      // For first change to an element, use originalText/originalHtml if available
+      const oldValue = change.originalText || change.originalHtml || null
+      console.log('[VisualEditor] Adding to undoRedoManager (new) - oldValue:', oldValue)
+      this.undoRedoManager.addChange(
+        {
+          selector: change.selector,
+          type: change.type as any,
+          value: change.value,
+          enabled: true
+        },
+        oldValue
+      )
+      console.log('[VisualEditor] UndoRedoManager state - canUndo:', this.undoRedoManager.canUndo(), 'undoCount:', this.undoRedoManager.getUndoCount())
+      this.updateBannerState()
+    }
+
+    // Mark that we have unsaved changes
+    this.hasUnsavedChanges = true
+    console.log('[VisualEditor] Marked as having unsaved changes')
+
+    console.log('[VisualEditor] New changes count:', this.changes.length)
+    console.log('[VisualEditor] Updating state manager with changes')
+
+    // Update state manager with new changes array
+    this.stateManager.setChanges(this.changes)
+
+    // DO NOT auto-save to sidebar - wait for explicit save button click
+    console.log('[VisualEditor] Changes updated internally, not saving to sidebar yet')
+  }
+
   private squashChanges(changes: DOMChange[]): DOMChange[] {
     console.log('[ABSmartly] Squashing changes from', changes.length, 'to consolidated list')
 
@@ -468,8 +546,8 @@ export class VisualEditor {
   }
 
   private saveChanges(): void {
-    // Get the latest changes from undo/redo manager
-    const currentChanges = this.undoRedoManager.squashChanges()
+    // Get the latest changes from the state manager
+    const currentChanges = this.stateManager.getState().changes || []
     console.log('[ABSmartly] Saving changes - raw count:', currentChanges.length)
 
     // Squash changes to consolidate multiple operations on same elements
