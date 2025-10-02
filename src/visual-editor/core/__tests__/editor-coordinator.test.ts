@@ -162,6 +162,8 @@ describe('EditorCoordinator', () => {
       showRelativeElementSelector: jest.fn(),
       undoLastChange: jest.fn(),
       redoChange: jest.fn(),
+      undo: jest.fn(),
+      redo: jest.fn(),
       clearAllChanges: jest.fn(),
       saveChanges: jest.fn(),
       stop: jest.fn()
@@ -401,45 +403,29 @@ describe('EditorCoordinator', () => {
     it('should setup all event listeners', () => {
       coordinator.setupEventListeners()
 
-      // Coordinator only registers these 4 - EventHandlers module handles click, mouseover, mouseout
-      expect(addEventListenerSpy).toHaveBeenCalledWith('contextmenu', expect.any(Function), true)
+      // Coordinator registers these - EventHandlers module handles click, mouseover, mouseout
       expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
       expect(addEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
       expect(addEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
 
       // EventHandlers.attachEventListeners() is called but we're only testing coordinator's direct listeners
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(4)
+      expect(addEventListenerSpy).toHaveBeenCalledTimes(3)
     })
 
     it('should remove all event listeners', () => {
       coordinator.setupEventListeners()
       coordinator.removeEventListeners()
 
-      // Coordinator only removes its 4 listeners - EventHandlers module handles the rest
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('contextmenu', expect.any(Function), true)
+      // Coordinator removes its listeners - EventHandlers module handles the rest
       expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
 
       // EventHandlers.detachEventListeners() is called but we're only testing coordinator's direct listeners
-      expect(removeEventListenerSpy).toHaveBeenCalledTimes(4)
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(3)
     })
 
-    it('should handle context menu events by preventing default', () => {
-      coordinator.setupEventListeners()
-
-      const contextMenuEvent = new MouseEvent('contextmenu')
-      const preventDefaultSpy = jest.spyOn(contextMenuEvent, 'preventDefault')
-      const stopPropagationSpy = jest.spyOn(contextMenuEvent, 'stopPropagation')
-
-      const contextMenuHandler = coordinator['handleContextMenu']
-      contextMenuHandler(contextMenuEvent)
-
-      expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(stopPropagationSpy).toHaveBeenCalled()
-    })
-
-    it('should handle placeholder events without errors', () => {
+it('should handle placeholder events without errors', () => {
       coordinator.setupEventListeners()
 
       const keyDownEvent = new KeyboardEvent('keydown')
@@ -485,7 +471,7 @@ describe('EditorCoordinator', () => {
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.undo).toHaveBeenCalled()
+      expect(mockCallbacks.undo).toHaveBeenCalled()
     })
 
     it('should handle Cmd+Z for undo on Mac', () => {
@@ -498,7 +484,7 @@ describe('EditorCoordinator', () => {
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.undo).toHaveBeenCalled()
+      expect(mockCallbacks.undo).toHaveBeenCalled()
     })
 
     it('should handle Ctrl+Y for redo', () => {
@@ -511,7 +497,7 @@ describe('EditorCoordinator', () => {
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.redo).toHaveBeenCalled()
+      expect(mockCallbacks.redo).toHaveBeenCalled()
     })
 
     it('should handle Ctrl+Shift+Z for redo', () => {
@@ -524,7 +510,7 @@ describe('EditorCoordinator', () => {
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.redo).toHaveBeenCalled()
+      expect(mockCallbacks.redo).toHaveBeenCalled()
     })
 
     it('should handle Ctrl+Shift+C for copy selector', async () => {
@@ -1213,12 +1199,12 @@ describe('EditorCoordinator', () => {
       // Test undo shortcut
       const undoEvent = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true })
       document.dispatchEvent(undoEvent)
-      expect(mockUndoRedoManager.undo).toHaveBeenCalled()
+      expect(mockCallbacks.undo).toHaveBeenCalled()
 
       // Test redo shortcut
       const redoEvent = new KeyboardEvent('keydown', { key: 'y', ctrlKey: true })
       document.dispatchEvent(redoEvent)
-      expect(mockUndoRedoManager.redo).toHaveBeenCalled()
+      expect(mockCallbacks.redo).toHaveBeenCalled()
     })
 
     it('should handle state changes and update UI', () => {

@@ -602,5 +602,227 @@ describe('UndoRedoManager', () => {
 
       // The final state should be "Undo test 3" (the last redo's change.value)
       expect(redo3!.change.value).toBe('Undo test 3')
-    })
   })
+  })
+
+  describe('Change counting accuracy', () => {
+    it('should correctly count undo changes with pointer approach', () => {
+      const manager = new UndoRedoManager()
+
+      // Add 3 changes
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        'original'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        'A'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        'B'
+      )
+
+      // All 3 changes can be undone
+      expect(manager.getUndoCount()).toBe(3)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // After 1 undo
+      manager.undo()
+      expect(manager.getUndoCount()).toBe(2)
+      expect(manager.getRedoCount()).toBe(1)
+
+      // After 2 undos
+      manager.undo()
+      expect(manager.getUndoCount()).toBe(1)
+      expect(manager.getRedoCount()).toBe(2)
+
+      // After 3 undos
+      manager.undo()
+      expect(manager.getUndoCount()).toBe(0)
+      expect(manager.getRedoCount()).toBe(3)
+
+      // After 1 redo
+      manager.redo()
+      expect(manager.getUndoCount()).toBe(1)
+      expect(manager.getRedoCount()).toBe(2)
+
+      // After 2 redos
+      manager.redo()
+      expect(manager.getUndoCount()).toBe(2)
+      expect(manager.getRedoCount()).toBe(1)
+
+      // After 3 redos (back to original state)
+      manager.redo()
+      expect(manager.getUndoCount()).toBe(3)
+      expect(manager.getRedoCount()).toBe(0)
+    })
+
+    it('should count changes correctly after adding new change mid-history', () => {
+      const manager = new UndoRedoManager()
+
+      // Add 3 changes
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        'original'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        'A'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        'B'
+      )
+
+      // Undo twice to go back to 'A'
+      manager.undo() // C -> B
+      manager.undo() // B -> A
+
+      expect(manager.getUndoCount()).toBe(1) // Only 'A' can be undone
+      expect(manager.getRedoCount()).toBe(2) // 'B' and 'C' can be redone
+
+      // Add new change - should truncate future history
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'D', enabled: true },
+        'A'
+      )
+
+      // Now we have: original -> A -> D
+      expect(manager.getUndoCount()).toBe(2) // 'A' and 'D'
+      expect(manager.getRedoCount()).toBe(0) // 'B' and 'C' were discarded
+    })
+
+    it('should maintain accurate counts with mixed operations', () => {
+      const manager = new UndoRedoManager()
+
+      // Initial state
+      expect(manager.getUndoCount()).toBe(0)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // Add 1
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        'original'
+      )
+      expect(manager.getUndoCount()).toBe(1)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // Add 2
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        'A'
+      )
+      expect(manager.getUndoCount()).toBe(2)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // Undo 1
+      manager.undo()
+      expect(manager.getUndoCount()).toBe(1)
+      expect(manager.getRedoCount()).toBe(1)
+
+      // Add 3 (should clear redo stack)
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        'A'
+      )
+      expect(manager.getUndoCount()).toBe(2)
+      expect(manager.getRedoCount()).toBe(0)
+
+      // Undo all
+      manager.undo()
+      manager.undo()
+      expect(manager.getUndoCount()).toBe(0)
+      expect(manager.getRedoCount()).toBe(2)
+
+      // Redo all
+      manager.redo()
+      manager.redo()
+      expect(manager.getUndoCount()).toBe(2)
+      expect(manager.getRedoCount()).toBe(0)
+    })
+
+    it('should count squashed changes correctly regardless of undo/redo state', () => {
+      const manager = new UndoRedoManager()
+
+      // Add 3 changes to same element
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        'original'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        'A'
+      )
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        'B'
+      )
+
+      // Before any undo: squash should give final state
+      let squashed = manager.squashChanges()
+      expect(squashed.length).toBe(1)
+      expect(squashed[0].value).toBe('C')
+
+      // After 1 undo: squash should give intermediate state
+      manager.undo()
+      squashed = manager.squashChanges()
+      expect(squashed.length).toBe(1)
+      expect(squashed[0].value).toBe('B')
+
+      // After 2 undos: squash should give first state
+      manager.undo()
+      squashed = manager.squashChanges()
+      expect(squashed.length).toBe(1)
+      expect(squashed[0].value).toBe('A')
+
+      // After 3 undos: squash should give empty
+      manager.undo()
+      squashed = manager.squashChanges()
+      expect(squashed.length).toBe(0)
+
+      // After 1 redo: squash should give first state again
+      manager.redo()
+      squashed = manager.squashChanges()
+      expect(squashed.length).toBe(1)
+      expect(squashed[0].value).toBe('A')
+
+      // After all redos: squash should give final state
+      manager.redo()
+      manager.redo()
+      squashed = manager.squashChanges()
+      expect(squashed.length).toBe(1)
+      expect(squashed[0].value).toBe('C')
+    })
+
+    it('should handle edge case: canUndo/canRedo at boundaries', () => {
+      const manager = new UndoRedoManager()
+
+      // No changes
+      expect(manager.canUndo()).toBe(false)
+      expect(manager.canRedo()).toBe(false)
+
+      // 1 change
+      manager.addChange(
+        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        'original'
+      )
+      expect(manager.canUndo()).toBe(true)
+      expect(manager.canRedo()).toBe(false)
+
+      // After undo
+      manager.undo()
+      expect(manager.canUndo()).toBe(false)
+      expect(manager.canRedo()).toBe(true)
+
+      // After redo
+      manager.redo()
+      expect(manager.canUndo()).toBe(true)
+      expect(manager.canRedo()).toBe(false)
+
+      // After clear
+      manager.clear()
+      expect(manager.canUndo()).toBe(false)
+      expect(manager.canRedo()).toBe(false)
+    })
+})

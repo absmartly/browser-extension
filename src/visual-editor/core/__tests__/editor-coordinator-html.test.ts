@@ -17,6 +17,7 @@ import HtmlEditor from '../../ui/html-editor'
 describe('EditorCoordinator HTML Editor Integration', () => {
   let coordinator: EditorCoordinator
   let stateManager: StateManager
+  let undoRedoManager: UndoRedoManager
   let mockCallbacks: any
   let mockHtmlEditor: any
 
@@ -64,6 +65,8 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       showRelativeElementSelector: jest.fn(),
       undoLastChange: jest.fn(),
       redoLastChange: jest.fn(),
+      undo: jest.fn(),
+      redo: jest.fn(),
       clearAllChanges: jest.fn(),
       saveChanges: jest.fn(),
       stop: jest.fn()
@@ -72,7 +75,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
     // Create dependencies
     const eventHandlers = new EventHandlers(stateManager)
     const contextMenu = new ContextMenu(stateManager)
-    const undoRedoManager = new UndoRedoManager()
+    undoRedoManager = new UndoRedoManager()
     const uiComponents = new UIComponents(stateManager)
     const editModes = new EditModes(stateManager)
     const cleanup = new Cleanup(stateManager)
@@ -160,11 +163,14 @@ describe('EditorCoordinator HTML Editor Integration', () => {
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(mockCallbacks.addChange).toHaveBeenCalledWith({
+      // Check that change was added to undoRedoManager
+      expect(undoRedoManager.canUndo()).toBe(true)
+      const changes = undoRedoManager.squashChanges()
+      expect(changes).toHaveLength(1)
+      expect(changes[0]).toMatchObject({
         selector: '.test-element',
         type: 'html',
         value: newHtml,
-        originalHtml: originalState.innerHTML,
         enabled: true
       })
     })
@@ -278,8 +284,8 @@ describe('EditorCoordinator HTML Editor Integration', () => {
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      // Should not call addChange if HTML hasn't changed
-      expect(mockCallbacks.addChange).not.toHaveBeenCalled()
+      // Should not add change to undoRedoManager if HTML hasn't changed
+      expect(undoRedoManager.canUndo()).toBe(false)
     })
 
     it('should handle editor errors gracefully', async () => {
@@ -331,11 +337,16 @@ describe('EditorCoordinator HTML Editor Integration', () => {
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(mockCallbacks.addChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          originalHtml: '<span>Test Content</span>'
-        })
-      )
+      // Check that change was added to undoRedoManager
+      expect(undoRedoManager.canUndo()).toBe(true)
+      const changes = undoRedoManager.squashChanges()
+      expect(changes).toHaveLength(1)
+      expect(changes[0]).toMatchObject({
+        selector: '.test-element',
+        type: 'html',
+        value: '<span>Modified</span>',
+        enabled: true
+      })
     })
   })
 
@@ -351,6 +362,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       })
 
       expect(element.innerHTML).toBe('<div>First Edit</div>')
+      expect(undoRedoManager.canUndo()).toBe(true)
 
       // Second edit
       mockHtmlEditor.mockResolvedValue('<div>Second Edit</div>')
@@ -360,7 +372,10 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       })
 
       expect(element.innerHTML).toBe('<div>Second Edit</div>')
-      expect(mockCallbacks.addChange).toHaveBeenCalledTimes(2)
+      // squashChanges() consolidates multiple changes to same element into 1
+      const changes = undoRedoManager.squashChanges()
+      expect(changes).toHaveLength(1)
+      expect(changes[0].value).toBe('<div>Second Edit</div>')
     })
 
     it('should handle switching between text and HTML editing', async () => {
@@ -390,12 +405,6 @@ describe('EditorCoordinator HTML Editor Integration', () => {
   describe('State Management', () => {
     it('should track HTML changes in visual editor state', async () => {
       const element = document.getElementById('test-element')!
-      const changes: any[] = []
-
-      // Override addChange to track changes
-      mockCallbacks.addChange = jest.fn((change) => {
-        changes.push(change)
-      })
 
       mockHtmlEditor.mockResolvedValue('<div>State Test</div>')
 
@@ -404,11 +413,12 @@ describe('EditorCoordinator HTML Editor Integration', () => {
         textContent: 'Original'
       })
 
+      // Check that change was added to undoRedoManager
+      const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
       expect(changes[0]).toMatchObject({
         type: 'html',
         value: '<div>State Test</div>',
-        originalHtml: 'Original',
         enabled: true
       })
     })
@@ -426,11 +436,11 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       })
 
       expect(mockCallbacks.getSelector).toHaveBeenCalledWith(element)
-      expect(mockCallbacks.addChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          selector: '#test-element.test-class.another-class'
-        })
-      )
+      // Check the change has the correct selector
+      const changes = undoRedoManager.squashChanges()
+      expect(changes[0]).toMatchObject({
+        selector: '#test-element.test-class.another-class'
+      })
     })
   })
 })
