@@ -193,6 +193,27 @@ export class HtmlEditor {
 
       document.body.appendChild(this.editorHost)
 
+      // IMPORTANT: When using Shadow DOM, Monaco needs to render in regular DOM
+      // Move the editor container out of shadow DOM after initial setup
+      if (this.useShadowDOM) {
+        // Remove from shadow DOM
+        editorContainer.remove()
+        // Append directly to the host element (regular DOM)
+        this.editorHost.appendChild(editorContainer)
+        // Position it absolutely to overlay the shadow DOM placeholder
+        editorContainer.style.cssText = `
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: calc(80vw - 80px);
+          max-width: 720px;
+          height: 400px;
+          z-index: 2147483649;
+          pointer-events: auto;
+        `
+      }
+
       // Create Monaco editor
       setTimeout(() => {
         // Create Monaco editor instance
