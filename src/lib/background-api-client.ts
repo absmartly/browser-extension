@@ -115,9 +115,8 @@ export class BackgroundAPIClient {
   
   async getUnitTypes(): Promise<any[]> {
     try {
-      debugLog('Fetching unit types...')
       const data = await this.makeRequest('GET', '/unit_types')
-      debugLog('Unit types API raw response:', JSON.stringify(data))
+      // debugLog('Unit types API raw response:', JSON.stringify(data))
       
       // Check if data is an array directly
       if (Array.isArray(data)) {

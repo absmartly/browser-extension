@@ -4,13 +4,16 @@ import { ErrorBoundary } from '~src/components/ErrorBoundary'
 import ExtensionSidebar from '~src/components/ExtensionUI'
 import "~style.css"
 
-// Test: Add global listener for ALL chrome.runtime messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[index.tsx GLOBAL] Received chrome.runtime message:', message.type)
-  return false // Don't keep channel open
-})
-
-console.log('[index.tsx] Script loaded, chrome.runtime.onMessage listener registered')
+// Test: Add global listener for ALL chrome.runtime messages (only if chrome.runtime exists)
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[index.tsx GLOBAL] Received chrome.runtime message:', message.type)
+    return false // Don't keep channel open
+  })
+  console.log('[index.tsx] Script loaded, chrome.runtime.onMessage listener registered')
+} else {
+  console.log('[index.tsx] Script loaded in non-extension context (test mode), chrome.runtime not available')
+}
 
 const container = document.getElementById('__plasmo')
 if (container) {

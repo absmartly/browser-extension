@@ -300,34 +300,38 @@ export function ExperimentEditor({
   }
 
   const handlePreviewToggleForVariant = (enabled: boolean, variantIndex: number) => {
-    setPreviewEnabled(enabled)
-    setActivePreviewVariant(enabled ? variantIndex : null)
-    
-    if (enabled && variants[variantIndex]) {
-      const changes = variants[variantIndex].dom_changes || []
-      const variantName = variants[variantIndex].name
-      
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'apply',
-            changes: changes.filter(c => c.enabled !== false),
-            experimentName: formData.name,
-            variantName: variantName
-          })
-        }
-      })
-    } else if (!enabled) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: formData.name
-          })
-        }
-      })
+    try {
+      setPreviewEnabled(enabled)
+      setActivePreviewVariant(enabled ? variantIndex : null)
+
+      if (enabled && variants[variantIndex]) {
+        const changes = variants[variantIndex].dom_changes || []
+        const variantName = variants[variantIndex].name
+
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: 'ABSMARTLY_PREVIEW',
+              action: 'apply',
+              changes: changes.filter(c => c.enabled !== false),
+              experimentName: formData.name,
+              variantName: variantName
+            })
+          }
+        })
+      } else if (!enabled) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: 'ABSMARTLY_PREVIEW',
+              action: 'remove',
+              experimentName: formData.name
+            })
+          }
+        })
+      }
+    } catch (error) {
+      debugError('Error in handlePreviewToggleForVariant:', error)
     }
   }
 
@@ -583,7 +587,7 @@ export function ExperimentEditor({
                     activeVEVariant={null}
                     onVEStart={() => {}}
                     onVEStop={() => {}}
-                    activePreviewVariantName={activePreviewVariant !== null ? formData.variants[activePreviewVariant]?.name : null}
+                    activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
                   />
                 </div>
               </div>

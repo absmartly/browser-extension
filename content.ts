@@ -78,34 +78,39 @@ async function startVisualEditor(config: {
         console.log('[Visual Editor Content Script] CALLBACK START')
         debugLog('[Visual Editor Content Script] Changes updated:', changes?.length)
         console.log('[Visual Editor Content Script] AFTER debugLog - about to send message')
-        console.log('[Visual Editor Content Script] NOW SENDING VISUAL_EDITOR_CHANGES message with', changes.length, 'changes to extension')
+        console.log('[Visual Editor Content Script] NOW SENDING VISUAL_EDITOR_CHANGES message with', changes.length, 'changes')
+
+        // Check if we're in test mode by looking for the test query parameter
+        const urlParams = new URLSearchParams(window.location.search)
+        const isTestMode = urlParams.has('use_shadow_dom_for_visual_editor_context_menu')
+        console.log('[Visual Editor Content Script] Test mode:', isTestMode)
 
         if (isTestMode) {
-          // In test mode, find the sidebar iframe and post message to it
-          console.log('[Visual Editor Content Script] Test mode: Finding sidebar iframe')
-          const iframe = document.querySelector('#absmartly-sidebar-iframe') as HTMLIFrameElement
-          if (iframe && iframe.contentWindow) {
-            console.log('[Visual Editor Content Script] Found iframe, posting message to contentWindow')
-            iframe.contentWindow.postMessage({
+          // In test mode, find the sidebar iframe and post message to its contentWindow
+          console.log('[Visual Editor Content Script] Sending message via iframe.contentWindow.postMessage (test mode)')
+          const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+          if (sidebarIframe && sidebarIframe.contentWindow) {
+            sidebarIframe.contentWindow.postMessage({
               source: 'absmartly-visual-editor',
               type: 'VISUAL_EDITOR_CHANGES',
               variantName: config.variantName,
               changes: changes
             }, '*')
-            console.log('[Visual Editor Content Script] Posted message to iframe with', changes.length, 'changes')
+            console.log('[Visual Editor Content Script] Message posted to sidebar iframe')
           } else {
             console.error('[Visual Editor Content Script] Sidebar iframe not found!')
           }
         } else {
-          // In production, use chrome.runtime.sendMessage
+          // In production, use chrome.runtime.sendMessage for extension context
+          console.log('[Visual Editor Content Script] Sending message via chrome.runtime.sendMessage (production mode)')
           chrome.runtime.sendMessage({
             type: 'VISUAL_EDITOR_CHANGES',
             variantName: config.variantName,
             changes: changes
           }, (response) => {
-            console.log('[Content] ✅ Message sent, got response:', response)
+            console.log('[Visual Editor Content Script] Message sent, got response:', response)
             if (chrome.runtime.lastError) {
-              console.error('[Content] ❌ Error:', chrome.runtime.lastError.message)
+              console.error('[Visual Editor Content Script] Error:', chrome.runtime.lastError.message)
             }
           })
         }
