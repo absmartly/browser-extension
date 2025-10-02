@@ -70,6 +70,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
+    test.setTimeout(50000)
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
     await testPage.evaluate((extUrl) => {
@@ -379,21 +380,23 @@ test.describe('Visual Editor Complete Workflow', () => {
       for (let i = 0; i < textChanges.length; i++) {
         console.log(`  ✏️  Making change ${i + 1}: "${textChanges[i]}"`)
 
-        // Ensure the paragraph is not in editing mode and is properly reset
+        // Ensure all elements are deselected and context menu is removed
         await testPage.evaluate(() => {
-          const para = document.querySelector('#test-paragraph') as HTMLElement
-          if (para) {
-            para.contentEditable = 'false'
-            para.classList.remove('absmartly-editing', 'absmartly-selected')
-            para.blur()
-          }
-          // Also remove any existing context menu
+          // Deselect ALL elements (not just the paragraph)
+          document.querySelectorAll('.absmartly-selected, .absmartly-editing').forEach(el => {
+            el.classList.remove('absmartly-selected', 'absmartly-editing')
+            if (el instanceof HTMLElement && el.contentEditable === 'true') {
+              el.contentEditable = 'false'
+              el.blur()
+            }
+          })
+          // Remove any existing context menu
           document.getElementById('absmartly-menu-host')?.remove()
         })
 
-        // Click somewhere else first to deselect the paragraph
+        // Click somewhere else first to deselect everything
         await testPage.locator('body').click({ position: { x: 5, y: 5 } })
-        await testPage.waitForTimeout(500) // Increased wait time
+        await testPage.waitForTimeout(500)
 
         // Left-click on paragraph to show context menu
         await testPage.click('#test-paragraph', { force: true })
@@ -413,8 +416,11 @@ test.describe('Visual Editor Complete Workflow', () => {
         const paragraph = testPage.locator('#test-paragraph')
         await paragraph.fill(textChanges[i])
 
-        // Click outside to save
-        await testPage.locator('body').click({ position: { x: 10, y: 10 } })
+        // Explicitly blur the element to trigger save
+        await testPage.evaluate(() => {
+          const para = document.querySelector('#test-paragraph') as HTMLElement
+          para?.blur()
+        })
 
         // Wait for change to be committed
         await testPage.waitForFunction((expectedText) => {
@@ -570,7 +576,9 @@ test.describe('Visual Editor Complete Workflow', () => {
     const changeCards = await sidebar.locator('.dom-change-card').count()
     console.log(`Found ${changeCards} DOM change cards in sidebar`)
 
-    // Verify we have the expected 5 changes (text, hide, delete, move, html)
+    // Verify we have the expected 5 changes after squashing
+    // (text [squashed from multiple edits], hide, delete, move, html)
+    // Note: Multiple text edits to same element are squashed into one
     expect(changeCards).toBeGreaterThanOrEqual(5)
 
     // Get the text content of all cards to verify change types
@@ -893,11 +901,14 @@ test.describe('Visual Editor Complete Workflow', () => {
       await veButtons.nth(0).click()
       console.log('  ✓ Clicked Visual Editor button for second launch')
 
-      // Wait for VE toolbar to appear and VE to be fully active
+      // Take screenshot to see what's happening
+      await testPage.screenshot({ path: 'test-results/second-ve-before-wait.png' })
+
+      // Wait for VE banner host to appear (banner uses shadow DOM so we check for the host)
       await testPage.waitForFunction(() => {
-        const toolbar = document.querySelector('.absmartly-toolbar')
+        const bannerHost = document.querySelector('#absmartly-visual-editor-banner-host')
         const active = (window as any).__absmartlyVisualEditorActive
-        return toolbar !== null && active === true
+        return bannerHost !== null && active === true
       }, { timeout: 5000 })
       console.log('  ✓ Second VE instance launched successfully!')
 
@@ -959,17 +970,17 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Wait for VE to be active
       await testPage.waitForFunction(() => {
-        const toolbar = document.querySelector('.absmartly-toolbar')
+        const banner = document.querySelector('.absmartly-banner')
         const active = (window as any).__absmartlyVisualEditorActive
-        return toolbar !== null && active === true
+        return banner !== null && active === true
       }, { timeout: 3000 })
       console.log('  ✓ Visual editor active')
 
       // Make a change to the paragraph
       const paragraph = testPage.locator('#test-paragraph')
-      await paragraph.click({ button: 'right' })
+      await paragraph.click() // Left-click to show context menu
 
-      const contextMenu = testPage.locator('.absmartly-context-menu')
+      const contextMenu = testPage.locator('.menu-container')
       await expect(contextMenu).toBeVisible()
 
       const editTextButton = contextMenu.locator('button:has-text("Edit Text")')

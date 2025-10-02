@@ -156,8 +156,16 @@ export class ElementActions {
     // In production, the DOM Changes plugin will actually remove it
     htmlElement.style.display = 'none'
 
-    // Note: The coordinator already handles adding the delete change to undoRedoManager
-    // when Delete key is pressed, so we don't add it here to avoid duplication
+    // Track the delete change
+    this.undoRedoManager.addChange(
+      {
+        selector,
+        type: 'delete',
+        value: null,
+        enabled: true
+      },
+      htmlElement.outerHTML
+    )
 
     this.deselectElement()
   }
