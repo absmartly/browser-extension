@@ -5,7 +5,7 @@
  * It stores DOMChanges with their old and new values.
  */
 
-import { DOMChange } from '../types/dom-changes'
+import { DOMChange } from '../types/visual-editor'
 
 export interface ChangeRecord {
   change: DOMChange  // The DOM change with the new value
