@@ -58,14 +58,15 @@ async function startVisualEditor(config: {
     // Get the extension URL for the logo
     const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
 
-    // Use shadow DOM by default, unless explicitly disabled (for testing)
-    const useShadowDOM = config.useShadowDOM !== false
-    debugLog('[Visual Editor Content Script] Use Shadow DOM:', useShadowDOM)
-
-    // Check if we're in test mode (same query param used for shadow DOM)
+    // Check if we're in test mode (URL param or window flag)
     const urlParams = new URLSearchParams(window.location.search)
     const isTestMode = urlParams.get('use_shadow_dom_for_visual_editor_context_menu') === '0'
     debugLog('[Visual Editor Content Script] Test mode:', isTestMode)
+
+    // Use shadow DOM by default, unless explicitly disabled (for testing)
+    // If in test mode, always disable shadow DOM
+    const useShadowDOM = isTestMode ? false : (config.useShadowDOM !== false)
+    debugLog('[Visual Editor Content Script] Use Shadow DOM:', useShadowDOM)
 
     // Create and start new editor
     currentEditor = new VisualEditor({
@@ -182,6 +183,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
     const isActive = isVisualEditorActive || isVisualEditorStarting || !!(window as any).__absmartlyVisualEditorActive
+    debugLog('[Visual Editor Content Script] CHECK_VISUAL_EDITOR_ACTIVE:', {
+      isVisualEditorActive,
+      isVisualEditorStarting,
+      windowFlag: !!(window as any).__absmartlyVisualEditorActive,
+      result: isActive
+    })
     sendResponse(isActive)
     return true
   }

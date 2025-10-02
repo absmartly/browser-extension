@@ -55,8 +55,17 @@ export class ChangeTracker {
 
     switch (type) {
       case 'edit':
-        undoData.restoreText = data.oldText
-        undoData.element = element
+        // Handle both DOMChange-based (selector + oldValue) and legacy (element + oldText) formats
+        if (data.selector) {
+          // DOMChange format from visual-editor.ts addChange
+          undoData.selector = data.selector
+          undoData.type = data.type
+          undoData.oldValue = data.oldValue
+        } else {
+          // Legacy format
+          undoData.restoreText = data.oldText
+          undoData.element = element
+        }
         break
 
       case 'editHtml':
@@ -114,13 +123,30 @@ export class ChangeTracker {
 
   performUndo(): void {
     const undoAction = this.stateManager.popUndo()
-    if (!undoAction) return
+    if (!undoAction) {
+      return
+    }
 
     const { originalAction, undoData } = undoAction
 
     switch (originalAction.type) {
       case 'edit':
-        if (undoData.element && undoData.restoreText !== undefined) {
+        // Handle DOMChange-based undo (from visual-editor.ts addChange)
+        if (undoData.selector) {
+          const elements = document.querySelectorAll(undoData.selector)
+          elements.forEach(element => {
+            const htmlElement = element as HTMLElement
+            if (undoData.type === 'text' && undoData.oldValue !== null) {
+              htmlElement.textContent = undoData.oldValue
+            } else if (undoData.type === 'html' && undoData.oldValue !== null) {
+              htmlElement.innerHTML = undoData.oldValue
+            } else if (undoData.type === 'style' && undoData.oldValue) {
+              Object.assign(htmlElement.style, undoData.oldValue)
+            }
+          })
+        }
+        // Legacy: Handle element-based undo (for backwards compatibility)
+        else if (undoData.element && undoData.restoreText !== undefined) {
           ;(undoData.element as HTMLElement).textContent = undoData.restoreText
         }
         break
@@ -189,12 +215,33 @@ export class ChangeTracker {
 
   performRedo(): void {
     const redoAction = this.stateManager.popRedo()
-    if (!redoAction) return
+    if (!redoAction) {
+      return
+    }
 
-    const { originalAction } = redoAction
+    const { originalAction, undoData } = redoAction
 
-    // Re-apply the original action
-    this.reapplyAction(originalAction)
+    // DEBUG: Log what we're about to redo
+    document.body.setAttribute('data-redo-newvalue', String(originalAction.data.newValue || 'undefined'))
+
+    // Re-apply the change from originalAction.data (which contains the NEW values)
+    if (originalAction.type === 'edit' && originalAction.data.selector) {
+      const elements = document.querySelectorAll(originalAction.data.selector)
+      elements.forEach(element => {
+        const htmlElement = element as HTMLElement
+        if (originalAction.data.type === 'text' && originalAction.data.newValue !== undefined) {
+          htmlElement.textContent = originalAction.data.newValue
+        } else if (originalAction.data.type === 'html' && originalAction.data.newValue !== undefined) {
+          htmlElement.innerHTML = originalAction.data.newValue
+        } else if (originalAction.data.type === 'style' && originalAction.data.newValue) {
+          Object.assign(htmlElement.style, originalAction.data.newValue)
+        }
+      })
+    }
+    // Legacy: Re-apply the original action for element-based redo
+    else {
+      this.reapplyAction(originalAction)
+    }
 
     // Push back to undo stack
     const undoAction = this.createUndoAction(originalAction.type, originalAction.element, originalAction.data)
