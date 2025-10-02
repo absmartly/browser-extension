@@ -438,37 +438,77 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(afterChanges).toBe('Undo test 3')
       console.log(`  ✓ Final text after changes: "${afterChanges}"`)
 
-      // Now test undo - with change squashing, all 3 changes are squashed into 1 undo entry
-      // So one undo should revert from "Undo test 3" back to "Modified text!"
-      console.log('\n  ⏪ Testing undo with change squashing...')
+      // Now test undo - changes are tracked individually, so we need 3 undo operations
+      // to go back from "Undo test 3" to "Modified text!"
+      console.log('\n  ⏪ Testing undo with individual change tracking...')
 
-      // Undo - with change squashing, this should revert directly to "Modified text!"
+      // Undo 1: "Undo test 3" -> "Undo test 2"
       await testPage.locator('[data-action="undo"]').click()
       await testPage.waitForTimeout(500)
       const afterUndo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
       })
-      console.log(`  ✓ Undo (squashed): Text is now "${afterUndo1}"`)
-      expect(afterUndo1).toBe('Modified text!')
+      console.log(`  ✓ Undo 1: Text is now "${afterUndo1}"`)
+      expect(afterUndo1).toBe('Undo test 2')
 
-      // Now test redo - should redo the squashed change back to "Undo test 3"
+      // Undo 2: "Undo test 2" -> "Undo test 1"
+      await testPage.locator('[data-action="undo"]').click()
+      await testPage.waitForTimeout(500)
+      const afterUndo2 = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim()
+      })
+      console.log(`  ✓ Undo 2: Text is now "${afterUndo2}"`)
+      expect(afterUndo2).toBe('Undo test 1')
+
+      // Undo 3: "Undo test 1" -> "Modified text!"
+      await testPage.locator('[data-action="undo"]').click()
+      await testPage.waitForTimeout(500)
+      const afterUndo3 = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim()
+      })
+      console.log(`  ✓ Undo 3: Text is now "${afterUndo3}"`)
+      expect(afterUndo3).toBe('Modified text!')
+
+      // Now test redo - should redo each change individually
       console.log('\n  ⏩ Testing redo...')
 
-      // Redo - Click redo button in banner
+      // Redo 1: "Modified text!" -> "Undo test 1"
       await testPage.locator('[data-action="redo"]').click()
       await testPage.waitForTimeout(500)
       const afterRedo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
       })
-      console.log(`  ✓ Redo (squashed): Text is now "${afterRedo1}"`)
-      expect(afterRedo1).toBe('Undo test 3')
+      console.log(`  ✓ Redo 1: Text is now "${afterRedo1}"`)
+      expect(afterRedo1).toBe('Undo test 1')
 
-      console.log('\n✅ Undo/redo with change squashing working correctly!')
-      console.log(`  • Undo (squashed): "Undo test 3" -> "${afterUndo1}"`)
-      console.log(`  • Redo (squashed): "${afterUndo1}" -> "${afterRedo1}"`)
-      console.log('  • Multiple changes to same element are automatically squashed into one undo entry')
+      // Redo 2: "Undo test 1" -> "Undo test 2"
+      await testPage.locator('[data-action="redo"]').click()
+      await testPage.waitForTimeout(500)
+      const afterRedo2 = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim()
+      })
+      console.log(`  ✓ Redo 2: Text is now "${afterRedo2}"`)
+      expect(afterRedo2).toBe('Undo test 2')
+
+      // Redo 3: "Undo test 2" -> "Undo test 3"
+      await testPage.locator('[data-action="redo"]').click()
+      await testPage.waitForTimeout(500)
+      const afterRedo3 = await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim()
+      })
+      console.log(`  ✓ Redo 3: Text is now "${afterRedo3}"`)
+      expect(afterRedo3).toBe('Undo test 3')
+
+      console.log('\n✅ Undo/redo with individual change tracking working correctly!')
+      console.log('  • Each change tracked individually for granular undo/redo')
+      console.log(`  • 3 undos: "Undo test 3" -> "Undo test 2" -> "Undo test 1" -> "Modified text!"`)
+      console.log(`  • 3 redos: "Modified text!" -> "Undo test 1" -> "Undo test 2" -> "Undo test 3"`)
     })
 
     await test.step('Save changes to sidebar', async () => {

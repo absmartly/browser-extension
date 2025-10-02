@@ -86,7 +86,7 @@ export class VisualEditor {
     // Initialize element actions
     this.elementActions = new ElementActions(
       this.stateManager,
-      this.changeTracker,
+      this.undoRedoManager,
       this.notifications,
       {
         onChangesUpdate: (changes: DOMChange[]) => {
@@ -353,6 +353,8 @@ export class VisualEditor {
     if (existingIndex >= 0) {
       // Store old change for undo
       const oldChange = { ...this.changes[existingIndex] }
+      console.log('[VisualEditor] Found existing change at index:', existingIndex)
+      console.log('[VisualEditor] Old change:', oldChange)
 
       if (change.type === 'style' && this.changes[existingIndex].type === 'style') {
         this.changes[existingIndex].value = {
@@ -364,6 +366,9 @@ export class VisualEditor {
       }
 
       // Track change for undo/redo using undoRedoManager
+      // Use the incoming change's originalText/originalHtml which has the correct old value
+      const oldValue = change.originalText || change.originalHtml || oldChange.value
+      console.log('[VisualEditor] Adding to undoRedoManager - oldValue:', oldValue)
       this.undoRedoManager.addChange(
         {
           selector: change.selector,
@@ -371,14 +376,18 @@ export class VisualEditor {
           value: change.value,
           enabled: true
         },
-        oldChange.value || oldChange.originalText || oldChange.originalHtml
+        oldValue
       )
+      console.log('[VisualEditor] UndoRedoManager state - canUndo:', this.undoRedoManager.canUndo(), 'undoCount:', this.undoRedoManager.getUndoCount())
       this.updateBannerState()
     } else {
+      console.log('[VisualEditor] No existing change, adding new one')
       this.changes.push({ ...change }) // Create a copy to avoid reference issues
 
       // Track change for undo/redo using undoRedoManager
       // For first change to an element, use originalText/originalHtml if available
+      const oldValue = change.originalText || change.originalHtml || null
+      console.log('[VisualEditor] Adding to undoRedoManager (new) - oldValue:', oldValue)
       this.undoRedoManager.addChange(
         {
           selector: change.selector,
@@ -386,8 +395,9 @@ export class VisualEditor {
           value: change.value,
           enabled: true
         },
-        change.originalText || change.originalHtml || null
+        oldValue
       )
+      console.log('[VisualEditor] UndoRedoManager state - canUndo:', this.undoRedoManager.canUndo(), 'undoCount:', this.undoRedoManager.getUndoCount())
       this.updateBannerState()
     }
 
