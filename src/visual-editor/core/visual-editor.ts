@@ -159,6 +159,7 @@ export class VisualEditor {
 
     // Mark as active
     this.isActive = true
+    ;(window as any).__absmartlyVisualEditorActive = true
 
     // Keep preview header visible when visual editor starts
     // Users should see both the preview header and visual editor UI
