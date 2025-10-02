@@ -21,6 +21,15 @@ export class HtmlEditor {
       return
     }
 
+    // Configure Monaco to work without Web Workers in extension context
+    // @ts-ignore
+    window.MonacoEnvironment = {
+      getWorker: function () {
+        // Return null to disable web workers and use main thread
+        return null
+      }
+    }
+
     // Monaco is now bundled, so we can use it directly
     console.log('[HtmlEditor] Monaco editor ready')
     this.editorLoaded = true
@@ -131,11 +140,12 @@ export class HtmlEditor {
 
       // Create Monaco editor
       setTimeout(() => {
-        // Create Monaco editor instance
+        // Create Monaco editor instance with enhanced options
         this.monacoEditor = monaco.editor.create(editorContainer, {
           value: this.formatHtml(currentHtml),
           language: 'html',
           theme: 'vs-dark',
+          'semanticHighlighting.enabled': true,
           automaticLayout: true,
           minimap: { enabled: false },
           fontSize: 14,
@@ -154,7 +164,9 @@ export class HtmlEditor {
       }, 10)
 
       // Handle button clicks
-      formatBtn.addEventListener('click', () => {
+      formatBtn.addEventListener('click', (e) => {
+        console.log('[HtmlEditor] Format button clicked')
+        e.stopPropagation()
         if (this.monacoEditor) {
           const currentValue = this.monacoEditor.getValue()
           const formatted = this.formatHtml(currentValue)
@@ -162,7 +174,9 @@ export class HtmlEditor {
         }
       })
 
-      wrapBtn.addEventListener('click', () => {
+      wrapBtn.addEventListener('click', (e) => {
+        console.log('[HtmlEditor] Wrap button clicked')
+        e.stopPropagation()
         if (this.monacoEditor) {
           const selection = this.monacoEditor.getSelection()
           if (selection) {
@@ -180,7 +194,9 @@ export class HtmlEditor {
         }
       })
 
-      previewBtn.addEventListener('click', () => {
+      previewBtn.addEventListener('click', (e) => {
+        console.log('[HtmlEditor] Preview button clicked')
+        e.stopPropagation()
         if (this.monacoEditor) {
           const newHtml = this.monacoEditor.getValue()
           // Temporarily update the element to show preview
@@ -232,39 +248,14 @@ export class HtmlEditor {
         }
       })
 
-      // Prevent all clicks from propagating to prevent context menu
-      // BUT allow button clicks to work
+      // Prevent clicks from propagating to the page, but allow editor and button interactions
       container.addEventListener('click', (e) => {
-        // Don't prevent clicks on buttons
-        const target = e.target as HTMLElement
-        if (target.closest('.editor-button')) {
-          return
-        }
         e.stopPropagation()
-        e.preventDefault()
-      }, true)
+      })
 
-      // Prevent clicks in editor from triggering visual editor selection
-      // BUT allow button clicks to work
       container.addEventListener('mousedown', (e) => {
-        // Don't prevent clicks on buttons
-        const target = e.target as HTMLElement
-        if (target.closest('.editor-button')) {
-          return
-        }
         e.stopPropagation()
-        e.preventDefault()
-      }, true)
-
-      editorContainer.addEventListener('click', (e) => {
-        e.stopPropagation()
-        e.preventDefault()
-      }, true)
-
-      editorContainer.addEventListener('mousedown', (e) => {
-        e.stopPropagation()
-        e.preventDefault()
-      }, true)
+      })
     })
   }
 
