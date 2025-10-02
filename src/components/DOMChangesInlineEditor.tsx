@@ -1787,6 +1787,7 @@ export function DOMChangesInlineEditor({
         if (isVEActive) {
           debugLog('⏭️ Visual Editor already active in page, skipping launch')
           isLaunchingVisualEditor = false
+          alert(`Visual Editor is already running. Please close it first before launching for "${variantName}".`)
           return
         }
       } catch (e) {
