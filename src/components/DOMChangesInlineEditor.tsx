@@ -1769,12 +1769,30 @@ export function DOMChangesInlineEditor({
     }
 
     // Prevent concurrent launches from multiple variant instances
-    // Use atomic check-and-set pattern
+    // Use atomic check-and-set pattern - set flag FIRST, then check
     if (isLaunchingVisualEditor) {
       debugLog('⏭️ Visual Editor already launching, skipping duplicate launch for:', variantName)
       return
     }
+    // Set flag immediately to prevent race condition
     isLaunchingVisualEditor = true
+
+    // Check if VE is already active in the page (extra guard)
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (tabs[0]?.id) {
+      try {
+        const isVEActive = await chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'CHECK_VISUAL_EDITOR_ACTIVE'
+        })
+        if (isVEActive) {
+          debugLog('⏭️ Visual Editor already active in page, skipping launch')
+          isLaunchingVisualEditor = false
+          return
+        }
+      } catch (e) {
+        // Ignore errors from CHECK message
+      }
+    }
 
     try {
       debugLog('🎨 Launching Visual Editor for variant:', variantName)
@@ -1785,7 +1803,6 @@ export function DOMChangesInlineEditor({
       onVEStart()
 
       // Set a flag to prevent preview header from showing FIRST
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       if (tabs[0]?.id) {
         await chrome.tabs.sendMessage(tabs[0].id, {
           type: 'SET_VISUAL_EDITOR_STARTING',

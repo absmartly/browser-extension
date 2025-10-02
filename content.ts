@@ -180,6 +180,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
   
+  if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
+    const isActive = isVisualEditorActive || isVisualEditorStarting || !!(window as any).__absmartlyVisualEditorActive
+    sendResponse(isActive)
+    return true
+  }
+
   if (message.type === 'SET_VISUAL_EDITOR_STARTING') {
     debugLog('[Visual Editor Content Script] Setting visual editor starting flag:', message.starting)
     isVisualEditorStarting = message.starting
