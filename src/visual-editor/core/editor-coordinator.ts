@@ -157,8 +157,8 @@ export class EditorCoordinator {
     // Use the event handlers module for main event handling
     this.eventHandlers.attachEventListeners()
 
+    // Note: keydown handling is done in setupKeyboardHandlers()
     // Add coordinator-specific event listeners
-    document.addEventListener('keydown', this.handleKeyDown, true)
     document.addEventListener('mousedown', this.handleMouseDown, true)
     document.addEventListener('mouseup', this.handleMouseUp, true)
   }
@@ -167,8 +167,8 @@ export class EditorCoordinator {
     // Detach event handlers module listeners
     this.eventHandlers.detachEventListeners()
 
+    // Note: keydown listener is removed in setupKeyboardHandlers cleanup
     // Remove coordinator-specific event listeners
-    document.removeEventListener('keydown', this.handleKeyDown, true)
     document.removeEventListener('mousedown', this.handleMouseDown, true)
     document.removeEventListener('mouseup', this.handleMouseUp, true)
     this.removeHoverTooltip()
@@ -225,6 +225,36 @@ export class EditorCoordinator {
             },
             oldValue
           )
+        }
+      }
+
+      // Exit Visual Editor: Escape key
+      if (e.key === 'Escape') {
+        console.log('[EditorCoordinator] Escape key detected')
+        console.log('[EditorCoordinator] isEditingMode:', this.eventHandlers.isEditingMode)
+        
+        // Don't exit VE if we're editing text inline or if HTML editor is open
+        if (this.eventHandlers.isEditingMode) {
+          console.log('[EditorCoordinator] Escape ignored - editing mode is active')
+          return
+        }
+        
+        e.preventDefault()
+        e.stopPropagation()
+        console.log('[EditorCoordinator] Escape pressed - exiting Visual Editor')
+        console.log('[EditorCoordinator] callbacks.stop exists:', !!this.callbacks.stop)
+        console.log('[EditorCoordinator] callbacks.stop type:', typeof this.callbacks.stop)
+        
+        if (this.callbacks.stop && typeof this.callbacks.stop === 'function') {
+          console.log('[EditorCoordinator] Calling stop callback...')
+          try {
+            this.callbacks.stop()
+            console.log('[EditorCoordinator] stop callback completed')
+          } catch (error) {
+            console.error('[EditorCoordinator] Error calling stop:', error)
+          }
+        } else {
+          console.error('[EditorCoordinator] stop callback not available')
         }
       }
     }
