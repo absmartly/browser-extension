@@ -175,6 +175,7 @@ export class EditorCoordinator {
   }
 
   setupKeyboardHandlers(): void {
+    console.log('[EditorCoordinator] Setting up keyboard handlers')
     const handleKeyDown = (e: KeyboardEvent) => {
       // Copy selector: Ctrl+Shift+C (Cmd+Shift+C on Mac)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'c') {

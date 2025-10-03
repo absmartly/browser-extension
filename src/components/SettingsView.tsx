@@ -402,7 +402,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       
       <div>
         <Input
-          label={`API Key ${authMethod === 'apikey' ? '(Required)' : '(Optional - used as fallback)'}`}
+          label={`API Key ${authMethod === 'apikey' ? '(Required)' : '(Optional)'}`}
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
@@ -411,8 +411,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           showPasswordToggle={true}
         />
         <p className="mt-1 text-xs text-gray-500">
-          {authMethod === 'jwt' 
-            ? 'API key will be used as fallback if JWT authentication fails.'
+          {authMethod === 'jwt'
+            ? 'Not used when JWT is selected. You must be logged into ABsmartly in your browser.'
             : 'API key will be used for all authentication requests.'}
         </p>
       </div>

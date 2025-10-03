@@ -968,8 +968,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Exit the second VE by pressing Escape key
       console.log('  Pressing Escape to exit VE...')
       
-      // Make sure the page has focus (not the sidebar)
-      await testPage.click('body', { position: { x: 100, y: 100 } })
+      // Bring focus to the page (not sidebar) by calling focus on the page
+      await testPage.evaluate(() => window.focus())
       await testPage.waitForTimeout(100)
       
       // Press Escape
