@@ -71,6 +71,8 @@ export function ExperimentDetail({
   })
   
   const [currentVariants, setCurrentVariants] = useState<Variant[]>(initialVariants)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isLoadingFullData, setIsLoadingFullData] = useState(false)
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
 
   debugLog('🔍 ExperimentDetail state - displayName:', displayName)
