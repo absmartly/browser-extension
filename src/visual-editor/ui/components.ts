@@ -38,10 +38,9 @@ export class UIComponents {
     bannerHost.id = 'absmartly-visual-editor-banner-host'
     bannerHost.style.cssText = `
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: auto;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 2147483647;
       pointer-events: none;
     `
@@ -69,16 +68,20 @@ export class UIComponents {
     const bannerStyle = document.createElement('style')
     bannerStyle.textContent = `
       .banner {
-        background: linear-gradient(90deg, #3b82f6, #10b981);
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
         color: white;
-        padding: 10px;
+        padding: 12px 20px;
         font-family: system-ui, -apple-system, sans-serif;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
         pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 20px;
+        border-radius: 24px;
+        min-width: 600px;
+        max-width: 90vw;
       }
       .banner-content {
         flex: 1;
@@ -99,18 +102,25 @@ export class UIComponents {
         align-items: center;
       }
       .banner-button {
-        background: rgba(255, 255, 255, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
         color: white;
-        padding: 6px 12px;
-        border-radius: 4px;
-        font-size: 12px;
+        padding: 8px 16px;
+        border-radius: 16px;
+        font-size: 13px;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
+      }
+      .banner-button:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.25);
+      }
+      .banner-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
       .banner-button:hover:not(:disabled) {
         background: rgba(255, 255, 255, 0.3);
@@ -125,9 +135,9 @@ export class UIComponents {
       }
       .changes-counter {
         background: rgba(255, 255, 255, 0.2);
-        padding: 4px 8px;
+        padding: 4px 12px;
         border-radius: 12px;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
       }
     `
@@ -223,6 +233,49 @@ export class UIComponents {
     bannerContainer.appendChild(banner)
 
     document.body.appendChild(bannerHost)
+
+    // Add drag functionality
+    let isDragging = false
+    let currentX = 0
+    let currentY = 16 // Initial top position
+    let initialX = 0
+    let initialY = 0
+
+    banner.style.cursor = 'grab'
+
+    banner.addEventListener('mousedown', (e) => {
+      // Don't start drag if clicking on a button
+      if ((e.target as HTMLElement).closest('.banner-button')) {
+        return
+      }
+
+      isDragging = true
+      banner.style.cursor = 'grabbing'
+      
+      initialX = e.clientX - currentX
+      initialY = e.clientY - currentY
+    })
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return
+
+      e.preventDefault()
+      
+      currentX = e.clientX - initialX
+      currentY = e.clientY - initialY
+
+      // Update position
+      bannerHost.style.left = '0'
+      bannerHost.style.transform = 'none'
+      banner.style.transform = `translate(${currentX}px, ${currentY}px)`
+    })
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false
+        banner.style.cursor = 'grab'
+      }
+    })
 
     // Add event listeners for banner actions
     banner.addEventListener('click', (e) => {

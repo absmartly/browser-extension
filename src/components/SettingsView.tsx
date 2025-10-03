@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
@@ -249,7 +250,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
         {apiEndpoint ? (
           <a 
             href="#"
@@ -275,6 +277,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           />
         )}
         <h2 className="text-lg font-semibold">ABsmartly Settings</h2>
+        </div>
+        <button
+          onClick={onCancel}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          aria-label="Go back"
+          title="Go back"
+        >
+          <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+        </button>
       </div>
       
       {errors.general && (

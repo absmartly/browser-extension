@@ -26,7 +26,9 @@ const sendMessageToExtension = (message: any) => {
     debugLog(`Sent ${message.type} to sidebar iframe (test mode)`)
   } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
     // Production: use chrome.runtime.sendMessage
-    chrome.runtime.sendMessage(message)
+    chrome.runtime.sendMessage(message).catch(err => {
+      debugError(`Failed to send ${message.type} via chrome.runtime:`, err)
+    })
     debugLog(`Sent ${message.type} via chrome.runtime (production mode)`)
   } else {
     debugError('No message transport available (neither iframe nor chrome.runtime)')
@@ -127,6 +129,9 @@ async function startVisualEditor(config: {
     // Mark visual editor as active BEFORE starting
     isVisualEditorActive = true
     isVisualEditorStarting = false
+
+    // Hide preview header if it exists, since VE has its own toolbar
+    removePreviewHeader()
 
     // Get the extension URL for the logo
     const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
@@ -485,90 +490,120 @@ function createPreviewHeader(experimentName: string, variantName: string) {
     return
   }
   
-  // Create preview header container
+  // Create preview header container - floating bar style
   const headerContainer = document.createElement('div')
   headerContainer.id = 'absmartly-preview-header'
   headerContainer.style.cssText = `
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(90deg, #3b82f6, #10b981);
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
     color: white;
     padding: 12px 20px;
+    border-radius: 24px;
     z-index: 2147483647;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 20px;
     font-size: 14px;
+    min-width: 500px;
+    max-width: 90vw;
+    cursor: grab;
+    pointer-events: auto;
   `
-  
+
+  // Drag functionality
+  let isDragging = false
+  let startX = 0
+  let startY = 0
+  let currentX = 0
+  let currentY = 0
+
+  headerContainer.addEventListener('mousedown', (e) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    isDragging = true
+    headerContainer.style.cursor = 'grabbing'
+    startX = e.clientX - currentX
+    startY = e.clientY - currentY
+  })
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return
+    currentX = e.clientX - startX
+    currentY = e.clientY - startY
+    headerContainer.style.transform = `translate(calc(-50% + ${currentX}px), ${currentY}px)`
+  })
+
+  document.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false
+      headerContainer.style.cursor = 'grab'
+    }
+  })
+
   // Create content
   const content = document.createElement('div')
-  content.style.cssText = 'flex: 1; text-align: center;'
+  content.style.cssText = 'flex: 1; display: flex; flex-direction: column; align-items: center;'
 
   // Get the extension URL for the logo
   const logoUrl = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
 
   content.innerHTML = `
-    <div style="font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-      <img src="${logoUrl}" alt="ABSmartly" style="height: 20px; width: auto; vertical-align: middle;">
-      <span>ABSmartly Preview Mode Active</span>
+    <div style="font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 10px;">
+      <img src="${logoUrl}" alt="ABSmartly" style="width: 24px; height: 24px;">
+      <span>Preview Mode - ${experimentName}</span>
     </div>
-    <div style="font-size: 12px; opacity: 0.95;">
-      Previewing variant <strong>${variantName}</strong> of experiment <strong>${experimentName}</strong>
+    <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">
+      Variant: <strong>${variantName}</strong>
     </div>
   `
-  
+
   // Create close button
   const closeButton = document.createElement('button')
   closeButton.style.cssText = `
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
     color: white;
-    padding: 6px 12px;
-    border-radius: 4px;
+    padding: 8px 16px;
+    border-radius: 16px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s;
     white-space: nowrap;
     flex-shrink: 0;
   `
   closeButton.textContent = 'Exit Preview'
   closeButton.onmouseover = () => {
-    closeButton.style.background = 'rgba(255, 255, 255, 0.3)'
+    closeButton.style.background = 'rgba(255, 255, 255, 0.25)'
   }
   closeButton.onmouseout = () => {
-    closeButton.style.background = 'rgba(255, 255, 255, 0.2)'
+    closeButton.style.background = 'rgba(255, 255, 255, 0.15)'
   }
   closeButton.onclick = () => {
+    // Remove preview header immediately
+    removePreviewHeader()
+
     // Send message back to extension to disable preview
     sendMessageToExtension({
       type: 'DISABLE_PREVIEW',
       experimentName: experimentName
     })
   }
-  
+
   headerContainer.appendChild(content)
   headerContainer.appendChild(closeButton)
   document.body.appendChild(headerContainer)
-  
-  // Adjust body padding to accommodate header
-  const originalPaddingTop = document.body.style.paddingTop
-  document.body.style.paddingTop = '60px'
-  headerContainer.dataset.originalPadding = originalPaddingTop
 }
 
 // Function to remove preview header
 function removePreviewHeader() {
   const header = document.getElementById('absmartly-preview-header')
   if (header) {
-    // Restore original body padding
-    const originalPadding = header.dataset.originalPadding || ''
-    document.body.style.paddingTop = originalPadding
     header.remove()
   }
 }
