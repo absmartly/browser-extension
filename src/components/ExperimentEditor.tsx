@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
@@ -106,6 +106,28 @@ export function ExperimentEditor({
     }
     loadConfig()
   }, [])
+
+  // Stable onChange handler for ExperimentMetadata using functional state update
+  const handleMetadataChange = useCallback((metadata: Partial<typeof formData>) => {
+    setFormData(prev => ({ ...prev, ...metadata }))
+  }, [])
+
+  // Memoize metadata data object to prevent unnecessary re-renders
+  const metadataData = useMemo(() => ({
+    percentage_of_traffic: formData.percentage_of_traffic,
+    unit_type_id: formData.unit_type_id,
+    application_ids: formData.application_ids,
+    owner_ids: formData.owner_ids,
+    team_ids: formData.team_ids,
+    tag_ids: formData.tag_ids
+  }), [
+    formData.percentage_of_traffic,
+    formData.unit_type_id,
+    formData.application_ids,
+    formData.owner_ids,
+    formData.team_ids,
+    formData.tag_ids
+  ])
 
   // Helper functions for name conversion
   const snakeToTitle = (snake: string): string => {
@@ -325,15 +347,8 @@ export function ExperimentEditor({
           </div>
 
           <ExperimentMetadata
-            data={{
-              percentage_of_traffic: formData.percentage_of_traffic,
-              unit_type_id: formData.unit_type_id,
-              application_ids: formData.application_ids,
-              owner_ids: formData.owner_ids,
-              team_ids: formData.team_ids,
-              tag_ids: formData.tag_ids
-            }}
-            onChange={(metadata) => setFormData({ ...formData, ...metadata })}
+            data={metadataData}
+            onChange={handleMetadataChange}
             canEdit={true}
             applications={applications}
             unitTypes={unitTypes}

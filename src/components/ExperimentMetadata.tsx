@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { MultiSelect, type MultiSelectOption } from './ui/MultiSelect'
@@ -23,7 +23,7 @@ interface ExperimentMetadataProps {
   tags?: any[]
 }
 
-export function ExperimentMetadata({
+export const ExperimentMetadata = React.memo(function ExperimentMetadata({
   data,
   onChange,
   canEdit = true,
@@ -114,7 +114,7 @@ export function ExperimentMetadata({
     [data.owner_ids, data.team_ids]
   )
 
-  // Extract handler to stable reference (parse string IDs back to numbers)
+  // Extract handler (parse string IDs back to numbers)
   const handleOwnersChange = (selectedIds: (number | string)[]) => {
     const ownerIds = selectedIds
       .filter(id => typeof id === 'string' && id.startsWith('user-'))
@@ -170,7 +170,6 @@ export function ExperimentMetadata({
         disabled={!canEdit || loading}
       />
 
-      {/* TODO: Re-enable Owners field after fixing re-render issue
       <MultiSelect
         label="Owners"
         options={ownersOptions}
@@ -180,7 +179,6 @@ export function ExperimentMetadata({
         loading={loading}
         disabled={!canEdit || loading}
       />
-      */}
 
       <MultiSelect
         label="Tags (optional)"
@@ -193,4 +191,4 @@ export function ExperimentMetadata({
       />
     </div>
   )
-}
+})
