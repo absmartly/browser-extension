@@ -50,29 +50,19 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       let devEnv = await getDevelopmentEnvironment()
       if (!devEnv) {
         try {
-          // Fetch environments from API
-          const endpoint = localStorage.getItem('absmartly-endpoint')
-          const apiKey = localStorage.getItem('absmartly-apikey')
-          const authMethod = localStorage.getItem('absmartly-auth-method') || 'apikey'
+          // Fetch environments from API using BackgroundAPIClient
+          const { BackgroundAPIClient } = await import('~src/lib/background-api-client')
+          const client = new BackgroundAPIClient()
 
-          if (endpoint) {
-            const { ABsmartlyClient } = await import('~src/lib/absmartly-client')
-            const client = new ABsmartlyClient({
-              apiEndpoint: endpoint,
-              apiKey: apiKey || '',
-              authMethod: authMethod as 'apikey' | 'jwt'
-            })
+          const environments = await client.getEnvironments()
+          debugLog('Fetched environments:', environments)
 
-            const environments = await client.getEnvironments()
-            debugLog('Fetched environments:', environments)
-
-            // Find first development environment
-            const firstDevEnv = environments.find(env => env.type === 'development')
-            if (firstDevEnv) {
-              devEnv = firstDevEnv.name
-              await saveDevelopmentEnvironment(firstDevEnv.name)
-              debugLog('Saved development environment:', firstDevEnv.name)
-            }
+          // Find first development environment
+          const firstDevEnv = environments.find(env => env.type === 'development')
+          if (firstDevEnv) {
+            devEnv = firstDevEnv.name
+            await saveDevelopmentEnvironment(firstDevEnv.name)
+            debugLog('Saved development environment:', firstDevEnv.name)
           }
         } catch (error) {
           debugWarn('Failed to fetch environments:', error)

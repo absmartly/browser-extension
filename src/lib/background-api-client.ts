@@ -172,4 +172,14 @@ export class BackgroundAPIClient {
       throw error
     }
   }
+
+  async getEnvironments(): Promise<any[]> {
+    try {
+      const data = await this.makeRequest('GET', '/environments')
+      return data?.environments || []
+    } catch (error) {
+      debugError('Failed to fetch environments:', error)
+      throw error
+    }
+  }
 }
