@@ -23,6 +23,8 @@ export { default as UIComponents } from './ui/components'
 export { Toolbar } from './ui/toolbar'
 export { Notifications } from './ui/notifications'
 export { Styles } from './ui/styles'
+export { JSONEditor } from './ui/json-editor'
+export { default as HtmlEditor } from './ui/html-editor'
 
 // Utilities
 export { generateRobustSelector } from './utils/selector-generator'
