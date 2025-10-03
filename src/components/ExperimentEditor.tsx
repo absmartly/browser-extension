@@ -4,11 +4,11 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Badge } from './ui/Badge'
 import { Select } from './ui/Select'
-import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
-import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
+// Removed - now using VariantList
 import type { Experiment } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
+import { VariantList } from './VariantList'
 import { getConfig } from '~src/utils/storage'
 
 interface ExperimentEditorProps {
@@ -53,14 +53,13 @@ export function ExperimentEditor({
     tag_ids: experiment?.experiment_tags?.map(t => t.experiment_tag_id) || []
   })
 
-  const [variants, setVariants] = useState<VariantData[]>(() => {
+  const [initialVariants] = useState<VariantData[]>(() => {
     if (experiment?.variants) {
       return experiment.variants.map(v => {
         let dom_changes: DOMChange[] = []
         let variables: Record<string, any> = {}
         try {
           const config = JSON.parse(v.config || '{}')
-          // Try default field name first (will be properly loaded in useEffect)
           const fieldName = '__dom_changes'
           if (config[fieldName] && Array.isArray(config[fieldName])) {
             dom_changes = config[fieldName]
@@ -87,11 +86,8 @@ export function ExperimentEditor({
     ]
   })
 
-  const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
-  const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(null)
-  const [previewEnabled, setPreviewEnabled] = useState(false)
-  const [activePreviewVariant, setActivePreviewVariant] = useState<number | null>(null)
-  const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
+  const [currentVariants, setCurrentVariants] = useState<VariantData[]>(initialVariants)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
 
   // Load config on mount to get the DOM changes field name
@@ -100,36 +96,9 @@ export function ExperimentEditor({
       const config = await getConfig()
       const fieldName = config?.domChangesFieldName || '__dom_changes'
       setDomFieldName(fieldName)
-
-      // Re-parse variants with correct field name if we have an existing experiment
-      if (experiment?.variants && fieldName !== '__dom_changes') {
-        setVariants(experiment.variants.map(v => {
-          let dom_changes: DOMChange[] = []
-          let variables: Record<string, any> = {}
-          try {
-            const config = JSON.parse(v.config || '{}')
-            if (config[fieldName] && Array.isArray(config[fieldName])) {
-              dom_changes = config[fieldName]
-              const tempConfig = { ...config }
-              delete tempConfig[fieldName]
-              variables = tempConfig
-            } else {
-              variables = config
-            }
-          } catch (e) {
-            debugError('Failed to parse variant config:', e)
-          }
-
-          return {
-            name: v.name || '',
-            variables,
-            dom_changes
-          }
-        }))
-      }
     }
     loadConfig()
-  }, [experiment])
+  }, [])
 
   // Helper functions for name conversion
   const snakeToTitle = (snake: string): string => {
@@ -173,7 +142,7 @@ export function ExperimentEditor({
     }
     
     // Prepare variants with DOM changes
-    const preparedVariants = variants.map((v, index) => {
+    const preparedVariants = currentVariants.map((v, index) => {
       const config: any = { ...v.variables }
       
       // Include DOM changes only if not empty
@@ -234,107 +203,7 @@ export function ExperimentEditor({
     await onSave(experimentData)
   }
 
-  const addVariant = () => {
-    setVariants([...variants, { 
-      name: `Variant ${variants.length}`, 
-      variables: {},
-      dom_changes: []
-    }])
-    
-    // Update percentages
-    const count = variants.length + 1
-    const percentage = Math.floor(100 / count)
-    const remainder = 100 - (percentage * count)
-    const percentages = Array(count).fill(percentage)
-    percentages[0] += remainder
-    
-    setFormData({
-      ...formData,
-      nr_variants: count,
-      percentages: percentages.join('/')
-    })
-  }
 
-  const removeVariant = (index: number) => {
-    if (variants.length <= 2) return // Minimum 2 variants
-    
-    const newVariants = variants.filter((_, i) => i !== index)
-    setVariants(newVariants)
-    
-    // Update percentages
-    const count = newVariants.length
-    const percentage = Math.floor(100 / count)
-    const remainder = 100 - (percentage * count)
-    const percentages = Array(count).fill(percentage)
-    percentages[0] += remainder
-    
-    setFormData({
-      ...formData,
-      nr_variants: count,
-      percentages: percentages.join('/')
-    })
-  }
-
-  const updateVariantDOMChanges = (index: number, changes: DOMChange[]) => {
-    const newVariants = [...variants]
-    newVariants[index].dom_changes = changes
-    setVariants(newVariants)
-  }
-
-  const updateVariantVariables = (index: number, key: string, value: string) => {
-    const newVariants = [...variants]
-    newVariants[index].variables[key] = value
-    setVariants(newVariants)
-  }
-
-  const addVariantVariable = (index: number) => {
-    const key = prompt('Enter variable name:')
-    if (key) {
-      updateVariantVariables(index, key, '')
-    }
-  }
-
-  const deleteVariantVariable = (index: number, key: string) => {
-    const newVariants = [...variants]
-    delete newVariants[index].variables[key]
-    setVariants(newVariants)
-  }
-
-  const handlePreviewToggleForVariant = (enabled: boolean, variantIndex: number) => {
-    try {
-      setPreviewEnabled(enabled)
-      setActivePreviewVariant(enabled ? variantIndex : null)
-
-      if (enabled && variants[variantIndex]) {
-        const changes = variants[variantIndex].dom_changes || []
-        const variantName = variants[variantIndex].name
-
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-              type: 'ABSMARTLY_PREVIEW',
-              action: 'apply',
-              changes: changes.filter(c => c.enabled !== false),
-              experimentName: formData.name,
-              variantName: variantName
-            })
-          }
-        })
-      } else if (!enabled) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-              type: 'ABSMARTLY_PREVIEW',
-              action: 'remove',
-              experimentName: formData.name
-            })
-          }
-        })
-      }
-    } catch (error) {
-      debugError('Error in handlePreviewToggleForVariant:', error)
-    }
-  }
 
   return (
     <div className="p-4">
@@ -375,8 +244,6 @@ export function ExperimentEditor({
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="my_experiment_name"
                   required
-                  disabled={previewEnabled}
-                  title={previewEnabled ? "Cannot change experiment name while preview is active" : ""}
                 />
               </div>
 
@@ -493,120 +360,28 @@ export function ExperimentEditor({
         </div>
 
         {/* Variants */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-700">Variants</h3>
-            <Button
-              type="button"
-              onClick={addVariant}
-              size="sm"
-              variant="secondary"
-            >
-              <PlusIcon className="h-4 w-4 mr-1" />
-              Add Variant
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            {variants.map((variant, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Input
-                    className="flex-1 font-medium"
-                    value={variant.name}
-                    onChange={(e) => {
-                      const newVariants = [...variants]
-                      newVariants[index].name = e.target.value
-                      setVariants(newVariants)
-                    }}
-                    placeholder={`Variant ${index}`}
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setJsonEditorVariant(index)
-                      setJsonEditorOpen(true)
-                    }}
-                    size="sm"
-                    variant="secondary"
-                    title="Edit DOM Changes as JSON"
-                  >
-                    <CodeBracketIcon className="h-4 w-4" />
-                    JSON
-                  </Button>
-                  {variants.length > 2 && (
-                    <button
-                      type="button"
-                      onClick={() => removeVariant(index)}
-                      className="p-1 text-red-600 hover:text-red-800"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Variables Section */}
-                <div className="space-y-3">
-                  <div>
-                    <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
-                    <div className="space-y-2">
-                      {Object.entries(variant.variables).map(([key, value]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <Input
-                            value={key}
-                            disabled
-                            className="flex-1 text-sm"
-                          />
-                          <Input
-                            value={typeof value === 'object' ? JSON.stringify(value) : value}
-                            onChange={(e) => updateVariantVariables(index, key, e.target.value)}
-                            className="flex-1 text-sm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => deleteVariantVariable(index, key)}
-                            className="p-1 text-red-600 hover:text-red-800"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        onClick={() => addVariantVariable(index)}
-                        size="sm"
-                        variant="secondary"
-                        className="w-full"
-                      >
-                        Add Variable
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* DOM Changes Section */}
-                  <DOMChangesInlineEditor
-                    variantName={variant.name}
-                    experimentName={formData.name}
-                    changes={variant.dom_changes}
-                    onChange={(changes) => updateVariantDOMChanges(index, changes)}
-                    previewEnabled={previewEnabled && activePreviewVariant === index}
-                    onPreviewToggle={(enabled) => handlePreviewToggleForVariant(enabled, index)}
-                    activeVEVariant={activeVEVariant}
-                    onVEStart={() => {
-                      console.log('[ExperimentEditor] onVEStart called for variant:', variant.name)
-                      setActiveVEVariant(variant.name)
-                    }}
-                    onVEStop={() => {
-                      console.log('[ExperimentEditor] onVEStop called')
-                      setActiveVEVariant(null)
-                    }}
-                    activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <VariantList
+          initialVariants={initialVariants}
+          experimentId={experiment?.id || 0}
+          experimentName={formData.name}
+          onVariantsChange={(variants, hasChanges) => {
+            setCurrentVariants(variants)
+            setHasUnsavedChanges(hasChanges)
+            // Update percentages
+            const count = variants.length
+            const percentage = Math.floor(100 / count)
+            const remainder = 100 - (percentage * count)
+            const percentages = Array(count).fill(percentage)
+            percentages[0] += remainder
+            setFormData(prev => ({
+              ...prev,
+              nr_variants: count,
+              percentages: percentages.join('/')
+            }))
+          }}
+          canEdit={true}
+          canAddRemove={true}
+        />
 
         {/* Submit Buttons */}
         <div className="pt-4 flex gap-2 border-t">
@@ -627,24 +402,6 @@ export function ExperimentEditor({
           </Button>
         </div>
       </form>
-      
-      {/* JSON Editor Modal */}
-      {jsonEditorVariant !== null && (
-        <DOMChangesJSONEditor
-          isOpen={jsonEditorOpen}
-          onClose={() => {
-            setJsonEditorOpen(false)
-            setJsonEditorVariant(null)
-          }}
-          changes={variants[jsonEditorVariant]?.dom_changes || []}
-          onSave={(newChanges) => {
-            updateVariantDOMChanges(jsonEditorVariant, newChanges)
-            setJsonEditorOpen(false)
-            setJsonEditorVariant(null)
-          }}
-          variantName={variants[jsonEditorVariant]?.name || ''}
-        />
-      )}
     </div>
   )
 }
