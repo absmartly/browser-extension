@@ -175,7 +175,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     await test.step('Activate Visual Editor', async () => {
       console.log('🎨 STEP 3: Clicking Visual Editor button')
-      
+
       // Listen for console messages from the page to debug (only in DEBUG mode)
       if (DEBUG_MODE) {
         testPage.on('console', msg => {
