@@ -72,14 +72,6 @@ export function ExperimentMetadata({
     })
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <div className="text-sm text-gray-500">Loading metadata...</div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-3">
       <div>
@@ -100,9 +92,9 @@ export function ExperimentMetadata({
         label="Unit Type"
         value={data.unit_type_id || ''}
         onChange={(e) => handleUnitTypeChange(e.target.value ? parseInt(e.target.value) : null)}
-        placeholder="Select a unit type"
+        placeholder={loading ? "Loading..." : "Select a unit type"}
         required
-        disabled={!canEdit}
+        disabled={!canEdit || loading}
       >
         {unitTypes.map(ut => (
           <option key={ut.unit_type_id || ut.id} value={ut.unit_type_id || ut.id}>
@@ -115,8 +107,8 @@ export function ExperimentMetadata({
         label="Applications"
         value={data.application_ids[0] || ''}
         onChange={(e) => handleApplicationChange(e.target.value ? [parseInt(e.target.value)] : [])}
-        placeholder="Select an application"
-        disabled={!canEdit}
+        placeholder={loading ? "Loading..." : "Select an application"}
+        disabled={!canEdit || loading}
       >
         {applications.map(app => (
           <option key={app.application_id || app.id} value={app.application_id || app.id}>
