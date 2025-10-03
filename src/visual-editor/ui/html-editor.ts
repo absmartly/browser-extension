@@ -1,52 +1,29 @@
 /**
- * Monaco-based HTML Editor for Visual Editor
+ * CodeMirror-based HTML Editor for Visual Editor
  * Provides syntax highlighting, autocomplete, and full code editing features
  */
 
 import StateManager from '../core/state-manager'
-import * as monaco from 'monaco-editor'
+import { EditorView } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { html } from '@codemirror/lang-html'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { basicSetup } from 'codemirror'
 
 export class HtmlEditor {
   private stateManager: StateManager
   private editorHost: HTMLElement | null = null
-  private monacoEditor: monaco.editor.IStandaloneCodeEditor | null = null
-  private editorLoaded: boolean = false
+  private editorView: EditorView | null = null
+
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
-    // Monaco Editor doesn't work well with Shadow DOM, so we never use it for the HTML editor
   }
-
-  private async loadMonacoIfNeeded(): Promise<void> {
-    if (this.editorLoaded) {
-      return
-    }
-
-    // Configure Monaco to work without Web Workers in extension context
-    // @ts-ignore
-    window.MonacoEnvironment = {
-      getWorker: function () {
-        // Return null to disable web workers and use main thread
-        return null
-      }
-    }
-
-    // Monaco is now bundled, so we can use it directly
-    console.log('[HtmlEditor] Monaco editor ready')
-    this.editorLoaded = true
-    return
-  }
-
 
   async show(element: Element, currentHtml: string): Promise<string | null> {
-    // Load editor on-demand when show() is called
-    if (!this.editorLoaded) {
-      await this.loadMonacoIfNeeded()
-    }
-
     return new Promise((resolve) => {
-      // Create editor host in regular DOM (no Shadow DOM for Monaco compatibility)
+      // Create editor host in regular DOM
       this.editorHost = document.createElement('div')
-      this.editorHost.id = 'absmartly-monaco-editor-host'
+      this.editorHost.id = 'absmartly-html-editor-host'
       this.editorHost.style.cssText = `
         position: fixed;
         top: 0;
@@ -60,7 +37,6 @@ export class HtmlEditor {
       const editorStyle = document.createElement('style')
       editorStyle.id = 'absmartly-html-editor-styles'
       editorStyle.textContent = this.getEditorStyles()
-      // Add styles to document head (no Shadow DOM)
       document.head.appendChild(editorStyle)
 
       // Create editor elements
@@ -86,8 +62,8 @@ export class HtmlEditor {
 
       // Create editor container
       const editorContainer = document.createElement('div')
-      editorContainer.id = 'monaco-container'
-      editorContainer.className = 'editor-monaco-container'
+      editorContainer.id = 'codemirror-container'
+      editorContainer.className = 'editor-codemirror-container'
 
       // Create toolbar
       const toolbar = document.createElement('div')
@@ -96,21 +72,9 @@ export class HtmlEditor {
       const formatBtn = document.createElement('button')
       formatBtn.className = 'toolbar-button'
       formatBtn.innerHTML = '⚡ Format'
-      formatBtn.title = 'Format HTML (Shift+Alt+F)'
-
-      const wrapBtn = document.createElement('button')
-      wrapBtn.className = 'toolbar-button'
-      wrapBtn.innerHTML = '📦 Wrap Selection'
-      wrapBtn.title = 'Wrap selection with tags'
-
-      const previewBtn = document.createElement('button')
-      previewBtn.className = 'toolbar-button'
-      previewBtn.innerHTML = '👁 Preview'
-      previewBtn.title = 'Preview changes'
+      formatBtn.title = 'Format HTML'
 
       toolbar.appendChild(formatBtn)
-      toolbar.appendChild(wrapBtn)
-      toolbar.appendChild(previewBtn)
 
       // Create buttons
       const buttons = document.createElement('div')
@@ -134,81 +98,44 @@ export class HtmlEditor {
       container.appendChild(buttons)
       backdrop.appendChild(container)
 
-      // Append directly to the host element (no Shadow DOM)
       this.editorHost.appendChild(backdrop)
       document.body.appendChild(this.editorHost)
 
-      // Create Monaco editor
+      // Create CodeMirror editor
       setTimeout(() => {
-        // Create Monaco editor instance with enhanced options
-        this.monacoEditor = monaco.editor.create(editorContainer, {
-          value: this.formatHtml(currentHtml),
-          language: 'html',
-          theme: 'vs-dark',
-          'semanticHighlighting.enabled': true,
-          automaticLayout: true,
-          minimap: { enabled: false },
-          fontSize: 14,
-          lineNumbers: 'on',
-          wordWrap: 'on',
-          formatOnPaste: true,
-          formatOnType: true,
-          scrollBeyondLastLine: false,
-          renderLineHighlight: 'all',
-          folding: true,
-          glyphMargin: true,
+        const startState = EditorState.create({
+          doc: this.formatHtml(currentHtml),
+          extensions: [
+            basicSetup,
+            html(),
+            oneDark,
+            EditorView.lineWrapping,
+          ]
+        })
+
+        this.editorView = new EditorView({
+          state: startState,
+          parent: editorContainer
         })
 
         // Focus the editor
-        this.monacoEditor.focus()
+        this.editorView.focus()
       }, 10)
 
       // Handle button clicks
       formatBtn.addEventListener('click', (e) => {
         console.log('[HtmlEditor] Format button clicked')
         e.stopPropagation()
-        if (this.monacoEditor) {
-          const currentValue = this.monacoEditor.getValue()
+        if (this.editorView) {
+          const currentValue = this.editorView.state.doc.toString()
           const formatted = this.formatHtml(currentValue)
-          this.monacoEditor.setValue(formatted)
-        }
-      })
-
-      wrapBtn.addEventListener('click', (e) => {
-        console.log('[HtmlEditor] Wrap button clicked')
-        e.stopPropagation()
-        if (this.monacoEditor) {
-          const selection = this.monacoEditor.getSelection()
-          if (selection) {
-            const model = this.monacoEditor.getModel()
-            if (model) {
-              const selectedText = model.getValueInRange(selection)
-              const wrappedText = `<div>\n  ${selectedText}\n</div>`
-              this.monacoEditor.executeEdits('', [{
-                range: selection,
-                text: wrappedText,
-                forceMoveMarkers: true
-              }])
+          this.editorView.dispatch({
+            changes: {
+              from: 0,
+              to: this.editorView.state.doc.length,
+              insert: formatted
             }
-          }
-        }
-      })
-
-      previewBtn.addEventListener('click', (e) => {
-        console.log('[HtmlEditor] Preview button clicked')
-        e.stopPropagation()
-        if (this.monacoEditor) {
-          const newHtml = this.monacoEditor.getValue()
-          // Temporarily update the element to show preview
-          const originalHtml = element.innerHTML
-          element.innerHTML = newHtml
-
-          setTimeout(() => {
-            const shouldKeep = confirm('Keep these changes?')
-            if (!shouldKeep) {
-              element.innerHTML = originalHtml
-            }
-          }, 100)
+          })
         }
       })
 
@@ -223,7 +150,7 @@ export class HtmlEditor {
         console.log('[HtmlEditor] Save button clicked!')
         e.stopPropagation()
         e.preventDefault()
-        const newHtml = this.monacoEditor?.getValue() || ''
+        const newHtml = this.editorView?.state.doc.toString() || ''
         console.log('[HtmlEditor] New HTML:', newHtml)
         this.cleanup()
         console.log('[HtmlEditor] Cleanup done, resolving...')
@@ -248,7 +175,7 @@ export class HtmlEditor {
         }
       })
 
-      // Prevent clicks from propagating to the page, but allow editor and button interactions
+      // Prevent clicks from propagating to the page
       container.addEventListener('click', (e) => {
         e.stopPropagation()
       })
@@ -291,9 +218,9 @@ export class HtmlEditor {
   }
 
   private cleanup(): void {
-    if (this.monacoEditor) {
-      this.monacoEditor.dispose()
-      this.monacoEditor = null
+    if (this.editorView) {
+      this.editorView.destroy()
+      this.editorView = null
     }
 
     // Remove styles from document head
@@ -413,10 +340,18 @@ export class HtmlEditor {
         border-color: #007acc;
       }
 
-      .editor-monaco-container {
+      .editor-codemirror-container {
         flex: 1;
         position: relative;
         overflow: hidden;
+      }
+
+      .editor-codemirror-container .cm-editor {
+        height: 100%;
+      }
+
+      .editor-codemirror-container .cm-scroller {
+        overflow: auto;
       }
 
       .editor-buttons {
