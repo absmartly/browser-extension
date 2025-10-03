@@ -7,7 +7,7 @@ const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-t
 // Slow mode - set to true to add waits between steps for debugging
 // Pass SLOW=1 environment variable to enable: SLOW=1 npx playwright test ...
 const SLOW_MODE = process.env.SLOW === '1'
-const debugWait = async (ms: number = 1000) => SLOW_MODE ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve()
+const debugWait = async (ms: number = 300) => SLOW_MODE ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve()
 
 // Debug mode - set to true to show console logs from page/sidebar
 // Enabled automatically when using --debug flag: npx playwright test --debug
