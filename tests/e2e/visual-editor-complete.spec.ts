@@ -80,7 +80,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(120000)
+    test.setTimeout(10000)
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
     await testPage.evaluate((extUrl) => {
@@ -168,12 +168,17 @@ test.describe('Visual Editor Complete Workflow', () => {
     experimentName = `E2E Test Experiment ${Date.now()}`
     await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
     console.log(`  Filled experiment name: ${experimentName}`)
+    await testPage.waitForTimeout(500)
     await debugWait()
 
     // Select Unit Type (required field)
     console.log('  Selecting Unit Type...')
     const unitTypeSelect = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select')
     await unitTypeSelect.waitFor({ state: 'visible', timeout: 5000 })
+    
+    // Wait for unit types to be loaded (dropdown will have more than just placeholder)
+    await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select option').nth(1).waitFor({ state: 'attached', timeout: 10000 })
+    console.log('  ✓ Unit types loaded')
     
     // Get first available option (skip the placeholder)
     const unitTypeOptions = await unitTypeSelect.locator('option').count()
@@ -185,6 +190,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     const firstUnitTypeValue = await unitTypeSelect.locator('option').nth(1).getAttribute('value')
     await unitTypeSelect.selectOption(firstUnitTypeValue || '')
     console.log(`  ✓ Selected unit type`)
+    await testPage.waitForTimeout(500)
     await debugWait()
 
     // Select Applications (required field)
@@ -194,21 +200,20 @@ test.describe('Visual Editor Complete Workflow', () => {
     
     await appsClickArea.click({ timeout: 5000 })
     console.log('  ✓ Clicked applications field')
-    await testPage.waitForTimeout(500)
     
     // Wait for dropdown and select first application
     const appsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
     await appsDropdown.waitFor({ state: 'visible', timeout: 3000 })
     
+    // Wait for applications to be loaded in the dropdown
     const firstAppOption = appsDropdown.locator('div[class*="cursor-pointer"]').first()
-    if (!await firstAppOption.isVisible({ timeout: 2000 })) {
-      throw new Error('No applications available - form cannot be filled')
-    }
+    await firstAppOption.waitFor({ state: 'visible', timeout: 5000 })
+    console.log('  ✓ Applications loaded in dropdown')
     
     const selectedAppText = await firstAppOption.textContent()
     await firstAppOption.click()
     console.log(`  ✓ Selected application: ${selectedAppText?.trim()}`)
-    await testPage.waitForTimeout(300)
+    await testPage.waitForTimeout(500)
     
     // Verify application badge appeared
     const appBadge = appsContainer.locator('div[class*="inline-flex"]')
@@ -218,7 +223,12 @@ test.describe('Visual Editor Complete Workflow', () => {
     
     // Click outside to close dropdown
     await sidebar.locator('label:has-text("Traffic")').click()
-    await testPage.waitForTimeout(300)
+    await testPage.waitForTimeout(500)
+    
+    // Wait for dropdown to close
+    const appsDropdownClosed = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+    await appsDropdownClosed.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
+    await testPage.waitForTimeout(500)
 
     console.log('✅ Experiment form filled with required fields')
     await debugWait()
@@ -236,11 +246,38 @@ test.describe('Visual Editor Complete Workflow', () => {
         })
       }
     const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
+    
+    // Wait for button to be visible and then become enabled (form validation to complete)
+    await visualEditorButton.waitFor({ state: 'visible', timeout: 5000 })
+    await expect(visualEditorButton).toBeEnabled({ timeout: 10000 })
+    console.log('  ✓ Visual Editor button is enabled (form validation complete)')
+    
+    // Set up console error listener before clicking
+    const consoleErrors: string[] = []
+    testPage.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text())
+        console.log(`  ❌ [Page Error] ${msg.text()}`)
+      }
+    })
+    
     await visualEditorButton.click()
-
-    // Wait for visual editor notification to appear
-      await testPage.locator('.absmartly-notification:has-text("Visual Editor Active")').waitFor({ state: 'visible', timeout: 10000 })
-      console.log('✅ Visual editor active')
+    console.log('  ✓ Clicked Visual Editor button')
+    
+    // Wait a bit for any errors to surface
+    await testPage.waitForTimeout(1000)
+    
+    // Check if page is still alive
+    const pageAlive = await testPage.evaluate(() => true).catch(() => false)
+    if (!pageAlive) {
+      console.log('  ❌ Page crashed after clicking VE button')
+      console.log('  Console errors before crash:', consoleErrors)
+      throw new Error('Page crashed when launching Visual Editor')
+    }
+    
+    // Wait for VE banner to appear (more reliable than checking window variable)
+    await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 10000 })
+    console.log('✅ Visual editor active')
 
       // Take screenshot to see sidebar state after VE activates
       await testPage.screenshot({ path: 'test-results/sidebar-after-ve-launch.png', fullPage: true })
@@ -1264,7 +1301,7 @@ test.describe('Visual Editor Complete Workflow', () => {
             if (elem instanceof HTMLElement) elem.scrollTop = 0
           })
         })
-        await testPage.waitForTimeout(500)
+        //await testPage.waitForTimeout(500)
 
         // Fill the new metadata fields (owners, teams, tags)
         console.log('  📝 Filling owners, teams, and tags fields...')
@@ -1272,7 +1309,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Scroll to the metadata section
         await sidebar.locator('label:has-text("Applications"), label:has-text("Owners")').first().scrollIntoViewIfNeeded()
-        await testPage.waitForTimeout(500)
+        //await testPage.waitForTimeout(500)
         await debugWait()
         
         // Fill Owners field - click the field to open dropdown
@@ -1291,15 +1328,18 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         await ownersClickArea.click({ timeout: 5000 })
         console.log('  ✓ Clicked owners field')
-        await testPage.waitForTimeout(500)
+        await debugWait()
         
         // Wait for dropdown to appear and get first option
         const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
         await ownersDropdown.waitFor({ state: 'visible', timeout: 3000 })
         console.log('  ✓ Owners dropdown appeared')
         
-        // Click first available option in the dropdown
+        // Wait for owners/teams to be loaded in the dropdown
         const firstOwnerOption = ownersDropdown.locator('div[class*="cursor-pointer"]').first()
+        await firstOwnerOption.waitFor({ state: 'visible', timeout: 5000 })
+        console.log('  ✓ Owners/teams loaded in dropdown')
+        
         const optionExists = await firstOwnerOption.isVisible({ timeout: 2000 })
         
         if (!optionExists) {
@@ -1309,7 +1349,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         const selectedOptionText = await firstOwnerOption.textContent()
         await firstOwnerOption.click()
         console.log(`  ✓ Selected owner/team: ${selectedOptionText?.trim()}`)
-        await testPage.waitForTimeout(300)
+        //await testPage.waitForTimeout(300)
         
         // Verify selection was made - check for selected badge
         const selectedBadge = ownersContainer.locator('div[class*="inline-flex"]', { hasText: selectedOptionText?.trim() || '' })
@@ -1322,7 +1362,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         // Click outside to close dropdown
         await sidebar.locator('label:has-text("Traffic")').click()
-        await testPage.waitForTimeout(300)
+        //await testPage.waitForTimeout(300)
         
         // Fill Tags field - click the field to open dropdown
         console.log('  Attempting to select tags...')
@@ -1340,7 +1380,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         await tagsClickArea.click({ timeout: 5000 })
         console.log('  ✓ Clicked tags field')
-        await testPage.waitForTimeout(500)
+        //await testPage.waitForTimeout(500)
         
         // Wait for dropdown to appear and get first option
         const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
@@ -1349,6 +1389,9 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         // Click first available option in the dropdown
         const firstTagOption = tagsDropdown.locator('div[class*="cursor-pointer"]').first()
+        await firstTagOption.waitFor({ state: 'visible', timeout: 5000 })
+        console.log('  ✓ Tags loaded in dropdown')
+        
         const tagOptionExists = await firstTagOption.isVisible({ timeout: 2000 })
         
         if (!tagOptionExists) {
@@ -1358,7 +1401,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         const selectedTagText = await firstTagOption.textContent()
         await firstTagOption.click()
         console.log(`  ✓ Selected tag: ${selectedTagText?.trim()}`)
-        await testPage.waitForTimeout(300)
+        //await testPage.waitForTimeout(300)
         
         // Verify selection was made - check for selected badge
         const selectedTagBadge = tagsContainer.locator('div[class*="inline-flex"]', { hasText: selectedTagText?.trim() || '' })
@@ -1371,9 +1414,8 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         // Click outside to close dropdown
         await sidebar.locator('label:has-text("Traffic")').click()
-        await testPage.waitForTimeout(300)
 
-        await testPage.waitForTimeout(500)
+        //await testPage.waitForTimeout(500)
         console.log('  ✓ Filled metadata fields')
         await debugWait()
 
