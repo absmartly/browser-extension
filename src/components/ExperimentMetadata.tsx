@@ -178,7 +178,7 @@ export function ExperimentMetadata({
       <MultiSelect
         label="Owners"
         options={[...ownerOptions, ...teamOptions]}
-        selectedIds={[...data.owner_ids, ...data.team_ids]}
+        selectedIds={[...(data.owner_ids || []), ...(data.team_ids || [])]}
         onChange={(selectedIds) => {
           const ownerIds = selectedIds.filter(id => ownerOptions.some(o => o.id === id))
           const teamIds = selectedIds.filter(id => teamOptions.some(t => t.id === id))
