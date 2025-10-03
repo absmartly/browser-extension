@@ -189,15 +189,17 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
         disabled={!canEdit || loading}
       />
 
-      <OwnersField
-        ownerIds={data.owner_ids}
-        teamIds={data.team_ids}
-        owners={owners}
-        teams={teams}
-        loading={loading}
-        canEdit={canEdit}
-        onChange={handleOwnersChange}
-      />
+{owners.length > 0 || teams.length > 0 ? (
+        <OwnersField
+          ownerIds={data.owner_ids}
+          teamIds={data.team_ids}
+          owners={owners}
+          teams={teams}
+          loading={loading}
+          canEdit={canEdit}
+          onChange={handleOwnersChange}
+        />
+      ) : null}
 
       <MultiSelect
         label="Tags (optional)"
