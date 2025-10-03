@@ -7,7 +7,7 @@ import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import { getConfig } from '~src/utils/storage'
@@ -728,9 +728,42 @@ export function ExperimentDetail({
     }
   }
 
+  const addVariant = () => {
+    const variantCount = Object.keys(variantData).length
+    const newVariantName = `Variant ${variantCount + 1}`
+    setVariantData(prev => ({
+      ...prev,
+      [newVariantName]: {
+        variables: {},
+        dom_changes: []
+      }
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const canAddVariants = experiment.state !== 'running' &&
+                         experiment.state !== 'development' &&
+                         experiment.status !== 'running' &&
+                         experiment.status !== 'development'
+
+  const logoUrl = chrome.runtime.getURL('assets/icon128.png')
+
   return (
     <div className="p-4">
       <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img
+            src={logoUrl}
+            alt="ABsmartly"
+            className="w-6 h-6"
+          />
+          {loading && (
+            <div className="flex items-center text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+              Loading full data...
+            </div>
+          )}
+        </div>
         <button
           onClick={() => {
             if (hasUnsavedChanges) {
@@ -757,12 +790,6 @@ export function ExperimentDetail({
         >
           <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
         </button>
-        {loading && (
-          <div className="flex items-center text-sm text-gray-500">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-            Loading full data...
-          </div>
-        )}
       </div>
 
       <div className="space-y-4">
@@ -886,6 +913,17 @@ export function ExperimentDetail({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-700">Variants</h3>
+              {canAddVariants && (
+                <Button
+                  type="button"
+                  onClick={addVariant}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <PlusIcon className="h-4 w-4 mr-1" />
+                  Add Variant
+                </Button>
+              )}
             </div>
             {Object.keys(variantData).map((variantKey, index) => {
               const data = variantData[variantKey]
