@@ -966,13 +966,24 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  ✓ Second VE is active and ready')
 
       // Exit the second VE by pressing Escape key
+      console.log('  Pressing Escape to exit VE...')
+      
+      // Make sure the page has focus (not the sidebar)
+      await testPage.click('body', { position: { x: 100, y: 100 } })
+      await testPage.waitForTimeout(100)
+      
+      // Press Escape
       await testPage.keyboard.press('Escape')
 
       // Wait for VE to exit
       await testPage.waitForFunction(() => {
         return (window as any).__absmartlyVisualEditorActive !== true
       }, { timeout: 5000 })
-      console.log('  🚪 Exited second VE instance')
+      console.log('  🚪 VE exited - waiting for sidebar to update...')
+      
+      // Wait for sidebar to clear activeVEVariant state (onVEStop callback)
+      await testPage.waitForTimeout(1000)
+      console.log('  ✓ Waited for sidebar state cleanup')
 
       console.log('\n✅ Second VE launch test PASSED!')
       console.log('  • Successfully launched VE a second time')
@@ -1011,6 +1022,10 @@ test.describe('Visual Editor Complete Workflow', () => {
       })
       console.log(`  📝 Original text: "${originalText}"`)
 
+      // Take screenshot before attempting to launch VE
+      await testPage.screenshot({ path: 'test-results/before-discard-test-ve-launch.png', fullPage: true })
+      console.log('  Screenshot saved: before-discard-test-ve-launch.png')
+
       // Launch VE - wait for button to be enabled first
       const veButtons = freshSidebar.locator('button:has-text("Visual Editor")')
 
@@ -1018,21 +1033,32 @@ test.describe('Visual Editor Complete Workflow', () => {
       await veButtons.nth(0).waitFor({ state: 'attached', timeout: 5000 })
 
       // Wait for the button to be enabled by checking it's not disabled
+      console.log('  Waiting for VE button to become enabled...')
       let buttonEnabled = false
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 50; i++) {
         const isDisabled = await veButtons.nth(0).isDisabled()
+        const title = await veButtons.nth(0).getAttribute('title')
+        
+        if (i % 10 === 0) {
+          console.log(`  Check ${i}: disabled=${isDisabled}, title="${title}"`)
+        }
+        
         if (!isDisabled) {
           buttonEnabled = true
+          console.log(`  ✓ Button enabled after ${i * 200}ms`)
           break
         }
         await testPage.waitForTimeout(200)
       }
 
       if (!buttonEnabled) {
-        console.log('  ⚠️  Warning: Button still disabled, forcing click anyway')
+        // Take screenshot to debug
+        await testPage.screenshot({ path: 'test-results/ve-button-still-disabled.png', fullPage: true })
+        console.log('  ⚠️  Screenshot saved: ve-button-still-disabled.png')
+        throw new Error('VE button never became enabled after 10 seconds')
       }
 
-      await veButtons.nth(0).click({ force: true })
+      await veButtons.nth(0).click()
       console.log('  ✓ Clicked Visual Editor button')
 
       // Wait for VE to be active

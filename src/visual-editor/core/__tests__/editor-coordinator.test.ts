@@ -142,6 +142,10 @@ describe('EditorCoordinator', () => {
     // Add spies on undo/redo methods
     mockUndoRedoManager.undo = jest.fn()
     mockUndoRedoManager.redo = jest.fn()
+    mockUndoRedoManager.canUndo = jest.fn().mockReturnValue(true)
+    mockUndoRedoManager.canRedo = jest.fn().mockReturnValue(false)
+    mockUndoRedoManager.getUndoCount = jest.fn().mockReturnValue(1)
+    mockUndoRedoManager.getRedoCount = jest.fn().mockReturnValue(0)
     mockUIComponents = new UIComponents({} as any) as jest.Mocked<UIComponents>
     mockEditModes = new EditModes({} as any) as jest.Mocked<EditModes>
     mockCleanup = new Cleanup(mockStateManager) as jest.Mocked<Cleanup>
@@ -404,12 +408,12 @@ describe('EditorCoordinator', () => {
       coordinator.setupEventListeners()
 
       // Coordinator registers these - EventHandlers module handles click, mouseover, mouseout
-      expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+      // Note: keydown is handled separately in setupKeyboardHandlers()
       expect(addEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
       expect(addEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
 
       // EventHandlers.attachEventListeners() is called but we're only testing coordinator's direct listeners
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(3)
+      expect(addEventListenerSpy).toHaveBeenCalledTimes(2)
     })
 
     it('should remove all event listeners', () => {
@@ -417,12 +421,12 @@ describe('EditorCoordinator', () => {
       coordinator.removeEventListeners()
 
       // Coordinator removes its listeners - EventHandlers module handles the rest
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+      // Note: keydown is handled separately in setupKeyboardHandlers()
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
 
       // EventHandlers.detachEventListeners() is called but we're only testing coordinator's direct listeners
-      expect(removeEventListenerSpy).toHaveBeenCalledTimes(3)
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2)
     })
 
 it('should handle placeholder events without errors', () => {
