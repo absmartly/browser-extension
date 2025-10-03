@@ -750,54 +750,17 @@ export function ExperimentDetail({
 
   return (
     <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img
-            src={logoUrl}
-            alt="ABsmartly"
-            className="w-6 h-6"
-          />
-          {loading && (
-            <div className="flex items-center text-sm text-gray-500">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-              Loading full data...
-            </div>
-          )}
-        </div>
-        <button
-          onClick={() => {
-            if (hasUnsavedChanges) {
-              if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
-                // User wants to discard changes - clear storage before navigating back
-                const storageKey = `experiment-${experiment.id}-variants`
-                debugLog('🧹 User chose to discard changes for experiment', experiment.id)
-                storage.remove(storageKey).then(() => {
-                  debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
-                  onBack()
-                }).catch(error => {
-                  debugError('Failed to clear storage:', error)
-                  onBack()
-                })
-              }
-              // If user cancels, do nothing (stay on the page)
-            } else {
-              onBack()
-            }
-          }}
-          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          aria-label="Go back"
-          title="Go back"
-        >
-          <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {/* Header Section */}
-        <div>
-          <div className="mb-2">
+      {/* Header with logo, experiment name, status/traffic, and actions */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <img
+              src={logoUrl}
+              alt="ABsmartly"
+              className="w-6 h-6"
+            />
             {editingName ? (
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-0.5">
                   <input
                     className="flex-1 text-lg font-semibold rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
@@ -827,76 +790,21 @@ export function ExperimentDetail({
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2 flex-1">
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900" title={`ID: ${experiment.id}`}>{displayName}</h2>
-                  {displayName !== experiment.name && (
-                    <p className="text-sm text-gray-500" title={`ID: ${experiment.id}`}>{experiment.name}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setEditingName(true)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                    title="Edit name"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  
-                  <div className="flex gap-1">
-                    {/* Open in ABsmartly */}
-                    <div className="relative group">
-                      <button
-                        onClick={async () => {
-                          const config = await getConfig()
-                          if (config?.apiEndpoint) {
-                            const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                            const url = `${baseUrl}/experiments/${experiment.id}`
-                            chrome.tabs.create({ url })
-                          }
-                        }}
-                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        aria-label="Open in ABsmartly"
-                      >
-                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                      </button>
-                      
-                      {/* Tooltip with high z-index */}
-                      <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                        Open in ABsmartly
-                        <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                      </div>
-                    </div>
-                    
-                    {/* Edit in ABsmartly */}
-                    <div className="relative group">
-                      <button
-                        onClick={async () => {
-                          const config = await getConfig()
-                          if (config?.apiEndpoint) {
-                            const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                            const url = `${baseUrl}/experiments/${experiment.id}/edit`
-                            chrome.tabs.create({ url })
-                          }
-                        }}
-                        className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                        aria-label="Edit in ABsmartly"
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      
-                      {/* Tooltip with high z-index */}
-                      <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                        Edit in ABsmartly
-                        <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-gray-900" title={`ID: ${experiment.id}`}>{displayName}</h2>
+                {displayName !== experiment.name && (
+                  <p className="text-sm text-gray-500" title={`ID: ${experiment.id}`}>{experiment.name}</p>
+                )}
               </div>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {loading && (
+              <div className="flex items-center text-sm text-gray-500">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                Loading...
+              </div>
+            )}
             <Badge variant={getStatusVariant(experiment.state || experiment.status || 'created')}>
               {experiment.state || experiment.status || 'created'}
             </Badge>
@@ -905,8 +813,96 @@ export function ExperimentDetail({
                 {experiment.percentage_of_traffic !== undefined ? experiment.percentage_of_traffic : experiment.traffic_split}% traffic
               </span>
             )}
+            {!editingName && (
+              <>
+                <button
+                  onClick={() => setEditingName(true)}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Edit name"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+
+                {/* Open in ABsmartly */}
+                <div className="relative group">
+                  <button
+                    onClick={async () => {
+                      const config = await getConfig()
+                      if (config?.apiEndpoint) {
+                        const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                        const url = `${baseUrl}/experiments/${experiment.id}`
+                        chrome.tabs.create({ url })
+                      }
+                    }}
+                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    aria-label="Open in ABsmartly"
+                  >
+                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  </button>
+
+                  {/* Tooltip with high z-index */}
+                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    Open in ABsmartly
+                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+
+                {/* Edit in ABsmartly */}
+                <div className="relative group">
+                  <button
+                    onClick={async () => {
+                      const config = await getConfig()
+                      if (config?.apiEndpoint) {
+                        const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                        const url = `${baseUrl}/experiments/${experiment.id}/edit`
+                        chrome.tabs.create({ url })
+                      }
+                    }}
+                    className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                    aria-label="Edit in ABsmartly"
+                  >
+                    <PencilSquareIcon className="h-4 w-4" />
+                  </button>
+
+                  {/* Tooltip with high z-index */}
+                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    Edit in ABsmartly
+                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+              </>
+            )}
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
+                    // User wants to discard changes - clear storage before navigating back
+                    const storageKey = `experiment-${experiment.id}-variants`
+                    debugLog('🧹 User chose to discard changes for experiment', experiment.id)
+                    storage.remove(storageKey).then(() => {
+                      debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+                      onBack()
+                    }).catch(error => {
+                      debugError('Failed to clear storage:', error)
+                      onBack()
+                    })
+                  }
+                  // If user cancels, do nothing (stay on the page)
+                } else {
+                  onBack()
+                }
+              }}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+              aria-label="Go back"
+              title="Go back"
+            >
+              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+            </button>
           </div>
         </div>
+      </div>
+
+      <div className="space-y-4">
 
         {/* Variants Section - Show if we have any variant data to display */}
         {Object.keys(variantData).length > 0 && (
