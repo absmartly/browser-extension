@@ -210,13 +210,24 @@ async function getJWTCookie(domain: string): Promise<string | null> {
     const uniqueCookies = Array.from(new Map(allCookies.map(c => [`${c.name}-${c.value}`, c])).values())
     
     debugLog(`Total unique cookies found: ${uniqueCookies.length}`)
-    
+
     // Look for JWT cookie - check common ABsmartly cookie names
-    const jwtCookie = uniqueCookies.find(cookie => 
+    // Try exact matches first
+    let jwtCookie = uniqueCookies.find(cookie =>
       cookie.name === 'jwt' || // ABsmartly typically uses lowercase 'jwt'
       cookie.name === 'JWT' ||
-      cookie.name.toLowerCase() === 'jwt'
+      cookie.name === 'access_token' ||
+      cookie.name === 'auth_token' ||
+      cookie.name === 'authorization'
     )
+
+    // If not found, look for cookies that might contain JWT token (3 parts separated by dots)
+    if (!jwtCookie) {
+      jwtCookie = uniqueCookies.find(cookie => {
+        const value = cookie.value
+        return value && value.includes('.') && value.split('.').length === 3
+      })
+    }
     
     if (jwtCookie) {
       debugLog(`✅ JWT cookie found: ${jwtCookie.name} (length: ${jwtCookie.value.length}, domain: ${jwtCookie.domain})`)
@@ -260,12 +271,12 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
       'Accept': 'application/json'
     }
 
-    // If auth method is JWT, try JWT first
+    // If auth method is JWT, use JWT only (no API key fallback)
     if (shouldTryJwtFirst) {
       debugLog('Using JWT authentication method...')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
       debugLog('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length}, preview: ${jwtToken.substring(0, 20)}...)` : 'Not found')
-      
+
       if (jwtToken) {
         if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
           headers['Authorization'] = `JWT ${jwtToken}`
@@ -273,19 +284,10 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
           headers['Authorization'] = `Bearer ${jwtToken}`
         }
         debugLog('Using JWT from browser cookie, Authorization header:', headers['Authorization'].substring(0, 30) + '...')
-        return headers
-      }
-      // If JWT not available but we have API key as fallback
-      if (config.apiKey && useApiKey) {
-        debugLog('JWT not available, falling back to API key')
-        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-          ? `JWT ${config.apiKey}`
-          : `Api-Key ${config.apiKey}`
-        headers['Authorization'] = authHeader
-        debugLog('Using API key fallback, Authorization header:', headers['Authorization'].substring(0, 30) + '...')
       } else {
-        debugLog('No JWT cookie available and no API key fallback')
+        debugLog('No JWT cookie available - user may need to log in to ABsmartly')
       }
+      return headers
     } else {
       // Auth method is API key
       if (config.apiKey && useApiKey) {
