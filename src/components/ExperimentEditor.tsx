@@ -21,6 +21,8 @@ interface ExperimentEditorProps {
   unitTypes?: any[]
   metrics?: any[]
   tags?: any[]
+  owners?: any[]
+  teams?: any[]
 }
 
 interface VariantData {
@@ -37,7 +39,9 @@ export function ExperimentEditor({
   applications = [],
   unitTypes = [],
   metrics = [],
-  tags = []
+  tags = [],
+  owners = [],
+  teams = []
 }: ExperimentEditorProps) {
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
   const [formData, setFormData] = useState({
@@ -51,6 +55,8 @@ export function ExperimentEditor({
     audience: experiment?.audience || '{"filter":[{"and":[]}]}',
     unit_type_id: experiment?.unit_type?.unit_type_id || null,
     application_ids: experiment?.applications?.map(a => a.application_id) || [],
+    owner_ids: experiment?.owners?.map(o => o.user_id || o.id) || [],
+    team_ids: experiment?.teams?.map(t => t.team_id || t.id) || [],
     tag_ids: experiment?.experiment_tags?.map(t => t.experiment_tag_id) || []
   })
 
@@ -172,8 +178,8 @@ export function ExperimentEditor({
       experiment_tags: formData.tag_ids.map(id => ({ experiment_tag_id: id })),
       variants: preparedVariants,
       variant_screenshots: [],
-      owners: [{ user_id: 3 }], // TODO: Get current user ID
-      teams: [],
+      owners: formData.owner_ids.map(id => ({ user_id: id })),
+      teams: formData.team_ids.map(id => ({ team_id: id })),
       // Add analysis type fields for new experiments
       type: 'test',
       analysis_type: 'group_sequential',
@@ -322,10 +328,18 @@ export function ExperimentEditor({
             data={{
               percentage_of_traffic: formData.percentage_of_traffic,
               unit_type_id: formData.unit_type_id,
-              application_ids: formData.application_ids
+              application_ids: formData.application_ids,
+              owner_ids: formData.owner_ids,
+              team_ids: formData.team_ids,
+              tag_ids: formData.tag_ids
             }}
             onChange={(metadata) => setFormData({ ...formData, ...metadata })}
             canEdit={true}
+            applications={applications}
+            unitTypes={unitTypes}
+            owners={owners}
+            teams={teams}
+            tags={tags}
           />
 
         </div>

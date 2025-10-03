@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo } from 'react'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { MultiSelect, type MultiSelectOption } from './ui/MultiSelect'
-import { debugLog, debugError } from '~src/utils/debug'
-import { useABsmartly } from '~src/hooks/useABsmartly'
 
 export interface ExperimentMetadataData {
   percentage_of_traffic: number
@@ -18,54 +16,24 @@ interface ExperimentMetadataProps {
   data: ExperimentMetadataData
   onChange: (data: ExperimentMetadataData) => void
   canEdit?: boolean
+  applications?: any[]
+  unitTypes?: any[]
+  owners?: any[]
+  teams?: any[]
+  tags?: any[]
 }
 
 export function ExperimentMetadata({
   data,
   onChange,
-  canEdit = true
+  canEdit = true,
+  applications = [],
+  unitTypes = [],
+  owners = [],
+  teams = [],
+  tags = []
 }: ExperimentMetadataProps) {
-  const { getApplications, getUnitTypes, getOwners, getTeams, getExperimentTags } = useABsmartly()
-  const [unitTypes, setUnitTypes] = useState<any[]>([])
-  const [applications, setApplications] = useState<any[]>([])
-  const [owners, setOwners] = useState<any[]>([])
-  const [teams, setTeams] = useState<any[]>([])
-  const [tags, setTags] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-
-        const [fetchedUnitTypes, fetchedApplications, fetchedOwners, fetchedTeams, fetchedTags] = await Promise.all([
-          getUnitTypes(),
-          getApplications(),
-          getOwners(),
-          getTeams(),
-          getExperimentTags()
-        ])
-
-        setUnitTypes(fetchedUnitTypes || [])
-        setApplications(fetchedApplications || [])
-        setOwners(fetchedOwners || [])
-        setTeams(fetchedTeams || [])
-        setTags(fetchedTags || [])
-
-        debugLog('📦 Loaded unit types:', fetchedUnitTypes)
-        debugLog('📦 Loaded applications:', fetchedApplications)
-        debugLog('📦 Loaded owners:', fetchedOwners)
-        debugLog('📦 Loaded teams:', fetchedTeams)
-        debugLog('📦 Loaded tags:', fetchedTags)
-      } catch (error) {
-        debugError('Failed to fetch metadata:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [getApplications, getUnitTypes, getOwners, getTeams, getExperimentTags])
+  const loading = applications.length === 0 || unitTypes.length === 0
   const handleTrafficChange = (value: number) => {
     onChange({
       ...data,
@@ -108,31 +76,58 @@ export function ExperimentMetadata({
     })
   }
 
-  const applicationOptions: MultiSelectOption[] = applications.map(app => ({
+  const applicationOptions = useMemo(() => applications.map(app => ({
     id: app.application_id || app.id,
     name: app.name || app.display_name || `Application ${app.application_id || app.id}`,
     display_name: app.display_name || app.name
-  }))
+  })), [applications])
 
-  const ownerOptions: MultiSelectOption[] = owners.map(owner => ({
-    id: owner.user_id || owner.id,
+  const ownerOptions = useMemo(() => owners.map(owner => ({
+    id: `user-${owner.user_id || owner.id}`,
     name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email || `User ${owner.user_id || owner.id}`,
     display_name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email,
     type: 'user' as const
-  }))
+  })), [owners])
 
-  const teamOptions: MultiSelectOption[] = teams.map(team => ({
-    id: team.team_id || team.id,
+  const teamOptions = useMemo(() => teams.map(team => ({
+    id: `team-${team.team_id || team.id}`,
     name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
     display_name: team.display_name || team.name,
     type: 'team' as const
-  }))
+  })), [teams])
 
-  const tagOptions: MultiSelectOption[] = tags.map(tag => ({
+  const tagOptions = useMemo(() => tags.map(tag => ({
     id: tag.experiment_tag_id || tag.id || (tag.experiment_tag?.id),
     name: tag.tag || tag.name || tag.experiment_tag?.tag || tag.experiment_tag?.name || `Tag ${tag.experiment_tag_id || tag.id}`,
     display_name: tag.tag || tag.name || tag.experiment_tag?.tag || tag.experiment_tag?.name
-  }))
+  })), [tags])
+
+  // Memoize combined owners options to prevent re-renders (teams first, like ABsmartly)
+  const ownersOptions = useMemo(() => [...teamOptions, ...ownerOptions], [ownerOptions, teamOptions])
+
+  // Memoize selected IDs to prevent re-renders (with string prefixes)
+  const ownersSelectedIds = useMemo(
+    () => [
+      ...(data.team_ids || []).map(id => `team-${id}`),
+      ...(data.owner_ids || []).map(id => `user-${id}`)
+    ],
+    [data.owner_ids, data.team_ids]
+  )
+
+  // Extract handler to stable reference (parse string IDs back to numbers)
+  const handleOwnersChange = (selectedIds: (number | string)[]) => {
+    const ownerIds = selectedIds
+      .filter(id => typeof id === 'string' && id.startsWith('user-'))
+      .map(id => parseInt((id as string).replace('user-', '')))
+    const teamIds = selectedIds
+      .filter(id => typeof id === 'string' && id.startsWith('team-'))
+      .map(id => parseInt((id as string).replace('team-', '')))
+    onChange({
+      ...data,
+      owner_ids: ownerIds,
+      team_ids: teamIds
+    })
+  }
 
   return (
     <div className="space-y-3">
@@ -175,23 +170,17 @@ export function ExperimentMetadata({
         disabled={!canEdit || loading}
       />
 
+      {/* TODO: Re-enable Owners field after fixing re-render issue
       <MultiSelect
         label="Owners"
-        options={[...ownerOptions, ...teamOptions]}
-        selectedIds={[...(data.owner_ids || []), ...(data.team_ids || [])]}
-        onChange={(selectedIds) => {
-          const ownerIds = selectedIds.filter(id => ownerOptions.some(o => o.id === id))
-          const teamIds = selectedIds.filter(id => teamOptions.some(t => t.id === id))
-          onChange({
-            ...data,
-            owner_ids: ownerIds,
-            team_ids: teamIds
-          })
-        }}
+        options={ownersOptions}
+        selectedIds={ownersSelectedIds}
+        onChange={handleOwnersChange}
         placeholder="Select owners and teams"
         loading={loading}
         disabled={!canEdit || loading}
       />
+      */}
 
       <MultiSelect
         label="Tags (optional)"
