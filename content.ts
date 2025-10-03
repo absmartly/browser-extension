@@ -1011,7 +1011,7 @@ async function openJSONEditor(data: {
   closeJSONEditor()
 
   // Dynamically import the JSON editor
-  const { JSONEditor } = await import('~src/visual-editor/ui/json-editor')
+  const { JSONEditor } = await import('~src/content/json-editor')
   
   jsonEditorInstance = new JSONEditor()
   
