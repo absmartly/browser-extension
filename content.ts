@@ -12,6 +12,10 @@ export const config: PlasmoCSConfig = {
   all_frames: false
 }
 
+// Mark that content script has loaded (for debugging)
+;(window as any).__absmartlyContentScriptLoaded = true
+debugLog('[Visual Editor Content Script] Content script loaded')
+
 // Helper function to send messages - handles both test mode (iframe) and production (chrome.runtime)
 const sendMessageToExtension = (message: any) => {
   // Check if sidebar iframe exists (only in test mode)
@@ -774,6 +778,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === 'CLOSE_CODE_EDITOR') {
     closeCodeEditor()
     sendResponse({ success: true })
+  } else if (message.type === 'OPEN_JSON_EDITOR') {
+    openJSONEditor(message.data)
+    sendResponse({ success: true })
+  } else if (message.type === 'CLOSE_JSON_EDITOR') {
+    closeJSONEditor()
+    sendResponse({ success: true })
   }
 })
 
@@ -974,5 +984,46 @@ function closeCodeEditor() {
     codeEditorContainer.remove()
     codeEditorContainer = null
     document.body.style.overflow = ''
+  }
+}
+
+// JSON editor functionality
+let jsonEditorInstance: any = null
+
+async function openJSONEditor(data: {
+  variantName: string
+  value: string
+}) {
+  // Close any existing editor
+  closeJSONEditor()
+
+  // Dynamically import the JSON editor
+  const { JSONEditor } = await import('~src/visual-editor/ui/json-editor')
+  
+  jsonEditorInstance = new JSONEditor()
+  
+  const title = `Edit DOM Changes - ${data.variantName}`
+  const result = await jsonEditorInstance.show(title, data.value)
+  
+  if (result !== null) {
+    // User saved changes
+    chrome.runtime.sendMessage({ 
+      type: 'JSON_EDITOR_SAVE',
+      value: result
+    })
+  } else {
+    // User cancelled
+    chrome.runtime.sendMessage({ 
+      type: 'JSON_EDITOR_CLOSE'
+    })
+  }
+  
+  jsonEditorInstance = null
+}
+
+function closeJSONEditor() {
+  if (jsonEditorInstance) {
+    // The editor cleans up when promise resolves/rejects
+    jsonEditorInstance = null
   }
 }
