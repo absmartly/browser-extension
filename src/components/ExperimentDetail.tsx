@@ -389,11 +389,6 @@ export function ExperimentDetail({
             <Badge variant={getStatusVariant(experiment.state || experiment.status || 'created')}>
               {experiment.state || experiment.status || 'created'}
             </Badge>
-            {(experiment.percentage_of_traffic !== undefined ? experiment.percentage_of_traffic : experiment.traffic_split) && (
-              <span className="text-sm text-gray-500">
-                {experiment.percentage_of_traffic !== undefined ? experiment.percentage_of_traffic : experiment.traffic_split}% traffic
-              </span>
-            )}
           </div>
           {!editingName && (
             <div className="flex items-center gap-1">
