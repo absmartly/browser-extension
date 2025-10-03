@@ -7,7 +7,7 @@ import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PlayIcon, StopIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, CodeBracketIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import { getConfig } from '~src/utils/storage'
@@ -741,6 +741,22 @@ export function ExperimentDetail({
     setHasUnsavedChanges(true)
   }
 
+  const removeVariant = (variantKey: string) => {
+    setVariantData(prev => {
+      const newData = { ...prev }
+      delete newData[variantKey]
+
+      // Save to storage
+      const storageKey = `experiment-${experiment.id}-variants`
+      storage.set(storageKey, newData).catch(error => {
+        debugError('Failed to save variant data:', error)
+      })
+
+      return newData
+    })
+    setHasUnsavedChanges(true)
+  }
+
   const canAddVariants = experiment.state !== 'running' &&
                          experiment.state !== 'development' &&
                          experiment.status !== 'running' &&
@@ -959,13 +975,13 @@ export function ExperimentDetail({
                               newData[newName] = { ...prev[variantKey] }
                               // Delete old key
                               delete newData[variantKey]
-                              
+
                               // Save to storage
                               const storageKey = `experiment-${experiment.id}-variants`
                               storage.set(storageKey, newData).catch(error => {
                                 debugError('Failed to save variant data:', error)
                               })
-                              
+
                               return newData
                             })
                           }
@@ -984,6 +1000,16 @@ export function ExperimentDetail({
                       <CodeBracketIcon className="h-4 w-4" />
                       JSON
                     </Button>
+                    {Object.keys(variantData).length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(variantKey)}
+                        className="p-1 text-red-600 hover:text-red-800"
+                        title="Delete variant"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Variables Section */}
