@@ -245,9 +245,9 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Move up works')
     await debugWait()
 
-    // Action 5: Edit HTML with CodeMirror editor
-    console.log('  Testing: Edit HTML on #section-title')
-    await testPage.click('#section-title', { force: true })
+    // Action 5: Edit HTML with CodeMirror editor on parent container
+    console.log('  Testing: Edit HTML on #test-container')
+    await testPage.click('#test-container', { force: true })
     await testPage.locator('.menu-container').waitFor({ state: 'visible' })
     await testPage.locator('.menu-item:has-text("Edit HTML")').click()
 
@@ -283,7 +283,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     // Select all and replace with new content (use Meta/Command for macOS)
     await testPage.keyboard.press('Meta+A')
-    await testPage.keyboard.type('HTML Edited!')
+    await testPage.keyboard.type('<h2>HTML Edited!</h2><p>New paragraph content</p>')
     console.log('  ✓ Updated HTML via CodeMirror')
     await debugWait()
 
@@ -326,13 +326,13 @@ test.describe('Visual Editor Complete Workflow', () => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
-        const sectionTitle = document.querySelector('#section-title')
+        const testContainer = document.querySelector('#test-container')
 
         return {
           paragraphText: paragraph?.textContent?.trim(),
           button1Display: button1 ? window.getComputedStyle(button1).display : null,
           button2Display: button2 ? window.getComputedStyle(button2).display : null,
-          sectionTitleHTML: sectionTitle?.innerHTML
+          testContainerHTML: testContainer?.innerHTML?.trim()
         }
       })
 
@@ -347,9 +347,9 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       expect(appliedChanges.button2Display).toBe('none')
       console.log('  ✓ Delete change applied: button-2 is hidden (display:none)')
-      
-      expect(appliedChanges.sectionTitleHTML).toBe('HTML Edited!')
-      console.log('  ✓ HTML change applied: section-title has new HTML')
+
+      expect(appliedChanges.testContainerHTML).toBe('<h2>HTML Edited!</h2><p>New paragraph content</p>')
+      console.log('  ✓ HTML change applied: test-container has new HTML')
       
       console.log('✅ All DOM changes verified and applied correctly')
       await debugWait()
@@ -633,9 +633,9 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     console.log('DOM Change cards content:', allText.substring(0, 400))
     console.log('\nSearching for HTML change...')
-    console.log('Looking for: #section-title and "HTML Edited!"')
-    console.log('Has #section-title:', allText.includes('#section-title'))
-    console.log('Has "HTML Edited!":', allText.includes('HTML Edited!'))
+    console.log('Looking for: #test-container and "<h2>HTML Edited!</h2><p>New paragraph content</p>"')
+    console.log('Has #test-container:', allText.includes('#test-container'))
+    console.log('Has "<h2>HTML Edited!</h2><p>New paragraph content</p>":', allText.includes('HTML Edited!'))
 
     // Verify each specific change we made is present with correct details
     console.log('\n  Verifying individual changes:')
@@ -660,9 +660,9 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log(`  ${hasMove ? '✓' : '✗'} Move: #item-2`)
     expect(hasMove).toBeTruthy()
 
-    // 5. Edit HTML on #section-title - should have HTML change type
-    const hasEditHTML = allText.includes('#section-title') && (allText.includes('HTML') || allText.includes('html'))
-    console.log(`  ${hasEditHTML ? '✓' : '✗'} Edit HTML: #section-title → HTML change`)
+    // 5. Edit HTML on #test-container - should have HTML change type
+    const hasEditHTML = allText.includes('#test-container') && (allText.includes('HTML') || allText.includes('html'))
+    console.log(`  ${hasEditHTML ? '✓' : '✗'} Edit HTML: #test-container → HTML change`)
     expect(hasEditHTML).toBeTruthy()
 
     console.log('\n✅ All expected changes verified in sidebar')
@@ -691,7 +691,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
-        const sectionTitle = document.querySelector('#section-title')
+        const testContainer = document.querySelector('#test-container')
 
         // Count elements with markers
         const markedElements = document.querySelectorAll('[data-absmartly-experiment]')
@@ -702,7 +702,7 @@ test.describe('Visual Editor Complete Workflow', () => {
           paragraphText: paragraph?.textContent?.trim(),
           button1Display: button1 ? window.getComputedStyle(button1).display : null,
           button2Display: button2 ? window.getComputedStyle(button2).display : null,
-          sectionTitleHTML: sectionTitle?.innerHTML,
+          testContainerHTML: testContainer?.innerHTML?.trim(),
           // Verify markers are present
           markedElementsCount: markedElements.length,
           elementsWithOriginalsCount: elementsWithOriginals.length,
@@ -719,7 +719,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(postVEState.paragraphText).toBe('Undo test 3')
       expect(postVEState.button1Display).toBe('none')
       expect(postVEState.button2Display).toBe('none')
-      expect(postVEState.sectionTitleHTML).toBe('HTML Edited!')
+      expect(postVEState.testContainerHTML).toBe('HTML Edited!')
       console.log('  ✓ All changes still applied after VE exit')
 
       // Verify markers are present (preview mode is still active)
@@ -772,14 +772,14 @@ test.describe('Visual Editor Complete Workflow', () => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
-        const sectionTitle = document.querySelector('#section-title')
+        const testContainer = document.querySelector('#test-container')
 
         return {
           paragraphText: paragraph?.textContent,
           paragraphVisible: paragraph ? window.getComputedStyle(paragraph).display !== 'none' : false,
           button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
           button2Visible: button2 ? window.getComputedStyle(button2).display !== 'none' : false,
-          sectionTitleHTML: sectionTitle?.innerHTML
+          testContainerHTML: testContainer?.innerHTML?.trim()
         }
       })
       console.log('  States captured:', previewEnabledStates)
@@ -796,7 +796,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
-        const sectionTitle = document.querySelector('#section-title')
+        const testContainer = document.querySelector('#test-container')
         const stillModified = document.querySelectorAll('[data-absmartly-modified]').length
         const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]').length
 
@@ -804,7 +804,7 @@ test.describe('Visual Editor Complete Workflow', () => {
           paragraphText: paragraph?.textContent,
           button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
           button2Visible: button2 ? window.getComputedStyle(button2).display !== 'none' : false,
-          sectionTitleHTML: sectionTitle?.innerHTML,
+          testContainerHTML: testContainer?.innerHTML?.trim(),
           stillModifiedCount: stillModified,
           experimentMarkersCount: experimentMarkers
         }
@@ -829,8 +829,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(disabledStates.button2Visible).toBe(true)
       console.log('  ✓ Button-2 is visible again (restored from delete)')
 
-      expect(disabledStates.sectionTitleHTML).not.toBe('HTML Edited!')
-      console.log(`  ✓ Section title reverted: "${disabledStates.sectionTitleHTML}"`)
+      expect(disabledStates.testContainerHTML).not.toBe('HTML Edited!')
+      console.log(`  ✓ Section title reverted: "${disabledStates.testContainerHTML}"`)
 
       console.log('  ✓ All changes reverted when preview disabled')
       await debugWait()
@@ -846,14 +846,14 @@ test.describe('Visual Editor Complete Workflow', () => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
-        const sectionTitle = document.querySelector('#section-title')
+        const testContainer = document.querySelector('#test-container')
 
         return {
           // Verify changes are re-applied
           paragraphText: paragraph?.textContent?.trim(),
           button1Display: button1 ? window.getComputedStyle(button1).display : null,
           button2Display: button2 ? window.getComputedStyle(button2).display : null,
-          sectionTitleHTML: sectionTitle?.innerHTML,
+          testContainerHTML: testContainer?.innerHTML?.trim(),
           // Verify markers are back
           modifiedElementsCount: document.querySelectorAll('[data-absmartly-modified]').length,
           experimentMarkersCount: document.querySelectorAll('[data-absmartly-experiment]').length,
@@ -873,7 +873,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(reEnabledStates.button2Display).toBe('none')
       console.log('  ✓ Button-2 hidden again (delete re-applied)')
 
-      expect(reEnabledStates.sectionTitleHTML).toBe('HTML Edited!')
+      expect(reEnabledStates.testContainerHTML).toBe('HTML Edited!')
       console.log('  ✓ Section title HTML re-applied')
 
       // Verify markers are back
