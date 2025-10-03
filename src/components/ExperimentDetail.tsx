@@ -752,6 +752,7 @@ export function ExperimentDetail({
     <div className="p-4">
       {/* Header with logo, experiment name, status/traffic, and actions */}
       <div className="mb-4">
+        {/* First line: logo + name on left, back button on right */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <img
@@ -798,6 +799,36 @@ export function ExperimentDetail({
               </div>
             )}
           </div>
+          <button
+            onClick={() => {
+              if (hasUnsavedChanges) {
+                if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
+                  // User wants to discard changes - clear storage before navigating back
+                  const storageKey = `experiment-${experiment.id}-variants`
+                  debugLog('🧹 User chose to discard changes for experiment', experiment.id)
+                  storage.remove(storageKey).then(() => {
+                    debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+                    onBack()
+                  }).catch(error => {
+                    debugError('Failed to clear storage:', error)
+                    onBack()
+                  })
+                }
+                // If user cancels, do nothing (stay on the page)
+              } else {
+                onBack()
+              }
+            }}
+            className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+            aria-label="Go back"
+            title="Go back"
+          >
+            <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+          </button>
+        </div>
+
+        {/* Second line: status + traffic on left, action icons on right */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {loading && (
               <div className="flex items-center text-sm text-gray-500">
@@ -813,92 +844,66 @@ export function ExperimentDetail({
                 {experiment.percentage_of_traffic !== undefined ? experiment.percentage_of_traffic : experiment.traffic_split}% traffic
               </span>
             )}
-            {!editingName && (
-              <>
+          </div>
+          {!editingName && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setEditingName(true)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+                title="Edit name"
+              >
+                <PencilIcon className="h-4 w-4" />
+              </button>
+
+              {/* Open in ABsmartly */}
+              <div className="relative group">
                 <button
-                  onClick={() => setEditingName(true)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
-                  title="Edit name"
+                  onClick={async () => {
+                    const config = await getConfig()
+                    if (config?.apiEndpoint) {
+                      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                      const url = `${baseUrl}/experiments/${experiment.id}`
+                      chrome.tabs.create({ url })
+                    }
+                  }}
+                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  aria-label="Open in ABsmartly"
                 >
-                  <PencilIcon className="h-4 w-4" />
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                 </button>
 
-                {/* Open in ABsmartly */}
-                <div className="relative group">
-                  <button
-                    onClick={async () => {
-                      const config = await getConfig()
-                      if (config?.apiEndpoint) {
-                        const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                        const url = `${baseUrl}/experiments/${experiment.id}`
-                        chrome.tabs.create({ url })
-                      }
-                    }}
-                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                    aria-label="Open in ABsmartly"
-                  >
-                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                  </button>
-
-                  {/* Tooltip with high z-index */}
-                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                    Open in ABsmartly
-                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                  </div>
+                {/* Tooltip with high z-index */}
+                <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                  Open in ABsmartly
+                  <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
                 </div>
+              </div>
 
-                {/* Edit in ABsmartly */}
-                <div className="relative group">
-                  <button
-                    onClick={async () => {
-                      const config = await getConfig()
-                      if (config?.apiEndpoint) {
-                        const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                        const url = `${baseUrl}/experiments/${experiment.id}/edit`
-                        chrome.tabs.create({ url })
-                      }
-                    }}
-                    className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                    aria-label="Edit in ABsmartly"
-                  >
-                    <PencilSquareIcon className="h-4 w-4" />
-                  </button>
+              {/* Edit in ABsmartly */}
+              <div className="relative group">
+                <button
+                  onClick={async () => {
+                    const config = await getConfig()
+                    if (config?.apiEndpoint) {
+                      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                      const url = `${baseUrl}/experiments/${experiment.id}/edit`
+                      chrome.tabs.create({ url })
+                    }
+                  }}
+                  className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                  aria-label="Edit in ABsmartly"
+                >
+                  <PencilSquareIcon className="h-4 w-4" />
+                </button>
 
-                  {/* Tooltip with high z-index */}
-                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                    Edit in ABsmartly
-                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                  </div>
+                {/* Tooltip with high z-index */}
+                <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                  Edit in ABsmartly
+                  <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
                 </div>
-              </>
-            )}
-            <button
-              onClick={() => {
-                if (hasUnsavedChanges) {
-                  if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
-                    // User wants to discard changes - clear storage before navigating back
-                    const storageKey = `experiment-${experiment.id}-variants`
-                    debugLog('🧹 User chose to discard changes for experiment', experiment.id)
-                    storage.remove(storageKey).then(() => {
-                      debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
-                      onBack()
-                    }).catch(error => {
-                      debugError('Failed to clear storage:', error)
-                      onBack()
-                    })
-                  }
-                  // If user cancels, do nothing (stay on the page)
-                } else {
-                  onBack()
-                }
-              }}
-              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-              aria-label="Go back"
-              title="Go back"
-            >
-              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-            </button>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
