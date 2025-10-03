@@ -9,6 +9,7 @@ import type { Experiment } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
 import { ArrowLeftIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
 import { VariantList } from './VariantList'
+import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
 
 interface ExperimentEditorProps {
@@ -317,45 +318,15 @@ export function ExperimentEditor({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Traffic Percentage
-            </label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              value={formData.percentage_of_traffic}
-              onChange={(e) => setFormData({ ...formData, percentage_of_traffic: parseInt(e.target.value) })}
-            />
-          </div>
-
-          <Select
-            label="Unit Type"
-            value={formData.unit_type_id || ''}
-            onChange={(e) => setFormData({ ...formData, unit_type_id: e.target.value ? parseInt(e.target.value) : null })}
-            placeholder="Select a unit type"
-            required
-          >
-            {unitTypes.map(ut => (
-              <option key={ut.unit_type_id || ut.id} value={ut.unit_type_id || ut.id}>
-                {ut.name || ut.display_name || `Unit Type ${ut.unit_type_id || ut.id}`}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            label="Applications"
-            value={formData.application_ids[0] || ''}
-            onChange={(e) => setFormData({ ...formData, application_ids: e.target.value ? [parseInt(e.target.value)] : [] })}
-            placeholder="Select an application"
-          >
-            {applications.map(app => (
-              <option key={app.application_id || app.id} value={app.application_id || app.id}>
-                {app.name || app.display_name || `Application ${app.application_id || app.id}`}
-              </option>
-            ))}
-          </Select>
+          <ExperimentMetadata
+            data={{
+              percentage_of_traffic: formData.percentage_of_traffic,
+              unit_type_id: formData.unit_type_id,
+              application_ids: formData.application_ids
+            }}
+            onChange={(metadata) => setFormData({ ...formData, ...metadata })}
+            canEdit={true}
+          />
 
         </div>
 
