@@ -1036,8 +1036,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     await testPage.evaluate(() => {
-      console.log('
-🔄 STEP 9: Testing discard changes functionality')
+      console.log('\n🔄 STEP 9: Testing discard changes functionality')
     })
 
     // Test that discarding changes properly cleans up the page
