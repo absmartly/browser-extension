@@ -47,6 +47,8 @@ try {
     '--minify-syntax',
     '--keep-names',
     '--external:chrome',
+    '--external:codemirror',
+    '--external:@codemirror/*',
     '--loader:.ttf=dataurl',
     '--loader:.woff=dataurl',
     '--loader:.woff2=dataurl',
