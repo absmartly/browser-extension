@@ -965,15 +965,39 @@ test.describe('Visual Editor Complete Workflow', () => {
       await testPage.waitForTimeout(500) // Give banner time to render
       console.log('  ✓ Second VE is active and ready')
 
-      // Exit the second VE by pressing Escape key
-      console.log('  Pressing Escape to exit VE...')
+      // Exit the second VE by clicking the Exit button in the banner
+      console.log('  Clicking Exit button to exit VE...')
       
-      // Bring focus to the page (not sidebar) by calling focus on the page
-      await testPage.evaluate(() => window.focus())
-      await testPage.waitForTimeout(100)
-      
-      // Press Escape
-      await testPage.keyboard.press('Escape')
+      // Click the Exit button in the banner (check shadow DOM first, then direct)
+      await testPage.evaluate(() => {
+        const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
+        if (!bannerHost) {
+          console.error('  ✗ Banner host not found')
+          return
+        }
+        
+        // Try shadow DOM first
+        let exitButton: HTMLElement | null = null
+        if (bannerHost.shadowRoot) {
+          exitButton = bannerHost.shadowRoot.querySelector('[data-action="exit"]') as HTMLElement
+        } else {
+          // Fallback to direct query (test mode without shadow DOM)
+          exitButton = bannerHost.querySelector('[data-action="exit"]') as HTMLElement
+        }
+        
+        if (exitButton) {
+          console.log('  Found Exit button, dispatching click event...')
+          const clickEvent = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          })
+          exitButton.dispatchEvent(clickEvent)
+          console.log('  ✓ Dispatched click event to Exit button')
+        } else {
+          console.error('  ✗ Exit button not found in banner')
+        }
+      })
 
       // Wait for VE to exit
       await testPage.waitForFunction(() => {

@@ -515,28 +515,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })
     return true // Will respond asynchronously
-  } else if (message.type === "FETCH_UNIT_TYPES") {
-    // Fetch unit types from API
-    makeAPIRequest('GET', '/unit_types')
-      .then(data => {
-        sendResponse({ unitTypes: data })
-      })
-      .catch(error => {
-        debugError('Failed to fetch unit types:', error)
-        sendResponse({ unitTypes: [] })
-      })
-    return true // Will respond asynchronously
-  } else if (message.type === "FETCH_APPLICATIONS") {
-    // Fetch applications from API
-    makeAPIRequest('GET', '/applications')
-      .then(data => {
-        sendResponse({ applications: data })
-      })
-      .catch(error => {
-        debugError('Failed to fetch applications:', error)
-        sendResponse({ applications: [] })
-      })
-    return true // Will respond asynchronously
   } else if (message.type === "API_REQUEST") {
     // Handle API requests
     debugLog('Background received API_REQUEST:', { method: message.method, path: message.path, data: message.data })

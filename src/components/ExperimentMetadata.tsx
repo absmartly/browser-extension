@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { debugLog, debugError } from '~src/utils/debug'
+import { useABsmartly } from '~src/hooks/useABsmartly'
 
 export interface ExperimentMetadataData {
   percentage_of_traffic: number
@@ -20,6 +21,7 @@ export function ExperimentMetadata({
   onChange,
   canEdit = true
 }: ExperimentMetadataProps) {
+  const { getApplications, getUnitTypes } = useABsmartly()
   const [unitTypes, setUnitTypes] = useState<any[]>([])
   const [applications, setApplications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,24 +31,17 @@ export function ExperimentMetadata({
       try {
         setLoading(true)
 
-        // Fetch unit types and applications from background script
-        const unitTypesResponse = await chrome.runtime.sendMessage({
-          type: 'FETCH_UNIT_TYPES'
-        })
+        // Fetch unit types and applications using the hook
+        const [fetchedUnitTypes, fetchedApplications] = await Promise.all([
+          getUnitTypes(),
+          getApplications()
+        ])
 
-        const applicationsResponse = await chrome.runtime.sendMessage({
-          type: 'FETCH_APPLICATIONS'
-        })
+        setUnitTypes(fetchedUnitTypes || [])
+        setApplications(fetchedApplications || [])
 
-        if (unitTypesResponse?.unitTypes) {
-          setUnitTypes(unitTypesResponse.unitTypes)
-          debugLog('📦 Loaded unit types:', unitTypesResponse.unitTypes)
-        }
-
-        if (applicationsResponse?.applications) {
-          setApplications(applicationsResponse.applications)
-          debugLog('📦 Loaded applications:', applicationsResponse.applications)
-        }
+        debugLog('📦 Loaded unit types:', fetchedUnitTypes)
+        debugLog('📦 Loaded applications:', fetchedApplications)
       } catch (error) {
         debugError('Failed to fetch metadata:', error)
       } finally {
@@ -55,7 +50,7 @@ export function ExperimentMetadata({
     }
 
     fetchData()
-  }, [])
+  }, [getApplications, getUnitTypes])
   const handleTrafficChange = (value: number) => {
     onChange({
       ...data,

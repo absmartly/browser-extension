@@ -175,7 +175,6 @@ export class EditorCoordinator {
   }
 
   setupKeyboardHandlers(): void {
-    console.log('[EditorCoordinator] Setting up keyboard handlers')
     const handleKeyDown = (e: KeyboardEvent) => {
       // Copy selector: Ctrl+Shift+C (Cmd+Shift+C on Mac)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'c') {
@@ -209,6 +208,23 @@ export class EditorCoordinator {
         this.callbacks.redo()
       }
 
+      // Exit Visual Editor: Escape key
+      if (e.key === 'Escape') {
+        // Don't exit VE if we're editing text inline or if HTML editor is open
+        if (this.eventHandlers.isEditingMode) {
+          return
+        }
+        
+        e.preventDefault()
+        e.stopPropagation()
+        
+        // Call stop to properly exit the VE
+        if (this.callbacks.stop && typeof this.callbacks.stop === 'function') {
+          this.callbacks.stop()
+        }
+        return
+      }
+
       // Delete: Delete key
       if (e.key === 'Delete') {
         const selectedElement = this.stateManager.getState().selectedElement
@@ -229,35 +245,7 @@ export class EditorCoordinator {
         }
       }
 
-      // Exit Visual Editor: Escape key
-      if (e.key === 'Escape') {
-        console.log('[EditorCoordinator] Escape key detected')
-        console.log('[EditorCoordinator] isEditingMode:', this.eventHandlers.isEditingMode)
-        
-        // Don't exit VE if we're editing text inline or if HTML editor is open
-        if (this.eventHandlers.isEditingMode) {
-          console.log('[EditorCoordinator] Escape ignored - editing mode is active')
-          return
-        }
-        
-        e.preventDefault()
-        e.stopPropagation()
-        console.log('[EditorCoordinator] Escape pressed - exiting Visual Editor')
-        console.log('[EditorCoordinator] callbacks.stop exists:', !!this.callbacks.stop)
-        console.log('[EditorCoordinator] callbacks.stop type:', typeof this.callbacks.stop)
-        
-        if (this.callbacks.stop && typeof this.callbacks.stop === 'function') {
-          console.log('[EditorCoordinator] Calling stop callback...')
-          try {
-            this.callbacks.stop()
-            console.log('[EditorCoordinator] stop callback completed')
-          } catch (error) {
-            console.error('[EditorCoordinator] Error calling stop:', error)
-          }
-        } else {
-          console.error('[EditorCoordinator] stop callback not available')
-        }
-      }
+
     }
 
     document.addEventListener('keydown', handleKeyDown)
