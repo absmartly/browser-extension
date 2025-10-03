@@ -54,7 +54,9 @@ export const test = base.extend<ExtFixtures>({
       ...(process.env.SLOW === '1' ? { headless: false } : {}),
       args: [
         `--disable-extensions-except=${extPath}`,
-        `--load-extension=${extPath}`
+        `--load-extension=${extPath}`,
+        // Allow extensions to run on file:// URLs
+        '--enable-file-cookies'
       ],
       // Add slow motion for debugging if needed
       slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : undefined,
