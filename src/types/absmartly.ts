@@ -17,11 +17,11 @@ export interface Experiment {
   applications?: Application[]
   unit_type?: { unit_type_id: number; name?: string }
   primary_metric?: { metric_id: number; name?: string }
-  experiment_tags?: { experiment_tag_id: number; experiment_tag?: { id: number; tag: string } }[]
+  experiment_tags?: ExperimentTag[]
   context_ids?: string[]
   owner?: ExperimentOwner
-  owners?: ExperimentUser[]  // Array of experiment owners
-  team?: string
+  owners?: ExperimentUser[]
+  teams?: ExperimentTeam[]
   created_by?: ExperimentUser
   updated_by?: ExperimentUser
   exposures?: number
@@ -112,5 +112,29 @@ export interface ExperimentUser {
     height?: number
     file_name?: string
     content_type?: string
+  }
+}
+
+export interface ExperimentTag {
+  experiment_tag_id?: number
+  id?: number
+  tag?: string
+  name?: string
+  experiment_tag?: {
+    id: number
+    tag: string
+    name?: string
+  }
+}
+
+export interface ExperimentTeam {
+  team_id?: number
+  id?: number
+  name?: string
+  display_name?: string
+  team?: {
+    id: number
+    name: string
+    display_name?: string
   }
 }

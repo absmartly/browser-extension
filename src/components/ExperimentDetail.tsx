@@ -78,7 +78,10 @@ export function ExperimentDetail({
   const [metadata, setMetadata] = useState({
     percentage_of_traffic: experiment.percentage_of_traffic || 100,
     unit_type_id: experiment.unit_type?.unit_type_id || experiment.unit_type?.id || null,
-    application_ids: experiment.applications?.map(a => a.application_id || a.id) || []
+    application_ids: experiment.applications?.map(a => a.application_id || a.id) || [],
+    owner_ids: experiment.owners?.map(o => o.user_id || o.id) || [],
+    team_ids: experiment.teams?.map(t => t.team_id || t.id) || [],
+    tag_ids: experiment.experiment_tags?.map(t => t.experiment_tag_id || t.id || t.experiment_tag?.id).filter((id): id is number => id !== undefined) || []
   })
 
   debugLog('🔍 ExperimentDetail state - displayName:', displayName)
@@ -208,9 +211,9 @@ export function ExperimentDetail({
           percentages: fullExperiment.percentages,
           audience: fullExperiment.audience,
           audience_strict: fullExperiment.audience_strict,
-          owners: fullExperiment.owners?.map((o: any) => ({ user_id: o.user_id || o.user?.id || o.id })) || [],
-          teams: fullExperiment.teams?.map((t: any) => ({ team_id: t.team_id || t.id })) || [],
-          experiment_tags: fullExperiment.experiment_tags || [],
+          owners: metadata.owner_ids.map(id => ({ user_id: id })),
+          teams: metadata.team_ids.map(id => ({ team_id: id })),
+          experiment_tags: metadata.tag_ids.map(id => ({ experiment_tag_id: id })),
           applications: metadata.application_ids.map(id => ({
             application_id: id,
             application_version: "0"
