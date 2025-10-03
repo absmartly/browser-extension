@@ -49,6 +49,8 @@ function SidebarContent() {
   const [unitTypes, setUnitTypes] = useState<any[]>([])
   const [metrics, setMetrics] = useState<any[]>([])
   const [tags, setTags] = useState<any[]>([])
+  const [owners, setOwners] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
   
   const {
     client,
@@ -66,7 +68,9 @@ function SidebarContent() {
     getApplications,
     getUnitTypes,
     getMetrics,
-    getExperimentTags
+    getExperimentTags,
+    getOwners,
+    getTeams
   } = useABsmartly()
 
   // Track if we've initialized experiments for this session
@@ -228,23 +232,28 @@ function SidebarContent() {
   const loadEditorResources = async () => {
     debugLog('Loading editor resources...')
     try {
-      const [apps, units, metricsData, tagsData] = await Promise.all([
+      const [apps, units, metricsData, tagsData, ownersData, teamsData] = await Promise.all([
         getApplications(),
         getUnitTypes(),
         getMetrics(),
-        getExperimentTags()
+        getExperimentTags(),
+        getOwners(),
+        getTeams()
       ])
-      debugLog('Editor resources loaded:', { 
-        apps: apps?.length || 0, 
+      debugLog('Editor resources loaded:', {
+        apps: apps?.length || 0,
         units: units?.length || 0,
         metricsData: metricsData?.length || 0,
         tagsData: tagsData?.length || 0,
-        unitsExample: units?.[0]
+        ownersData: ownersData?.length || 0,
+        teamsData: teamsData?.length || 0
       })
       setApplications(apps || [])
       setUnitTypes(units || [])
       setMetrics(metricsData || [])
       setTags(tagsData || [])
+      setOwners(ownersData || [])
+      setTeams(teamsData || [])
     } catch (error) {
       debugError('Failed to load editor resources:', error)
       // Continue with empty arrays if the call fails
@@ -880,6 +889,8 @@ function SidebarContent() {
           unitTypes={unitTypes}
           metrics={metrics}
           tags={tags}
+          owners={owners}
+          teams={teams}
         />
       )}
       

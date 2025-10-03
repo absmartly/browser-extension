@@ -1,22 +1,53 @@
-// Simple debug flag - change this to false to disable all debug logging
-const DEBUG = true
+/**
+ * Debug logging utility that only logs when DEBUG flag is enabled
+ * Can be controlled via environment variable or localStorage
+ */
 
-// Dead simple debug functions
-export function debugLog(...args: any[]) {
-  if (DEBUG) console.log(...args)
+// Check if debug mode is enabled
+const isDebugEnabled = (): boolean => {
+  // Check localStorage first (for browser environment)
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    return localStorage.getItem('ABSMARTLY_DEBUG') === 'true'
+  }
+  
+  // Check environment variable (for tests)
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.ABSMARTLY_DEBUG === 'true'
+  }
+  
+  return false
 }
 
-export function debugError(...args: any[]) {
-  if (DEBUG) console.error(...args)
+/**
+ * Debug log - only outputs when debug mode is enabled
+ */
+export const debugLog = (...args: any[]) => {
+  if (isDebugEnabled()) {
+    console.log(...args)
+  }
 }
 
-export function debugWarn(...args: any[]) {
-  if (DEBUG) console.warn(...args)
+/**
+ * Debug warn - only outputs when debug mode is enabled
+ */
+export const debugWarn = (...args: any[]) => {
+  if (isDebugEnabled()) {
+    console.warn(...args)
+  }
 }
 
-// Also make them available globally as a fallback
-if (typeof window !== 'undefined') {
-  (window as any).debugLog = debugLog;
-  (window as any).debugError = debugError;
-  (window as any).debugWarn = debugWarn;
+/**
+ * Debug error - only outputs when debug mode is enabled
+ */
+export const debugError = (...args: any[]) => {
+  if (isDebugEnabled()) {
+    console.error(...args)
+  }
+}
+
+/**
+ * Always log - bypasses debug flag (use for important messages)
+ */
+export const alwaysLog = (...args: any[]) => {
+  console.log(...args)
 }

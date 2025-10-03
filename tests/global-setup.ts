@@ -59,7 +59,7 @@ async function globalSetup(config: FullConfig) {
   }
 
   // 3. Load environment variables if .env.local exists
-  const envPath = path.join(rootDir, '.env.local')
+  const envPath = path.join(rootDir, '.env.development.local')
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, 'utf-8')
     envContent.split('\n').forEach(line => {

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { XMarkIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 export interface MultiSelectOption {
-  id: number
+  id: number | string
   name: string
   display_name?: string
   type?: 'user' | 'team'
@@ -12,8 +12,8 @@ export interface MultiSelectOption {
 interface MultiSelectProps {
   label: string
   options: MultiSelectOption[]
-  selectedIds: number[]
-  onChange: (selectedIds: number[]) => void
+  selectedIds: (number | string)[]
+  onChange: (selectedIds: (number | string)[]) => void
   placeholder?: string
   loading?: boolean
   disabled?: boolean
