@@ -1204,16 +1204,77 @@ test.describe('Visual Editor Complete Workflow', () => {
         console.log('\n💾 Saving experiment to database...')
         console.log('⚠️  WARNING: This will write to the production database!')
 
+        // Scroll to very top of sidebar (to the experiment form header) to see validation errors
+        await sidebar.locator('body').evaluate(el => {
+          el.scrollTop = 0
+          // Also scroll within any scrollable containers
+          const scrollableElements = el.querySelectorAll('[style*="overflow"]')
+          scrollableElements.forEach(elem => {
+            if (elem instanceof HTMLElement) elem.scrollTop = 0
+          })
+        })
+        await testPage.waitForTimeout(500)
+
+        // Take screenshot before clicking save (should show top of form with any existing errors)
+        await testPage.screenshot({ path: 'test-results/before-save-top.png', fullPage: true })
+        console.log('  📸 Screenshot saved: before-save-top.png')
+
         // Click the save/create button in the experiment form
         const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
         await saveButton.click()
         console.log('  ✓ Clicked save button')
 
-        // Wait for success confirmation
-        await testPage.waitForTimeout(2000)
-        console.log('  ✓ Experiment saved to database')
+        // Wait for response
+        await testPage.waitForTimeout(3000)
+
+        // Scroll to very top again to see any new error messages or success toasts
+        await sidebar.locator('body').evaluate(el => {
+          el.scrollTop = 0
+          const scrollableElements = el.querySelectorAll('[style*="overflow"]')
+          scrollableElements.forEach(elem => {
+            if (elem instanceof HTMLElement) elem.scrollTop = 0
+          })
+        })
+        await testPage.waitForTimeout(500)
+
+        // Take screenshot after save (should show validation errors if any)
+        await testPage.screenshot({ path: 'test-results/after-save-top.png', fullPage: true })
+        console.log('  📸 Screenshot saved: after-save-top.png')
+
+        // Check if we're still on the create form or navigated away
+        const stillOnCreateForm = await sidebar.locator('button:has-text("Create Experiment")').count() > 0
+        console.log('  Still on create form:', stillOnCreateForm)
+
+        // Check for success toast or error message
+        const successToast = sidebar.locator('text=/successfully created|saved successfully|experiment created/i')
+        const errorMessages = sidebar.locator('text=/error|required|must select|please|is required/i')
+
+        const hasSuccess = await successToast.count() > 0
+        const hasError = await errorMessages.count() > 0
+
+        if (hasSuccess) {
+          console.log('  ✅ Success toast found - experiment saved!')
+          const successText = await successToast.first().textContent()
+          console.log(`  Success message: ${successText}`)
+        } else if (hasError) {
+          console.log(`  ❌ Found ${await errorMessages.count()} error message(s):`)
+          for (let i = 0; i < Math.min(5, await errorMessages.count()); i++) {
+            const errorText = await errorMessages.nth(i).textContent()
+            console.log(`    ${i + 1}. ${errorText}`)
+          }
+          throw new Error('Failed to save experiment - validation errors found. Check screenshots.')
+        } else if (stillOnCreateForm) {
+          console.log('  ⚠️  Still on create form - no success or error message visible')
+          console.log('  This likely means validation failed but errors are not visible.')
+          console.log('  Check the screenshots to see what fields are missing.')
+        } else {
+          console.log('  ✅ Navigated away from create form - likely saved successfully')
+        }
+
         console.log(`  📊 Experiment name: ${experimentName}`)
       })
+    } else {
+      await test.step.skip('Save experiment to database', async () => {})
     }
   })
 })
