@@ -1,7 +1,7 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 // This is the main content script that will be injected into all web pages
-import { VisualEditor } from '~src/visual-editor'
+import { VisualEditor, JSONEditor } from '~src/visual-editor'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
@@ -1009,9 +1009,6 @@ async function openJSONEditor(data: {
 }) {
   // Close any existing editor
   closeJSONEditor()
-
-  // Dynamically import the JSON editor
-  const { JSONEditor } = await import('~src/content/json-editor')
   
   jsonEditorInstance = new JSONEditor()
   
