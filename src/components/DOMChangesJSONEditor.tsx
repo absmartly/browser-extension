@@ -1,9 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
-import { Button } from './ui/Button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/Dialog';
-import { ExclamationTriangleIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Alert, AlertDescription } from './ui/Alert';
+import React, { useEffect, useRef } from 'react';
 
 interface DOMChangesJSONEditorProps {
   isOpen: boolean;
@@ -13,140 +8,73 @@ interface DOMChangesJSONEditorProps {
   variantName: string;
 }
 
-export const DOMChangesJSONEditor: React.FC<DOMChangesJSONEditorProps> = ({
+export const export const DOMChangesJSONEditor: React.FC<DOMChangesJSONEditorProps> = ({
   isOpen,
   onClose,
   changes,
   onSave,
   variantName,
 }) => {
-  const [jsonContent, setJsonContent] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
+  const onSaveRef = useRef(onSave)
+  const onCloseRef = useRef(onClose)
+  
+  useEffect(() => {
+    onSaveRef.current = onSave
+    onCloseRef.current = onClose
+  }, [onSave, onClose])
 
   useEffect(() => {
-    // Format the JSON with proper indentation
-    try {
-      setJsonContent(JSON.stringify(changes, null, 2));
-      setHasChanges(false);
-      setError(null);
-    } catch (e) {
-      setError('Failed to format changes as JSON');
-    }
-  }, [changes, isOpen]);
+    if (!isOpen) return
 
-  const handleEditorChange = (value: string | undefined) => {
-    if (value === undefined) return;
-    
-    setJsonContent(value);
-    setHasChanges(value !== JSON.stringify(changes, null, 2));
-    
-    // Validate JSON syntax
-    try {
-      JSON.parse(value);
-      setError(null);
-    } catch (e) {
-      setError(`Invalid JSON: ${(e as Error).message}`);
-    }
-  };
-
-  const handleSave = () => {
-    try {
-      const parsedChanges = JSON.parse(jsonContent);
-      
-      // Validate that it's an array
-      if (!Array.isArray(parsedChanges)) {
-        setError('Changes must be an array');
-        return;
+    // Send message to content script to open the JSON editor
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'OPEN_JSON_EDITOR',
+          data: {
+            variantName,
+            value: JSON.stringify(changes, null, 2)
+          }
+        })
       }
-      
-      // Validate each change has required fields
-      for (let i = 0; i < parsedChanges.length; i++) {
-        const change = parsedChanges[i];
-        if (!change.selector || !change.type) {
-          setError(`Change at index ${i} is missing required fields (selector, type)`);
-          return;
+    })
+
+    const handleMessage = (message: any) => {
+      if (message.type === 'JSON_EDITOR_SAVE') {
+        try {
+          const parsedChanges = JSON.parse(message.value)
+          
+          if (!Array.isArray(parsedChanges)) {
+            console.error('Changes must be an array')
+            return
+          }
+          
+          onSaveRef.current(parsedChanges)
+          onCloseRef.current()
+        } catch (e) {
+          console.error('Failed to parse JSON:', e)
         }
-        
-        // Validate type-specific requirements
-        switch (change.type) {
-          case 'text':
-          case 'html':
-            if (change.value === undefined) {
-              setError(`Change at index ${i} (${change.type}) is missing 'value' field`);
-              return;
-            }
-            break;
-          case 'style':
-            if (!change.value || typeof change.value !== 'object') {
-              setError(`Change at index ${i} (style) must have 'value' as an object`);
-              return;
-            }
-            break;
-          case 'styleRules':
-            if (!change.states || typeof change.states !== 'object') {
-              setError(`Change at index ${i} (styleRules) must have 'states' as an object`);
-              return;
-            }
-            // Validate states structure
-            const validStates = ['normal', 'hover', 'active', 'focus'];
-            for (const state in change.states) {
-              if (!validStates.includes(state)) {
-                setError(`Change at index ${i} (styleRules) has invalid state '${state}'. Valid states are: ${validStates.join(', ')}`);
-                return;
-              }
-              if (change.states[state] && typeof change.states[state] !== 'object') {
-                setError(`Change at index ${i} (styleRules) state '${state}' must be an object`);
-                return;
-              }
-            }
-            break;
-          case 'class':
-            if (!change.add && !change.remove) {
-              setError(`Change at index ${i} (class) must have 'add' or 'remove' array`);
-              return;
-            }
-            break;
-          case 'attribute':
-            if (!change.value || typeof change.value !== 'object') {
-              setError(`Change at index ${i} (attribute) must have 'value' as an object`);
-              return;
-            }
-            break;
-          case 'move':
-            if (!change.targetSelector || !change.position) {
-              setError(`Change at index ${i} (move) is missing targetSelector or position`);
-              return;
-            }
-            break;
-          case 'create':
-            if (!change.element || !change.targetSelector) {
-              setError(`Change at index ${i} (create) is missing element or targetSelector`);
-              return;
-            }
-            break;
-        }
+      } else if (message.type === 'JSON_EDITOR_CLOSE') {
+        onCloseRef.current()
       }
-      
-      onSave(parsedChanges);
-      onClose();
-    } catch (e) {
-      setError(`Failed to save: ${(e as Error).message}`);
     }
-  };
 
-  const handleFormat = () => {
-    try {
-      const parsed = JSON.parse(jsonContent);
-      setJsonContent(JSON.stringify(parsed, null, 2));
-      setError(null);
-    } catch (e) {
-      setError(`Cannot format invalid JSON: ${(e as Error).message}`);
+    chrome.runtime.onMessage.addListener(handleMessage)
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'CLOSE_JSON_EDITOR'
+          })
+        }
+      })
     }
-  };
+  }, [isOpen, changes, variantName])
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+  return null
+} => !open && onClose()}>
       <DialogContent className="max-w-[90vw] max-h-[90vh] w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
