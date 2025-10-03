@@ -202,4 +202,14 @@ export class BackgroundAPIClient {
       throw error
     }
   }
+
+  async getTemplates(type: 'test_template' | 'feature_template' | 'test_template,feature_template' = 'test_template'): Promise<any[]> {
+    try {
+      const data = await this.makeRequest('GET', '/experiments', { type })
+      return data.experiments || []
+    } catch (error) {
+      debugError('Failed to fetch templates:', error)
+      throw error
+    }
+  }
 }
