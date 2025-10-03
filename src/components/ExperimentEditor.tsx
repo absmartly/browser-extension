@@ -338,7 +338,17 @@ export function ExperimentEditor({
 
   return (
     <div className="p-4">
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img
+            src={chrome.runtime.getURL('assets/icon128.png')}
+            alt="ABsmartly"
+            className="w-6 h-6"
+          />
+          <h2 className="text-lg font-semibold text-gray-900">
+            {experiment ? 'Edit Experiment' : 'Create New Experiment'}
+          </h2>
+        </div>
         <button
           onClick={onCancel}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
@@ -350,11 +360,6 @@ export function ExperimentEditor({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            {experiment ? 'Edit Experiment' : 'Create New Experiment'}
-          </h2>
-        </div>
 
         {/* Basic Information */}
         <div className="space-y-3">
