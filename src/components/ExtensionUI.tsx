@@ -14,6 +14,7 @@ import { Toast } from "~src/components/Toast"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment } from "~src/types/absmartly"
 import { CogIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
+import { CreateExperimentDropdown } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
 import logoUrl from "data-base64:~assets/logo.png"
 import "~style.css"
@@ -763,14 +764,9 @@ function SidebarContent() {
                 >
                   <ArrowPathIcon className="h-5 w-5 text-gray-600" />
                 </button>
-                <button
-                  onClick={handleCreateExperiment}
-                  className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-                  aria-label="Create Experiment"
-                  title="Create New Experiment"
-                >
-                  <PlusIcon className="h-5 w-5 text-gray-600" />
-                </button>
+                <CreateExperimentDropdown
+                  onCreateFromScratch={handleCreateExperiment}
+                />
                 <button
                   onClick={() => setView('settings')}
                   className="p-2 hover:bg-gray-100 rounded-md transition-colors"
