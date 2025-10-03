@@ -156,7 +156,7 @@ export function CreateExperimentDropdown({
 
       {isOpen && (
         <div
-          className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50 max-h-[500px] flex flex-col"
+          className="absolute right-0 mt-2 left-0 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50 max-h-[500px] flex flex-col"
           role="menu"
         >
           {/* Warning message */}
