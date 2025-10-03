@@ -153,6 +153,26 @@ export class BackgroundAPIClient {
       throw error
     }
   }
+
+  async getOwners(): Promise<any[]> {
+    try {
+      const data = await this.makeRequest('GET', '/users')
+      return data.users || []
+    } catch (error) {
+      debugError('Failed to fetch owners:', error)
+      throw error
+    }
+  }
+  
+  async getTeams(): Promise<any[]> {
+    try {
+      const data = await this.makeRequest('GET', '/teams')
+      return data.teams || []
+    } catch (error) {
+      debugError('Failed to fetch teams:', error)
+      throw error
+    }
+  }
   
   async getFavorites(): Promise<number[]> {
     try {
