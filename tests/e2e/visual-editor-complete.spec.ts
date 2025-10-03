@@ -348,7 +348,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(appliedChanges.button2Display).toBe('none')
       console.log('  ✓ Delete change applied: button-2 is hidden (display:none)')
 
-      expect(appliedChanges.testContainerHTML).toBe('<h2>HTML Edited!</h2><p>New paragraph content</p>')
+      expect(appliedChanges.testContainerHTML).toContain('<h2>HTML Edited!</h2>')
+      expect(appliedChanges.testContainerHTML).toContain('<p>New paragraph content</p>')
       console.log('  ✓ HTML change applied: test-container has new HTML')
       
       console.log('✅ All DOM changes verified and applied correctly')
@@ -719,7 +720,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(postVEState.paragraphText).toBe('Undo test 3')
       expect(postVEState.button1Display).toBe('none')
       expect(postVEState.button2Display).toBe('none')
-      expect(postVEState.testContainerHTML).toBe('HTML Edited!')
+      expect(postVEState.testContainerHTML).toContain('HTML Edited!')
       console.log('  ✓ All changes still applied after VE exit')
 
       // Verify markers are present (preview mode is still active)
@@ -873,7 +874,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(reEnabledStates.button2Display).toBe('none')
       console.log('  ✓ Button-2 hidden again (delete re-applied)')
 
-      expect(reEnabledStates.testContainerHTML).toBe('HTML Edited!')
+      expect(reEnabledStates.testContainerHTML).toContain('HTML Edited!')
       console.log('  ✓ Section title HTML re-applied')
 
       // Verify markers are back

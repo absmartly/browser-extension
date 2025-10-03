@@ -108,18 +108,35 @@ function copyWithHash() {
 
 // Watch for changes in dev mode
 if (process.argv.includes('--watch')) {
-  console.log('[Dev Build] Watching inject-sdk-plugin.js for changes...');
-  
+  console.log('[Dev Build] Watching inject-sdk-plugin.js and visual-editor for changes...');
+
   // Initial copy
   setTimeout(copyWithHash, 2000);
-  
-  // Watch for changes
+
+  // Watch inject-sdk-plugin.js for changes
   fs.watchFile(injectScriptSource, { interval: 1000 }, (curr, prev) => {
     if (curr.mtime !== prev.mtime) {
       console.log('[Dev Build] Change detected in inject-sdk-plugin.js');
       copyWithHash();
     }
   });
+
+  // Watch visual editor directory for changes
+  const visualEditorDir = path.join(__dirname, '..', 'src', 'visual-editor');
+
+  function watchVisualEditorDir(dir) {
+    fs.watch(dir, { recursive: true }, (eventType, filename) => {
+      if (filename && (filename.endsWith('.ts') || filename.endsWith('.tsx') || filename.endsWith('.css'))) {
+        console.log(`[Dev Build] Change detected in visual-editor: ${filename}`);
+        buildVisualEditor();
+      }
+    });
+  }
+
+  if (fs.existsSync(visualEditorDir)) {
+    watchVisualEditorDir(visualEditorDir);
+    console.log('[Dev Build] Watching visual-editor directory for changes');
+  }
 } else {
   // Single copy
   copyWithHash();

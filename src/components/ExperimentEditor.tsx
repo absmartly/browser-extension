@@ -341,10 +341,11 @@ export function ExperimentEditor({
       <div className="mb-4">
         <button
           onClick={onCancel}
-          className="flex items-center text-sm text-gray-600 hover:text-gray-900"
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          aria-label="Go back"
+          title="Go back"
         >
-          <ArrowLeftIcon className="h-4 w-4 mr-1" />
-          Back to experiments
+          <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
         </button>
       </div>
 
