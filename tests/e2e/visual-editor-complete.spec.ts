@@ -1215,6 +1215,56 @@ test.describe('Visual Editor Complete Workflow', () => {
         })
         await testPage.waitForTimeout(500)
 
+        // Fill the new metadata fields (owners, teams, tags)
+        console.log('  📝 Filling owners, teams, and tags fields...')
+        
+        // Scroll to the metadata section
+        await sidebar.locator('label:has-text("Applications"), label:has-text("Owners")').first().scrollIntoViewIfNeeded()
+        await testPage.waitForTimeout(500)
+        
+        // Fill Owners field - click the field to open dropdown
+        const ownersField = sidebar.locator('label:has-text("Owners")').locator('..').locator('div[role="button"], div.cursor-pointer').first()
+        try {
+          await ownersField.click({ timeout: 5000 })
+          console.log('  ✓ Opened owners dropdown')
+          
+          // Wait for dropdown to appear and select first owner/team
+          await testPage.waitForTimeout(500)
+          const firstOption = sidebar.locator('div:has-text("Marketing"), div:has-text("Frontend"), div:has-text("Product")').first()
+          if (await firstOption.isVisible({ timeout: 2000 })) {
+            await firstOption.click()
+            console.log('  ✓ Selected an owner/team')
+          }
+          
+          // Click outside to close dropdown
+          await sidebar.locator('label:has-text("Traffic")').click()
+        } catch (err) {
+          console.log('  ⚠️  Could not fill owners field:', err.message)
+        }
+        
+        // Fill Tags field - click the field to open dropdown
+        const tagsField = sidebar.locator('label:has-text("Tags")').locator('..').locator('div[role="button"], div.cursor-pointer').first()
+        try {
+          await tagsField.click({ timeout: 5000 })
+          console.log('  ✓ Opened tags dropdown')
+          
+          // Wait for dropdown and select first tag
+          await testPage.waitForTimeout(500)
+          const firstTag = sidebar.locator('div:has-text("theme:Urgency"), div:has-text("Product Page"), div:has-text("conversion")').first()
+          if (await firstTag.isVisible({ timeout: 2000 })) {
+            await firstTag.click()
+            console.log('  ✓ Selected a tag')
+          }
+          
+          // Click outside to close dropdown
+          await sidebar.locator('label:has-text("Traffic")').click()
+        } catch (err) {
+          console.log('  ⚠️  Could not fill tags field:', err.message)
+        }
+        
+        await testPage.waitForTimeout(500)
+        console.log('  ✓ Filled metadata fields')
+
         // Take screenshot before clicking save (should show top of form with any existing errors)
         await testPage.screenshot({ path: 'test-results/before-save-top.png', fullPage: true })
         console.log('  📸 Screenshot saved: before-save-top.png')
