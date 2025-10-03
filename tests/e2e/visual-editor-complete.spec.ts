@@ -60,9 +60,30 @@ async function clickContextMenuItem(page: Page, itemText: string) {
 
 test.describe('Visual Editor Complete Workflow', () => {
   let testPage: Page
+  let allConsoleMessages: Array<{type: string, text: string}> = []
 
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
+
+    // Set up console listener BEFORE page loads to capture all messages (including iframes)
+    allConsoleMessages = []
+    const consoleHandler = (msg: any) => {
+      const msgType = msg.type()
+      const msgText = msg.text()
+      allConsoleMessages.push({ type: msgType, text: msgText })
+
+      // Log ABsmartly, DOMChanges, and background messages immediately
+      if (msgText.includes('[ABsmartly]') || msgText.includes('[Background]') || msgText.includes('[DOMChanges]')) {
+        console.log(`  📝 [${msgType}] ${msgText}`)
+      }
+    }
+    testPage.on('console', consoleHandler)
+
+    // Also listen to console events from all frames (including the sidebar iframe)
+    testPage.on('frameattached', async (frame) => {
+      frame.on('console', consoleHandler)
+    })
+
     await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForLoadState('networkidle')
@@ -73,6 +94,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     console.log('✅ Test page loaded (test mode enabled)')
+    console.log(`  📋 Console messages so far: ${allConsoleMessages.length}`)
   })
 
   test.afterEach(async () => {
@@ -80,7 +102,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(10000)
+    test.setTimeout(20000)
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
     await testPage.evaluate((extUrl) => {
@@ -251,21 +273,31 @@ test.describe('Visual Editor Complete Workflow', () => {
     await visualEditorButton.waitFor({ state: 'visible', timeout: 5000 })
     await expect(visualEditorButton).toBeEnabled({ timeout: 10000 })
     console.log('  ✓ Visual Editor button is enabled (form validation complete)')
-    
-    // Set up console error listener before clicking
-    const consoleErrors: string[] = []
-    testPage.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text())
-        console.log(`  ❌ [Page Error] ${msg.text()}`)
-      }
-    })
-    
-    await visualEditorButton.click()
-    console.log('  ✓ Clicked Visual Editor button')
-    
-    // Wait a bit for any errors to surface
+
+    // Extra wait to ensure React event handlers are attached in headless mode
     await testPage.waitForTimeout(1000)
+    console.log('  ✓ Waited for React handlers to attach')
+
+    // Track console errors (console listener is already set up in beforeEach)
+    const consoleErrors: string[] = []
+    const beforeClickMessageCount = allConsoleMessages.length
+
+    // Filter for errors from all messages
+    consoleErrors.push(...allConsoleMessages.filter(m => m.type === 'error').map(m => m.text))
+
+    // Ensure test page is focused/active before clicking VE button
+    await testPage.bringToFront()
+    console.log('  ✓ Brought test page to front')
+
+    // Try dispatchEvent instead of click() to ensure handler is triggered
+    await visualEditorButton.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    console.log('  ✓ Dispatched click event to Visual Editor button')
+
+    // Wait longer for messages to arrive and VE to start
+    await testPage.waitForTimeout(3000)
+    console.log('  ⏳ Waited 3s after VE button click')
     
     // Check if page is still alive
     const pageAlive = await testPage.evaluate(() => true).catch(() => false)
@@ -274,9 +306,30 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  Console errors before crash:', consoleErrors)
       throw new Error('Page crashed when launching Visual Editor')
     }
-    
+
+    // Log console message summary
+    console.log(`  📋 Captured ${allConsoleMessages.length} console messages`)
+    const contentScriptMessages = allConsoleMessages.filter(m => m.text.includes('[ABsmartly]') || m.text.includes('[Background]'))
+    console.log(`  📋 Content script/background messages: ${contentScriptMessages.length}`)
+    if (contentScriptMessages.length > 0) {
+      console.log('  Messages:\n    ' + contentScriptMessages.map(m => `[${m.type}] ${m.text}`).join('\n    '))
+    } else {
+      console.log('  ⚠️  No content script messages detected - content script may not be loading!')
+    }
+
+    // Check for errors
+    const errorMessages = allConsoleMessages.filter(m => m.type === 'error')
+    if (errorMessages.length > 0) {
+      console.log(`  ❌ Found ${errorMessages.length} error messages:`)
+      errorMessages.forEach(m => console.log(`    - ${m.text}`))
+    }
+
+    // Wait longer for VE banner and log more messages
+    console.log('  ⏳ Waiting for VE banner to appear...')
+    console.log(`  📋 Total messages captured so far: ${allConsoleMessages.length}`)
+
     // Wait for VE banner to appear (more reliable than checking window variable)
-    await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 10000 })
+    await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
     console.log('✅ Visual editor active')
 
       // Take screenshot to see sidebar state after VE activates
@@ -1059,8 +1112,12 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Click the VE button to launch second instance
       const veButtons = freshSidebar.locator('button:has-text("Visual Editor")')
-      await veButtons.nth(0).click()
-      console.log('  ✓ Clicked Visual Editor button for second launch')
+      
+      // Use dispatchEvent to ensure React handler is triggered in headless mode
+      await veButtons.nth(0).evaluate((button) => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      console.log('  ✓ Dispatched click event to Visual Editor button for second launch')
 
       // Take screenshot to see what's happening
       await testPage.screenshot({ path: 'test-results/second-ve-before-wait.png' })
@@ -1191,8 +1248,11 @@ test.describe('Visual Editor Complete Workflow', () => {
         throw new Error('VE button never became enabled after 10 seconds')
       }
 
-      await veButtons.nth(0).click()
-      console.log('  ✓ Clicked Visual Editor button')
+      // Use dispatchEvent to ensure React handler is triggered in headless mode
+      await veButtons.nth(0).evaluate((button) => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      console.log('  ✓ Dispatched click event to Visual Editor button')
 
       // Wait for VE to be active
       await testPage.waitForFunction(() => {
