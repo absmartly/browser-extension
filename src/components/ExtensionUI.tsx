@@ -83,7 +83,7 @@ function SidebarContent() {
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
 
-      // Load all metadata resources once at startup
+      // Load all editor resources at startup
       loadEditorResources()
 
       // Load applications first, then check for pending application filter
@@ -133,8 +133,7 @@ function SidebarContent() {
     }
   }, [config, view, hasInitialized, filtersLoaded, filters])
 
-  // Note: Editor resources (apps, units, metrics, tags, owners, teams) are loaded once at startup above
-  // No need to reload when entering create/edit view
+
 
   // Load applications for filter when they're not loaded yet
   useEffect(() => {
@@ -231,27 +230,29 @@ function SidebarContent() {
     debugLog('Loading editor resources...')
     try {
       const [apps, units, metricsData, tagsData, ownersData, teamsData] = await Promise.all([
-        getApplications(),
-        getUnitTypes(),
-        getMetrics(),
-        getExperimentTags(),
-        getOwners(),
-        getTeams()
-      ])
+          getApplications(),
+          getUnitTypes(),
+          getMetrics(),
+          getExperimentTags(),
+          getOwners(),
+          getTeams()
+        ])
+
       debugLog('Editor resources loaded:', {
         apps: apps?.length || 0,
         units: units?.length || 0,
         metricsData: metricsData?.length || 0,
         tagsData: tagsData?.length || 0,
         ownersData: ownersData?.length || 0,
-        teamsData: teamsData?.length || 0
+          teamsData: teamsData?.length || 0
       })
       setApplications(apps || [])
       setUnitTypes(units || [])
       setMetrics(metricsData || [])
       setTags(tagsData || [])
+
       setOwners(ownersData || [])
-      setTeams(teamsData || [])
+        setTeams(teamsData || [])
     } catch (error) {
       debugError('Failed to load editor resources:', error)
       // Continue with empty arrays if the call fails
@@ -752,6 +753,7 @@ function SidebarContent() {
                 <button
                   onClick={() => {
                     loadExperiments(true, 1, pageSize)
+                    loadEditorResources()
                     loadFavorites()
                   }}
                   className={`p-2 hover:bg-gray-100 rounded-md transition-colors ${experimentsLoading ? 'animate-spin' : ''}`}
@@ -888,7 +890,7 @@ function SidebarContent() {
           metrics={metrics}
           tags={tags}
           owners={owners}
-          teams={teams}
+            teams={teams}
         />
       )}
       

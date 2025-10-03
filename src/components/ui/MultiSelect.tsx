@@ -55,7 +55,7 @@ export function MultiSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleToggleOption = (optionId: number) => {
+  const handleToggleOption = (optionId: number | string) => {
     if (selectedIds.includes(optionId)) {
       onChange(selectedIds.filter(id => id !== optionId))
     } else {
@@ -63,7 +63,7 @@ export function MultiSelect({
     }
   }
 
-  const handleRemoveOption = (optionId: number, e: React.MouseEvent) => {
+  const handleRemoveOption = (optionId: number | string, e: React.MouseEvent) => {
     e.stopPropagation()
     onChange(selectedIds.filter(id => id !== optionId))
   }

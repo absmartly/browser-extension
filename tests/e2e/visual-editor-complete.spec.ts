@@ -1225,50 +1225,102 @@ test.describe('Visual Editor Complete Workflow', () => {
         await debugWait()
         
         // Fill Owners field - click the field to open dropdown
-        const ownersField = sidebar.locator('label:has-text("Owners")').locator('..').locator('div[role="button"], div.cursor-pointer').first()
-        try {
-          await ownersField.click({ timeout: 5000 })
-          console.log('  ✓ Opened owners dropdown')
-          await debugWait()
-
-          // Wait for dropdown to appear and select first owner/team
-          await testPage.waitForTimeout(500)
-          const firstOption = sidebar.locator('div:has-text("Marketing"), div:has-text("Frontend"), div:has-text("Product")').first()
-          if (await firstOption.isVisible({ timeout: 2000 })) {
-            await firstOption.click()
-            console.log('  ✓ Selected an owner/team')
-            await debugWait()
-          }
-
-          // Click outside to close dropdown
-          await sidebar.locator('label:has-text("Traffic")').click()
-          await debugWait()
-        } catch (err) {
-          console.log('  ⚠️  Could not fill owners field:', err.message)
+        console.log('  Attempting to select owners...')
+        const ownersContainer = sidebar.locator('label:has-text("Owners")').locator('..')
+        const ownersClickArea = ownersContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
+        
+        // Verify field is enabled
+        const ownersDisabled = await ownersClickArea.evaluate(el => {
+          return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
+        })
+        
+        if (ownersDisabled) {
+          throw new Error('Owners field is disabled - cannot select')
         }
         
-        // Fill Tags field - click the field to open dropdown
-        const tagsField = sidebar.locator('label:has-text("Tags")').locator('..').locator('div[role="button"], div.cursor-pointer').first()
-        try {
-          await tagsField.click({ timeout: 5000 })
-          console.log('  ✓ Opened tags dropdown')
-          await debugWait()
-
-          // Wait for dropdown and select first tag
-          await testPage.waitForTimeout(500)
-          const firstTag = sidebar.locator('div:has-text("theme:Urgency"), div:has-text("Product Page"), div:has-text("conversion")').first()
-          if (await firstTag.isVisible({ timeout: 2000 })) {
-            await firstTag.click()
-            console.log('  ✓ Selected a tag')
-            await debugWait()
-          }
-
-          // Click outside to close dropdown
-          await sidebar.locator('label:has-text("Traffic")').click()
-          await debugWait()
-        } catch (err) {
-          console.log('  ⚠️  Could not fill tags field:', err.message)
+        await ownersClickArea.click({ timeout: 5000 })
+        console.log('  ✓ Clicked owners field')
+        await testPage.waitForTimeout(500)
+        
+        // Wait for dropdown to appear and get first option
+        const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+        await ownersDropdown.waitFor({ state: 'visible', timeout: 3000 })
+        console.log('  ✓ Owners dropdown appeared')
+        
+        // Click first available option in the dropdown
+        const firstOwnerOption = ownersDropdown.locator('div[class*="cursor-pointer"]').first()
+        const optionExists = await firstOwnerOption.isVisible({ timeout: 2000 })
+        
+        if (!optionExists) {
+          throw new Error('No owners/teams available in dropdown')
         }
+        
+        const selectedOptionText = await firstOwnerOption.textContent()
+        await firstOwnerOption.click()
+        console.log(`  ✓ Selected owner/team: ${selectedOptionText?.trim()}`)
+        await testPage.waitForTimeout(300)
+        
+        // Verify selection was made - check for selected badge
+        const selectedBadge = ownersContainer.locator('div[class*="inline-flex"]', { hasText: selectedOptionText?.trim() || '' })
+        const badgeVisible = await selectedBadge.isVisible({ timeout: 2000 })
+        
+        if (!badgeVisible) {
+          throw new Error(`Owner selection failed - badge not visible for "${selectedOptionText?.trim()}"`)
+        }
+        console.log('  ✓ Verified owner selection badge appeared')
+        
+        // Click outside to close dropdown
+        await sidebar.locator('label:has-text("Traffic")').click()
+        await testPage.waitForTimeout(300)
+        
+        // Fill Tags field - click the field to open dropdown
+        console.log('  Attempting to select tags...')
+        const tagsContainer = sidebar.locator('label:has-text("Tags")').locator('..')
+        const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
+        
+        // Verify field is enabled
+        const tagsDisabled = await tagsClickArea.evaluate(el => {
+          return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
+        })
+        
+        if (tagsDisabled) {
+          throw new Error('Tags field is disabled - cannot select')
+        }
+        
+        await tagsClickArea.click({ timeout: 5000 })
+        console.log('  ✓ Clicked tags field')
+        await testPage.waitForTimeout(500)
+        
+        // Wait for dropdown to appear and get first option
+        const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+        await tagsDropdown.waitFor({ state: 'visible', timeout: 3000 })
+        console.log('  ✓ Tags dropdown appeared')
+        
+        // Click first available option in the dropdown
+        const firstTagOption = tagsDropdown.locator('div[class*="cursor-pointer"]').first()
+        const tagOptionExists = await firstTagOption.isVisible({ timeout: 2000 })
+        
+        if (!tagOptionExists) {
+          throw new Error('No tags available in dropdown')
+        }
+        
+        const selectedTagText = await firstTagOption.textContent()
+        await firstTagOption.click()
+        console.log(`  ✓ Selected tag: ${selectedTagText?.trim()}`)
+        await testPage.waitForTimeout(300)
+        
+        // Verify selection was made - check for selected badge
+        const selectedTagBadge = tagsContainer.locator('div[class*="inline-flex"]', { hasText: selectedTagText?.trim() || '' })
+        const tagBadgeVisible = await selectedTagBadge.isVisible({ timeout: 2000 })
+        
+        if (!tagBadgeVisible) {
+          throw new Error(`Tag selection failed - badge not visible for "${selectedTagText?.trim()}"`)
+        }
+        console.log('  ✓ Verified tag selection badge appeared')
+        
+        // Click outside to close dropdown
+        await sidebar.locator('label:has-text("Traffic")').click()
+        await testPage.waitForTimeout(300)
 
         await testPage.waitForTimeout(500)
         console.log('  ✓ Filled metadata fields')
@@ -1325,11 +1377,12 @@ test.describe('Visual Editor Complete Workflow', () => {
           }
           throw new Error('Failed to save experiment - validation errors found. Check screenshots.')
         } else if (stillOnCreateForm) {
-          console.log('  ⚠️  Still on create form - no success or error message visible')
+          console.log('  ❌ Still on create form - save failed')
           console.log('  This likely means validation failed but errors are not visible.')
           console.log('  Check the screenshots to see what fields are missing.')
+          throw new Error('Experiment save failed - still on create form with no success message. Check screenshots: before-save-top.png and after-save-top.png')
         } else {
-          console.log('  ✅ Navigated away from create form - likely saved successfully')
+          console.log('  ✅ Navigated away from create form - experiment saved successfully')
         }
 
         console.log(`  📊 Experiment name: ${experimentName}`)
