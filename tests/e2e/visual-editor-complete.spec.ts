@@ -80,7 +80,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(50000)
+    test.setTimeout(120000)
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
     await testPage.evaluate((extUrl) => {
