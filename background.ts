@@ -515,10 +515,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })
     return true // Will respond asynchronously
+  } else if (message.type === "FETCH_UNIT_TYPES") {
+    // Fetch unit types from API
+    makeAPIRequest('GET', '/unit_types')
+      .then(data => {
+        sendResponse({ unitTypes: data })
+      })
+      .catch(error => {
+        debugError('Failed to fetch unit types:', error)
+        sendResponse({ unitTypes: [] })
+      })
+    return true // Will respond asynchronously
+  } else if (message.type === "FETCH_APPLICATIONS") {
+    // Fetch applications from API
+    makeAPIRequest('GET', '/applications')
+      .then(data => {
+        sendResponse({ applications: data })
+      })
+      .catch(error => {
+        debugError('Failed to fetch applications:', error)
+        sendResponse({ applications: [] })
+      })
+    return true // Will respond asynchronously
   } else if (message.type === "API_REQUEST") {
     // Handle API requests
     debugLog('Background received API_REQUEST:', { method: message.method, path: message.path, data: message.data })
-    
+
     makeAPIRequest(message.method, message.path, message.data)
       .then(data => {
         debugLog('Background API request successful')
@@ -526,15 +548,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch(error => {
         debugError('Background API request failed:', error)
-        debugError('Error details:', { 
+        debugError('Error details:', {
           message: error.message,
           response: error.response,
           status: error.response?.status,
-          data: error.response?.data 
+          data: error.response?.data
         })
         const errorMessage = error.message || 'API request failed'
-        sendResponse({ 
-          success: false, 
+        sendResponse({
+          success: false,
           error: errorMessage,
           isAuthError: errorMessage === 'AUTH_EXPIRED'
         })
