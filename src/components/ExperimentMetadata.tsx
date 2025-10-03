@@ -23,6 +23,71 @@ interface ExperimentMetadataProps {
   tags?: any[]
 }
 
+// Separate memoized component for Owners field - only re-renders when owners/teams/IDs change
+const OwnersField = React.memo(function OwnersField({
+  ownerIds,
+  teamIds,
+  owners,
+  teams,
+  loading,
+  canEdit,
+  onChange
+}: {
+  ownerIds: number[]
+  teamIds: number[]
+  owners: any[]
+  teams: any[]
+  loading: boolean
+  canEdit: boolean
+  onChange: (ownerIds: number[], teamIds: number[]) => void
+}) {
+  const ownerOptions = useMemo(() => owners.map(owner => ({
+    id: `user-${owner.user_id || owner.id}`,
+    name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email || `User ${owner.user_id || owner.id}`,
+    display_name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email,
+    type: 'user' as const
+  })), [owners])
+
+  const teamOptions = useMemo(() => teams.map(team => ({
+    id: `team-${team.team_id || team.id}`,
+    name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
+    display_name: team.display_name || team.name,
+    type: 'team' as const
+  })), [teams])
+
+  const ownersOptions = useMemo(() => [...teamOptions, ...ownerOptions], [ownerOptions, teamOptions])
+
+  const ownersSelectedIds = useMemo(
+    () => [
+      ...(teamIds || []).map(id => `team-${id}`),
+      ...(ownerIds || []).map(id => `user-${id}`)
+    ],
+    [ownerIds, teamIds]
+  )
+
+  const handleOwnersChange = useCallback((selectedIds: (number | string)[]) => {
+    const newOwnerIds = selectedIds
+      .filter(id => typeof id === 'string' && id.startsWith('user-'))
+      .map(id => parseInt((id as string).replace('user-', '')))
+    const newTeamIds = selectedIds
+      .filter(id => typeof id === 'string' && id.startsWith('team-'))
+      .map(id => parseInt((id as string).replace('team-', '')))
+    onChange(newOwnerIds, newTeamIds)
+  }, [onChange])
+
+  return (
+    <MultiSelect
+      label="Owners"
+      options={ownersOptions}
+      selectedIds={ownersSelectedIds}
+      onChange={handleOwnersChange}
+      placeholder="Select owners and teams"
+      loading={loading}
+      disabled={!canEdit || loading}
+    />
+  )
+})
+
 export const ExperimentMetadata = React.memo(function ExperimentMetadata({
   data,
   onChange,
@@ -55,20 +120,6 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
     })
   }
 
-  const handleOwnerChange = (ownerIds: number[]) => {
-    onChange({
-      ...data,
-      owner_ids: ownerIds
-    })
-  }
-
-  const handleTeamChange = (teamIds: number[]) => {
-    onChange({
-      ...data,
-      team_ids: teamIds
-    })
-  }
-
   const handleTagChange = (tagIds: number[]) => {
     onChange({
       ...data,
@@ -82,52 +133,20 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
     display_name: app.display_name || app.name
   })), [applications])
 
-  const ownerOptions = useMemo(() => owners.map(owner => ({
-    id: `user-${owner.user_id || owner.id}`,
-    name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email || `User ${owner.user_id || owner.id}`,
-    display_name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email,
-    type: 'user' as const
-  })), [owners])
-
-  const teamOptions = useMemo(() => teams.map(team => ({
-    id: `team-${team.team_id || team.id}`,
-    name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
-    display_name: team.display_name || team.name,
-    type: 'team' as const
-  })), [teams])
-
   const tagOptions = useMemo(() => tags.map(tag => ({
     id: tag.experiment_tag_id || tag.id || (tag.experiment_tag?.id),
     name: tag.tag || tag.name || tag.experiment_tag?.tag || tag.experiment_tag?.name || `Tag ${tag.experiment_tag_id || tag.id}`,
     display_name: tag.tag || tag.name || tag.experiment_tag?.tag || tag.experiment_tag?.name
   })), [tags])
 
-  // Memoize combined owners options to prevent re-renders (teams first, like ABsmartly)
-  const ownersOptions = useMemo(() => [...teamOptions, ...ownerOptions], [ownerOptions, teamOptions])
-
-  // Memoize selected IDs to prevent re-renders (with string prefixes)
-  const ownersSelectedIds = useMemo(
-    () => [
-      ...(data.team_ids || []).map(id => `team-${id}`),
-      ...(data.owner_ids || []).map(id => `user-${id}`)
-    ],
-    [data.owner_ids, data.team_ids]
-  )
-
-  // Extract handler (parse string IDs back to numbers)
-  const handleOwnersChange = (selectedIds: (number | string)[]) => {
-    const ownerIds = selectedIds
-      .filter(id => typeof id === 'string' && id.startsWith('user-'))
-      .map(id => parseInt((id as string).replace('user-', '')))
-    const teamIds = selectedIds
-      .filter(id => typeof id === 'string' && id.startsWith('team-'))
-      .map(id => parseInt((id as string).replace('team-', '')))
+  // Handler for owners field - updates both owner_ids and team_ids
+  const handleOwnersChange = useCallback((ownerIds: number[], teamIds: number[]) => {
     onChange({
       ...data,
       owner_ids: ownerIds,
       team_ids: teamIds
     })
-  }
+  }, [data, onChange])
 
   return (
     <div className="space-y-3">
@@ -170,14 +189,14 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
         disabled={!canEdit || loading}
       />
 
-      <MultiSelect
-        label="Owners"
-        options={ownersOptions}
-        selectedIds={ownersSelectedIds}
-        onChange={handleOwnersChange}
-        placeholder="Select owners and teams"
+      <OwnersField
+        ownerIds={data.owner_ids}
+        teamIds={data.team_ids}
+        owners={owners}
+        teams={teams}
         loading={loading}
-        disabled={!canEdit || loading}
+        canEdit={canEdit}
+        onChange={handleOwnersChange}
       />
 
       <MultiSelect

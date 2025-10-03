@@ -82,12 +82,15 @@ function SidebarContent() {
     if (config && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
-      
+
+      // Load all metadata resources once at startup
+      loadEditorResources()
+
       // Load applications first, then check for pending application filter
       getApplications().then(apps => {
         if (apps && apps.length > 0) {
           setApplications(apps)
-          
+
           // Check if we have a pending application filter from config
           const storage = new Storage({ area: "local" })
           storage.get('pendingApplicationFilter').then(appName => {
@@ -130,14 +133,9 @@ function SidebarContent() {
     }
   }, [config, view, hasInitialized, filtersLoaded, filters])
 
-  // Load editor resources when switching to create or edit view
-  useEffect(() => {
-    if (config && (view === 'create' || view === 'edit')) {
-      debugLog('Loading editor resources for view:', view)
-      loadEditorResources()
-    }
-  }, [config, view])
-  
+  // Note: Editor resources (apps, units, metrics, tags, owners, teams) are loaded once at startup above
+  // No need to reload when entering create/edit view
+
   // Load applications for filter when they're not loaded yet
   useEffect(() => {
     if (config && view === 'list' && applications.length === 0) {
