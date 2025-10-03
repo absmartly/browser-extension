@@ -10,6 +10,7 @@ import type { DOMChange } from '~src/types/dom-changes'
 import { ArrowLeftIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon, PlusIcon, TrashIcon, CodeBracketIcon, PlayIcon, StopIcon } from '@heroicons/react/24/outline'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
 import { VariantList, type Variant } from './VariantList'
+import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
 
 const storage = new Storage({ area: "local" })
@@ -74,6 +75,11 @@ export function ExperimentDetail({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
+  const [metadata, setMetadata] = useState({
+    percentage_of_traffic: experiment.percentage_of_traffic || 100,
+    unit_type_id: experiment.unit_type?.unit_type_id || experiment.unit_type?.id || null,
+    application_ids: experiment.applications?.map(a => a.application_id || a.id) || []
+  })
 
   debugLog('🔍 ExperimentDetail state - displayName:', displayName)
   debugLog('🔍 ExperimentDetail state - variants length:', experiment?.variants?.length)
@@ -196,8 +202,8 @@ export function ExperimentDetail({
           name: fullExperiment.name,
           display_name: displayName,
           iteration: fullExperiment.iteration,
-          percentage_of_traffic: fullExperiment.percentage_of_traffic,
-          unit_type: fullExperiment.unit_type ? { unit_type_id: fullExperiment.unit_type.unit_type_id || fullExperiment.unit_type.id } : undefined,
+          percentage_of_traffic: metadata.percentage_of_traffic,
+          unit_type: metadata.unit_type_id ? { unit_type_id: metadata.unit_type_id } : undefined,
           nr_variants: updatedVariants.length,
           percentages: fullExperiment.percentages,
           audience: fullExperiment.audience,
@@ -205,10 +211,10 @@ export function ExperimentDetail({
           owners: fullExperiment.owners?.map((o: any) => ({ user_id: o.user_id || o.user?.id || o.id })) || [],
           teams: fullExperiment.teams?.map((t: any) => ({ team_id: t.team_id || t.id })) || [],
           experiment_tags: fullExperiment.experiment_tags || [],
-          applications: fullExperiment.applications?.map((app: any) => ({
-            application_id: app.application_id || app.id,
-            application_version: app.application_version || "0"
-          })) || [],
+          applications: metadata.application_ids.map(id => ({
+            application_id: id,
+            application_version: "0"
+          })),
           primary_metric: fullExperiment.primary_metric ? { metric_id: fullExperiment.primary_metric.metric_id || fullExperiment.primary_metric.id } : undefined,
           secondary_metrics: fullExperiment.secondary_metrics?.map((m: any) => ({
             metric_id: m.metric_id || m.metric?.id || m.id,
@@ -453,6 +459,16 @@ export function ExperimentDetail({
 
       <div className="space-y-4">
 
+        {/* Metadata Section */}
+        <ExperimentMetadata
+          data={metadata}
+          onChange={(newMetadata) => {
+            setMetadata(newMetadata)
+            setHasUnsavedChanges(true)
+          }}
+          canEdit={true}
+        />
+
         {/* Variants Section */}
         {currentVariants.length > 0 && (
           <VariantList
@@ -466,24 +482,6 @@ export function ExperimentDetail({
             canEdit={true}
             canAddRemove={canAddVariants}
           />
-        )}
-
-        {/* Applications */}
-        {experiment.applications && experiment.applications.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-700">Applications</h3>
-            <div className="flex flex-wrap gap-2">
-              {experiment.applications.map((app) => (
-                <span 
-                  key={app.application_id ?? app.id} 
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 cursor-default"
-                  title={app.application?.description || app.description || ''}
-                >
-                  {app.application?.name || app.name || `App ${app.application_id || app.id}`}
-                </span>
-              ))}
-            </div>
-          </div>
         )}
 
         {/* Action Buttons */}
