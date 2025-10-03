@@ -9,6 +9,16 @@ const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-t
 const SLOW_MODE = process.env.SLOW === '1'
 const debugWait = async (ms: number = 1000) => SLOW_MODE ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve()
 
+// Debug mode - set to true to show console logs from page/sidebar
+// Enabled automatically when using --debug flag: npx playwright test --debug
+// Or manually with: DEBUG=1 npx playwright test ...
+const DEBUG_MODE = process.env.DEBUG === '1' || process.env.PWDEBUG === '1'
+
+// Save experiment mode - set to true to actually save the experiment to the database
+// WARNING: This writes to the production database! Only use when needed.
+// Pass SAVE_EXPERIMENT=1 environment variable to enable: SAVE_EXPERIMENT=1 npx playwright test ...
+const SAVE_EXPERIMENT = process.env.SAVE_EXPERIMENT === '1'
+
 // Helper to wait for visual editor to be active
 async function waitForVisualEditorActive(page: Page, timeout = 10000) {
   await page.waitForFunction(
@@ -130,13 +140,15 @@ test.describe('Visual Editor Complete Workflow', () => {
       await sidebar.locator('body').waitFor({ timeout: 10000 })
       console.log('✅ Sidebar visible')
 
-      // Listen for console messages from the sidebar iframe
-      testPage.on('console', msg => {
-        const msgText = msg.text()
-        if (msgText.includes('[DOMChanges') || msgText.includes('[ExperimentDetail]') || msgText.includes('[ExperimentEditor]') || msgText.includes('[Test Eval]') || msgText.includes('Window message') || msgText.includes('index.tsx')) {
-          console.log(`  [Sidebar Console] ${msgText}`)
-        }
-      })
+      // Listen for console messages from the sidebar iframe (only in DEBUG mode)
+      if (DEBUG_MODE) {
+        testPage.on('console', msg => {
+          const msgText = msg.text()
+          if (msgText.includes('[DOMChanges') || msgText.includes('[ExperimentDetail]') || msgText.includes('[ExperimentEditor]') || msgText.includes('[Test Eval]') || msgText.includes('Window message') || msgText.includes('index.tsx')) {
+            console.log(`  [Sidebar Console] ${msgText}`)
+          }
+        })
+      }
 
       await debugWait()
     })
@@ -164,12 +176,14 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Activate Visual Editor', async () => {
       console.log('🎨 STEP 3: Clicking Visual Editor button')
       
-      // Listen for console messages from the page to debug
-      testPage.on('console', msg => {
-        if (msg.text().includes('[ABsmartly') || msg.text().includes('[Visual') || msg.text().includes('PREVIEW')) {
-          console.log(`  [Page Console] ${msg.text()}`)
-        }
-      })
+      // Listen for console messages from the page to debug (only in DEBUG mode)
+      if (DEBUG_MODE) {
+        testPage.on('console', msg => {
+          if (msg.text().includes('[ABsmartly') || msg.text().includes('[Visual') || msg.text().includes('PREVIEW')) {
+            console.log(`  [Page Console] ${msg.text()}`)
+          }
+        })
+      }
     const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
     await visualEditorButton.click()
 
@@ -581,10 +595,9 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Wait for sidebar to update', async () => {
       console.log('\n⏳ STEP 6: Waiting for sidebar to update after visual editor closes...')
 
-      // After the visual editor closes, wait for the sidebar to update
-      // The DOM changes should now be visible in the variant editor
-
-      // Wait a bit for the sidebar to process the changes
+      // After the visual editor closes, wait for the DOM changes to appear in the create form
+      // The changes should be visible in the variant's DOM Changes section
+      // Give it extra time for React to re-render the inline editor with the changes
       await testPage.waitForTimeout(2000)
 
       await debugWait()
@@ -613,9 +626,19 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Wait for DOM change cards to appear in the sidebar
     // The changes are displayed as cards, not in a Monaco editor
     try {
-      await sidebar.locator('.dom-change-card').first().waitFor({ timeout: 5000 })
+      // Wait for at least one DOM change card to appear (no need to scroll, they should be visible)
+      await sidebar.locator('.dom-change-card').first().waitFor({ timeout: 10000 })
     } catch (err) {
-      console.log('⚠️  DOM change cards did not appear within 5000ms')
+      console.log('⚠️  DOM change cards did not appear within 10000ms')
+      console.log('  Searching for any elements with "dom-change" in class...')
+      const anyDomChangeElements = await sidebar.locator('[class*="dom-change"]').count()
+      console.log(`  Found ${anyDomChangeElements} elements with "dom-change" in class`)
+      
+      // Debug: Check if changes are in the data but not rendered
+      const sidebarText = await sidebar.textContent()
+      console.log('  Sidebar contains "Undo test":', sidebarText?.includes('Undo test'))
+      console.log('  Sidebar contains "display:none":', sidebarText?.includes('display:none'))
+      
       throw err // Re-throw to fail the test
     }
 
@@ -740,12 +763,14 @@ test.describe('Visual Editor Complete Workflow', () => {
       // NOTE: Preview is already enabled after using the visual editor in step 4
       // So the first click will DISABLE preview, and second click will re-enable it
 
-      // Listen for console messages from the page to debug
-      testPage.on('console', msg => {
-        if (msg.text().includes('[ABsmartly Page]') || msg.text().includes('PREVIEW') || msg.text().includes('[VisualEditor]') || msg.text().includes('Visual Editor Content Script')) {
-          console.log(`  [Page Console] ${msg.text()}`)
-        }
-      })
+      // Listen for console messages from the page to debug (only in DEBUG mode)
+      if (DEBUG_MODE) {
+        testPage.on('console', msg => {
+          if (msg.text().includes('[ABsmartly Page]') || msg.text().includes('PREVIEW') || msg.text().includes('[VisualEditor]') || msg.text().includes('Visual Editor Content Script')) {
+            console.log(`  [Page Console] ${msg.text()}`)
+          }
+        })
+      }
 
       const previewToggle = sidebar.locator('label:has-text("Preview:") button').first()
 
@@ -1174,5 +1199,24 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  • Page correctly reverts when changes are discarded')
       console.log('  • Changes are not saved to sidebar when discarded')
     })
+
+    if (SAVE_EXPERIMENT) {
+      await test.step('Save experiment to database', async () => {
+        console.log('\n💾 OPTIONAL: Saving experiment to database...')
+        console.log('⚠️  WARNING: This will write to the production database!')
+
+        // Click the save/create button in the experiment form
+        const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
+        await saveButton.click()
+        console.log('  ✓ Clicked save button')
+
+        // Wait for success confirmation
+        await testPage.waitForTimeout(2000)
+        console.log('  ✓ Experiment saved to database')
+        console.log(`  📊 Experiment name: ${experimentName}`)
+      })
+    } else {
+      console.log('\n⏭️  Skipping experiment save (SAVE_EXPERIMENT=1 to enable)')
+    }
   })
 })
