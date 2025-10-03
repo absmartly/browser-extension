@@ -79,6 +79,14 @@ export function useABsmartly() {
     return client.getExperimentTags()
   }, [client])
 
+  const getOwners = useCallback(async (): Promise<any[]> => {
+    return client.getOwners()
+  }, [client])
+
+  const getTeams = useCallback(async (): Promise<any[]> => {
+    return client.getTeams()
+  }, [client])
+
   return {
     client,
     config,
@@ -96,6 +104,8 @@ export function useABsmartly() {
     getApplications,
     getUnitTypes,
     getMetrics,
-    getExperimentTags
+    getExperimentTags,
+    getOwners,
+    getTeams
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
+import { MultiSelect, type MultiSelectOption } from './ui/MultiSelect'
 import { debugLog, debugError } from '~src/utils/debug'
 import { useABsmartly } from '~src/hooks/useABsmartly'
 
@@ -8,6 +9,9 @@ export interface ExperimentMetadataData {
   percentage_of_traffic: number
   unit_type_id: number | null
   application_ids: number[]
+  owner_ids: number[]
+  team_ids: number[]
+  tag_ids: number[]
 }
 
 interface ExperimentMetadataProps {
@@ -21,9 +25,12 @@ export function ExperimentMetadata({
   onChange,
   canEdit = true
 }: ExperimentMetadataProps) {
-  const { getApplications, getUnitTypes } = useABsmartly()
+  const { getApplications, getUnitTypes, getOwners, getTeams, getExperimentTags } = useABsmartly()
   const [unitTypes, setUnitTypes] = useState<any[]>([])
   const [applications, setApplications] = useState<any[]>([])
+  const [owners, setOwners] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+  const [tags, setTags] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -31,17 +38,25 @@ export function ExperimentMetadata({
       try {
         setLoading(true)
 
-        // Fetch unit types and applications using the hook
-        const [fetchedUnitTypes, fetchedApplications] = await Promise.all([
+        const [fetchedUnitTypes, fetchedApplications, fetchedOwners, fetchedTeams, fetchedTags] = await Promise.all([
           getUnitTypes(),
-          getApplications()
+          getApplications(),
+          getOwners(),
+          getTeams(),
+          getExperimentTags()
         ])
 
         setUnitTypes(fetchedUnitTypes || [])
         setApplications(fetchedApplications || [])
+        setOwners(fetchedOwners || [])
+        setTeams(fetchedTeams || [])
+        setTags(fetchedTags || [])
 
         debugLog('📦 Loaded unit types:', fetchedUnitTypes)
         debugLog('📦 Loaded applications:', fetchedApplications)
+        debugLog('📦 Loaded owners:', fetchedOwners)
+        debugLog('📦 Loaded teams:', fetchedTeams)
+        debugLog('📦 Loaded tags:', fetchedTags)
       } catch (error) {
         debugError('Failed to fetch metadata:', error)
       } finally {
@@ -50,7 +65,7 @@ export function ExperimentMetadata({
     }
 
     fetchData()
-  }, [getApplications, getUnitTypes])
+  }, [getApplications, getUnitTypes, getOwners, getTeams, getExperimentTags])
   const handleTrafficChange = (value: number) => {
     onChange({
       ...data,
@@ -71,6 +86,53 @@ export function ExperimentMetadata({
       application_ids: applicationIds
     })
   }
+
+  const handleOwnerChange = (ownerIds: number[]) => {
+    onChange({
+      ...data,
+      owner_ids: ownerIds
+    })
+  }
+
+  const handleTeamChange = (teamIds: number[]) => {
+    onChange({
+      ...data,
+      team_ids: teamIds
+    })
+  }
+
+  const handleTagChange = (tagIds: number[]) => {
+    onChange({
+      ...data,
+      tag_ids: tagIds
+    })
+  }
+
+  const applicationOptions: MultiSelectOption[] = applications.map(app => ({
+    id: app.application_id || app.id,
+    name: app.name || app.display_name || `Application ${app.application_id || app.id}`,
+    display_name: app.display_name || app.name
+  }))
+
+  const ownerOptions: MultiSelectOption[] = owners.map(owner => ({
+    id: owner.user_id || owner.id,
+    name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email || `User ${owner.user_id || owner.id}`,
+    display_name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email,
+    type: 'user' as const
+  }))
+
+  const teamOptions: MultiSelectOption[] = teams.map(team => ({
+    id: team.team_id || team.id,
+    name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
+    display_name: team.display_name || team.name,
+    type: 'team' as const
+  }))
+
+  const tagOptions: MultiSelectOption[] = tags.map(tag => ({
+    id: tag.experiment_tag_id || tag.id || (tag.experiment_tag?.id),
+    name: tag.tag || tag.name || tag.experiment_tag?.tag || tag.experiment_tag?.name || `Tag ${tag.experiment_tag_id || tag.id}`,
+    display_name: tag.tag || tag.name || tag.experiment_tag?.tag || tag.experiment_tag?.name
+  }))
 
   return (
     <div className="space-y-3">
@@ -103,19 +165,43 @@ export function ExperimentMetadata({
         ))}
       </Select>
 
-      <Select
+      <MultiSelect
         label="Applications"
-        value={data.application_ids[0] || ''}
-        onChange={(e) => handleApplicationChange(e.target.value ? [parseInt(e.target.value)] : [])}
-        placeholder={loading ? "Loading..." : "Select an application"}
+        options={applicationOptions}
+        selectedIds={data.application_ids}
+        onChange={handleApplicationChange}
+        placeholder="Select applications"
+        loading={loading}
         disabled={!canEdit || loading}
-      >
-        {applications.map(app => (
-          <option key={app.application_id || app.id} value={app.application_id || app.id}>
-            {app.name || app.display_name || `Application ${app.application_id || app.id}`}
-          </option>
-        ))}
-      </Select>
+      />
+
+      <MultiSelect
+        label="Owners"
+        options={[...ownerOptions, ...teamOptions]}
+        selectedIds={[...data.owner_ids, ...data.team_ids]}
+        onChange={(selectedIds) => {
+          const ownerIds = selectedIds.filter(id => ownerOptions.some(o => o.id === id))
+          const teamIds = selectedIds.filter(id => teamOptions.some(t => t.id === id))
+          onChange({
+            ...data,
+            owner_ids: ownerIds,
+            team_ids: teamIds
+          })
+        }}
+        placeholder="Select owners and teams"
+        loading={loading}
+        disabled={!canEdit || loading}
+      />
+
+      <MultiSelect
+        label="Tags (optional)"
+        options={tagOptions}
+        selectedIds={data.tag_ids}
+        onChange={handleTagChange}
+        placeholder="Type tags"
+        loading={loading}
+        disabled={!canEdit || loading}
+      />
     </div>
   )
 }
