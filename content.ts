@@ -13,7 +13,10 @@ export const config: PlasmoCSConfig = {
 }
 
 // Mark that content script has loaded (for debugging)
-;(window as any).__absmartlyContentScriptLoaded = true
+console.log('[ABsmartly] Content script executing - TOP OF FILE')
+const w = window as any
+w.__absmartlyContentScriptLoaded = true
+console.log('[ABsmartly] Content script marker set:', w.__absmartlyContentScriptLoaded)
 debugLog('[Visual Editor Content Script] Content script loaded')
 
 // Helper function to send messages - handles both test mode (iframe) and production (chrome.runtime)
@@ -364,6 +367,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })()
 
+    return true
+  }
+  
+  // Code editor messages
+  if (message.type === 'OPEN_CODE_EDITOR') {
+    openCodeEditor(message.data)
+    sendResponse({ success: true })
+    return true
+  }
+  
+  if (message.type === 'CLOSE_CODE_EDITOR') {
+    closeCodeEditor()
+    sendResponse({ success: true })
+    return true
+  }
+  
+  // JSON editor messages
+  if (message.type === 'OPEN_JSON_EDITOR') {
+    openJSONEditor(message.data)
+    sendResponse({ success: true })
+    return true
+  }
+  
+  if (message.type === 'CLOSE_JSON_EDITOR') {
+    closeJSONEditor()
+    sendResponse({ success: true })
     return true
   }
 })
@@ -770,22 +799,6 @@ document.addEventListener('absmartly-test', (event: any) => {
 
 // Code editor functionality
 let codeEditorContainer: HTMLDivElement | null = null
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'OPEN_CODE_EDITOR') {
-    openCodeEditor(message.data)
-    sendResponse({ success: true })
-  } else if (message.type === 'CLOSE_CODE_EDITOR') {
-    closeCodeEditor()
-    sendResponse({ success: true })
-  } else if (message.type === 'OPEN_JSON_EDITOR') {
-    openJSONEditor(message.data)
-    sendResponse({ success: true })
-  } else if (message.type === 'CLOSE_JSON_EDITOR') {
-    closeJSONEditor()
-    sendResponse({ success: true })
-  }
-})
 
 function openCodeEditor(data: {
   section: string
