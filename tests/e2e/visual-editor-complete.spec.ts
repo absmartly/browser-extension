@@ -700,12 +700,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  • Edit HTML - Modified heading HTML')
     console.log('  • Save to sidebar - Changes synced to DOM editor')
 
-      // Wait 30 seconds at the end in slow mode to inspect the result
-      if (SLOW_MODE) {
-        console.log('⏳ Slow mode: Waiting 30 seconds before test completion...')
-        await debugWait(30000)
-        console.log('✅ Slow wait complete')
-      }
+
     })
 
     await test.step('Verify changes and markers after VE exit', async () => {
