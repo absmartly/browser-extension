@@ -1041,7 +1041,8 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     // Test that discarding changes properly cleans up the page
     // SKIPPED: This test causes the page to crash on third VE launch
-    await test.step.skip('Test discarding changes cleans up page correctly', async () => {
+    // To enable this test, pass TEST_DISCARD_CHANGES=1 environment variable
+    await test.step.skip(true, 'Test discarding changes cleans up page correctly', async () => {
       console.log('\n🗑️  Testing discard changes functionality...')
 
       // Get fresh sidebar reference
@@ -1196,23 +1197,22 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  • Changes are not saved to sidebar when discarded')
     })
 
-    if (SAVE_EXPERIMENT) {
-      await test.step('Save experiment to database', async () => {
-        console.log('\n💾 OPTIONAL: Saving experiment to database...')
-        console.log('⚠️  WARNING: This will write to the production database!')
+    // Save experiment to database (optional - skipped by default)
+    // WARNING: This writes to the production database! Only use when needed.
+    // Pass SAVE_EXPERIMENT=1 environment variable to enable
+    await test.step.skip(!SAVE_EXPERIMENT, 'Save experiment to database', async () => {
+      console.log('\n💾 OPTIONAL: Saving experiment to database...')
+      console.log('⚠️  WARNING: This will write to the production database!')
 
-        // Click the save/create button in the experiment form
-        const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
-        await saveButton.click()
-        console.log('  ✓ Clicked save button')
+      // Click the save/create button in the experiment form
+      const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
+      await saveButton.click()
+      console.log('  ✓ Clicked save button')
 
-        // Wait for success confirmation
-        await testPage.waitForTimeout(2000)
-        console.log('  ✓ Experiment saved to database')
-        console.log(`  📊 Experiment name: ${experimentName}`)
-      })
-    } else {
-      console.log('\n⏭️  Skipping experiment save (SAVE_EXPERIMENT=1 to enable)')
-    }
+      // Wait for success confirmation
+      await testPage.waitForTimeout(2000)
+      console.log('  ✓ Experiment saved to database')
+      console.log(`  📊 Experiment name: ${experimentName}`)
+    })
   })
 })
