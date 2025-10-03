@@ -168,9 +168,60 @@ test.describe('Visual Editor Complete Workflow', () => {
     experimentName = `E2E Test Experiment ${Date.now()}`
     await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
     console.log(`  Filled experiment name: ${experimentName}`)
+    await debugWait()
 
-      console.log('✅ Experiment form filled')
-      await debugWait()
+    // Select Unit Type (required field)
+    console.log('  Selecting Unit Type...')
+    const unitTypeSelect = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select')
+    await unitTypeSelect.waitFor({ state: 'visible', timeout: 5000 })
+    
+    // Get first available option (skip the placeholder)
+    const unitTypeOptions = await unitTypeSelect.locator('option').count()
+    if (unitTypeOptions < 2) {
+      throw new Error('No unit types available - form cannot be filled')
+    }
+    
+    // Select the first real option (index 1, skipping placeholder at index 0)
+    const firstUnitTypeValue = await unitTypeSelect.locator('option').nth(1).getAttribute('value')
+    await unitTypeSelect.selectOption(firstUnitTypeValue || '')
+    console.log(`  ✓ Selected unit type`)
+    await debugWait()
+
+    // Select Applications (required field)
+    console.log('  Selecting Applications...')
+    const appsContainer = sidebar.locator('label:has-text("Applications")').locator('..')
+    const appsClickArea = appsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
+    
+    await appsClickArea.click({ timeout: 5000 })
+    console.log('  ✓ Clicked applications field')
+    await testPage.waitForTimeout(500)
+    
+    // Wait for dropdown and select first application
+    const appsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+    await appsDropdown.waitFor({ state: 'visible', timeout: 3000 })
+    
+    const firstAppOption = appsDropdown.locator('div[class*="cursor-pointer"]').first()
+    if (!await firstAppOption.isVisible({ timeout: 2000 })) {
+      throw new Error('No applications available - form cannot be filled')
+    }
+    
+    const selectedAppText = await firstAppOption.textContent()
+    await firstAppOption.click()
+    console.log(`  ✓ Selected application: ${selectedAppText?.trim()}`)
+    await testPage.waitForTimeout(300)
+    
+    // Verify application badge appeared
+    const appBadge = appsContainer.locator('div[class*="inline-flex"]')
+    if (!await appBadge.isVisible({ timeout: 2000 })) {
+      throw new Error('Application selection failed - badge not visible')
+    }
+    
+    // Click outside to close dropdown
+    await sidebar.locator('label:has-text("Traffic")').click()
+    await testPage.waitForTimeout(300)
+
+    console.log('✅ Experiment form filled with required fields')
+    await debugWait()
     })
 
     await test.step('Activate Visual Editor', async () => {
