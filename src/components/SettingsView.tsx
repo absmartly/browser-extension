@@ -276,7 +276,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             className="w-6 h-6"
           />
         )}
-        <h2 className="text-lg font-semibold">ABsmartly Settings</h2>
+        <h2 className="text-lg font-semibold">Settings</h2>
         </div>
         <button
           onClick={onCancel}
