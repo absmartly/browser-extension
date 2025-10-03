@@ -87,6 +87,10 @@ export function useABsmartly() {
     return client.getTeams()
   }, [client])
 
+  const getTemplates = useCallback(async (type: 'test_template' | 'feature_template' | 'test_template,feature_template' = 'test_template'): Promise<any[]> => {
+    return client.getTemplates(type)
+  }, [client])
+
   return {
     client,
     config,
@@ -106,6 +110,7 @@ export function useABsmartly() {
     getMetrics,
     getExperimentTags,
     getOwners,
-    getTeams
+    getTeams,
+    getTemplates
   }
 }
