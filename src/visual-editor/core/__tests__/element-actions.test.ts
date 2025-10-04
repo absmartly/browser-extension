@@ -4,11 +4,13 @@
  * Aims for 95%+ test coverage
  */
 
-import { ElementActions, ElementActionsOptions } from '../element-actions'
-import StateManager, { VisualEditorConfig } from '../state-manager'
+import { ElementActions } from '../element-actions'
+import type { ElementActionsOptions } from '../element-actions'
+import StateManager from '../state-manager'
+import type { VisualEditorConfig } from '../state-manager'
 import UndoRedoManager from '../undo-redo-manager'
 import { Notifications } from '../../ui/notifications'
-import { DOMChange } from '../../types/visual-editor'
+import type { DOMChange } from '../../types/visual-editor'
 import { generateRobustSelector } from '../../utils/selector-generator'
 
 // Mock dependencies

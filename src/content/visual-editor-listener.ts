@@ -38,10 +38,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Create and start new editor
       currentEditor = new VisualEditor({
         variantName: message.variantName,
+        experimentName: message.experimentName || 'Unknown Experiment',
+        logoUrl: message.logoUrl || '',
         initialChanges: message.changes || [],
         onChangesUpdate: (changes: DOMChange[]) => {
-          console.log('[Visual Editor Listener] Changes updated:', changes)
-          // Send changes back to extension
           chrome.runtime.sendMessage({
             type: 'VISUAL_EDITOR_CHANGES',
             variantName: message.variantName,

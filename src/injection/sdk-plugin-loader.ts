@@ -3,7 +3,7 @@
  * Detects ABsmartly SDK on the page and initializes the DOM Changes Plugin
  */
 
-import { DOMChangesPlugin } from '@absmartly/dom-changes-plugin'
+// import { DOMChangesPlugin } from '@absmartly/dom-changes-plugin'
 
 interface ABsmartlyContext {
   treatment: (experimentName: string) => number
