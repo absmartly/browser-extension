@@ -107,6 +107,7 @@ export function DOMChangesInlineEditor({
   const [isDragOver, setIsDragOver] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
   // Debug editingChange state changes (commented out - too verbose)
   // useEffect(() => {
@@ -783,6 +784,41 @@ export function DOMChangesInlineEditor({
     const newChange = createEmptyChange()
     debugLog('🆕 Creating new DOM change:', newChange)
     setEditingChange(newChange)
+  }
+
+  const handleAIGenerate = async (prompt: string) => {
+    try {
+      debugLog('🤖 Generating DOM changes with AI, prompt:', prompt)
+
+      const config = await getConfig()
+      if (!config?.anthropicApiKey) {
+        throw new Error('Anthropic API key not configured. Please add it in Settings.')
+      }
+
+      const html = await capturePageHTML()
+
+      const response = await chrome.runtime.sendMessage({
+        type: 'AI_GENERATE_DOM_CHANGES',
+        html,
+        prompt,
+        apiKey: config.anthropicApiKey
+      })
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to generate DOM changes')
+      }
+
+      const generatedChanges = response.changes as DOMChange[]
+      debugLog('✅ Generated', generatedChanges.length, 'DOM changes:', generatedChanges)
+
+      const updatedChanges = [...changes, ...generatedChanges]
+      onChange(updatedChanges)
+
+      debugLog('✅ AI-generated changes added successfully')
+    } catch (error) {
+      debugError('❌ AI generation failed:', error)
+      throw error
+    }
   }
 
   const handleEditChange = (index: number) => {
@@ -1535,6 +1571,16 @@ export function DOMChangesInlineEditor({
           </Button>
           <Button
             type="button"
+            onClick={() => setAiDialogOpen(true)}
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+          >
+            <SparklesIcon className="h-4 w-4 mr-1" />
+            Generate with AI
+          </Button>
+          <Button
+            type="button"
             onClick={handleLaunchVisualEditor}
             size="sm"
             variant="primary"
@@ -1553,6 +1599,14 @@ export function DOMChangesInlineEditor({
           </Button>
         </div>
       )}
+
+      {/* AI Dialog */}
+      <AIDOMChangesDialog
+        isOpen={aiDialogOpen}
+        onClose={() => setAiDialogOpen(false)}
+        onGenerate={handleAIGenerate}
+        variantName={variantName}
+      />
     </div>
   )
 }
