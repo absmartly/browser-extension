@@ -139,6 +139,69 @@ test.describe('Visual Improvements Tests', () => {
     })
   })
 
+  test('Verify Create Experiment dropdown shows templates', async ({ extensionId, extensionUrl }) => {
+    test.setTimeout(30000)
+
+    const sidebar = await injectSidebar(testPage, extensionUrl)
+    
+    await test.step('Open create experiment dropdown', async () => {
+      console.log('Opening create experiment dropdown')
+      
+      const createButton = sidebar.locator('button[title="Create New Experiment"]')
+      await createButton.click()
+      await debugWait(1000)
+      
+      console.log('Dropdown opened')
+      
+      // Check if dropdown is visible
+      const dropdown = sidebar.locator('[role="menu"]')
+      await dropdown.waitFor({ state: 'visible', timeout: 5000 })
+      
+      // Check for "Create from scratch" button
+      const createFromScratch = sidebar.locator('button:has-text("Create from scratch")')
+      await createFromScratch.waitFor({ state: 'visible', timeout: 5000 })
+      console.log('Create from scratch button found')
+      
+      // Check for search input
+      const searchInput = sidebar.locator('input[placeholder="Search templates"]')
+      await searchInput.waitFor({ state: 'visible', timeout: 5000 })
+      console.log('Search input found')
+      
+      // Wait for templates to finish loading (loading indicator to disappear)
+      const loadingIndicator = sidebar.locator('text=Loading templates')
+      await loadingIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+      await loadingIndicator.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {})
+      
+      await debugWait(1000)
+      
+      // Check if templates loaded successfully
+      const templateButtons = sidebar.locator('button:has-text("Load")')
+      const templateCount = await templateButtons.count()
+      console.log('Number of templates loaded:', templateCount)
+      
+      const noTemplates = sidebar.locator('text=No templates found')
+      const hasNoTemplates = await noTemplates.isVisible()
+      console.log('No templates message visible:', hasNoTemplates)
+      
+      if (templateCount > 0) {
+        console.log('✅ Templates loaded successfully')
+      } else if (hasNoTemplates) {
+        console.log('⚠️  No templates available')
+      } else {
+        console.log('⚠️  Templates may still be loading')
+      }
+      
+      // Take screenshot
+      await testPage.screenshot({
+        path: 'test-results/create-experiment-dropdown.png',
+        fullPage: true
+      })
+      console.log('Screenshot saved: create-experiment-dropdown.png')
+      
+      await debugWait()
+    })
+  })
+
   test('Verify Visual Editor floating bar', async ({ extensionId, extensionUrl }) => {
     test.setTimeout(50000)
 

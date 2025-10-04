@@ -1,0 +1,183 @@
+
+> absmartly-browser-extension@0.0.1 test:e2e
+> playwright test visual-editor-complete.spec.ts
+
+🚀 Starting global test setup...
+✅ Extension already built
+⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.
+✅ Copied seed.html to build directory
+✅ Copied local-test-page.html to build directory
+✅ Loaded environment variables from .env.local
+✅ API credentials found in environment
+✅ Global setup completed successfully
+---
+
+Running 1 test using 1 worker
+
+  📝 [log] [ABsmartly] Content script executing - TOP OF FILE
+  📝 [log] [ABsmartly] Content script marker set: true
+✅ Test page loaded (test mode enabled)
+  📋 Console messages so far: 3
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+
+📂 STEP 1: Injecting sidebar
+✅ Sidebar visible
+
+📋 STEP 2: Creating new experiment
+  Dispatched click event to Create New Experiment button
+  Selecting "From Scratch" option...
+  ✓ Selected "From Scratch" option
+  Filled experiment name: E2E Test Experiment 1759577454661
+  📝 [log] [ABsmartly] Message listener called! Message type: ABSMARTLY_PREVIEW
+  Selecting Unit Type...
+  ✓ Unit types loaded
+  ✓ Selected unit type
+  Selecting Applications...
+  ✓ Clicked applications field
+  ✓ Applications loaded in dropdown
+  ✓ Selected application: Wwww
+✅ Experiment form filled with required fields
+🎨 STEP 3: Clicking Visual Editor button
+  ✓ Visual Editor button is enabled (form validation complete)
+  ✓ Waited for React handlers to attach
+  ✓ Brought test page to front
+  📝 [log] [DOMChanges] HANDLER CALLED - about to query tabs
+  📝 [log] [DOMChanges] Initial tabs query result: 1 tabs
+  📝 [log] [DOMChanges] Using tab ID: 544484408
+  📝 [log] [ABsmartly] Message listener called! Message type: CHECK_VISUAL_EDITOR_ACTIVE
+  📝 [log] [ABsmartly] Message listener called! Message type: SET_VISUAL_EDITOR_STARTING
+  ✓ Dispatched click event to Visual Editor button
+  📝 [log] [DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id: 544484408
+  📝 [log] [ABsmartly] Message listener called! Message type: ABSMARTLY_PREVIEW
+  📝 [log] [DOMChanges] Sending START_VISUAL_EDITOR to tab: 544484408
+  📝 [log] [ABsmartly] Message listener called! Message type: START_VISUAL_EDITOR
+  📝 [log] [ABsmartly] Received START_VISUAL_EDITOR message: {"type":"START_VISUAL_EDITOR","variantName":"Control","experimentName":"E2E Test Experiment 1759577454661","changes":[]}
+  📝 [log] [ABsmartly] startVisualEditor called with config: {"variantName":"Control","experimentName":"E2E Test Experiment 1759577454661","changes":[]}
+  📝 [log] [ABsmartly] startVisualEditor completed with result: {"success":true}
+  ⏳ Waited 3s after VE button click
+  📋 Captured 147 console messages
+  📋 Content script/background messages: 10
+  Messages:
+    [log] [ABsmartly] Content script executing - TOP OF FILE
+    [log] [ABsmartly] Content script marker set: true
+    [log] [ABsmartly] Message listener called! Message type: ABSMARTLY_PREVIEW
+    [log] [ABsmartly] Message listener called! Message type: CHECK_VISUAL_EDITOR_ACTIVE
+    [log] [ABsmartly] Message listener called! Message type: SET_VISUAL_EDITOR_STARTING
+    [log] [ABsmartly] Message listener called! Message type: ABSMARTLY_PREVIEW
+    [log] [ABsmartly] Message listener called! Message type: START_VISUAL_EDITOR
+    [log] [ABsmartly] Received START_VISUAL_EDITOR message: {"type":"START_VISUAL_EDITOR","variantName":"Control","experimentName":"E2E Test Experiment 1759577454661","changes":[]}
+    [log] [ABsmartly] startVisualEditor called with config: {"variantName":"Control","experimentName":"E2E Test Experiment 1759577454661","changes":[]}
+    [log] [ABsmartly] startVisualEditor completed with result: {"success":true}
+  ⏳ Waiting for VE banner to appear...
+  📋 Total messages captured so far: 147
+✅ Visual editor active
+  Screenshot saved: sidebar-after-ve-launch.png
+
+🚫 STEP 3.5: Testing VE protection - all buttons should be disabled
+  Found 2 Visual Editor buttons
+  Button 0 disabled: true, title: "Visual Editor is already active for this variant"
+  Button 1 disabled: true, title: "Visual Editor is active for variant "Control""
+  ✅ All VE buttons correctly disabled when VE is active
+
+🧪 STEP 4: Testing visual editor context menu actions
+  Testing: Edit Text on #test-paragraph
+  ✓ Edit Text works
+  Testing: Hide on #button-1
+  ✓ Hide works
+  Testing: Delete on #button-2
+  ✓ Delete works
+  Testing: Move up on #item-2
+  ✓ Move up works
+  Testing: Edit HTML on #test-container
+  ✓ CodeMirror editor appeared
+  ✓ CodeMirror syntax highlighting: true
+  ✓ Updated HTML via CodeMirror
+  Looking for Save button...
+  Clicking Save button with JavaScript click...
+  Clicked Save button
+  Editor closed
+  ✓ Edit HTML with CodeMirror works
+✅ Visual editor actions tested (Edit Text, Hide, Delete, Move up, Edit HTML)
+
+✓ Verifying DOM changes were actually applied...
+  Applied changes: {
+  paragraphText: [32m'Modified text!'[39m,
+  button1Display: [32m'none'[39m,
+  button2Display: [32m'none'[39m,
+  testContainerHTML: [32m'<h2>HTML Edited!</h2><p>New paragraph content</p><p></p>'[39m
+}
+  ✓ Text change applied: paragraph text is "Modified text!"
+  ✓ Hide change applied: button-1 is display:none
+  ✓ Delete change applied: button-2 is hidden (display:none)
+  ✓ HTML change applied: test-container has new HTML
+✅ All DOM changes verified and applied correctly
+
+🔄 Testing undo/redo with multiple changes to same element...
+  📝 Current text: "Modified text!"
+  ✏️  Making change 1: "Undo test 1"
+  ✓ Change 1 applied: "Undo test 1" (trackChange: null, undoAction: null)
+  ✏️  Making change 2: "Undo test 2"
+  ✓ Change 2 applied: "Undo test 2" (trackChange: null, undoAction: null)
+  ✏️  Making change 3: "Undo test 3"
+  ✓ Change 3 applied: "Undo test 3" (trackChange: null, undoAction: null)
+  ✓ Final text after changes: "Undo test 3"
+
+  ⏪ Testing undo with individual change tracking...
+  ✓ Undo 1: Text is now "Undo test 2"
+  ✓ Undo 2: Text is now "Undo test 1"
+  ✓ Undo 3: Text is now "Modified text!"
+
+  ⏩ Testing redo...
+  ✓ Redo 1: Text is now "Undo test 1"
+  ✓ Redo 2: Text is now "Undo test 2"
+  ✓ Redo 3: Text is now "Undo test 3"
+
+✅ Undo/redo with individual change tracking working correctly!
+  • Each change tracked individually for granular undo/redo
+  • 3 undos: "Undo test 3" -> "Undo test 2" -> "Undo test 1" -> "Modified text!"
+  • 3 redos: "Modified text!" -> "Undo test 1" -> "Undo test 2" -> "Undo test 3"
+
+🔘 Testing undo/redo button states...
+  ⏪ Undoing all changes to test undo button disabled state...
+  ✓ Undo button became disabled after 8 undos
+  ✓ Undo button is disabled when no more changes to undo
+
+  ⏩ Redoing all changes to test redo button disabled state...
+  ✓ Redo button became disabled after 8 redos
+  ✓ Redo button is disabled when no more changes to redo
+
+✅ Undo/redo button states test PASSED!
+  • Undo button disabled after 8 undos (no more history)
+  • Redo button disabled after 8 redos (caught up to current state)
+
+💾 STEP 5: Clicking Save button...
+✅ Save button clicked
+
+⏳ STEP 6: Waiting for sidebar to update after visual editor closes...
+  📝 [log] [ABsmartly] Message listener called! Message type: ABSMARTLY_PREVIEW
+  ✘  1 [chromium] › tests/e2e/visual-editor-complete.spec.ts:104:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify (20.2s)
+
+
+  1) [chromium] › tests/e2e/visual-editor-complete.spec.ts:104:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify › Wait for sidebar to update 
+
+    [31mTest timeout of 20000ms exceeded.[39m
+
+    Error: page.waitForTimeout: Target page, context or browser has been closed
+
+      753 |       // The changes should be visible in the variant's DOM Changes section
+      754 |       // Give it extra time for React to re-render the inline editor with the changes
+    > 755 |       await testPage.waitForTimeout(2000)
+          |                      ^
+      756 |
+      757 |       await debugWait()
+      758 |     })
+        at /Users/joalves/git_tree/absmartly-browser-extension/tests/e2e/visual-editor-complete.spec.ts:755:22
+        at /Users/joalves/git_tree/absmartly-browser-extension/tests/e2e/visual-editor-complete.spec.ts:749:16
+
+  1 failed
+    [chromium] › tests/e2e/visual-editor-complete.spec.ts:104:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify 
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
