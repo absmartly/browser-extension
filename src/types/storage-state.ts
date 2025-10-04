@@ -27,3 +27,16 @@ export interface VisualEditorChanges {
   variantName: string
   changes: any[]
 }
+
+export interface SidebarState {
+  view: string
+  selectedExperiment: number | null
+}
+
+export interface ExperimentFilters {
+  state?: string[]
+  application?: number
+  owner?: number
+  team?: number
+  tag?: number
+}
