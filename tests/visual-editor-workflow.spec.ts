@@ -71,7 +71,7 @@ test.describe('Visual Editor Workflow Tests', () => {
     await frame.waitForTimeout(2000)
 
     // Enable console logging from iframe
-    frame.on('console', msg => console.log('[Sidebar]', msg.text()))
+    (frame as any).on('console', msg => console.log('[Sidebar]', msg.text()))
 
     // Check if welcome screen is visible
     const hasWelcome = await frame.locator('text=Welcome to ABsmartly').isVisible().catch(() => false)

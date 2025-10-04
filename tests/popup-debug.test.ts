@@ -55,7 +55,7 @@ test.describe('Debug Extension Loading', () => {
     const scripts = await page.evaluate(() => {
       return Array.from(document.scripts).map(s => ({
         src: s.src,
-        loaded: s.readyState === 'complete' || !s.readyState
+        loaded: (s as any).readyState === 'complete' || !(s as any).readyState
       }))
     })
     console.log('Scripts:', scripts)

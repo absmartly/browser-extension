@@ -324,7 +324,7 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
       await page.waitForTimeout(100)
 
       // Check if button is on the same line
-      const headerHeight = await page.$eval('#absmartly-preview-header', el => el.offsetHeight)
+      const headerHeight = await page.$eval('#absmartly-preview-header', el => (el as HTMLElement).offsetHeight)
       const buttonPosition = await page.$eval('#absmartly-preview-header button', el => {
         const rect = el.getBoundingClientRect()
         return { top: rect.top, height: rect.height }
