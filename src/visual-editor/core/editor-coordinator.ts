@@ -4,7 +4,7 @@
  */
 
 import { generateRobustSelector } from '../utils/selector-generator'
-import StateManager from '../state-manager'
+import StateManager from './state-manager'
 import type { VisualEditorState } from './state-manager'
 import EventHandlers from './event-handlers'
 import ContextMenu from './context-menu'
@@ -237,7 +237,7 @@ export class EditorCoordinator {
           this.undoRedoManager.addChange(
             {
               selector,
-              type: 'delete',
+              type: 'remove',
               value: null,
               enabled: true
             },
