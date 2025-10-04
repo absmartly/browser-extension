@@ -6,6 +6,7 @@ import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import { Input } from './ui/Input'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
+import { Logo } from './Logo'
 import type { DOMChange } from '~src/types/dom-changes'
 import { ArrowLeftIcon, PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon, ArrowTopRightOnSquareIcon, PencilSquareIcon, PlusIcon, TrashIcon, CodeBracketIcon, PlayIcon, StopIcon } from '@heroicons/react/24/outline'
 import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
@@ -299,8 +300,6 @@ export function ExperimentDetail({
                          experiment.status !== 'running' &&
                          experiment.status !== 'development'
 
-  const logoUrl = chrome.runtime.getURL('assets/icon128.png')
-
   return (
     <div className="p-4">
       {/* Header with logo, experiment name, status/traffic, and actions */}
@@ -308,11 +307,7 @@ export function ExperimentDetail({
         {/* First line: logo + name on left, back button on right */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <img
-              src={logoUrl}
-              alt="ABsmartly"
-              className="w-6 h-6"
-            />
+            <Logo />
             {editingName ? (
               <div className="flex-1">
                 <div className="flex items-center gap-0.5">
