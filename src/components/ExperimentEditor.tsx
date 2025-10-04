@@ -11,6 +11,7 @@ import { ArrowLeftIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24
 import { VariantList } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
+import { Logo } from './Logo'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -238,11 +239,7 @@ export function ExperimentEditor({
     <div className="p-4">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img
-            src={chrome.runtime.getURL('assets/icon128.png')}
-            alt="ABsmartly"
-            className="w-6 h-6"
-          />
+          <Logo />
           <h2 className="text-lg font-semibold text-gray-900">
             {experiment ? 'Edit Experiment' : 'Create New Experiment'}
           </h2>
