@@ -79,11 +79,6 @@ test.describe('Visual Editor Complete Workflow', () => {
     }
     testPage.on('console', consoleHandler)
 
-    // Also listen to console events from all frames (including the sidebar iframe)
-    testPage.on('frameattached', async (frame) => {
-      (frame as any).on('console', consoleHandler)
-    })
-
     await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForLoadState('networkidle')
@@ -777,9 +772,9 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log(`  Found ${anyDomChangeElements} elements with "dom-change" in class`)
       
       // Debug: Check if changes are in the data but not rendered
-      const sidebarText = await (sidebar as any).textContent()
-      console.log('  Sidebar contains "Undo test":', sidebarText?.includes('Undo test'))
-      console.log('  Sidebar contains "display:none":', sidebarText?.includes('display:none'))
+      const sidebarText = await sidebar.locator('body').innerText()
+      console.log('  Sidebar contains "Undo test":', sidebarText.includes('Undo test'))
+      console.log('  Sidebar contains "display:none":', sidebarText.includes('display:none'))
       
       throw err // Re-throw to fail the test
     }

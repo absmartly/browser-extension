@@ -68,10 +68,7 @@ test.describe('Visual Editor Workflow Tests', () => {
 
     // Wait for sidebar content to load
     await frame.waitForLoadState('domcontentloaded')
-    await (page as any).waitForTimeout(2000)
-
-    // Enable console logging from iframe
-    (frame as any).on('console', msg => console.log('[Sidebar]', msg.text()))
+    await new Promise(resolve => setTimeout(resolve, 2000))
 
     // Check if welcome screen is visible
     const hasWelcome = await frame.locator('text=Welcome to ABsmartly').isVisible().catch(() => false)

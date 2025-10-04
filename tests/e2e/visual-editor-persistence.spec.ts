@@ -579,20 +579,31 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
         }
       ]
 
-      // Implement merging logic
-      const mergedChanges: any[] = []
-      const changeMap = new Map()
+      // Define test change type with timestamp
+      interface TestChange {
+        selector: string
+        type: 'text' | 'style'
+        value: string | Record<string, string>
+        enabled: boolean
+        timestamp: number
+      }
 
-      for (const change of changes) {
+      // Implement merging logic
+      const mergedChanges: TestChange[] = []
+      const changeMap = new Map<string, TestChange>()
+
+      for (const change of changes as TestChange[]) {
         const key = `${change.selector}:${change.type}`
 
         if (changeMap.has(key)) {
-          const existing = changeMap.get(key)
+          const existing = changeMap.get(key)!
 
-          if (change.type === 'style') {
-            // Merge style properties
-            existing.value = { ...(existing as any).value, ...(change as any).value }
-            existing.timestamp = Math.max(existing.timestamp, change.timestamp)
+          if (change.type === 'style' && existing.type === 'style') {
+            // Merge style properties - both must be Records
+            if (typeof change.value === 'object' && typeof existing.value === 'object') {
+              existing.value = { ...existing.value, ...change.value }
+              existing.timestamp = Math.max(existing.timestamp, change.timestamp)
+            }
           } else {
             // Replace for other types if newer
             if (change.timestamp > existing.timestamp) {
@@ -677,10 +688,10 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
       changes.forEach(change => {
         const element = document.querySelector(change.selector)
         if (element) {
-          if (change.type === 'style') {
+          if (change.type === 'style' && typeof change.value === 'object') {
             Object.assign((element as HTMLElement).style, change.value)
-          } else if (change.type === 'text') {
-            element.textContent = change.value as string
+          } else if (change.type === 'text' && typeof change.value === 'string') {
+            element.textContent = change.value
           }
         }
       })
@@ -802,11 +813,11 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
             const results = updatedChanges.map(change => {
               const elem = document.querySelector(change.selector)
               if (elem) {
-                if (change.type === 'style') {
+                if (change.type === 'style' && typeof change.value === 'object') {
                   Object.assign((elem as HTMLElement).style, change.value)
                   return { selector: change.selector, applied: true, found: true }
-                } else if (change.type === 'text') {
-                  elem.textContent = change.value as string
+                } else if (change.type === 'text' && typeof change.value === 'string') {
+                  elem.textContent = change.value
                   return { selector: change.selector, applied: true, found: true }
                 }
               }
@@ -1640,11 +1651,11 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
         const element = document.querySelector(change.selector)
         if (element) {
           try {
-            if (change.type === 'style') {
+            if (change.type === 'style' && typeof change.value === 'object') {
               Object.assign((element as HTMLElement).style, change.value)
-            } else if (change.type === 'text') {
-              element.textContent = change.value as string
-            } else if (change.type === 'attribute') {
+            } else if (change.type === 'text' && typeof change.value === 'string') {
+              element.textContent = change.value
+            } else if (change.type === 'attribute' && typeof change.value === 'object') {
               Object.entries(change.value).forEach(([attr, value]) => {
                 element.setAttribute(attr, value as string)
               })
@@ -1925,13 +1936,36 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
       const applicationResults = []
 
+      // Define types for test data
+      interface TestExperimentChange {
+        selector: string
+        type: string
+        value?: unknown
+        position?: string
+        html?: string
+      }
+
+      interface TestVariant {
+        id: string
+        name: string
+        weight: number
+        changes: TestExperimentChange[]
+      }
+
+      interface TestExperiment {
+        id: string
+        name: string
+        status: string
+        variants: Record<string, TestVariant>
+      }
+
       // Apply changes for assigned variants
       Object.entries(userAssignments).forEach(([experimentId, variantId]) => {
-        const experiment = experiments[experimentId as keyof typeof experiments]
-        const variant = experiment.variants[variantId as keyof typeof experiment.variants]
+        const experiment = experiments[experimentId as keyof typeof experiments] as TestExperiment
+        const variant = experiment.variants[variantId]
 
-        if (variant && (variant as any).changes) {
-          (variant as any).changes.forEach((change: any) => {
+        if (variant && variant.changes) {
+          variant.changes.forEach((change) => {
             const element = document.querySelector(change.selector)
             if (element) {
               try {
@@ -1944,7 +1978,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
                     selector: change.selector,
                     applied: true
                   })
-                } else if (change.type === 'text') {
+                } else if (change.type === 'text' && typeof change.value === 'string') {
                   element.textContent = change.value
                   applicationResults.push({
                     experimentId,
@@ -1953,7 +1987,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
                     selector: change.selector,
                     applied: true
                   })
-                } else if (change.type === 'html') {
+                } else if (change.type === 'html' && typeof change.value === 'string') {
                   element.innerHTML = change.value
                   applicationResults.push({
                     experimentId,
@@ -2944,10 +2978,17 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
         for (const operation of errorTests) {
           const result = await simulateNetworkFailure(operation)
+          // Define type for error result
+          interface ErrorResult {
+            retryable?: boolean
+            code?: string
+          }
+
+          const errorResult = result as ErrorResult
           errorResults.push({
             operation,
-            retryable: (result as any).retryable,
-            errorCode: (result as any).code,
+            retryable: errorResult.retryable ?? false,
+            errorCode: errorResult.code ?? 'unknown',
             handled: true
           })
         }
