@@ -16,7 +16,7 @@ import type { Experiment } from "~src/types/absmartly"
 import { CogIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
-import logoUrl from "data-base64:~assets/logo.png"
+import { Logo } from "~src/components/Logo"
 import "~style.css"
 
 type View = 'list' | 'detail' | 'settings' | 'create' | 'edit'
@@ -766,32 +766,8 @@ function SidebarContent() {
           <div className="border-b px-4 py-3 flex-shrink-0 relative">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                {config?.apiEndpoint ? (
-                  <a 
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                      chrome.tabs.create({ url: baseUrl })
-                    }}
-                    className="cursor-pointer"
-                    title="Open ABsmartly"
-                  >
-                    <img 
-                      src={logoUrl} 
-                      alt="ABsmartly" 
-                      className="w-6 h-6 hover:opacity-80 transition-opacity"
-                    />
-                  </a>
-                ) : (
-                  <img 
-                    src={logoUrl} 
-                    alt="ABsmartly" 
-                    className="w-6 h-6"
-                  />
-                )}
+                <Logo config={config} />
                 <h1 className="text-lg font-semibold">Experiments</h1>
-                <span className="px-2 py-0.5 text-xs font-semibold text-blue-600 bg-blue-100 rounded-md">BETA</span>
               </div>
               <div className="flex items-center gap-2">
                 <button

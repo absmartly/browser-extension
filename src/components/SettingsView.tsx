@@ -7,7 +7,7 @@ import { Select } from './ui/Select'
 import { CustomCodeSettings } from './CustomCodeSettings'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
-import logoUrl from "data-base64:~assets/logo.png"
+import { Logo } from './Logo'
 import axios from 'axios'
 
 interface SettingsViewProps {
@@ -252,31 +252,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-        {apiEndpoint ? (
-          <a 
-            href="#"
-            onClick={(e) => {
-              e.preventDefault()
-              const baseUrl = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-              chrome.tabs.create({ url: baseUrl })
-            }}
-            className="cursor-pointer"
-            title="Open ABsmartly"
-          >
-            <img 
-              src={logoUrl} 
-              alt="ABsmartly" 
-              className="w-6 h-6 hover:opacity-80 transition-opacity"
-            />
-          </a>
-        ) : (
-          <img 
-            src={logoUrl} 
-            alt="ABsmartly" 
-            className="w-6 h-6"
-          />
-        )}
-        <h2 className="text-lg font-semibold">Settings</h2>
+          <Logo config={apiEndpoint ? { apiEndpoint } : undefined} />
+          <h2 className="text-lg font-semibold">Settings</h2>
         </div>
         <button
           onClick={onCancel}
