@@ -5,6 +5,8 @@ import { useABsmartly } from "~src/hooks/useABsmartly"
 interface CreateExperimentDropdownProps {
   onCreateFromScratch: () => void
   onCreateFromTemplate?: (templateId: number) => void
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface Template {
@@ -177,9 +179,19 @@ export function CreateExperimentDropdownPanel({
 
 export function CreateExperimentDropdown({
   onCreateFromScratch,
-  onCreateFromTemplate
+  onCreateFromTemplate,
+  isOpen: externalIsOpen,
+  onOpenChange
 }: CreateExperimentDropdownProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen
+  const setIsOpen = (value: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(value)
+    } else {
+      setInternalIsOpen(value)
+    }
+  }
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -252,107 +264,25 @@ export function CreateExperimentDropdown({
   }
 
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-        aria-label="Create Experiment"
-        title="Create New Experiment"
+    <button
+      onClick={() => setIsOpen(!isOpen)}
+      className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+      aria-label="Create Experiment"
+      title="Create New Experiment"
+    >
+      <svg
+        className="h-5 w-5 text-gray-600"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
       >
-        <svg
-          className="h-5 w-5 text-gray-600"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div
-          ref={dropdownRef}
-          className="absolute left-0 right-0 top-full bg-white border-b border-gray-200 shadow-lg z-50 animate-slideDown"
-          role="menu"
-        >
-          {/* Warning message */}
-          <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
-            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-yellow-800">
-              Loading a new template will overwrite the current experiment fields.
-            </p>
-          </div>
-
-          <button
-            onClick={handleCreateFromScratch}
-            className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm font-medium text-blue-600 border-b border-gray-200"
-            role="menuitem"
-          >
-            <PlusCircleIcon className="h-5 w-5" />
-            Create from scratch
-          </button>
-
-          {/* Templates list */}
-          <div className="max-h-[300px] overflow-y-auto">
-            {loading ? (
-              <div className="px-4 py-8 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-xs text-gray-500 mt-2">Loading templates...</p>
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm text-gray-500">No templates found</p>
-              </div>
-            ) : (
-              <div className="py-2 space-y-1">
-                {filteredTemplates.map((template) => {
-                  const avatarUrl = getAvatarUrl(template.created_by)
-                  const initials = getInitials(template.created_by)
-                  const userName = getUserName(template.created_by)
-
-                  return (
-                    <div
-                      key={template.id}
-                      className="px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
-                    >
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt={userName}
-                          className="h-10 w-10 rounded-full"
-                        />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
-                          {initials}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {template.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Saved {timeAgo(template.updated_at || template.created_at)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleTemplateSelect(template.id)}
-                        className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                      >
-                        Load
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 4v16m8-8H4"
+        />
+      </svg>
+    </button>
   )
 }
