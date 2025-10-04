@@ -79,7 +79,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     await page.waitForLoadState('networkidle')
 
     // Initialize visual editor with test configuration
-    const changes = await page.evaluate(() => {
+    const changes: any[] = await page.evaluate(() => {
       return new Promise((resolve) => {
         const mockChanges: any[] = []
 

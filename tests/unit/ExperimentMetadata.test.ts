@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
-import { setupTestPage } from './test-utils'
+// import { setupTestPage } from './test-utils'
 
 test.describe('ExperimentMetadata Component', () => {
   test.beforeEach(async ({ page }) => {
-    await setupTestPage(page)
     // The component will use the real useABsmartly hook which makes API calls
     // The API calls will be handled by the background script or mocked at that level
   })

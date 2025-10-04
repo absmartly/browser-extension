@@ -81,7 +81,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     // Also listen to console events from all frames (including the sidebar iframe)
     testPage.on('frameattached', async (frame) => {
-      frame.on('console', consoleHandler)
+      (frame as any).on('console', consoleHandler)
     })
 
     await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
