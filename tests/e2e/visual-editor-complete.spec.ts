@@ -1476,12 +1476,33 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Click the save/create button in the experiment form
         const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
+
+        // Debug: check if button exists and its state
+        const buttonExists = await saveButton.count() > 0
+        console.log(`  Save button exists: ${buttonExists}`)
+
+        if (buttonExists) {
+          const buttonText = await saveButton.textContent()
+          const isDisabled = await saveButton.isDisabled()
+          console.log(`  Save button text: "${buttonText}", disabled: ${isDisabled}`)
+        }
+
+        // Scroll to the save button to make it visible
+        await saveButton.scrollIntoViewIfNeeded()
+        console.log('  ✓ Scrolled to save button')
+
+        // Wait a moment for any React state updates
+        await testPage.waitForTimeout(200)
+
         // Use dispatchEvent to ensure React handler is triggered in headless mode
         await saveButton.evaluate((button) => {
+          console.log('[TEST] Clicking button:', button.textContent, 'disabled:', button.disabled)
           button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
         console.log('  ✓ Dispatched click event to save button')
-        await debugWait()
+
+        // Wait for the click to be processed
+        await testPage.waitForTimeout(500)
 
         // Wait for response
 
