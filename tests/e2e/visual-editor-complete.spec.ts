@@ -559,12 +559,18 @@ test.describe('Visual Editor Complete Workflow', () => {
         await testPage.waitForTimeout(500)
 
         // Left-click on paragraph to show context menu
-        await testPage.click('#test-paragraph', { force: true })
+        // Use dispatchEvent to ensure menu handler is triggered in headless mode
+        await testPage.locator('#test-paragraph').evaluate((el) => {
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
         await testPage.waitForTimeout(100)
 
         // Wait for context menu and click Edit Text
         await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-        await testPage.locator('.menu-item:has-text("Edit Text")').click({ timeout: 5000 })
+        // Use dispatchEvent for menu item click in headless mode
+        await testPage.locator('.menu-item:has-text("Edit Text")').evaluate((el) => {
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
 
         // Wait for element to be editable
         await testPage.waitForFunction(() => {
