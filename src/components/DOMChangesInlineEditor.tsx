@@ -6,6 +6,7 @@ import { all as knownCSSProperties } from 'known-css-properties'
 let isLaunchingVisualEditor = false
 
 import { Storage } from '@plasmohq/storage'
+import type { DOMChangesInlineState, ElementPickerResult, DragDropResult, VisualEditorChanges } from '~src/types/storage-state'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Checkbox } from './ui/Checkbox'
@@ -566,16 +567,41 @@ const DOMChangeEditor = ({
               </label>
             </div>
           </div>
-          <MultiSelectTags
-            value={localChange.classesWithStatus || []}
-            onChange={(classes) => {
-              const classAdd = classes.filter(c => c.action === 'add').map(c => c.name)
-              const classRemove = classes.filter(c => c.action === 'remove').map(c => c.name)
-              setLocalChange({ ...localChange, classesWithStatus: classes, classAdd, classRemove })
-            }}
-            placeholder="Type class name and press Enter"
-            label="Classes to add or remove"
-          />
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Classes to Add
+            </label>
+            <MultiSelectTags
+              currentClasses={localChange.classAdd || []}
+              onAddClass={(className) => {
+                const classAdd = [...(localChange.classAdd || []), className]
+                setLocalChange({ ...localChange, classAdd })
+              }}
+              onRemoveClass={(className) => {
+                const classAdd = (localChange.classAdd || []).filter(c => c !== className)
+                setLocalChange({ ...localChange, classAdd })
+              }}
+              placeholder="Type class name and press Enter"
+              pillColor="green"
+            />
+
+            <label className="block text-sm font-medium text-gray-700 mt-4">
+              Classes to Remove
+            </label>
+            <MultiSelectTags
+              currentClasses={localChange.classRemove || []}
+              onAddClass={(className) => {
+                const classRemove = [...(localChange.classRemove || []), className]
+                setLocalChange({ ...localChange, classRemove })
+              }}
+              onRemoveClass={(className) => {
+                const classRemove = (localChange.classRemove || []).filter(c => c !== className)
+                setLocalChange({ ...localChange, classRemove })
+              }}
+              placeholder="Type class name and press Enter"
+              pillColor="red"
+            />
+          </div>
         </div>
       )}
 
@@ -1380,21 +1406,21 @@ export function DOMChangesInlineEditor({
   // Restore state when component mounts
   useEffect(() => {
     const storage = new Storage({ area: "session" })
-    
+
     // First restore the editing state
-    storage.get('domChangesInlineState').then(async (result) => {
+    storage.get<DOMChangesInlineState>('domChangesInlineState').then(async (result) => {
       debugLog('Checking for saved DOM Changes inline state, variantName:', variantName)
       debugLog('Retrieved state:', result)
-      
+
       if (result && result.variantName === variantName) {
         debugLog('Restoring DOM Changes inline state:', result)
         debugLog('Was in dragDropMode?', result.dragDropMode)
-        
+
         setEditingChange(result.editingChange)
         setPickingForField(result.pickingForField)
-        
+
         // Then check for element picker result
-        const pickerResult = await storage.get('elementPickerResult')
+        const pickerResult = await storage.get<ElementPickerResult>('elementPickerResult')
         if (pickerResult && pickerResult.variantName === variantName && pickerResult.selector) {
           debugLog('Applying element picker result:', pickerResult)
           
@@ -1429,10 +1455,10 @@ export function DOMChangesInlineEditor({
         }
         
         // Check for drag-drop result
-        const dragDropResult = await storage.get('dragDropResult')
+        const dragDropResult = await storage.get<DragDropResult>('dragDropResult')
         debugLog('Checking for drag-drop result:', dragDropResult)
         debugLog('Current editingChange from state:', result.editingChange)
-        
+
         if (dragDropResult && dragDropResult.variantName === variantName) {
           debugLog('Applying drag-drop result:', dragDropResult)
           debugLog('Variant names match:', dragDropResult.variantName, '===', variantName)
@@ -1479,7 +1505,7 @@ export function DOMChangesInlineEditor({
       }
       
       // Also check for visual editor changes
-      const visualEditorResult = await storage.get('visualEditorChanges')
+      const visualEditorResult = await storage.get<VisualEditorChanges>('visualEditorChanges')
       debugLog('💾 visualEditorChanges:', visualEditorResult)
       if (visualEditorResult && visualEditorResult.variantName === variantName) {
         debugLog('Found visual editor changes for this variant!')
@@ -1524,28 +1550,9 @@ export function DOMChangesInlineEditor({
 
         // Update current state if we're still open
         if (pickingForField === 'selector' && editingChange) {
-          // For move changes, preserve the original position data
-          if (editingChange.type === 'move' && editingChange.value && typeof editingChange.value === 'object') {
-            setEditingChange({ ...editingChange, selector: message.selector })
-          } else {
-            setEditingChange({ ...editingChange, selector: message.selector })
-          }
+          setEditingChange({ ...editingChange, selector: message.selector })
         } else if (pickingForField === 'targetSelector' && editingChange) {
-          // When updating target selector, preserve original position if not already set
-          if (editingChange.type === 'move' && editingChange.value && typeof editingChange.value === 'object') {
-            const currentValue = editingChange.value as any
-            // Only update the targetSelector, keep original position data intact
-            setEditingChange({
-              ...editingChange,
-              targetSelector: message.selector,
-              value: {
-                ...currentValue,
-                targetSelector: message.selector
-              }
-            })
-          } else {
-            setEditingChange({ ...editingChange, targetSelector: message.selector })
-          }
+          setEditingChange({ ...editingChange, targetSelector: message.selector })
         }
         
         setPickingForField(null)
@@ -2106,10 +2113,8 @@ export function DOMChangesInlineEditor({
       classAdd: change.type === 'class' ? (change.add || []) : [],
       classRemove: change.type === 'class' ? (change.remove || []) : [],
       classesWithStatus,
-      targetSelector: change.type === 'move' ? (change.value?.targetSelector || change.targetSelector || '') : '',
-      position: change.type === 'move' ? (change.value?.position || change.position || 'after') : change.type === 'insert' ? (change as any).position : 'after',
-      // Preserve the entire value object for move changes to keep original position data
-      value: change.type === 'move' && change.value ? change.value : undefined,
+      targetSelector: change.type === 'move' ? (change.targetSelector || '') : '',
+      position: change.type === 'move' ? (change.position || 'after') : change.type === 'insert' ? (change as any).position : 'after',
       mode: (change as any).mode || 'merge',
       waitForElement: (change as any).waitForElement,
       observerRoot: (change as any).observerRoot
@@ -2136,7 +2141,6 @@ export function DOMChangesInlineEditor({
           type: 'text',
           value: change.textValue || '',
           enabled: true,
-          mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -2147,7 +2151,6 @@ export function DOMChangesInlineEditor({
           type: 'html',
           value: change.htmlValue || '',
           enabled: true,
-          mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -2158,7 +2161,6 @@ export function DOMChangesInlineEditor({
           type: 'javascript',
           value: change.jsValue || '',
           enabled: true,
-          mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -2223,29 +2225,12 @@ export function DOMChangesInlineEditor({
         }
         break
       case 'move':
-        // Preserve original position data if it exists
-        const moveValue: any = {
-          targetSelector: change.targetSelector || '',
-          position: change.position || 'after'
-        }
-
-        // If we have existing value object with original position data, preserve it
-        if (change.value && typeof change.value === 'object') {
-          const existingValue = change.value as any
-          if (existingValue.originalTargetSelector) {
-            moveValue.originalTargetSelector = existingValue.originalTargetSelector
-          }
-          if (existingValue.originalPosition) {
-            moveValue.originalPosition = existingValue.originalPosition
-          }
-        }
-
         domChange = {
           selector: change.selector,
           type: 'move',
-          value: moveValue,
+          targetSelector: change.targetSelector || '',
+          position: change.position || 'after',
           enabled: true,
-          mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -2255,7 +2240,6 @@ export function DOMChangesInlineEditor({
           selector: change.selector,
           type: 'remove',
           enabled: true,
-          mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -2267,7 +2251,6 @@ export function DOMChangesInlineEditor({
           html: change.htmlValue || '',
           position: change.position || 'after',
           enabled: true,
-          mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -2446,8 +2429,8 @@ export function DOMChangesInlineEditor({
           </span>
         )
       case 'move':
-        const moveTarget = change.value?.targetSelector || change.targetSelector || ''
-        const movePosition = change.value?.position || change.position || 'after'
+        const moveTarget = change.targetSelector || ''
+        const movePosition = change.position || 'after'
         const positionText = movePosition === 'before' ? 'before' :
                            movePosition === 'after' ? 'after' :
                            movePosition === 'firstChild' ? 'as first child of' :
