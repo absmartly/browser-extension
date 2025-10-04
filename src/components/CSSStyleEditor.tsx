@@ -3,7 +3,6 @@ import { TrashIcon } from '@heroicons/react/24/outline'
 import { all as knownCSSProperties } from 'known-css-properties'
 
 const cssPropertyNames = knownCSSProperties
-  .map(p => p.property)
   .filter((prop): prop is string => prop !== undefined && prop !== null)
 
 const commonCSSValues: Record<string, string[]> = {

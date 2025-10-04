@@ -60,7 +60,8 @@ export interface ABsmartlyConfig {
   apiKey?: string
   apiEndpoint: string
   sdkEndpoint?: string  // Optional SDK endpoint (defaults to apiEndpoint with .io)
-  applicationName?: string  // Changed from applicationId to applicationName
+  applicationId?: number  // Application ID (numeric)
+  applicationName?: string  // Application name (string)
   domChangesStorageType?: 'variable' | 'custom_field'
   domChangesFieldName?: string
   authMethod?: 'jwt' | 'apikey'  // New field for auth method preference

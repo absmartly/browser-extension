@@ -2,25 +2,8 @@
  * Type definitions for the Visual Editor
  */
 
-// DOM Change types
-export interface DOMChange {
-  selector: string
-  type: 'text' | 'html' | 'style' | 'class' | 'attribute' | 'js' | 'hide' | 'delete' | 'move' | 'insert' | 'duplicate'
-  value?: any
-  enabled?: boolean
-  timestamp?: number
-
-  // Additional properties for different change types
-  originalText?: string
-  originalHtml?: string
-  newText?: string
-  newHtml?: string
-  css?: Record<string, string>
-  className?: string
-  attributeName?: string
-  position?: 'before' | 'after' | 'prepend' | 'append'
-  targetSelector?: string
-}
+// Re-export DOMChange types from the main types
+export type { DOMChange, DOMChangeType } from '../../types/dom-changes'
 
 // Visual Editor configuration
 export interface VisualEditorConfig {

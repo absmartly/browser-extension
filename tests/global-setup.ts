@@ -1,4 +1,4 @@
-import { FullConfig } from '@playwright/test'
+import type { FullConfig } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
