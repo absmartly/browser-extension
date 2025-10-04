@@ -5,7 +5,7 @@ interface LogoProps {
   className?: string
 }
 
-export function Logo({ config, className = "w-6 h-6" }: LogoProps) {
+export function Logo({ config, className = "w-8 h-8" }: LogoProps) {
   const handleClick = (e: React.MouseEvent) => {
     if (config?.apiEndpoint) {
       e.preventDefault()
@@ -30,7 +30,7 @@ export function Logo({ config, className = "w-6 h-6" }: LogoProps) {
           className={`${className} ${config?.apiEndpoint ? 'hover:opacity-80 transition-opacity' : ''}`}
         />
       </Logo>
-      <span className="absolute -top-1 -right-2 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 bg-blue-100 rounded-md leading-none">
+      <span className="absolute -top-0.5 -right-4 px-1 py-0.5 text-[9px] font-semibold text-blue-600 bg-blue-100 rounded leading-none">
         BETA
       </span>
     </div>
