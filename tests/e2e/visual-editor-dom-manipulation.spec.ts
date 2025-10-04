@@ -1,4 +1,4 @@
-import { test, expect, Page, Browser } from '@playwright/test'
+import { test, expect, type Page, type Browser } from '@playwright/test'
 import path from 'path'
 
 /**

@@ -2,7 +2,7 @@
  * E2E tests for Visual Editor HTML Editing with Monaco Editor
  */
 
-import { test, expect, Page, BrowserContext, chromium } from '@playwright/test'
+import { test, expect, type Page, type BrowserContext, chromium } from '@playwright/test'
 import path from 'path'
 
 // Test page content

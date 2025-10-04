@@ -238,7 +238,6 @@ export class EditorCoordinator {
             {
               selector,
               type: 'remove',
-              value: null,
               enabled: true
             },
             oldValue

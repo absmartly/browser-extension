@@ -400,18 +400,18 @@ export class ElementActions {
         switch (change.type) {
           case 'move':
             // Apply move to target position
-            if (change.value?.targetSelector && change.value?.position) {
-              const target = document.querySelector(change.value.targetSelector)
+            if (change.targetSelector && change.position) {
+              const target = document.querySelector(change.targetSelector)
               if (target) {
                 const parent = target.parentElement
                 if (parent) {
-                  if (change.value.position === 'before') {
+                  if (change.position === 'before') {
                     parent.insertBefore(htmlElement, target)
-                  } else if (change.value.position === 'after') {
+                  } else if (change.position === 'after') {
                     parent.insertBefore(htmlElement, target.nextSibling)
-                  } else if (change.value.position === 'firstChild') {
+                  } else if (change.position === 'firstChild') {
                     target.insertBefore(htmlElement, target.firstChild)
-                  } else if (change.value.position === 'lastChild') {
+                  } else if (change.position === 'lastChild') {
                     target.appendChild(htmlElement)
                   }
                   console.log('[ElementActions] Moved element to target position')

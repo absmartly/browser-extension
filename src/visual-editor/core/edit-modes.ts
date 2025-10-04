@@ -557,17 +557,12 @@ export class EditModes {
       return
     }
 
-    // Create the move change with BOTH current and original position info
+    // Create the move change
     const moveChange: DOMChange = {
       selector: elementSelector,
       type: 'move',
-      value: {
-        targetSelector,
-        position,
-        // Store original position for reverting when preview is turned off
-        originalTargetSelector,
-        originalPosition
-      },
+      targetSelector,
+      position,
       enabled: true
     }
 

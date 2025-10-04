@@ -3,6 +3,7 @@
  */
 
 // Re-export DOMChange types from the main types
+import type { DOMChange, DOMChangeType } from '../../types/dom-changes'
 export type { DOMChange, DOMChangeType } from '../../types/dom-changes'
 
 // Visual Editor configuration
