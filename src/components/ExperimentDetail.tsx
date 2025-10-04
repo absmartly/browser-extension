@@ -297,8 +297,7 @@ export function ExperimentDetail({
 
   const canAddVariants = experiment.state !== 'running' &&
                          experiment.state !== 'development' &&
-                         experiment.status !== 'running' &&
-                         experiment.status !== 'development'
+                         experiment.status !== 'running'
 
   return (
     <div className="p-4">

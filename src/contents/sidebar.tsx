@@ -346,10 +346,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 // Export for HMR support
-if (module.hot) {
-  module.hot.accept()
-  module.hot.dispose(() => {
-    // Clean up on HMR
+if ((module as any).hot) {
+  (module as any).hot.accept()
+  (module as any).hot.dispose(() => {
     if (reactRoot) {
       reactRoot.unmount()
     }
@@ -365,4 +364,3 @@ export default () => {
 }
 
 // Export injectSidebar for dynamic imports
-export { injectSidebar }

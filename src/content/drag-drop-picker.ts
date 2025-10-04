@@ -422,7 +422,7 @@ export class DragDropPicker {
       // Handle both regular elements and SVG elements
       const className = typeof current.className === 'string' 
         ? current.className 
-        : current.className?.baseVal || ''
+        : (current.className as SVGAnimatedString)?.baseVal || ''
       
       if (className) {
         const classes = className.split(' ').filter(c => c && !c.includes('absmartly'))
@@ -452,7 +452,7 @@ export class DragDropPicker {
     // Check if element is part of the extension UI
     const className = typeof element.className === 'string' 
       ? element.className 
-      : element.className?.baseVal || ''
+      : (element.className as SVGAnimatedString)?.baseVal || ''
     
     return element.id?.includes('absmartly') || 
            className.includes('absmartly') ||

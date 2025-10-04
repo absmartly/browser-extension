@@ -49,7 +49,7 @@ export async function getCurrentVariantAssignments(experimentNames: string[]): P
         // Try to use the function exposed by our inject script
         if (typeof window.__absmartlyGetVariantAssignments === 'function') {
           console.log('[ABsmartly Extension SDK Bridge] Found exposed function, using it')
-          return await window.__absmartlyGetVariantAssignments(expNames)
+          return await window.__absmartlyGetVariantAssignments(expNames as string[])
         }
         
         console.warn('[ABsmartly Extension SDK Bridge] No exposed function found, trying direct access...')
@@ -167,7 +167,7 @@ export async function getSDKContextPath(): Promise<{ found: boolean; path: strin
       }
     })
     
-    return result[0]?.result || { found: false, path: null }
+    return (result[0]?.result as { found: boolean; path: string | null }) || { found: false, path: null }
   } catch (error) {
     console.warn('Failed to get SDK context path:', error)
     return { found: false, path: null }

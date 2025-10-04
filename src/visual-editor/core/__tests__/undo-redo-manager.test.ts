@@ -1,5 +1,6 @@
-import UndoRedoManager, { ChangeRecord } from '../undo-redo-manager'
-import { DOMChange } from '../../types/visual-editor'
+import UndoRedoManager from '../undo-redo-manager'
+import type { ChangeRecord } from '../undo-redo-manager'
+import type { DOMChange } from '../../types/visual-editor'
 
 describe('UndoRedoManager', () => {
   let manager: UndoRedoManager
