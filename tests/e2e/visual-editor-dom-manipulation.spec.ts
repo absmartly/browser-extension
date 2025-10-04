@@ -416,12 +416,12 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
 
       // Change background color (simulate style panel interaction)
       const newColor = '#ff0000'
-      await page.evaluate((selector, color) => {
+      await page.evaluate(({ selector, color }) => {
         const element = document.querySelector(selector) as HTMLElement
         if (element) {
           element.style.backgroundColor = color
         }
-      }, targetSelector, newColor)
+      }, { selector: targetSelector, color: newColor })
 
       // Verify style change
       const backgroundColor = await page.evaluate((selector) => {
@@ -441,13 +441,13 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       const newWidth = '300px'
       const newHeight = '150px'
 
-      await page.evaluate((selector, width, height) => {
+      await page.evaluate(({ selector, width, height }) => {
         const element = document.querySelector(selector) as HTMLElement
         if (element) {
           element.style.width = width
           element.style.height = height
         }
-      }, targetSelector, newWidth, newHeight)
+      }, { selector: targetSelector, width: newWidth, height: newHeight })
 
       // Verify dimension changes
       const computedStyle = await page.evaluate((selector) => {
