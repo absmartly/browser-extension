@@ -3,7 +3,8 @@
  * Tests constructor, lifecycle methods, change management, and integrations
  */
 
-import { VisualEditor, VisualEditorOptions, initVisualEditor } from '../visual-editor'
+import { VisualEditor, initVisualEditor } from '../visual-editor'
+import type { VisualEditorOptions } from '../visual-editor'
 import type { DOMChange } from '../../types/visual-editor'
 
 // Mock all dependencies except UndoRedoManager (use real implementation)
@@ -47,7 +48,8 @@ import Cleanup from '../cleanup'
 import { Toolbar } from '../../ui/toolbar'
 import { Notifications } from '../../ui/notifications'
 import { ElementActions } from '../element-actions'
-import { EditorCoordinator, EditorCoordinatorCallbacks } from '../editor-coordinator'
+import { EditorCoordinator } from '../editor-coordinator'
+import type { EditorCoordinatorCallbacks } from '../editor-coordinator'
 
 // Mock implementations (UndoRedoManager uses real class)
 const MockStateManager = StateManager as jest.MockedClass<typeof StateManager>

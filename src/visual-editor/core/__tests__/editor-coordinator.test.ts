@@ -3,8 +3,10 @@
  * Comprehensive test suite for the EditorCoordinator class
  */
 
-import { EditorCoordinator, EditorCoordinatorCallbacks } from '../editor-coordinator'
-import StateManager, { VisualEditorState } from '../state-manager'
+import { EditorCoordinator } from '../editor-coordinator'
+import type { EditorCoordinatorCallbacks } from '../editor-coordinator'
+import StateManager from '../state-manager'
+import type { VisualEditorState } from '../state-manager'
 import EventHandlers from '../event-handlers'
 import ContextMenu from '../context-menu'
 import UndoRedoManager from '../undo-redo-manager'

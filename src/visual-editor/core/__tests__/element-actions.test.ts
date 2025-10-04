@@ -930,7 +930,7 @@ describe('ElementActions', () => {
         {
           selector: '#complex-2',
           type: 'attribute',
-          value: 'new-value',
+          value: { 'data-test': 'new-value' },
           enabled: false
         }
       ]

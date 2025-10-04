@@ -4,7 +4,12 @@
  */
 
 // import { DOMChangesPlugin } from '@absmartly/dom-changes-plugin'
-type DOMChangesPlugin = any
+class DOMChangesPlugin {
+  constructor(config: any) {}
+  initialize() {}
+  injectCode(code: any) {}
+  on(event: string, handler: Function) {}
+}
 
 interface ABsmartlyContext {
   treatment: (experimentName: string) => number

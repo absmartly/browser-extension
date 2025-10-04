@@ -10,7 +10,7 @@
  * - squashChanges() consolidates changes up to currentIndex for saving
  */
 
-import { DOMChange } from '../types/visual-editor'
+import type { DOMChange } from '../types/visual-editor'
 
 export interface ChangeRecord {
   change: DOMChange  // The DOM change with the new value

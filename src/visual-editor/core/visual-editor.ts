@@ -3,7 +3,8 @@
  * Refactored to use ElementActions and EditorCoordinator for better separation of concerns
  */
 
-import StateManager, { VisualEditorConfig } from './state-manager'
+import StateManager from './state-manager'
+import type { VisualEditorConfig } from './state-manager'
 import EventHandlers from './event-handlers'
 import ContextMenu from './context-menu'
 import UndoRedoManager from './undo-redo-manager'
@@ -13,7 +14,8 @@ import Cleanup from './cleanup'
 // Removed toolbar import - using UIComponents banner instead
 import { Notifications } from '../ui/notifications'
 import { ElementActions } from './element-actions'
-import { EditorCoordinator, EditorCoordinatorCallbacks } from './editor-coordinator'
+import { EditorCoordinator } from './editor-coordinator'
+import type { EditorCoordinatorCallbacks } from './editor-coordinator'
 import type { DOMChange } from '../types/visual-editor'
 
 export interface VisualEditorOptions {

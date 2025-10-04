@@ -88,15 +88,15 @@ describe('UndoRedoManager', () => {
 
       // Undo should work step by step
       const undo1 = manager.undo()
-      expect(undo1!.change.value).toBe('text 3')
+      expect((undo1!.change as any).value).toBe('text 3')
       expect(undo1!.oldValue).toBe('text 2')
 
       const undo2 = manager.undo()
-      expect(undo2!.change.value).toBe('text 2')
+      expect((undo2!.change as any).value).toBe('text 2')
       expect(undo2!.oldValue).toBe('text 1')
 
       const undo3 = manager.undo()
-      expect(undo3!.change.value).toBe('text 1')
+      expect((undo3!.change as any).value).toBe('text 1')
       expect(undo3!.oldValue).toBe('original')
     })
 
@@ -154,7 +154,7 @@ describe('UndoRedoManager', () => {
       const record = manager.undo()
 
       expect(record).not.toBeNull()
-      expect(record!.change.value).toBe('new text')
+      expect((record!.change as any).value).toBe('new text')
       expect(record!.oldValue).toBe('old text')
       expect(manager.canUndo()).toBe(false)
       expect(manager.canRedo()).toBe(true)
@@ -204,7 +204,7 @@ describe('UndoRedoManager', () => {
       const record = manager.redo()
 
       expect(record).not.toBeNull()
-      expect(record!.change.value).toBe('new text')
+      expect((record!.change as any).value).toBe('new text')
       expect(record!.oldValue).toBe('old text')
       expect(manager.canUndo()).toBe(true)
       expect(manager.canRedo()).toBe(false)
@@ -269,7 +269,7 @@ describe('UndoRedoManager', () => {
       expect(squashed.length).toBe(1)
       expect(squashed[0].selector).toBe('#test')
       expect(squashed[0].type).toBe('text')
-      expect(squashed[0].value).toBe('text 3')
+      expect((squashed[0] as any).value).toBe('text 3')
     })
 
     it('should not squash changes to different selectors', () => {
@@ -353,7 +353,7 @@ describe('UndoRedoManager', () => {
 
       const squashed = manager.squashChanges()
       expect(squashed.length).toBe(1)
-      expect(squashed[0].value).toEqual({ color: 'blue', fontSize: '16px' })
+      expect((squashed[0] as any).value).toEqual({ color: 'blue', fontSize: '16px' })
     })
   })
 
@@ -369,11 +369,11 @@ describe('UndoRedoManager', () => {
       manager.addChange(change, 'old value')
 
       // Mutate the original
-      change.value = 'mutated value'
+      ;(change as any).value = 'mutated value'
 
       // The stored change should not be affected
       const record = manager.undo()
-      expect(record!.change.value).toBe('original value')
+      expect((record!.change as any).value).toBe('original value')
     })
 
     it('should deep copy old values to prevent mutation', () => {
@@ -407,11 +407,11 @@ describe('UndoRedoManager', () => {
       const undoRecord = manager.undo()
 
       // Mutate the undo record
-      undoRecord!.change.value = 'mutated'
+      ;(undoRecord!.change as any).value = 'mutated'
 
       // The redo record should not be affected
       const redoRecord = manager.redo()
-      expect(redoRecord!.change.value).toBe('new value')
+      expect((redoRecord!.change as any).value).toBe('new value')
     })
   })
 
@@ -433,13 +433,13 @@ describe('UndoRedoManager', () => {
 
       // Should have the last 3 changes (2, 3, 4)
       const undo1 = smallManager.undo()
-      expect(undo1!.change.value).toBe('text 4')
+      expect((undo1!.change as any).value).toBe('text 4')
 
       const undo2 = smallManager.undo()
-      expect(undo2!.change.value).toBe('text 3')
+      expect((undo2!.change as any).value).toBe('text 3')
 
       const undo3 = smallManager.undo()
-      expect(undo3!.change.value).toBe('text 2')
+      expect((undo3!.change as any).value).toBe('text 2')
 
       expect(smallManager.canUndo()).toBe(false)
     })
@@ -460,10 +460,10 @@ describe('UndoRedoManager', () => {
 
       // Should have the last 2 changes (3 and 4)
       const undo1 = smallManager.undo()
-      expect(undo1!.change.value).toBe('text 4')
+      expect((undo1!.change as any).value).toBe('text 4')
 
       const undo2 = smallManager.undo()
-      expect(undo2!.change.value).toBe('text 3')
+      expect((undo2!.change as any).value).toBe('text 3')
 
       expect(smallManager.canUndo()).toBe(false)
     })
@@ -522,7 +522,7 @@ describe('UndoRedoManager', () => {
       expect(manager.getRedoCount()).toBe(1)
 
       const redo1 = manager.redo() // B -> C
-      expect(redo1!.change.value).toBe('C')
+      expect((redo1!.change as any).value).toBe('C')
       expect(redo1!.oldValue).toBe('B')
     })
   })
@@ -559,19 +559,19 @@ describe('UndoRedoManager', () => {
       // Undo 1: "Undo test 3" -> "Undo test 2"
       const undo1 = manager.undo()
       expect(undo1).not.toBeNull()
-      expect(undo1!.change.value).toBe('Undo test 3')
+      expect((undo1!.change as any).value).toBe('Undo test 3')
       expect(undo1!.oldValue).toBe('Undo test 2')
 
       // Undo 2: "Undo test 2" -> "Undo test 1"
       const undo2 = manager.undo()
       expect(undo2).not.toBeNull()
-      expect(undo2!.change.value).toBe('Undo test 2')
+      expect((undo2!.change as any).value).toBe('Undo test 2')
       expect(undo2!.oldValue).toBe('Undo test 1')
 
       // Undo 3: "Undo test 1" -> "Modified text!"
       const undo3 = manager.undo()
       expect(undo3).not.toBeNull()
-      expect(undo3!.change.value).toBe('Undo test 1')
+      expect((undo3!.change as any).value).toBe('Undo test 1')
       expect(undo3!.oldValue).toBe('Modified text!')
 
       // After 3 undos
@@ -582,19 +582,19 @@ describe('UndoRedoManager', () => {
       // Redo 1: "Modified text!" -> "Undo test 1"
       const redo1 = manager.redo()
       expect(redo1).not.toBeNull()
-      expect(redo1!.change.value).toBe('Undo test 1')
+      expect((redo1!.change as any).value).toBe('Undo test 1')
       expect(redo1!.oldValue).toBe('Modified text!')
 
       // Redo 2: "Undo test 1" -> "Undo test 2"
       const redo2 = manager.redo()
       expect(redo2).not.toBeNull()
-      expect(redo2!.change.value).toBe('Undo test 2')
+      expect((redo2!.change as any).value).toBe('Undo test 2')
       expect(redo2!.oldValue).toBe('Undo test 1')
 
       // Redo 3: "Undo test 2" -> "Undo test 3"
       const redo3 = manager.redo()
       expect(redo3).not.toBeNull()
-      expect(redo3!.change.value).toBe('Undo test 3')
+      expect((redo3!.change as any).value).toBe('Undo test 3')
       expect(redo3!.oldValue).toBe('Undo test 2')
 
       // After 3 redos, we should be back to the final state
@@ -602,7 +602,7 @@ describe('UndoRedoManager', () => {
       expect(manager.getRedoCount()).toBe(0)
 
       // The final state should be "Undo test 3" (the last redo's change.value)
-      expect(redo3!.change.value).toBe('Undo test 3')
+      expect((redo3!.change as any).value).toBe('Undo test 3')
   })
   })
 
@@ -763,19 +763,19 @@ describe('UndoRedoManager', () => {
       // Before any undo: squash should give final state
       let squashed = manager.squashChanges()
       expect(squashed.length).toBe(1)
-      expect(squashed[0].value).toBe('C')
+      expect((squashed[0] as any).value).toBe('C')
 
       // After 1 undo: squash should give intermediate state
       manager.undo()
       squashed = manager.squashChanges()
       expect(squashed.length).toBe(1)
-      expect(squashed[0].value).toBe('B')
+      expect((squashed[0] as any).value).toBe('B')
 
       // After 2 undos: squash should give first state
       manager.undo()
       squashed = manager.squashChanges()
       expect(squashed.length).toBe(1)
-      expect(squashed[0].value).toBe('A')
+      expect((squashed[0] as any).value).toBe('A')
 
       // After 3 undos: squash should give empty
       manager.undo()
@@ -786,14 +786,14 @@ describe('UndoRedoManager', () => {
       manager.redo()
       squashed = manager.squashChanges()
       expect(squashed.length).toBe(1)
-      expect(squashed[0].value).toBe('A')
+      expect((squashed[0] as any).value).toBe('A')
 
       // After all redos: squash should give final state
       manager.redo()
       manager.redo()
       squashed = manager.squashChanges()
       expect(squashed.length).toBe(1)
-      expect(squashed[0].value).toBe('C')
+      expect((squashed[0] as any).value).toBe('C')
     })
 
     it('should handle edge case: canUndo/canRedo at boundaries', () => {
