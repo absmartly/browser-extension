@@ -2,7 +2,7 @@
  * Helper functions for E2E testing of the Visual Editor
  */
 
-import { Page, expect } from '@playwright/test'
+import { type Page, expect } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 
