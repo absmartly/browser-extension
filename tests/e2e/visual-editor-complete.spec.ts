@@ -182,8 +182,21 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('\n📋 STEP 2: Creating new experiment')
 
     // Click the plus icon button with title="Create New Experiment"
-    await sidebar.locator('button[title="Create New Experiment"]').click()
-    console.log('  Clicked Create New Experiment button')
+    // Use dispatchEvent to ensure React handler is triggered in headless mode
+    await sidebar.locator('button[title="Create New Experiment"]').evaluate((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    console.log('  Dispatched click event to Create New Experiment button')
+    await debugWait()
+
+    // Select "From Scratch" option from the dropdown menu
+    console.log('  Selecting "From Scratch" option...')
+    const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+    await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
+    await fromScratchButton.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    console.log('  ✓ Selected "From Scratch" option')
     await debugWait()
 
     // Fill experiment name in the form
