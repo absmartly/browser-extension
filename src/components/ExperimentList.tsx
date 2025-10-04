@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Badge } from './ui/Badge'
-import type { Experiment } from '~src/types/absmartly'
+import type { Experiment, ExperimentUser } from '~src/types/absmartly'
 import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
@@ -414,10 +414,10 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                   
                   {/* Owner Avatar and Team */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {experiment.team && (
+                    {experiment.teams && experiment.teams.length > 0 && (
                       <div className="flex items-center gap-1">
                         <UsersIcon className="h-4 w-4 text-gray-400" />
-                        <span className="text-xs text-gray-600">{experiment.team}</span>
+                        <span className="text-xs text-gray-600">{experiment.teams[0].name || `Team ${experiment.teams[0].team_id}`}</span>
                       </div>
                     )}
                     
