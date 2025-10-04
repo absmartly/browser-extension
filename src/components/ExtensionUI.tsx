@@ -720,7 +720,7 @@ function SidebarContent() {
     <div className="w-full h-screen bg-white flex flex-col">
       {view === 'list' && (
         <>
-          <div className="border-b px-4 py-3 flex-shrink-0">
+          <div className="border-b px-4 py-3 flex-shrink-0 relative">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 {config?.apiEndpoint ? (
