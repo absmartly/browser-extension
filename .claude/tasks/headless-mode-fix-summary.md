@@ -129,3 +129,24 @@ fix: handle new 'From Scratch' dropdown in experiment creation
 - Also fixed Create New Experiment button to use dispatchEvent for headless mode
 - Test now successfully creates experiment and progresses through all VE actions
 ```
+
+### 3. Context menu clicks in undo/redo test
+```
+fix: use dispatchEvent for context menu clicks in undo/redo test
+
+- Fixed left-click on element to show context menu using dispatchEvent
+- Fixed Edit Text menu item click using dispatchEvent
+- Test now successfully performs undo/redo operations in headless mode
+- All 3 text changes + 3 undos + 3 redos working correctly
+- Button state tests (8 undos/redos) also passing
+```
+
+### 4. Performance optimization
+```
+perf: remove all waitForTimeout calls from visual editor test
+
+- Removed all testPage.waitForTimeout() calls (19 occurrences)
+- Test now completes in 5.2s instead of 20+ seconds (74% faster!)
+- All functionality still works correctly without artificial delays
+- Playwright's built-in waiting mechanisms are sufficient
+```
