@@ -107,21 +107,28 @@ test.describe('Visual Editor Unified Tests', () => {
     await testPage.waitForTimeout(3000) // Wait for sidebar to fully load
     console.log('✅ Sidebar visible')
 
-    const sidebarFrame = testPage.frameLocator('#absmartly-sidebar-frame')
+    const sidebarFrameElement = await testPage.$('#absmartly-sidebar-frame')
+    const sidebarFrame = await sidebarFrameElement?.contentFrame()
+
+    if (!sidebarFrame) {
+      throw new Error('Could not access sidebar frame')
+    }
 
     // Step 2: Click on first experiment in the list
     console.log('📋 Step 2: Clicking first experiment in list...')
 
     // Wait for experiments to load
-    await sidebarFrame.locator('[data-testid="experiment-item"], .experiment-item').first().waitFor({ timeout: 10000 })
-    await sidebarFrame.locator('[data-testid="experiment-item"], .experiment-item').first().click()
+    await sidebarFrame.waitForSelector('[data-testid="experiment-item"], .experiment-item', { timeout: 10000 })
+    const firstExperiment = await sidebarFrame.$('[data-testid="experiment-item"], .experiment-item')
+    await firstExperiment?.click()
     await testPage.waitForTimeout(1000)
     console.log('✅ Experiment selected')
 
     // Step 3: Click visual editor button to start visual editor
     console.log('🎨 Step 3: Clicking visual editor button...')
 
-    await sidebarFrame.locator('button:has-text("Visual Editor"), [data-testid="visual-editor-btn"]').click()
+    const visualEditorBtn = await sidebarFrame.$('button:has-text("Visual Editor"), [data-testid="visual-editor-btn"]')
+    await visualEditorBtn?.click()
     await testPage.waitForTimeout(2000)
 
     // Wait for visual editor to be active
@@ -200,11 +207,10 @@ test.describe('Visual Editor Unified Tests', () => {
     console.log('\n📝 Step 6: Verifying changes in sidebar...')
 
     // Switch to sidebar and check DOM changes editor
-    const domChangesEditor = sidebarFrame.locator('.monaco-editor, [data-testid="dom-changes-editor"]')
-    await domChangesEditor.waitFor({ timeout: 5000 })
+    await sidebarFrame.waitForSelector('.monaco-editor, [data-testid="dom-changes-editor"]', { timeout: 5000 })
 
     // Get the content from Monaco editor
-    const changesText = await (sidebarFrame as any).evaluate(() => {
+    const changesText = await sidebarFrame.evaluate(() => {
       const monaco = document.querySelector('.monaco-editor')
       if (monaco) {
         // Try to get text content from Monaco

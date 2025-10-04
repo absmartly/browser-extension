@@ -124,7 +124,12 @@ test.describe('Move Operation Original Position Preservation', () => {
     }, extensionId)
 
     await page.waitForSelector('#absmartly-sidebar-root')
-    const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
+    const sidebarFrameElement = await page.$('#absmartly-sidebar-iframe')
+    const sidebarFrame = await sidebarFrameElement?.contentFrame()
+
+    if (!sidebarFrame) {
+      throw new Error('Could not access sidebar iframe')
+    }
 
     // Wait for sidebar to load
     await page.waitForTimeout(3000)
@@ -134,7 +139,7 @@ test.describe('Move Operation Original Position Preservation', () => {
 
     // First, we need to inject a move change as if created by visual editor
     // This simulates the visual editor creating a move with original position data
-    await (sidebarFrame as any).evaluate(() => {
+    await sidebarFrame.evaluate(() => {
       // Mock experiment data with a move change that has original position
       const mockChanges = [{
         selector: '#item1',
@@ -156,8 +161,8 @@ test.describe('Move Operation Original Position Preservation', () => {
     console.log('📝 Opening DOM changes editor...')
 
     // Click to add/edit DOM changes (this would normally show existing changes)
-    const domChangesButton = sidebarFrame.locator('button:has-text("DOM Changes"), button:has-text("Edit Changes")')
-    if (await domChangesButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const domChangesButton = await sidebarFrame.$('button:has-text("DOM Changes"), button:has-text("Edit Changes")')
+    if (domChangesButton && await domChangesButton.isVisible().catch(() => false)) {
       await domChangesButton.click()
       await page.waitForTimeout(1000)
     }
@@ -194,19 +199,19 @@ test.describe('Move Operation Original Position Preservation', () => {
     console.log('🎯 Step 3: Changing selector with element picker...')
 
     // Click element picker button for selector field
-    const pickerButton = sidebarFrame.locator('[data-testid="pick-selector"], button[title*="Pick element"]').first()
-    if (await pickerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const pickerButton = await sidebarFrame.$('[data-testid="pick-selector"], button[title*="Pick element"]')
+    if (pickerButton && await pickerButton.isVisible().catch(() => false)) {
       await pickerButton.click()
       await page.waitForTimeout(500)
 
       // Click on item2 to select it
-      await page.locator('#item2').click()
+      await page.click('#item2')
       await page.waitForTimeout(500)
     }
 
     // Save the change
-    const saveButton = sidebarFrame.locator('button:has-text("Save"), button[title="Save"]').first()
-    if (await saveButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const saveButton = await sidebarFrame.$('button:has-text("Save"), button[title="Save"]')
+    if (saveButton && await saveButton.isVisible().catch(() => false)) {
       await saveButton.click()
       await page.waitForTimeout(500)
     }
