@@ -167,7 +167,7 @@ function SidebarContent() {
       if (state) {
         debugLog('Restoring sidebar state:', state)
         if (state.view) setView(state.view as View)
-        if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment as Experiment)
+        if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
         // Don't clear the state - keep it for next time
       }
     })

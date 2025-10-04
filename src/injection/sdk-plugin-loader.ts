@@ -4,6 +4,7 @@
  */
 
 // import { DOMChangesPlugin } from '@absmartly/dom-changes-plugin'
+type DOMChangesPlugin = any
 
 interface ABsmartlyContext {
   treatment: (experimentName: string) => number
