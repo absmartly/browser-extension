@@ -9,6 +9,7 @@ import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import { Logo } from './Logo'
 import axios from 'axios'
+import { getAvatarColor, getInitials } from '~src/utils/avatar'
 
 interface SettingsViewProps {
   onSave: (config: ABsmartlyConfig) => void
@@ -294,17 +295,26 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         ) : user && user.authenticated ? (
           <div>
             <div className="flex items-center space-x-3">
-              {(avatarDataUrl || user.picture) && (
-                <img 
-                  src={avatarDataUrl || user.picture} 
-                  alt={user.name || 'User'} 
-                  className="w-10 h-10 rounded-full object-cover"
-                  onError={(e) => {
-                    debugError('Avatar failed to load:', avatarDataUrl || user.picture)
-                    e.currentTarget.style.display = 'none'
-                  }}
-                />
-              )}
+              <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                {(avatarDataUrl || user.picture) ? (
+                  <img 
+                    src={avatarDataUrl || user.picture} 
+                    alt={user.name || 'User'} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      debugError('Avatar failed to load:', avatarDataUrl || user.picture)
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <div 
+                    className="w-full h-full flex items-center justify-center text-white text-sm font-medium"
+                    style={{ backgroundColor: getAvatarColor(user.name || 'User') }}
+                  >
+                    {getInitials(user.name || 'User')}
+                  </div>
+                )}
+              </div>
               <div>
                 <div className="text-sm font-medium text-gray-900">{user.name || 'User'}</div>
                 <div className="text-xs text-gray-600">{user.email || 'No email'}</div>
