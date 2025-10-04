@@ -12,7 +12,8 @@ import { Button } from "~src/components/ui/Button"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
 import { Toast } from "~src/components/Toast"
 import { useABsmartly } from "~src/hooks/useABsmartly"
-import type { Experiment } from "~src/types/absmartly"
+import type { Experiment, ABsmartlyConfig } from "~src/types/absmartly"
+import type { SidebarState, ExperimentFilters } from "~src/types/storage-state"
 import { CogIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
@@ -162,20 +163,19 @@ function SidebarContent() {
     const storage = new Storage({ area: "local" })
     
     // Restore sidebar state
-    storage.get('sidebarState').then(result => {
-      if (result) {
-        debugLog('Restoring sidebar state:', result)
-        const state = result
+    storage.get<SidebarState>('sidebarState').then(state => {
+      if (state) {
+        debugLog('Restoring sidebar state:', state)
         if (state.view) setView(state.view)
         if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment)
         // Don't clear the state - keep it for next time
       }
     })
-    
+
     // Restore filters and check for configured application
     Promise.all([
-      storage.get('experimentFilters'),
-      storage.get('absmartly-config')
+      storage.get<ExperimentFilters>('experimentFilters'),
+      storage.get<ABsmartlyConfig>('absmartly-config')
     ]).then(([savedFilters, savedConfig]) => {
       debugLog('Loading saved filters:', savedFilters)
       debugLog('Loading config for app filter:', savedConfig)
@@ -423,20 +423,15 @@ function SidebarContent() {
     try {
       const fullExperiment = await getExperiment(experiment.id)
       if (fullExperiment) {
-        // Handle nested experiment structure from API
-        const experimentData = fullExperiment.experiment || fullExperiment
-        setSelectedExperiment(experimentData)
+        setSelectedExperiment(fullExperiment)
       } else {
         debugWarn('getExperiment returned null/undefined, using cached data')
-        // Use the cached data as fallback - handle nested structure
-        const experimentData = experiment.experiment || experiment
-        setSelectedExperiment(experimentData)
+        setSelectedExperiment(experiment)
       }
     } catch (err: any) {
       debugError('Failed to fetch full experiment details:', err)
-      // Use cached data on error - also handle nested structure
-      const experimentData = experiment.experiment || experiment
-      setSelectedExperiment(experimentData)
+      // Use cached data on error
+      setSelectedExperiment(experiment)
       
       // Check if this is an authentication error
       if (err.isAuthError || err.message === 'AUTH_EXPIRED') {

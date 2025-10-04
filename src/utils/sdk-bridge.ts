@@ -5,6 +5,17 @@
 import { Storage } from '@plasmohq/storage'
 import { getConfig } from './storage'
 
+// Augment Window interface with SDK-specific properties
+declare global {
+  interface Window {
+    __absmartlyGetVariantAssignments?: (experimentNames: string[]) => Promise<any>
+    __absmartlyGetContextPath?: () => string | null
+    ABsmartlyContext?: any
+    peek?: (key: string) => any
+    [key: string]: any
+  }
+}
+
 const storage = new Storage()
 
 export interface VariantAssignments {
@@ -44,7 +55,7 @@ export async function getCurrentVariantAssignments(experimentNames: string[]): P
         console.warn('[ABsmartly Extension SDK Bridge] No exposed function found, trying direct access...')
         
         // Try the configured SDK property first if provided
-        if (sdkProp) {
+        if (sdkProp && typeof sdkProp === 'string') {
           console.log(`[ABsmartly Extension SDK Bridge] Trying configured property: ${sdkProp}`)
           try {
             // Handle nested property paths like "sdk.context"
