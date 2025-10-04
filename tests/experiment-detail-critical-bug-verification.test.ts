@@ -426,7 +426,7 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
     expect(validVar).toBeTruthy() // Valid config should display its variables
 
     // Should have logged warnings for invalid configs
-    expect(consoleWarnings.length).toBeGreaterThan(0, 'Should log warnings for invalid JSON configs')
+    expect(consoleWarnings.length).toBeGreaterThan(0) // Should log warnings for invalid JSON configs
 
     await popup.screenshot({ path: 'tests/screenshots/edge-case-handling.png' })
 

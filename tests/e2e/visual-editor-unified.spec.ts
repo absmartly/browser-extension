@@ -204,7 +204,7 @@ test.describe('Visual Editor Unified Tests', () => {
     await domChangesEditor.waitFor({ timeout: 5000 })
 
     // Get the content from Monaco editor
-    const changesText = await sidebarFrame.evaluate(() => {
+    const changesText = await (sidebarFrame as any).evaluate(() => {
       const monaco = document.querySelector('.monaco-editor')
       if (monaco) {
         // Try to get text content from Monaco

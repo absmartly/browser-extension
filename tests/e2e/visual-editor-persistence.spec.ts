@@ -465,7 +465,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
         }
         tests.push({
           test: 'missing-type',
-          passed: !incompleteChange.type, // Should detect missing type
+          passed: !(incompleteChange as any).type, // Should detect missing type
           error: null
         })
       } catch (error) {
@@ -591,7 +591,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
           if (change.type === 'style') {
             // Merge style properties
-            existing.value = { ...existing.value, ...change.value }
+            existing.value = { ...(existing as any).value, ...(change as any).value }
             existing.timestamp = Math.max(existing.timestamp, change.timestamp)
           } else {
             // Replace for other types if newer
@@ -680,7 +680,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
           if (change.type === 'style') {
             Object.assign((element as HTMLElement).style, change.value)
           } else if (change.type === 'text') {
-            element.textContent = change.value
+            element.textContent = change.value as string
           }
         }
       })
@@ -806,7 +806,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
                   Object.assign((elem as HTMLElement).style, change.value)
                   return { selector: change.selector, applied: true, found: true }
                 } else if (change.type === 'text') {
-                  elem.textContent = change.value
+                  elem.textContent = change.value as string
                   return { selector: change.selector, applied: true, found: true }
                 }
               }
@@ -931,7 +931,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
       // Check that basic CSS properties are supported
       Object.entries(result.compatibility).forEach(([prop, compat]: [string, any]) => {
         if (['transform', 'border-radius', 'box-shadow', 'transition'].includes(prop)) {
-          expect(compat.supported).toBeTruthy(`Property ${prop} should be supported`)
+          expect(compat.supported).toBeTruthy() // Property should be supported
         }
       })
     })
@@ -1643,7 +1643,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
             if (change.type === 'style') {
               Object.assign((element as HTMLElement).style, change.value)
             } else if (change.type === 'text') {
-              element.textContent = change.value
+              element.textContent = change.value as string
             } else if (change.type === 'attribute') {
               Object.entries(change.value).forEach(([attr, value]) => {
                 element.setAttribute(attr, value as string)
@@ -1750,7 +1750,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     // Verify all changes were reapplied successfully
     const reapplicationResults = (postReloadResult as any).reapplicationResults
     reapplicationResults.forEach((result: any) => {
-      expect(result.applied).toBeTruthy(`Change ${result.changeId} for ${result.selector} should be reapplied after reload`)
+      expect(result.applied).toBeTruthy() // Change should be reapplied after reload
     })
 
     // Verify visual state after reload
@@ -1930,8 +1930,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
         const experiment = experiments[experimentId as keyof typeof experiments]
         const variant = experiment.variants[variantId as keyof typeof experiment.variants]
 
-        if (variant && variant.changes) {
-          variant.changes.forEach((change: any) => {
+        if (variant && (variant as any).changes) {
+          (variant as any).changes.forEach((change: any) => {
             const element = document.querySelector(change.selector)
             if (element) {
               try {
@@ -2490,7 +2490,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
     // Verify each test passed
     backupRestoreResult.tests.forEach((test: any) => {
-      expect(test.success).toBeTruthy(`${test.name} should succeed: ${test.error || 'OK'}`)
+      expect(test.success).toBeTruthy() // Test should succeed
     })
 
     // Verify backup was created with proper metadata
@@ -2946,8 +2946,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
           const result = await simulateNetworkFailure(operation)
           errorResults.push({
             operation,
-            retryable: result.retryable,
-            errorCode: result.code,
+            retryable: (result as any).retryable,
+            errorCode: (result as any).code,
             handled: true
           })
         }

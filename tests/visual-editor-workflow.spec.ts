@@ -68,7 +68,7 @@ test.describe('Visual Editor Workflow Tests', () => {
 
     // Wait for sidebar content to load
     await frame.waitForLoadState('domcontentloaded')
-    await frame.waitForTimeout(2000)
+    await (page as any).waitForTimeout(2000)
 
     // Enable console logging from iframe
     (frame as any).on('console', msg => console.log('[Sidebar]', msg.text()))
