@@ -101,7 +101,7 @@ export function CreateExperimentDropdownPanel({
   if (!isOpen) return null
 
   return (
-    <div className="absolute left-0 right-0 top-full bg-white border-b border-gray-200 shadow-md z-40">
+    <div className="absolute left-0 right-0 top-[60px] bg-white border border-gray-200 shadow-lg z-50">
       {/* Warning message */}
       <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
         <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
