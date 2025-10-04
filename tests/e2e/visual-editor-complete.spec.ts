@@ -203,7 +203,6 @@ test.describe('Visual Editor Complete Workflow', () => {
     experimentName = `E2E Test Experiment ${Date.now()}`
     await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
     console.log(`  Filled experiment name: ${experimentName}`)
-    await testPage.waitForTimeout(500)
     await debugWait()
 
     // Select Unit Type (required field)
