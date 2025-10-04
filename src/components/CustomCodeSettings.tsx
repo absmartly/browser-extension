@@ -31,7 +31,13 @@ export function CustomCodeSettings({ onSave }: CustomCodeSettingsProps) {
     try {
       const code = await getCustomCode()
       if (code) {
-        setCustomCodeState(code)
+        setCustomCodeState({
+          headStart: code.headStart || '',
+          headEnd: code.headEnd || '',
+          bodyStart: code.bodyStart || '',
+          bodyEnd: code.bodyEnd || '',
+          styleTag: code.styleTag || ''
+        })
       }
     } catch (error) {
       debugError('Failed to load custom code:', error)

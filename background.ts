@@ -107,7 +107,7 @@ initializeConfig().catch(err => debugError('Init config error:', err))
 
 // Helper function to get config
 async function getConfig(): Promise<ABsmartlyConfig | null> {
-  const config = await storage.get("absmartly-config")
+  const config = await storage.get("absmartly-config") as ABsmartlyConfig | null
   return config
 }
 
@@ -128,13 +128,7 @@ async function openLoginPage() {
 
   // Check if user is already authenticated first
   try {
-    const authResponse = await makeApiRequest(`${config.apiEndpoint}/auth/current-user`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    })
+    const authResponse = await makeAPIRequest('GET', '/auth/current-user', undefined, false)
 
     if (authResponse.ok) {
       // User is already authenticated, no need to redirect
@@ -479,7 +473,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const sessionStorage = new Storage({ area: "session" })
 
     // Get the current state to find out which field we were picking for
-    sessionStorage.get('domChangesInlineState').then(async (state) => {
+    sessionStorage.get('domChangesInlineState').then(async (stateData) => {
+      const state = (stateData as unknown) as { variantName: string; editingChange: any; pickingForField: string } | null
       if (state && state.pickingForField) {
         debugLog('Storing element picker result for field:', state.pickingForField)
 
@@ -823,9 +818,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Get both custom code and config
     Promise.all([
-      storage.get("absmartly-custom-code"),
+      storage.get("absmartly-custom-code") as Promise<CustomCode | null>,
       getConfig()
-    ]).then(([customCode, config]: [CustomCode | null, ABsmartlyConfig | null]) => {
+    ]).then(([customCode, config]) => {
       // Prepare injection data for SDK plugin
       const injectionData = {
         headStart: customCode?.headStart || '',

@@ -1,4 +1,5 @@
-import { test, expect, chromium, Page, BrowserContext } from '@playwright/test'
+import { test, expect, chromium } from '@playwright/test'
+import type { Page, BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 
