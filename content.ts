@@ -802,8 +802,14 @@ window.addEventListener('message', async (event) => {
   // Handle messages from the injected script (absmartly-page)
   if (event.data && event.data.source === 'absmartly-page') {
     debugLog('[Content Script] Received message from page:', event.data)
-    
-    if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
+
+    if (event.data.type === 'SDK_EVENT') {
+      // Forward SDK events to the extension UI
+      sendMessageToExtension({
+        type: 'SDK_EVENT',
+        payload: event.data.payload
+      })
+    } else if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
       // Get custom code and config from extension settings
       const response = await chrome.runtime.sendMessage({
         type: 'REQUEST_INJECTION_CODE',
