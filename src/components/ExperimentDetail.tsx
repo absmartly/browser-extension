@@ -305,8 +305,8 @@ export function ExperimentDetail({
       {/* Header with logo, experiment name, status/traffic, and actions */}
       <div className="mb-4">
         {/* First line: logo + name on left, back button on right */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start gap-3">
             <Logo />
             {editingName ? (
               <div className="flex-1">
