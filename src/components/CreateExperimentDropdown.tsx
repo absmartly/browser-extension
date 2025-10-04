@@ -120,7 +120,7 @@ export function CreateExperimentDropdownPanel({
       </button>
 
       {/* Templates list */}
-      <div className="max-h-[300px] overflow-y-auto">
+      <div className="max-h-[calc(100vh-180px)] overflow-y-auto">
         {loading ? (
           <div className="px-4 py-8 text-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
