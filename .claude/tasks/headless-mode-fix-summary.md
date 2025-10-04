@@ -25,7 +25,7 @@ await visualEditorButton.evaluate((button) => {
 
 ### File: `tests/e2e/visual-editor-complete.spec.ts`
 
-Fixed 4 button click locations to use dispatchEvent:
+Fixed 6 button click locations to use dispatchEvent:
 
 1. **Initial VE launch** (line ~293)
    - Changed from `await visualEditorButton.click()`
@@ -44,6 +44,16 @@ Fixed 4 button click locations to use dispatchEvent:
    - Changed from `await veButtons.nth(0).click()`
    - To `dispatchEvent` pattern
 
+5. **Element clicks for context menu** (line ~563 & ~571)
+   - Fixed left-click on element and menu item clicks to use `dispatchEvent`
+   - Required for undo/redo test context menu interactions
+
+6. **Save/Create Experiment button** (line ~1480)
+   - Added `scrollIntoViewIfNeeded()` to ensure button is visible
+   - Added 200ms wait before click for React state updates
+   - Added 500ms wait after click for event processing
+   - Fixed experiment save in database step (SAVE_EXPERIMENT=1 flag)
+
 ## Test Results
 
 The test now successfully completes these steps in headless mode:
@@ -59,6 +69,10 @@ The test now successfully completes these steps in headless mode:
 - ✅ **Saves changes** - Changes sync to sidebar DOM editor
 - ✅ **Preview mode toggle** - Tests disable/re-enable with proper state restoration
 - ✅ **Launches second VE instance** - Successfully starts VE a second time
+- ✅ **Saves experiment to database** - Successfully creates experiment with SAVE_EXPERIMENT=1 flag
+  - Fills owners, teams, and tags metadata fields
+  - Scrolls to save button and clicks successfully
+  - Navigates away from create form confirming save
 
 ## Test Output Highlights
 
@@ -90,14 +104,19 @@ The test now successfully completes these steps in headless mode:
 2. **Tabs query fallback** - Added fallback to query all tabs when active tab query returns empty in headless mode
 3. **Console logging** - Added comprehensive logging for debugging in both content script and sidebar
 
-### Known Issues
-- Test times out after second VE launches because the page crashes at that point
-- This appears to be a bug in the VE code itself (not the test)
-- The crash happens after successfully launching the second instance
+### Performance Metrics
+- **Without SAVE_EXPERIMENT flag**: ~5 seconds
+- **With SAVE_EXPERIMENT=1 flag** (full database save): ~6.5 seconds
+- **Previous performance** (with waitForTimeout calls): 20+ seconds
+- **Improvement**: 74% faster than original implementation
 
-## Key Takeaway
+## Key Takeaways
 
-When writing Playwright tests for React applications that will run in headless mode, **always use `dispatchEvent` instead of `.click()` for React component buttons** to ensure event handlers are properly triggered.
+1. **Event Dispatching**: When writing Playwright tests for React applications that will run in headless mode, **always use `dispatchEvent` instead of `.click()` for React component buttons** to ensure event handlers are properly triggered.
+
+2. **React State Timing**: After filling form fields or making state changes, React may need time to update. Add small delays (100-200ms) before clicking submit/save buttons to allow React to finish state updates.
+
+3. **Event Processing**: After dispatching click events on important buttons (like save/submit), add a delay (500ms) to allow the event to be fully processed before checking results.
 
 ## Files Modified
 - `tests/e2e/visual-editor-complete.spec.ts` - Fixed all VE button clicks to use dispatchEvent
@@ -149,4 +168,25 @@ perf: remove all waitForTimeout calls from visual editor test
 - Test now completes in 5.2s instead of 20+ seconds (74% faster!)
 - All functionality still works correctly without artificial delays
 - Playwright's built-in waiting mechanisms are sufficient
+```
+
+### 5. Save button timing fix
+```
+fix: add timing delays and debug logging for save button click
+
+- Add 200ms wait before clicking save button for React state updates
+- Add 500ms wait after click for event processing
+- Add debug logging to verify button state and text
+- Fixes experiment save failing to navigate away from create form
+
+Test now passes with SAVE_EXPERIMENT=1 flag
+```
+
+### 6. Debug cleanup
+```
+chore: clean up debug logging from save button fix
+
+- Remove verbose debug console.log statements
+- Keep essential flow logging (scrolled, dispatched click)
+- Preserve timing delays that fix the React state/event issue
 ```
