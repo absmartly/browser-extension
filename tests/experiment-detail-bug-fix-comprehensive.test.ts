@@ -830,10 +830,10 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
     const savedVariant = saveRequestData.variants[0]
     const savedConfig = JSON.parse(savedVariant.config)
     
-    expect(savedConfig.test_var).toBe('edited_value', 'Edited variable should be saved')
-    expect(savedConfig.new_variable).toBe('new_value', 'New variable should be saved')
+    expect(savedConfig.test_var).toBe('edited_value') // Edited variable should be saved
+    expect(savedConfig.new_variable).toBe('new_value') // New variable should be saved
     expect(savedConfig.dom_changes).toBeTruthy('DOM changes should be preserved in save')
-    expect(savedConfig.dom_changes[0].selector).toBe('.button', 'DOM change details should be preserved')
+    expect(savedConfig.dom_changes[0].selector).toBe('.button') // DOM change details should be preserved
     
     console.log('SUCCESS: Save functionality properly serializes variant configurations!')
   })
