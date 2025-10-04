@@ -152,7 +152,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     
     // Check if flickering was detected
     const flickerResult = await popup.evaluate(() => window.flickerDetected)
-    expect(flickerResult).toBeFalsy('UI should not flicker during rapid updates')
+    expect(flickerResult).toBeFalsy() // UI should not flicker during rapid updates
     
     // Verify final state is stable
     const variablesVisible = await popup.locator('text=Variables').isVisible()
@@ -260,7 +260,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     console.log(`Large dataset load time: ${loadTime}ms`)
     
     // Performance should be reasonable (less than 10 seconds for large dataset)
-    expect(loadTime).toBeLessThan(10000, 'Large dataset should load within 10 seconds')
+    expect(loadTime).toBeLessThan(10000) // Large dataset should load within 10 seconds
     
     // Verify data integrity with large dataset
     const variant0 = await popup.locator('text=Variant 0').isVisible()
@@ -281,7 +281,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     const editModeTime = Date.now() - editStartTime
     console.log(`Edit mode activation time: ${editModeTime}ms`)
     
-    expect(editModeTime).toBeLessThan(3000, 'Edit mode should activate quickly even with large dataset')
+    expect(editModeTime).toBeLessThan(3000) // Edit mode should activate quickly even with large dataset
     
     await popup.screenshot({ path: 'tests/screenshots/performance-large-dataset.png' })
   })
@@ -381,7 +381,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
         
         // Verify experiment loaded
         const expVar = await popup.locator(`input[value="value_${i}"]`).isVisible()
-        expect(expVar).toBe(true, `Experiment ${i} should load correctly`)
+        expect(expVar).toBe(true) // Experiment should load correctly
         
         // Go back to list
         await popup.click('text=Back to experiments')
@@ -413,7 +413,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
       console.log(`Memory increase: ${memoryIncrease} bytes (${memoryIncreasePercent.toFixed(2)}%)`)
       
       // Memory increase should be reasonable (less than 50% increase)
-      expect(memoryIncreasePercent).toBeLessThan(50, 'Memory usage should not increase excessively')
+      expect(memoryIncreasePercent).toBeLessThan(50) // Memory usage should not increase excessively
     }
     
     // Final functionality test - switch to last experiment and verify it works

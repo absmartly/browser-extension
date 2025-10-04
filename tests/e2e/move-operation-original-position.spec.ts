@@ -134,7 +134,7 @@ test.describe('Move Operation Original Position Preservation', () => {
 
     // First, we need to inject a move change as if created by visual editor
     // This simulates the visual editor creating a move with original position data
-    await sidebarFrame.evaluate(() => {
+    await (sidebarFrame as any).evaluate(() => {
       // Mock experiment data with a move change that has original position
       const mockChanges = [{
         selector: '#item1',

@@ -777,7 +777,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log(`  Found ${anyDomChangeElements} elements with "dom-change" in class`)
       
       // Debug: Check if changes are in the data but not rendered
-      const sidebarText = await sidebar.textContent()
+      const sidebarText = await (sidebar as any).textContent()
       console.log('  Sidebar contains "Undo test":', sidebarText?.includes('Undo test'))
       console.log('  Sidebar contains "display:none":', sidebarText?.includes('display:none'))
       
