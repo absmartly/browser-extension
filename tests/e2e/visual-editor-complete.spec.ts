@@ -224,7 +224,6 @@ test.describe('Visual Editor Complete Workflow', () => {
     const firstUnitTypeValue = await unitTypeSelect.locator('option').nth(1).getAttribute('value')
     await unitTypeSelect.selectOption(firstUnitTypeValue || '')
     console.log(`  ✓ Selected unit type`)
-    await testPage.waitForTimeout(500)
     await debugWait()
 
     // Select Applications (required field)
@@ -247,7 +246,6 @@ test.describe('Visual Editor Complete Workflow', () => {
     const selectedAppText = await firstAppOption.textContent()
     await firstAppOption.click()
     console.log(`  ✓ Selected application: ${selectedAppText?.trim()}`)
-    await testPage.waitForTimeout(500)
     
     // Verify application badge appeared
     const appBadge = appsContainer.locator('div[class*="inline-flex"]')
@@ -257,12 +255,10 @@ test.describe('Visual Editor Complete Workflow', () => {
     
     // Click outside to close dropdown
     await sidebar.locator('label:has-text("Traffic")').click()
-    await testPage.waitForTimeout(500)
     
     // Wait for dropdown to close
     const appsDropdownClosed = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
     await appsDropdownClosed.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
-    await testPage.waitForTimeout(500)
 
     console.log('✅ Experiment form filled with required fields')
     await debugWait()
@@ -287,7 +283,6 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Visual Editor button is enabled (form validation complete)')
 
     // Extra wait to ensure React event handlers are attached in headless mode
-    await testPage.waitForTimeout(1000)
     console.log('  ✓ Waited for React handlers to attach')
 
     // Track console errors (console listener is already set up in beforeEach)
@@ -308,7 +303,6 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Dispatched click event to Visual Editor button')
 
     // Wait longer for messages to arrive and VE to start
-    await testPage.waitForTimeout(3000)
     console.log('  ⏳ Waited 3s after VE button click')
     
     // Check if page is still alive
@@ -555,14 +549,12 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Click somewhere else first to deselect everything
         await testPage.locator('body').click({ position: { x: 5, y: 5 } })
-        await testPage.waitForTimeout(500)
 
         // Left-click on paragraph to show context menu
         // Use dispatchEvent to ensure menu handler is triggered in headless mode
         await testPage.locator('#test-paragraph').evaluate((el) => {
           el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
-        await testPage.waitForTimeout(100)
 
         // Wait for context menu and click Edit Text
         await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
@@ -615,7 +607,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Undo 1: "Undo test 3" -> "Undo test 2"
       await testPage.locator('[data-action="undo"]').click()
-      await testPage.waitForTimeout(500)
       const afterUndo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
@@ -625,7 +616,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Undo 2: "Undo test 2" -> "Undo test 1"
       await testPage.locator('[data-action="undo"]').click()
-      await testPage.waitForTimeout(500)
       const afterUndo2 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
@@ -635,7 +625,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Undo 3: "Undo test 1" -> "Modified text!"
       await testPage.locator('[data-action="undo"]').click()
-      await testPage.waitForTimeout(500)
       const afterUndo3 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
@@ -648,7 +637,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Redo 1: "Modified text!" -> "Undo test 1"
       await testPage.locator('[data-action="redo"]').click()
-      await testPage.waitForTimeout(500)
       const afterRedo1 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
@@ -658,7 +646,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Redo 2: "Undo test 1" -> "Undo test 2"
       await testPage.locator('[data-action="redo"]').click()
-      await testPage.waitForTimeout(500)
       const afterRedo2 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
@@ -668,7 +655,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Redo 3: "Undo test 2" -> "Undo test 3"
       await testPage.locator('[data-action="redo"]').click()
-      await testPage.waitForTimeout(500)
       const afterRedo3 = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
@@ -704,7 +690,6 @@ test.describe('Visual Editor Complete Workflow', () => {
           break
         }
         await undoButton.click()
-        await testPage.waitForTimeout(200)
         undoCount++
       }
 
@@ -724,7 +709,6 @@ test.describe('Visual Editor Complete Workflow', () => {
           break
         }
         await redoButton.click()
-        await testPage.waitForTimeout(200)
         redoCount++
       }
 
@@ -757,7 +741,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       // After the visual editor closes, wait for the DOM changes to appear in the create form
       // The changes should be visible in the variant's DOM Changes section
       // Give it extra time for React to re-render the inline editor with the changes
-      await testPage.waitForTimeout(2000)
 
       await debugWait()
     })
@@ -1145,7 +1128,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  ✓ Second VE instance launched successfully!')
 
       // Verify banner shows correct experiment name
-      await testPage.waitForTimeout(500) // Give banner time to render
       console.log('  ✓ Second VE is active and ready')
 
       // Exit the second VE by clicking the Exit button in the banner
@@ -1189,7 +1171,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  🚪 VE exited - waiting for sidebar to update...')
       
       // Wait for sidebar to clear activeVEVariant state (onVEStop callback)
-      await testPage.waitForTimeout(1000)
       console.log('  ✓ Waited for sidebar state cleanup')
 
       console.log('\n✅ Second VE launch test PASSED!')
@@ -1256,7 +1237,6 @@ test.describe('Visual Editor Complete Workflow', () => {
           console.log(`  ✓ Button enabled after ${i * 200}ms`)
           break
         }
-        await testPage.waitForTimeout(200)
       }
 
       if (!buttonEnabled) {
@@ -1337,7 +1317,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // BUG: The page should revert to original text, but currently keeps the discarded change
       // Wait a moment for cleanup to happen
-      await testPage.waitForTimeout(500)
 
       // Check if the change was properly cleaned up
       const textAfterDiscard = await testPage.evaluate(() => {
@@ -1379,7 +1358,6 @@ test.describe('Visual Editor Complete Workflow', () => {
             if (elem instanceof HTMLElement) elem.scrollTop = 0
           })
         })
-        //await testPage.waitForTimeout(500)
 
         // Fill the new metadata fields (owners, teams, tags)
         console.log('  📝 Filling owners, teams, and tags fields...')
@@ -1387,7 +1365,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Scroll to the metadata section
         await sidebar.locator('label:has-text("Applications"), label:has-text("Owners")').first().scrollIntoViewIfNeeded()
-        //await testPage.waitForTimeout(500)
         await debugWait()
         
         // Fill Owners field - click the field to open dropdown
@@ -1427,7 +1404,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         const selectedOptionText = await firstOwnerOption.textContent()
         await firstOwnerOption.click()
         console.log(`  ✓ Selected owner/team: ${selectedOptionText?.trim()}`)
-        //await testPage.waitForTimeout(300)
         
         // Verify selection was made - check for selected badge
         const selectedBadge = ownersContainer.locator('div[class*="inline-flex"]', { hasText: selectedOptionText?.trim() || '' })
@@ -1440,7 +1416,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         // Click outside to close dropdown
         await sidebar.locator('label:has-text("Traffic")').click()
-        //await testPage.waitForTimeout(300)
         
         // Fill Tags field - click the field to open dropdown
         console.log('  Attempting to select tags...')
@@ -1458,7 +1433,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         
         await tagsClickArea.click({ timeout: 5000 })
         console.log('  ✓ Clicked tags field')
-        //await testPage.waitForTimeout(500)
         
         // Wait for dropdown to appear and get first option
         const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
@@ -1479,7 +1453,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         const selectedTagText = await firstTagOption.textContent()
         await firstTagOption.click()
         console.log(`  ✓ Selected tag: ${selectedTagText?.trim()}`)
-        //await testPage.waitForTimeout(300)
         
         // Verify selection was made - check for selected badge
         const selectedTagBadge = tagsContainer.locator('div[class*="inline-flex"]', { hasText: selectedTagText?.trim() || '' })
@@ -1493,7 +1466,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         // Click outside to close dropdown
         await sidebar.locator('label:has-text("Traffic")').click()
 
-        //await testPage.waitForTimeout(500)
         console.log('  ✓ Filled metadata fields')
         await debugWait()
 
@@ -1509,7 +1481,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         await debugWait()
 
         // Wait for response
-        await testPage.waitForTimeout(3000)
 
         // Scroll to very top again to see any new error messages or success toasts
         await sidebar.locator('body').evaluate(el => {
@@ -1519,7 +1490,6 @@ test.describe('Visual Editor Complete Workflow', () => {
             if (elem instanceof HTMLElement) elem.scrollTop = 0
           })
         })
-        await testPage.waitForTimeout(500)
 
         // Take screenshot after save (should show validation errors if any)
         await testPage.screenshot({ path: 'test-results/after-save-top.png', fullPage: true })
