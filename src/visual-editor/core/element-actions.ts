@@ -160,8 +160,7 @@ export class ElementActions {
     this.undoRedoManager.addChange(
       {
         selector,
-        type: 'delete',
-        value: null,
+        type: 'remove',
         enabled: true
       },
       htmlElement.outerHTML
@@ -232,9 +231,10 @@ export class ElementActions {
       {
         selector,
         type: 'move',
-        value: direction,
+        targetSelector: parent.tagName.toLowerCase(),
+        position: direction === 'up' ? 'before' : 'after',
         enabled: true
-      },
+      } as any,
       oldDirection
     )
   }
@@ -262,24 +262,9 @@ export class ElementActions {
         switch (change.type) {
           case 'move':
             // Revert move by moving element back to original position
-            if (change.value?.originalTargetSelector && change.value?.originalPosition) {
-              const originalTarget = document.querySelector(change.value.originalTargetSelector)
-              if (originalTarget) {
-                const parent = originalTarget.parentElement
-                if (parent) {
-                  if (change.value.originalPosition === 'before') {
-                    parent.insertBefore(htmlElement, originalTarget)
-                  } else if (change.value.originalPosition === 'after') {
-                    parent.insertBefore(htmlElement, originalTarget.nextSibling)
-                  } else if (change.value.originalPosition === 'firstChild') {
-                    originalTarget.insertBefore(htmlElement, originalTarget.firstChild)
-                  } else if (change.value.originalPosition === 'lastChild') {
-                    originalTarget.appendChild(htmlElement)
-                  }
-                  console.log('[ElementActions] Moved element back to original position')
-                }
-              }
-            }
+            // Note: for simple up/down moves, we don't have original position stored
+            // This would need enhancement to store original parent/sibling info
+            console.log('[ElementActions] Move revert not fully implemented')
             break
 
           case 'text':
@@ -326,41 +311,17 @@ export class ElementActions {
             }
             break
 
-          case 'delete':
-            // Can't revert delete on existing element since it was removed
+          case 'remove':
+            // Can't revert remove on existing element since it was removed
             // This case is handled separately below
             break
         }
       })
 
-      // Special handling for delete - need to restore the element
-      if (change.type === 'delete' && change.value) {
-        const { html, parentSelector, nextSiblingSelector } = change.value
-
-        if (html && parentSelector) {
-          const parent = document.querySelector(parentSelector) as HTMLElement
-
-          if (parent) {
-            // Create a temporary div to parse the HTML
-            const temp = document.createElement('div')
-            temp.innerHTML = html
-            const elementToRestore = temp.firstElementChild as HTMLElement
-
-            if (elementToRestore) {
-              if (nextSiblingSelector) {
-                const nextSibling = document.querySelector(nextSiblingSelector)
-                if (nextSibling && nextSibling.parentElement === parent) {
-                  parent.insertBefore(elementToRestore, nextSibling)
-                } else {
-                  parent.appendChild(elementToRestore)
-                }
-              } else {
-                parent.appendChild(elementToRestore)
-              }
-              console.log('[ElementActions] Restored deleted element')
-            }
-          }
-        }
+      // Special handling for remove - would need to restore the element
+      // Note: We don't currently store the HTML for removed elements in undo data
+      if (change.type === 'remove') {
+        console.log('[ElementActions] Remove revert not fully implemented - element cannot be restored')
       }
     } catch (error) {
       console.error('[ElementActions] Error reverting DOM change:', error)
@@ -504,10 +465,10 @@ export class ElementActions {
             }
             break
 
-          case 'delete':
-            // Delete the element
+          case 'remove':
+            // Remove the element
             htmlElement.remove()
-            console.log('[ElementActions] Deleted element')
+            console.log('[ElementActions] Removed element')
             break
 
         }
