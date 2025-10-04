@@ -332,8 +332,8 @@ describe('UndoRedoManager', () => {
       const test1Change = squashed.find(c => c.selector === '#test1')
       const test2Change = squashed.find(c => c.selector === '#test2')
 
-      expect(test1Change!.value).toBe('C') // Final value
-      expect(test2Change!.value).toBe('X')
+      expect((test1Change! as any).value).toBe('C') // Final value
+      expect((test2Change! as any).value).toBe('X')
     })
 
     it('should return empty array when no changes', () => {

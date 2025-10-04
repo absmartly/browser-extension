@@ -361,14 +361,8 @@ export class VisualEditor {
             ...change.value
           }
         } else if (change.type === 'move' && existing.type === 'move') {
-          // For moves, keep the original position from the first move
-          // but use the final target position from the last move
-          existing.value = {
-            ...change.value,
-            // Preserve original position from first move
-            originalTargetSelector: existing.value.originalTargetSelector,
-            originalPosition: existing.value.originalPosition
-          }
+          // For moves, replace with the latest change (final position)
+          changeMap.set(key, change)
         } else {
           // For other types, replace with the latest change
           changeMap.set(key, change)
@@ -386,9 +380,8 @@ export class VisualEditor {
       if (change.type === 'move') {
         console.log('[ABSmartly] Move change after squashing:', {
           selector: change.selector,
-          value: change.value,
-          hasTargetSelector: !!change.value?.targetSelector,
-          hasPosition: !!change.value?.position
+          targetSelector: change.targetSelector,
+          position: change.position
         })
       }
     })
@@ -428,30 +421,23 @@ export class VisualEditor {
               }
             }
           } else if (change.type === 'move' && !originalData.move) {
-            // Store original position for move
-            if (change.value.originalTargetSelector && change.value.originalPosition) {
+            // Store original position for move - capture current position before it's moved
+            const parent = htmlElement.parentElement
+            const nextSibling = htmlElement.nextElementSibling
+            if (parent) {
               originalData.move = {
-                targetSelector: change.value.originalTargetSelector,
-                position: change.value.originalPosition
-              }
-            } else {
-              // If no original position stored in change, capture current position
-              // This handles the first move of an element
-              const parent = htmlElement.parentElement
-              const nextSibling = htmlElement.nextElementSibling
-              if (parent) {
-                originalData.move = {
-                  parentId: parent.id || '',
-                  parentClass: parent.className || '',
-                  nextSiblingId: nextSibling?.id || '',
-                  nextSiblingClass: nextSibling?.className || ''
-                }
+                parentId: parent.id || '',
+                parentClass: parent.className || '',
+                nextSiblingId: nextSibling?.id || '',
+                nextSiblingClass: nextSibling?.className || ''
               }
             }
           } else if (change.type === 'attribute' && !originalData.attributes) {
             originalData.attributes = {}
-            if (change.attributeName) {
-              originalData.attributes[change.attributeName] = htmlElement.getAttribute(change.attributeName) || ''
+            if (change.value && typeof change.value === 'object') {
+              for (const attrName in change.value) {
+                originalData.attributes[attrName] = htmlElement.getAttribute(attrName) || ''
+              }
             }
           } else if (change.type === 'class') {
             if (!originalData.className) {

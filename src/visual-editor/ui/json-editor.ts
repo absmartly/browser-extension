@@ -8,7 +8,7 @@ import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { basicSetup } from 'codemirror'
-import { linter, Diagnostic } from '@codemirror/lint'
+import { linter, type Diagnostic } from '@codemirror/lint'
 
 export class JSONEditor {
   private editorHost: HTMLElement | null = null
