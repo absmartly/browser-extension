@@ -375,7 +375,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       // squashChanges() consolidates multiple changes to same element into 1
       const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
-      expect(changes[0].value).toBe('<div>Second Edit</div>')
+      expect((changes[0] as any).value).toBe('<div>Second Edit</div>')
     })
 
     it('should handle switching between text and HTML editing', async () => {

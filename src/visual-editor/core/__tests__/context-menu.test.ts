@@ -3,8 +3,10 @@
  * Tests menu creation, positioning, interactions, and cleanup
  */
 
-import { ContextMenu, MenuAction, MenuItem } from '../context-menu'
-import StateManager, { VisualEditorConfig } from '../state-manager'
+import { ContextMenu } from '../context-menu'
+import type { MenuAction, MenuItem } from '../context-menu'
+import StateManager from '../state-manager'
+import type { VisualEditorConfig } from '../state-manager'
 
 // Mock the selector generator utility
 jest.mock('../../utils/selector-generator', () => ({
