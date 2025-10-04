@@ -99,7 +99,7 @@ export function CreateExperimentDropdownPanel({
   if (!isOpen) return null
 
   return (
-    <div className="absolute left-0 right-0 top-full bg-white border-b border-gray-200 shadow-md z-40">
+    <div className="absolute left-0 right-0 -top-1 bg-white border-b border-gray-200 shadow-md z-40">
       {/* Warning message */}
       <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
         <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -116,21 +116,6 @@ export function CreateExperimentDropdownPanel({
         <PlusCircleIcon className="h-5 w-5" />
         Create from scratch
       </button>
-
-      {/* Search box */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search templates"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={loading || templates.length === 0}
-          />
-          <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute right-3 top-2.5" />
-        </div>
-      </div>
 
       {/* Templates list */}
       <div className="max-h-[300px] overflow-y-auto">
@@ -290,9 +275,9 @@ export function CreateExperimentDropdown({
       </button>
 
       {isOpen && (
-        <div 
+        <div
           ref={dropdownRef}
-          className="absolute left-0 right-0 top-full bg-white border-b border-gray-200 shadow-lg z-50 animate-slideDown"
+          className="absolute left-0 right-0 -top-1 bg-white border-b border-gray-200 shadow-lg z-50 animate-slideDown"
           role="menu"
         >
           {/* Warning message */}
@@ -312,23 +297,8 @@ export function CreateExperimentDropdown({
             Create from scratch
           </button>
 
-          {/* Search box */}
-          <div className="px-4 py-3 border-b border-gray-200">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search templates"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={loading || templates.length === 0}
-              />
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute right-3 top-2.5" />
-            </div>
-          </div>
-
           {/* Templates list */}
-          <div className="overflow-y-auto flex-1">
+          <div className="max-h-[300px] overflow-y-auto">
             {loading ? (
               <div className="px-4 py-8 text-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
