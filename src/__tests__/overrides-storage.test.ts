@@ -24,11 +24,11 @@ import {
   saveOverrides,
   saveDevelopmentEnvironment,
   getDevelopmentEnvironment,
-  ExperimentOverrides,
   ENV_TYPE,
   OVERRIDES_STORAGE_KEY,
   DEV_ENV_STORAGE_KEY,
 } from '../utils/overrides'
+import type { ExperimentOverrides } from '../utils/overrides'
 
 // Mock chrome APIs
 const mockChromeApi = {

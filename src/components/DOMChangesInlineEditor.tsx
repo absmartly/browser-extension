@@ -14,11 +14,11 @@ import type { DOMChange, DOMChangeType, DOMChangeStyleRules } from '~src/types/d
 import { suggestCleanedSelector } from '~src/utils/selector-cleaner'
 import { generateSelectorSuggestions } from '~src/utils/selector-suggestions'
 import { StyleRulesEditor } from './StyleRulesEditor'
-import { 
-  PencilIcon, 
-  TrashIcon, 
-  PlusIcon, 
-  XMarkIcon, 
+import {
+  PencilIcon,
+  TrashIcon,
+  PlusIcon,
+  XMarkIcon,
   CheckIcon,
   CodeBracketIcon,
   CursorArrowRaysIcon,
@@ -28,7 +28,6 @@ import {
   CubeIcon,
   CommandLineIcon,
   ArrowsUpDownIcon,
-  TrashIcon,
   PlusCircleIcon,
   ExclamationTriangleIcon,
   SparklesIcon

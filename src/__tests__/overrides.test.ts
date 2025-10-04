@@ -1,7 +1,5 @@
 import {
   ENV_TYPE,
-  ExperimentOverrides,
-  OverrideValue,
   OVERRIDES_COOKIE_NAME,
   OVERRIDES_STORAGE_KEY,
   DEV_ENV_STORAGE_KEY,
@@ -15,6 +13,7 @@ import {
   parseCookieFormat,
   serializeToCookieFormat,
 } from '../utils/overrides'
+import type { ExperimentOverrides, OverrideValue } from '../utils/overrides'
 
 // Mock @plasmohq/storage
 jest.mock('@plasmohq/storage', () => ({
