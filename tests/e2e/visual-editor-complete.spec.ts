@@ -1476,8 +1476,11 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Click the save/create button in the experiment form
         const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
-        await saveButton.click()
-        console.log('  ✓ Clicked save button')
+        // Use dispatchEvent to ensure React handler is triggered in headless mode
+        await saveButton.evaluate((button) => {
+          button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
+        console.log('  ✓ Dispatched click event to save button')
         await debugWait()
 
         // Wait for response
