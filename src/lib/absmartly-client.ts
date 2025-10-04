@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { type AxiosInstance } from 'axios'
 import type { Experiment, ABsmartlyConfig } from '~src/types/absmartly'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 

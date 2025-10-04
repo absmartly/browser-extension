@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react'
+import React, { Component, type ReactNode } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 interface Props {
