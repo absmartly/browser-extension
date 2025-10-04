@@ -3,7 +3,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
   roots: ['<rootDir>/src'],
-  testMatch: ['**/__tests__/**/*.test.(ts|js)', '**/?(*.)+(spec|test).(ts|js)'],
+  testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)', '**/?(*.)+(spec|test).(ts|tsx|js)'],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       tsconfig: {
@@ -11,6 +11,7 @@ module.exports = {
         moduleResolution: 'node',
         module: 'esnext',
         target: 'es2017',
+        jsx: 'react',
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         skipLibCheck: true,
