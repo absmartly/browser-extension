@@ -335,14 +335,14 @@ export function ExperimentDetail({
                   </button>
                 </div>
                 {displayName !== experiment.name && (
-                  <p className="text-sm text-gray-500 mt-1 overflow-hidden text-ellipsis whitespace-nowrap" title={experiment.name}>{experiment.name}</p>
+                  <p className="text-sm text-gray-500 mt-1 overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title={experiment.name}>{experiment.name}</p>
                 )}
               </div>
             ) : (
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap" title={displayName}>{displayName}</h2>
+                <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title={displayName}>{displayName}</h2>
                 {displayName !== experiment.name && (
-                  <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap" title={experiment.name}>{experiment.name}</p>
+                  <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title={experiment.name}>{experiment.name}</p>
                 )}
               </div>
             )}
