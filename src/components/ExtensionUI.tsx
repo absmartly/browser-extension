@@ -14,7 +14,7 @@ import { Toast } from "~src/components/Toast"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment } from "~src/types/absmartly"
 import { CogIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
-import { CreateExperimentDropdown } from "~src/components/CreateExperimentDropdown"
+import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
 import logoUrl from "data-base64:~assets/logo.png"
 import "~style.css"
@@ -71,12 +71,19 @@ function SidebarContent() {
     getMetrics,
     getExperimentTags,
     getOwners,
-    getTeams
+    getTeams,
+    getTemplates
   } = useABsmartly()
 
   // Track if we've initialized experiments for this session
   const [hasInitialized, setHasInitialized] = useState(false)
   const [filtersInitialized, setFiltersInitialized] = useState(false)
+
+  // Create experiment panel state
+  const [createPanelOpen, setCreatePanelOpen] = useState(false)
+  const [templates, setTemplates] = useState<any[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("")
   
   // Load experiments when switching to list view AND filters are loaded
   useEffect(() => {
@@ -216,6 +223,25 @@ function SidebarContent() {
       setCurrentPage(1)
     }
   }, [view])
+
+  // Load templates when panel opens
+  useEffect(() => {
+    if (createPanelOpen && templates.length === 0) {
+      const loadTemplates = async () => {
+        setTemplatesLoading(true)
+        try {
+          const data = await getTemplates('test_template')
+          setTemplates(data)
+        } catch (error) {
+          console.error('Failed to load templates:', error)
+          setTemplates([])
+        } finally {
+          setTemplatesLoading(false)
+        }
+      }
+      loadTemplates()
+    }
+  }, [createPanelOpen])
 
   const loadFavorites = async () => {
     try {
@@ -766,6 +792,8 @@ function SidebarContent() {
                 </button>
                 <CreateExperimentDropdown
                   onCreateFromScratch={handleCreateExperiment}
+                  isOpen={createPanelOpen}
+                  onOpenChange={setCreatePanelOpen}
                 />
                 <button
                   onClick={() => setView('settings')}
@@ -784,6 +812,24 @@ function SidebarContent() {
                 applications={applications}
               />
             )}
+
+            <CreateExperimentDropdownPanel
+              isOpen={createPanelOpen}
+              templates={templates}
+              loading={templatesLoading}
+              searchQuery={templateSearchQuery}
+              onSearchChange={setTemplateSearchQuery}
+              onCreateFromScratch={() => {
+                setCreatePanelOpen(false)
+                handleCreateExperiment()
+              }}
+              onTemplateSelect={(templateId) => {
+                setCreatePanelOpen(false)
+                // TODO: Implement template loading
+                console.log('Load template:', templateId)
+              }}
+              config={config}
+            />
           </div>
           {error && (
             <div role="alert" className="bg-red-50 text-red-700 px-4 py-2 text-sm">
