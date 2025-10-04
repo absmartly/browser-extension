@@ -879,15 +879,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 })
 
-// Listen for tab updates to inject content script if needed
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url) {
-    // Check if visual editor should be active for this tab
-    storage.get("visualEditorActive").then((active) => {
-      if (active) {
-        // Content script will be injected automatically by Plasmo
+// Register content script for file:// URLs dynamically
+// This is needed because content scripts in manifest don't auto-inject on file:// URLs
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    const manifest = chrome.runtime.getManifest()
+    const contentScripts = manifest.content_scripts
+    if (contentScripts && contentScripts.length > 0) {
+      const contentScriptFile = contentScripts[0].js[0]
+
+      // Register a dynamic content script for file:// URLs
+      await chrome.scripting.registerContentScripts([{
+        id: 'file-url-content-script',
+        matches: ['file://*/*'],
+        js: [contentScriptFile],
+        runAt: 'document_idle',
+        allFrames: false
+      }])
+
+      console.log('[Background] Registered dynamic content script for file:// URLs')
+    }
+  } catch (error) {
+    // Script might already be registered, unregister and try again
+    try {
+      await chrome.scripting.unregisterContentScripts({ ids: ['file-url-content-script'] })
+      const manifest = chrome.runtime.getManifest()
+      const contentScripts = manifest.content_scripts
+      if (contentScripts && contentScripts.length > 0) {
+        const contentScriptFile = contentScripts[0].js[0]
+        await chrome.scripting.registerContentScripts([{
+          id: 'file-url-content-script',
+          matches: ['file://*/*'],
+          js: [contentScriptFile],
+          runAt: 'document_idle',
+          allFrames: false
+        }])
+        console.log('[Background] Re-registered dynamic content script for file:// URLs')
       }
-    })
+    } catch (retryError) {
+      console.error('[Background] Failed to register dynamic content script:', retryError)
+    }
+  }
+})
+
+// Listen for tab updates (keeping for other purposes)
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && tab.url) {
+    // Dynamic content script should now auto-inject on file:// URLs
+    // No manual injection needed
   }
 })
 

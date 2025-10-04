@@ -120,6 +120,7 @@ async function startVisualEditor(config: {
   changes?: DOMChange[]
   useShadowDOM?: boolean
 }): Promise<{ success: boolean; error?: string }> {
+  console.log('[ABsmartly] startVisualEditor called with config:', JSON.stringify(config))
   debugLog('[Visual Editor Content Script] Starting visual editor with config:', config)
   debugLog('[Visual Editor Content Script] Variant:', config.variantName)
   debugLog('[Visual Editor Content Script] Experiment name:', config.experimentName)
@@ -193,6 +194,7 @@ async function startVisualEditor(config: {
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[ABsmartly] Message listener called! Message type:', message?.type)
   debugLog('[Visual Editor Content Script] Received message:', message.type)
   
   // Handle test connection message
@@ -257,6 +259,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'START_VISUAL_EDITOR') {
+    console.log('[ABsmartly] Received START_VISUAL_EDITOR message:', JSON.stringify(message))
     // Use shared start function
     startVisualEditor({
       variantName: message.variantName,
@@ -264,7 +267,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       changes: message.changes,
       useShadowDOM: message.useShadowDOM
     }).then(result => {
+      console.log('[ABsmartly] startVisualEditor completed with result:', JSON.stringify(result))
       sendResponse(result)
+    }).catch(error => {
+      console.error('[ABsmartly] startVisualEditor failed:', error)
+      sendResponse({ success: false, error: error.message })
     })
 
     return true // Keep message channel open for async response

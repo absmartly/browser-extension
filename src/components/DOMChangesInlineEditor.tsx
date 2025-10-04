@@ -1772,6 +1772,10 @@ export function DOMChangesInlineEditor({
   }, [variantName, onChange, changes])
 
   const handleLaunchVisualEditor = async () => {
+    // TEMPORARY DEBUG: This alert should show up in test
+    if (typeof window !== 'undefined') {
+      console.log('[DOMChanges] HANDLER CALLED - about to query tabs')
+    }
     console.log('[DOMChangesInlineEditor] 🎨 Launch requested for variant:', variantName)
     console.log('[DOMChangesInlineEditor] 🎨 activeVEVariant state:', activeVEVariant)
     console.log('[DOMChangesInlineEditor] 🎨 isLaunchingVisualEditor flag:', isLaunchingVisualEditor)
@@ -1799,7 +1803,17 @@ export function DOMChangesInlineEditor({
     isLaunchingVisualEditor = true
 
     // Check if VE is already active in the page (extra guard)
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+    let tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+    console.log('[DOMChanges] Initial tabs query result:', tabs.length, 'tabs')
+
+    // Fallback for headless mode: if no active tab found, query all tabs
+    if (!tabs || tabs.length === 0) {
+      console.log('[DOMChanges] ⚠️ No active tab found, querying all tabs as fallback')
+      tabs = await chrome.tabs.query({})
+      console.log('[DOMChanges] Found tabs (fallback):', tabs.length)
+    }
+
+    console.log('[DOMChanges] Using tab ID:', tabs[0]?.id)
     if (tabs[0]?.id) {
       try {
         const isVEActive = await chrome.tabs.sendMessage(tabs[0].id, {
@@ -1865,8 +1879,10 @@ export function DOMChangesInlineEditor({
     })
 
     // Send directly to content script (no relay through background)
+    console.log('[DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id:', tabs[0]?.id)
     if (tabs[0]?.id) {
       const tabId = tabs[0].id
+      console.log('[DOMChanges] Sending START_VISUAL_EDITOR to tab:', tabId)
 
       // Let content script detect test mode itself (it checks URL params and window flags)
       // Don't pass useShadowDOM - let content script decide based on URL param
@@ -1889,6 +1905,8 @@ export function DOMChangesInlineEditor({
         isLaunchingVisualEditor = false
       })
     } else {
+      console.error('[DOMChanges] ❌ No active tab found after tabs query')
+      console.error('[DOMChanges] tabs array:', tabs)
       debugError('❌ No active tab found')
       isLaunchingVisualEditor = false
     }

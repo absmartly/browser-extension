@@ -57,6 +57,139 @@ function getInitials(user: Template['created_by']): string {
   return '?'
 }
 
+interface CreateExperimentDropdownPanelProps {
+  isOpen: boolean
+  templates: Template[]
+  loading: boolean
+  searchQuery: string
+  onSearchChange: (query: string) => void
+  onCreateFromScratch: () => void
+  onTemplateSelect: (id: number) => void
+  config: any
+}
+
+export function CreateExperimentDropdownPanel({
+  isOpen,
+  templates,
+  loading,
+  searchQuery,
+  onSearchChange,
+  onCreateFromScratch,
+  onTemplateSelect,
+  config
+}: CreateExperimentDropdownPanelProps) {
+  const filteredTemplates = templates.filter(template =>
+    template.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const getAvatarUrl = (user: Template['created_by']) => {
+    if (!user?.avatar?.base_url || !config?.apiEndpoint) return null
+    const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    return `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
+  }
+
+  const getUserName = (user: Template['created_by']) => {
+    if (!user) return 'Unknown'
+    if (user.first_name || user.last_name) {
+      return `${user.first_name || ''} ${user.last_name || ''}`.trim()
+    }
+    return user.email || 'Unknown'
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="absolute left-0 right-0 top-full bg-white border-b border-gray-200 shadow-md z-40">
+      {/* Warning message */}
+      <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
+        <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-yellow-800">
+          Loading a new template will overwrite the current experiment fields.
+        </p>
+      </div>
+
+      <button
+        onClick={onCreateFromScratch}
+        className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm font-medium text-blue-600 border-b border-gray-200"
+        role="menuitem"
+      >
+        <PlusCircleIcon className="h-5 w-5" />
+        Create from scratch
+      </button>
+
+      {/* Search box */}
+      <div className="px-4 py-3 border-b border-gray-200">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search templates"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={loading || templates.length === 0}
+          />
+          <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute right-3 top-2.5" />
+        </div>
+      </div>
+
+      {/* Templates list */}
+      <div className="max-h-[300px] overflow-y-auto">
+        {loading ? (
+          <div className="px-4 py-8 text-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-xs text-gray-500 mt-2">Loading templates...</p>
+          </div>
+        ) : filteredTemplates.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm text-gray-500">No templates found</p>
+          </div>
+        ) : (
+          <div className="py-2 space-y-1">
+            {filteredTemplates.map((template) => {
+              const avatarUrl = getAvatarUrl(template.created_by)
+              const initials = getInitials(template.created_by)
+              const userName = getUserName(template.created_by)
+
+              return (
+                <div
+                  key={template.id}
+                  className="px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={userName}
+                      className="h-10 w-10 rounded-full"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
+                      {initials}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {template.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Saved {timeAgo(template.updated_at || template.created_at)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onTemplateSelect(template.id)}
+                    className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    Load
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function CreateExperimentDropdown({
   onCreateFromScratch,
   onCreateFromTemplate
@@ -93,9 +226,11 @@ export function CreateExperimentDropdown({
     setLoading(true)
     try {
       const data = await getTemplates('test_template')
+      console.log('Templates loaded:', data)
       setTemplates(data)
     } catch (error) {
       console.error('Failed to load templates:', error)
+      setTemplates([])
     } finally {
       setLoading(false)
     }
@@ -132,7 +267,7 @@ export function CreateExperimentDropdown({
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 hover:bg-gray-100 rounded-md transition-colors"
@@ -155,9 +290,9 @@ export function CreateExperimentDropdown({
       </button>
 
       {isOpen && (
-        <div
-          className="absolute right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50 max-h-[500px] flex flex-col"
-          style={{ width: 'calc(100vw - 2rem)', maxWidth: '384px' }}
+        <div 
+          ref={dropdownRef}
+          className="absolute left-0 right-0 top-full bg-white border-b border-gray-200 shadow-lg z-50 animate-slideDown"
           role="menu"
         >
           {/* Warning message */}
@@ -248,6 +383,6 @@ export function CreateExperimentDropdown({
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
