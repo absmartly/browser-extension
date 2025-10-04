@@ -157,9 +157,9 @@ test.describe('Experiment Variables UI Visibility', () => {
       console.log('Number of input fields visible:', inputFields)
 
       // The key test: Variables and DOM changes should both be visible
-      expect(variablesSection).toBe(true, 'Variables section should be visible')
-      expect(domChangesSection).toBe(true, 'DOM Changes section should be visible')
-      expect(editButton).toBe(true, 'Edit Variables button should be visible in view mode')
+      expect(variablesSection).toBeTruthy() // Variables section should be visible
+      expect(domChangesSection).toBeTruthy() // DOM Changes section should be visible
+      expect(editButton).toBeTruthy() // Edit Variables button should be visible in view mode
 
       console.log('SUCCESS: Both variables and DOM changes are visible!')
     } else {
@@ -236,8 +236,8 @@ test.describe('Experiment Variables UI Visibility', () => {
         const cancelButton = popup.locator('button:has-text("Cancel")')
         const saveButton = popup.locator('button:has-text("Save Changes")')
         
-        expect(await cancelButton.isVisible()).toBe(true, 'Cancel button should be visible in edit mode')
-        expect(await saveButton.isVisible()).toBe(true, 'Save button should be visible in edit mode')
+        expect(await cancelButton.isVisible()).toBeTruthy() // Cancel button should be visible in edit mode
+        expect(await saveButton.isVisible()).toBeTruthy() // Save button should be visible in edit mode
 
         // The critical test: Click Cancel and ensure DOM changes are still visible
         await cancelButton.click()
@@ -248,9 +248,9 @@ test.describe('Experiment Variables UI Visibility', () => {
         const domChangesStillVisible = await popup.locator('text=DOM Changes for').isVisible()
         const variablesStillVisible = await popup.locator('text=Variables').isVisible()
 
-        expect(editButtonAgain).toBe(true, 'Edit Variables button should reappear after cancel')
-        expect(domChangesStillVisible).toBe(true, 'DOM Changes should still be visible after cancel')
-        expect(variablesStillVisible).toBe(true, 'Variables should still be visible after cancel')
+        expect(editButtonAgain).toBeTruthy() // Edit Variables button should reappear after cancel
+        expect(domChangesStillVisible).toBeTruthy() // DOM Changes should still be visible after cancel
+        expect(variablesStillVisible).toBeTruthy() // Variables should still be visible after cancel
 
         console.log('SUCCESS: Variables and DOM changes remain visible after Cancel!')
       }

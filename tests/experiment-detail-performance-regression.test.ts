@@ -156,7 +156,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     
     // Verify final state is stable
     const variablesVisible = await popup.locator('text=Variables').isVisible()
-    expect(variablesVisible).toBe(true, 'Variables should be visible after rapid updates')
+    expect(variablesVisible).toBeTruthy() // Variables should be visible after rapid updates
     
     await popup.screenshot({ path: 'tests/screenshots/no-flicker-test.png' })
   })
@@ -264,14 +264,14 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     
     // Verify data integrity with large dataset
     const variant0 = await popup.locator('text=Variant 0').isVisible()
-    expect(variant0).toBe(true, 'First variant should be visible')
+    expect(variant0).toBeTruthy() // First variant should be visible
     
     const variant19 = await popup.locator('text=Variant 19').isVisible()
-    expect(variant19).toBe(true, 'Last variant should be visible')
+    expect(variant19).toBeTruthy() // Last variant should be visible
     
     // Check some variables are present
     const someVariable = await popup.locator('input[value="value_0_0"]').isVisible()
-    expect(someVariable).toBe(true, 'Variables should be parsed correctly for large dataset')
+    expect(someVariable).toBeTruthy() // Variables should be parsed correctly for large dataset
     
     // Test edit mode performance with large dataset
     const editStartTime = Date.now()
@@ -421,7 +421,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     await popup.waitForTimeout(1000)
     
     const finalTestVar = await popup.locator('input[value="value_9"]').isVisible()
-    expect(finalTestVar).toBe(true, 'Final experiment should work correctly after many switches')
+    expect(finalTestVar).toBeTruthy() // Final experiment should work correctly after many switches
   })
 
   test('Concurrent data updates do not cause race conditions', async () => {
@@ -534,14 +534,14 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     
     // Verify final state is consistent (no race condition artifacts)
     const variablesVisible = await popup.locator('text=Variables').isVisible()
-    expect(variablesVisible).toBe(true, 'Variables should be visible after concurrent updates')
+    expect(variablesVisible).toBeTruthy() // Variables should be visible after concurrent updates
     
     const controlVisible = await popup.locator('text=Control').isVisible()
-    expect(controlVisible).toBe(true, 'Control variant should be visible')
+    expect(controlVisible).toBeTruthy() // Control variant should be visible
     
     // Should show data from the last successful request
     const finalValue = await popup.locator('input[value^="value_from_request_"]').isVisible()
-    expect(finalValue).toBe(true, 'Should show final value from completed request')
+    expect(finalValue).toBeTruthy() // Should show final value from completed request
     
     // Verify no console errors or race condition warnings
     const hasErrors = consoleMessages.some(msg => 
@@ -549,7 +549,7 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
       msg.toLowerCase().includes('race condition') ||
       msg.toLowerCase().includes('undefined')
     )
-    expect(hasErrors).toBe(false, 'Should not have race condition errors')
+    expect(hasErrors).toBeFalsy() // Should not have race condition errors
     
     await popup.screenshot({ path: 'tests/screenshots/race-condition-test.png' })
   })
@@ -660,18 +660,18 @@ test.describe('ExperimentDetail Performance & Regression Tests', () => {
     
     // Verify UI is still stable after stress test
     const variablesVisible = await popup.locator('text=Variables').isVisible()
-    expect(variablesVisible).toBe(true, 'Variables should remain visible after stress test')
+    expect(variablesVisible).toBeTruthy() // Variables should remain visible after stress test
     
     const controlVisible = await popup.locator('text=Control').isVisible()
-    expect(controlVisible).toBe(true, 'Control variant should remain visible after stress test')
+    expect(controlVisible).toBeTruthy() // Control variant should remain visible after stress test
     
     // Should be in view mode
     const editButton = await popup.locator('button:has-text("Edit Variables")').isVisible()
-    expect(editButton).toBe(true, 'Should be in view mode after stress test')
+    expect(editButton).toBeTruthy() // Should be in view mode after stress test
     
     // Variable should have stable value (either original or last saved)
     const stableValue = await popup.locator('input[value^="stress_value"], input[value^="edited_"]').isVisible()
-    expect(stableValue).toBe(true, 'Should have stable variable value after stress test')
+    expect(stableValue).toBeTruthy() // Should have stable variable value after stress test
     
     console.log('Stress test completed successfully - UI remains stable')
   })

@@ -176,32 +176,32 @@ test.describe('Experiment Detail UI State', () => {
 
     // Verify we're in detail view
     const backButton = await popup.locator('text=Back to experiments').isVisible()
-    expect(backButton).toBe(true, 'Should be in experiment detail view')
+    expect(backButton).toBeTruthy() // Should be in experiment detail view
 
     // The key tests: Check that both Variables and DOM Changes are visible
     const variablesHeader = await popup.locator('text=Variables').isVisible()
-    expect(variablesHeader).toBe(true, 'Variables section should be visible')
+    expect(variablesHeader).toBeTruthy() // Variables section should be visible
 
     const domChangesHeader = await popup.locator('text=DOM Changes for Control').isVisible()
-    expect(domChangesHeader).toBe(true, 'DOM Changes section should be visible for Control variant')
+    expect(domChangesHeader).toBeTruthy() // DOM Changes section should be visible for Control variant
 
     const domChangesVariant = await popup.locator('text=DOM Changes for Variant 1').isVisible()
-    expect(domChangesVariant).toBe(true, 'DOM Changes section should be visible for Variant 1')
+    expect(domChangesVariant).toBeTruthy() // DOM Changes section should be visible for Variant 1
 
     // Check that Edit Variables button is visible (view mode)
     const editButton = await popup.locator('button:has-text("Edit Variables")').isVisible()
-    expect(editButton).toBe(true, 'Edit Variables button should be visible in view mode')
+    expect(editButton).toBeTruthy() // Edit Variables button should be visible in view mode
 
     // Check that variables are displayed
     const testVariableInput = await popup.locator('input[value="control_value"]').isVisible()
-    expect(testVariableInput).toBe(true, 'Control variable should be visible')
+    expect(testVariableInput).toBeTruthy() // Control variable should be visible
 
     const variantVariableInput = await popup.locator('input[value="variant_value"]').isVisible()
-    expect(variantVariableInput).toBe(true, 'Variant variable should be visible')
+    expect(variantVariableInput).toBeTruthy() // Variant variable should be visible
 
     // Check that DOM changes are listed
     const domChangeButton = await popup.locator('text=.test-button').isVisible()
-    expect(domChangeButton).toBe(true, 'DOM change selector should be visible')
+    expect(domChangeButton).toBeTruthy() // DOM change selector should be visible
 
     console.log('SUCCESS: All UI elements are visible in view mode!')
 
@@ -213,12 +213,12 @@ test.describe('Experiment Detail UI State', () => {
     // In edit mode, we should see Save and Cancel buttons
     const saveButton = await popup.locator('button:has-text("Save Changes")').isVisible()
     const cancelButton = await popup.locator('button:has-text("Cancel")').isVisible()
-    expect(saveButton).toBe(true, 'Save Changes button should be visible in edit mode')
-    expect(cancelButton).toBe(true, 'Cancel button should be visible in edit mode')
+    expect(saveButton).toBeTruthy() // Save Changes button should be visible in edit mode
+    expect(cancelButton).toBeTruthy() // Cancel button should be visible in edit mode
 
     // Edit Variables button should be hidden in edit mode
     const editButtonHidden = await popup.locator('button:has-text("Edit Variables")').isVisible()
-    expect(editButtonHidden).toBe(false, 'Edit Variables button should be hidden in edit mode')
+    expect(editButtonHidden).toBeFalsy() // Edit Variables button should be hidden in edit mode
 
     console.log('Testing cancel behavior...')
     await popup.click('button:has-text("Cancel")')
@@ -226,14 +226,14 @@ test.describe('Experiment Detail UI State', () => {
 
     // After cancel, we should be back in view mode
     const editButtonBack = await popup.locator('button:has-text("Edit Variables")').isVisible()
-    expect(editButtonBack).toBe(true, 'Edit Variables button should reappear after cancel')
+    expect(editButtonBack).toBeTruthy() // Edit Variables button should reappear after cancel
 
     // Most importantly: DOM Changes should still be visible after cancel
     const domChangesStillVisible = await popup.locator('text=DOM Changes for Control').isVisible()
-    expect(domChangesStillVisible).toBe(true, 'DOM Changes should remain visible after cancel')
+    expect(domChangesStillVisible).toBeTruthy() // DOM Changes should remain visible after cancel
 
     const variablesStillVisible = await popup.locator('text=Variables').isVisible()
-    expect(variablesStillVisible).toBe(true, 'Variables section should remain visible after cancel')
+    expect(variablesStillVisible).toBeTruthy() // Variables section should remain visible after cancel
 
     console.log('SUCCESS: Variables and DOM changes remain visible after Cancel!')
 

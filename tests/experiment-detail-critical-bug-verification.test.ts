@@ -213,32 +213,32 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
     // CRITICAL ASSERTION: Variables should STILL be visible after the second API call
     // This is the core bug - variables would disappear when API returns structure without variants
     const variablesHeaderVisible = await popup.locator('text=Variables').isVisible()
-    expect(variablesHeaderVisible).toBe(true, 'CRITICAL: Variables section must remain visible after API structure change')
+    expect(variablesHeaderVisible).toBeTruthy() // CRITICAL: Variables section must remain visible after API structure change
 
     // Check that both variants are still displayed
     const controlVariantVisible = await popup.locator('text=Control').isVisible()
-    expect(controlVariantVisible).toBe(true, 'Control variant must remain visible')
+    expect(controlVariantVisible).toBeTruthy() // Control variant must remain visible
 
     const testVariantVisible = await popup.locator('text=Test Variant').isVisible()
-    expect(testVariantVisible).toBe(true, 'Test Variant must remain visible')
+    expect(testVariantVisible).toBeTruthy() // Test Variant must remain visible
 
     // Check that actual variable values are still displayed
     const criticalVarControl = await popup.locator('input[value="critical_value"]').isVisible()
-    expect(criticalVarControl).toBe(true, 'Control critical_var must remain visible')
+    expect(criticalVarControl).toBeTruthy() // Control critical_var must remain visible
 
     const criticalVarTest = await popup.locator('input[value="test_value"]').isVisible()
-    expect(criticalVarTest).toBe(true, 'Test Variant critical_var must remain visible')
+    expect(criticalVarTest).toBeTruthy() // Test Variant critical_var must remain visible
 
     // Check that DOM changes sections are still displayed
     const domChangesControl = await popup.locator('text=DOM Changes for Control').isVisible()
-    expect(domChangesControl).toBe(true, 'DOM Changes for Control must remain visible')
+    expect(domChangesControl).toBeTruthy() // DOM Changes for Control must remain visible
 
     const domChangesTest = await popup.locator('text=DOM Changes for Test Variant').isVisible()
-    expect(domChangesTest).toBe(true, 'DOM Changes for Test Variant must remain visible')
+    expect(domChangesTest).toBeTruthy() // DOM Changes for Test Variant must remain visible
 
     // Verify that Edit Variables button is still functional
     const editButton = await popup.locator('button:has-text("Edit Variables")').isVisible()
-    expect(editButton).toBe(true, 'Edit Variables button must remain visible and functional')
+    expect(editButton).toBeTruthy() // Edit Variables button must remain visible and functional
 
     // Test edit functionality to ensure data integrity
     await popup.click('button:has-text("Edit Variables")')
@@ -246,10 +246,10 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
 
     // Should be able to edit variables
     const saveButton = await popup.locator('button:has-text("Save Changes")').isVisible()
-    expect(saveButton).toBe(true, 'Save Changes button should appear in edit mode')
+    expect(saveButton).toBeTruthy() // Save Changes button should appear in edit mode
 
     const cancelButton = await popup.locator('button:has-text("Cancel")').isVisible()
-    expect(cancelButton).toBe(true, 'Cancel button should appear in edit mode')
+    expect(cancelButton).toBeTruthy() // Cancel button should appear in edit mode
 
     // Test editing a variable value
     const editableInput = popup.locator('input[value="critical_value"]')
@@ -263,10 +263,10 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
 
     // Variable should revert to original value (proving data integrity)
     const revertedValue = await popup.locator('input[value="critical_value"]').isVisible()
-    expect(revertedValue).toBe(true, 'Variable should revert to original value after cancel')
+    expect(revertedValue).toBeTruthy() // Variable should revert to original value after cancel
 
     const editedValueGone = await popup.locator('input[value="edited_critical_value"]').isVisible()
-    expect(editedValueGone).toBe(false, 'Edited value should be discarded after cancel')
+    expect(editedValueGone).toBeFalsy() // Edited value should be discarded after cancel
 
     console.log('🎉 SUCCESS: Critical bug fix verified!')
     console.log('✅ Variables remain visible after API structure change')
@@ -410,20 +410,20 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
 
     // All variants should be visible despite problematic configs
     const nullConfigVisible = await popup.locator('text=Null Config').isVisible()
-    expect(nullConfigVisible).toBe(true, 'Null config variant should be handled gracefully')
+    expect(nullConfigVisible).toBeTruthy() // Null config variant should be handled gracefully
 
     const invalidJsonVisible = await popup.locator('text=Invalid JSON').isVisible()
-    expect(invalidJsonVisible).toBe(true, 'Invalid JSON variant should be handled gracefully')
+    expect(invalidJsonVisible).toBeTruthy() // Invalid JSON variant should be handled gracefully
 
     const emptyStringVisible = await popup.locator('text=Empty String').isVisible()
-    expect(emptyStringVisible).toBe(true, 'Empty string variant should be handled gracefully')
+    expect(emptyStringVisible).toBeTruthy() // Empty string variant should be handled gracefully
 
     const validConfigVisible = await popup.locator('text=Valid Config').isVisible()
-    expect(validConfigVisible).toBe(true, 'Valid config variant should work normally')
+    expect(validConfigVisible).toBeTruthy() // Valid config variant should work normally
 
     // Valid config should show its variable
     const validVar = await popup.locator('input[value="valid_value"]').isVisible()
-    expect(validVar).toBe(true, 'Valid config should display its variables')
+    expect(validVar).toBeTruthy() // Valid config should display its variables
 
     // Should have logged warnings for invalid configs
     expect(consoleWarnings.length).toBeGreaterThan(0, 'Should log warnings for invalid JSON configs')
@@ -549,11 +549,11 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
 
     // User edit should be preserved despite server returning null config
     const userEditPreserved = await popup.locator('input[value="user_edited_value"]').isVisible()
-    expect(userEditPreserved).toBe(true, 'User edits should be preserved during server data updates')
+    expect(userEditPreserved).toBeTruthy() // User edits should be preserved during server data updates
 
     // Original server value should not reappear
     const originalValueGone = await popup.locator('input[value="original_server_value"]').isVisible()
-    expect(originalValueGone).toBe(false, 'Original server value should not overwrite user edit')
+    expect(originalValueGone).toBeFalsy() // Original server value should not overwrite user edit
 
     console.log('✅ User edit preservation verified')
 

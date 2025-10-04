@@ -213,28 +213,28 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
 
     // CRITICAL TEST: Variables should still be visible after the second API call
     const variablesHeader = await popup.locator('text=Variables').isVisible()
-    expect(variablesHeader).toBe(true, 'Variables section should remain visible after API structure change')
+    expect(variablesHeader).toBeTruthy() // Variables section should remain visible after API structure change
 
     // Check that both variants are still displayed
     const controlVariant = await popup.locator('text=Control').isVisible()
-    expect(controlVariant).toBe(true, 'Control variant should remain visible')
+    expect(controlVariant).toBeTruthy() // Control variant should remain visible
 
     const variant1 = await popup.locator('text=Variant 1').isVisible()
-    expect(variant1).toBe(true, 'Variant 1 should remain visible')
+    expect(variant1).toBeTruthy() // Variant 1 should remain visible
 
     // Check that variables are still displayed
     const testVariableInput = await popup.locator('input[value="control_value"]').isVisible()
-    expect(testVariableInput).toBe(true, 'Control variable should remain visible')
+    expect(testVariableInput).toBeTruthy() // Control variable should remain visible
 
     const variantVariableInput = await popup.locator('input[value="variant_value"]').isVisible()
-    expect(variantVariableInput).toBe(true, 'Variant variable should remain visible')
+    expect(variantVariableInput).toBeTruthy() // Variant variable should remain visible
 
     // Check that DOM changes are still displayed
     const domChangesControl = await popup.locator('text=DOM Changes for Control').isVisible()
-    expect(domChangesControl).toBe(true, 'DOM Changes for Control should remain visible')
+    expect(domChangesControl).toBeTruthy() // DOM Changes for Control should remain visible
 
     const domChangesVariant = await popup.locator('text=DOM Changes for Variant 1').isVisible()
-    expect(domChangesVariant).toBe(true, 'DOM Changes for Variant 1 should remain visible')
+    expect(domChangesVariant).toBeTruthy() // DOM Changes for Variant 1 should remain visible
 
     console.log('SUCCESS: Bug fix verified - Variables and DOM changes remain visible!')
   })
@@ -302,14 +302,14 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
 
     // Should show experiment details but no variants section
     const backButton = await popup.locator('text=Back to experiments').isVisible()
-    expect(backButton).toBe(true, 'Should be in experiment detail view')
+    expect(backButton).toBeTruthy() // Should be in experiment detail view
 
     const experimentTitle = await popup.locator('text=Empty Experiment').isVisible()
-    expect(experimentTitle).toBe(true, 'Experiment title should be visible')
+    expect(experimentTitle).toBeTruthy() // Experiment title should be visible
 
     // Variables section should not be visible for empty variants
     const variablesHeader = await popup.locator('text=Variables').isVisible()
-    expect(variablesHeader).toBe(false, 'Variables section should not be visible for empty variants')
+    expect(variablesHeader).toBeFalsy() // Variables section should not be visible for empty variants
   })
 
   test('Edge Case: Malformed variant config JSON handling', async () => {
@@ -410,18 +410,18 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
 
     // Should show experiment details
     const variablesHeader = await popup.locator('text=Variables').isVisible()
-    expect(variablesHeader).toBe(true, 'Variables section should be visible even with malformed JSON')
+    expect(variablesHeader).toBeTruthy() // Variables section should be visible even with malformed JSON
 
     // Control variant should show empty variables (fallback)
     const controlVariant = await popup.locator('text=Control').isVisible()
-    expect(controlVariant).toBe(true, 'Control variant should be visible')
+    expect(controlVariant).toBeTruthy() // Control variant should be visible
 
     // Variant 1 should show valid variables
     const variant1 = await popup.locator('text=Variant 1').isVisible()
-    expect(variant1).toBe(true, 'Variant 1 should be visible')
+    expect(variant1).toBeTruthy() // Variant 1 should be visible
 
     const validVariableInput = await popup.locator('input[value="valid_value"]').isVisible()
-    expect(validVariableInput).toBe(true, 'Valid variable should be displayed')
+    expect(validVariableInput).toBeTruthy() // Valid variable should be displayed
   })
 
   test('Rapid experiment switching does not cause UI flickering', async () => {
@@ -536,7 +536,7 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
     
     // Verify Experiment A variables are visible
     const varAInput = await popup.locator('input[value="value_a"]').isVisible()
-    expect(varAInput).toBe(true, 'Experiment A variables should be visible')
+    expect(varAInput).toBeTruthy() // Experiment A variables should be visible
     
     // Go back to list
     await popup.click('text=Back to experiments')
@@ -548,7 +548,7 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
     
     // Verify Experiment B variables are visible (no flickering/disappearing)
     const varBInput = await popup.locator('input[value="value_b"]').isVisible()
-    expect(varBInput).toBe(true, 'Experiment B variables should be visible after rapid switching')
+    expect(varBInput).toBeTruthy() // Experiment B variables should be visible after rapid switching
     
     // Go back and forth rapidly to test for flickering
     await popup.click('text=Back to experiments')
@@ -558,7 +558,7 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
     
     // Should still show correct variables
     const varAInputAgain = await popup.locator('input[value="value_a"]').isVisible()
-    expect(varAInputAgain).toBe(true, 'Experiment A variables should remain stable after rapid switching')
+    expect(varAInputAgain).toBeTruthy() // Experiment A variables should remain stable after rapid switching
   })
 
   test('User edits are preserved during data refreshes', async () => {
@@ -683,11 +683,11 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
 
     // User edits should be preserved, not overwritten by server data
     const editedVarStillThere = await popup.locator('input[value="user_edited_value"]').isVisible()
-    expect(editedVarStillThere).toBe(true, 'User edited variable value should be preserved during refresh')
+    expect(editedVarStillThere).toBeTruthy() // User edited variable value should be preserved during refresh
 
     // Original server value should not overwrite user edits
     const originalValueGone = await popup.locator('input[value="original_value"]').isVisible()
-    expect(originalValueGone).toBe(false, 'Original server value should not overwrite user edit')
+    expect(originalValueGone).toBeFalsy() // Original server value should not overwrite user edit
   })
 
   test('Save functionality properly updates variant configurations', async () => {

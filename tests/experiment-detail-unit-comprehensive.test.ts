@@ -180,43 +180,43 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // All variants should be displayed, even with problematic configs
     const nullConfigVariant = await popup.locator('text=Null Config').isVisible()
-    expect(nullConfigVariant).toBe(true, 'Null config variant should be displayed')
+    expect(nullConfigVariant).toBeTruthy() // Null config variant should be displayed
 
     const undefinedConfigVariant = await popup.locator('text=Undefined Config').isVisible()
-    expect(undefinedConfigVariant).toBe(true, 'Undefined config variant should be displayed')
+    expect(undefinedConfigVariant).toBeTruthy() // Undefined config variant should be displayed
 
     const emptyStringConfigVariant = await popup.locator('text=Empty String Config').isVisible()
-    expect(emptyStringConfigVariant).toBe(true, 'Empty string config variant should be displayed')
+    expect(emptyStringConfigVariant).toBeTruthy() // Empty string config variant should be displayed
 
     const invalidJsonConfigVariant = await popup.locator('text=Invalid JSON Config').isVisible()
-    expect(invalidJsonConfigVariant).toBe(true, 'Invalid JSON config variant should be displayed')
+    expect(invalidJsonConfigVariant).toBeTruthy() // Invalid JSON config variant should be displayed
 
     const nonStringConfigVariant = await popup.locator('text=Non-String Config').isVisible()
-    expect(nonStringConfigVariant).toBe(true, 'Non-string config variant should be displayed')
+    expect(nonStringConfigVariant).toBeTruthy() // Non-string config variant should be displayed
 
     const validJsonConfigVariant = await popup.locator('text=Valid JSON Config').isVisible()
-    expect(validJsonConfigVariant).toBe(true, 'Valid JSON config variant should be displayed')
+    expect(validJsonConfigVariant).toBeTruthy() // Valid JSON config variant should be displayed
 
     // Check that valid config produces correct variables
     const testVarInput = await popup.locator('input[value="test_value"]').isVisible()
-    expect(testVarInput).toBe(true, 'Valid config should produce correct variables')
+    expect(testVarInput).toBeTruthy() // Valid config should produce correct variables
 
     // Check that direct object config works
     const directObjectInput = await popup.locator('input[value="value"]').isVisible()
-    expect(directObjectInput).toBe(true, 'Direct object config should work')
+    expect(directObjectInput).toBeTruthy() // Direct object config should work
 
     // Check that DOM changes are parsed correctly
     const validDomChanges = await popup.locator('text=DOM Changes for Valid JSON Config').isVisible()
-    expect(validDomChanges).toBe(true, 'Valid DOM changes should be displayed')
+    expect(validDomChanges).toBeTruthy() // Valid DOM changes should be displayed
 
     const testDomChanges = await popup.locator('text=DOM Changes for Non-String Config').isVisible()
-    expect(testDomChanges).toBe(true, 'Direct object DOM changes should be displayed')
+    expect(testDomChanges).toBeTruthy() // Direct object DOM changes should be displayed
 
     // Verify that parsing warnings were logged for invalid configs
     const hasInvalidJsonWarning = consoleMessages.some(msg => 
       msg.includes('Invalid JSON') || msg.includes('Failed to parse variant config')
     )
-    expect(hasInvalidJsonWarning).toBe(true, 'Should log warnings for invalid JSON configs')
+    expect(hasInvalidJsonWarning).toBeTruthy() // Should log warnings for invalid JSON configs
 
     await popup.screenshot({ path: 'tests/screenshots/edge-case-parsing.png' })
   })
@@ -325,7 +325,7 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // Verify initial variable is loaded
     const initialVarInput = await popup.locator('input[value="initial_value"]').isVisible()
-    expect(initialVarInput).toBe(true, 'Initial variable should be loaded')
+    expect(initialVarInput).toBeTruthy() // Initial variable should be loaded
 
     // Enter edit mode and make changes
     await popup.click('button:has-text("Edit Variables")')
@@ -344,11 +344,11 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // The user edit should be preserved, not overwritten by null config
     const editedVarStillThere = await popup.locator('input[value="user_edited_value"]').isVisible()
-    expect(editedVarStillThere).toBe(true, 'User edited value should be preserved when server returns null config')
+    expect(editedVarStillThere).toBeTruthy() // User edited value should be preserved when server returns null config
 
     // Original value should not reappear
     const originalValueGone = await popup.locator('input[value="initial_value"]').isVisible()
-    expect(originalValueGone).toBe(false, 'Original value should not overwrite user edit')
+    expect(originalValueGone).toBeFalsy() // Original value should not overwrite user edit
   })
 
   test('Enhanced useEffect with smart experiment ID tracking', async () => {
@@ -470,7 +470,7 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
     
     // Verify experiment 100 data is loaded
     const exp100Var = await popup.locator('input[value="exp100_value"]').isVisible()
-    expect(exp100Var).toBe(true, 'Experiment 100 variables should be visible')
+    expect(exp100Var).toBeTruthy() // Experiment 100 variables should be visible
     
     // Go back and switch to second experiment
     await popup.click('text=Back to experiments')
@@ -480,21 +480,21 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
     
     // Verify experiment 200 data is loaded and 100's data is gone
     const exp200Var = await popup.locator('input[value="exp200_value"]').isVisible()
-    expect(exp200Var).toBe(true, 'Experiment 200 variables should be visible')
+    expect(exp200Var).toBeTruthy() // Experiment 200 variables should be visible
     
     const exp100VarGone = await popup.locator('input[value="exp100_value"]').isVisible()
-    expect(exp100VarGone).toBe(false, 'Experiment 100 variables should be cleared when switching')
+    expect(exp100VarGone).toBeFalsy() // Experiment 100 variables should be cleared when switching
     
     // Verify the experiment ID tracking worked correctly
     const hasNewExperimentLogs = consoleMessages.some(msg => 
       msg.includes('Processing variant data for experiment 100') && msg.includes('isNewExperiment: true')
     )
-    expect(hasNewExperimentLogs).toBe(true, 'Should detect new experiment correctly')
+    expect(hasNewExperimentLogs).toBeTruthy() // Should detect new experiment correctly
     
     const hasExperiment200Logs = consoleMessages.some(msg => 
       msg.includes('Processing variant data for experiment 200') && msg.includes('isNewExperiment: true')
     )
-    expect(hasExperiment200Logs).toBe(true, 'Should detect second new experiment correctly')
+    expect(hasExperiment200Logs).toBeTruthy() // Should detect second new experiment correctly
   })
 
   test('Single source of truth rendering using variantData', async () => {
@@ -588,10 +588,10 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // Verify that rendering is based on variantData (single source of truth)
     const renderVar = await popup.locator('input[value="render_value"]').isVisible()
-    expect(renderVar).toBe(true, 'Variable should be rendered from variantData')
+    expect(renderVar).toBeTruthy() // Variable should be rendered from variantData
 
     const domChangesSection = await popup.locator('text=DOM Changes for Control').isVisible()
-    expect(domChangesSection).toBe(true, 'DOM changes should be rendered from variantData')
+    expect(domChangesSection).toBeTruthy() // DOM changes should be rendered from variantData
 
     // Check console logs to verify variantData is being used for rendering
     const hasRenderingLogs = consoleMessages.some(msg => 
@@ -600,7 +600,7 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
       msg.includes('variablesCount: 1') &&
       msg.includes('domChangesCount: 1')
     )
-    expect(hasRenderingLogs).toBe(true, 'Should log rendering details from variantData')
+    expect(hasRenderingLogs).toBeTruthy() // Should log rendering details from variantData
 
     // Enter edit mode to verify state consistency
     await popup.click('button:has-text("Edit Variables")')
@@ -618,10 +618,10 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // Variable should revert to original value (proving single source of truth)
     const originalValueBack = await popup.locator('input[value="render_value"]').isVisible()
-    expect(originalValueBack).toBe(true, 'Should revert to original value from variantData after cancel')
+    expect(originalValueBack).toBeTruthy() // Should revert to original value from variantData after cancel
 
     const editedValueGone = await popup.locator('input[value="edited_render_value"]').isVisible()
-    expect(editedValueGone).toBe(false, 'Edited value should be discarded after cancel')
+    expect(editedValueGone).toBeFalsy() // Edited value should be discarded after cancel
   })
 
   test('Variable and DOM change operations work correctly', async () => {
@@ -743,21 +743,21 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // Verify operations worked
     const modifiedVar = await popup.locator('input[value="modified_value"]').isVisible()
-    expect(modifiedVar).toBe(true, 'Existing variable should be modified')
+    expect(modifiedVar).toBeTruthy() // Existing variable should be modified
 
     const newVar = await popup.locator('input[value="new_test_value"]').isVisible()
-    expect(newVar).toBe(true, 'New variable should be added')
+    expect(newVar).toBeTruthy() // New variable should be added
 
     const deletedVarGone = await popup.locator('input[value="delete_me_value"]').isVisible()
-    expect(deletedVarGone).toBe(false, 'Deleted variable should be removed')
+    expect(deletedVarGone).toBeFalsy() // Deleted variable should be removed
 
     // Test DOM changes operations
     const domChangesExpanded = await popup.locator('text=DOM Changes for Control').isVisible()
-    expect(domChangesExpanded).toBe(true, 'DOM changes section should be visible')
+    expect(domChangesExpanded).toBeTruthy() // DOM changes section should be visible
 
     // Verify existing DOM change is there
     const existingDomChange = await popup.locator('text=.existing').isVisible()
-    expect(existingDomChange).toBe(true, 'Existing DOM change should be visible')
+    expect(existingDomChange).toBeTruthy() // Existing DOM change should be visible
 
     // Save changes to verify everything persists
     await popup.click('button:has-text("Save Changes")')
@@ -765,14 +765,14 @@ test.describe('ExperimentDetail Component Unit Tests', () => {
 
     // Verify we're back in view mode
     const editButton = await popup.locator('button:has-text("Edit Variables")').isVisible()
-    expect(editButton).toBe(true, 'Should be back in view mode after save')
+    expect(editButton).toBeTruthy() // Should be back in view mode after save
 
     // Verify all changes persisted
     const persistedModifiedVar = await popup.locator('input[value="modified_value"]').isVisible()
-    expect(persistedModifiedVar).toBe(true, 'Modified variable should persist after save')
+    expect(persistedModifiedVar).toBeTruthy() // Modified variable should persist after save
 
     const persistedNewVar = await popup.locator('input[value="new_test_value"]').isVisible()
-    expect(persistedNewVar).toBe(true, 'New variable should persist after save')
+    expect(persistedNewVar).toBeTruthy() // New variable should persist after save
 
     await popup.screenshot({ path: 'tests/screenshots/operations-test-result.png' })
   })
