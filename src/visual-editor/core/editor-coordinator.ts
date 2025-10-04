@@ -4,7 +4,8 @@
  */
 
 import { generateRobustSelector } from '../utils/selector-generator'
-import StateManager, { VisualEditorState } from './state-manager'
+import StateManager from '../state-manager'
+import type { VisualEditorState } from './state-manager'
 import EventHandlers from './event-handlers'
 import ContextMenu from './context-menu'
 import UndoRedoManager from './undo-redo-manager'

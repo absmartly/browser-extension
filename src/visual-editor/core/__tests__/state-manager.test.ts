@@ -3,7 +3,8 @@
  * Tests all state mutations, immutability, transitions, and edge cases
  */
 
-import StateManager, { VisualEditorState, VisualEditorConfig } from '../state-manager'
+import StateManager from '../state-manager'
+import type { VisualEditorState, VisualEditorConfig } from '../state-manager'
 
 describe('StateManager', () => {
   let stateManager: StateManager
