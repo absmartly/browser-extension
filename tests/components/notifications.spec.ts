@@ -557,7 +557,7 @@ test.describe('Notifications Component Tests', () => {
     expect(messageText).toContain('...')
 
     // Should not break layout
-    const notificationWidth = await notification.evaluate(el => el.offsetWidth)
+    const notificationWidth = await notification.evaluate(el => (el as HTMLElement).offsetWidth)
     expect(notificationWidth).toBeLessThanOrEqual(400) // max-width constraint
   })
 
@@ -597,8 +597,8 @@ test.describe('Notifications Component Tests', () => {
     const srAnnouncement = await page.evaluate(() => {
       const announcements = Array.from(document.querySelectorAll('[aria-live]'))
       return announcements.find(el =>
-        el.style.position === 'absolute' &&
-        el.style.left === '-10000px'
+        (el as HTMLElement).style.position === 'absolute' &&
+        (el as HTMLElement).style.left === '-10000px'
       )
     })
 
@@ -719,6 +719,6 @@ test.describe('Notifications Component Tests', () => {
 
     // Should be centered in new viewport width
     const expectedLeft = 800 / 2 // New viewport center
-    expect(Math.abs(newPosition.left + (await notification.evaluate(el => el.offsetWidth / 2)) - expectedLeft)).toBeLessThan(10)
+    expect(Math.abs(newPosition.left + (await notification.evaluate(el => (el as HTMLElement).offsetWidth / 2)) - expectedLeft)).toBeLessThan(10)
   })
 })
