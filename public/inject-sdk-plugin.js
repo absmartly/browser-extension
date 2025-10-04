@@ -668,6 +668,46 @@
   }
 
   /**
+   * Intercept eventLogger calls and forward to extension
+   */
+  function interceptEventLogger(context) {
+    if (!context || context.__eventLoggerIntercepted) {
+      return;
+    }
+
+    const originalEventLogger = context.eventLogger ? context.eventLogger() : null;
+
+    // Create wrapper eventLogger
+    const wrappedEventLogger = (ctx, eventName, data) => {
+      debugLog('[ABsmartly Extension] SDK Event:', { eventName, data });
+
+      // Forward event to extension UI
+      window.postMessage({
+        source: 'absmartly-page',
+        type: 'SDK_EVENT',
+        payload: {
+          eventName,
+          data: data ? JSON.parse(JSON.stringify(data)) : null,
+          timestamp: new Date().toISOString()
+        }
+      }, '*');
+
+      // Call original eventLogger if it exists
+      if (originalEventLogger) {
+        originalEventLogger(ctx, eventName, data);
+      }
+    };
+
+    // Replace the eventLogger
+    if (context._eventLogger !== undefined) {
+      context._eventLogger = wrappedEventLogger;
+    }
+
+    context.__eventLoggerIntercepted = true;
+    debugLog('[ABsmartly Extension] EventLogger intercepted successfully');
+  }
+
+  /**
    * Detects ABsmartly SDK on the window object - uses cache if available
    */
   function detectABsmartlySDK() {
@@ -728,7 +768,7 @@
     // Cache the context and its location for future use
     if (context && !cachedContext) {
       cachedContext = context;
-      
+
       // Store where we found it
       if (window.ABsmartlyContext === context) {
         contextPropertyPath = 'ABsmartlyContext';
@@ -739,8 +779,11 @@
       } else {
         contextPropertyPath = 'unknown';
       }
-      
+
       debugLog('[ABsmartly Extension] Context found and cached at:', contextPropertyPath);
+
+      // Intercept eventLogger
+      interceptEventLogger(context);
     }
 
     return { sdk: null, context };
