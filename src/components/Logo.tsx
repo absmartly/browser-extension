@@ -6,23 +6,26 @@ interface LogoProps {
 }
 
 export function Logo({ config, className = "w-10 h-10" }: LogoProps) {
+  const baseUrl = config?.apiEndpoint
+    ? config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    : undefined
+
   const handleClick = (e: React.MouseEvent) => {
-    if (config?.apiEndpoint) {
+    if (baseUrl) {
       e.preventDefault()
-      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
       chrome.tabs.create({ url: baseUrl })
     }
   }
 
-  const Logo = config?.apiEndpoint ? 'a' : 'div'
+  const Logo = baseUrl ? 'a' : 'div'
 
   return (
     <div className="relative inline-block">
       <Logo
-        href={config?.apiEndpoint ? "#" : undefined}
-        onClick={config?.apiEndpoint ? handleClick : undefined}
-        className={config?.apiEndpoint ? "cursor-pointer" : ""}
-        title={config?.apiEndpoint ? "Open ABsmartly" : undefined}
+        href={baseUrl}
+        onClick={baseUrl ? handleClick : undefined}
+        className={baseUrl ? "cursor-pointer" : ""}
+        title={baseUrl ? "Open ABsmartly" : undefined}
       >
         <img
           src={logoUrl}
