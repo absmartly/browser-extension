@@ -1,6 +1,7 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
 import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
+import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 // Storage instance
@@ -473,8 +474,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const sessionStorage = new Storage({ area: "session" })
 
     // Get the current state to find out which field we were picking for
-    sessionStorage.get('domChangesInlineState').then(async (stateData) => {
-      const state = (stateData as unknown) as { variantName: string; editingChange: any; pickingForField: string } | null
+    sessionStorage.get<DOMChangesInlineState>('domChangesInlineState').then(async (state) => {
       if (state && state.pickingForField) {
         debugLog('Storing element picker result for field:', state.pickingForField)
 
