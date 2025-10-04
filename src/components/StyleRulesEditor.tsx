@@ -151,7 +151,7 @@ export function StyleRulesEditor({ change, onChange }: StyleRulesEditorProps) {
         <Button
           onClick={() => setShowTemplates(!showTemplates)}
           size="sm"
-          variant="outline"
+          variant="secondary"
         >
           <SparklesIcon className="w-4 h-4 mr-1" />
           Templates

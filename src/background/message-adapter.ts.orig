@@ -58,7 +58,7 @@ export class ChromeMessageAdapter implements MessageAdapter {
       sendResponse: (response?: any) => void
     ) => {
       const result = handler(message, {
-        tab: sender.tab?.id ? { id: sender.tab.id } : undefined,
+        tab: sender.tab,
         frameId: sender.frameId
       })
 

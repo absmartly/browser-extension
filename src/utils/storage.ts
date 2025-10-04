@@ -44,13 +44,13 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
       // Try to get non-chunked data
       const data = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE)
       console.log('Cache retrieved (non-chunked):', data ? 'exists' : 'null')
-      return data
+      return data as ExperimentsCache | null
     }
     
     // If data is chunked, retrieve all chunks
-    if (metadata.chunked) {
+    if ((metadata as any).chunked) {
       const chunks: string[] = []
-      for (let i = 0; i < metadata.chunks; i++) {
+      for (let i = 0; i < (metadata as any).chunks; i++) {
         const chunk = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_' + i)
         if (!chunk) {
           console.warn(`Missing chunk ${i}, cache is corrupted`)
@@ -73,7 +73,7 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
     } else {
       // Data wasn't chunked, get it directly
       const data = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE)
-      return data
+      return data as ExperimentsCache | null
     }
   } catch (error) {
     console.error('Error getting experiments cache:', error)

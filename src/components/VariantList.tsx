@@ -318,7 +318,7 @@ export function VariantList({
                 variantName={variant.name}
                 experimentName={experimentName}
                 changes={variant.dom_changes}
-                onChange={(changes, options) => updateVariantDOMChanges(index, changes, options)}
+                onChange={(changes) => updateVariantDOMChanges(index, changes)}
                 previewEnabled={previewEnabled && activePreviewVariant === index}
                 onPreviewToggle={(enabled) => {
                   // Check if another variant has VE active
