@@ -492,6 +492,19 @@ function SidebarContent() {
     setView('create')
   }
 
+  const handleCreateFromTemplate = async (templateId: number) => {
+    try {
+      const template = await getExperiment(templateId)
+      // Remove the ID so it creates a new experiment instead of updating the template
+      const { id, created_at, updated_at, created_by, updated_by, exposures, started_at, stopped_at, favorite, ...templateData } = template
+      setSelectedExperiment(templateData as Experiment)
+      setView('create')
+    } catch (err) {
+      console.error('Failed to load template:', err)
+      setError('Failed to load template')
+    }
+  }
+
   const handleEditExperiment = (experiment: Experiment) => {
     setSelectedExperiment(experiment)
     setView('edit')
@@ -825,8 +838,7 @@ function SidebarContent() {
               }}
               onTemplateSelect={(templateId) => {
                 setCreatePanelOpen(false)
-                // TODO: Implement template loading
-                console.log('Load template:', templateId)
+                handleCreateFromTemplate(templateId)
               }}
               config={config}
             />
