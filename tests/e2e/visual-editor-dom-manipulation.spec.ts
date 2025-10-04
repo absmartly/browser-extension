@@ -356,8 +356,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.dblclick(targetSelector)
 
       // Clear and type new text
-      await page.selectText(targetSelector)
-      await page.type(targetSelector, newText)
+      await page.locator(targetSelector).selectText()
+      await page.locator(targetSelector).fill(newText)
 
       // Press Enter to save
       await page.press(targetSelector, 'Enter')
@@ -383,8 +383,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.dblclick(targetSelector)
 
       // Type some text
-      await page.selectText(targetSelector)
-      await page.type(targetSelector, 'This should be cancelled')
+      await page.locator(targetSelector).selectText()
+      await page.locator(targetSelector).fill('This should be cancelled')
 
       // Press Escape to cancel
       await page.press(targetSelector, 'Escape')
@@ -1170,8 +1170,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
 
       // Text change
       await page.dblclick(textSelector)
-      await page.selectText(textSelector)
-      await page.type(textSelector, 'Modified text')
+      await page.locator(textSelector).selectText()
+      await page.locator(textSelector).fill('Modified text')
       await page.press(textSelector, 'Enter')
 
       // Hide operation
@@ -1202,8 +1202,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
 
       // Make a change
       await page.dblclick(targetSelector)
-      await page.selectText(targetSelector)
-      await page.type(targetSelector, 'Persistent change')
+      await page.locator(targetSelector).selectText()
+      await page.locator(targetSelector).fill('Persistent change')
       await page.press(targetSelector, 'Enter')
 
       // Get changes before stopping editor
