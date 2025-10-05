@@ -143,6 +143,18 @@ test.describe('SDK Events Debug Page', () => {
     await sidebar.locator('body').waitFor({ timeout: 10000 })
     console.log('  ✓ Sidebar injected')
 
+    // Inject SDK plugin script into the page to intercept SDK events
+    const sdkPluginPath = extensionUrl('inject-sdk-plugin.js')
+    await testPage.evaluate((scriptUrl) => {
+      const script = document.createElement('script')
+      script.src = scriptUrl
+      script.onload = () => console.log('[Test] SDK plugin script loaded')
+      script.onerror = () => console.error('[Test] Failed to load SDK plugin script')
+      document.head.appendChild(script)
+    }, sdkPluginPath)
+    await testPage.waitForTimeout(1000) // Wait for SDK plugin to initialize
+    console.log('  ✓ SDK plugin injected')
+
     // Open Events Debug Page
     await openEventsDebugPage(testPage)
     console.log('  ✓ Opened Events Debug Page')

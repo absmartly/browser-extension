@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>SDK Events Test Page</title>
+  <script src="https://unpkg.com/@absmartly/javascript-sdk/dist/absmartly.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 40px; background: #f5f5f5; }
     .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
@@ -47,20 +48,7 @@
   </div>
 
   <script>
-    // Helper function to dispatch SDK events
-    function dispatchSDKEvent(eventName, data = {}) {
-      const event = {
-        source: 'absmartly-page',
-        type: 'SDK_EVENT',
-        payload: {
-          eventName,
-          data,
-          timestamp: new Date().toISOString()
-        }
-      }
-      window.postMessage(event, '*')
-      logEvent(`Dispatched ${eventName} event`)
-    }
+    let sdk = null
 
     function logEvent(message) {
       const logContent = document.getElementById('log-content')
@@ -68,65 +56,128 @@
       logContent.innerHTML += `<div>[${timestamp}] ${message}</div>`
     }
 
-    // Event button handlers
-    document.getElementById('trigger-ready').addEventListener('click', () => {
-      dispatchSDKEvent('ready', {
-        units: { session_id: '123', user_id: 'user_456' },
-        context: { url: window.location.href }
-      })
+    // Initialize ABsmartly SDK
+    async function initSDK() {
+      try {
+        const ABSmartly = window.absmartly
+        const sdkConfig = {
+          endpoint: 'https://demo.absmartly.io/v1',
+          apiKey: 'test-api-key',
+          environment: 'test',
+          application: 'test-app'
+        }
+
+        const contextConfig = {
+          units: {
+            session_id: 'test-session-' + Date.now(),
+            user_id: 'test-user-123'
+          }
+        }
+
+        sdk = ABSmartly.create(sdkConfig)
+        const context = await sdk.createContext(contextConfig)
+
+        logEvent('ABsmartly SDK initialized')
+        return context
+      } catch (error) {
+        logEvent('SDK initialization error: ' + error.message)
+        console.error('SDK init error:', error)
+      }
+    }
+
+    // Event button handlers - these will trigger real SDK events
+    document.getElementById('trigger-ready').addEventListener('click', async () => {
+      try {
+        const context = await initSDK()
+        logEvent('Triggered ready event')
+      } catch (error) {
+        logEvent('Error: ' + error.message)
+      }
     })
 
-    document.getElementById('trigger-refresh').addEventListener('click', () => {
-      dispatchSDKEvent('refresh', {
-        units: { session_id: '123' },
-        refreshedAt: new Date().toISOString()
-      })
+    document.getElementById('trigger-refresh').addEventListener('click', async () => {
+      try {
+        if (!sdk) await initSDK()
+        const context = await sdk.createContext({
+          units: { session_id: 'test-session-' + Date.now() }
+        })
+        await context.refresh()
+        logEvent('Triggered refresh event')
+      } catch (error) {
+        logEvent('Error: ' + error.message)
+      }
     })
 
-    document.getElementById('trigger-publish').addEventListener('click', () => {
-      dispatchSDKEvent('publish', {
-        hashed: true,
-        units: { session_id: '123', user_id: 'user_456' },
-        publishedUnits: ['session_id', 'user_id']
-      })
+    document.getElementById('trigger-publish').addEventListener('click', async () => {
+      try {
+        if (!sdk) await initSDK()
+        const context = await sdk.createContext({
+          units: { session_id: 'test-session-' + Date.now() }
+        })
+        await context.publish()
+        logEvent('Triggered publish event')
+      } catch (error) {
+        logEvent('Error: ' + error.message)
+      }
     })
 
-    document.getElementById('trigger-exposure').addEventListener('click', () => {
-      dispatchSDKEvent('exposure', {
-        id: 1,
-        name: 'test_experiment',
-        unit: 'session_id',
-        variant: 1,
-        exposedAt: Date.now(),
-        assigned: true,
-        eligible: true,
-        overridden: false,
-        fullOn: false,
-        custom: false,
-        audienceMismatch: false
-      })
+    document.getElementById('trigger-exposure').addEventListener('click', async () => {
+      try {
+        if (!sdk) await initSDK()
+        const context = await sdk.createContext({
+          units: { session_id: 'test-session-' + Date.now() }
+        })
+        // Trigger an exposure by getting a treatment
+        context.treatment('test_experiment')
+        logEvent('Triggered exposure event')
+      } catch (error) {
+        logEvent('Error: ' + error.message)
+      }
     })
 
-    document.getElementById('trigger-goal').addEventListener('click', () => {
-      dispatchSDKEvent('goal', {
-        name: 'conversion',
-        achievedAt: Date.now(),
-        properties: { value: 99.99, currency: 'USD' }
-      })
+    document.getElementById('trigger-goal').addEventListener('click', async () => {
+      try {
+        if (!sdk) await initSDK()
+        const context = await sdk.createContext({
+          units: { session_id: 'test-session-' + Date.now() }
+        })
+        context.track('conversion', { value: 99.99, currency: 'USD' })
+        logEvent('Triggered goal event')
+      } catch (error) {
+        logEvent('Error: ' + error.message)
+      }
     })
 
-    document.getElementById('trigger-finalize').addEventListener('click', () => {
-      dispatchSDKEvent('finalize', {
-        finalizedAt: new Date().toISOString()
-      })
+    document.getElementById('trigger-finalize').addEventListener('click', async () => {
+      try {
+        if (!sdk) await initSDK()
+        const context = await sdk.createContext({
+          units: { session_id: 'test-session-' + Date.now() }
+        })
+        await context.close()
+        logEvent('Triggered finalize event')
+      } catch (error) {
+        logEvent('Error: ' + error.message)
+      }
     })
 
     document.getElementById('trigger-error').addEventListener('click', () => {
-      dispatchSDKEvent('error', {
-        message: 'Test error message',
-        code: 'TEST_ERROR',
-        stack: 'Error: Test error\n    at testFunction (test.js:10:15)'
-      })
+      // Dispatch a custom error event
+      const event = {
+        source: 'absmartly-page',
+        type: 'SDK_EVENT',
+        payload: {
+          eventName: 'error',
+          data: {
+            message: 'Test error message',
+            code: 'TEST_ERROR',
+            stack: 'Error: Test error\n    at testFunction (test.js:10:15)'
+          },
+          timestamp: new Date().toISOString()
+        }
+      }
+      window.postMessage(event, '*')
+      logEvent('Triggered error event')
     })
 
     document.getElementById('trigger-all').addEventListener('click', () => {
@@ -134,7 +185,7 @@
       events.forEach((eventName, index) => {
         setTimeout(() => {
           document.getElementById(`trigger-${eventName}`).click()
-        }, index * 100)
+        }, index * 200)
       })
     })
 
@@ -146,6 +197,7 @@
     // Log page load
     window.addEventListener('load', () => {
       logEvent('SDK Events Test Page loaded')
+      logEvent('ABsmartly SDK available: ' + (typeof window.absmartly !== 'undefined'))
     })
   </script>
 </body>
