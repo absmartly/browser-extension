@@ -2,6 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 // This is the main content script that will be injected into all web pages
 import { VisualEditor, JSONEditor } from '~src/visual-editor'
+import { EventViewer } from '~src/visual-editor/ui/event-viewer'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
@@ -418,9 +419,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true })
     return true
   }
-  
+
   if (message.type === 'CLOSE_JSON_EDITOR') {
     closeJSONEditor()
+    sendResponse({ success: true })
+    return true
+  }
+
+  // Event viewer messages
+  if (message.type === 'OPEN_EVENT_VIEWER') {
+    openEventViewer(message.data)
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (message.type === 'CLOSE_EVENT_VIEWER') {
+    closeEventViewer()
     sendResponse({ success: true })
     return true
   }
@@ -1105,39 +1119,59 @@ async function openJSONEditor(data: {
 }) {
   // Close any existing editor
   closeJSONEditor()
-  
+
   // Temporarily disable VE if it's active (to prevent event conflicts)
   const wasVEActive = isVisualEditorActive
   if (wasVEActive && currentEditor) {
     debugLog('[JSON Editor] Temporarily disabling VE while JSON editor is open')
     currentEditor.disable()
   }
-  
+
   jsonEditorInstance = new JSONEditor()
-  
+
   const title = `Edit DOM Changes - ${data.variantName}`
   const result = await jsonEditorInstance.show(title, data.value)
-  
+
   // Re-enable VE if it was active before
   if (wasVEActive && currentEditor) {
     debugLog('[JSON Editor] Re-enabling VE after JSON editor closed')
     currentEditor.enable()
   }
-  
+
   if (result !== null) {
     // User saved changes
-    chrome.runtime.sendMessage({ 
+    chrome.runtime.sendMessage({
       type: 'JSON_EDITOR_SAVE',
       value: result
     })
   } else {
     // User cancelled
-    chrome.runtime.sendMessage({ 
+    chrome.runtime.sendMessage({
       type: 'JSON_EDITOR_CLOSE'
     })
   }
-  
-  jsonEditorInstance = null
+}
+
+// Event viewer functionality
+let eventViewerInstance: EventViewer | null = null
+
+function openEventViewer(data: {
+  eventName: string
+  timestamp: string
+  value: string
+}) {
+  // Close any existing viewer
+  closeEventViewer()
+
+  eventViewerInstance = new EventViewer()
+  eventViewerInstance.show(data.eventName, data.timestamp, data.value)
+}
+
+function closeEventViewer() {
+  if (eventViewerInstance) {
+    eventViewerInstance.close()
+    eventViewerInstance = null
+  }
 }
 
 function closeJSONEditor() {
