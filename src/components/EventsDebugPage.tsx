@@ -118,25 +118,27 @@ export default function EventsDebugPage() {
               <div
                 key={event.id}
                 onClick={() => handleEventClick(event)}
-                className="p-4 border rounded-lg cursor-pointer hover:shadow-md transition-shadow bg-white">
-                <div className="flex items-center justify-between mb-2">
+                className="p-3 border rounded-lg cursor-pointer hover:shadow-md transition-shadow bg-white">
+                <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`px-3 py-1 text-sm font-semibold rounded border ${getEventColor(
+                    className={`px-2 py-0.5 text-xs font-semibold rounded border whitespace-nowrap ${getEventColor(
                       event.eventName
                     )}`}>
                     {event.eventName}
                   </span>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
                     {formatTimestamp(event.timestamp)}
                   </span>
                 </div>
                 {event.data && (
-                  <div className="text-sm text-gray-600 font-mono bg-gray-50 p-2 rounded mt-2">
-                    {typeof event.data === "object"
-                      ? JSON.stringify(event.data).substring(0, 150) +
-                        (JSON.stringify(event.data).length > 150 ? "..." : "")
-                      : String(event.data).substring(0, 150) +
-                        (String(event.data).length > 150 ? "..." : "")}
+                  <div className="text-xs text-gray-600 font-mono bg-gray-50 p-2 rounded mt-2 overflow-hidden">
+                    <div className="truncate">
+                      {typeof event.data === "object"
+                        ? JSON.stringify(event.data).substring(0, 100) +
+                          (JSON.stringify(event.data).length > 100 ? "..." : "")
+                        : String(event.data).substring(0, 100) +
+                          (String(event.data).length > 100 ? "..." : "")}
+                    </div>
                   </div>
                 )}
               </div>

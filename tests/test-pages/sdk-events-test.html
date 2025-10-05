@@ -60,11 +60,16 @@
     async function initSDK() {
       try {
         const ABSmartly = window.absmartly
+
+        // Use credentials from window (injected by test) or defaults
+        const apiEndpoint = window.__absmartlyAPIEndpoint || 'https://demo.absmartly.io'
+        const apiKey = window.__absmartlyAPIKey || 'test-dev-key'
+
         const sdkConfig = {
-          endpoint: 'https://demo.absmartly.io/v1',
-          apiKey: 'test-api-key',
-          environment: 'test',
-          application: 'test-app'
+          endpoint: `${apiEndpoint}/v1`,
+          apiKey: apiKey,
+          environment: 'development',
+          application: 'absmartly.com'
         }
 
         const contextConfig = {
@@ -74,9 +79,12 @@
           }
         }
 
-        sdk = ABSmartly.create(sdkConfig)
+        // Create SDK instance using constructor
+        if (!sdk) {
+          sdk = new ABSmartly.SDK(sdkConfig)
+        }
         const context = await sdk.createContext(contextConfig)
-
+        await context.ready()
         logEvent('ABsmartly SDK initialized')
         return context
       } catch (error) {
@@ -97,12 +105,11 @@
 
     document.getElementById('trigger-refresh').addEventListener('click', async () => {
       try {
-        if (!sdk) await initSDK()
-        const context = await sdk.createContext({
-          units: { session_id: 'test-session-' + Date.now() }
-        })
-        await context.refresh()
-        logEvent('Triggered refresh event')
+        const context = await initSDK()
+        if (context) {
+          await context.refresh()
+          logEvent('Triggered refresh event')
+        }
       } catch (error) {
         logEvent('Error: ' + error.message)
       }
@@ -110,12 +117,11 @@
 
     document.getElementById('trigger-publish').addEventListener('click', async () => {
       try {
-        if (!sdk) await initSDK()
-        const context = await sdk.createContext({
-          units: { session_id: 'test-session-' + Date.now() }
-        })
-        await context.publish()
-        logEvent('Triggered publish event')
+        const context = await initSDK()
+        if (context) {
+          await context.publish()
+          logEvent('Triggered publish event')
+        }
       } catch (error) {
         logEvent('Error: ' + error.message)
       }
@@ -123,13 +129,12 @@
 
     document.getElementById('trigger-exposure').addEventListener('click', async () => {
       try {
-        if (!sdk) await initSDK()
-        const context = await sdk.createContext({
-          units: { session_id: 'test-session-' + Date.now() }
-        })
-        // Trigger an exposure by getting a treatment
-        context.treatment('test_experiment')
-        logEvent('Triggered exposure event')
+        const context = await initSDK()
+        if (context) {
+          // Trigger an exposure by getting a treatment
+          context.treatment('test_experiment')
+          logEvent('Triggered exposure event')
+        }
       } catch (error) {
         logEvent('Error: ' + error.message)
       }
@@ -137,12 +142,11 @@
 
     document.getElementById('trigger-goal').addEventListener('click', async () => {
       try {
-        if (!sdk) await initSDK()
-        const context = await sdk.createContext({
-          units: { session_id: 'test-session-' + Date.now() }
-        })
-        context.track('conversion', { value: 99.99, currency: 'USD' })
-        logEvent('Triggered goal event')
+        const context = await initSDK()
+        if (context) {
+          context.track('conversion', { value: 99.99, currency: 'USD' })
+          logEvent('Triggered goal event')
+        }
       } catch (error) {
         logEvent('Error: ' + error.message)
       }
@@ -150,12 +154,11 @@
 
     document.getElementById('trigger-finalize').addEventListener('click', async () => {
       try {
-        if (!sdk) await initSDK()
-        const context = await sdk.createContext({
-          units: { session_id: 'test-session-' + Date.now() }
-        })
-        await context.close()
-        logEvent('Triggered finalize event')
+        const context = await initSDK()
+        if (context) {
+          await context.close()
+          logEvent('Triggered finalize event')
+        }
       } catch (error) {
         logEvent('Error: ' + error.message)
       }

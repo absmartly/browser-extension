@@ -3,11 +3,12 @@
  * Displays SDK event data in a modal with syntax highlighting
  */
 
-import { EditorView } from '@codemirror/view'
+import { EditorView, keymap, highlightActiveLine, highlightActiveLineGutter, lineNumbers } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { basicSetup } from 'codemirror'
+import { foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { searchKeymap } from '@codemirror/search'
 
 export class EventViewer {
   private viewerHost: HTMLElement | null = null
@@ -82,7 +83,13 @@ export class EventViewer {
       const startState = EditorState.create({
         doc: jsonData,
         extensions: [
-          basicSetup,
+          // Minimal viewer setup - no editing features
+          lineNumbers(),
+          highlightActiveLineGutter(),
+          highlightActiveLine(),
+          foldGutter(),
+          syntaxHighlighting(defaultHighlightStyle),
+          keymap.of(searchKeymap),
           json(),
           oneDark,
           EditorView.lineWrapping,
