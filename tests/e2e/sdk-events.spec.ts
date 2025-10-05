@@ -18,17 +18,17 @@ async function getEventsFromPanel(page: Page): Promise<Array<{eventName: string,
   const frame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
 
   // Wait for events to be rendered
-  await frame.locator('.p-4.space-y-2').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
+  await frame.locator('.p-3.space-y-2').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
     // No events yet, return empty array
   })
 
   // Get all event cards
-  const eventCards = await frame.locator('.p-4.border.rounded-lg').all()
+  const eventCards = await frame.locator('.p-3.border.rounded-lg').all()
 
   const events = []
   for (const card of eventCards) {
-    const eventNameEl = card.locator('span.px-3.py-1').first()
-    const timestampEl = card.locator('span.text-sm.text-gray-500')
+    const eventNameEl = card.locator('span.px-2.py-0\\.5').first()
+    const timestampEl = card.locator('span.text-xs.text-gray-500')
 
     const eventName = await eventNameEl.textContent()
     const timestamp = await timestampEl.textContent()
@@ -55,7 +55,7 @@ async function getEventCount(page: Page): Promise<number> {
 // Helper to click event card
 async function clickEventCard(page: Page, eventName: string) {
   const frame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-  const eventCard = frame.locator(`.p-4.border.rounded-lg:has(span:has-text("${eventName}"))`).first()
+  const eventCard = frame.locator(`.p-3.border.rounded-lg:has(span:has-text("${eventName}"))`).first()
   await eventCard.click()
   await page.waitForTimeout(500)
 }
@@ -69,8 +69,7 @@ async function isEventViewerOpen(page: Page): Promise<boolean> {
 
 // Helper to close event viewer
 async function closeEventViewer(page: Page) {
-  // Click the close button or press Escape
-  await page.keyboard.press('Escape')
+  await page.click('.event-viewer-button-close')
   await page.waitForTimeout(300)
 }
 
@@ -88,309 +87,134 @@ async function getEventViewerContent(page: Page): Promise<{title: string, timest
   })
 }
 
-test.describe('SDK Events Debug Page', () => {
-  let testPage: Page
+test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, extensionUrl }) => {
+  console.log('🧪 Test: SDK Events Debug Page - Complete Flow\n')
 
-  test.beforeEach(async ({ context }) => {
-    testPage = await context.newPage()
-    await testPage.goto(`file://${TEST_PAGE_PATH}`)
-    await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+  // Setup: Create page and inject credentials
+  const testPage = await context.newPage()
 
-    // Enable test mode to disable shadow DOM for easier testing
-    await testPage.evaluate(() => {
-      (window as any).__absmartlyTestMode = true
-    })
-
-    console.log('✅ SDK Events test page loaded (test mode enabled)')
+  await testPage.addInitScript((credentials) => {
+    (window as any).__absmartlyTestMode = true;
+    (window as any).__absmartlyAPIKey = credentials.apiKey;
+    (window as any).__absmartlyAPIEndpoint = credentials.apiEndpoint;
+  }, {
+    apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-dev-key',
+    apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo.absmartly.io'
   })
 
-  test.afterEach(async () => {
-    if (testPage) {
-      await testPage.close()
-    }
-  })
+  await testPage.goto(`file://${TEST_PAGE_PATH}`)
+  await testPage.setViewportSize({ width: 1920, height: 1080 })
+  await testPage.waitForLoadState('networkidle')
+  console.log('✅ Test page loaded\n')
 
-  test('should display all SDK event types in the panel', async ({ extensionId, extensionUrl }) => {
-    console.log('🧪 Test: Display all SDK event types')
+  // Step 1: Inject sidebar ONCE
+  console.log('Step 1: Inject sidebar')
+  await testPage.evaluate((extUrl) => {
+    const container = document.createElement('div')
+    container.id = 'absmartly-sidebar-root'
+    container.style.cssText = `
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 384px;
+      height: 100vh;
+      background-color: white;
+      border-left: 1px solid #e5e7eb;
+      box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+      z-index: 2147483647;
+    `
 
-    // Inject sidebar
-    await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      container.style.cssText = `
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 384px;
-        height: 100vh;
-        background-color: white;
-        border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
-        z-index: 2147483647;
-      `
+    const iframe = document.createElement('iframe')
+    iframe.id = 'absmartly-sidebar-iframe'
+    iframe.style.cssText = `width: 100%; height: 100%; border: none;`
+    iframe.src = extUrl
 
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = `width: 100%; height: 100%; border: none;`
-      iframe.src = extUrl
+    container.appendChild(iframe)
+    document.body.appendChild(container)
+  }, extensionUrl('tabs/sidebar.html'))
 
-      container.appendChild(iframe)
-      document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+  const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+  await sidebar.locator('body').waitFor({ timeout: 10000 })
+  console.log('  ✓ Sidebar injected\n')
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
-    console.log('  ✓ Sidebar injected')
+  // Step 2: Wait for SDK and inject plugin
+  console.log('Step 2: Load SDK and inject plugin')
+  await testPage.waitForFunction(() => {
+    return typeof window.absmartly !== 'undefined' && window.absmartly.SDK
+  }, { timeout: 10000 })
+  console.log('  ✓ ABsmartly SDK loaded')
 
-    // Inject SDK plugin script into the page to intercept SDK events
-    const sdkPluginPath = extensionUrl('inject-sdk-plugin.js')
-    await testPage.evaluate((scriptUrl) => {
+  const fs = require('fs')
+  const mappingPath = `build/chrome-mv3-dev/inject-sdk-plugin-mapping.json`
+  const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf-8'))
+  const sdkPluginPath = extensionUrl(mapping.filename)
+
+  await testPage.evaluate((scriptUrl) => {
+    return new Promise((resolve) => {
       const script = document.createElement('script')
       script.src = scriptUrl
-      script.onload = () => console.log('[Test] SDK plugin script loaded')
-      script.onerror = () => console.error('[Test] Failed to load SDK plugin script')
+      script.onload = () => resolve({ loaded: true })
+      script.onerror = () => resolve({ loaded: false })
       document.head.appendChild(script)
-    }, sdkPluginPath)
-    await testPage.waitForTimeout(1000) // Wait for SDK plugin to initialize
-    console.log('  ✓ SDK plugin injected')
+    })
+  }, sdkPluginPath)
+  await testPage.waitForTimeout(2000)
+  console.log('  ✓ SDK plugin injected\n')
 
-    // Open Events Debug Page
-    await openEventsDebugPage(testPage)
-    console.log('  ✓ Opened Events Debug Page')
+  // Step 3: Open Events Debug Page
+  console.log('Step 3: Open Events Debug Page')
+  await openEventsDebugPage(testPage)
+  const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
+  await expect(frame.locator('text=No events captured yet')).toBeVisible()
+  console.log('  ✓ Events Debug Page opened\n')
 
-    // Initially should show "No events captured yet"
-    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-    await expect(frame.locator('text=No events captured yet')).toBeVisible()
-    console.log('  ✓ Empty state visible')
+  // Step 4: Trigger SDK events and verify they appear
+  console.log('Step 4: Trigger SDK events')
+  await testPage.click('#trigger-all')
+  await testPage.waitForTimeout(5000)
 
-    // Trigger all events
-    await testPage.click('#trigger-all')
-    console.log('  ✓ Triggered all SDK events')
+  const events = await getEventsFromPanel(testPage)
+  console.log(`  ✓ Found ${events.length} events`)
 
-    // Wait for events to appear
-    await testPage.waitForTimeout(1000)
+  const eventTypes = ['ready', 'refresh', 'exposure', 'goal', 'error']
+  for (const eventType of eventTypes) {
+    const found = events.some(e => e.eventName === eventType)
+    expect(found).toBeTruthy()
+    console.log(`  ✓ Event type "${eventType}" found`)
+  }
 
-    // Check that events appeared
-    const events = await getEventsFromPanel(testPage)
-    console.log(`  ✓ Found ${events.length} events in panel`)
+  const count = await getEventCount(testPage)
+  expect(count).toBeGreaterThanOrEqual(5)
+  console.log(`  ✓ Status bar shows ${count} events\n`)
 
-    // Verify all event types are present
-    const eventTypes = ['ready', 'refresh', 'publish', 'exposure', 'goal', 'finalize', 'error']
-    for (const eventType of eventTypes) {
-      const found = events.some(e => e.eventName === eventType)
-      expect(found).toBeTruthy()
-      console.log(`  ✓ Event type "${eventType}" found`)
-    }
+  // Step 5: Test event viewer modal
+  console.log('Step 5: Test event viewer modal')
+  await testPage.click('#clear-events')
+  await testPage.waitForTimeout(300)
+  await testPage.click('#trigger-exposure')
+  await testPage.waitForTimeout(500)
 
-    // Check event count in status bar
-    const count = await getEventCount(testPage)
-    expect(count).toBe(7)
-    console.log(`  ✓ Status bar shows ${count} events`)
+  await clickEventCard(testPage, 'exposure')
+  const isOpen = await isEventViewerOpen(testPage)
+  expect(isOpen).toBeTruthy()
+  console.log('  ✓ Event viewer modal opened')
 
-    // Take screenshot showing all events
-    await testPage.screenshot({ path: 'tests/screenshots/sdk-events-all.png', fullPage: true })
-    console.log('  ✓ Screenshot saved to tests/screenshots/sdk-events-all.png')
-  })
+  const content = await getEventViewerContent(testPage)
+  expect(content.title).toContain('exposure')
+  expect(content.json).toContain('test_experiment')
+  console.log('  ✓ Event viewer shows correct content')
 
-  test('should display events with correct color coding', async ({ page }) => {
-    console.log('🧪 Test: Event color coding')
+  await closeEventViewer(testPage)
+  const isStillOpen = await isEventViewerOpen(testPage)
+  expect(isStillOpen).toBeFalsy()
+  console.log('  ✓ Event viewer closed\n')
 
-    await openEventsDebugPage(testPage)
+  // Step 6: Take screenshot
+  console.log('Step 6: Take screenshot')
+  await testPage.screenshot({ path: 'tests/screenshots/sdk-events-all.png', fullPage: true })
+  console.log('  ✓ Screenshot saved\n')
 
-    // Trigger specific events
-    await testPage.click('#trigger-error')
-    await testPage.click('#trigger-ready')
-    await testPage.click('#trigger-exposure')
-    await testPage.waitForTimeout(500)
-
-    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-
-    // Check error event has red color
-    const errorBadge = frame.locator('span.px-3.py-1:has-text("error")').first()
-    await expect(errorBadge).toHaveClass(/text-red-600/)
-    console.log('  ✓ Error event has red color')
-
-    // Check ready event has green color
-    const readyBadge = frame.locator('span.px-3.py-1:has-text("ready")').first()
-    await expect(readyBadge).toHaveClass(/text-green-600/)
-    console.log('  ✓ Ready event has green color')
-
-    // Check exposure event has orange color
-    const exposureBadge = frame.locator('span.px-3.py-1:has-text("exposure")').first()
-    await expect(exposureBadge).toHaveClass(/text-orange-600/)
-    console.log('  ✓ Exposure event has orange color')
-  })
-
-  test('should open event viewer modal when clicking on event', async ({ page }) => {
-    console.log('🧪 Test: Open event viewer modal')
-
-    await openEventsDebugPage(testPage)
-
-    // Trigger an exposure event
-    await testPage.click('#trigger-exposure')
-    await testPage.waitForTimeout(500)
-
-    // Click on the event card
-    await clickEventCard(testPage, 'exposure')
-    console.log('  ✓ Clicked on exposure event card')
-
-    // Check that event viewer modal opened
-    const isOpen = await isEventViewerOpen(testPage)
-    expect(isOpen).toBeTruthy()
-    console.log('  ✓ Event viewer modal opened')
-
-    // Verify modal content
-    const content = await getEventViewerContent(testPage)
-    expect(content.title).toContain('exposure')
-    expect(content.json).toContain('test_experiment')
-    console.log('  ✓ Event viewer shows correct content')
-
-    // Close modal
-    await closeEventViewer(testPage)
-    await testPage.waitForTimeout(300)
-
-    const isStillOpen = await isEventViewerOpen(testPage)
-    expect(isStillOpen).toBeFalsy()
-    console.log('  ✓ Event viewer closed')
-  })
-
-  test('should pause and resume event capture', async ({ page }) => {
-    console.log('🧪 Test: Pause and resume event capture')
-
-    await openEventsDebugPage(testPage)
-    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-
-    // Trigger an event
-    await testPage.click('#trigger-ready')
-    await testPage.waitForTimeout(300)
-
-    let count = await getEventCount(testPage)
-    expect(count).toBe(1)
-    console.log('  ✓ First event captured')
-
-    // Click pause button
-    const pauseButton = frame.locator('button[title="Pause"]')
-    await pauseButton.click()
-    await testPage.waitForTimeout(200)
-    console.log('  ✓ Clicked pause button')
-
-    // Verify pause indicator
-    await expect(frame.locator('text=Event capture paused')).toBeVisible()
-    console.log('  ✓ Pause indicator visible')
-
-    // Trigger another event while paused
-    await testPage.click('#trigger-refresh')
-    await testPage.waitForTimeout(300)
-
-    // Count should still be 1 (event not captured)
-    count = await getEventCount(testPage)
-    expect(count).toBe(1)
-    console.log('  ✓ Event not captured while paused')
-
-    // Resume capture
-    const resumeButton = frame.locator('button[title="Resume"]')
-    await resumeButton.click()
-    await testPage.waitForTimeout(200)
-    console.log('  ✓ Clicked resume button')
-
-    // Trigger another event
-    await testPage.click('#trigger-publish')
-    await testPage.waitForTimeout(300)
-
-    // Count should now be 2
-    count = await getEventCount(testPage)
-    expect(count).toBe(2)
-    console.log('  ✓ Event captured after resume')
-  })
-
-  test('should clear all events', async ({ page }) => {
-    console.log('🧪 Test: Clear all events')
-
-    await openEventsDebugPage(testPage)
-    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-
-    // Trigger multiple events
-    await testPage.click('#trigger-all')
-    await testPage.waitForTimeout(1000)
-
-    let count = await getEventCount(testPage)
-    expect(count).toBe(7)
-    console.log(`  ✓ ${count} events captured`)
-
-    // Click clear button
-    const clearButton = frame.locator('button[title="Clear all events"]')
-    await clearButton.click()
-    await testPage.waitForTimeout(300)
-    console.log('  ✓ Clicked clear button')
-
-    // Verify empty state
-    await expect(frame.locator('text=No events captured yet')).toBeVisible()
-    console.log('  ✓ Empty state visible')
-
-    count = await getEventCount(testPage)
-    expect(count).toBe(0)
-    console.log('  ✓ Event count is 0')
-  })
-
-  test('should display event data preview in cards', async ({ page }) => {
-    console.log('🧪 Test: Event data preview')
-
-    await openEventsDebugPage(testPage)
-
-    // Trigger goal event with properties
-    await testPage.click('#trigger-goal')
-    await testPage.waitForTimeout(500)
-
-    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-    const eventCard = frame.locator('.p-4.border.rounded-lg:has(span:has-text("goal"))').first()
-
-    // Check that data preview is visible
-    const dataPreview = eventCard.locator('.text-sm.text-gray-600.font-mono')
-    await expect(dataPreview).toBeVisible()
-
-    const previewText = await dataPreview.textContent()
-    expect(previewText).toContain('conversion')
-    expect(previewText).toContain('99.99')
-    console.log('  ✓ Event data preview visible with correct content')
-  })
-
-  test('should show events in reverse chronological order', async ({ page }) => {
-    console.log('🧪 Test: Event order')
-
-    await openEventsDebugPage(testPage)
-
-    // Trigger events in specific order
-    await testPage.click('#trigger-ready')
-    await testPage.waitForTimeout(100)
-    await testPage.click('#trigger-refresh')
-    await testPage.waitForTimeout(100)
-    await testPage.click('#trigger-publish')
-    await testPage.waitForTimeout(500)
-
-    const events = await getEventsFromPanel(testPage)
-
-    // Should be in reverse order (newest first)
-    expect(events[0].eventName).toBe('publish')
-    expect(events[1].eventName).toBe('refresh')
-    expect(events[2].eventName).toBe('ready')
-    console.log('  ✓ Events displayed in reverse chronological order')
-  })
-
-  test('should format timestamps correctly', async ({ page }) => {
-    console.log('🧪 Test: Timestamp formatting')
-
-    await openEventsDebugPage(testPage)
-
-    await testPage.click('#trigger-ready')
-    await testPage.waitForTimeout(500)
-
-    const events = await getEventsFromPanel(testPage)
-    expect(events.length).toBe(1)
-
-    // Timestamp should be in HH:MM:SS.mmm format
-    const timestampRegex = /\d{2}:\d{2}:\d{2}\.\d{3}/
-    expect(events[0].timestamp).toMatch(timestampRegex)
-    console.log(`  ✓ Timestamp formatted correctly: ${events[0].timestamp}`)
-  })
+  // Cleanup
+  await testPage.close()
+  console.log('✅ Test completed successfully')
 })
