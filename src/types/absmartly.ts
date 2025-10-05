@@ -71,7 +71,6 @@ export interface ABsmartlyConfig {
   persistQueryToCookie?: boolean  // Whether to persist query overrides to cookie
   injectSDK?: boolean  // Whether to inject the ABsmartly SDK if not detected
   sdkUrl?: string  // Custom SDK URL (defaults to https://sdk.absmartly.com/sdk.js)
-  anthropicApiKey?: string  // Anthropic API key for AI-powered DOM changes generation
 }
 
 export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'

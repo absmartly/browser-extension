@@ -67,6 +67,38 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           debugError('[index.tsx] Cannot forward message - chrome.runtime not available')
         }
       }
+
+      // Handle AI_GENERATE_DOM_CHANGES in test mode
+      if (event.data.type === 'AI_GENERATE_DOM_CHANGES') {
+        console.log('[index.tsx] Handling AI_GENERATE_DOM_CHANGES in test mode')
+        try {
+          // Import the AI generation function
+          const { generateDOMChanges } = await import('~src/lib/ai-generator')
+
+          const { html, prompt, apiKey } = event.data
+          console.log('[index.tsx] Generating with prompt:', prompt?.substring(0, 60) + '...')
+
+          const changes = await generateDOMChanges(html, prompt, apiKey)
+
+          window.postMessage({
+            source: 'absmartly-extension',
+            responseId: event.data.responseId,
+            response: { success: true, changes }
+          }, '*')
+
+          console.log('[index.tsx] ✅ Sent AI generation response:', changes.length, 'changes')
+        } catch (error) {
+          console.error('[index.tsx] ❌ AI generation failed:', error)
+          window.postMessage({
+            source: 'absmartly-extension',
+            responseId: event.data.responseId,
+            response: {
+              success: false,
+              error: error instanceof Error ? error.message : 'Failed to generate DOM changes'
+            }
+          }, '*')
+        }
+      }
     }
   })
 

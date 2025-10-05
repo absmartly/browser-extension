@@ -111,6 +111,30 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setInjectSDK(loadedInjectSDK)
       setSdkUrl(loadedSdkUrl)
 
+      // Auto-save config if values were loaded from environment variables
+      // This ensures env vars are persisted to storage on first load
+      const hasEnvValues = (envApiKey || envApiEndpoint)
+      const hasStoredConfig = (config?.apiKey || config?.apiEndpoint)
+
+      if (hasEnvValues && !hasStoredConfig) {
+        // Save the config with env values
+        const autoConfig: ABsmartlyConfig = {
+          apiKey: loadedApiKey.trim() || undefined,
+          apiEndpoint: loadedApiEndpoint,
+          sdkEndpoint: loadedSdkEndpoint.trim() || undefined,
+          applicationName: loadedApplicationName.trim() || undefined,
+          domChangesFieldName: loadedDomChangesFieldName,
+          authMethod: loadedAuthMethod,
+          sdkWindowProperty: loadedSdkWindowProperty.trim() || undefined,
+          queryPrefix: loadedQueryPrefix,
+          persistQueryToCookie: loadedPersistQueryToCookie,
+          injectSDK: loadedInjectSDK,
+          sdkUrl: loadedSdkUrl.trim() || undefined
+        }
+        await setConfig(autoConfig)
+        console.log('[SettingsView] Auto-saved config from environment variables')
+      }
+
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
         // Store endpoint in localStorage for avatar URLs

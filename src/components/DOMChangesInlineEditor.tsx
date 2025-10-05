@@ -619,10 +619,13 @@ export function DOMChangesInlineEditor({
     debugLog('Experiment name:', experimentName)
     debugLog('Changes:', changes)
 
-    // Send directly to content script
-    console.log('[DOMChanges] 🚀 READY TO SEND START_VISUAL_EDITOR')
-    console.log('[DOMChanges] tabs[0]?.id:', tabs[0]?.id)
-    console.log('[DOMChanges] tabs array length:', tabs.length)
+    // Test if we can send any message at all
+    sendMessage({ type: 'PING' }, (response) => {
+      debugLog('PING response:', response)
+    })
+
+    // Send directly to content script (no relay through background)
+    console.log('[DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id:', tabs[0]?.id)
     if (tabs[0]?.id) {
       console.log('[DOMChanges] ✅ SENDING START_VISUAL_EDITOR')
       console.log('[DOMChanges] Variant:', variantName)
@@ -788,34 +791,70 @@ export function DOMChangesInlineEditor({
 
   const handleAIGenerate = async (prompt: string) => {
     try {
+      console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt)
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt)
 
       const config = await getConfig()
-      if (!config?.anthropicApiKey) {
+      // Fallback to environment variable if not in config (for E2E tests and development)
+      const apiKey = config?.anthropicApiKey || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || "***REMOVED_API_KEY***"
+
+      console.log('[AI Generate] Config loaded:', config ? 'YES' : 'NO', 'Has API key:', !!apiKey)
+      if (!apiKey) {
         throw new Error('Anthropic API key not configured. Please add it in Settings.')
       }
 
+      console.log('[AI Generate] Capturing page HTML...')
       const html = await capturePageHTML()
+      console.log('[AI Generate] HTML captured, length:', html?.length || 0)
 
-      const response = await chrome.runtime.sendMessage({
+      // Test connection first
+      console.log('[AI Generate] Testing background connection with PING...')
+      try {
+        const pingResponse = await sendMessage({ type: 'PING' })
+        console.log('[AI Generate] PING response:', pingResponse)
+      } catch (pingError) {
+        console.error('[AI Generate] PING failed:', pingError)
+      }
+
+      console.log('[AI Generate] Sending TEST message first...')
+      try {
+        const testResponse = await sendMessage({
+          type: 'AI_GENERATE_DOM_CHANGES'
+        })
+        console.log('[AI Generate] TEST response:', testResponse)
+      } catch (testError) {
+        console.error('[AI Generate] TEST failed:', testError)
+      }
+
+      console.log('[AI Generate] Sending FULL message to background script...')
+      const response = await sendMessage({
         type: 'AI_GENERATE_DOM_CHANGES',
         html,
         prompt,
-        apiKey: config.anthropicApiKey
+        apiKey
       })
 
+      console.log('[AI Generate] Response received:', response)
+
       if (!response.success) {
+        console.error('[AI Generate] ❌ Response failed:', response.error)
         throw new Error(response.error || 'Failed to generate DOM changes')
       }
 
       const generatedChanges = response.changes as DOMChange[]
+      console.log('[AI Generate] ✅ Generated', generatedChanges.length, 'DOM changes:', generatedChanges)
       debugLog('✅ Generated', generatedChanges.length, 'DOM changes:', generatedChanges)
 
+      console.log('[AI Generate] Current changes count:', changes.length)
       const updatedChanges = [...changes, ...generatedChanges]
+      console.log('[AI Generate] Updated changes count:', updatedChanges.length)
+      console.log('[AI Generate] Calling onChange...')
       onChange(updatedChanges)
 
+      console.log('[AI Generate] ✅ AI-generated changes added successfully')
       debugLog('✅ AI-generated changes added successfully')
     } catch (error) {
+      console.error('[AI Generate] ❌ AI generation failed:', error)
       debugError('❌ AI generation failed:', error)
       throw error
     }
