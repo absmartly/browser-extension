@@ -72,12 +72,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
   console.log('[index.tsx] Added postMessage listener for polyfilled chrome.runtime calls')
 }
 
-const container = document.getElementById('__plasmo')
-if (container) {
-  const root = createRoot(container)
-  root.render(
+function IndexSidePanel() {
+  return (
     <ErrorBoundary>
       <ExtensionSidebar />
     </ErrorBoundary>
   )
 }
+
+export default IndexSidePanel
