@@ -6,20 +6,20 @@ const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test
 
 // Helper to open Events Debug Page panel
 async function openEventsDebugPage(page: Page) {
-  // Click on the sidebar button to open the extension
-  const sidebarButton = page.locator('iframe[title="ABsmartly Sidebar"]').contentFrame().locator('button:has-text("Events Debug")')
-  await sidebarButton.click()
+  const sidebarFrame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
+  const eventsButton = sidebarFrame.locator('button[aria-label="Events Debug"]')
+  await eventsButton.waitFor({ state: 'visible', timeout: 10000 })
+  await eventsButton.click()
   await page.waitForTimeout(500)
 }
 
 // Helper to get events from the panel
 async function getEventsFromPanel(page: Page): Promise<Array<{eventName: string, timestamp: string}>> {
-  const frame = page.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+  const frame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
 
   // Wait for events to be rendered
-  await frame.waitForSelector('.p-4.space-y-2', { timeout: 5000 }).catch(() => {
+  await frame.locator('.p-4.space-y-2').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
     // No events yet, return empty array
-    return []
   })
 
   // Get all event cards
@@ -27,8 +27,8 @@ async function getEventsFromPanel(page: Page): Promise<Array<{eventName: string,
 
   const events = []
   for (const card of eventCards) {
-    const eventNameEl = await card.locator('span.px-3.py-1').first()
-    const timestampEl = await card.locator('span.text-sm.text-gray-500')
+    const eventNameEl = card.locator('span.px-3.py-1').first()
+    const timestampEl = card.locator('span.text-sm.text-gray-500')
 
     const eventName = await eventNameEl.textContent()
     const timestamp = await timestampEl.textContent()
@@ -46,7 +46,7 @@ async function getEventsFromPanel(page: Page): Promise<Array<{eventName: string,
 
 // Helper to get event count from status bar
 async function getEventCount(page: Page): Promise<number> {
-  const frame = page.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+  const frame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
   const statusText = await frame.locator('.p-2.bg-gray-50.text-gray-600.text-sm.text-center').last().textContent()
   const match = statusText?.match(/(\d+) event/)
   return match ? parseInt(match[1], 10) : 0
@@ -54,7 +54,7 @@ async function getEventCount(page: Page): Promise<number> {
 
 // Helper to click event card
 async function clickEventCard(page: Page, eventName: string) {
-  const frame = page.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+  const frame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
   const eventCard = frame.locator(`.p-4.border.rounded-lg:has(span:has-text("${eventName}"))`).first()
   await eventCard.click()
   await page.waitForTimeout(500)
@@ -96,7 +96,13 @@ test.describe('SDK Events Debug Page', () => {
     await testPage.goto(`file://${TEST_PAGE_PATH}`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForLoadState('networkidle')
-    console.log('✅ SDK Events test page loaded')
+
+    // Enable test mode to disable shadow DOM for easier testing
+    await testPage.evaluate(() => {
+      (window as any).__absmartlyTestMode = true
+    })
+
+    console.log('✅ SDK Events test page loaded (test mode enabled)')
   })
 
   test.afterEach(async () => {
@@ -105,15 +111,44 @@ test.describe('SDK Events Debug Page', () => {
     }
   })
 
-  test('should display all SDK event types in the panel', async ({ page }) => {
+  test('should display all SDK event types in the panel', async ({ extensionId, extensionUrl }) => {
     console.log('🧪 Test: Display all SDK event types')
+
+    // Inject sidebar
+    await testPage.evaluate((extUrl) => {
+      const container = document.createElement('div')
+      container.id = 'absmartly-sidebar-root'
+      container.style.cssText = `
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 384px;
+        height: 100vh;
+        background-color: white;
+        border-left: 1px solid #e5e7eb;
+        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+        z-index: 2147483647;
+      `
+
+      const iframe = document.createElement('iframe')
+      iframe.id = 'absmartly-sidebar-iframe'
+      iframe.style.cssText = `width: 100%; height: 100%; border: none;`
+      iframe.src = extUrl
+
+      container.appendChild(iframe)
+      document.body.appendChild(container)
+    }, extensionUrl('tabs/sidebar.html'))
+
+    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    console.log('  ✓ Sidebar injected')
 
     // Open Events Debug Page
     await openEventsDebugPage(testPage)
     console.log('  ✓ Opened Events Debug Page')
 
     // Initially should show "No events captured yet"
-    const frame = testPage.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
     await expect(frame.locator('text=No events captured yet')).toBeVisible()
     console.log('  ✓ Empty state visible')
 
@@ -140,6 +175,10 @@ test.describe('SDK Events Debug Page', () => {
     const count = await getEventCount(testPage)
     expect(count).toBe(7)
     console.log(`  ✓ Status bar shows ${count} events`)
+
+    // Take screenshot showing all events
+    await testPage.screenshot({ path: 'tests/screenshots/sdk-events-all.png', fullPage: true })
+    console.log('  ✓ Screenshot saved to tests/screenshots/sdk-events-all.png')
   })
 
   test('should display events with correct color coding', async ({ page }) => {
@@ -153,7 +192,7 @@ test.describe('SDK Events Debug Page', () => {
     await testPage.click('#trigger-exposure')
     await testPage.waitForTimeout(500)
 
-    const frame = testPage.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
 
     // Check error event has red color
     const errorBadge = frame.locator('span.px-3.py-1:has-text("error")').first()
@@ -208,7 +247,7 @@ test.describe('SDK Events Debug Page', () => {
     console.log('🧪 Test: Pause and resume event capture')
 
     await openEventsDebugPage(testPage)
-    const frame = testPage.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
 
     // Trigger an event
     await testPage.click('#trigger-ready')
@@ -257,7 +296,7 @@ test.describe('SDK Events Debug Page', () => {
     console.log('🧪 Test: Clear all events')
 
     await openEventsDebugPage(testPage)
-    const frame = testPage.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
 
     // Trigger multiple events
     await testPage.click('#trigger-all')
@@ -291,7 +330,7 @@ test.describe('SDK Events Debug Page', () => {
     await testPage.click('#trigger-goal')
     await testPage.waitForTimeout(500)
 
-    const frame = testPage.locator('iframe[title="ABsmartly Sidebar"]').contentFrame()
+    const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
     const eventCard = frame.locator('.p-4.border.rounded-lg:has(span:has-text("goal"))').first()
 
     // Check that data preview is visible
