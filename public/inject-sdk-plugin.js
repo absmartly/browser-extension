@@ -668,6 +668,26 @@
   }
 
   /**
+   * Send message to extension - handles both test mode and production
+   */
+  function sendMessageToExtension(message) {
+    // In test mode, send directly to sidebar iframe
+    const sidebarIframe = document.getElementById('absmartly-sidebar-iframe');
+    if (sidebarIframe && sidebarIframe.contentWindow) {
+      try {
+        sidebarIframe.contentWindow.postMessage(message, '*');
+        debugLog('[ABsmartly Extension] Message sent to sidebar iframe');
+        return;
+      } catch (error) {
+        debugWarn('[ABsmartly Extension] Failed to send to sidebar iframe:', error);
+      }
+    }
+
+    // In production, send via window.postMessage (content script will relay via chrome.runtime)
+    window.postMessage(message, '*');
+  }
+
+  /**
    * Intercept eventLogger calls and forward to extension
    */
   function interceptEventLogger(context) {
@@ -681,8 +701,7 @@
     const wrappedEventLogger = (ctx, eventName, data) => {
       debugLog('[ABsmartly Extension] SDK Event:', { eventName, data });
 
-      // Forward event to extension UI
-      window.postMessage({
+      const eventMessage = {
         source: 'absmartly-page',
         type: 'SDK_EVENT',
         payload: {
@@ -690,7 +709,10 @@
           data: data ? JSON.parse(JSON.stringify(data)) : null,
           timestamp: new Date().toISOString()
         }
-      }, '*');
+      };
+
+      // Send via unified message function
+      sendMessageToExtension(eventMessage);
 
       // Call original eventLogger if it exists
       if (originalEventLogger) {
@@ -708,15 +730,109 @@
   }
 
   /**
+   * Intercept SDK's createContext method to auto-intercept all new contexts
+   */
+  function interceptSDKCreateContext(sdk) {
+    if (!sdk || !sdk.createContext || sdk.__createContextIntercepted) {
+      return;
+    }
+
+    const originalCreateContext = sdk.createContext.bind(sdk);
+
+    sdk.createContext = async function(config) {
+      debugLog('[ABsmartly Extension] Intercepting createContext call');
+
+      // Call original createContext
+      const context = await originalCreateContext(config);
+
+      // Intercept the eventLogger on this new context
+      interceptEventLogger(context);
+
+      return context;
+    };
+
+    sdk.__createContextIntercepted = true;
+    debugLog('[ABsmartly Extension] SDK createContext intercepted successfully');
+  }
+
+  /**
+   * Intercept SDK constructor to intercept all SDK instances
+   */
+  function interceptSDKConstructor(sdkModule) {
+    if (!sdkModule || !sdkModule.SDK || sdkModule.SDK.__constructorIntercepted) {
+      return;
+    }
+
+    const OriginalSDK = sdkModule.SDK;
+
+    // Create a proxy constructor
+    sdkModule.SDK = function(config) {
+      debugLog('[ABsmartly Extension] Intercepting new SDK() call');
+
+      // Create SDK instance
+      const sdkInstance = new OriginalSDK(config);
+
+      // Intercept createContext on this SDK instance
+      if (sdkInstance && typeof sdkInstance.createContext === 'function') {
+        interceptSDKCreateContext(sdkInstance);
+      }
+
+      return sdkInstance;
+    };
+
+    // Copy static properties
+    Object.setPrototypeOf(sdkModule.SDK, OriginalSDK);
+    Object.assign(sdkModule.SDK, OriginalSDK);
+
+    sdkModule.SDK.__constructorIntercepted = true;
+    debugLog('[ABsmartly Extension] SDK constructor intercepted successfully');
+  }
+
+  /**
    * Detects ABsmartly SDK on the window object - uses cache if available
    */
   function detectABsmartlySDK() {
-    // Return cached context if we already found it
-    if (cachedContext) {
-      return { sdk: null, context: cachedContext };
+    // Check for SDK module (has SDK constructor)
+    const sdkModuleLocations = [
+      window.absmartly,
+      window.ABsmartly,
+      window.__absmartly
+    ];
+
+    for (const location of sdkModuleLocations) {
+      if (location && location.SDK && typeof location.SDK === 'function') {
+        debugLog('[ABsmartly Extension] SDK module found, intercepting SDK constructor');
+        interceptSDKConstructor(location);
+        break;
+      }
     }
 
-    // Check common SDK locations
+    // Check for SDK instances (have createContext method)
+    let sdk = null;
+    const sdkLocations = [
+      window.sdk,
+      window.absmartly,
+      window.ABsmartly,
+      window.__absmartly
+    ];
+
+    for (const location of sdkLocations) {
+      if (location && typeof location.createContext === 'function') {
+        sdk = location;
+        debugLog('[ABsmartly Extension] SDK instance found');
+
+        // Intercept createContext to auto-intercept all future contexts
+        interceptSDKCreateContext(sdk);
+        break;
+      }
+    }
+
+    // Return cached context if we already found it
+    if (cachedContext) {
+      return { sdk, context: cachedContext };
+    }
+
+    // Check common context locations
     const possibleLocations = [
       window.ABsmartlyContext,
       window.absmartly,
@@ -782,11 +898,11 @@
 
       debugLog('[ABsmartly Extension] Context found and cached at:', contextPropertyPath);
 
-      // Intercept eventLogger
+      // Intercept eventLogger on this context
       interceptEventLogger(context);
     }
 
-    return { sdk: null, context };
+    return { sdk, context };
   }
 
   /**
