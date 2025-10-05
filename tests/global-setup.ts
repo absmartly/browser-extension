@@ -65,17 +65,20 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Copied local-test-page.html to build directory')
   }
 
-  // 3. Load environment variables if .env.local exists
-  const envPath = path.join(rootDir, '.env.development.local')
+  // 3. Load environment variables from .env.dev.local
+  const envPath = path.join(rootDir, '.env.dev.local')
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, 'utf-8')
     envContent.split('\n').forEach(line => {
+      // Skip comments and empty lines
+      if (line.trim().startsWith('#') || !line.trim()) return
+
       const [key, value] = line.split('=')
       if (key && value) {
         process.env[key.trim()] = value.trim()
       }
     })
-    console.log('✅ Loaded environment variables from .env.local')
+    console.log('✅ Loaded environment variables from .env.dev.local')
   }
 
   // 4. Verify API credentials are available
