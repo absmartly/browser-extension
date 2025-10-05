@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SDK Events Test Page</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
+    h1 { color: #333; font-size: 32px; margin-bottom: 20px; }
+    .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+    .event-button {
+      padding: 12px 24px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .event-button:hover { background: #2563eb; }
+    .info { margin: 20px 0; padding: 15px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SDK Events Test Page</h1>
+    <p class="info">
+      Click the buttons below to trigger different ABsmartly SDK events.
+      These events will appear in the Events Debug Page panel.
+    </p>
+
+    <div class="button-grid">
+      <button id="trigger-ready" class="event-button">Trigger Ready</button>
+      <button id="trigger-refresh" class="event-button">Trigger Refresh</button>
+      <button id="trigger-publish" class="event-button">Trigger Publish</button>
+      <button id="trigger-exposure" class="event-button">Trigger Exposure</button>
+      <button id="trigger-goal" class="event-button">Trigger Goal</button>
+      <button id="trigger-finalize" class="event-button">Trigger Finalize</button>
+      <button id="trigger-error" class="event-button">Trigger Error</button>
+      <button id="trigger-all" class="event-button">Trigger All</button>
+      <button id="clear-events" class="event-button">Clear Events</button>
+    </div>
+
+    <div id="event-log" style="margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 6px; min-height: 100px;">
+      <strong>Event Log:</strong>
+      <div id="log-content" style="margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+    </div>
+  </div>
+
+  <script>
+    // Helper function to dispatch SDK events
+    function dispatchSDKEvent(eventName, data = {}) {
+      const event = {
+        source: 'absmartly-page',
+        type: 'SDK_EVENT',
+        payload: {
+          eventName,
+          data,
+          timestamp: new Date().toISOString()
+        }
+      }
+      window.postMessage(event, '*')
+      logEvent(`Dispatched ${eventName} event`)
+    }
+
+    function logEvent(message) {
+      const logContent = document.getElementById('log-content')
+      const timestamp = new Date().toLocaleTimeString()
+      logContent.innerHTML += `<div>[${timestamp}] ${message}</div>`
+    }
+
+    // Event button handlers
+    document.getElementById('trigger-ready').addEventListener('click', () => {
+      dispatchSDKEvent('ready', {
+        units: { session_id: '123', user_id: 'user_456' },
+        context: { url: window.location.href }
+      })
+    })
+
+    document.getElementById('trigger-refresh').addEventListener('click', () => {
+      dispatchSDKEvent('refresh', {
+        units: { session_id: '123' },
+        refreshedAt: new Date().toISOString()
+      })
+    })
+
+    document.getElementById('trigger-publish').addEventListener('click', () => {
+      dispatchSDKEvent('publish', {
+        hashed: true,
+        units: { session_id: '123', user_id: 'user_456' },
+        publishedUnits: ['session_id', 'user_id']
+      })
+    })
+
+    document.getElementById('trigger-exposure').addEventListener('click', () => {
+      dispatchSDKEvent('exposure', {
+        id: 1,
+        name: 'test_experiment',
+        unit: 'session_id',
+        variant: 1,
+        exposedAt: Date.now(),
+        assigned: true,
+        eligible: true,
+        overridden: false,
+        fullOn: false,
+        custom: false,
+        audienceMismatch: false
+      })
+    })
+
+    document.getElementById('trigger-goal').addEventListener('click', () => {
+      dispatchSDKEvent('goal', {
+        name: 'conversion',
+        achievedAt: Date.now(),
+        properties: { value: 99.99, currency: 'USD' }
+      })
+    })
+
+    document.getElementById('trigger-finalize').addEventListener('click', () => {
+      dispatchSDKEvent('finalize', {
+        finalizedAt: new Date().toISOString()
+      })
+    })
+
+    document.getElementById('trigger-error').addEventListener('click', () => {
+      dispatchSDKEvent('error', {
+        message: 'Test error message',
+        code: 'TEST_ERROR',
+        stack: 'Error: Test error\n    at testFunction (test.js:10:15)'
+      })
+    })
+
+    document.getElementById('trigger-all').addEventListener('click', () => {
+      const events = ['ready', 'refresh', 'publish', 'exposure', 'goal', 'finalize', 'error']
+      events.forEach((eventName, index) => {
+        setTimeout(() => {
+          document.getElementById(`trigger-${eventName}`).click()
+        }, index * 100)
+      })
+    })
+
+    document.getElementById('clear-events').addEventListener('click', () => {
+      document.getElementById('log-content').innerHTML = ''
+      logEvent('Log cleared')
+    })
+
+    // Log page load
+    window.addEventListener('load', () => {
+      logEvent('SDK Events Test Page loaded')
+    })
+  </script>
+</body>
+</html>
