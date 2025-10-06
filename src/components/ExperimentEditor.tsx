@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
-import { Badge } from './ui/Badge'
-import { Select } from './ui/Select'
-// Removed - now using VariantList
 import type { Experiment } from '~src/types/absmartly'
-import type { DOMChange } from '~src/types/dom-changes'
-import { ArrowLeftIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
+import { LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
+import { Header } from './Header'
 import { VariantList } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
-import { Logo } from './Logo'
+import { useExperimentVariants } from '~src/hooks/useExperimentVariants'
+import { useExperimentSave } from '~src/hooks/useExperimentSave'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -24,12 +21,6 @@ interface ExperimentEditorProps {
   tags?: any[]
   owners?: any[]
   teams?: any[]
-}
-
-interface VariantData {
-  name: string
-  variables: Record<string, any>
-  dom_changes: DOMChange[]
 }
 
 export function ExperimentEditor({
@@ -61,41 +52,13 @@ export function ExperimentEditor({
     tag_ids: experiment?.experiment_tags?.map(t => t.experiment_tag_id) || []
   })
 
-  const [initialVariants] = useState<VariantData[]>(() => {
-    if (experiment?.variants) {
-      return experiment.variants.map(v => {
-        let dom_changes: DOMChange[] = []
-        let variables: Record<string, any> = {}
-        try {
-          const config = JSON.parse(v.config || '{}')
-          const fieldName = '__dom_changes'
-          if (config[fieldName] && Array.isArray(config[fieldName])) {
-            dom_changes = config[fieldName]
-            const tempConfig = { ...config }
-            delete tempConfig[fieldName]
-            variables = tempConfig
-          } else {
-            variables = config
-          }
-        } catch (e) {
-          debugError('Failed to parse variant config:', e)
-        }
-        
-        return {
-          name: v.name || '',
-          variables,
-          dom_changes
-        }
-      })
-    }
-    return [
-      { name: 'Control', variables: {}, dom_changes: [] },
-      { name: 'Variant 1', variables: {}, dom_changes: [] }
-    ]
+  // Use hooks
+  const { initialVariants, currentVariants, setCurrentVariants, handleVariantsChange } = useExperimentVariants({
+    experiment,
+    domFieldName
   })
+  const { save: saveExperiment } = useExperimentSave({ experiment, domFieldName })
 
-  const [currentVariants, setCurrentVariants] = useState<VariantData[]>(initialVariants)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
 
   // Load config on mount to get the DOM changes field name
@@ -164,95 +127,24 @@ export function ExperimentEditor({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validate required fields
     if (!formData.unit_type_id) {
       alert('Please select a unit type')
       return
     }
-    
-    // Prepare variants with DOM changes
-    const preparedVariants = currentVariants.map((v, index) => {
-      const config: any = { ...v.variables }
-      
-      // Include DOM changes only if not empty
-      if (v.dom_changes && v.dom_changes.length > 0) {
-        config[domFieldName] = v.dom_changes
-      }
-      
-      return {
-        variant: index,
-        name: v.name,
-        config: JSON.stringify(config)
-      }
-    })
 
-    const experimentData: any = {
-      ...formData,
-      state: experiment ? formData.state : 'created', // New experiments start as created/draft
-      iteration: 1,
-      unit_type: { unit_type_id: formData.unit_type_id },
-      primary_metric: { metric_id: null },
-      secondary_metrics: [],
-      applications: formData.application_ids.map(id => ({
-        application_id: id,
-        application_version: "0"
-      })),
-      experiment_tags: formData.tag_ids.map(id => ({ experiment_tag_id: id })),
-      variants: preparedVariants,
-      variant_screenshots: [],
-      owners: formData.owner_ids.map(id => ({ user_id: id })),
-      teams: formData.team_ids.map(id => ({ team_id: id })),
-      // Add analysis type fields for new experiments
-      type: 'test',
-      analysis_type: 'group_sequential',
-      baseline_participants_per_day: '33',
-      required_alpha: '0.100',
-      required_power: '0.800',
-      group_sequential_futility_type: 'binding',
-      group_sequential_analysis_count: null,
-      group_sequential_min_analysis_interval: '1d',
-      group_sequential_first_analysis_interval: '7d',
-      minimum_detectable_effect: null,
-      group_sequential_max_duration_interval: '6w',
-      parent_experiment: null,
-      template_permission: {},
-      template_name: '',
-      template_description: '',
-      // Add custom section field values (empty for now)
-      custom_section_field_values: {
-        "1": { value: "", type: "text", id: 1 },
-        "2": { value: "", type: "text", id: 2 },
-        "3": { value: "", type: "text", id: 3 },
-        "4": { value: "", type: "text", id: 4 },
-        "5": { value: "", type: "text", id: 5 },
-        "111": { value: "", type: "string", id: 111 }
-      }
-    }
-
-    await onSave(experimentData)
+    await saveExperiment(formData, currentVariants, undefined, onSave)
   }
 
 
 
   return (
     <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Logo />
-          <h2 className="text-lg font-semibold text-gray-900">
-            {experiment?.id ? 'Edit Experiment' : 'Create New Experiment'}
-          </h2>
-        </div>
-        <button
-          onClick={onCancel}
-          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          aria-label="Go back"
-          title="Go back"
-        >
-          <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-        </button>
-      </div>
+      <Header
+        title={experiment?.id ? 'Edit Experiment' : 'Create New Experiment'}
+        onBack={onCancel}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -362,8 +254,7 @@ export function ExperimentEditor({
           experimentId={experiment?.id || 0}
           experimentName={formData.name}
           onVariantsChange={(variants, hasChanges) => {
-            setCurrentVariants(variants)
-            setHasUnsavedChanges(hasChanges)
+            handleVariantsChange(variants, hasChanges)
             // Update percentages
             const count = variants.length
             const percentage = Math.floor(100 / count)

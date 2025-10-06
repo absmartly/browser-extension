@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { CustomCodeSettings } from './CustomCodeSettings'
+import { Header } from './Header'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
-import { Logo } from './Logo'
 import axios from 'axios'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
 
@@ -251,20 +250,11 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Logo config={apiEndpoint ? { apiEndpoint } : undefined} />
-          <h2 className="text-lg font-semibold">Settings</h2>
-        </div>
-        <button
-          onClick={onCancel}
-          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          aria-label="Go back"
-          title="Go back"
-        >
-          <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-        </button>
-      </div>
+      <Header
+        title="Settings"
+        onBack={onCancel}
+        config={apiEndpoint ? { apiEndpoint } : undefined}
+      />
       
       {errors.general && (
         <div role="alert" className="bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
