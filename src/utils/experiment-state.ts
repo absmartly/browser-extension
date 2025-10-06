@@ -16,8 +16,6 @@ export function getExperimentStateLabel(state: string): string {
   switch (state) {
     case 'running':
       return 'Running'
-    case 'running_not_full_on':
-      return 'Running'
     case 'full_on':
       return 'Full On'
     case 'stopped':
@@ -50,7 +48,7 @@ export function getExperimentStateLabel(state: string): string {
 export function getExperimentStateBadgeVariant(state: string): BadgeVariant {
   switch (state) {
     case 'running':
-    case 'running_not_full_on':
+    case 'full_on':
       return 'success'
     case 'draft':
     case 'created':
@@ -79,7 +77,6 @@ export function getExperimentStateBadgeVariant(state: string): BadgeVariant {
 export function getExperimentStateClasses(state: string): string {
   switch (state) {
     case 'running':
-    case 'running_not_full_on':
       return 'bg-green-700 text-white'  // green-700
     case 'full_on':
       return 'bg-green-800 text-white'  // moss-green-800

@@ -2,7 +2,7 @@ export interface Experiment {
   id: number
   name: string
   display_name?: string
-  state: 'created' | 'ready' | 'running' | 'development' | 'full_on' | 'running_not_full_on' | 'stopped' | 'archived' | 'scheduled'
+  state: 'created' | 'ready' | 'running' | 'development' | 'full_on' | 'stopped' | 'archived' | 'scheduled'
   status?: 'draft' | 'running' | 'stopped' | 'archived' // For backward compatibility
   created_at: string
   updated_at?: string
