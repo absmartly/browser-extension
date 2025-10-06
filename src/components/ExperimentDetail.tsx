@@ -6,7 +6,7 @@ import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
 import { Header } from './Header'
-import { PencilIcon, CheckIcon, XMarkIcon, PlayIcon, StopIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, CheckIcon, XMarkIcon, PlayIcon, StopIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { VariantList } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
@@ -224,6 +224,18 @@ export function ExperimentDetail({
           />
         )}
 
+        {/* Warning for running/development experiments */}
+        {(experiment.state === 'running' || experiment.state === 'development' || experiment.state === 'running_not_full_on') && (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-yellow-800">
+                <strong>Experiment is {experiment.state === 'development' ? 'in development' : 'running'}.</strong> Changes cannot be saved while the experiment is active. Stop the experiment to make changes.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="pt-4 flex gap-2">
           <Button
@@ -232,11 +244,18 @@ export function ExperimentDetail({
             size="sm"
             disabled={loading || experiment.state === 'running' || experiment.state === 'development'}
             className={hasUnsavedChanges ? 'ring-2 ring-yellow-400' : ''}
+            title={
+              experiment.state === 'running' || experiment.state === 'development'
+                ? 'Stop the experiment to save changes'
+                : hasUnsavedChanges
+                ? 'Save your changes'
+                : 'No changes to save'
+            }
           >
             {hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
           </Button>
           {(experiment.state === 'ready' || experiment.state === 'created' || experiment.status === 'draft') && (
-            <Button 
+            <Button
               onClick={() => onStart(experiment.id)}
               variant="secondary"
               size="sm"
@@ -247,7 +266,7 @@ export function ExperimentDetail({
             </Button>
           )}
           {(experiment.state === 'running' || experiment.state === 'running_not_full_on' || experiment.status === 'running') && (
-            <Button 
+            <Button
               onClick={() => onStop(experiment.id)}
               variant="danger"
               size="sm"
