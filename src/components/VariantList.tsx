@@ -65,11 +65,16 @@ export function VariantList({
   }, [experimentId])
 
   // Sync with parent when initialVariants change (new experiment loaded)
+  // Only sync when experiment actually changes (not on every parent re-render)
   useEffect(() => {
     if (initialVariants.length > 0) {
-      setVariants(initialVariants)
+      // Only update if this is truly a new experiment (different ID)
+      // Don't sync if we already have variants from storage or user edits
+      if (variants.length === 0) {
+        setVariants(initialVariants)
+      }
     }
-  }, [initialVariants])
+  }, [initialVariants, experimentId])
 
   // Cleanup storage and preview on unmount
   useEffect(() => {
