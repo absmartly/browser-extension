@@ -478,11 +478,11 @@ export function ExperimentDetail({
 
         {/* Action Buttons */}
         <div className="pt-4 flex gap-2">
-          <Button 
+          <Button
             onClick={handleSaveChanges}
             variant="primary"
             size="sm"
-            disabled={loading}
+            disabled={loading || experiment.state === 'running' || experiment.state === 'development'}
             className={hasUnsavedChanges ? 'ring-2 ring-yellow-400' : ''}
           >
             {hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
