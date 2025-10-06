@@ -241,7 +241,7 @@ export function ExperimentEditor({
         <div className="flex items-center gap-3">
           <Logo />
           <h2 className="text-lg font-semibold text-gray-900">
-            {experiment ? 'Edit Experiment' : 'Create New Experiment'}
+            {experiment?.id ? 'Edit Experiment' : 'Create New Experiment'}
           </h2>
         </div>
         <button
@@ -387,7 +387,7 @@ export function ExperimentEditor({
             variant="primary"
             disabled={loading}
           >
-            {experiment ? 'Update Experiment' : 'Create Experiment'}
+            {experiment?.id ? 'Update Experiment' : 'Create Experiment'}
           </Button>
           <Button
             type="button"
