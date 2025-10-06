@@ -225,7 +225,7 @@ export function ExperimentDetail({
         )}
 
         {/* Warning for running/development experiments */}
-        {(experiment.state === 'running' || experiment.state === 'development' || experiment.state === 'running_not_full_on') && (
+        {(experiment.state === 'running' || experiment.state === 'development') && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -265,7 +265,7 @@ export function ExperimentDetail({
               Start Experiment
             </Button>
           )}
-          {(experiment.state === 'running' || experiment.state === 'running_not_full_on' || experiment.status === 'running') && (
+          {(experiment.state === 'running' || experiment.status === 'running') && (
             <Button
               onClick={() => onStop(experiment.id)}
               variant="danger"

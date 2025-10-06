@@ -111,7 +111,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
           id: experiment.id
         }
         console.log('[ABsmartly] Setting development override:', overrideValue)
-      } else if (status !== 'running' && status !== 'running_not_full_on' && status !== 'full_on') {
+      } else if (status !== 'running' && status !== 'full_on') {
         // Non-running experiments (draft, stopped, etc) need API fetch flag and ID
         overrideValue = {
           variant: variantIndex,
