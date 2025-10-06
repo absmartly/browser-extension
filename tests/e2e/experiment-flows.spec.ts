@@ -56,9 +56,13 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Verify Header component in experiment list', async () => {
       console.log('\n🔍 Verifying Header component in experiment list')
 
+      // Debug: Log what's actually in the sidebar
+      const bodyText = await sidebar.locator('body').textContent()
+      console.log('  📋 Sidebar body text:', bodyText?.substring(0, 200))
+
       // Header should have logo and title
       const header = sidebar.locator('div').filter({ hasText: /Experiments/i }).first()
-      await expect(header).toBeVisible()
+      await expect(header).toBeVisible({ timeout: 2000 })
       console.log('  ✓ Header with "Experiments" title visible')
 
       // Logo should be present
@@ -130,16 +134,22 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
 
       // Wait for loading to finish - the placeholder should not say "Loading..."
-      await unitTypeClickArea.waitFor({ state: 'visible', timeout: 5000 })
-      await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 10000 })
+      await unitTypeClickArea.waitFor({ state: 'visible', timeout: 2000 })
+      await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
 
-      await unitTypeClickArea.click({ timeout: 5000 })
+      // Small wait to ensure component is ready
+      await testPage.waitForTimeout(500)
+
+      await unitTypeClickArea.click({ timeout: 2000 })
+
+      // Small wait for dropdown to render
+      await testPage.waitForTimeout(300)
 
       const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-      await unitTypeDropdown.waitFor({ state: 'visible', timeout: 3000 })
+      await unitTypeDropdown.waitFor({ state: 'visible', timeout: 2000 })
 
       const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
-      await firstUnitOption.waitFor({ state: 'visible', timeout: 5000 })
+      await firstUnitOption.waitFor({ state: 'visible', timeout: 2000 })
       await firstUnitOption.click()
       console.log('  ✓ Selected unit type')
       await debugWait()
@@ -222,6 +232,80 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
+    await test.step('Navigate back and open existing experiment to test detail view dropdowns', async () => {
+      console.log('\n🔄 Testing detail view dropdowns with existing experiment')
+
+      // Click back button to return to list
+      const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
+      await backButton.click()
+      console.log('  ✓ Clicked back button')
+      await debugWait()
+
+      // Wait for list view
+      await sidebar.locator('text=Experiments').waitFor({ timeout: 2000 })
+
+      // Wait for experiments to load
+      await testPage.waitForTimeout(1000)
+
+      // Find any experiment in the list (not the one we just created, since it's not saved)
+      const hasExperiments = await waitForExperiments(sidebar)
+
+      if (!hasExperiments) {
+        console.log('  ℹ️  No experiments available to test detail view')
+        return
+      }
+
+      // Click the first available experiment
+      const experimentItem = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i }).first()
+      await experimentItem.click()
+      console.log('  ✓ Opened existing experiment')
+      await debugWait()
+
+      // Wait for detail view to load
+      await testPage.waitForTimeout(2000)
+
+      // Check Unit Type dropdown
+      const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const unitTypeText = await unitTypeDropdown.textContent()
+      const isUnitTypeLoading = unitTypeText?.includes('Loading...')
+
+      if (isUnitTypeLoading) {
+        console.log('  ❌ Unit Type dropdown stuck in loading state')
+        console.log('  📝 Unit Type text:', unitTypeText)
+      } else {
+        console.log('  ✓ Unit Type dropdown loaded')
+      }
+      expect(isUnitTypeLoading).toBe(false)
+
+      // Check Owners dropdown
+      const ownersDropdown = sidebar.locator('label:has-text("Owners")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const ownersText = await ownersDropdown.textContent()
+      const isOwnersLoading = ownersText?.includes('Loading...')
+
+      if (isOwnersLoading) {
+        console.log('  ❌ Owners dropdown stuck in loading state')
+        console.log('  📝 Owners text:', ownersText)
+      } else {
+        console.log('  ✓ Owners dropdown loaded')
+      }
+      expect(isOwnersLoading).toBe(false)
+
+      // Check Tags dropdown
+      const tagsDropdown = sidebar.locator('label:has-text("Tags")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const tagsText = await tagsDropdown.textContent()
+      const isTagsLoading = tagsText?.includes('Loading...')
+
+      if (isTagsLoading) {
+        console.log('  ❌ Tags dropdown stuck in loading state')
+        console.log('  📝 Tags text:', tagsText)
+      } else {
+        console.log('  ✓ Tags dropdown loaded')
+      }
+      expect(isTagsLoading).toBe(false)
+
+      await debugWait()
+    })
+
     console.log('\n✅ Create experiment flow test PASSED!')
   })
 
@@ -285,6 +369,54 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const experimentItem = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i }).first()
       await experimentItem.click()
       console.log('  ✓ Clicked first experiment')
+      await debugWait()
+    })
+
+    await test.step('Verify dropdowns load in detail view', async () => {
+      console.log('\n⏳ Verifying dropdowns loaded in detail view')
+
+      // Wait a moment for data to load
+      await testPage.waitForTimeout(2000)
+
+      // Check Unit Type dropdown
+      const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const unitTypeText = await unitTypeDropdown.textContent()
+      const isUnitTypeLoading = unitTypeText?.includes('Loading...')
+
+      if (isUnitTypeLoading) {
+        console.log('  ❌ Unit Type dropdown stuck in loading state')
+        console.log('  📝 Unit Type text:', unitTypeText)
+      } else {
+        console.log('  ✓ Unit Type dropdown loaded')
+      }
+      expect(isUnitTypeLoading).toBe(false)
+
+      // Check Owners dropdown
+      const ownersDropdown = sidebar.locator('label:has-text("Owners")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const ownersText = await ownersDropdown.textContent()
+      const isOwnersLoading = ownersText?.includes('Loading...')
+
+      if (isOwnersLoading) {
+        console.log('  ❌ Owners dropdown stuck in loading state')
+        console.log('  📝 Owners text:', ownersText)
+      } else {
+        console.log('  ✓ Owners dropdown loaded')
+      }
+      expect(isOwnersLoading).toBe(false)
+
+      // Check Tags dropdown
+      const tagsDropdown = sidebar.locator('label:has-text("Tags")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const tagsText = await tagsDropdown.textContent()
+      const isTagsLoading = tagsText?.includes('Loading...')
+
+      if (isTagsLoading) {
+        console.log('  ❌ Tags dropdown stuck in loading state')
+        console.log('  📝 Tags text:', tagsText)
+      } else {
+        console.log('  ✓ Tags dropdown loaded')
+      }
+      expect(isTagsLoading).toBe(false)
+
       await debugWait()
     })
 

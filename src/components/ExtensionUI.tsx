@@ -134,6 +134,8 @@ function SidebarContent() {
         // Continue without applications
         loadExperiments(false)
       })
+
+      loadFavorites()
     }
   }, [config, view, hasInitialized, filtersLoaded, filters])
 
@@ -194,15 +196,6 @@ function SidebarContent() {
       setFiltersLoaded(true)
     })
   }, [])
-
-  // Load editor resources when config is available
-  useEffect(() => {
-    if (config && unitTypes.length === 0) {
-      debugLog('Loading editor resources at init time')
-      loadEditorResources()
-      loadFavorites()
-    }
-  }, [config, unitTypes.length, loadEditorResources])
 
   // Save sidebar state whenever view or selectedExperiment changes
   useEffect(() => {
@@ -283,7 +276,27 @@ function SidebarContent() {
       debugError('Failed to load editor resources:', error)
       // Continue with empty arrays if the call fails
     }
-  }, [getApplications, getUnitTypes, getMetrics, getExperimentTags, getOwners, getTeams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Load editor resources when config is available (regardless of view)
+  // This ensures resources are loaded when:
+  // - Refreshing directly on detail page then navigating to edit
+  // - Opening extension for the first time on any page
+  useEffect(() => {
+    if (config && unitTypes.length === 0) {
+      debugLog('Loading editor resources (config available, resources not loaded)')
+      loadEditorResources()
+    }
+  }, [config, unitTypes.length, loadEditorResources])
+
+  // Also load resources when switching to create/edit view if not loaded
+  useEffect(() => {
+    if ((view === 'create' || view === 'edit') && config && unitTypes.length === 0) {
+      debugLog('Loading editor resources for create/edit view')
+      loadEditorResources()
+    }
+  }, [view, config, unitTypes.length, loadEditorResources])
 
   const loadExperiments = async (forceRefresh = false, page = currentPage, size = pageSize, customFilters = null) => {
     setExperimentsLoading(true)
@@ -863,6 +876,11 @@ function SidebarContent() {
             onBack={() => setView('list')}
             onStart={handleStartExperiment}
             onStop={handleStopExperiment}
+            applications={applications}
+            unitTypes={unitTypes}
+            owners={owners}
+            teams={teams}
+            tags={tags}
             onUpdate={async (id, updates) => {
             try {
               // Send the update
