@@ -818,10 +818,12 @@ window.addEventListener('message', async (event) => {
     debugLog('[Content Script] Received message from page:', event.data)
 
     if (event.data.type === 'SDK_EVENT') {
-      // Forward SDK events to the extension UI
-      sendMessageToExtension({
+      // Forward SDK events to background script for buffering
+      chrome.runtime.sendMessage({
         type: 'SDK_EVENT',
         payload: event.data.payload
+      }).catch(err => {
+        debugError('[Content Script] Failed to send SDK_EVENT to background:', err)
       })
     } else if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
       // Get custom code and config from extension settings

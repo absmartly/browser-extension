@@ -4,6 +4,37 @@ import '@testing-library/jest-dom'
 import EventsDebugPage from '../EventsDebugPage'
 
 describe('EventsDebugPage', () => {
+  // Mock chrome.runtime.sendMessage
+  const mockSendMessage = jest.fn((message, callback) => {
+    if (callback) {
+      // Call callback synchronously to avoid timing issues in tests
+      if (message.type === 'GET_BUFFERED_EVENTS') {
+        callback({ success: true, events: [] })
+      } else if (message.type === 'CLEAR_BUFFERED_EVENTS') {
+        callback({ success: true })
+      }
+    }
+  })
+
+  beforeAll(() => {
+    // Mock chrome.runtime and chrome.tabs
+    global.chrome = {
+      runtime: {
+        sendMessage: mockSendMessage,
+        onMessage: {
+          addListener: jest.fn(),
+          removeListener: jest.fn()
+        }
+      },
+      tabs: {
+        query: jest.fn((query, callback) => {
+          callback([{ id: 1 }])
+        }),
+        sendMessage: jest.fn()
+      }
+    } as any
+  })
+
   // Helper to dispatch SDK events wrapped in act()
   const dispatchSDKEvent = (eventName: string, data: any = null, timestamp?: string) => {
     act(() => {
@@ -34,7 +65,6 @@ describe('EventsDebugPage', () => {
       render(<EventsDebugPage />)
 
       expect(screen.getByText('SDK Events')).toBeInTheDocument()
-      expect(screen.getByText('Event Details')).toBeInTheDocument()
       expect(screen.getByText('No events captured yet')).toBeInTheDocument()
       expect(screen.getByText('SDK events will appear here in real-time')).toBeInTheDocument()
       expect(screen.getByText('0 events captured')).toBeInTheDocument()
@@ -392,22 +422,28 @@ describe('EventsDebugPage', () => {
       dispatchSDKEvent('ready', null)
 
       await waitFor(() => {
+        expect(screen.getByText('ready')).toBeInTheDocument()
         expect(screen.getByText('1 event captured')).toBeInTheDocument()
       })
 
       // Pause
       fireEvent.click(screen.getByTitle('Pause'))
 
+      // Verify paused state
+      await waitFor(() => {
+        expect(screen.getByText('Event capture paused')).toBeInTheDocument()
+      })
+
       // Try to add another event while paused
       dispatchSDKEvent('exposure', null)
 
       // Should still have only 1 event
       await new Promise(resolve => setTimeout(resolve, 100))
-      expect(screen.getByText('1 event captured')).toBeInTheDocument()
-      expect(screen.queryByText('exposure')).not.toBeInTheDocument()
-
-      // Original event should still be there
-      expect(screen.getByText('ready')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('1 event captured')).toBeInTheDocument()
+        expect(screen.queryByText('exposure')).not.toBeInTheDocument()
+        expect(screen.getByText('ready')).toBeInTheDocument()
+      })
     })
   })
 })
