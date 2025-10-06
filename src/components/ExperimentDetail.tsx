@@ -246,7 +246,7 @@ export function ExperimentDetail({
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm text-yellow-800">
-                <strong>Experiment is {experiment.state === 'development' ? 'in development' : 'running'}.</strong> Changes cannot be saved while the experiment is active. Stop the experiment to make changes.
+                <strong>Experiment is {experiment.state === 'development' ? 'in development' : 'running'}.</strong> Changes cannot be saved while the experiment is active. Restart the experiment to make changes.
               </p>
             </div>
           </div>
