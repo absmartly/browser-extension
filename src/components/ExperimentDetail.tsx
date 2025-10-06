@@ -24,21 +24,32 @@ interface ExperimentDetailProps {
   onStop: (id: number) => void
   onUpdate?: (id: number, updates: Partial<Experiment>) => void
   loading?: boolean
+  applications?: any[]
+  unitTypes?: any[]
+  owners?: any[]
+  teams?: any[]
+  tags?: any[]
 }
 
 // Removed - now using Variant from VariantList
 
-export function ExperimentDetail({ 
-  experiment, 
-  onBack, 
-  onStart, 
+export function ExperimentDetail({
+  experiment,
+  onBack,
+  onStart,
   onStop,
   onUpdate,
-  loading 
+  loading,
+  applications = [],
+  unitTypes = [],
+  owners = [],
+  teams = [],
+  tags = []
 }: ExperimentDetailProps) {
   debugLog('🔍 ExperimentDetail render start - experiment:', experiment)
   debugLog('🔍 ExperimentDetail render start - experiment.variants:', experiment?.variants)
   debugLog('🔍 ExperimentDetail render start - loading:', loading)
+  debugLog('🔍 ExperimentDetail props - unitTypes:', unitTypes?.length, 'owners:', owners?.length, 'tags:', tags?.length)
 
   // Always in edit mode - removed isEditing state
   const [editingName, setEditingName] = useState(false)
@@ -210,6 +221,11 @@ export function ExperimentDetail({
             setMetadata(newMetadata)
           }}
           canEdit={true}
+          applications={applications}
+          unitTypes={unitTypes}
+          owners={owners}
+          teams={teams}
+          tags={tags}
         />
 
         {/* Variants Section */}

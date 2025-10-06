@@ -131,25 +131,31 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log(`  Filled experiment name: ${experimentName}`)
     await debugWait()
 
-    // Select Unit Type (required field)
+    // Select Unit Type (required field) - now using SearchableSelect component
     console.log('  Selecting Unit Type...')
-    const unitTypeSelect = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select')
-    await unitTypeSelect.waitFor({ state: 'visible', timeout: 5000 })
-    
-    // Wait for unit types to be loaded (dropdown will have more than just placeholder)
-    await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select option').nth(1).waitFor({ state: 'attached', timeout: 10000 })
+    const unitTypeContainer = sidebar.locator('label:has-text("Unit Type")').locator('..')
+    const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
+
+    // Wait for loading to finish - the placeholder should not say "Loading..."
+    await unitTypeClickArea.waitFor({ state: 'visible', timeout: 2000 })
+    await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
     console.log('  ✓ Unit types loaded')
-    
-    // Get first available option (skip the placeholder)
-    const unitTypeOptions = await unitTypeSelect.locator('option').count()
-    if (unitTypeOptions < 2) {
-      throw new Error('No unit types available - form cannot be filled')
-    }
-    
-    // Select the first real option (index 1, skipping placeholder at index 0)
-    const firstUnitTypeValue = await unitTypeSelect.locator('option').nth(1).getAttribute('value')
-    await unitTypeSelect.selectOption(firstUnitTypeValue || '')
-    console.log(`  ✓ Selected unit type`)
+
+    // Small wait to ensure component is ready
+    await testPage.waitForTimeout(500)
+
+    await unitTypeClickArea.click({ timeout: 2000 })
+
+    // Small wait for dropdown to render
+    await testPage.waitForTimeout(300)
+
+    const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+    await unitTypeDropdown.waitFor({ state: 'visible', timeout: 2000 })
+
+    const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
+    await firstUnitOption.waitFor({ state: 'visible', timeout: 2000 })
+    await firstUnitOption.click()
+    console.log('  ✓ Selected unit type')
     await debugWait()
 
     // Select Applications (required field)
