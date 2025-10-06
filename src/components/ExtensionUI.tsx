@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 import { Storage } from "@plasmohq/storage"
@@ -202,7 +202,7 @@ function SidebarContent() {
       loadEditorResources()
       loadFavorites()
     }
-  }, [config])
+  }, [config, unitTypes.length, loadEditorResources])
 
   // Save sidebar state whenever view or selectedExperiment changes
   useEffect(() => {
@@ -252,7 +252,7 @@ function SidebarContent() {
     }
   }
 
-  const loadEditorResources = async () => {
+  const loadEditorResources = useCallback(async () => {
     debugLog('Loading editor resources...')
     try {
       const [apps, units, metricsData, tagsData, ownersData, teamsData] = await Promise.all([
@@ -283,7 +283,7 @@ function SidebarContent() {
       debugError('Failed to load editor resources:', error)
       // Continue with empty arrays if the call fails
     }
-  }
+  }, [getApplications, getUnitTypes, getMetrics, getExperimentTags, getOwners, getTeams])
 
   const loadExperiments = async (forceRefresh = false, page = currentPage, size = pageSize, customFilters = null) => {
     setExperimentsLoading(true)
