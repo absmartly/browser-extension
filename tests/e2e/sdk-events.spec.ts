@@ -161,20 +161,40 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   await testPage.waitForTimeout(2000)
   console.log('  ✓ SDK plugin injected\n')
 
-  // Step 3: Open Events Debug Page
-  console.log('Step 3: Open Events Debug Page')
+  // Step 3: Trigger events BEFORE opening sidebar (test buffering)
+  console.log('Step 3: Trigger events before opening sidebar (testing buffering)')
+  await testPage.click('#trigger-ready')
+  await testPage.waitForTimeout(300)
+  await testPage.click('#trigger-exposure')
+  await testPage.waitForTimeout(300)
+  console.log('  ✓ Events triggered before sidebar opened\n')
+
+  // Step 4: Open Events Debug Page and verify buffered events appear
+  console.log('Step 4: Open Events Debug Page and verify buffered events')
   await openEventsDebugPage(testPage)
   const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
-  await expect(frame.locator('text=No events captured yet')).toBeVisible()
-  console.log('  ✓ Events Debug Page opened\n')
 
-  // Step 4: Trigger SDK events and verify they appear
-  console.log('Step 4: Trigger SDK events')
+  // Wait a moment for buffered events to load
+  await testPage.waitForTimeout(1000)
+
+  // Verify buffered events are displayed
+  const bufferedEvents = await getEventsFromPanel(testPage)
+  expect(bufferedEvents.length).toBeGreaterThanOrEqual(2)
+  console.log(`  ✓ Found ${bufferedEvents.length} buffered events`)
+
+  const hasReady = bufferedEvents.some(e => e.eventName === 'ready')
+  const hasExposure = bufferedEvents.some(e => e.eventName === 'exposure')
+  expect(hasReady).toBeTruthy()
+  expect(hasExposure).toBeTruthy()
+  console.log('  ✓ Buffered events include "ready" and "exposure"\n')
+
+  // Step 5: Trigger more SDK events and verify they appear in real-time
+  console.log('Step 5: Trigger more SDK events in real-time')
   await testPage.click('#trigger-all')
   await testPage.waitForTimeout(5000)
 
   const events = await getEventsFromPanel(testPage)
-  console.log(`  ✓ Found ${events.length} events`)
+  console.log(`  ✓ Found ${events.length} total events`)
 
   const eventTypes = ['ready', 'refresh', 'exposure', 'goal', 'error']
   for (const eventType of eventTypes) {
@@ -184,11 +204,11 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   }
 
   const count = await getEventCount(testPage)
-  expect(count).toBeGreaterThanOrEqual(5)
-  console.log(`  ✓ Status bar shows ${count} events\n`)
+  expect(count).toBeGreaterThanOrEqual(7)
+  console.log(`  ✓ Status bar shows ${count} events (including buffered)\n`)
 
-  // Step 5: Test event viewer modal
-  console.log('Step 5: Test event viewer modal')
+  // Step 6: Test event viewer modal
+  console.log('Step 6: Test event viewer modal')
   await testPage.click('#clear-events')
   await testPage.waitForTimeout(300)
   await testPage.click('#trigger-exposure')
@@ -209,8 +229,8 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   expect(isStillOpen).toBeFalsy()
   console.log('  ✓ Event viewer closed\n')
 
-  // Step 6: Take screenshot
-  console.log('Step 6: Take screenshot')
+  // Step 7: Take screenshot
+  console.log('Step 7: Take screenshot')
   await testPage.screenshot({ path: 'tests/screenshots/sdk-events-all.png', fullPage: true })
   console.log('  ✓ Screenshot saved\n')
 

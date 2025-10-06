@@ -21,6 +21,13 @@ export default function EventsDebugPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
+    // Fetch buffered events on mount
+    chrome.runtime.sendMessage({ type: 'GET_BUFFERED_EVENTS' }, (response) => {
+      if (response?.success && response.events) {
+        setEvents(response.events)
+      }
+    })
+
     const handleMessage = (event: MessageEvent) => {
       if (
         event.data &&
@@ -46,6 +53,7 @@ export default function EventsDebugPage() {
   const clearEvents = () => {
     setEvents([])
     setSelectedEvent(null)
+    chrome.runtime.sendMessage({ type: 'CLEAR_BUFFERED_EVENTS' })
   }
 
   const handleEventClick = (event: SDKEvent) => {
