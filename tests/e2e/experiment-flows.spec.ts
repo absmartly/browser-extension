@@ -306,22 +306,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    console.log('\n✅ Create experiment flow test PASSED!')
-  })
-
-  test('Edit existing experiment with Header and hooks', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 30000 : 15000)
-
-    let sidebar: any
-
-    await test.step('Inject sidebar and navigate to experiment list', async () => {
-      console.log('\n📂 Injecting sidebar')
-      sidebar = await injectSidebar(testPage, extensionUrl)
-      console.log('✅ Sidebar visible')
-      await debugWait()
-    })
-
-    await test.step('Verify state labels in experiment list', async () => {
+    // Continue testing with the experiments list that's already loaded
+    await test.step('Verify state labels in existing experiments list', async () => {
       console.log('\n🏷️  Verifying state labels in experiment list')
 
       // Get all experiment cards with state badges
@@ -587,21 +573,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    console.log('\n✅ Edit experiment flow test PASSED!')
-  })
-
-  test('Template selection shows "Create New Experiment"', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 20000 : 10000)
-
-    let sidebar: any
-
-    await test.step('Inject sidebar', async () => {
-      sidebar = await injectSidebar(testPage, extensionUrl)
-      await debugWait()
-    })
-
-    await test.step('Open template selection', async () => {
-      console.log('\n📋 Opening template selection')
+    await test.step('Test template selection flow', async () => {
+      console.log('\n📋 Testing template selection')
 
       await sidebar.locator('button[title="Create New Experiment"]').evaluate((button) => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -610,7 +583,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
       // Look for template option (if available)
       const templateButton = sidebar.locator('button').filter({ hasText: /Template|From Template/i })
-      const hasTemplateOption = await templateButton.isVisible({ timeout: 3000 }).catch(() => false)
+      const hasTemplateOption = await templateButton.isVisible({ timeout: 2000 }).catch(() => false)
 
       if (hasTemplateOption) {
         await templateButton.click()
@@ -619,7 +592,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
         // Select first template
         const firstTemplate = sidebar.locator('[class*="template"], [class*="card"]').first()
-        const templateExists = await firstTemplate.isVisible({ timeout: 5000 }).catch(() => false)
+        const templateExists = await firstTemplate.isVisible({ timeout: 2000 }).catch(() => false)
 
         if (templateExists) {
           await firstTemplate.click()
@@ -627,18 +600,23 @@ test.describe('Experiment Creation and Editing Flows', () => {
           await debugWait()
         } else {
           console.log('  ℹ️  No templates available')
-          test.skip()
-          return
         }
       } else {
-        console.log('  ℹ️  Template option not available')
-        test.skip()
-        return
+        // No template option, go directly to create
+        const scratchButton = sidebar.locator('button').filter({ hasText: /From Scratch|Scratch/i })
+        const hasScratchButton = await scratchButton.isVisible({ timeout: 2000 }).catch(() => false)
+        if (hasScratchButton) {
+          await scratchButton.click()
+          console.log('  ✓ Clicked "From Scratch" option')
+          await debugWait()
+        }
       }
+
+      await debugWait()
     })
 
-    await test.step('Verify header shows "Create New Experiment"', async () => {
-      console.log('\n🔍 Verifying header for template')
+    await test.step('Verify create form shows "Create New Experiment"', async () => {
+      console.log('\n🔍 Verifying create form header')
 
       const headerTitle = sidebar.locator('h2:has-text("Create New Experiment")')
       await expect(headerTitle).toBeVisible()
@@ -657,47 +635,46 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    console.log('\n✅ Template selection test PASSED!')
-  })
+    await test.step('Navigate back to experiments list', async () => {
+      console.log('\n◀️  Navigating back to experiments list')
 
-  test('Header component in Settings view', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 20000 : 15000)
-
-    let sidebar: any
-
-    await test.step('Inject sidebar and navigate to settings', async () => {
-      sidebar = await injectSidebar(testPage, extensionUrl)
+      const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
+      await backButton.click()
+      console.log('  ✓ Clicked back button')
       await debugWait()
 
-      // Click settings button - look for gear/cog icon or Settings button
+      const experimentList = sidebar.locator('h2:has-text("Experiments")')
+      await expect(experimentList).toBeVisible({ timeout: 2000 })
+      console.log('  ✓ Returned to experiment list')
+
+      await debugWait()
+    })
+
+    await test.step('Navigate to Settings and verify Header', async () => {
+      console.log('\n⚙️  Testing Settings view')
+
+      // Click settings button
       const settingsButton = sidebar.locator('button[title*="Settings"], button[aria-label*="Settings"]').first()
-      const hasSettingsButton = await settingsButton.isVisible({ timeout: 5000 }).catch(() => false)
+      const hasSettingsButton = await settingsButton.isVisible({ timeout: 2000 }).catch(() => false)
 
       if (!hasSettingsButton) {
-        console.log('  ℹ️  Settings button not found')
-        test.skip()
+        console.log('  ℹ️  Settings button not found, skipping settings test')
         return
       }
 
       await settingsButton.click()
       console.log('  ✓ Clicked settings button')
       await debugWait()
-    })
 
-    await test.step('Verify Header component in Settings', async () => {
-      console.log('\n🔍 Verifying Header in Settings view')
-
-      // Header should show "Settings"
+      // Verify Header in Settings
       const headerTitle = sidebar.locator('h2:has-text("Settings")')
       await expect(headerTitle).toBeVisible()
       console.log('  ✓ Header shows "Settings" title')
 
-      // Logo should be present
       const logo = sidebar.locator('svg, img').first()
       await expect(logo).toBeVisible()
       console.log('  ✓ Logo visible in header')
 
-      // Back button should be present
       const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
       await expect(backButton).toBeVisible()
       console.log('  ✓ Back button visible in header')
@@ -705,23 +682,23 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    await test.step('Test back navigation from settings', async () => {
-      console.log('\n◀️  Testing back from settings')
+    await test.step('Test back navigation from Settings', async () => {
+      console.log('\n◀️  Testing back from Settings')
 
       const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
       await backButton.click()
       console.log('  ✓ Clicked back button')
       await debugWait()
 
-      // Should return to previous view (experiment list or main view)
-      // Wait for settings to be gone
+      // Should return to experiment list
       const settingsGone = sidebar.locator('h2:has-text("Settings")')
-      await expect(settingsGone).not.toBeVisible({ timeout: 5000 })
-      console.log('  ✓ Settings view closed, returned to previous view')
+      await expect(settingsGone).not.toBeVisible({ timeout: 2000 })
+      console.log('  ✓ Settings view closed')
 
       await debugWait()
     })
 
-    console.log('\n✅ Settings Header test PASSED!')
+    console.log('\n✅ Comprehensive experiment flow test PASSED!')
   })
+
 })
