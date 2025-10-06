@@ -292,6 +292,39 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
+    await test.step('Verify state labels in experiment list', async () => {
+      console.log('\n🏷️  Verifying state labels in experiment list')
+
+      // Get all experiment cards with state badges
+      const experimentCards = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i })
+      const cardCount = await experimentCards.count()
+
+      if (cardCount > 0) {
+        // Check first 3 experiment cards for state badges
+        const cardsToCheck = Math.min(3, cardCount)
+        for (let i = 0; i < cardsToCheck; i++) {
+          const card = experimentCards.nth(i)
+          const stateBadge = card.locator('[class*="badge"], span[class*="bg-"]').first()
+          const hasStateBadge = await stateBadge.isVisible().catch(() => false)
+
+          if (hasStateBadge) {
+            const badgeText = await stateBadge.textContent()
+            console.log(`  Card ${i + 1} badge: "${badgeText}"`)
+
+            // Verify badge doesn't show raw state values
+            const rawStates = ['created', 'running_not_full_on', 'full_on']
+            const hasRawState = rawStates.some(raw => badgeText?.toLowerCase() === raw.toLowerCase())
+            expect(hasRawState).toBe(false)
+          }
+        }
+        console.log('  ✓ State labels display correctly in list view')
+      } else {
+        console.log('  ℹ️  No experiments available to check')
+      }
+
+      await debugWait()
+    })
+
     await test.step('Open first experiment', async () => {
       console.log('\n📖 Opening first experiment')
 
@@ -342,6 +375,37 @@ test.describe('Experiment Creation and Editing Flows', () => {
         console.log(`  ✓ Found ${actionButtonCount} ExperimentActions buttons`)
       } else {
         console.log('  ℹ️  No ExperimentActions buttons visible (may depend on permissions)')
+      }
+
+      await debugWait()
+    })
+
+    await test.step('Verify state label display', async () => {
+      console.log('\n🏷️  Verifying state label displays correctly')
+
+      // Get the state badge
+      const stateBadge = sidebar.locator('[class*="badge"]').first()
+      await expect(stateBadge).toBeVisible()
+
+      const badgeText = await stateBadge.textContent()
+      console.log(`  Badge text: "${badgeText}"`)
+
+      // Verify badge doesn't show raw state values like "created" or "running_not_full_on"
+      // Should show display labels like "Draft" or "Running"
+      const rawStates = ['created', 'running_not_full_on', 'full_on']
+      const hasRawState = rawStates.some(raw => badgeText?.toLowerCase() === raw.toLowerCase())
+
+      expect(hasRawState).toBe(false)
+      console.log('  ✓ Badge shows display label (not raw state value)')
+
+      // Verify it shows a valid display label
+      const validLabels = ['Running', 'Draft', 'Ready', 'Stopped', 'Scheduled', 'Archived', 'Development', 'Full On']
+      const hasValidLabel = validLabels.some(label => badgeText?.includes(label))
+
+      if (hasValidLabel) {
+        console.log(`  ✓ Badge shows valid display label: "${badgeText}"`)
+      } else {
+        console.log(`  ℹ️  Badge shows: "${badgeText}"`)
       }
 
       await debugWait()
