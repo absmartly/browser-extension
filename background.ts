@@ -34,6 +34,10 @@ const secureStorage = new Storage({
   secretKeyring: true
 })
 
+// Event buffering constants
+const EVENT_BUFFER_KEY = 'sdk_events_buffer'
+const MAX_BUFFER_SIZE = 1000
+
 // Handle storage operations from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'STORAGE_GET') {
@@ -45,7 +49,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       debugError('[Background] Storage GET error:', error)
       sendResponse({ success: false, error: error.message })
     })
-    return true // Keep the message channel open for async response
+    return true
   } else if (message.type === 'STORAGE_SET') {
     const sessionStorage = new Storage({ area: "session" })
     sessionStorage.set(message.key, message.value).then(() => {
@@ -55,7 +59,59 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       debugError('[Background] Storage SET error:', error)
       sendResponse({ success: false, error: error.message })
     })
-    return true // Keep the message channel open for async response
+    return true
+  } else if (message.type === 'SDK_EVENT') {
+    // Buffer SDK events
+    const sessionStorage = new Storage({ area: "session" })
+
+    sessionStorage.get(EVENT_BUFFER_KEY).then(buffer => {
+      const events = buffer || []
+
+      // Add new event to beginning of array
+      events.unshift({
+        id: `${Date.now()}-${Math.random()}`,
+        eventName: message.payload.eventName,
+        data: message.payload.data,
+        timestamp: message.payload.timestamp
+      })
+
+      // Keep only last MAX_BUFFER_SIZE events
+      const trimmedEvents = events.slice(0, MAX_BUFFER_SIZE)
+
+      return sessionStorage.set(EVENT_BUFFER_KEY, trimmedEvents)
+    }).then(() => {
+      debugLog('[Background] SDK event buffered:', message.payload.eventName)
+      sendResponse({ success: true })
+    }).catch(error => {
+      debugError('[Background] Failed to buffer event:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+
+    return true
+  } else if (message.type === 'GET_BUFFERED_EVENTS') {
+    const sessionStorage = new Storage({ area: "session" })
+
+    sessionStorage.get(EVENT_BUFFER_KEY).then(events => {
+      debugLog('[Background] Retrieved buffered events:', events?.length || 0)
+      sendResponse({ success: true, events: events || [] })
+    }).catch(error => {
+      debugError('[Background] Failed to get buffered events:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+
+    return true
+  } else if (message.type === 'CLEAR_BUFFERED_EVENTS') {
+    const sessionStorage = new Storage({ area: "session" })
+
+    sessionStorage.remove(EVENT_BUFFER_KEY).then(() => {
+      debugLog('[Background] Cleared buffered events')
+      sendResponse({ success: true })
+    }).catch(error => {
+      debugError('[Background] Failed to clear buffered events:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+
+    return true
   }
 })
 
