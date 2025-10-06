@@ -17,6 +17,7 @@ import {
 } from '~src/utils/overrides'
 import { getCurrentVariantAssignments, type VariantAssignments, type SDKVariantData } from '~src/utils/sdk-bridge'
 import { getConfig } from '~src/utils/storage'
+import { getExperimentStateLabel, getExperimentStateClasses } from '~src/utils/experiment-state'
 
 interface ExperimentListProps {
   experiments: Experiment[]
@@ -184,57 +185,6 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     )
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'running':
-      case 'running_not_full_on':
-        return 'bg-orange-500 text-white'  // warning color
-      case 'full_on':
-        return 'bg-green-500 text-white'  // success color
-      case 'stopped':
-        return 'bg-gray-400 text-white'  // muted color
-      case 'scheduled':
-        return 'bg-indigo-500 text-white'  // unknown color
-      case 'archived':
-        return 'bg-slate-200 text-gray-900'
-      case 'development':
-        return 'bg-white text-cyan-600 border border-cyan-600'
-      case 'ready':
-        return 'bg-green-800 text-white'  // moss-green-800
-      case 'draft':
-      case 'created':
-        return 'bg-white text-slate-700 border border-slate-700'
-      default:
-        return 'bg-gray-300 text-gray-700'
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'running':
-        return 'Running'
-      case 'running_not_full_on':
-        return 'Running'
-      case 'full_on':
-        return 'Full On'
-      case 'stopped':
-        return 'Stopped'
-      case 'scheduled':
-        return 'Scheduled'
-      case 'archived':
-        return 'Archived'
-      case 'development':
-        return 'Development'
-      case 'draft':
-        return 'Draft'
-      case 'created':
-        return 'Draft'  // Match ABsmartly UI - "created" state shows as "Draft"
-      case 'ready':
-        return 'Ready'
-      default:
-        return status
-    }
-  }
 
   const formatDuration = (startedAt?: string, stoppedAt?: string) => {
     if (!startedAt) return null
@@ -485,8 +435,8 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                 
                 {/* Status, Metrics and Override Row */}
                 <div className="mt-2 flex items-center gap-3 flex-wrap">
-                  <span className={`inline-flex items-center h-[26px] px-3 text-xs font-medium rounded-full ${getStatusColor(status)}`}>
-                    {getStatusLabel(status)}
+                  <span className={`inline-flex items-center h-[26px] px-3 text-xs font-medium rounded-full ${getExperimentStateClasses(status)}`}>
+                    {getExperimentStateLabel(status)}
                   </span>
                   
                   {(() => {

@@ -1,8 +1,10 @@
 import React from 'react'
 import { clsx } from 'clsx'
 
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'primary'
+
 interface BadgeProps {
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'primary'
+  variant?: BadgeVariant
   children: React.ReactNode
   className?: string
 }

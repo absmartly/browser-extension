@@ -13,6 +13,7 @@ import { getConfig } from '~src/utils/storage'
 import { useExperimentVariants } from '~src/hooks/useExperimentVariants'
 import { useExperimentSave } from '~src/hooks/useExperimentSave'
 import { ExperimentActions } from './ExperimentDetail/ExperimentActions'
+import { getExperimentStateLabel, getExperimentStateBadgeVariant } from '~src/utils/experiment-state'
 
 const storage = new Storage({ area: "local" })
 
@@ -73,26 +74,6 @@ export function ExperimentDetail({
     loadConfig()
   }, [])
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'running':
-      case 'running_not_full_on':
-        return 'success'
-      case 'draft':
-      case 'created':
-      case 'ready':
-        return 'default'
-      case 'stopped':
-      case 'scheduled':
-        return 'warning'
-      case 'archived':
-        return 'danger'
-      case 'development':
-        return 'info'
-      default:
-        return 'default'
-    }
-  }
 
   const handleSaveDisplayName = () => {
     if (onUpdate && displayName !== experiment.display_name) {
@@ -215,8 +196,8 @@ export function ExperimentDetail({
             Loading...
           </div>
         )}
-        <Badge variant={getStatusVariant(experiment.state || experiment.status || 'created')}>
-          {experiment.state || experiment.status || 'created'}
+        <Badge variant={getExperimentStateBadgeVariant(experiment.state || experiment.status || 'created')}>
+          {getExperimentStateLabel(experiment.state || experiment.status || 'created')}
         </Badge>
       </div>
 
