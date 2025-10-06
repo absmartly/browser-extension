@@ -1,15 +1,9 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
+import { injectSidebar, debugWait, setupConsoleLogging, waitForExperiments } from './utils/test-helpers'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
-
-// Slow mode - set to true to add waits between steps for debugging
-const SLOW_MODE = process.env.SLOW === '1'
-const debugWait = async (ms: number = 300) => SLOW_MODE ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve()
-
-// Debug mode - set to true to show console logs
-const DEBUG_MODE = process.env.DEBUG === '1' || process.env.PWDEBUG === '1'
 
 /**
  * E2E Tests for Experiment Creation, Editing, and Header Components
@@ -29,18 +23,11 @@ test.describe('Experiment Creation and Editing Flows', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
-    // Set up console listener
-    allConsoleMessages = []
-    const consoleHandler = (msg: any) => {
-      const msgType = msg.type()
-      const msgText = msg.text()
-      allConsoleMessages.push({ type: msgType, text: msgText })
-
-      if (DEBUG_MODE && (msgText.includes('[ABsmartly]') || msgText.includes('[Background]'))) {
-        console.log(`  📝 [${msgType}] ${msgText}`)
-      }
-    }
-    testPage.on('console', consoleHandler)
+    // Set up console listener using helper
+    allConsoleMessages = setupConsoleLogging(
+      testPage,
+      (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]')
+    )
 
     await testPage.goto(`file://${TEST_PAGE_PATH}`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
@@ -54,49 +41,16 @@ test.describe('Experiment Creation and Editing Flows', () => {
   })
 
   test('Create new experiment from scratch with Header component', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(SLOW_MODE ? 30000 : 15000)
+    test.setTimeout(process.env.SLOW === '1' ? 30000 : 15000)
+
+    let sidebar: any
 
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 Injecting sidebar')
-      await testPage.evaluate((extUrl) => {
-        const originalPadding = document.body.style.paddingRight || '0px'
-        document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
-        document.body.style.transition = 'padding-right 0.3s ease-in-out'
-        document.body.style.paddingRight = '384px'
-
-        const container = document.createElement('div')
-        container.id = 'absmartly-sidebar-root'
-        container.style.cssText = `
-          position: fixed;
-          top: 0;
-          right: 0;
-          width: 384px;
-          height: 100vh;
-          background-color: white;
-          border-left: 1px solid #e5e7eb;
-          box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
-          z-index: 2147483647;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          font-size: 14px;
-          color: #111827;
-        `
-
-        const iframe = document.createElement('iframe')
-        iframe.id = 'absmartly-sidebar-iframe'
-        iframe.style.cssText = `width: 100%; height: 100%; border: none;`
-        iframe.src = extUrl
-
-        container.appendChild(iframe)
-        document.body.appendChild(container)
-      }, extensionUrl('tabs/sidebar.html'))
-
-      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-      await sidebar.locator('body').waitFor({ timeout: 10000 })
+      sidebar = await injectSidebar(testPage, extensionUrl)
       console.log('✅ Sidebar visible')
       await debugWait()
     })
-
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
     let experimentName: string
 
     await test.step('Verify Header component in experiment list', async () => {
@@ -263,34 +217,16 @@ test.describe('Experiment Creation and Editing Flows', () => {
   })
 
   test('Edit existing experiment with Header and hooks', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(SLOW_MODE ? 30000 : 15000)
+    test.setTimeout(process.env.SLOW === '1' ? 30000 : 15000)
+
+    let sidebar: any
 
     await test.step('Inject sidebar and navigate to experiment list', async () => {
       console.log('\n📂 Injecting sidebar')
-      await testPage.evaluate((extUrl) => {
-        document.body.style.paddingRight = '384px'
-        const container = document.createElement('div')
-        container.id = 'absmartly-sidebar-root'
-        container.style.cssText = `
-          position: fixed; top: 0; right: 0; width: 384px; height: 100vh;
-          background-color: white; border-left: 1px solid #e5e7eb;
-          z-index: 2147483647;
-        `
-        const iframe = document.createElement('iframe')
-        iframe.id = 'absmartly-sidebar-iframe'
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
-        iframe.src = extUrl
-        container.appendChild(iframe)
-        document.body.appendChild(container)
-      }, extensionUrl('tabs/sidebar.html'))
-
-      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-      await sidebar.locator('body').waitFor({ timeout: 10000 })
+      sidebar = await injectSidebar(testPage, extensionUrl)
       console.log('✅ Sidebar visible')
       await debugWait()
     })
-
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
     await test.step('Verify state labels in experiment list', async () => {
       console.log('\n🏷️  Verifying state labels in experiment list')
@@ -328,9 +264,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Open first experiment', async () => {
       console.log('\n📖 Opening first experiment')
 
-      // Wait for experiments to load - look for any clickable experiment item
-      const experimentItem = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i }).first()
-      const hasExperiments = await experimentItem.isVisible({ timeout: 10000 }).catch(() => false)
+      // Wait for experiments to load using helper
+      const hasExperiments = await waitForExperiments(sidebar)
 
       if (!hasExperiments) {
         console.log('  ℹ️  No experiments available to open')
@@ -338,6 +273,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
         return
       }
 
+      const experimentItem = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i }).first()
       await experimentItem.click()
       console.log('  ✓ Clicked first experiment')
       await debugWait()
@@ -514,31 +450,14 @@ test.describe('Experiment Creation and Editing Flows', () => {
   })
 
   test('Template selection shows "Create New Experiment"', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(SLOW_MODE ? 20000 : 10000)
+    test.setTimeout(process.env.SLOW === '1' ? 20000 : 10000)
+
+    let sidebar: any
 
     await test.step('Inject sidebar', async () => {
-      await testPage.evaluate((extUrl) => {
-        document.body.style.paddingRight = '384px'
-        const container = document.createElement('div')
-        container.id = 'absmartly-sidebar-root'
-        container.style.cssText = `
-          position: fixed; top: 0; right: 0; width: 384px; height: 100vh;
-          background-color: white; z-index: 2147483647;
-        `
-        const iframe = document.createElement('iframe')
-        iframe.id = 'absmartly-sidebar-iframe'
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
-        iframe.src = extUrl
-        container.appendChild(iframe)
-        document.body.appendChild(container)
-      }, extensionUrl('tabs/sidebar.html'))
-
-      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-      await sidebar.locator('body').waitFor({ timeout: 10000 })
+      sidebar = await injectSidebar(testPage, extensionUrl)
       await debugWait()
     })
-
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
     await test.step('Open template selection', async () => {
       console.log('\n📋 Opening template selection')
@@ -601,27 +520,12 @@ test.describe('Experiment Creation and Editing Flows', () => {
   })
 
   test('Header component in Settings view', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(SLOW_MODE ? 20000 : 15000)
+    test.setTimeout(process.env.SLOW === '1' ? 20000 : 15000)
+
+    let sidebar: any
 
     await test.step('Inject sidebar and navigate to settings', async () => {
-      await testPage.evaluate((extUrl) => {
-        document.body.style.paddingRight = '384px'
-        const container = document.createElement('div')
-        container.id = 'absmartly-sidebar-root'
-        container.style.cssText = `
-          position: fixed; top: 0; right: 0; width: 384px; height: 100vh;
-          background-color: white; z-index: 2147483647;
-        `
-        const iframe = document.createElement('iframe')
-        iframe.id = 'absmartly-sidebar-iframe'
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
-        iframe.src = extUrl
-        container.appendChild(iframe)
-        document.body.appendChild(container)
-      }, extensionUrl('tabs/sidebar.html'))
-
-      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-      await sidebar.locator('body').waitFor({ timeout: 10000 })
+      sidebar = await injectSidebar(testPage, extensionUrl)
       await debugWait()
 
       // Click settings button - look for gear/cog icon or Settings button
@@ -638,8 +542,6 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('  ✓ Clicked settings button')
       await debugWait()
     })
-
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
     await test.step('Verify Header component in Settings', async () => {
       console.log('\n🔍 Verifying Header in Settings view')
