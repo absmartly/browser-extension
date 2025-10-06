@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react'
 import { Input } from './ui/Input'
-import { Select } from './ui/Select'
 import { MultiSelect, type MultiSelectOption } from './ui/MultiSelect'
+import { SearchableSelect } from './ui/SearchableSelect'
 
 export interface ExperimentMetadataData {
   percentage_of_traffic: number
@@ -164,20 +164,21 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
         />
       </div>
 
-      <Select
+      <SearchableSelect
+        mode="single"
         label="Unit Type"
-        value={data.unit_type_id || ''}
-        onChange={(e) => handleUnitTypeChange(e.target.value ? parseInt(e.target.value) : null)}
+        options={useMemo(() => unitTypes.map(ut => ({
+          id: ut.unit_type_id || ut.id,
+          name: ut.name || ut.display_name || `Unit Type ${ut.unit_type_id || ut.id}`,
+          display_name: ut.display_name || ut.name
+        })), [unitTypes])}
+        selectedId={data.unit_type_id}
+        onChange={handleUnitTypeChange}
         placeholder={loading ? "Loading..." : "Select a unit type"}
-        required
+        loading={loading}
         disabled={!canEdit || loading}
-      >
-        {unitTypes.map(ut => (
-          <option key={ut.unit_type_id || ut.id} value={ut.unit_type_id || ut.id}>
-            {ut.name || ut.display_name || `Unit Type ${ut.unit_type_id || ut.id}`}
-          </option>
-        ))}
-      </Select>
+        required={true}
+      />
 
       <MultiSelect
         label="Applications"

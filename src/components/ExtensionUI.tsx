@@ -92,9 +92,6 @@ function SidebarContent() {
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
 
-      // Load all editor resources at startup
-      loadEditorResources()
-
       // Load applications first, then check for pending application filter
       getApplications().then(apps => {
         if (apps && apps.length > 0) {
@@ -137,8 +134,6 @@ function SidebarContent() {
         // Continue without applications
         loadExperiments(false)
       })
-      
-      loadFavorites()
     }
   }, [config, view, hasInitialized, filtersLoaded, filters])
 
@@ -161,7 +156,7 @@ function SidebarContent() {
   // Restore sidebar state and filters when component mounts
   useEffect(() => {
     const storage = new Storage({ area: "local" })
-    
+
     // Restore sidebar state
     storage.get<SidebarState>('sidebarState').then(state => {
       if (state) {
@@ -179,18 +174,18 @@ function SidebarContent() {
     ]).then(([savedFilters, savedConfig]) => {
       debugLog('Loading saved filters:', savedFilters)
       debugLog('Loading config for app filter:', savedConfig)
-      
+
       let defaultFilters = {
         state: ['created', 'ready']  // 'created' maps to 'Draft' in the UI
       }
-      
+
       // If there's a configured application, we'll need to load applications first
       // to get the application ID for filtering
       if (savedConfig?.applicationName) {
         // Store the application name for later use
         storage.set('pendingApplicationFilter', savedConfig.applicationName)
       }
-      
+
       if (savedFilters) {
         setFilters(savedFilters)
       } else {
@@ -198,12 +193,16 @@ function SidebarContent() {
       }
       setFiltersLoaded(true)
     })
-    
-    // Load favorites from server
-    if (config) {
+  }, [])
+
+  // Load editor resources when config is available
+  useEffect(() => {
+    if (config && unitTypes.length === 0) {
+      debugLog('Loading editor resources at init time')
+      loadEditorResources()
       loadFavorites()
     }
-  }, [])
+  }, [config])
 
   // Save sidebar state whenever view or selectedExperiment changes
   useEffect(() => {

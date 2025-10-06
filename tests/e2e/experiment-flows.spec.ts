@@ -411,6 +411,51 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
+    await test.step('Verify dropdowns are not stuck in loading state', async () => {
+      console.log('\n⏳ Verifying dropdowns loaded properly')
+
+      // Wait a moment for data to load
+      await testPage.waitForTimeout(2000)
+
+      // Check Unit Type dropdown
+      const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const unitTypeText = await unitTypeDropdown.textContent()
+      const isUnitTypeLoading = unitTypeText?.includes('Loading...')
+
+      if (isUnitTypeLoading) {
+        console.log('  ❌ Unit Type dropdown stuck in loading state')
+      } else {
+        console.log('  ✓ Unit Type dropdown loaded')
+      }
+      expect(isUnitTypeLoading).toBe(false)
+
+      // Check Owners dropdown
+      const ownersDropdown = sidebar.locator('label:has-text("Owners")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const ownersText = await ownersDropdown.textContent()
+      const isOwnersLoading = ownersText?.includes('Loading...')
+
+      if (isOwnersLoading) {
+        console.log('  ❌ Owners dropdown stuck in loading state')
+      } else {
+        console.log('  ✓ Owners dropdown loaded')
+      }
+      expect(isOwnersLoading).toBe(false)
+
+      // Check Tags dropdown
+      const tagsDropdown = sidebar.locator('label:has-text("Tags")').locator('..').locator('[class*="cursor-pointer"]').first()
+      const tagsText = await tagsDropdown.textContent()
+      const isTagsLoading = tagsText?.includes('Loading...')
+
+      if (isTagsLoading) {
+        console.log('  ❌ Tags dropdown stuck in loading state')
+      } else {
+        console.log('  ✓ Tags dropdown loaded')
+      }
+      expect(isTagsLoading).toBe(false)
+
+      await debugWait()
+    })
+
     await test.step('Verify Save Changes button state', async () => {
       console.log('\n💾 Verifying Save Changes button')
 
