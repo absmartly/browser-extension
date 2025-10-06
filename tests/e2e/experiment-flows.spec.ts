@@ -124,14 +124,23 @@ test.describe('Experiment Creation and Editing Flows', () => {
       expect(lockCount).toBeGreaterThan(0)
       console.log('  ✓ Name sync lock icon present')
 
-      // Select Unit Type
+      // Select Unit Type (now using SearchableSelect component)
       console.log('  Selecting Unit Type...')
-      const unitTypeSelect = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select')
-      await unitTypeSelect.waitFor({ state: 'visible', timeout: 5000 })
-      await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('select option').nth(1).waitFor({ state: 'attached', timeout: 10000 })
+      const unitTypeContainer = sidebar.locator('label:has-text("Unit Type")').locator('..')
+      const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
 
-      const firstUnitTypeValue = await unitTypeSelect.locator('option').nth(1).getAttribute('value')
-      await unitTypeSelect.selectOption(firstUnitTypeValue || '')
+      // Wait for loading to finish - the placeholder should not say "Loading..."
+      await unitTypeClickArea.waitFor({ state: 'visible', timeout: 5000 })
+      await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 10000 })
+
+      await unitTypeClickArea.click({ timeout: 5000 })
+
+      const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+      await unitTypeDropdown.waitFor({ state: 'visible', timeout: 3000 })
+
+      const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
+      await firstUnitOption.waitFor({ state: 'visible', timeout: 5000 })
+      await firstUnitOption.click()
       console.log('  ✓ Selected unit type')
       await debugWait()
 
