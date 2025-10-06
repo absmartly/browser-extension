@@ -1,18 +1,9 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
+import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
-
-// Slow mode - set to true to add waits between steps for debugging
-// Pass SLOW=1 environment variable to enable: SLOW=1 npx playwright test ...
-const SLOW_MODE = process.env.SLOW === '1'
-const debugWait = async (ms: number = 300) => SLOW_MODE ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve()
-
-// Debug mode - set to true to show console logs from page/sidebar
-// Enabled automatically when using --debug flag: npx playwright test --debug
-// Or manually with: DEBUG=1 npx playwright test ...
-const DEBUG_MODE = process.env.DEBUG === '1' || process.env.PWDEBUG === '1'
 
 // Save experiment mode - set to true to actually save the experiment to the database
 // WARNING: This writes to the production database! Only use when needed.
@@ -65,19 +56,11 @@ test.describe('Visual Editor Complete Workflow', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
-    // Set up console listener BEFORE page loads to capture all messages (including iframes)
-    allConsoleMessages = []
-    const consoleHandler = (msg: any) => {
-      const msgType = msg.type()
-      const msgText = msg.text()
-      allConsoleMessages.push({ type: msgType, text: msgText })
-
-      // Log ABsmartly, DOMChanges, and background messages immediately
-      if (msgText.includes('[ABsmartly]') || msgText.includes('[Background]') || msgText.includes('[DOMChanges]')) {
-        console.log(`  📝 [${msgType}] ${msgText}`)
-      }
-    }
-    testPage.on('console', consoleHandler)
+    // Set up console listener using helper
+    allConsoleMessages = setupConsoleLogging(
+      testPage,
+      (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[DOMChanges]')
+    )
 
     await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
@@ -97,68 +80,17 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(SLOW_MODE ? 40000 : 20000)
+    test.setTimeout(process.env.SLOW === '1' ? 40000 : 20000)
+
+    let sidebar: any
+
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
-    await testPage.evaluate((extUrl) => {
-      console.log('🔵 ABSmartly Extension Test: Injecting sidebar')
-
-      // Store original body padding before modifying
-      const originalPadding = document.body.style.paddingRight || '0px'
-      document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
-
-      // Add transition to body for smooth animation
-      document.body.style.transition = 'padding-right 0.3s ease-in-out'
-
-      // Set body padding to push content left
-      document.body.style.paddingRight = '384px'
-
-      // Create the sidebar container
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      container.style.cssText = `
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 384px;
-        height: 100vh;
-        background-color: white;
-        border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
-        z-index: 2147483647;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-        font-size: 14px;
-        line-height: 1.5;
-        color: #111827;
-        transform: translateX(0);
-        transition: transform 0.3s ease-in-out;
-      `
-
-      // Create the iframe for isolation
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = `
-        width: 100%;
-        height: 100%;
-        border: none;
-      `
-      // Use the tabs page as the iframe source
-      iframe.src = extUrl
-
-      container.appendChild(iframe)
-      document.body.appendChild(container)
-
-      console.log('🔵 ABSmartly Extension Test: Sidebar injected successfully')
-    }, extensionUrl('tabs/sidebar.html'))
-
-      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-
-      // Wait for sidebar iframe to be ready
-      await sidebar.locator('body').waitFor({ timeout: 10000 })
+      sidebar = await injectSidebar(testPage, extensionUrl)
       console.log('✅ Sidebar visible')
 
       // Listen for console messages from the sidebar iframe (only in DEBUG mode)
-      if (DEBUG_MODE) {
+      if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
         testPage.on('console', msg => {
           const msgText = msg.text()
           if (msgText.includes('[DOMChanges') || msgText.includes('[ExperimentDetail]') || msgText.includes('[ExperimentEditor]') || msgText.includes('[Test Eval]') || msgText.includes('Window message') || msgText.includes('index.tsx')) {
@@ -170,7 +102,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
     let experimentName: string
 
     await test.step('Create new experiment', async () => {
@@ -263,7 +194,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('🎨 STEP 3: Clicking Visual Editor button')
 
       // Listen for console messages from the page to debug (only in DEBUG mode)
-      if (DEBUG_MODE) {
+      if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
         testPage.on('console', msg => {
           if (msg.text().includes('[ABsmartly') || msg.text().includes('[Visual') || msg.text().includes('PREVIEW')) {
             console.log(`  [Page Console] ${msg.text()}`)
@@ -896,7 +827,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       // So the first click will DISABLE preview, and second click will re-enable it
 
       // Listen for console messages from the page to debug (only in DEBUG mode)
-      if (DEBUG_MODE) {
+      if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
         testPage.on('console', msg => {
           if (msg.text().includes('[ABsmartly Page]') || msg.text().includes('PREVIEW') || msg.text().includes('[VisualEditor]') || msg.text().includes('Visual Editor Content Script')) {
             console.log(`  [Page Console] ${msg.text()}`)
