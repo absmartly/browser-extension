@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from "react"
 import { Storage } from "@plasmohq/storage"
 import { debugLog, debugError } from "~src/utils/debug"
 import "~style.css"
+import { generateDOMChanges } from "~src/lib/ai-dom-generator"
 
 const storage = new Storage()
 
