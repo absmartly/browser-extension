@@ -1151,24 +1151,33 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Now open the JSON editor for variant 1 to verify the URL filter is in the payload
       console.log('  Opening JSON editor to verify URL filter...')
 
-      // Find the JSON button for variant 1 (should be near the URL Filtering section)
-      // First scroll back up to the top of variant 1 to find the JSON button
-      await variant1Section.scrollIntoViewIfNeeded()
+      // Scroll to variant 1 section to find the JSON button
+      await sidebar.locator('[data-testid="preview-toggle-variant-1"]').scrollIntoViewIfNeeded()
 
       const jsonButton = sidebar.locator('button:has-text("JSON")').first()
       await jsonButton.scrollIntoViewIfNeeded()
       await jsonButton.click()
       console.log('  ✓ Clicked JSON editor button')
+      await testPage.waitForTimeout(1000)
 
-      // Wait for JSON editor modal to appear
-      await sidebar.locator('text="Edit DOM Changes JSON"').waitFor({ state: 'visible', timeout: 5000 })
+      // The CodeMirror editor appears in the page, not in the sidebar
+      // Look for the json-editor-title class or CodeMirror container
+      const jsonEditorInPage = testPage.locator('.json-editor-title, .cm-editor').first()
+      const editorVisible = await jsonEditorInPage.isVisible({ timeout: 10000 }).catch(() => false)
+      console.log(`  JSON editor visible in page: ${editorVisible}`)
+
+      if (!editorVisible) {
+        await testPage.screenshot({ path: 'test-results/json-editor-not-found.png', fullPage: true })
+        throw new Error('JSON editor did not open')
+      }
+
       console.log('  ✓ JSON editor modal opened')
 
-      // Get the JSON editor content (Monaco editor)
-      const jsonContent = await sidebar.locator('.monaco-editor').first().evaluate((editor) => {
-        // Monaco editor stores content in a specific way - try to get the text
-        const lines = editor.querySelectorAll('.view-line')
-        return Array.from(lines).map(line => line.textContent).join('\n')
+      // Get the JSON editor content from CodeMirror
+      const jsonContent = await testPage.evaluate(() => {
+        // CodeMirror 6 stores content in the editor state
+        const cmEditor = document.querySelector('.cm-content')
+        return cmEditor ? cmEditor.textContent : ''
       })
 
       console.log('  📄 JSON editor content preview:')
@@ -1191,8 +1200,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(hasMatchType).toBeTruthy()
       console.log('  ✓ JSON contains matchType: path')
 
-      // Close the JSON editor modal
-      const closeButton = sidebar.locator('button:has-text("Cancel"), button:has-text("Close")').first()
+      // Close the JSON editor modal - look for Cancel or Close button in the page
+      const closeButton = testPage.locator('button:has-text("Cancel"), button:has-text("Close")').first()
       await closeButton.click()
       console.log('  ✓ Closed JSON editor')
 
