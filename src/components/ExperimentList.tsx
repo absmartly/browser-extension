@@ -214,6 +214,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       name: string
       initials: string
       isTeam?: boolean
+      color?: string
     }> = []
 
     // Add created_by as the first avatar
@@ -270,16 +271,19 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
 
     // Add teams as avatars
     if (experiment.teams && Array.isArray(experiment.teams)) {
-      experiment.teams.forEach((team: any) => {
-        const name = team.name || `Team ${team.team_id}`
-        const initials = getInitials(name)
+      experiment.teams.forEach((teamWrapper: any) => {
+        const team = teamWrapper.team || teamWrapper
+        const name = team.name || `Team ${team.team_id || team.id}`
+        const initials = team.initials || getInitials(name)
+        const color = team.color
 
         avatars.push({
           user: undefined,
           avatar: undefined, // Teams don't have avatar images
           name,
           initials,
-          isTeam: true
+          isTeam: true,
+          color
         })
       })
     }
@@ -405,7 +409,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                                 />
                                 <div
                                   className="hidden h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                                  style={{ display: 'none', backgroundColor: getAvatarColor(avatarData.name) }}
+                                  style={{ display: 'none', backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
                                 >
                                   {avatarData.initials}
                                 </div>
@@ -413,7 +417,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                             ) : (
                               <div
                                 className="flex h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                                style={{ backgroundColor: getAvatarColor(avatarData.name) }}
+                                style={{ backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
                               >
                                 {avatarData.initials}
                               </div>
