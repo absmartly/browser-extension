@@ -265,7 +265,12 @@ export class ImageSourceDialog {
     applyButton.className = 'dialog-button dialog-button-apply'
     applyButton.textContent = 'Apply'
 
-    const handleApply = () => {
+    const handleApply = (e?: Event) => {
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+
       const url = input.value.trim()
 
       if (!this.validateImageUrl(url)) {
@@ -282,12 +287,20 @@ export class ImageSourceDialog {
       this.remove()
     }
 
-    const handleCancel = () => {
+    const handleCancel = (e?: Event) => {
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
       this.remove()
     }
 
-    cancelButton.addEventListener('click', handleCancel)
-    applyButton.addEventListener('click', handleApply)
+    cancelButton.addEventListener('click', (e) => {
+      handleCancel(e)
+    })
+    applyButton.addEventListener('click', (e) => {
+      handleApply(e)
+    })
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) {
         handleCancel()
