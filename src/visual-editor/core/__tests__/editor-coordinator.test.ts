@@ -172,7 +172,8 @@ describe('EditorCoordinator', () => {
       redo: jest.fn(),
       clearAllChanges: jest.fn(),
       saveChanges: jest.fn(),
-      stop: jest.fn()
+      stop: jest.fn(),
+      changeImageSource: jest.fn()
     }
 
     // Mock state manager methods
