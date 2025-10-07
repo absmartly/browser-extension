@@ -115,6 +115,7 @@ export class VisualEditor {
       moveElement: (direction: 'up' | 'down') => this.elementActions.moveElement(direction),
       insertNewBlock: () => this.elementActions.insertNewBlock(),
       showRelativeElementSelector: () => this.elementActions.showRelativeElementSelector(),
+      changeImageSource: () => this.elementActions.changeImageSource(),
       undoLastChange: () => this.undoLastChange(),
       redoChange: () => this.redoChange(),
       undo: () => this.undoLastChange(),
