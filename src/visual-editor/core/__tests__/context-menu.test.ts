@@ -115,6 +115,99 @@ describe('ContextMenu', () => {
     })
   })
 
+  describe('Menu Items', () => {
+    it('should not include Move up and Move down in menu items', () => {
+      contextMenu.show(100, 100, mockElement)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      // Get all menu items
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).not.toContain('Move up')
+      expect(labels).not.toContain('Move down')
+    })
+
+    it('should include Change image source for img elements', () => {
+      const img = document.createElement('img')
+      img.src = 'https://example.com/test.jpg'
+      document.body.appendChild(img)
+
+      contextMenu.show(100, 100, img)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).toContain('Change image source')
+    })
+
+    it('should include Change image source for elements with background-image', () => {
+      const div = document.createElement('div')
+      div.style.backgroundImage = "url('https://example.com/bg.jpg')"
+      document.body.appendChild(div)
+
+      contextMenu.show(100, 100, div)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).toContain('Change image source')
+    })
+
+    it('should not include Change image source for regular elements', () => {
+      const div = document.createElement('div')
+      document.body.appendChild(div)
+
+      contextMenu.show(100, 100, div)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).not.toContain('Change image source')
+    })
+
+    it('should include standard menu items', () => {
+      contextMenu.show(100, 100, mockElement)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      // Check for expected menu items
+      expect(labels).toContain('Edit Text')
+      expect(labels).toContain('Edit HTML')
+      expect(labels).toContain('Rearrange')
+      expect(labels).toContain('Resize')
+      expect(labels).toContain('Copy')
+      expect(labels).toContain('Copy Selector Path')
+      expect(labels).toContain('Hide')
+      expect(labels).toContain('Delete')
+    })
+  })
+
   describe('show() method', () => {
     it('should create menu host element with correct ID and positioning', () => {
       contextMenu.show(100, 100, mockElement)
@@ -139,11 +232,11 @@ describe('ContextMenu', () => {
       expect(menuHosts.length).toBe(1)
     })
 
-    it('should create shadow DOM with closed mode', () => {
+    it('should create shadow DOM with open mode', () => {
       contextMenu.show(100, 100, mockElement)
 
       const menuHost = document.getElementById('absmartly-menu-host')
-      expect(menuHost?.shadowRoot).toBeFalsy() // Closed mode means shadowRoot is null
+      expect(menuHost?.shadowRoot).toBeTruthy() // Open mode means shadowRoot is accessible
     })
 
     it('should position menu correctly within viewport bounds', () => {
@@ -205,13 +298,14 @@ describe('ContextMenu', () => {
     it('should create all menu actions', () => {
       const expectedActions = [
         'edit', 'editHtml', 'rearrange', 'resize',
-        'move-up', 'move-down',
+        // 'move-up', 'move-down', // Removed per feature requirements
         'copy', 'copySelector',
         'selectRelative', 'insert-block',
         'hide', 'delete'
       ]
 
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -222,14 +316,15 @@ describe('ContextMenu', () => {
     })
 
     it('should create menu items with correct structure', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
 
       // Check that we have both actions and dividers
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
       const dividers = menuItems.filter(item => 'divider' in item)
 
-      expect(actions.length).toBeGreaterThan(10)
-      expect(dividers.length).toBeGreaterThan(3)
+      expect(actions.length).toBe(10) // 10 actions for non-image elements (Move up/down removed)
+      expect(dividers.length).toBe(4) // 4 dividers for non-image elements
 
       // Check action structure
       actions.forEach(action => {
@@ -243,7 +338,8 @@ describe('ContextMenu', () => {
     })
 
     it('should include shortcuts for specific actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
       const actionsWithShortcuts = actions.filter(item => item.shortcut)
 
@@ -469,7 +565,8 @@ describe('ContextMenu', () => {
 
   describe('Menu Actions Catalog', () => {
     it('should have all expected edit actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -481,19 +578,21 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected movement actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
 
-      const movementActions = ['move-up', 'move-down', 'resize']
+      const movementActions = ['resize'] // 'move-up' and 'move-down' removed per feature requirements
       movementActions.forEach(action => {
         expect(actions).toContain(action)
       })
     })
 
     it('should have all expected clipboard actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -505,7 +604,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected content actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -517,7 +617,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected destructive actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -532,7 +633,8 @@ describe('ContextMenu', () => {
 
   describe('Menu Item Icons and Labels', () => {
     it('should have appropriate icons for each action type', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
 
       // Test that all actions have non-empty icons and labels
@@ -545,7 +647,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have descriptive labels for actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const editAction = menuItems.find((item): item is MenuAction =>
         !('divider' in item) && item.action === 'edit'
       )
@@ -558,7 +661,8 @@ describe('ContextMenu', () => {
     })
 
     it('should use appropriate emoji icons', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
 
       // Check some specific expected icons

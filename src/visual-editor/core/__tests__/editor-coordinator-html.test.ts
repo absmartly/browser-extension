@@ -1,5 +1,5 @@
 /**
- * Integration tests for EditorCoordinator with HTML Editor
+ * Integration tests for EditorCoordinator with CodeMirror-based HTML Editor
  */
 
 import { EditorCoordinator } from '../editor-coordinator'
@@ -24,23 +24,6 @@ describe('EditorCoordinator HTML Editor Integration', () => {
   beforeEach(() => {
     // Setup DOM environment
     document.body.innerHTML = '<div id="test-element">Original HTML</div>'
-
-    // Mock Monaco Editor
-    ;(global.window as any).monaco = {
-      editor: {
-        create: jest.fn().mockReturnValue({
-          getValue: jest.fn(),
-          setValue: jest.fn(),
-          dispose: jest.fn(),
-          getAction: jest.fn().mockReturnValue({ run: jest.fn() })
-        })
-      },
-      languages: {
-        registerCompletionItemProvider: jest.fn(),
-        CompletionItemKind: { Keyword: 1, Property: 2 },
-        CompletionItemInsertTextRule: { InsertAsSnippet: 1 }
-      }
-    }
 
     // Create StateManager
     stateManager = new StateManager({

@@ -325,6 +325,132 @@ describe('ElementActions', () => {
     })
   })
 
+  describe('Element Manipulation - Change Image Source', () => {
+    let testImg: HTMLImageElement
+    let testDivWithBg: HTMLDivElement
+
+    beforeEach(() => {
+      testImg = document.createElement('img')
+      testImg.id = 'test-img'
+      testImg.src = 'https://example.com/old.jpg'
+      document.body.appendChild(testImg)
+
+      testDivWithBg = document.createElement('div')
+      testDivWithBg.id = 'test-bg'
+      testDivWithBg.style.backgroundImage = "url('https://example.com/old-bg.jpg')"
+      document.body.appendChild(testDivWithBg)
+    })
+
+    it('should change img src attribute', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testImg
+      })
+
+      mockGenerateRobustSelector.mockReturnValue('#test-img')
+
+      // Mock the dialog to return a new URL
+      const mockShow = jest.fn().mockResolvedValue('https://example.com/new.jpg')
+      ;(elementActions as any).imageSourceDialog.show = mockShow
+
+      await elementActions.changeImageSource()
+
+      expect(testImg.src).toBe('https://example.com/new.jpg')
+      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: '#test-img',
+          type: 'attribute',
+          value: { src: 'https://example.com/new.jpg' },
+          enabled: true,
+          mode: 'merge'
+        }),
+        { src: 'https://example.com/old.jpg' }
+      )
+      expect(mockNotifications.show).toHaveBeenCalledWith(
+        'Image source updated',
+        '',
+        'success'
+      )
+    })
+
+    it('should change background-image style', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDivWithBg
+      })
+
+      mockGenerateRobustSelector.mockReturnValue('#test-bg')
+
+      const mockShow = jest.fn().mockResolvedValue('https://example.com/new-bg.jpg')
+      ;(elementActions as any).imageSourceDialog.show = mockShow
+
+      await elementActions.changeImageSource()
+
+      // Browser normalizes to double quotes when reading from DOM
+      expect(testDivWithBg.style.backgroundImage).toBe('url("https://example.com/new-bg.jpg")')
+      // But the change object uses single quotes as set by the implementation
+      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: '#test-bg',
+          type: 'style',
+          value: { 'background-image': "url('https://example.com/new-bg.jpg')" },
+          enabled: true,
+          mode: 'merge'
+        }),
+        { 'background-image': 'url("https://example.com/old-bg.jpg")' }
+      )
+    })
+
+    it('should not change when dialog is cancelled', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testImg
+      })
+
+      const mockShow = jest.fn().mockResolvedValue(null)
+      ;(elementActions as any).imageSourceDialog.show = mockShow
+
+      await elementActions.changeImageSource()
+
+      expect(testImg.src).toBe('https://example.com/old.jpg')
+      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+    })
+
+    it('should not change when no element is selected', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: null
+      })
+
+      await elementActions.changeImageSource()
+
+      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+    })
+
+    it('should handle errors gracefully', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testImg
+      })
+
+      const mockShow = jest.fn().mockRejectedValue(new Error('Test error'))
+      ;(elementActions as any).imageSourceDialog.show = mockShow
+
+      await elementActions.changeImageSource()
+
+      expect(mockNotifications.show).toHaveBeenCalledWith(
+        'Failed to change image source',
+        '',
+        'error'
+      )
+    })
+  })
+
   describe('Element Manipulation - Delete', () => {
     beforeEach(() => {
       // Simulate element being selected
@@ -438,7 +564,8 @@ describe('ElementActions', () => {
         expect.objectContaining({
           selector: '#child-2',
           type: 'move',
-          value: 'up',
+          targetSelector: 'div',
+          position: 'before',
           enabled: true
         }),
         'down' // oldValue is opposite direction
