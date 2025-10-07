@@ -232,11 +232,11 @@ describe('ContextMenu', () => {
       expect(menuHosts.length).toBe(1)
     })
 
-    it('should create shadow DOM with closed mode', () => {
+    it('should create shadow DOM with open mode', () => {
       contextMenu.show(100, 100, mockElement)
 
       const menuHost = document.getElementById('absmartly-menu-host')
-      expect(menuHost?.shadowRoot).toBeFalsy() // Closed mode means shadowRoot is null
+      expect(menuHost?.shadowRoot).toBeTruthy() // Open mode means shadowRoot is accessible
     })
 
     it('should position menu correctly within viewport bounds', () => {
@@ -298,7 +298,7 @@ describe('ContextMenu', () => {
     it('should create all menu actions', () => {
       const expectedActions = [
         'edit', 'editHtml', 'rearrange', 'resize',
-        'move-up', 'move-down',
+        // 'move-up', 'move-down', // Removed per feature requirements
         'copy', 'copySelector',
         'selectRelative', 'insert-block',
         'hide', 'delete'
@@ -584,7 +584,7 @@ describe('ContextMenu', () => {
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
 
-      const movementActions = ['move-up', 'move-down', 'resize']
+      const movementActions = ['resize'] // 'move-up' and 'move-down' removed per feature requirements
       movementActions.forEach(action => {
         expect(actions).toContain(action)
       })
