@@ -59,7 +59,7 @@ npx prettier --write .   # Format code with Prettier
 
 ## SDK Plugin Integration
 
-The extension works with a companion DOM changes SDK plugin located at `../absmartly-sdk-plugins/`. During development, the build script automatically uses the development build if available.
+The extension works with a companion DOM changes SDK plugin located at `/Users/joalves/git_tree/absmartly-sdk-plugins/src`. During development, the build script automatically uses the development build if available.
 
 ## Key Technical Details
 

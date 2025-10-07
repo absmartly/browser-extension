@@ -15,7 +15,16 @@ export default defineConfig({
   use: {
     actionTimeout: 0,
     trace: 'on-first-retry',
-    video: 'retain-on-failure'
+    video: 'retain-on-failure',
+    baseURL: 'http://localhost:3456'
+  },
+
+  // Web server to serve test pages
+  webServer: {
+    command: 'npx http-server tests/test-pages -p 3456 --silent',
+    port: 3456,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000
   },
 
   projects: [
