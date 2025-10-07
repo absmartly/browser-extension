@@ -37,6 +37,7 @@ import {
 
 interface DOMChangesInlineEditorProps {
   variantName: string
+  variantIndex?: number
   experimentName?: string
   changes: DOMChange[]
   onChange: (changes: DOMChange[]) => void
@@ -1285,6 +1286,7 @@ const OperationModeSelector = ({
 
 export function DOMChangesInlineEditor({
   variantName,
+  variantIndex,
   experimentName,
   changes,
   onChange,
@@ -2552,6 +2554,8 @@ export function DOMChangesInlineEditor({
             <span>Preview:</span>
             <button
               type="button"
+              data-variant-index={variantIndex}
+              data-testid={`preview-toggle-variant-${variantIndex}`}
               onClick={() => onPreviewToggle(!previewEnabled)}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 previewEnabled ? 'bg-blue-600' : 'bg-gray-200'
