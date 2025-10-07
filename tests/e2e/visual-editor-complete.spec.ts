@@ -1054,19 +1054,37 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Add URL filter and verify JSON payload', async () => {
       console.log('\n🔗 STEP 7.5: Adding URL filter and verifying JSON payload')
 
-      // Make sure preview is disabled for this test (cleaner state)
-      const disableButton = sidebar.locator('button:has-text("Disable Preview")')
-      const isPreviewEnabled = await disableButton.isVisible({ timeout: 2000 }).catch(() => false)
-      if (isPreviewEnabled) {
-        await disableButton.click()
-        await testPage.waitForTimeout(1000)
-        console.log('  ✓ Disabled preview mode for clean state')
+      // Take screenshot to see current state
+      await testPage.screenshot({ path: 'test-results/before-url-filter-test.png', fullPage: true })
+      console.log('  📸 Screenshot: before-url-filter-test.png')
+
+      // Disable preview if it's enabled (look for the toggle button for variant 1)
+      const variant1PreviewToggle = sidebar.locator('[data-testid="preview-toggle-variant-1"]')
+      const toggleExists = await variant1PreviewToggle.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (toggleExists) {
+        // Check if preview is enabled by looking at the class (bg-blue-600 means enabled)
+        const isEnabled = await variant1PreviewToggle.evaluate((btn) => {
+          return btn.className.includes('bg-blue-600')
+        })
+
+        if (isEnabled) {
+          await variant1PreviewToggle.click()
+          await testPage.waitForTimeout(1000)
+          console.log('  ✓ Disabled preview mode for Variant 1')
+        } else {
+          console.log('  ✓ Preview already disabled for Variant 1')
+        }
+      } else {
+        console.log('  ⚠️  Variant 1 preview toggle not found')
+        await testPage.screenshot({ path: 'test-results/toggle-not-found.png', fullPage: true })
       }
 
-      // Scroll to variant 1 (the one with DOM changes)
-      const variant1Section = sidebar.locator('text="Variant 1"').first()
+      // Find Variant 1 section using the preview toggle as anchor
+      console.log('  Looking for Variant 1 section...')
+      const variant1Section = sidebar.locator('[data-testid="preview-toggle-variant-1"]').locator('..')
       await variant1Section.scrollIntoViewIfNeeded()
-      console.log('  ✓ Scrolled to Variant 1')
+      console.log('  ✓ Found and scrolled to Variant 1 section')
 
       // Find and click the URL Filtering section to expand it
       const urlFilterButton = sidebar.locator('button:has-text("URL Filtering")').first()

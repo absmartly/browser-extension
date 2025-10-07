@@ -396,6 +396,7 @@ export function VariantList({
               {/* DOM Changes Section */}
               <DOMChangesInlineEditor
                 variantName={variant.name}
+                variantIndex={index}
                 experimentName={experimentName}
                 changes={getChangesArray(variant.dom_changes)}
                 onChange={(changes) => updateVariantDOMChanges(index, changes)}
