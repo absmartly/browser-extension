@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Filtering Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    #test-element {
+      padding: 20px;
+      margin: 20px 0;
+      border: 2px solid #ccc;
+      background-color: #f5f5f5;
+    }
+
+    #variant-display {
+      padding: 15px;
+      margin: 15px 0;
+      background-color: #e3f2fd;
+      border-left: 4px solid #2196f3;
+    }
+
+    .info-section {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      color: #666;
+      font-size: 1.2em;
+      margin-top: 20px;
+    }
+
+    .test-info {
+      font-size: 0.9em;
+      color: #666;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>URL Filtering Test Page</h1>
+
+  <div class="test-info">
+    <p>This page is used for testing URL filtering functionality with the ABsmartly DOM Changes plugin.</p>
+    <p><strong>Current URL:</strong> <span id="current-url"></span></p>
+  </div>
+
+  <div id="variant-display">
+    <strong>Assigned Variant:</strong> <span id="variant-value">Not initialized</span>
+  </div>
+
+  <div class="info-section">
+    <h2>Test Element</h2>
+    <p>The element below should be modified by DOM changes when URL filters match:</p>
+    <div id="test-element">
+      Original test content
+    </div>
+  </div>
+
+  <div class="info-section">
+    <h2>Navigation Test</h2>
+    <p>Tests should navigate between different URLs to verify URL filtering:</p>
+    <ul>
+      <li>/products/123 - Should match product page filter</li>
+      <li>/about - Should not match product page filter</li>
+      <li>/checkout - Should match checkout filter</li>
+    </ul>
+  </div>
+
+  <script>
+    // Display current URL
+    document.getElementById('current-url').textContent = window.location.href;
+  </script>
+</body>
+</html>
