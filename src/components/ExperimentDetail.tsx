@@ -171,10 +171,10 @@ export function ExperimentDetail({
           )}
 
           {/* Tooltip */}
-          <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-            <div>{displayName}</div>
+          <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
+            <div className="break-words">{displayName}</div>
             {displayName !== experiment.name && (
-              <div className="text-gray-300">{experiment.name}</div>
+              <div className="text-gray-300 break-words">{experiment.name}</div>
             )}
             <div className="text-gray-400">ID: {experiment.id}</div>
             <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
