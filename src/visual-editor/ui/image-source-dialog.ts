@@ -333,7 +333,8 @@ export class ImageSourceDialog {
   }
 
   remove(): void {
-    if (this.resolveCallback) {
+    // Only resolve with null if we're removing an actual dialog (not just cleanup)
+    if (this.dialogHost && this.resolveCallback) {
       this.resolveCallback(null)
       this.resolveCallback = null
     }
