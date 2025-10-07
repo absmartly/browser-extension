@@ -186,6 +186,7 @@ describe('ImageSourceDialog', () => {
       input.value = newUrl
 
       const applyButton = shadowRoot.querySelector('.dialog-button-apply') as HTMLElement
+      expect(applyButton).toBeTruthy() // Verify button exists
       applyButton?.click()
 
       const result = await promise
