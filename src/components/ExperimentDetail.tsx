@@ -135,7 +135,7 @@ export function ExperimentDetail({
     <div className="flex-1 min-w-0">
       {editingName ? (
         <div>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-2">
             <input
               className="flex-1 text-lg font-semibold rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
               value={displayName}
@@ -143,42 +143,53 @@ export function ExperimentDetail({
               autoFocus
               title={`ID: ${experiment.id}`}
             />
-            <button
-              onClick={handleSaveDisplayName}
-              className="p-0.5 text-green-600 hover:text-green-800"
-            >
-              <CheckIcon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => {
-                setDisplayName(experiment.display_name || experiment.name)
-                setEditingName(false)
-              }}
-              className="p-0.5 text-gray-400 hover:text-gray-600"
-            >
-              <XMarkIcon className="h-4 w-4" />
-            </button>
+            <div className="flex flex-col gap-0.5">
+              <button
+                onClick={handleSaveDisplayName}
+                className="p-0.5 text-green-600 hover:text-green-800"
+              >
+                <CheckIcon className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setDisplayName(experiment.display_name || experiment.name)
+                  setEditingName(false)
+                }}
+                className="p-0.5 text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           {displayName !== experiment.name && (
             <p className="text-sm text-gray-500 mt-1 overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title={experiment.name}>{experiment.name}</p>
           )}
         </div>
       ) : (
-        <div className="relative group">
-          <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</h2>
-          {displayName !== experiment.name && (
-            <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">{experiment.name}</p>
-          )}
-
-          {/* Tooltip */}
-          <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
-            <div className="break-words">{displayName}</div>
+        <div className="relative group flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</h2>
             {displayName !== experiment.name && (
-              <div className="text-gray-300 break-words">{experiment.name}</div>
+              <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">{experiment.name}</p>
             )}
-            <div className="text-gray-400">ID: {experiment.id}</div>
-            <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
+
+            {/* Tooltip */}
+            <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
+              <div className="break-words">{displayName}</div>
+              {displayName !== experiment.name && (
+                <div className="text-gray-300 break-words">{experiment.name}</div>
+              )}
+              <div className="text-gray-400">ID: {experiment.id}</div>
+              <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
+            </div>
           </div>
+          <button
+            onClick={() => setEditingName(true)}
+            className="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0"
+            title="Edit name"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>
@@ -187,16 +198,7 @@ export function ExperimentDetail({
   const actions = (
     <>
       {!editingName && (
-        <>
-          <button
-            onClick={() => setEditingName(true)}
-            className="p-1 text-gray-400 hover:text-gray-600"
-            title="Edit name"
-          >
-            <PencilIcon className="h-4 w-4" />
-          </button>
-          <ExperimentActions experimentId={experiment.id} />
-        </>
+        <ExperimentActions experimentId={experiment.id} />
       )}
     </>
   )
