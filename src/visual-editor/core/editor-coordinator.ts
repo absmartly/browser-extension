@@ -15,6 +15,7 @@ import Cleanup from './cleanup'
 // Removed toolbar import - using UIComponents banner instead
 import { Notifications } from '../ui/notifications'
 import HtmlEditor from '../ui/html-editor'
+import ImageSourceDialog from '../ui/image-source-dialog'
 import type { DOMChange } from '../types/visual-editor'
 
 export interface EditorCoordinatorCallbacks {
@@ -28,6 +29,7 @@ export interface EditorCoordinatorCallbacks {
   moveElement: (direction: 'up' | 'down') => void
   insertNewBlock: () => void
   showRelativeElementSelector: () => void
+  changeImageSource: () => void
   undoLastChange: () => void
   redoChange: () => void
   undo: () => void
@@ -48,6 +50,7 @@ export class EditorCoordinator {
   // Removed toolbar - using UIComponents banner instead
   private notifications: Notifications
   private htmlEditor: HtmlEditor
+  private imageSourceDialog: ImageSourceDialog
   private callbacks: EditorCoordinatorCallbacks
 
   // State for event handling
@@ -79,6 +82,7 @@ export class EditorCoordinator {
     // this.toolbar = toolbar // removed - using UIComponents banner
     this.notifications = notifications
     this.htmlEditor = new HtmlEditor(stateManager)
+    this.imageSourceDialog = new ImageSourceDialog()
     this.callbacks = callbacks
   }
 
@@ -341,6 +345,10 @@ export class EditorCoordinator {
         this.handleSelectRelativeElement(element)
         break
 
+      case 'change-image-source':
+        this.handleChangeImageSource(element)
+        break
+
       default:
         console.log('[ABSmartly] Action not yet implemented:', action)
         this.notifications.show(`${action}: Coming soon!`, '', 'info')
@@ -492,6 +500,65 @@ export class EditorCoordinator {
 
     this.removeContextMenu()
     this.showRelativeElementSelector(element)
+  }
+
+  async handleChangeImageSource(element: Element): Promise<void> {
+    console.log('[handleChangeImageSource] Called with element:', element)
+    console.log('[handleChangeImageSource] Element details:', element.tagName, element.id, element.className)
+
+    this.removeContextMenu()
+
+    const isImgTag = element.tagName.toLowerCase() === 'img'
+    const currentSrc = this.imageSourceDialog.getCurrentImageSource(element)
+
+    const newSrc = await this.imageSourceDialog.show(element, currentSrc)
+    if (!newSrc) {
+      console.log('[handleChangeImageSource] User cancelled')
+      return
+    }
+
+    console.log('[handleChangeImageSource] New source:', newSrc)
+
+    const selector = this.callbacks.getSelector(element as HTMLElement)
+
+    if (isImgTag) {
+      const oldSrc = (element as HTMLImageElement).src
+      ;(element as HTMLImageElement).src = newSrc
+
+      this.undoRedoManager.addChange(
+        {
+          selector,
+          type: 'attribute',
+          value: { src: newSrc },
+          enabled: true,
+          mode: 'merge'
+        },
+        { src: oldSrc }
+      )
+
+      console.log('[handleChangeImageSource] Created attribute change for img element')
+    } else {
+      const htmlElement = element as HTMLElement
+      const oldBgImage = htmlElement.style.backgroundImage ||
+                         window.getComputedStyle(htmlElement).backgroundImage
+
+      htmlElement.style.backgroundImage = `url('${newSrc}')`
+
+      this.undoRedoManager.addChange(
+        {
+          selector,
+          type: 'style',
+          value: { 'background-image': `url('${newSrc}')` },
+          enabled: true,
+          mode: 'merge'
+        },
+        { 'background-image': oldBgImage }
+      )
+
+      console.log('[handleChangeImageSource] Created style change for background-image')
+    }
+
+    this.notifications.show('Image source updated', '', 'success')
   }
 
   showRelativeElementSelector(element: Element): void {
