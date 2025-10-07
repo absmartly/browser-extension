@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
+import type { DOMChangesData } from '~src/types/dom-changes';
 
 interface DOMChangesJSONEditorProps {
   isOpen: boolean;
   onClose: () => void;
-  changes: any[];
-  onSave: (changes: any[]) => void;
+  changes: DOMChangesData;
+  onSave: (changes: DOMChangesData) => void;
   variantName: string;
 }
 
@@ -42,14 +43,17 @@ export const DOMChangesJSONEditor: React.FC<DOMChangesJSONEditorProps> = ({
     const handleMessage = (message: any) => {
       if (message.type === 'JSON_EDITOR_SAVE') {
         try {
-          const parsedChanges = JSON.parse(message.value)
-          
-          if (!Array.isArray(parsedChanges)) {
-            console.error('Changes must be an array')
-            return
+          const parsedData = JSON.parse(message.value)
+
+          // Validate: must be either an array or an object with a changes array
+          if (!Array.isArray(parsedData)) {
+            if (typeof parsedData !== 'object' || !parsedData.changes || !Array.isArray(parsedData.changes)) {
+              console.error('Data must be either an array or an object with a changes array')
+              return
+            }
           }
-          
-          onSaveRef.current(parsedChanges)
+
+          onSaveRef.current(parsedData)
           onCloseRef.current()
         } catch (e) {
           console.error('Failed to parse JSON:', e)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { all as knownCSSProperties } from 'known-css-properties'
+import { DOMChangeOptions } from './DOMChangeOptions'
 
 // Module-level flag to prevent concurrent VE launches from multiple variant instances
 let isLaunchingVisualEditor = false
@@ -476,48 +477,18 @@ const DOMChangeEditor = ({
           />
 
           {/* Checkboxes for important flag and lazy loading */}
-          <div className="space-y-2 pt-2 border-t border-gray-200">
-            <div className="flex items-start">
-              <input
-                type="checkbox"
-                id={`style-important-${isEditMode ? 'edit' : 'new'}`}
-                checked={localChange.styleImportant || false}
-                onChange={(e) => setLocalChange({ ...localChange, styleImportant: e.target.checked })}
-                className="mt-1 mr-2"
-              />
-              <label htmlFor={`style-important-${isEditMode ? 'edit' : 'new'}`} className="text-sm">
-                <span className="font-medium text-gray-700">Use !important flag</span>
-                <p className="text-gray-500">Ensures styles override existing CSS</p>
-              </label>
-            </div>
-
-            <div className="flex items-start">
-              <input
-                type="checkbox"
-                id={`style-wait-${isEditMode ? 'edit' : 'new'}`}
-                checked={localChange.waitForElement || false}
-                onChange={(e) => setLocalChange({ ...localChange, waitForElement: e.target.checked })}
-                className="mt-1 mr-2"
-              />
-              <label htmlFor={`style-wait-${isEditMode ? 'edit' : 'new'}`} className="text-sm">
-                <span className="font-medium text-gray-700">Wait for element (lazy-loaded)</span>
-                <p className="text-gray-500">Apply change when element appears in DOM</p>
-              </label>
-            </div>
-
-            {localChange.waitForElement && (
-              <div className="ml-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observer Root (optional)
-                </label>
-                <Input
-                  value={localChange.observerRoot || ''}
-                  onChange={(e) => setLocalChange({ ...localChange, observerRoot: e.target.value })}
-                  placeholder="body, .container, #app"
-                  className="text-xs"
-                />
-              </div>
-            )}
+          <div className="pt-2 border-t border-gray-200">
+            <DOMChangeOptions
+              important={localChange.styleImportant || false}
+              waitForElement={localChange.waitForElement || false}
+              persistStyle={localChange.persistStyle || false}
+              observerRoot={localChange.observerRoot || ''}
+              onImportantChange={(value) => setLocalChange({ ...localChange, styleImportant: value })}
+              onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+              onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistStyle: value })}
+              onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+              idPrefix={`style-${isEditMode ? 'edit' : 'new'}`}
+            />
           </div>
         </div>
       )}
