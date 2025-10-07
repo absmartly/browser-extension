@@ -140,7 +140,7 @@ export function ExperimentFilter({
   }, 0)
 
   return (
-    <div className={isExpanded ? 'border-b' : ''}>
+    <div>
       <div className="px-4 py-3">
         <div className="flex items-center gap-2">
           <Input
