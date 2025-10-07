@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Badge } from './ui/Badge'
 import type { Experiment, ExperimentUser } from '~src/types/absmartly'
-import { ChevronRightIcon, UserCircleIcon, UsersIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, UserCircleIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
 import {
@@ -213,19 +213,20 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
       avatar?: string
       name: string
       initials: string
+      isTeam?: boolean
     }> = []
-    
+
     // Add created_by as the first avatar
     if (experiment.created_by) {
       const user = experiment.created_by
-      const avatar = user.avatar?.base_url ? 
-        `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${user.avatar.base_url}/crop/32x32.webp` : 
+      const avatar = user.avatar?.base_url ?
+        `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${user.avatar.base_url}/crop/32x32.webp` :
         null
       const name = user.first_name || user.last_name ?
         `${user.first_name || ''} ${user.last_name || ''}`.trim() :
         user.email || 'Unknown'
       const initials = getInitials(name)
-      
+
       avatars.push({
         user,
         avatar: avatar || undefined,
@@ -233,31 +234,31 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         initials
       })
     }
-    
+
     // Add owners if they exist - handle nested structure with owner.user
     if ((experiment as any).owners && Array.isArray((experiment as any).owners)) {
       (experiment as any).owners.forEach((ownerWrapper: any) => {
         // Extract the actual user from the wrapper object
         const owner = ownerWrapper.user || ownerWrapper
-        
+
         // Skip if no user data
         if (!owner) return
-        
+
         // Skip if this owner is the same as created_by
-        if (experiment.created_by && 
-            ((owner.id && owner.id === experiment.created_by.id) || 
+        if (experiment.created_by &&
+            ((owner.id && owner.id === experiment.created_by.id) ||
              (owner.user_id && owner.user_id === experiment.created_by.user_id))) {
           return
         }
-        
-        const avatar = owner.avatar?.base_url ? 
-          `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp` : 
+
+        const avatar = owner.avatar?.base_url ?
+          `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp` :
           null
         const name = owner.first_name || owner.last_name ?
           `${owner.first_name || ''} ${owner.last_name || ''}`.trim() :
           owner.email || 'Unknown'
         const initials = getInitials(name)
-        
+
         avatars.push({
           user: owner,
           avatar: avatar || undefined,
@@ -266,7 +267,23 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         })
       })
     }
-    
+
+    // Add teams as avatars
+    if (experiment.teams && Array.isArray(experiment.teams)) {
+      experiment.teams.forEach((team: any) => {
+        const name = team.name || `Team ${team.team_id}`
+        const initials = getInitials(name)
+
+        avatars.push({
+          user: undefined,
+          avatar: undefined, // Teams don't have avatar images
+          name,
+          initials,
+          isTeam: true
+        })
+      })
+    }
+
     return avatars
   }
   const getOwnerAvatar = (experiment: Experiment) => {
@@ -364,13 +381,6 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                   
                   {/* Owner Avatar and Team */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {experiment.teams && experiment.teams.length > 0 && (
-                      <div className="flex items-center gap-1">
-                        <UsersIcon className="h-4 w-4 text-gray-400" />
-                        <span className="text-xs text-gray-600">{experiment.teams[0].name || `Team ${experiment.teams[0].team_id}`}</span>
-                      </div>
-                    )}
-                    
                     {/* Stacked Avatars with Tooltips */}
                     <div className="flex items-center">
                       {allAvatars.slice(0, 3).map((avatarData, idx) => (
