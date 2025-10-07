@@ -304,7 +304,8 @@ describe('ContextMenu', () => {
         'hide', 'delete'
       ]
 
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -315,7 +316,8 @@ describe('ContextMenu', () => {
     })
 
     it('should create menu items with correct structure', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
 
       // Check that we have both actions and dividers
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
@@ -336,7 +338,8 @@ describe('ContextMenu', () => {
     })
 
     it('should include shortcuts for specific actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
       const actionsWithShortcuts = actions.filter(item => item.shortcut)
 
@@ -562,7 +565,8 @@ describe('ContextMenu', () => {
 
   describe('Menu Actions Catalog', () => {
     it('should have all expected edit actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -574,7 +578,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected movement actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -586,7 +591,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected clipboard actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -598,7 +604,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected content actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -610,7 +617,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have all expected destructive actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems
         .filter((item): item is MenuAction => !('divider' in item))
         .map(item => item.action)
@@ -625,7 +633,8 @@ describe('ContextMenu', () => {
 
   describe('Menu Item Icons and Labels', () => {
     it('should have appropriate icons for each action type', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
 
       // Test that all actions have non-empty icons and labels
@@ -638,7 +647,8 @@ describe('ContextMenu', () => {
     })
 
     it('should have descriptive labels for actions', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const editAction = menuItems.find((item): item is MenuAction =>
         !('divider' in item) && item.action === 'edit'
       )
@@ -651,7 +661,8 @@ describe('ContextMenu', () => {
     })
 
     it('should use appropriate emoji icons', () => {
-      const menuItems = contextMenu['createMenuItems']()
+      const mockElement = document.createElement('div')
+      const menuItems = contextMenu['createMenuItems'](mockElement)
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
 
       // Check some specific expected icons
