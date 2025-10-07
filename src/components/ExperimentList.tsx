@@ -277,9 +277,14 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         const initials = team.initials || getInitials(name)
         const color = team.color
 
+        // Handle team avatar similar to user avatars
+        const avatar = team.avatar?.base_url ?
+          `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${team.avatar.base_url}/crop/32x32.webp` :
+          null
+
         avatars.push({
           user: undefined,
-          avatar: undefined, // Teams don't have avatar images
+          avatar: avatar || undefined,
           name,
           initials,
           isTeam: true,
