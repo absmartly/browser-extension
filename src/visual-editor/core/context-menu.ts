@@ -271,7 +271,11 @@ export class ContextMenu {
     return items
   }
 
-  private isImageElement(element: Element): boolean {
+  private isImageElement(element: Element | null): boolean {
+    if (!element) {
+      return false
+    }
+
     // Check if it's an img tag
     if (element.tagName.toLowerCase() === 'img') {
       return true
