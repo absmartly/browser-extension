@@ -164,11 +164,21 @@ export function ExperimentDetail({
           )}
         </div>
       ) : (
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title={displayName}>{displayName}</h2>
+        <div className="relative group">
+          <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</h2>
           {displayName !== experiment.name && (
-            <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title={experiment.name}>{experiment.name}</p>
+            <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">{experiment.name}</p>
           )}
+
+          {/* Tooltip */}
+          <div className="absolute bottom-full mb-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+            <div>{displayName}</div>
+            {displayName !== experiment.name && (
+              <div className="text-gray-300">{experiment.name}</div>
+            )}
+            <div className="text-gray-400">ID: {experiment.id}</div>
+            <div className="absolute top-full left-4 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+          </div>
         </div>
       )}
     </div>
