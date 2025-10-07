@@ -2,6 +2,7 @@ import { generateRobustSelector } from '../utils/selector-generator'
 import StateManager from './state-manager'
 import UndoRedoManager from './undo-redo-manager'
 import { Notifications } from '../ui/notifications'
+import ImageSourceDialog from '../ui/image-source-dialog'
 import type { DOMChange } from '../types/visual-editor'
 
 export interface ElementActionsOptions {
@@ -16,6 +17,7 @@ export class ElementActions {
   private stateManager: StateManager
   private undoRedoManager: UndoRedoManager
   private notifications: Notifications
+  private imageSourceDialog: ImageSourceDialog
   private options: ElementActionsOptions
 
   // UI state
@@ -32,6 +34,7 @@ export class ElementActions {
     this.stateManager = stateManager
     this.undoRedoManager = undoRedoManager
     this.notifications = notifications
+    this.imageSourceDialog = new ImageSourceDialog()
     this.options = options
 
     // Listen to state changes to keep local state in sync
@@ -122,6 +125,59 @@ export class ElementActions {
     } catch (error) {
       console.error('Failed to hide element:', error)
       this.notifications.show('Failed to hide element', '', 'error')
+    }
+  }
+
+  public async changeImageSource(): Promise<void> {
+    if (!this.selectedElement) return
+
+    try {
+      const isImgTag = this.selectedElement.tagName.toLowerCase() === 'img'
+      const currentSrc = this.imageSourceDialog.getCurrentImageSource(this.selectedElement)
+
+      const newSrc = await this.imageSourceDialog.show(this.selectedElement, currentSrc)
+      if (!newSrc) {
+        return
+      }
+
+      const selector = this.getSelector(this.selectedElement)
+
+      if (isImgTag) {
+        const oldSrc = (this.selectedElement as HTMLImageElement).src
+        ;(this.selectedElement as HTMLImageElement).src = newSrc
+
+        this.undoRedoManager.addChange(
+          {
+            selector,
+            type: 'attribute',
+            value: { src: newSrc },
+            enabled: true,
+            mode: 'merge'
+          },
+          { src: oldSrc }
+        )
+      } else {
+        const oldBgImage = this.selectedElement.style.backgroundImage ||
+                           window.getComputedStyle(this.selectedElement).backgroundImage
+
+        this.selectedElement.style.backgroundImage = `url('${newSrc}')`
+
+        this.undoRedoManager.addChange(
+          {
+            selector,
+            type: 'style',
+            value: { 'background-image': `url('${newSrc}')` },
+            enabled: true,
+            mode: 'merge'
+          },
+          { 'background-image': oldBgImage }
+        )
+      }
+
+      this.notifications.show('Image source updated', '', 'success')
+    } catch (error) {
+      console.error('Failed to change image source:', error)
+      this.notifications.show('Failed to change image source', '', 'error')
     }
   }
 

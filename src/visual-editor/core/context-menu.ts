@@ -38,10 +38,11 @@ export class ContextMenu {
     if (existingHost) existingHost.remove()
 
     // Calculate menu dimensions (approximate based on number of items)
-    const menuItemCount = 19 // One less item after removing Inline Edit
+    const isImage = this.isImageElement(element)
+    const menuItemCount = isImage ? 13 : 12 // Base items without Move up/down, +1 if image
     const itemHeight = 32
     const dividerHeight = 9
-    const dividerCount = 6
+    const dividerCount = isImage ? 5 : 4 // Number of dividers
     const menuPadding = 8
     const estimatedMenuHeight = (menuItemCount * itemHeight) + (dividerCount * dividerHeight) + menuPadding
     const estimatedMenuWidth = 220
@@ -107,7 +108,7 @@ export class ContextMenu {
     menuContainer.className = 'menu-container'
 
     // Create menu items
-    this.createMenuItems().forEach(item => {
+    this.createMenuItems(element).forEach(item => {
       if ('divider' in item && item.divider) {
         const divider = document.createElement('div')
         divider.className = 'menu-divider'
@@ -240,26 +241,46 @@ export class ContextMenu {
     `
   }
 
-  private createMenuItems(): MenuItem[] {
-    return [
+  private createMenuItems(element: Element): MenuItem[] {
+    const items: MenuItem[] = [
       { icon: '✏️', label: 'Edit Text', action: 'edit' },
       { icon: '</>', label: 'Edit HTML', action: 'editHtml' },
       { divider: true },
       { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
       { icon: '↔️', label: 'Resize', action: 'resize' },
       { divider: true },
-      { icon: '⬆', label: 'Move up', action: 'move-up' },
-      { icon: '⬇', label: 'Move down', action: 'move-down' },
-      { divider: true },
       { icon: '📋', label: 'Copy', action: 'copy' },
       { icon: '🔗', label: 'Copy Selector Path', action: 'copySelector', shortcut: '⌘+Shift+C' },
       { divider: true },
       { icon: '🎯', label: 'Select Relative Element', action: 'selectRelative' },
       { icon: '➕', label: 'Insert new block', action: 'insert-block' },
-      { divider: true },
+      { divider: true }
+    ]
+
+    // Add "Change image source" if element is an image or has background image
+    if (this.isImageElement(element)) {
+      items.push({ icon: '🖼️', label: 'Change image source', action: 'change-image-source' })
+      items.push({ divider: true })
+    }
+
+    items.push(
       { icon: '👁', label: 'Hide', action: 'hide' },
       { icon: '🗑', label: 'Delete', action: 'delete', shortcut: 'Delete' }
-    ]
+    )
+
+    return items
+  }
+
+  private isImageElement(element: Element): boolean {
+    // Check if it's an img tag
+    if (element.tagName.toLowerCase() === 'img') {
+      return true
+    }
+
+    // Check if element has a background image
+    const computedStyle = window.getComputedStyle(element)
+    const backgroundImage = computedStyle.backgroundImage
+    return backgroundImage && backgroundImage !== 'none'
   }
 
   private createMenuItem(item: MenuAction): HTMLElement {
