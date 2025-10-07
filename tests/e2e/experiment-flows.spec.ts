@@ -179,12 +179,12 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    await test.step('Verify button text shows "Create Experiment"', async () => {
+    await test.step('Verify button text shows "Create Experiment Draft"', async () => {
       console.log('\n🔍 Verifying create button text')
 
-      const createButton = sidebar.locator('button:has-text("Create Experiment")')
+      const createButton = sidebar.locator('button:has-text("Create Experiment Draft")')
       await expect(createButton).toBeVisible()
-      console.log('  ✓ Button shows "Create Experiment" (not "Update Experiment")')
+      console.log('  ✓ Button shows "Create Experiment Draft" (not "Update Experiment")')
 
       await debugWait()
     })
@@ -646,12 +646,12 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    await test.step('Verify button shows "Create Experiment"', async () => {
+    await test.step('Verify button shows "Create Experiment Draft"', async () => {
       console.log('\n🔍 Verifying button text')
 
-      const createButton = sidebar.locator('button:has-text("Create Experiment")')
+      const createButton = sidebar.locator('button:has-text("Create Experiment Draft")')
       await expect(createButton).toBeVisible()
-      console.log('  ✓ Button correctly shows "Create Experiment" (not "Update Experiment")')
+      console.log('  ✓ Button correctly shows "Create Experiment Draft" (not "Update Experiment")')
 
       await debugWait()
     })

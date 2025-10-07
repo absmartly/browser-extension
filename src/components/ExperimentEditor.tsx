@@ -272,13 +272,14 @@ export function ExperimentEditor({
         />
 
         {/* Submit Buttons */}
+        {/* Note: Creating an experiment here saves it as a draft. You'll need to finalize the experiment setup in the ABsmartly console before it can be started. */}
         <div className="pt-4 flex gap-2 border-t">
           <Button
             type="submit"
             variant="primary"
             disabled={loading}
           >
-            {experiment?.id ? 'Update Experiment' : 'Create Experiment'}
+            {experiment?.id ? 'Update Experiment' : 'Create Experiment Draft'}
           </Button>
           <Button
             type="button"

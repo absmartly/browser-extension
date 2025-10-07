@@ -1415,7 +1415,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         await debugWait()
 
         // Click the save/create button in the experiment form
-        const saveButton = sidebar.locator('button:has-text("Create Experiment"), button:has-text("Save")')
+        const saveButton = sidebar.locator('button:has-text("Create Experiment Draft"), button:has-text("Save")')
 
         // Scroll to the save button to make it visible
         await saveButton.scrollIntoViewIfNeeded()
@@ -1449,7 +1449,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         console.log('  📸 Screenshot saved: after-save-top.png')
 
         // Check if we're still on the create form or navigated away
-        const stillOnCreateForm = await sidebar.locator('button:has-text("Create Experiment")').count() > 0
+        const stillOnCreateForm = await sidebar.locator('button:has-text("Create Experiment Draft")').count() > 0
         console.log('  Still on create form:', stillOnCreateForm)
 
         // Check for success toast or error message
