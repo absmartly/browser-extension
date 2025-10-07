@@ -323,8 +323,8 @@ describe('ContextMenu', () => {
       const actions = menuItems.filter((item): item is MenuAction => !('divider' in item))
       const dividers = menuItems.filter(item => 'divider' in item)
 
-      expect(actions.length).toBeGreaterThan(10)
-      expect(dividers.length).toBeGreaterThan(3)
+      expect(actions.length).toBe(10) // 10 actions for non-image elements (Move up/down removed)
+      expect(dividers.length).toBe(4) // 4 dividers for non-image elements
 
       // Check action structure
       actions.forEach(action => {
