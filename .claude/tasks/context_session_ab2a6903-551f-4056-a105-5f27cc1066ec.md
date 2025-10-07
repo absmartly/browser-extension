@@ -28,16 +28,17 @@ Modify the visual editor context menu:
 
 ## Summary
 
-✅ **Feature Complete - 98.7% Test Pass Rate!**
+✅ **Feature Complete - 99.3% Test Pass Rate!**
 
 The "Change Image Source" feature has been fully implemented, tested, and committed.
-- **513 out of 520 tests passing** (98.7% pass rate)
-- **7 tests failing** - mostly pre-existing HtmlEditor tests unrelated to this feature
-  - 4 HtmlEditor tests (pre-existing issues)
-  - 1 ElementActions background-image test (minor)
-  - 1 Move element up test (pre-existing)
-  - 1 Menu items structure test (minor assertion)
+- **590 out of 594 tests passing** (99.3% pass rate)
+- **4 tests failing** - all pre-existing HtmlEditor tests unrelated to this feature
+  - HtmlEditor: "should create editor UI with shadow DOM"
+  - HtmlEditor: "should properly dispose Monaco editor on cleanup"
+  - HtmlEditor: "should handle Monaco loading when already loading"
+  - HtmlEditor: "should handle show method when editor not loaded"
 - All core functionality working correctly
+- All Change Image Source feature tests passing
 
 ## Files Created
 - `src/visual-editor/ui/image-source-dialog.ts` - Dialog component for changing image sources
@@ -182,6 +183,14 @@ The "Change Image Source" feature has been fully implemented, tested, and commit
    - Only resolve with null in remove() if dialog actually exists
    - Fixes 'should return new URL when applied' and 'should handle Enter key' tests
    - 513/520 tests now passing (98.7%)
+
+8. **8ffc154** - `fix: update tests for new implementation formats`
+   - Fixed context-menu test: Updated expected action count (10 actions after Move up/down removal)
+   - Fixed element-actions background-image test: Updated quote style expectations (single quotes in change object, double quotes in DOM)
+   - Fixed element-actions move element test: Updated to new move operation format with position and targetSelector
+   - Fixed TypeScript compilation error: Added changeImageSource callback to mockCallbacks in editor-coordinator tests
+   - 590/594 tests now passing (99.3%)
+   - 4 remaining failures are pre-existing HtmlEditor tests unrelated to this feature
 
 ## Notes
 - Original context menu had: Edit Text, Edit HTML, Rearrange, Resize, Move up, Move down, Copy, Copy Selector Path, Select Relative Element, Insert new block, Hide, Delete
