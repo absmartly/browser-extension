@@ -6,7 +6,7 @@ import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
 import { Header } from './Header'
-import { PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { VariantList } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
@@ -166,30 +166,24 @@ export function ExperimentDetail({
           )}
         </div>
       ) : (
-        <div className="relative group flex items-center gap-2">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</h2>
-            {displayName !== experiment.name && (
-              <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">{experiment.name}</p>
-            )}
+        <div
+          className="relative group flex-1 min-w-0 cursor-pointer"
+          onClick={() => setEditingName(true)}
+        >
+          <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap hover:text-blue-600 transition-colors">{displayName}</h2>
+          {displayName !== experiment.name && (
+            <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">{experiment.name}</p>
+          )}
 
-            {/* Tooltip */}
-            <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
-              <div className="break-words">{displayName}</div>
-              {displayName !== experiment.name && (
-                <div className="text-gray-300 break-words">{experiment.name}</div>
-              )}
-              <div className="text-gray-400">ID: {experiment.id}</div>
-              <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
-            </div>
+          {/* Tooltip */}
+          <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
+            <div className="break-words">{displayName}</div>
+            {displayName !== experiment.name && (
+              <div className="text-gray-300 break-words">{experiment.name}</div>
+            )}
+            <div className="text-gray-400">ID: {experiment.id}</div>
+            <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
           </div>
-          <button
-            onClick={() => setEditingName(true)}
-            className="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0"
-            title="Edit name"
-          >
-            <PencilIcon className="h-4 w-4" />
-          </button>
         </div>
       )}
     </div>
