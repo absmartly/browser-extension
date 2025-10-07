@@ -29,6 +29,121 @@ w.__absmartlyContentScriptLoaded = true
 console.log('[ABsmartly] Content script marker set:', w.__absmartlyContentScriptLoaded)
 debugLog('[Visual Editor Content Script] Content script loaded')
 
+// Polyfill chrome.runtime.sendMessage for test mode
+// This handles messages that expect a response (like REQUEST_INJECTION_CODE)
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+  const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
+  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
+  if (sidebarIframe && sidebarIframe.contentWindow) {
+    // We're in test mode - polyfill sendMessage
+    const responseCallbacks = new Map<string, (response: any) => void>()
+
+    // Listen for responses from sidebar
+    window.addEventListener('message', (event) => {
+      // SECURITY: Only accept messages from sidebar iframe or same window
+      if (event.source !== window && event.source !== sidebarIframe?.contentWindow) {
+        return
+      }
+
+      if (event.data?.source === 'absmartly-extension' && event.data?.responseId) {
+        const callback = responseCallbacks.get(event.data.responseId)
+        if (callback) {
+          callback(event.data.response)
+          responseCallbacks.delete(event.data.responseId)
+        }
+      }
+    })
+
+    chrome.runtime.sendMessage = function(message: any, callback?: (response: any) => void) {
+      // Determine the correct source based on message type
+      const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
+                      message.type === 'VISUAL_EDITOR_STOPPED' ||
+                      message.type === 'ELEMENT_SELECTED' ||
+                      message.type === 'PREVIEW_STATE_CHANGED')
+        ? 'absmartly-visual-editor'
+        : 'absmartly-content-script'
+
+      if (callback) {
+        // Generate unique ID for this request
+        const responseId = `${message.type}_${Date.now()}_${Math.random()}`
+        responseCallbacks.set(responseId, callback)
+
+        // Send request to sidebar with response ID
+        sidebarIframe.contentWindow!.postMessage({
+          source: source,
+          responseId: responseId,
+          ...message
+        }, '*')
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (responseCallbacks.has(responseId)) {
+            responseCallbacks.delete(responseId)
+            debugWarn(`No response received for ${message.type} after 5s`)
+          }
+        }, 5000)
+      } else {
+        // No callback, just send the message
+        sidebarIframe.contentWindow!.postMessage({
+          source: source,
+          ...message
+        }, '*')
+      }
+    } as any
+  }
+}
+
+// Message bridge relay for test mode
+// Forwards messages between sidebar iframe and background script
+window.addEventListener('message', async (event) => {
+  // Only handle messages from sidebar iframe that need to go to background
+  if (event.data?.source === 'absmartly-sidebar' && event.data?.responseId) {
+    const { responseId, type, ...messageData} = event.data
+
+    console.log('[Content Script Bridge] Relaying message from sidebar to background:', type)
+
+    try {
+      // Forward to background script
+      const response = await chrome.runtime.sendMessage({
+        type,
+        ...messageData
+      })
+
+      console.log('[Content Script Bridge] Got response from background for:', type)
+
+      // Send response back to sidebar iframe
+      const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+      if (sidebarIframe?.contentWindow) {
+        sidebarIframe.contentWindow.postMessage({
+          source: 'absmartly-extension',
+          responseId: responseId,
+          response: response
+        }, '*')
+
+        console.log('[Content Script Bridge] Sent response back to sidebar')
+      }
+    } catch (error) {
+      console.error('[Content Script Bridge] Error relaying message:', error)
+
+      // Send error response back to sidebar
+      const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+      if (sidebarIframe?.contentWindow) {
+        sidebarIframe.contentWindow.postMessage({
+          source: 'absmartly-extension',
+          responseId: responseId,
+          response: {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        }, '*')
+      }
+    }
+  }
+})
+
+console.log('[Content Script] Message bridge relay installed')
+
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null

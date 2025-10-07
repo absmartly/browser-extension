@@ -178,12 +178,12 @@ test.describe('Message Bridge - Console Verification', () => {
     }
 
     // The handler exists in the code, we just need to verify it can be triggered
-    const indexLoaded = allConsoleMessages.some(m =>
-      m.text.includes('[index.tsx]') && m.text.includes('Script loaded')
+    const sidebarLoaded = allConsoleMessages.some(m =>
+      m.text.includes('[sidebar.tsx]') && m.text.includes('Script loaded')
     )
 
-    console.log('\nindex.tsx loaded:', indexLoaded)
+    console.log('\nsidebar.tsx loaded:', sidebarLoaded)
 
-    expect(indexLoaded).toBe(true)
+    expect(sidebarLoaded).toBe(true)
   })
 })
