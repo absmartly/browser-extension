@@ -254,7 +254,8 @@ export function VariantList({
     setActivePreviewVariant(enabled ? variantIndex : null)
 
     if (enabled && variants[variantIndex]) {
-      const changes = variants[variantIndex].dom_changes || []
+      const domChanges = variants[variantIndex].dom_changes || { changes: [] }
+      const changes = getChangesArray(domChanges)
       const variantName = variants[variantIndex].name
 
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
