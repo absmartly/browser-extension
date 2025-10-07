@@ -388,7 +388,9 @@ describe('ElementActions', () => {
 
       await elementActions.changeImageSource()
 
-      expect(testDivWithBg.style.backgroundImage).toBe("url('https://example.com/new-bg.jpg')")
+      // Browser normalizes to double quotes when reading from DOM
+      expect(testDivWithBg.style.backgroundImage).toBe('url("https://example.com/new-bg.jpg")')
+      // But the change object uses single quotes as set by the implementation
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: '#test-bg',
@@ -397,7 +399,7 @@ describe('ElementActions', () => {
           enabled: true,
           mode: 'merge'
         }),
-        { 'background-image': "url('https://example.com/old-bg.jpg')" }
+        { 'background-image': 'url("https://example.com/old-bg.jpg")' }
       )
     })
 
@@ -562,7 +564,8 @@ describe('ElementActions', () => {
         expect.objectContaining({
           selector: '#child-2',
           type: 'move',
-          value: 'up',
+          targetSelector: 'div',
+          position: 'before',
           enabled: true
         }),
         'down' // oldValue is opposite direction
