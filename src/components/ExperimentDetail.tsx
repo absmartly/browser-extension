@@ -6,7 +6,7 @@ import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
 import { Header } from './Header'
-import { PencilIcon, CheckIcon, XMarkIcon, PlayIcon, StopIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { VariantList } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
@@ -270,6 +270,7 @@ export function ExperimentDetail({
           >
             {hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
           </Button>
+          {/* TODO: Implement Start/Stop experiment functionality
           {(experiment.state === 'ready' || experiment.state === 'created' || experiment.status === 'draft') && (
             <Button
               onClick={() => onStart(experiment.id)}
@@ -292,6 +293,7 @@ export function ExperimentDetail({
               Stop Experiment
             </Button>
           )}
+          */}
         </div>
       </div>
       
