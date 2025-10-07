@@ -115,6 +115,99 @@ describe('ContextMenu', () => {
     })
   })
 
+  describe('Menu Items', () => {
+    it('should not include Move up and Move down in menu items', () => {
+      contextMenu.show(100, 100, mockElement)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      // Get all menu items
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).not.toContain('Move up')
+      expect(labels).not.toContain('Move down')
+    })
+
+    it('should include Change image source for img elements', () => {
+      const img = document.createElement('img')
+      img.src = 'https://example.com/test.jpg'
+      document.body.appendChild(img)
+
+      contextMenu.show(100, 100, img)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).toContain('Change image source')
+    })
+
+    it('should include Change image source for elements with background-image', () => {
+      const div = document.createElement('div')
+      div.style.backgroundImage = "url('https://example.com/bg.jpg')"
+      document.body.appendChild(div)
+
+      contextMenu.show(100, 100, div)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).toContain('Change image source')
+    })
+
+    it('should not include Change image source for regular elements', () => {
+      const div = document.createElement('div')
+      document.body.appendChild(div)
+
+      contextMenu.show(100, 100, div)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      expect(labels).not.toContain('Change image source')
+    })
+
+    it('should include standard menu items', () => {
+      contextMenu.show(100, 100, mockElement)
+
+      const menuHost = document.getElementById('absmartly-menu-host')
+      const shadowRoot = (menuHost as any).shadowRoot
+
+      const menuItems = shadowRoot.querySelectorAll('.menu-item')
+      const labels = Array.from(menuItems).map((item: any) =>
+        item.querySelector('.menu-label')?.textContent
+      )
+
+      // Check for expected menu items
+      expect(labels).toContain('Edit Text')
+      expect(labels).toContain('Edit HTML')
+      expect(labels).toContain('Rearrange')
+      expect(labels).toContain('Resize')
+      expect(labels).toContain('Copy')
+      expect(labels).toContain('Copy Selector Path')
+      expect(labels).toContain('Hide')
+      expect(labels).toContain('Delete')
+    })
+  })
+
   describe('show() method', () => {
     it('should create menu host element with correct ID and positioning', () => {
       contextMenu.show(100, 100, mockElement)
