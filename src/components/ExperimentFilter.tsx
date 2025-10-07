@@ -140,7 +140,7 @@ export function ExperimentFilter({
   }, 0)
 
   return (
-    <div className="border-b">
+    <div className={isExpanded ? 'border-b' : ''}>
       <div className="px-4 py-3">
         <div className="flex items-center gap-2">
           <Input
@@ -177,7 +177,7 @@ export function ExperimentFilter({
       </div>
 
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-3 border-t">
+        <div className="px-4 pb-4 pt-4 space-y-3 border-t">
           {/* States */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
