@@ -80,7 +80,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 40000 : 20000)
+    test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
 
     let sidebar: any
 
@@ -1051,7 +1051,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
-    await test.step.skip('Add URL filter and verify JSON payload', async () => {
+    await test.step('Add URL filter and verify JSON payload', async () => {
       console.log('\n🔗 STEP 7.5: Adding URL filter and verifying JSON payload')
 
       // Take screenshot to see current state
@@ -1118,19 +1118,34 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       await modeSelect.selectOption('simple')
       console.log('  ✓ Selected simple URL filter mode')
-      await testPage.waitForTimeout(300)
+      await testPage.waitForTimeout(1000)
 
-      // Find the match type dropdown and select "path"
-      const matchTypeSelect = sidebar.locator('label:has-text("Match Type")').locator('..').locator('select')
-      await matchTypeSelect.selectOption('path')
-      console.log('  ✓ Selected path match type')
-      await testPage.waitForTimeout(300)
+      // Take screenshot after selecting simple mode
+      await testPage.screenshot({ path: 'test-results/after-simple-mode.png', fullPage: true })
+      console.log('  📸 Screenshot: after-simple-mode.png')
 
-      // Find the pattern input field and enter a path pattern
+      // The simple mode UI shows "Match against:" dropdown with "Path only" already selected
+      // and has a pattern input field. Let's verify the pattern field exists and update it
+      console.log('  Looking for pattern input field in URL Filtering section...')
+
+      // Find the input with placeholder containing /products
       const patternInput = sidebar.locator('input[placeholder*="/products/*"]').first()
-      await patternInput.fill('/products/*')
-      await patternInput.blur() // Trigger onBlur to save
-      console.log('  ✓ Entered URL filter pattern: /products/*')
+      const patternExists = await patternInput.isVisible({ timeout: 10000 }).catch(() => false)
+      console.log(`  Pattern input visible: ${patternExists}`)
+
+      if (!patternExists) {
+        // Take a screenshot to see what's there
+        await testPage.screenshot({ path: 'test-results/pattern-not-found.png', fullPage: true })
+        console.log('  📸 Screenshot: pattern-not-found.png')
+        throw new Error('Could not find pattern input field with placeholder /products/*')
+      }
+
+      const currentValue = await patternInput.inputValue()
+      console.log(`  Current pattern value: "${currentValue}"`)
+
+      await patternInput.fill('/test-path/*')
+      await patternInput.blur()
+      console.log('  ✓ Updated URL filter pattern to: /test-path/*')
       await testPage.waitForTimeout(500)
 
       // Now open the JSON editor for variant 1 to verify the URL filter is in the payload
@@ -1168,9 +1183,9 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(hasInclude).toBeTruthy()
       console.log('  ✓ JSON contains include array')
 
-      const hasPathPattern = jsonContent.includes('/products/*')
+      const hasPathPattern = jsonContent.includes('/test-path/*')
       expect(hasPathPattern).toBeTruthy()
-      console.log('  ✓ JSON contains the path pattern: /products/*')
+      console.log('  ✓ JSON contains the path pattern: /test-path/*')
 
       const hasMatchType = jsonContent.includes('matchType') && jsonContent.includes('path')
       expect(hasMatchType).toBeTruthy()
@@ -1184,7 +1199,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       await testPage.waitForTimeout(500)
 
       console.log('✅ URL filter test PASSED!')
-      console.log('  • Added URL filter with path pattern: /products/*')
+      console.log('  • Added URL filter with path pattern: /test-path/*')
       console.log('  • Verified JSON payload contains urlFilter configuration')
       console.log('  • Verified include array with pattern')
       console.log('  • Verified matchType is set to path')
