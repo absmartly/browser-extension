@@ -141,7 +141,7 @@ export function ExperimentFilter({
 
   return (
     <div>
-      <div className="px-4 py-2">
+      <div className="px-4 py-1">
         <div className="flex items-center gap-2">
           <Input
             placeholder="Search experiments..."
