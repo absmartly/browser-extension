@@ -166,24 +166,33 @@ export function ExperimentDetail({
           )}
         </div>
       ) : (
-        <div
-          className="relative group flex-1 min-w-0 cursor-pointer"
-          onClick={() => setEditingName(true)}
-        >
-          <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap hover:text-blue-600 transition-colors">{displayName}</h2>
-          {displayName !== experiment.name && (
-            <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">{experiment.name}</p>
-          )}
+        <div className="flex-1 min-w-0">
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => setEditingName(true)}
+          >
+            <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</h2>
 
-          {/* Tooltip */}
-          <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
-            <div className="break-words">{displayName}</div>
-            {displayName !== experiment.name && (
-              <div className="text-gray-300 break-words">{experiment.name}</div>
-            )}
-            <div className="text-gray-400">ID: {experiment.id}</div>
-            <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
+            {/* Click to edit tooltip */}
+            <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+              Click to edit
+              <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
+            </div>
           </div>
+
+          {displayName !== experiment.name && (
+            <div className="relative group">
+              <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap cursor-help">{experiment.name}</p>
+
+              {/* Experiment info tooltip */}
+              <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
+                <div className="break-words">{displayName}</div>
+                <div className="text-gray-300 break-words">{experiment.name}</div>
+                <div className="text-gray-400">ID: {experiment.id}</div>
+                <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
