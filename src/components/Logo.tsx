@@ -20,7 +20,7 @@ export function Logo({ config, className = "w-10 h-10" }: LogoProps) {
   const Logo = baseUrl ? 'a' : 'div'
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block flex-shrink-0">
       <Logo
         href={baseUrl}
         onClick={baseUrl ? handleClick : undefined}

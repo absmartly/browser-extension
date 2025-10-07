@@ -11,16 +11,16 @@ interface HeaderProps {
 
 export function Header({ title, onBack, actions, config }: HeaderProps) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
         <Logo config={config} />
         {typeof title === 'string' ? (
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{title}</h2>
         ) : (
           title
         )}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         {actions}
         <button
           onClick={onBack}
