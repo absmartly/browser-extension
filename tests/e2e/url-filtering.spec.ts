@@ -3,7 +3,7 @@ import { type Page } from '@playwright/test'
 import path from 'path'
 import { debugWait } from './utils/test-helpers'
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'url-filtering-test.html')
+const TEST_PAGE_URL = '/url-filtering-test.html'
 
 /**
  * E2E Tests for URL Filtering with DOM Changes
@@ -45,7 +45,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       console.log('\n📄 Loading test page with SDK')
 
       // Create test page with SDK loaded
-      await testPage.goto(`file://${TEST_PAGE_PATH}`)
+      await testPage.goto(TEST_PAGE_URL)
       await testPage.waitForLoadState('networkidle')
 
       // Inject ABsmartly SDK mock
@@ -154,25 +154,11 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Navigate to /products/123 - should apply changes', async () => {
       console.log('\n🔗 Navigating to /products/123')
 
-      // Simulate URL change - create a mock location and trigger plugin
+      // Change URL using history API
       await testPage.evaluate(() => {
-        // Store original location
-        const originalLocation = window.location
+        history.pushState({}, '', '/products/123')
 
-        // Create mock location object
-        const mockLocation = {
-          ...originalLocation,
-          pathname: '/products/123',
-          href: originalLocation.origin + '/products/123'
-        }
-
-        // Temporarily replace location for URL filtering
-        Object.defineProperty(window, 'location', {
-          configurable: true,
-          value: mockLocation
-        })
-
-        // Trigger plugin to check URL and apply changes
+        // Trigger plugin to recheck URL and apply changes
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
         if (plugin) {
@@ -197,13 +183,8 @@ test.describe('URL Filtering with DOM Changes', () => {
         const el = document.getElementById('test-element')
         if (el) el.textContent = 'Original Text'
 
-        // Mock location.pathname for URL filtering
-        Object.defineProperty(window.location, 'pathname', {
-          writable: true,
-          value: '/about'
-        })
+        history.pushState({}, '', '/about')
 
-        // Trigger plugin to check URL
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
         if (plugin) {
@@ -243,7 +224,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Load page with SDK and plugin', async () => {
       console.log('\n📄 Loading test page with SDK')
 
-      await testPage.goto(`file://${TEST_PAGE_PATH}`)
+      await testPage.goto(TEST_PAGE_URL)
       await testPage.waitForLoadState('networkidle')
 
       // Inject ABsmartly SDK mock with multiple variants having different URL filters
@@ -363,10 +344,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       console.log('\n🔗 Testing variant 1 on /products/123')
 
       await testPage.evaluate(() => {
-        Object.defineProperty(window.location, 'pathname', {
-          writable: true,
-          value: '/products/123'
-        })
+        history.pushState({}, '', '/products/123')
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -390,10 +368,7 @@ test.describe('URL Filtering with DOM Changes', () => {
         const el = document.getElementById('variant-display')
         if (el) el.textContent = 'Original Text'
 
-        Object.defineProperty(window.location, 'pathname', {
-          writable: true,
-          value: '/checkout'
-        })
+        history.pushState({}, '', '/checkout')
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -453,10 +428,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       await testPage.waitForTimeout(500)
 
       await testPage.evaluate(() => {
-        Object.defineProperty(window.location, 'pathname', {
-          writable: true,
-          value: '/checkout'
-        })
+        history.pushState({}, '', '/checkout')
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -480,10 +452,7 @@ test.describe('URL Filtering with DOM Changes', () => {
         const el = document.getElementById('variant-display')
         if (el) el.textContent = 'Original Text'
 
-        Object.defineProperty(window.location, 'pathname', {
-          writable: true,
-          value: '/products/456'
-        })
+        history.pushState({}, '', '/products/456')
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -509,7 +478,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Test path matching', async () => {
       console.log('\n🔗 Testing path matching')
 
-      await testPage.goto(`file://${TEST_PAGE_PATH}`)
+      await testPage.goto(TEST_PAGE_URL)
       await testPage.waitForLoadState('networkidle')
 
       await testPage.evaluate(() => {
@@ -568,10 +537,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       }, pluginCode)
 
       await testPage.evaluate(() => {
-        Object.defineProperty(window.location, 'pathname', {
-          writable: true,
-          value: '/products/test'
-        })
+        history.pushState({}, '', '/products/test')
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -599,7 +565,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Test query parameter matching', async () => {
       console.log('\n❓ Testing query parameter matching')
 
-      await testPage.goto(`file://${TEST_PAGE_PATH}`)
+      await testPage.goto(TEST_PAGE_URL)
       await testPage.waitForLoadState('networkidle')
 
       await testPage.evaluate(() => {
@@ -658,10 +624,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       }, pluginCode)
 
       await testPage.evaluate(() => {
-        Object.defineProperty(window.location, 'search', {
-          writable: true,
-          value: '?ref=newsletter'
-        })
+        history.pushState({}, '', '?ref=newsletter')
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -681,7 +644,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Test hash matching', async () => {
       console.log('\n# Testing hash matching')
 
-      await testPage.goto(`file://${TEST_PAGE_PATH}`)
+      await testPage.goto(TEST_PAGE_URL)
       await testPage.waitForLoadState('networkidle')
 
       await testPage.evaluate(() => {
@@ -740,10 +703,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       }, pluginCode)
 
       await testPage.evaluate(() => {
-        Object.defineProperty(window.location, 'hash', {
-          writable: true,
-          value: '#products-section'
-        })
+        window.location.hash = '#products-section'
 
         const context = new (window as any).absmartly.Context()
         const plugin = context.__domPlugin
@@ -751,6 +711,8 @@ test.describe('URL Filtering with DOM Changes', () => {
           plugin.applyChanges('hash_match_test')
         }
       })
+
+      await testPage.waitForTimeout(100)
 
       await testPage.waitForTimeout(500)
 
