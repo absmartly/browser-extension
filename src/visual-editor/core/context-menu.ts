@@ -90,8 +90,8 @@ export class ContextMenu {
     // Check if we should use shadow DOM
     console.log('🔍 Context Menu - Use Shadow DOM:', this.useShadowDOM)
 
-    // Attach shadow root with closed mode for complete isolation (unless disabled)
-    const shadow = this.useShadowDOM ? menuHost.attachShadow({ mode: 'closed' }) : menuHost
+    // Attach shadow root with open mode for testability (unless disabled)
+    const shadow = this.useShadowDOM ? menuHost.attachShadow({ mode: 'open' }) : menuHost
     console.log('🔍 Shadow container:', this.useShadowDOM ? 'Using shadow DOM' : 'Using menuHost directly')
 
     // Create styles for shadow DOM
