@@ -1101,8 +1101,21 @@ test.describe('Visual Editor Complete Workflow', () => {
         console.log('  ✓ URL Filtering section already expanded')
       }
 
+      // Take screenshot after expanding
+      await testPage.screenshot({ path: 'test-results/after-url-filter-expand.png', fullPage: true })
+      console.log('  📸 Screenshot: after-url-filter-expand.png')
+
       // Select "simple" mode (should be visible now)
-      const modeSelect = sidebar.locator('select').filter({ hasText: /All URLs|Apply on specific URLs/ }).first()
+      console.log('  Looking for mode select dropdown...')
+      // The dropdown is within the URL Filtering section and has "Apply on all pages" as one option
+      const modeSelect = sidebar.locator('select').filter({ has: sidebar.locator('option:has-text("Apply on all pages")') }).first()
+      const modeSelectVisible = await modeSelect.isVisible({ timeout: 5000 }).catch(() => false)
+      console.log(`  Mode select visible: ${modeSelectVisible}`)
+
+      if (!modeSelectVisible) {
+        throw new Error('Mode select dropdown not found after expanding URL Filtering')
+      }
+
       await modeSelect.selectOption('simple')
       console.log('  ✓ Selected simple URL filter mode')
       await testPage.waitForTimeout(300)
