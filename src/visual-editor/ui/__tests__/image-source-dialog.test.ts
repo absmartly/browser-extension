@@ -108,11 +108,13 @@ describe('ImageSourceDialog', () => {
 
       const promise = dialog.show(img, 'https://example.com/test.jpg')
 
+      // Wait for dialog to be created
+      await new Promise(resolve => setTimeout(resolve, 10))
+
       expect(document.getElementById('absmartly-image-dialog-host')).toBeTruthy()
 
       // Cancel the dialog
-      const backdrop = document.querySelector('.dialog-backdrop') as HTMLElement
-      backdrop?.click()
+      dialog.remove()
 
       await promise
     })
@@ -123,6 +125,9 @@ describe('ImageSourceDialog', () => {
 
       const promise = dialog.show(img, currentSrc)
 
+      // Wait for dialog to be created
+      await new Promise(resolve => setTimeout(resolve, 10))
+
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
       const input = shadowRoot.querySelector('input') as HTMLInputElement
@@ -130,8 +135,7 @@ describe('ImageSourceDialog', () => {
       expect(input.value).toBe(currentSrc)
 
       // Cancel
-      const backdrop = shadowRoot.querySelector('.dialog-backdrop') as HTMLElement
-      backdrop?.click()
+      dialog.remove()
 
       await promise
     })
@@ -140,6 +144,8 @@ describe('ImageSourceDialog', () => {
       const img = document.createElement('img')
 
       const promise = dialog.show(img, 'https://example.com/test.jpg')
+
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
@@ -155,6 +161,8 @@ describe('ImageSourceDialog', () => {
 
       const promise = dialog.show(img, 'https://example.com/test.jpg')
 
+      await new Promise(resolve => setTimeout(resolve, 10))
+
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
       const cancelButton = shadowRoot.querySelector('.dialog-button-cancel') as HTMLElement
@@ -169,6 +177,8 @@ describe('ImageSourceDialog', () => {
       const newUrl = 'https://example.com/new.jpg'
 
       const promise = dialog.show(img, 'https://example.com/old.jpg')
+
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
@@ -186,6 +196,8 @@ describe('ImageSourceDialog', () => {
       const img = document.createElement('img')
 
       const promise = dialog.show(img, 'https://example.com/old.jpg')
+
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
@@ -217,13 +229,19 @@ describe('ImageSourceDialog', () => {
 
       const promise = dialog.show(img, 'https://example.com/old.jpg')
 
+      await new Promise(resolve => setTimeout(resolve, 10))
+
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
       const input = shadowRoot.querySelector('input') as HTMLInputElement
 
       input.value = newUrl
 
-      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' })
+      const enterEvent = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true
+      })
       input.dispatchEvent(enterEvent)
 
       const result = await promise
@@ -235,11 +253,17 @@ describe('ImageSourceDialog', () => {
 
       const promise = dialog.show(img, 'https://example.com/old.jpg')
 
+      await new Promise(resolve => setTimeout(resolve, 10))
+
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
       const input = shadowRoot.querySelector('input') as HTMLInputElement
 
-      const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape' })
+      const escapeEvent = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true
+      })
       input.dispatchEvent(escapeEvent)
 
       const result = await promise
@@ -250,6 +274,8 @@ describe('ImageSourceDialog', () => {
       const img = document.createElement('img')
 
       const promise = dialog.show(img, 'https://example.com/old.jpg')
+
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       const host = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (host as any).shadowRoot
@@ -282,6 +308,8 @@ describe('ImageSourceDialog', () => {
       const img = document.createElement('img')
 
       const promise = dialog.show(img, 'https://example.com/test.jpg')
+
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(document.getElementById('absmartly-image-dialog-host')).toBeTruthy()
 

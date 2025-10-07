@@ -59,7 +59,7 @@ export class ImageSourceDialog {
       pointer-events: none;
     `
 
-    const shadow = dialogHost.attachShadow({ mode: 'closed' })
+    const shadow = dialogHost.attachShadow({ mode: 'open' })
 
     const style = document.createElement('style')
     style.textContent = `
@@ -275,15 +275,14 @@ export class ImageSourceDialog {
       }
 
       if (this.resolveCallback) {
-        this.resolveCallback(url)
+        const callback = this.resolveCallback
+        this.resolveCallback = null
+        callback(url)
       }
       this.remove()
     }
 
     const handleCancel = () => {
-      if (this.resolveCallback) {
-        this.resolveCallback(null)
-      }
       this.remove()
     }
 
@@ -334,11 +333,14 @@ export class ImageSourceDialog {
   }
 
   remove(): void {
+    if (this.resolveCallback) {
+      this.resolveCallback(null)
+      this.resolveCallback = null
+    }
     if (this.dialogHost) {
       this.dialogHost.remove()
       this.dialogHost = null
     }
-    this.resolveCallback = null
   }
 }
 
