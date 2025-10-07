@@ -1215,6 +1215,115 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
+    await test.step('Add URL filter and verify JSON payload', async () => {
+      console.log('\n🔗 STEP 7.5: Adding URL filter and verifying JSON payload')
+
+      // Make sure preview is disabled for this test (cleaner state)
+      const disableButton = sidebar.locator('button:has-text("Disable Preview")')
+      const isPreviewEnabled = await disableButton.isVisible({ timeout: 2000 }).catch(() => false)
+      if (isPreviewEnabled) {
+        await disableButton.click()
+        await testPage.waitForTimeout(1000)
+        console.log('  ✓ Disabled preview mode for clean state')
+      }
+
+      // Scroll to variant 1 (the one with DOM changes)
+      const variant1Section = sidebar.locator('text="Variant 1"').first()
+      await variant1Section.scrollIntoViewIfNeeded()
+      console.log('  ✓ Scrolled to Variant 1')
+
+      // Find and click the URL Filtering section to expand it
+      const urlFilterButton = sidebar.locator('button:has-text("URL Filtering")').first()
+      await urlFilterButton.scrollIntoViewIfNeeded()
+
+      // Check if it's already expanded
+      const isExpanded = await sidebar.locator('select[value="all"], select[value="simple"], select[value="advanced"]').first().isVisible({ timeout: 1000 }).catch(() => false)
+
+      if (!isExpanded) {
+        await urlFilterButton.click()
+        console.log('  ✓ Expanded URL Filtering section')
+        await testPage.waitForTimeout(500)
+      } else {
+        console.log('  ✓ URL Filtering section already expanded')
+      }
+
+      // Select "simple" mode (should be visible now)
+      const modeSelect = sidebar.locator('select').filter({ hasText: /All URLs|Apply on specific URLs/ }).first()
+      await modeSelect.selectOption('simple')
+      console.log('  ✓ Selected simple URL filter mode')
+      await testPage.waitForTimeout(300)
+
+      // Find the match type dropdown and select "path"
+      const matchTypeSelect = sidebar.locator('label:has-text("Match Type")').locator('..').locator('select')
+      await matchTypeSelect.selectOption('path')
+      console.log('  ✓ Selected path match type')
+      await testPage.waitForTimeout(300)
+
+      // Find the pattern input field and enter a path pattern
+      const patternInput = sidebar.locator('input[placeholder*="/products/*"]').first()
+      await patternInput.fill('/products/*')
+      await patternInput.blur() // Trigger onBlur to save
+      console.log('  ✓ Entered URL filter pattern: /products/*')
+      await testPage.waitForTimeout(500)
+
+      // Now open the JSON editor for variant 1 to verify the URL filter is in the payload
+      console.log('  Opening JSON editor to verify URL filter...')
+
+      // Find the JSON button for variant 1 (should be near the URL Filtering section)
+      // First scroll back up to the top of variant 1 to find the JSON button
+      await variant1Section.scrollIntoViewIfNeeded()
+
+      const jsonButton = sidebar.locator('button:has-text("JSON")').first()
+      await jsonButton.scrollIntoViewIfNeeded()
+      await jsonButton.click()
+      console.log('  ✓ Clicked JSON editor button')
+
+      // Wait for JSON editor modal to appear
+      await sidebar.locator('text="Edit DOM Changes JSON"').waitFor({ state: 'visible', timeout: 5000 })
+      console.log('  ✓ JSON editor modal opened')
+
+      // Get the JSON editor content (Monaco editor)
+      const jsonContent = await sidebar.locator('.monaco-editor').first().evaluate((editor) => {
+        // Monaco editor stores content in a specific way - try to get the text
+        const lines = editor.querySelectorAll('.view-line')
+        return Array.from(lines).map(line => line.textContent).join('\n')
+      })
+
+      console.log('  📄 JSON editor content preview:')
+      console.log(jsonContent.substring(0, 500)) // Show first 500 chars
+
+      // Verify the URL filter is present in the JSON
+      const hasUrlFilter = jsonContent.includes('urlFilter') || jsonContent.includes('url_filter')
+      expect(hasUrlFilter).toBeTruthy()
+      console.log('  ✓ JSON contains urlFilter field')
+
+      const hasInclude = jsonContent.includes('include')
+      expect(hasInclude).toBeTruthy()
+      console.log('  ✓ JSON contains include array')
+
+      const hasPathPattern = jsonContent.includes('/products/*')
+      expect(hasPathPattern).toBeTruthy()
+      console.log('  ✓ JSON contains the path pattern: /products/*')
+
+      const hasMatchType = jsonContent.includes('matchType') && jsonContent.includes('path')
+      expect(hasMatchType).toBeTruthy()
+      console.log('  ✓ JSON contains matchType: path')
+
+      // Close the JSON editor modal
+      const closeButton = sidebar.locator('button:has-text("Cancel"), button:has-text("Close")').first()
+      await closeButton.click()
+      console.log('  ✓ Closed JSON editor')
+
+      await testPage.waitForTimeout(500)
+
+      console.log('✅ URL filter test PASSED!')
+      console.log('  • Added URL filter with path pattern: /products/*')
+      console.log('  • Verified JSON payload contains urlFilter configuration')
+      console.log('  • Verified include array with pattern')
+      console.log('  • Verified matchType is set to path')
+      await debugWait()
+    })
+
     await testPage.evaluate(() => {
       console.log('\n🔄 STEP 8: Testing second VE launch')
     })
