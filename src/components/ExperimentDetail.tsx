@@ -196,20 +196,26 @@ export function ExperimentDetail({
       <Header
         title={titleContent}
         onBack={handleBack}
-        actions={actions}
       />
 
-      {/* Status badge */}
-      <div className="mb-4 flex items-center gap-2">
-        {loading && (
-          <div className="flex items-center text-sm text-gray-500">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-            Loading...
+      {/* Status badge and actions */}
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {loading && (
+            <div className="flex items-center text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+              Loading...
+            </div>
+          )}
+          <Badge variant={getExperimentStateBadgeVariant(experiment.state || experiment.status || 'created')}>
+            {getExperimentStateLabel(experiment.state || experiment.status || 'created')}
+          </Badge>
+        </div>
+        {!editingName && (
+          <div className="flex items-center gap-1">
+            {actions}
           </div>
         )}
-        <Badge variant={getExperimentStateBadgeVariant(experiment.state || experiment.status || 'created')}>
-          {getExperimentStateLabel(experiment.state || experiment.status || 'created')}
-        </Badge>
       </div>
 
       <div className="space-y-4">
