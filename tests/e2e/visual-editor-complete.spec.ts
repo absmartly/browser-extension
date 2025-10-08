@@ -133,24 +133,23 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     // Select Unit Type (required field) - now using SearchableSelect component
     console.log('  Selecting Unit Type...')
-    const unitTypeContainer = sidebar.locator('label:has-text("Unit Type")').locator('..')
-    const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
 
-    // Wait for loading to finish - the placeholder should not say "Loading..."
-    await unitTypeClickArea.waitFor({ state: 'visible', timeout: 2000 })
-    await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
+    // Wait for unit types to load (not showing "Loading...")
+    await sidebar.locator('[data-testid="unit-type-select"]').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 3000 })
     console.log('  ✓ Unit types loaded')
 
-    // Small wait to ensure component is ready
+    // Click the unit type select trigger
+    const unitTypeTrigger = sidebar.locator('[data-testid="unit-type-select-trigger"]')
+    await unitTypeTrigger.waitFor({ state: 'visible', timeout: 2000 })
+    await unitTypeTrigger.click({ timeout: 2000 })
+    console.log('  ✓ Clicked unit type trigger')
     await testPage.waitForTimeout(500)
 
-    await unitTypeClickArea.click({ timeout: 2000 })
-
-    // Small wait for dropdown to render
-    await testPage.waitForTimeout(300)
-
-    const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-    await unitTypeDropdown.waitFor({ state: 'visible', timeout: 2000 })
+    // Wait for dropdown to appear and click first option
+    // The dropdown is positioned absolutely, so it might be anywhere in the iframe
+    const unitTypeDropdown = sidebar.locator('[data-testid="unit-type-select-dropdown"]')
+    await unitTypeDropdown.waitFor({ state: 'visible', timeout: 3000 })
+    console.log('  ✓ Dropdown appeared')
 
     const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
     await firstUnitOption.waitFor({ state: 'visible', timeout: 2000 })
@@ -403,7 +402,92 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Edit HTML with CodeMirror works')
     await debugWait()
 
-      console.log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Edit HTML)')
+    // Action 5: Change image source
+    console.log('  Testing: Change image source on img element')
+
+    // First, add an image to the test page
+    await testPage.evaluate(() => {
+      const img = document.createElement('img')
+      img.id = 'test-image'
+      img.src = 'https://via.placeholder.com/150'
+      img.alt = 'Test image'
+      img.style.margin = '20px'
+      document.body.appendChild(img)
+    })
+    await testPage.waitForTimeout(500)
+    console.log('  ✓ Added test image to page')
+
+    // Click on the image to open context menu
+    await testPage.click('#test-image', { force: true })
+    await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
+    console.log('  ✓ Context menu opened for image')
+
+    // Verify "Change image source" option is present
+    const changeImageOption = testPage.locator('.menu-item:has-text("Change image source")')
+    await changeImageOption.waitFor({ state: 'visible', timeout: 2000 })
+    console.log('  ✓ "Change image source" option is visible')
+
+    // Click "Change image source"
+    await changeImageOption.click()
+    console.log('  ✓ Clicked "Change image source"')
+
+    // Wait for the image source dialog to appear
+    await testPage.locator('#absmartly-image-dialog-host').waitFor({ state: 'visible', timeout: 5000 })
+    console.log('  ✓ Image source dialog opened')
+
+    // Verify context menu is closed
+    const menuStillVisible = await testPage.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
+    expect(menuStillVisible).toBe(false)
+    console.log('  ✓ Context menu closed after opening image dialog')
+
+    // Enter a new image URL in the shadow DOM input
+    const newImageUrl = 'https://via.placeholder.com/200'
+    await testPage.evaluate((url) => {
+      const dialogHost = document.querySelector('#absmartly-image-dialog-host')
+      if (dialogHost?.shadowRoot) {
+        const input = dialogHost.shadowRoot.querySelector('input.dialog-input') as HTMLInputElement
+        if (input) {
+          input.value = url
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+      }
+    }, newImageUrl)
+    console.log(`  ✓ Entered new image URL: ${newImageUrl}`)
+
+    // Click the Apply button
+    await testPage.evaluate(() => {
+      const dialogHost = document.querySelector('#absmartly-image-dialog-host')
+      if (dialogHost?.shadowRoot) {
+        const applyButton = dialogHost.shadowRoot.querySelector('.dialog-button-apply') as HTMLButtonElement
+        if (applyButton) {
+          applyButton.click()
+        }
+      }
+    })
+    console.log('  ✓ Clicked Apply button')
+    await testPage.waitForTimeout(500)
+
+    // Verify the modal closed
+    const dialogStillVisible = await testPage.locator('#absmartly-image-dialog-host').isVisible({ timeout: 1000 }).catch(() => false)
+    expect(dialogStillVisible).toBe(false)
+    console.log('  ✓ Image source dialog closed after clicking Apply')
+
+    // CRITICAL TEST: Verify context menu did NOT reopen
+    const menuReopened = await testPage.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
+    expect(menuReopened).toBe(false)
+    console.log('  ✅ Context menu did NOT reopen (bug is fixed!)')
+
+    // Verify the image source was changed
+    const updatedSrc = await testPage.evaluate(() => {
+      const img = document.querySelector('#test-image') as HTMLImageElement
+      return img?.src
+    })
+    expect(updatedSrc).toBe(newImageUrl)
+    console.log(`  ✓ Image source updated to: ${updatedSrc}`)
+
+    await debugWait()
+
+      console.log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Edit HTML, Change Image Source)')
 
       // Verify the actual DOM changes were applied
       console.log('\n✓ Verifying DOM changes were actually applied...')

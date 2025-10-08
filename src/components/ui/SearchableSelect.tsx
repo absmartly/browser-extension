@@ -19,6 +19,7 @@ interface BaseSelectProps {
   renderSelectedOption?: (option: SearchableSelectOption, onRemove?: (e: React.MouseEvent) => void) => React.ReactNode
   showSearch?: boolean
   required?: boolean
+  'data-testid'?: string
 }
 
 interface SingleSelectProps extends BaseSelectProps {
@@ -46,7 +47,8 @@ export function SearchableSelect(props: SearchableSelectProps) {
     renderSelectedOption,
     showSearch = true,
     required = false,
-    mode
+    mode,
+    'data-testid': dataTestId
   } = props
 
   const [isOpen, setIsOpen] = useState(false)
@@ -186,7 +188,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
   }
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative" ref={containerRef} data-testid={dataTestId}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
@@ -197,6 +199,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
           disabled ? 'bg-gray-50 cursor-not-allowed' : ''
         }`}
         onClick={() => !disabled && !loading && setIsOpen(!isOpen)}
+        data-testid={dataTestId ? `${dataTestId}-trigger` : undefined}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2 flex-1">
@@ -227,7 +230,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
       </div>
 
       {isOpen && !loading && !disabled && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden" data-testid={dataTestId ? `${dataTestId}-dropdown` : undefined}>
           {showSearch && (
             <div className="p-2 border-b border-gray-200">
               <div className="relative">
