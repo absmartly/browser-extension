@@ -267,16 +267,30 @@ await testPage.click('#html-button')
 
 **Why**: React's synthetic event system in headless Chrome doesn't receive native click events properly. `dispatchEvent` creates DOM events that trigger React handlers correctly.
 
-### Step 5: Debug with Screenshots
+### Step 5: Debug with Screenshots and Slow Mode
 
-Take screenshots at key points to debug test failures:
+**Add `debugWait()` after each test step** for better visual inspection:
 
 ```typescript
+await test.step('Click button', async () => {
+  await sidebar.locator('[data-testid="save-button"]').evaluate(btn =>
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  )
+  console.log('  ✓ Clicked save button')
+  await debugWait() // Only waits if SLOW=1 - allows visual inspection
+})
+
+// Take screenshots at key points
 await testPage.screenshot({
-  path: 'test-results/feature-state.png',
+  path: 'test-results/after-save.png',
   fullPage: true
 })
-console.log('  📸 Screenshot saved: feature-state.png')
+console.log('  📸 Screenshot saved: after-save.png')
+```
+
+**Run in slow mode to see test execution**:
+```bash
+SLOW=1 npx playwright test tests/e2e/my-test.spec.ts --headed
 ```
 
 ## Common Helpers from test-helpers.ts
@@ -285,14 +299,17 @@ console.log('  📸 Screenshot saved: feature-state.png')
 // Inject sidebar iframe
 const sidebar = await injectSidebar(testPage, extensionUrl)
 
-// Wait in slow mode (for debugging)
-await debugWait(500) // only waits if SLOW=1 env var
+// Wait in slow mode (300ms default, does nothing if SLOW != 1)
+await debugWait()
+await debugWait(500) // Custom duration
 
 // Set up console logging
 const messages = setupConsoleLogging(testPage, (msg) =>
   msg.text.includes('[ABsmartly]')
 )
 ```
+
+**Best practice**: Add `await debugWait()` after every significant action (clicks, fills, waits) to make headed test execution more watchable.
 
 ## Running Tests
 
