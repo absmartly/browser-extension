@@ -158,4 +158,20 @@ export class ABsmartlyClient {
       throw error
     }
   }
+
+  /**
+   * Fetch a binary resource (like an image) with authentication
+   * Returns a Blob that can be used to create an object URL
+   */
+  async fetchBlob(url: string): Promise<Blob> {
+    try {
+      const response = await this.client.get(url, {
+        responseType: 'blob'
+      })
+      return response.data
+    } catch (error) {
+      debugError(`Failed to fetch blob from ${url}:`, error)
+      throw error
+    }
+  }
 }

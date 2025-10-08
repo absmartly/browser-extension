@@ -5,10 +5,13 @@ import type { Experiment } from '~src/types/absmartly'
 import { LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
 import { Header } from './Header'
 import { VariantList } from './VariantList'
+import type { Variant } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
 import { useExperimentVariants } from '~src/hooks/useExperimentVariants'
 import { useExperimentSave } from '~src/hooks/useExperimentSave'
+import { ExperimentCodeInjection } from './ExperimentCodeInjection'
+import type { ExperimentInjectionCode, URLFilter, DOMChangesData } from '~src/types/absmartly'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -123,6 +126,35 @@ export function ExperimentEditor({
       display_name: value,
       ...(namesSynced ? { name: titleToSnake(value) } : {})
     }))
+  }
+
+  // Helper functions for code injection
+  const extractInjectionCode = (variant: Variant): ExperimentInjectionCode | undefined => {
+    if (!variant || !variant.variables) return undefined
+    const injectHtml = variant.variables.__inject_html
+    if (!injectHtml) return undefined
+    return typeof injectHtml === 'string' ? JSON.parse(injectHtml) : injectHtml
+  }
+
+  const extractDomChangesUrlFilter = (variant: Variant): URLFilter | undefined => {
+    if (!variant) return undefined
+    const domChanges: DOMChangesData = variant.dom_changes
+    if (!domChanges || Array.isArray(domChanges)) return undefined
+    return domChanges.urlFilter
+  }
+
+  const handleInjectionCodeChange = (code: ExperimentInjectionCode) => {
+    const updatedVariants = [...currentVariants]
+    if (updatedVariants[0]) {
+      updatedVariants[0] = {
+        ...updatedVariants[0],
+        variables: {
+          ...updatedVariants[0].variables,
+          __inject_html: code
+        }
+      }
+      setCurrentVariants(updatedVariants)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -270,6 +302,18 @@ export function ExperimentEditor({
           canEdit={true}
           canAddRemove={true}
         />
+
+        {/* Code Injection Section - Only for control variant */}
+        {currentVariants.length > 0 && currentVariants[0] && (
+          <ExperimentCodeInjection
+            experimentId={experiment?.id || 0}
+            variantIndex={0}
+            initialCode={extractInjectionCode(currentVariants[0])}
+            domChangesUrlFilter={extractDomChangesUrlFilter(currentVariants[0])}
+            onChange={handleInjectionCodeChange}
+            canEdit={true}
+          />
+        )}
 
         {/* Submit Buttons */}
         <div className="pt-4 border-t">

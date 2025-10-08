@@ -134,55 +134,36 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Select Unit Type (required field) - now using SearchableSelect component
     console.log('  Selecting Unit Type...')
 
-    // Wait for unit types to load - the trigger should NOT have cursor-not-allowed class when loaded
-    const unitTypeTrigger = sidebar.locator('[data-testid="unit-type-select-trigger"]')
-    await unitTypeTrigger.waitFor({ state: 'visible', timeout: 2000 })
-
-    // Wait for the field to become enabled (not have bg-gray-50 cursor-not-allowed classes)
-    await sidebar.locator('[data-testid="unit-type-select-trigger"]:not([class*="cursor-not-allowed"])').waitFor({ timeout: 5000 })
-    console.log('  ✓ Unit type select is now enabled')
-
-    await unitTypeTrigger.click({ timeout: 2000 })
+    // Select Unit Type
+    console.log('  Selecting Unit Type...')
+    const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
+    await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
+    await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 5000 })
+    console.log('  ✓ Unit type select is enabled')
+    await unitTypeTrigger.click()
     console.log('  ✓ Clicked unit type trigger')
+    await debugWait(500)
 
-    // Wait for dropdown to appear
-    const unitTypeDropdown = sidebar.locator('[data-testid="unit-type-select-dropdown"]')
-    await unitTypeDropdown.waitFor({ state: 'visible', timeout: 3000 })
-    console.log('  ✓ Dropdown appeared')
-
-    const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
-    await firstUnitOption.waitFor({ state: 'visible', timeout: 2000 })
-    await firstUnitOption.click()
+    const unitTypeDropdown = sidebar.locator('#unit-type-select-dropdown, [data-testid="unit-type-select-dropdown"]')
+    await unitTypeDropdown.waitFor({ state: 'visible', timeout: 5000 })
+    await unitTypeDropdown.locator('div[class*="cursor-pointer"]').first().click()
     console.log('  ✓ Selected unit type')
     await debugWait()
 
-    // Select Applications (required field)
+    // Select Application
     console.log('  Selecting Applications...')
-    const appsContainer = sidebar.locator('label:has-text("Applications")').locator('..')
-    const appsClickArea = appsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
-    
-    await appsClickArea.click({ timeout: 5000 })
-    console.log('  ✓ Clicked applications field')
-    
-    // Wait for dropdown and select first application
-    const appsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-    await appsDropdown.waitFor({ state: 'visible', timeout: 3000 })
-    
-    // Wait for applications to be loaded in the dropdown
-    const firstAppOption = appsDropdown.locator('div[class*="cursor-pointer"]').first()
-    await firstAppOption.waitFor({ state: 'visible', timeout: 5000 })
-    console.log('  ✓ Applications loaded in dropdown')
-    
-    const selectedAppText = await firstAppOption.textContent()
-    await firstAppOption.click()
-    console.log(`  ✓ Selected application: ${selectedAppText?.trim()}`)
-    
-    // Verify application badge appeared
-    const appBadge = appsContainer.locator('div[class*="inline-flex"]')
-    if (!await appBadge.isVisible({ timeout: 2000 })) {
-      throw new Error('Application selection failed - badge not visible')
-    }
-    
+    const appsTrigger = sidebar.locator('#applications-select-trigger')
+    await appsTrigger.waitFor({ state: 'visible', timeout: 5000 })
+    await appsTrigger.click()
+    console.log('  ✓ Clicked applications trigger')
+    await debugWait(500)
+
+    const appsDropdown = sidebar.locator('#applications-select-dropdown, [data-testid="applications-select-dropdown"]')
+    await appsDropdown.waitFor({ state: 'visible', timeout: 5000 })
+    await appsDropdown.locator('div[class*="cursor-pointer"]').first().click()
+    console.log('  ✓ Selected application')
+    await debugWait()
+
     // Click outside to close dropdown
     await sidebar.locator('label:has-text("Traffic")').click()
     

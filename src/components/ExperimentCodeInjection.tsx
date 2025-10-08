@@ -26,8 +26,6 @@ export function ExperimentCodeInjection({
   canEdit,
   domChangesUrlFilter
 }: ExperimentCodeInjectionProps) {
-  console.log('[ExperimentCodeInjection] Rendered with canEdit:', canEdit, 'experimentId:', experimentId)
-
   const [isExpanded, setIsExpanded] = useState(false)
   const [code, setCode] = useState<ExperimentInjectionCode>(initialCode)
   const [editingSection, setEditingSection] = useState<InjectionSection | null>(null)
@@ -90,10 +88,21 @@ export function ExperimentCodeInjection({
   const codeCount = sections.filter(s => hasCode(s.key)).length
 
   const handleSectionClick = (section: InjectionSection) => {
-    console.log('[ExperimentCodeInjection] Section clicked:', section, 'canEdit:', canEdit)
     // Always allow opening the editor to view code, even in read-only mode
-    setEditingSection(section)
-    setTempValue(code[section] || '')
+    // If the same section is clicked again, temporarily close and reopen to trigger the effect
+    if (editingSection === section) {
+      // Store current code value before closing
+      const currentCode = code[section] || ''
+      setEditingSection(null)
+      // Use setTimeout to ensure the state update is processed before reopening
+      setTimeout(() => {
+        setEditingSection(section)
+        setTempValue(currentCode)
+      }, 0)
+    } else {
+      setEditingSection(section)
+      setTempValue(code[section] || '')
+    }
   }
 
   const handleSaveSection = () => {
