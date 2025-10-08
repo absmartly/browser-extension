@@ -91,6 +91,7 @@ export function ExperimentCodeInjection({
 
   const handleSectionClick = (section: InjectionSection) => {
     console.log('[ExperimentCodeInjection] Section clicked:', section, 'canEdit:', canEdit)
+    // Always allow opening the editor to view code, even in read-only mode
     setEditingSection(section)
     setTempValue(code[section] || '')
   }
@@ -457,12 +458,8 @@ export function ExperimentCodeInjection({
             {sections.map((section) => (
               <div
                 key={section.key}
-                onClick={() => canEdit && handleSectionClick(section.key)}
-                className={`border rounded-lg p-3 transition-colors ${
-                  canEdit
-                    ? 'cursor-pointer hover:bg-gray-50 border-gray-300'
-                    : 'cursor-not-allowed bg-gray-50 border-gray-200 opacity-60'
-                }`}
+                onClick={() => handleSectionClick(section.key)}
+                className="border rounded-lg p-3 transition-colors cursor-pointer hover:bg-gray-50 border-gray-300"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -512,6 +509,7 @@ export function ExperimentCodeInjection({
         value={tempValue}
         onChange={setTempValue}
         onSave={handleSaveSection}
+        readOnly={!canEdit}
       />
     </div>
   )
