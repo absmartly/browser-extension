@@ -205,15 +205,71 @@ test.describe('My Feature Tests', () => {
 })
 ```
 
-### Step 3: Implement Test Interactions
+### Step 3: Use Proper Test Selectors
+
+**IMPORTANT**: Avoid complex, fragile selectors. Use simple, stable selectors whenever possible.
+
+**Selector Priority** (best to worst):
+1. ✅ **data-testid attributes** - Most stable, purpose-built for testing
+2. ✅ **Semantic IDs** - `#experiment-name-input`, `#save-button`
+3. ✅ **ARIA labels** - `button[aria-label="Close"]`
+4. ⚠️ **Text content** - `button:has-text("Save")` (breaks with text changes)
+5. ❌ **CSS classes** - Fragile, can change with styling updates
+6. ❌ **Complex combinators** - `div.container > div:nth-child(2) > button`
+
+**When selectors are complex or fragile, ADD data-testid to the component code:**
+
+```typescript
+// ❌ BAD: Complex, fragile selector
+await sidebar.locator('div.flex.items-center > div > button.bg-blue-500').click()
+
+// ✅ GOOD: Add data-testid to component, then use it
+// In component code:
+<button data-testid="create-experiment-button" onClick={handleCreate}>
+  Create Experiment
+</button>
+
+// In test:
+await sidebar.locator('[data-testid="create-experiment-button"]').click()
+```
+
+**Examples of good test-friendly component patterns:**
+
+```tsx
+// Buttons
+<button data-testid="visual-editor-button">Visual Editor</button>
+<button data-testid="save-experiment-button">Save</button>
+
+// Inputs
+<input data-testid="experiment-name-input" placeholder="Experiment name" />
+
+// Dropdowns
+<div data-testid="unit-type-select-trigger" onClick={handleOpen}>
+  {selectedOption}
+</div>
+<div data-testid="unit-type-select-dropdown">
+  {options.map(opt => <div>{opt}</div>)}
+</div>
+
+// Preview toggles
+<button data-testid={`preview-toggle-variant-${variantId}`}>
+  Preview
+</button>
+```
+
+### Step 4: Implement Test Interactions
 
 #### Sidebar Interactions
 
 ```typescript
-// Click buttons
+// Click buttons (prefer data-testid)
+await sidebar.locator('[data-testid="visual-editor-button"]').click()
+// Fallback if no testid:
 await sidebar.locator('button:has-text("Visual Editor")').click()
 
 // Fill text inputs
+await sidebar.locator('[data-testid="experiment-name-input"]').fill('Test Name')
+// Fallback:
 await sidebar.locator('input[placeholder="Experiment name"]').fill('Test Name')
 
 // Select dropdowns
@@ -224,7 +280,7 @@ const title = await sidebar.locator('h1').textContent()
 expect(title).toContain('Experiments')
 
 // Scroll within sidebar
-await sidebar.locator('.some-element').scrollIntoViewIfNeeded()
+await sidebar.locator('[data-testid="some-section"]').scrollIntoViewIfNeeded()
 ```
 
 #### Page Interactions
@@ -278,30 +334,48 @@ await testPage.locator('.dialog-input').fill('https://example.com/image.jpg')
 await testPage.locator('.dialog-button-apply').click()
 ```
 
-### Step 4: Handle React Components in Headless Mode
+### Step 4: Use dispatchEvent for React Components
 
-React event handlers sometimes don't fire with regular clicks in headless mode. Use `dispatchEvent`:
+**IMPORTANT**: Playwright's `.click()` method does NOT work reliably with React components in headless mode. Regular HTML elements work fine, but React event handlers often don't execute.
+
+**Why `.click()` fails for React components in headless mode**:
+- Headless Chrome handles mouse events differently than headed mode
+- React's synthetic event system may not properly receive native browser events
+- Event handlers attached via `onClick` may not fire
+- The visual click happens but React handlers don't execute
+
+**Solution**: Use `dispatchEvent` with `evaluate()` for React components:
 
 ```typescript
-// Standard approach (may not work in headless)
+// ❌ DON'T: Regular .click() fails for React components in headless
 await sidebar.locator('button:has-text("Create")').click()
 
-// Reliable approach for React components
+// ✅ DO: Use dispatchEvent for React components
 await sidebar.locator('button:has-text("Create")').evaluate((button) => {
   button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
 })
 
-// Also works for page elements
-await testPage.locator('#react-button').evaluate((btn) => {
-  btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-})
+// Regular HTML elements work fine with .click()
+await testPage.click('#html-button') // ✅ OK for plain HTML
 ```
 
 **When to use `dispatchEvent`**:
-- ✅ React components in sidebar
-- ✅ Components in create/edit forms
-- ✅ Dropdown triggers and menu items
-- ✅ When regular `.click()` fails silently in headless mode
+- ✅ ALL React components in sidebar
+- ✅ Buttons and clickable elements in React forms
+- ✅ Custom React dropdowns and menu items
+- ✅ Any component with `onClick` handlers in JSX
+- ❌ NOT needed for plain HTML elements in test pages
+
+**When you can use regular `.click()`**:
+- ✅ Plain HTML buttons/links without React handlers
+- ✅ Visual editor elements (context menu, banner) - not React
+- ✅ Test page HTML elements with inline `onclick` attributes
+
+**Why `dispatchEvent` works for React**:
+- Creates a proper DOM event that bubbles through the tree
+- Triggers React's synthetic event system correctly
+- Works identically in headed and headless modes
+- Ensures React event handlers execute reliably
 
 ### Step 5: Debug with Screenshots and Logging
 
@@ -570,23 +644,28 @@ for (let i = 0; i < 3; i++) {
 
 ### ✅ DO
 
-- Use test.step() to organize tests into logical sections
-- Add console.log statements to track test progress
-- Take screenshots at key points
-- Use descriptive variable names
-- Add comments explaining complex interactions
-- Use debugWait() for visual inspection during development
+- Use `test.step()` to organize tests into logical sections
+- Add `console.log` statements to track test progress
+- Take screenshots at key points for debugging
+- Use descriptive variable names and add comments
+- Use `debugWait()` for visual inspection during development
 - Verify both UI state and DOM state
 - Test both happy paths and edge cases
+- **Prefer `data-testid` selectors for stability**
+- **Add `data-testid` to components when selectors get complex**
+- Use `dispatchEvent` for all React component clicks
+- Use explicit waits (`waitFor`, `waitForFunction`) instead of arbitrary timeouts
 
 ### ❌ DON'T
 
-- Use arbitrary timeouts (`await page.waitForTimeout(5000)`) - use explicit waits instead
-- Skip test cleanup (always close pages in afterEach)
+- Use complex CSS selectors like `div.container > div:nth-child(2) > button`
+- Use arbitrary timeouts (`await page.waitForTimeout(5000)`)
+- Skip test cleanup (always close pages in `afterEach`)
 - Test without the query param `use_shadow_dom_for_visual_editor_context_menu=0`
-- Assume element exists without waiting
-- Use .click() for React components without trying dispatchEvent first
+- Assume elements exist without waiting
+- Use `.click()` for React components (use `dispatchEvent` instead)
 - Write tests that depend on specific timing (make them deterministic)
+- Rely on CSS class names for selectors (they change frequently)
 
 ## Reference Test
 
@@ -616,7 +695,9 @@ When creating a new E2E test:
 - [ ] Set up console logging with `setupConsoleLogging()`
 - [ ] Use `injectSidebar()` helper
 - [ ] Use `test.step()` for organization
-- [ ] Use `dispatchEvent` for React components
+- [ ] **Use stable selectors (`data-testid` preferred)**
+- [ ] **Add `data-testid` to components if selectors are complex**
+- [ ] Use `dispatchEvent` for React component clicks
 - [ ] Add screenshots for debugging
 - [ ] Use `debugWait()` for visual inspection
 - [ ] Add proper waits (no arbitrary timeouts)

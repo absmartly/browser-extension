@@ -174,29 +174,55 @@ test.describe('My Feature Tests', () => {
 })
 ```
 
-### Step 3: Key Testing Patterns
+### Step 3: Use Proper Test Selectors
+
+**Avoid complex, fragile selectors. Use stable selectors or add data-testid to components.**
+
+**Selector priority** (best to worst):
+1. ✅ `data-testid` attributes (most stable)
+2. ✅ Semantic IDs (`#save-button`)
+3. ✅ ARIA labels (`button[aria-label="Close"]`)
+4. ⚠️ Text content (`button:has-text("Save")`)
+5. ❌ CSS classes (fragile)
+6. ❌ Complex combinators (very fragile)
+
+**When selectors get complex, ADD data-testid to the component:**
+
+```tsx
+// ❌ BAD: Fragile selector
+await sidebar.locator('div.flex > div > button.bg-blue-500').click()
+
+// ✅ GOOD: Add data-testid to component
+<button data-testid="create-button" onClick={handleCreate}>Create</button>
+
+// Then use in test:
+await sidebar.locator('[data-testid="create-button"]').click()
+```
+
+### Step 4: Key Testing Patterns
 
 **Interacting with sidebar elements:**
 ```typescript
-// Click buttons in sidebar
+// Prefer data-testid when available
+await sidebar.locator('[data-testid="visual-editor-button"]').click()
+
+// Fallback to text content
 await sidebar.locator('button:has-text("Visual Editor")').click()
 
-// Fill inputs in sidebar
-await sidebar.locator('input[placeholder="Experiment name"]').fill('Test Experiment')
+// Fill inputs
+await sidebar.locator('[data-testid="experiment-name-input"]').fill('Test')
 
-// Select dropdown options in sidebar
+// Select dropdowns
 await sidebar.locator('select[name="unitType"]').selectOption('user')
 ```
 
 **Interacting with page elements:**
 ```typescript
-// Click elements on test page
+// Use IDs for test page elements
 await testPage.click('#test-button')
-
-// Type in page elements
 await testPage.fill('#test-input', 'test value')
 
-// Verify page content
+// Verify content
 const text = await testPage.textContent('#test-paragraph')
 expect(text).toBe('Expected text')
 ```
@@ -215,14 +241,31 @@ await testPage.locator('[data-action="exit"]').click()
 
 ### Step 4: Use dispatchEvent for React Components
 
-In headless mode, React handlers sometimes don't fire with regular clicks. Use `dispatchEvent`:
+**IMPORTANT**: Playwright's `.click()` does NOT work reliably with React components in headless mode. Regular HTML works fine, but React event handlers often don't fire.
 
 ```typescript
-// Use dispatchEvent for React buttons in headless mode
+// ❌ DON'T: Regular .click() fails for React components in headless
+await sidebar.locator('button:has-text("Create")').click()
+
+// ✅ DO: Use dispatchEvent for React components
 await sidebar.locator('button:has-text("Create")').evaluate((button) => {
   button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
 })
+
+// ✅ OK: Regular .click() works fine for plain HTML
+await testPage.click('#html-button')
 ```
+
+**When to use dispatchEvent**:
+- ✅ ALL React components in sidebar (buttons, dropdowns, etc.)
+- ✅ Any element with `onClick` JSX handlers
+- ❌ NOT needed for plain HTML elements in test pages
+
+**When regular .click() works**:
+- ✅ Plain HTML elements without React
+- ✅ Visual editor UI (not React components)
+
+**Why**: React's synthetic event system in headless Chrome doesn't receive native click events properly. `dispatchEvent` creates DOM events that trigger React handlers correctly.
 
 ### Step 5: Debug with Screenshots
 
@@ -275,10 +318,11 @@ SLOW=1 npx playwright test tests/e2e/my-feature.spec.ts --headed
 1. ✅ **Always use HTML test page + sidebar iframe pattern**
 2. ✅ **Always add `?use_shadow_dom_for_visual_editor_context_menu=0` query param**
 3. ✅ **Set `__absmartlyTestMode = true` in page context**
-4. ✅ **Use `dispatchEvent` for React components in headless mode**
-5. ✅ **No need to mock chrome.runtime** - automatic polyfilling via postMessage
-6. ✅ **Take screenshots for debugging**
-7. ✅ **Use test.step() for clear test organization**
+4. ✅ **Use `dispatchEvent` for React components** - `.click()` fails for React in headless mode
+5. ✅ **Prefer `data-testid` selectors** - add them to components when needed
+6. ✅ **No need to mock chrome.runtime** - automatic polyfilling via postMessage
+7. ✅ **Take screenshots for debugging**
+8. ✅ **Use test.step() for clear test organization**
 
 ## Example: Full Reference Test
 
