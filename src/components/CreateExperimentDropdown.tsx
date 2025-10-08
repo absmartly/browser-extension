@@ -87,9 +87,23 @@ export function CreateExperimentDropdownPanel({
   )
 
   const getAvatarUrl = (user: Template['created_by']) => {
-    if (!user?.avatar?.base_url || !config?.apiEndpoint) return null
+    if (!user?.avatar?.base_url || !config?.apiEndpoint) {
+      console.log('[CreateExperimentDropdownPanel] Avatar URL skipped:', {
+        hasUser: !!user,
+        hasAvatar: !!user?.avatar,
+        hasBaseUrl: !!user?.avatar?.base_url,
+        baseUrl: user?.avatar?.base_url,
+        hasConfig: !!config,
+        hasApiEndpoint: !!config?.apiEndpoint,
+        apiEndpoint: config?.apiEndpoint,
+        configKeys: config ? Object.keys(config) : []
+      })
+      return null
+    }
     const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-    return `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
+    const avatarUrl = `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
+    console.log('[CreateExperimentDropdownPanel] Generated avatar URL:', avatarUrl)
+    return avatarUrl
   }
 
   const getUserName = (user: Template['created_by']) => {
