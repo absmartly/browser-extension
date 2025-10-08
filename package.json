@@ -2,7 +2,7 @@
   "name": "absmartly-browser-extension",
   "displayName": "ABsmartly Browser Extension",
   "version": "0.0.1",
-  "description": "Visual A/B testing browser extension for ABsmartly. Create and manage DOM-based experiments with an intuitive visual editor - no coding required. Features drag & drop element editing, real-time preview, experiment override management, and seamless integration with the ABsmartly experimentation platform.",
+  "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
   "author": "Jonas Alves",
   "scripts": {
     "dev": "plasmo dev --src-path=. & node scripts/dev-build.js --watch",
