@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { PlusCircleIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline"
 import { useABsmartly } from "~src/hooks/useABsmartly"
+import { fetchAuthenticatedImage } from "~src/utils/fetch-authenticated-image"
 
 interface CreateExperimentDropdownProps {
   onCreateFromScratch: () => void
@@ -98,35 +99,11 @@ export function CreateExperimentDropdownPanel({
         // Skip if already fetched or failed
         if (avatarBlobUrls.has(avatarUrl) || failedImages.has(avatarUrl)) continue
 
-        try {
-          // Prepare fetch options based on auth method
-          const fetchOptions: RequestInit = {}
+        const blobUrl = await fetchAuthenticatedImage(avatarUrl, config)
 
-          if (config.authMethod === 'jwt') {
-            // Use cookies for JWT authentication
-            fetchOptions.credentials = 'include'
-          } else if (config.authMethod === 'apikey' && config.apiKey) {
-            // Use Authorization header for API key
-            const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-              ? `JWT ${config.apiKey}`
-              : `Api-Key ${config.apiKey}`
-            fetchOptions.headers = {
-              'Authorization': authHeader
-            }
-          }
-
-          const response = await fetch(avatarUrl, fetchOptions)
-
-          if (response.ok) {
-            const blob = await response.blob()
-            const blobUrl = URL.createObjectURL(blob)
-            setAvatarBlobUrls(prev => new Map(prev).set(avatarUrl, blobUrl))
-          } else {
-            console.warn('[CreateExperimentDropdownPanel] Avatar fetch failed:', response.status, avatarUrl)
-            setFailedImages(prev => new Set(prev).add(avatarUrl))
-          }
-        } catch (error) {
-          console.error('[CreateExperimentDropdownPanel] Avatar fetch error:', error)
+        if (blobUrl) {
+          setAvatarBlobUrls(prev => new Map(prev).set(avatarUrl, blobUrl))
+        } else {
           setFailedImages(prev => new Set(prev).add(avatarUrl))
         }
       }
