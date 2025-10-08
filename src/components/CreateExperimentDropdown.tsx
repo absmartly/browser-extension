@@ -85,7 +85,7 @@ export function CreateExperimentDropdownPanel({
 
   // Fetch authenticated avatar images and convert to blob URLs
   useEffect(() => {
-    if (!isOpen || !config?.apiKey) return
+    if (!isOpen || !config) return
 
     const fetchAvatars = async () => {
       for (const template of templates) {
@@ -99,11 +99,23 @@ export function CreateExperimentDropdownPanel({
         if (avatarBlobUrls.has(avatarUrl) || failedImages.has(avatarUrl)) continue
 
         try {
-          const response = await fetch(avatarUrl, {
-            headers: {
-              'Authorization': `Bearer ${config.apiKey}`
+          // Prepare fetch options based on auth method
+          const fetchOptions: RequestInit = {}
+
+          if (config.authMethod === 'jwt') {
+            // Use cookies for JWT authentication
+            fetchOptions.credentials = 'include'
+          } else if (config.authMethod === 'apikey' && config.apiKey) {
+            // Use Authorization header for API key
+            const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+              ? `JWT ${config.apiKey}`
+              : `Api-Key ${config.apiKey}`
+            fetchOptions.headers = {
+              'Authorization': authHeader
             }
-          })
+          }
+
+          const response = await fetch(avatarUrl, fetchOptions)
 
           if (response.ok) {
             const blob = await response.blob()
