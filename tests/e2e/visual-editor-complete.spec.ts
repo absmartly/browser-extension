@@ -134,19 +134,18 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Select Unit Type (required field) - now using SearchableSelect component
     console.log('  Selecting Unit Type...')
 
-    // Wait for unit types to load (not showing "Loading...")
-    await sidebar.locator('[data-testid="unit-type-select"]').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 3000 })
-    console.log('  ✓ Unit types loaded')
-
-    // Click the unit type select trigger
+    // Wait for unit types to load - the trigger should NOT have cursor-not-allowed class when loaded
     const unitTypeTrigger = sidebar.locator('[data-testid="unit-type-select-trigger"]')
     await unitTypeTrigger.waitFor({ state: 'visible', timeout: 2000 })
+
+    // Wait for the field to become enabled (not have bg-gray-50 cursor-not-allowed classes)
+    await sidebar.locator('[data-testid="unit-type-select-trigger"]:not([class*="cursor-not-allowed"])').waitFor({ timeout: 5000 })
+    console.log('  ✓ Unit type select is now enabled')
+
     await unitTypeTrigger.click({ timeout: 2000 })
     console.log('  ✓ Clicked unit type trigger')
-    await testPage.waitForTimeout(500)
 
-    // Wait for dropdown to appear and click first option
-    // The dropdown is positioned absolutely, so it might be anywhere in the iframe
+    // Wait for dropdown to appear
     const unitTypeDropdown = sidebar.locator('[data-testid="unit-type-select-dropdown"]')
     await unitTypeDropdown.waitFor({ state: 'visible', timeout: 3000 })
     console.log('  ✓ Dropdown appeared')
