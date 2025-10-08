@@ -11,6 +11,7 @@ interface CustomCodeEditorProps {
   value: string
   onChange: (value: string) => void
   onSave: () => void
+  readOnly?: boolean
 }
 
 export function CustomCodeEditor({
@@ -19,7 +20,8 @@ export function CustomCodeEditor({
   section,
   value,
   onChange,
-  onSave
+  onSave,
+  readOnly = false
 }: CustomCodeEditorProps) {
   // Use refs to maintain stable references to callbacks
   const onChangeRef = useRef(onChange)
@@ -34,29 +36,56 @@ export function CustomCodeEditor({
   }, [onChange, onSave, onClose])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      debugLog('CustomCodeEditor: isOpen is false, not opening')
+      return
+    }
 
-    debugLog('Opening code editor for section:', section, 'with value:', value)
-    
-    // Send message to content script to open the editor in the main page
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'OPEN_CODE_EDITOR',
-          data: {
-            section,
-            value,
-            sectionTitle: getSectionTitle(section),
-            placeholder: getPlaceholder(section)
-          }
-        })
-      }
-    })
+    debugLog('CustomCodeEditor: Opening code editor for section:', section, 'with value length:', value?.length || 0)
+    console.log('[CustomCodeEditor] Effect running - isOpen:', isOpen, 'section:', section, 'value:', value?.substring(0, 50))
 
-    // Listen for messages from the background script (forwarded from content script)
+    // Detect if we're in an iframe (test mode)
+    const isInIframe = window.self !== window.top
+
+    if (isInIframe) {
+      // Test/iframe mode: use postMessage to communicate with parent page
+      debugLog('CustomCodeEditor: Using iframe postMessage mode')
+      console.log('[CustomCodeEditor] Sending OPEN_CODE_EDITOR to parent window')
+      window.parent.postMessage({
+        source: 'absmartly-sidebar',
+        type: 'OPEN_CODE_EDITOR',
+        data: {
+          section,
+          value,
+          sectionTitle: getSectionTitle(section),
+          placeholder: getPlaceholder(section),
+          readOnly
+        }
+      }, '*')
+      console.log('[CustomCodeEditor] Message sent')
+    } else {
+      // Production mode: use chrome.tabs API
+      debugLog('CustomCodeEditor: Using chrome.tabs API mode')
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'OPEN_CODE_EDITOR',
+            data: {
+              section,
+              value,
+              sectionTitle: getSectionTitle(section),
+              placeholder: getPlaceholder(section),
+              readOnly
+            }
+          })
+        }
+      })
+    }
+
+    // Listen for messages from the background script or parent window
     const handleMessage = (message: any) => {
       debugLog('CustomCodeEditor received message:', message)
-      
+
       if (message.type === 'CODE_EDITOR_SAVE') {
         debugLog('Saving value:', message.value)
         // Use the ref values to ensure we have the latest callbacks
@@ -68,18 +97,38 @@ export function CustomCodeEditor({
       }
     }
 
-    chrome.runtime.onMessage.addListener(handleMessage)
+    const handleWindowMessage = (event: MessageEvent) => {
+      // Only handle messages from the parent window (in iframe mode)
+      if (event.data?.source === 'absmartly-content-script') {
+        handleMessage(event.data)
+      }
+    }
+
+    if (isInIframe) {
+      window.addEventListener('message', handleWindowMessage)
+    } else {
+      chrome.runtime.onMessage.addListener(handleMessage)
+    }
 
     return () => {
-      chrome.runtime.onMessage.removeListener(handleMessage)
-      // Tell content script to close the editor
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'CLOSE_CODE_EDITOR'
-          })
-        }
-      })
+      if (isInIframe) {
+        window.removeEventListener('message', handleWindowMessage)
+        // Tell content script to close the editor
+        window.parent.postMessage({
+          source: 'absmartly-sidebar',
+          type: 'CLOSE_CODE_EDITOR'
+        }, '*')
+      } else {
+        chrome.runtime.onMessage.removeListener(handleMessage)
+        // Tell content script to close the editor
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: 'CLOSE_CODE_EDITOR'
+            })
+          }
+        })
+      }
     }
   }, [isOpen, section, value]) // Only re-run when these change
 

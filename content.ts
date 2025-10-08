@@ -6,6 +6,10 @@ import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { initializeOverrides } from '~src/utils/overrides'
+import { EditorView, basicSetup } from 'codemirror'
+import { EditorState } from '@codemirror/state'
+import { html } from '@codemirror/lang-html'
+import { oneDark } from '@codemirror/theme-one-dark'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -421,8 +425,40 @@ window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '
 
 // Listen for messages from the visual editor and test messages
 window.addEventListener('message', (event) => {
-  // Only handle messages from the same origin
-  if (event.source !== window) return
+  // Get sidebar iframe reference
+  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
+  // Only handle messages from:
+  // 1. The same window (visual editor, tests)
+  // 2. The sidebar iframe (when in test mode)
+  if (event.source !== window && (!sidebarIframe || event.source !== sidebarIframe.contentWindow)) {
+    return
+  }
+
+  // Handle messages from sidebar iframe
+  if (event.data?.source === 'absmartly-sidebar') {
+    console.log('[Content Script] Received message from sidebar iframe:', event.data.type, event.data)
+    debugLog('[Content Script] Received message from sidebar iframe:', event.data.type)
+
+    if (event.data.type === 'OPEN_CODE_EDITOR') {
+      console.log('[Content Script] Opening code editor with data:', event.data.data)
+      openCodeEditor(event.data.data)
+      // Send confirmation back to sidebar
+      if (sidebarIframe && sidebarIframe.contentWindow) {
+        console.log('[Content Script] Sending confirmation back to sidebar')
+        sidebarIframe.contentWindow.postMessage({
+          source: 'absmartly-content-script',
+          type: 'CODE_EDITOR_OPENED'
+        }, '*')
+      }
+      return
+    }
+
+    if (event.data.type === 'CLOSE_CODE_EDITOR') {
+      closeCodeEditor()
+      return
+    }
+  }
 
   // Handle test messages for programmatic sidebar control
   if (event.data.source === 'absmartly-tests') {
@@ -806,15 +842,19 @@ document.addEventListener('absmartly-test', (event: any) => {
 
 // Code editor functionality
 let codeEditorContainer: HTMLDivElement | null = null
+let codeEditorView: EditorView | null = null
 
 function openCodeEditor(data: {
   section: string
   value: string
   sectionTitle: string
   placeholder: string
+  readOnly?: boolean
 }) {
+  console.log('[openCodeEditor] Function called with:', { section: data.section, valueLength: data.value?.length, timestamp: Date.now() })
   // Remove any existing editor
   closeCodeEditor()
+  console.log('[openCodeEditor] After closeCodeEditor, now creating new container')
 
   // Create the editor container
   codeEditorContainer = document.createElement('div')
@@ -884,7 +924,7 @@ function openCodeEditor(data: {
   closeBtn.onmouseover = () => closeBtn.style.backgroundColor = '#f3f4f6'
   closeBtn.onmouseout = () => closeBtn.style.backgroundColor = 'transparent'
   closeBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
+    sendMessageToExtension({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -898,31 +938,43 @@ function openCodeEditor(data: {
     padding: 16px !important;
     overflow: hidden !important;
     background: #f9fafb !important;
+    display: flex !important;
+    flex-direction: column !important;
   `
 
-  // Create textarea
-  const textarea = document.createElement('textarea')
-  textarea.value = data.value || ''
-  textarea.placeholder = data.placeholder
-  textarea.style.cssText = `
-    width: 100% !important;
-    height: 100% !important;
-    padding: 16px !important;
-    background: #1f2937 !important;
-    color: #f3f4f6 !important;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-    font-size: 14px !important;
-    line-height: 1.5 !important;
-    border: none !important;
+  // Create CodeMirror wrapper
+  const editorWrapper = document.createElement('div')
+  editorWrapper.style.cssText = `
+    flex: 1 !important;
+    overflow: auto !important;
     border-radius: 6px !important;
-    resize: none !important;
-    outline: none !important;
-    tab-size: 2 !important;
-    box-sizing: border-box !important;
+    background: #1f2937 !important;
   `
-  textarea.spellcheck = false
 
-  editorContainer.appendChild(textarea)
+  // Initialize CodeMirror editor
+  const extensions = [
+    basicSetup,
+    html(),
+    oneDark,
+    EditorView.lineWrapping,
+  ]
+
+  // Add readOnly extension if needed
+  if (data.readOnly) {
+    extensions.push(EditorState.readOnly.of(true))
+  }
+
+  const startState = EditorState.create({
+    doc: data.value || '',
+    extensions
+  })
+
+  codeEditorView = new EditorView({
+    state: startState,
+    parent: editorWrapper
+  })
+
+  editorContainer.appendChild(editorWrapper)
 
   // Create footer
   const footer = document.createElement('div')
@@ -948,40 +1000,45 @@ function openCodeEditor(data: {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
     transition: all 0.2s !important;
   `
-  cancelBtn.textContent = 'Cancel'
+  cancelBtn.textContent = data.readOnly ? 'Close' : 'Cancel'
   cancelBtn.onmouseover = () => cancelBtn.style.backgroundColor = '#f9fafb'
   cancelBtn.onmouseout = () => cancelBtn.style.backgroundColor = 'white'
   cancelBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
-    closeCodeEditor()
-  }
-
-  const saveBtn = document.createElement('button')
-  saveBtn.style.cssText = `
-    padding: 8px 16px !important;
-    background: #3b82f6 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 6px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-    transition: all 0.2s !important;
-  `
-  saveBtn.textContent = 'Save'
-  saveBtn.onmouseover = () => saveBtn.style.backgroundColor = '#2563eb'
-  saveBtn.onmouseout = () => saveBtn.style.backgroundColor = '#3b82f6'
-  saveBtn.onclick = () => {
-    chrome.runtime.sendMessage({ 
-      type: 'CODE_EDITOR_SAVE',
-      value: textarea.value
-    })
+    sendMessageToExtension({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
   footer.appendChild(cancelBtn)
-  footer.appendChild(saveBtn)
+
+  // Only show Save button if not in read-only mode
+  if (!data.readOnly) {
+    const saveBtn = document.createElement('button')
+    saveBtn.style.cssText = `
+      padding: 8px 16px !important;
+      background: #3b82f6 !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 6px !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      cursor: pointer !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      transition: all 0.2s !important;
+    `
+    saveBtn.textContent = 'Save'
+    saveBtn.onmouseover = () => saveBtn.style.backgroundColor = '#2563eb'
+    saveBtn.onmouseout = () => saveBtn.style.backgroundColor = '#3b82f6'
+    saveBtn.onclick = () => {
+      const value = codeEditorView?.state.doc.toString() || ''
+      sendMessageToExtension({
+        type: 'CODE_EDITOR_SAVE',
+        value
+      })
+      closeCodeEditor()
+    }
+
+    footer.appendChild(saveBtn)
+  }
 
   // Assemble the modal
   modal.appendChild(header)
@@ -992,14 +1049,19 @@ function openCodeEditor(data: {
   // Add to page
   document.body.appendChild(codeEditorContainer)
 
-  // Focus the textarea
-  textarea.focus()
+  // Focus the editor
+  codeEditorView.focus()
 
   // Prevent body scroll
   document.body.style.overflow = 'hidden'
 }
 
 function closeCodeEditor() {
+  console.log('[closeCodeEditor] Function called, container exists:', !!codeEditorContainer, 'view exists:', !!codeEditorView)
+  if (codeEditorView) {
+    codeEditorView.destroy()
+    codeEditorView = null
+  }
   if (codeEditorContainer) {
     codeEditorContainer.remove()
     codeEditorContainer = null
