@@ -8,12 +8,16 @@ import type { Experiment } from '~src/types/absmartly'
 import { Header } from './Header'
 import { CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { VariantList } from './VariantList'
+import type { Variant } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
 import { getConfig } from '~src/utils/storage'
 import { useExperimentVariants } from '~src/hooks/useExperimentVariants'
 import { useExperimentSave } from '~src/hooks/useExperimentSave'
 import { ExperimentActions } from './ExperimentDetail/ExperimentActions'
 import { getExperimentStateLabel, getExperimentStateBadgeVariant } from '~src/utils/experiment-state'
+import { ExperimentCodeInjection } from './ExperimentCodeInjection'
+import type { ExperimentInjectionCode } from '~src/types/absmartly'
+import type { URLFilter, DOMChangesData } from '~src/types/dom-changes'
 
 const storage = new Storage({ area: "local" })
 
@@ -107,7 +111,34 @@ export function ExperimentDetail({
     await save(formData, currentVariants, onUpdate)
   }
 
+  // Helper functions for code injection
+  const extractInjectionCode = (variant: Variant): ExperimentInjectionCode | undefined => {
+    if (!variant || !variant.variables) return undefined
+    const injectHtml = variant.variables.__inject_html
+    if (!injectHtml) return undefined
+    return typeof injectHtml === 'string' ? JSON.parse(injectHtml) : injectHtml
+  }
 
+  const extractDomChangesUrlFilter = (variant: Variant): URLFilter | undefined => {
+    if (!variant) return undefined
+    const domChanges: DOMChangesData = variant.dom_changes
+    if (!domChanges || Array.isArray(domChanges)) return undefined
+    return domChanges.urlFilter
+  }
+
+  const handleInjectionCodeChange = (code: ExperimentInjectionCode) => {
+    const updatedVariants = [...currentVariants]
+    if (updatedVariants[0]) {
+      updatedVariants[0] = {
+        ...updatedVariants[0],
+        variables: {
+          ...updatedVariants[0].variables,
+          __inject_html: code
+        }
+      }
+      handleVariantsChange(updatedVariants, true)
+    }
+  }
 
   const canAddVariants = experiment.state !== 'running' &&
                          experiment.state !== 'development' &&
@@ -260,6 +291,22 @@ export function ExperimentDetail({
             canAddRemove={canAddVariants}
           />
         )}
+
+        {/* Code Injection Section - Only for control variant */}
+        {currentVariants.length > 0 && currentVariants[0] && (() => {
+          const canEditValue = experiment.state !== 'running' && experiment.state !== 'development'
+          console.log('[ExperimentDetail] Rendering CodeInjection - Experiment state:', experiment.state, 'canEdit:', canEditValue)
+          return (
+            <ExperimentCodeInjection
+              experimentId={experiment.id}
+              variantIndex={0}
+              initialCode={extractInjectionCode(currentVariants[0])}
+              domChangesUrlFilter={extractDomChangesUrlFilter(currentVariants[0])}
+              onChange={handleInjectionCodeChange}
+              canEdit={canEditValue}
+            />
+          )
+        })()}
 
         {/* Warning for running/development experiments */}
         {(experiment.state === 'running' || experiment.state === 'development') && (

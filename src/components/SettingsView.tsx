@@ -3,7 +3,6 @@ import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
-import { CustomCodeSettings } from './CustomCodeSettings'
 import { Header } from './Header'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
@@ -544,12 +543,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         )}
       </div>
 
-      {/* Custom Code Settings */}
-      <CustomCodeSettings onSave={() => {
-        // Optionally trigger a refresh or notification
-        debugLog('Custom code saved')
-      }} />
-      
       <div className="flex gap-2 pt-2">
         <Button onClick={handleSave} variant="primary">
           Save Settings

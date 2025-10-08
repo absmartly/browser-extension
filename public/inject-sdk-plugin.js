@@ -811,6 +811,197 @@
     }
   }
 
+  /**
+   * Helper function to check if current URL matches the filter
+   * Returns true if URL matches or if no filter is specified
+   */
+  function matchesUrlFilter(urlFilter) {
+    if (!urlFilter) return true; // No filter means apply on all pages
+
+    const currentUrl = window.location.href;
+    const currentPath = window.location.pathname;
+    const currentDomain = window.location.hostname;
+    const currentQuery = window.location.search;
+    const currentHash = window.location.hash;
+
+    // Determine what to match against
+    let matchTarget;
+    const matchType = (typeof urlFilter === 'object' && !Array.isArray(urlFilter))
+      ? urlFilter.matchType || 'path'
+      : 'path';
+
+    switch (matchType) {
+      case 'full-url':
+        matchTarget = currentUrl;
+        break;
+      case 'domain':
+        matchTarget = currentDomain;
+        break;
+      case 'query':
+        matchTarget = currentQuery;
+        break;
+      case 'hash':
+        matchTarget = currentHash;
+        break;
+      case 'path':
+      default:
+        matchTarget = currentPath;
+    }
+
+    // Get patterns
+    let includePatterns = [];
+    let excludePatterns = [];
+    let isRegex = false;
+
+    if (typeof urlFilter === 'string') {
+      includePatterns = [urlFilter];
+    } else if (Array.isArray(urlFilter)) {
+      includePatterns = urlFilter;
+    } else {
+      includePatterns = urlFilter.include || [];
+      excludePatterns = urlFilter.exclude || [];
+      isRegex = urlFilter.mode === 'regex';
+    }
+
+    // Check exclude patterns first
+    if (excludePatterns.length > 0) {
+      for (const pattern of excludePatterns) {
+        if (isRegex) {
+          try {
+            const regex = new RegExp(pattern);
+            if (regex.test(matchTarget)) {
+              debugLog(`[ABsmartly Extension] URL excluded by pattern: ${pattern}`);
+              return false;
+            }
+          } catch (e) {
+            debugWarn(`[ABsmartly Extension] Invalid regex pattern: ${pattern}`, e);
+          }
+        } else {
+          // Simple wildcard matching
+          const regexPattern = pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
+          const regex = new RegExp(`^${regexPattern}$`);
+          if (regex.test(matchTarget)) {
+            debugLog(`[ABsmartly Extension] URL excluded by pattern: ${pattern}`);
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check include patterns
+    if (includePatterns.length === 0) {
+      return true; // No include patterns means include all (that aren't excluded)
+    }
+
+    for (const pattern of includePatterns) {
+      if (isRegex) {
+        try {
+          const regex = new RegExp(pattern);
+          if (regex.test(matchTarget)) {
+            debugLog(`[ABsmartly Extension] URL matched by pattern: ${pattern}`);
+            return true;
+          }
+        } catch (e) {
+          debugWarn(`[ABsmartly Extension] Invalid regex pattern: ${pattern}`, e);
+        }
+      } else {
+        // Simple wildcard matching
+        const regexPattern = pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
+        const regex = new RegExp(`^${regexPattern}$`);
+        if (regex.test(matchTarget)) {
+          debugLog(`[ABsmartly Extension] URL matched by pattern: ${pattern}`);
+          return true;
+        }
+      }
+    }
+
+    debugLog(`[ABsmartly Extension] URL did not match any include patterns`);
+    return false;
+  }
+
+  /**
+   * Inject custom code from experiment variants' __inject_html variables
+   */
+  function injectExperimentCode(context) {
+    if (!context || !context.data_) {
+      debugLog('[ABsmartly Extension] No context data available for experiment code injection');
+      return;
+    }
+
+    const data = context.data_;
+
+    // Iterate through all experiments in the context
+    if (!data.experiments || !Array.isArray(data.experiments)) {
+      debugLog('[ABsmartly Extension] No experiments found in context');
+      return;
+    }
+
+    debugLog(`[ABsmartly Extension] Checking ${data.experiments.length} experiments for injection code`);
+
+    data.experiments.forEach((experiment, idx) => {
+      try {
+        // Get the assigned variant for this experiment
+        const assignment = context.assignments_ ? context.assignments_[experiment.id] : null;
+        if (assignment === null || assignment === undefined) {
+          return; // Not assigned to this experiment
+        }
+
+        const variant = experiment.variants ? experiment.variants[assignment] : null;
+        if (!variant || !variant.config) {
+          return;
+        }
+
+        // Parse variant config
+        let variantConfig;
+        try {
+          variantConfig = typeof variant.config === 'string'
+            ? JSON.parse(variant.config)
+            : variant.config;
+        } catch (e) {
+          debugWarn(`[ABsmartly Extension] Failed to parse variant config for experiment ${experiment.name}:`, e);
+          return;
+        }
+
+        // Check for __inject_html variable
+        const injectHtml = variantConfig.__inject_html;
+        if (!injectHtml) {
+          return; // No injection code for this variant
+        }
+
+        debugLog(`[ABsmartly Extension] Found __inject_html in experiment "${experiment.name}", variant ${assignment}`);
+
+        // Parse injection code
+        let injectionCode;
+        try {
+          injectionCode = typeof injectHtml === 'string'
+            ? JSON.parse(injectHtml)
+            : injectHtml;
+        } catch (e) {
+          debugWarn(`[ABsmartly Extension] Failed to parse __inject_html for experiment ${experiment.name}:`, e);
+          return;
+        }
+
+        // Check URL filter
+        if (injectionCode.urlFilter && !matchesUrlFilter(injectionCode.urlFilter)) {
+          debugLog(`[ABsmartly Extension] Skipping injection for experiment "${experiment.name}" - URL filter not matched`);
+          return;
+        }
+
+        // Inject code at each location
+        ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
+          if (injectionCode[location]) {
+            debugLog(`[ABsmartly Extension] Injecting code for experiment "${experiment.name}" at ${location}`);
+            executeScriptsInHTML(injectionCode[location], location);
+          }
+        });
+
+        debugLog(`[ABsmartly Extension] Successfully processed injection code for experiment "${experiment.name}"`);
+      } catch (error) {
+        debugError(`[ABsmartly Extension] Error processing experiment ${idx}:`, error);
+      }
+    });
+  }
+
   // Removed parseCookieOverrides - OverridesPlugin handles all cookie parsing now
 
   /* DEPRECATED - Kept for reference only
@@ -1314,9 +1505,9 @@
               domPlugin.initialize().then(() => {
                 debugLog('[ABsmartly Extension] DOMChangesPluginLite initialized successfully');
 
-                // Inject custom code if provided
+                // Inject global custom code if provided (from extension settings)
                 if (customCode) {
-                  debugLog('[ABsmartly Extension] Injecting custom code directly');
+                  debugLog('[ABsmartly Extension] Injecting global custom code');
                   try {
                     // Parse the custom code object
                     const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
@@ -1324,13 +1515,21 @@
                     // Execute scripts for each location
                     ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
                       if (codeData[location]) {
-                        debugLog(`[ABsmartly Extension] Executing scripts for ${location}`);
+                        debugLog(`[ABsmartly Extension] Executing global scripts for ${location}`);
                         executeScriptsInHTML(codeData[location], location);
                       }
                     });
                   } catch (error) {
-                    debugError('[ABsmartly Extension] Failed to inject custom code:', error);
+                    debugError('[ABsmartly Extension] Failed to inject global custom code:', error);
                   }
+                }
+
+                // Inject per-experiment custom code from __inject_html variables
+                try {
+                  debugLog('[ABsmartly Extension] Checking for experiment-specific injection code');
+                  injectExperimentCode(context);
+                } catch (error) {
+                  debugError('[ABsmartly Extension] Failed to inject experiment code:', error);
                 }
 
                 // Notify extension

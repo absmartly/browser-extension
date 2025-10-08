@@ -139,3 +139,11 @@ export interface ExperimentTeam {
     display_name?: string
   }
 }
+
+export interface ExperimentInjectionCode {
+  headStart?: string  // Injected at top of <head>
+  headEnd?: string    // Injected at bottom of <head>
+  bodyStart?: string  // Injected at top of <body>
+  bodyEnd?: string    // Injected at bottom of <body>
+  urlFilter?: import('~src/types/dom-changes').URLFilter  // URL filtering (same type as DOM changes)
+}
