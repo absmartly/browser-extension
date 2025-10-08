@@ -81,29 +81,65 @@ export function CreateExperimentDropdownPanel({
   config
 }: CreateExperimentDropdownPanelProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set())
+  const [avatarBlobUrls, setAvatarBlobUrls] = useState<Map<string, string>>(new Map())
+
+  // Fetch authenticated avatar images and convert to blob URLs
+  useEffect(() => {
+    if (!isOpen || !config?.apiKey) return
+
+    const fetchAvatars = async () => {
+      for (const template of templates) {
+        const user = template.created_by
+        if (!user?.avatar?.base_url) continue
+
+        const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+        const avatarUrl = `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
+
+        // Skip if already fetched or failed
+        if (avatarBlobUrls.has(avatarUrl) || failedImages.has(avatarUrl)) continue
+
+        try {
+          const response = await fetch(avatarUrl, {
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`
+            }
+          })
+
+          if (response.ok) {
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            setAvatarBlobUrls(prev => new Map(prev).set(avatarUrl, blobUrl))
+          } else {
+            console.warn('[CreateExperimentDropdownPanel] Avatar fetch failed:', response.status, avatarUrl)
+            setFailedImages(prev => new Set(prev).add(avatarUrl))
+          }
+        } catch (error) {
+          console.error('[CreateExperimentDropdownPanel] Avatar fetch error:', error)
+          setFailedImages(prev => new Set(prev).add(avatarUrl))
+        }
+      }
+    }
+
+    fetchAvatars()
+
+    // Cleanup blob URLs when component unmounts
+    return () => {
+      avatarBlobUrls.forEach(blobUrl => URL.revokeObjectURL(blobUrl))
+    }
+  }, [isOpen, templates, config])
 
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const getAvatarUrl = (user: Template['created_by']) => {
-    if (!user?.avatar?.base_url || !config?.apiEndpoint) {
-      console.log('[CreateExperimentDropdownPanel] Avatar URL skipped:', {
-        hasUser: !!user,
-        hasAvatar: !!user?.avatar,
-        hasBaseUrl: !!user?.avatar?.base_url,
-        baseUrl: user?.avatar?.base_url,
-        hasConfig: !!config,
-        hasApiEndpoint: !!config?.apiEndpoint,
-        apiEndpoint: config?.apiEndpoint,
-        configKeys: config ? Object.keys(config) : []
-      })
-      return null
-    }
+    if (!user?.avatar?.base_url || !config?.apiEndpoint) return null
+
     const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
     const avatarUrl = `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
-    console.log('[CreateExperimentDropdownPanel] Generated avatar URL:', avatarUrl)
-    return avatarUrl
+
+    // Return blob URL if we have it, otherwise null (will show initials)
+    return avatarBlobUrls.get(avatarUrl) || null
   }
 
   const getUserName = (user: Template['created_by']) => {
@@ -149,26 +185,20 @@ export function CreateExperimentDropdownPanel({
         ) : (
           <div className="py-2 space-y-1">
             {filteredTemplates.map((template) => {
-              const avatarUrl = getAvatarUrl(template.created_by)
+              const avatarBlobUrl = getAvatarUrl(template.created_by)
               const initials = getInitials(template.created_by)
               const userName = getUserName(template.created_by)
-
-              const shouldShowImage = avatarUrl && !failedImages.has(avatarUrl)
 
               return (
                 <div
                   key={template.id}
                   className="px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
                 >
-                  {shouldShowImage ? (
+                  {avatarBlobUrl ? (
                     <img
-                      src={avatarUrl!}
+                      src={avatarBlobUrl}
                       alt={userName}
                       className="h-10 w-10 rounded-full"
-                      onError={() => {
-                        // Track failed image and re-render with fallback
-                        setFailedImages(prev => new Set(prev).add(avatarUrl!))
-                      }}
                     />
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
