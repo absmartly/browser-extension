@@ -179,6 +179,7 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
         disabled={!canEdit || loading}
         required={true}
         data-testid="unit-type-select"
+        id="unit-type-select"
       />
 
       <MultiSelect
@@ -189,6 +190,8 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
         placeholder="Select applications"
         loading={loading}
         disabled={!canEdit || loading}
+        data-testid="applications-select"
+        id="applications-select"
       />
 
 {owners.length > 0 || teams.length > 0 ? (
