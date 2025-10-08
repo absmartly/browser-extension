@@ -20,6 +20,7 @@ interface BaseSelectProps {
   showSearch?: boolean
   required?: boolean
   'data-testid'?: string
+  id?: string
 }
 
 interface SingleSelectProps extends BaseSelectProps {
@@ -48,7 +49,8 @@ export function SearchableSelect(props: SearchableSelectProps) {
     showSearch = true,
     required = false,
     mode,
-    'data-testid': dataTestId
+    'data-testid': dataTestId,
+    id
   } = props
 
   const [isOpen, setIsOpen] = useState(false)
@@ -195,6 +197,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
       </label>
 
       <div
+        id={id ? `${id}-trigger` : undefined}
         className={`min-h-[42px] w-full border border-gray-300 rounded-md bg-white px-3 py-2 cursor-pointer ${
           disabled ? 'bg-gray-50 cursor-not-allowed' : ''
         }`}
@@ -230,7 +233,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
       </div>
 
       {isOpen && !loading && !disabled && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden" data-testid={dataTestId ? `${dataTestId}-dropdown` : undefined}>
+        <div id={id ? `${id}-dropdown` : undefined} className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden" data-testid={dataTestId ? `${dataTestId}-dropdown` : undefined}>
           {showSearch && (
             <div className="p-2 border-b border-gray-200">
               <div className="relative">

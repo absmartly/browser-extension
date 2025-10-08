@@ -31,7 +31,7 @@ const sendMessageToExtension = (message: any) => {
   if (sidebarIframe && sidebarIframe.contentWindow) {
     // Test mode: send to sidebar iframe
     sidebarIframe.contentWindow.postMessage({
-      source: 'absmartly-visual-editor',
+      source: 'absmartly-content-script',
       ...message
     }, '*')
     debugLog(`Sent ${message.type} to sidebar iframe (test mode)`)

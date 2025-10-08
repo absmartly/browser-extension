@@ -1,4 +1,4 @@
-import { type Page, type FrameLocator } from '@playwright/test'
+import { type Page, type FrameLocator, type Locator } from '@playwright/test'
 
 /**
  * Injects the extension sidebar into a test page
@@ -129,4 +129,36 @@ export async function waitForExperiments(sidebar: FrameLocator): Promise<boolean
     .first()
 
   return await experimentItem.isVisible({ timeout: 10000 }).catch(() => false)
+}
+
+/**
+ * Dispatches a synthetic click via MouseEvent on an element inside a FrameLocator
+ * Useful when regular .click() is flaky due to overlay/positioning, or when
+ * we want to simulate a bubbling/cancelable event like the app expects.
+ *
+ * @param frame - FrameLocator containing the target element
+ * @param selector - CSS selector for the target element
+ * @param waitVisibleTimeout - Optional timeout to wait for visibility
+ */
+export async function click(
+  target: FrameLocator | Page,
+  selectorOrLocator: string | Locator,
+  waitVisibleTimeout: number = 5000
+): Promise<void> {
+  let locator: Locator
+  if (typeof selectorOrLocator === 'string') {
+    if ('locator' in target && typeof (target as any).locator === 'function') {
+      // Works for both Page and FrameLocator
+      locator = (target as any).locator(selectorOrLocator)
+    } else {
+      throw new Error('Invalid target passed to click helper')
+    }
+  } else {
+    locator = selectorOrLocator
+  }
+
+  await locator.waitFor({ state: 'visible', timeout: waitVisibleTimeout })
+  await locator.evaluate((el: Element) => {
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  })
 }

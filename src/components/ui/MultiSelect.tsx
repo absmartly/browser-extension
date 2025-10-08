@@ -15,6 +15,8 @@ interface MultiSelectProps {
   renderOption?: (option: MultiSelectOption, isSelected: boolean, onSelect: () => void) => React.ReactNode
   renderSelectedOption?: (option: MultiSelectOption, onRemove?: (e: React.MouseEvent) => void) => React.ReactNode
   showSearch?: boolean
+  'data-testid'?: string
+  id?: string
 }
 
 export function MultiSelect({
@@ -27,7 +29,9 @@ export function MultiSelect({
   disabled,
   renderOption,
   renderSelectedOption,
-  showSearch
+  showSearch,
+  'data-testid': dataTestId,
+  id
 }: MultiSelectProps) {
   return (
     <SearchableSelect
@@ -42,6 +46,8 @@ export function MultiSelect({
       renderOption={renderOption}
       renderSelectedOption={renderSelectedOption}
       showSearch={showSearch}
+      data-testid={dataTestId}
+      id={id}
     />
   )
 }

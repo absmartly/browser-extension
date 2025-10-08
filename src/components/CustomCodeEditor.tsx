@@ -88,9 +88,12 @@ export function CustomCodeEditor({
 
       if (message.type === 'CODE_EDITOR_SAVE') {
         debugLog('Saving value:', message.value)
-        // Use the ref values to ensure we have the latest callbacks
+        // Update the value first
         onChangeRef.current(message.value)
-        onSaveRef.current()
+        // Use setTimeout to ensure React processes the state update before calling onSave
+        setTimeout(() => {
+          onSaveRef.current()
+        }, 0)
       } else if (message.type === 'CODE_EDITOR_CLOSE') {
         debugLog('Closing editor')
         onCloseRef.current()
