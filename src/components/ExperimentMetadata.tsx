@@ -178,6 +178,7 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
         loading={loading}
         disabled={!canEdit || loading}
         required={true}
+        data-testid="unit-type-select"
       />
 
       <MultiSelect
