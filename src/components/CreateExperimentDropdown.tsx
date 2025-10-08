@@ -80,6 +80,8 @@ export function CreateExperimentDropdownPanel({
   onTemplateSelect,
   config
 }: CreateExperimentDropdownPanelProps) {
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set())
+
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -137,16 +139,22 @@ export function CreateExperimentDropdownPanel({
               const initials = getInitials(template.created_by)
               const userName = getUserName(template.created_by)
 
+              const shouldShowImage = avatarUrl && !failedImages.has(avatarUrl)
+
               return (
                 <div
                   key={template.id}
                   className="px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
                 >
-                  {avatarUrl ? (
+                  {shouldShowImage ? (
                     <img
-                      src={avatarUrl}
+                      src={avatarUrl!}
                       alt={userName}
                       className="h-10 w-10 rounded-full"
+                      onError={() => {
+                        // Track failed image and re-render with fallback
+                        setFailedImages(prev => new Set(prev).add(avatarUrl!))
+                      }}
                     />
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
