@@ -1302,6 +1302,12 @@ export function DOMChangesInlineEditor({
     console.log(`[DOMChangesInlineEditor:${variantName}] activeVEVariant prop changed to:`, activeVEVariant)
   }, [activeVEVariant, variantName])
 
+  // Use ref to track current changes without causing listener re-creation
+  const changesRef = useRef(changes)
+  useEffect(() => {
+    changesRef.current = changes
+  }, [changes])
+
   const [editingChange, setEditingChange] = useState<EditingDOMChange | null>(null)
   const [pickingForField, setPickingForField] = useState<string | null>(null)
   const [draggedChange, setDraggedChange] = useState<DOMChange | null>(null)
@@ -1645,8 +1651,8 @@ export function DOMChangesInlineEditor({
           // Merge visual editor changes with existing ones
           debugLog('📝 Merging final visual editor changes with existing changes')
 
-          // Get current changes from parent
-          const currentChanges = changes || []
+          // Get current changes from ref (always up-to-date)
+          const currentChanges = changesRef.current || []
 
           // Create a map to track unique changes by selector and type
           const changesMap = new Map()
@@ -1744,11 +1750,12 @@ export function DOMChangesInlineEditor({
     chrome.storage.session.onChanged.addListener(handleStorageChange)
 
     return () => {
+      console.log('[DOMChangesInlineEditor] Cleaning up message listeners for variant:', variantName)
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
       window.removeEventListener('message', handleWindowMessage)
       chrome.storage.session.onChanged.removeListener(handleStorageChange)
     }
-  }, [variantName, onChange, changes])
+  }, [variantName, onChange]) // Removed 'changes' - handler doesn't need it since messages contain changes
 
   const handleLaunchVisualEditor = async () => {
     // TEMPORARY DEBUG: This alert should show up in test
