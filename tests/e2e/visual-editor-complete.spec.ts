@@ -404,19 +404,23 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Action 5: Change image source
     console.log('  Testing: Change image source on img element')
 
-    // First, add an image to the test page
+    // First, add an image to the test page at the top
     await testPage.evaluate(() => {
       const img = document.createElement('img')
       img.id = 'test-image'
       img.src = 'https://via.placeholder.com/150'
       img.alt = 'Test image'
       img.style.margin = '20px'
-      document.body.appendChild(img)
+      img.style.position = 'relative'
+      img.style.zIndex = '1'
+      // Insert at the beginning of body to ensure it's visible
+      document.body.insertBefore(img, document.body.firstChild)
     })
     await testPage.waitForTimeout(500)
     console.log('  ✓ Added test image to page')
 
-    // Click on the image to open context menu
+    // Scroll to the image and click to open context menu
+    await testPage.locator('#test-image').scrollIntoViewIfNeeded()
     await testPage.click('#test-image', { force: true })
     await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
     console.log('  ✓ Context menu opened for image')
