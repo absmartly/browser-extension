@@ -377,15 +377,35 @@ await testPage.click('#html-button') // ✅ OK for plain HTML
 - Works identically in headed and headless modes
 - Ensures React event handlers execute reliably
 
-### Step 5: Debug with Screenshots and Logging
+### Step 5: Debug with Screenshots, Logging, and Slow Mode
+
+**IMPORTANT**: Add `debugWait()` after each significant action for better test observability in headed/slow mode.
 
 ```typescript
+await test.step('Perform action', async () => {
+  // Perform action
+  await sidebar.locator('[data-testid="save-button"]').evaluate(btn =>
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  )
+  console.log('  ✓ Clicked save button')
+
+  // Add debugWait after actions (only waits if SLOW=1)
+  await debugWait()
+
+  // Verify result
+  const text = await sidebar.locator('h1').textContent()
+  expect(text).toBe('Saved')
+  console.log('  ✓ Verified save completed')
+
+  await debugWait() // Add after verifications too
+})
+
 // Take screenshots at key points
 await testPage.screenshot({
-  path: 'test-results/after-action.png',
+  path: 'test-results/after-save.png',
   fullPage: true
 })
-console.log('  📸 Screenshot saved: after-action.png')
+console.log('  📸 Screenshot saved: after-save.png')
 
 // Check console messages (already captured by setupConsoleLogging)
 console.log(`  📋 Captured ${allConsoleMessages.length} console messages`)
@@ -393,13 +413,25 @@ const errors = allConsoleMessages.filter(m => m.type === 'error')
 if (errors.length > 0) {
   console.log('  ❌ Console errors:', errors)
 }
-
-// Log test progress
-console.log('  ✓ Step completed successfully')
-
-// Wait in slow mode for visual inspection
-await debugWait(1000) // Only waits if SLOW=1 env var
 ```
+
+**Run tests in slow mode for visual inspection**:
+```bash
+# Slow mode with headed browser (can see what's happening)
+SLOW=1 npx playwright test tests/e2e/my-test.spec.ts --headed
+
+# Normal headless mode (fast, for CI)
+npx playwright test tests/e2e/my-test.spec.ts
+```
+
+**Best practice**: Add `await debugWait()` liberally throughout your tests:
+- After clicking buttons
+- After filling forms
+- After waiting for elements
+- After verifications
+- Between test steps
+
+This makes headed test runs much easier to follow and debug.
 
 ## Helper Functions
 
@@ -421,16 +453,29 @@ await sidebar.locator('button').click()
 
 ### debugWait(ms)
 
-Conditional wait that only executes in slow mode (SLOW=1 env var).
+Conditional wait that only executes in slow mode (SLOW=1 env var). **Use this liberally throughout tests.**
 
 ```typescript
-await debugWait(500) // Waits 500ms if SLOW=1, otherwise returns immediately
+await debugWait()     // Waits 300ms (default) if SLOW=1, otherwise returns immediately
+await debugWait(500)  // Waits 500ms if SLOW=1, otherwise returns immediately
 ```
 
-Useful for:
-- Visual inspection during development
-- Recording demo videos
-- Debugging flaky tests
+**When to use**:
+- ✅ After clicking buttons or links
+- ✅ After filling form fields
+- ✅ After waiting for elements to appear
+- ✅ After assertions/verifications
+- ✅ Between test steps
+- ✅ Anywhere you want to see what's happening in headed mode
+
+**Why it's useful**:
+- Makes headed test runs watchable and easy to debug
+- Has zero impact on headless test speed (returns immediately)
+- Helps identify timing issues
+- Great for recording demo videos
+- Essential for visual debugging
+
+**Best practice**: Add `await debugWait()` generously - it doesn't slow down CI tests but makes local debugging much easier.
 
 ### setupConsoleLogging(page, filter)
 
