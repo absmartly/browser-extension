@@ -223,8 +223,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       const responsePromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           chrome.runtime.onMessage.removeListener(listener)
-          reject(new Error('Auth check timed out'))
-        }, 15000)
+          reject(new Error('Auth check timed out (5s)'))
+        }, 5000)
 
         const listener = (message: any) => {
           if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
@@ -271,10 +271,24 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       } else {
         console.error('[SettingsView] Auth check failed:', response.error)
         setUser(null)
+
+        // Show specific error for permission issues
+        if (effectiveAuthMethod === 'jwt' && response.error?.includes('JWT token')) {
+          setErrors({
+            general: 'Cookie permission required. Please grant permission to use JWT authentication.'
+          })
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[SettingsView] Auth check failed:', error)
       setUser(null)
+
+      // Show specific error for timeout
+      if (error.message?.includes('timed out')) {
+        setErrors({
+          general: 'Authentication check timed out. Please check your connection and try again.'
+        })
+      }
     } finally {
       console.log('[SettingsView] checkAuthStatus finally block - setting checkingAuth to false')
       setCheckingAuth(false)
@@ -343,8 +357,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setShowCookieConsentModal(false)
 
     if (granted && apiEndpoint) {
+      // Small delay to ensure permission propagates to background script
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Permission granted, check auth
       await checkAuthStatus(apiEndpoint, { apiKey, authMethod })
+    } else if (!granted) {
+      setErrors({
+        general: 'Cookie permission was denied. Please grant permission to use JWT authentication.'
+      })
     }
   }
 
