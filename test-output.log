@@ -1,3 +1,7 @@
+
+> absmartly-browser-extension@0.0.1 test:e2e
+> playwright test
+
 🚀 Starting global test setup...
 ✅ Extension already built
 ⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.
@@ -8,18 +12,359 @@
 ✅ Global setup completed successfully
 ---
 
-Running 1 test using 1 worker
+Running 207 tests using 1 worker
 
+  ✓    1 [chromium] › tests/components/notifications.spec.ts:396:7 › Notifications Component Tests › should render toast notifications with different types (3.4s)
+  ✓    2 [chromium] › tests/components/notifications.spec.ts:426:7 › Notifications Component Tests › should auto-dismiss notifications after specified timing (2.0s)
+  ✓    3 [chromium] › tests/components/notifications.spec.ts:439:7 › Notifications Component Tests › should not auto-dismiss persistent notifications (5.2s)
+  ✓    4 [chromium] › tests/components/notifications.spec.ts:452:7 › Notifications Component Tests › should handle multiple notifications with queue management (4.0s)
+  ✓    5 [chromium] › tests/components/notifications.spec.ts:467:7 › Notifications Component Tests › should handle rapid notification creation without overwhelming queue (69ms)
+  ✓    6 [chromium] › tests/components/notifications.spec.ts:480:7 › Notifications Component Tests › should dismiss notifications when clicked (2.2s)
+  ✓    7 [chromium] › tests/components/notifications.spec.ts:493:7 › Notifications Component Tests › should dismiss notifications using close button (2.2s)
+  ✘    8 [chromium] › tests/components/notifications.spec.ts:506:7 › Notifications Component Tests › should show animation transitions correctly (2.2s)
+  ✘    9 [chromium] › tests/components/notifications.spec.ts:522:7 › Notifications Component Tests › should position notifications correctly on screen (1.2s)
+  ✘   10 [chromium] › tests/components/notifications.spec.ts:547:7 › Notifications Component Tests › should truncate long messages appropriately (1.2s)
+  ✓   11 [chromium] › tests/components/notifications.spec.ts:564:7 › Notifications Component Tests › should display appropriate icons for different notification types (8.3s)
+  ✘   12 [chromium] › tests/components/notifications.spec.ts:586:7 › Notifications Component Tests › should provide proper ARIA announcements for screen readers (1.2s)
+  ✓   13 [chromium] › tests/components/notifications.spec.ts:608:7 › Notifications Component Tests › should handle notifications without icons when configured (68ms)
+  ✓   14 [chromium] › tests/components/notifications.spec.ts:621:7 › Notifications Component Tests › should maintain proper stacking order with multiple rapid notifications (58ms)
+  ✓   15 [chromium] › tests/components/notifications.spec.ts:637:7 › Notifications Component Tests › should handle edge cases gracefully (2.2s)
+  ✓   16 [chromium] › tests/components/notifications.spec.ts:672:7 › Notifications Component Tests › should cleanup properly when notifications are removed (2.2s)
+  ✓   17 [chromium] › tests/components/notifications.spec.ts:696:7 › Notifications Component Tests › should handle viewport resizing correctly (1.2s)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+  ✘   18 [chromium] › tests/e2e/api-integration.spec.ts:8:7 › API Integration Tests › sidebar boots and makes a real API call via background (1.5m)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+  ✘   19 [chromium] › tests/e2e/api-integration.spec.ts:88:7 › API Integration Tests › sidebar shows experiments after API call (1.5m)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+  ✘   20 [chromium] › tests/e2e/api-integration.spec.ts:121:7 › API Integration Tests › can navigate to experiment details (1.5m)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+  ✘   21 [chromium] › tests/e2e/api-integration.spec.ts:160:7 › API Integration Tests › storage persists across page reloads (1.5m)
+[2m[WebServer] [22m(node:59124) [DEP0066] DeprecationWarning: OutgoingMessage.prototype._headers is deprecated
+[2m[WebServer] [22m(Use `node --trace-deprecation ...` to show where the warning was created)
+[DEBUG] Plugin properties: [
+  [32m'name'[39m,
+  [32m'version'[39m,
+  [32m'initialized'[39m,
+  [32m'capabilities'[39m,
+  [32m'instance'[39m,
+  [32m'timestamp'[39m
+]
+[DEBUG] Plugin prototype: []
+[DEBUG] Has exposureTracker: [33mfalse[39m
+[DEBUG] Context properties: [ [32m'__plugins'[39m, [32m'__domPlugin'[39m ]
+  ✓   22 [chromium] › tests/e2e/debug-exposure-props.spec.ts:5:5 › Debug: Show all plugin properties (2.8s)
+[DEBUG] Exposure Tracker State: {
+  "pluginExists": true,
+  "trackerExists": false,
+  "experimentsMapExists": false,
+  "experimentsMapType": "N/A",
+  "experimentNames": [],
+  "experimentDetails": null
+}
+[DEBUG] Element text: Test Content
+
+=== Debug Report ===
+Plugin exists: [33mtrue[39m
+Tracker exists: [33mfalse[39m
+Experiments Map exists: [33mfalse[39m
+Experiments Map type: N/A
+Experiments count: [90mundefined[39m
+Experiment names: []
+Has debug_test: [90mundefined[39m
+Experiment details: null
+Changes applied: [33mtrue[39m
+  ✓   23 [chromium] › tests/e2e/debug-exposure.spec.ts:5:5 › Debug: Check exposure tracker state (2.2s)
+Wrapper exists: [33mtrue[39m
+Wrapper keys: [
+  [32m'name'[39m,
+  [32m'version'[39m,
+  [32m'initialized'[39m,
+  [32m'capabilities'[39m,
+  [32m'instance'[39m,
+  [32m'timestamp'[39m
+]
+Real plugin exists: [33mtrue[39m
+Real plugin keys: [
+  [32m'mutationObserver'[39m,
+  [32m'exposedExperiments'[39m,
+  [32m'eventListeners'[39m,
+  [32m'styleManagers'[39m,
+  [32m'initialized'[39m,
+  [32m'watchedElements'[39m,
+  [32m'persistenceObserver'[39m,
+  [32m'reapplyingElements'[39m,
+  [32m'reapplyLogThrottle'[39m,
+  [32m'appliedStyleChanges'[39m,
+  [32m'antiFlickerTimeout'[39m,
+  [32m'antiFlickerStyleId'[39m,
+  [32m'config'[39m,
+  [32m'domManipulator'[39m,
+  [32m'variantExtractor'[39m,
+  [32m'exposureTracker'[39m
+]
+Has exposureTracker: [33mtrue[39m
+Tracker type: object
+Experiments exists: [33mtrue[39m
+Experiments size: [33m1[39m
+  ✓   24 [chromium] › tests/e2e/debug-instance.spec.ts:3:5 › Debug: Access plugin.instance (2.1s)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+
+📂 STEP 1: Injecting sidebar
+✅ Sidebar injected
+
+📋 STEP 2: Open Create experiment view
+  ✓ Clicked Create New Experiment button
+  ✓ Selected "From Scratch"
+  ✓ Filled experiment name: Code Injection Test 1760044619887
+  Selecting Unit Type...
+  ✓ Unit type select is enabled
+  ✓ Clicked unit type trigger
+  ✓ Selected unit type
+  Selecting Applications...
+  ✓ Clicked applications trigger
+  ✓ Selected application
+✅ Experiment create page opened
+
+📝 STEP 3: Looking for Custom Code Injection section
+✅ Found Custom Code Injection section
+
+🔽 STEP 4: Expanding Custom Code Injection section
+✅ Found Custom Code Injection button
+✅ Clicked Code Injection button/header
+✅ Found Start of <head> section
+
+👆 STEP 5: Clicking Start of <head> section
+[BROWSER log] [CustomCodeEditor] Effect running - isOpen: true section: headStart value: 
+[BROWSER log] [CustomCodeEditor] Sending OPEN_CODE_EDITOR to parent window
+[BROWSER log] [CustomCodeEditor] Message sent
+✅ Clicked Start of <head>
+
+✨ STEP 6: Waiting for editor modal to appear
+[BROWSER log] [Content Script] Received message from sidebar iframe: OPEN_CODE_EDITOR {source: absmartly-sidebar, type: OPEN_CODE_EDITOR, data: Object}
+[BROWSER log] [Content Script] Opening code editor with data: {section: headStart, value: , sectionTitle: Start of <head> tag, placeholder: <!-- Add your HTML/JavaScript code here -->
+<script>
+  // Your code
+</script>, readOnly: false}
+[BROWSER log] [openCodeEditor] Function called with: {section: headStart, valueLength: 0, timestamp: 1760044624890}
+[BROWSER log] [openCodeEditor] After closeCodeEditor, now creating new container
+[BROWSER log] [Content Script] Sending confirmation back to sidebar
+📸 Screenshot saved before modal check
+✅ Code editor modal appeared!
+✅ CodeMirror editor found
+✅ CodeMirror content area found
+
+⌨️  STEP 7: Typing HTML into CodeMirror
+✅ Typed HTML code
+📸 Screenshot saved with code
+
+💾 STEP 8: Saving code in modal
+✅ Clicked Save button
+[BROWSER log] [CustomCodeEditor] Effect running - isOpen: true section: headStart value: <script>
+    console.log("Test injection");
+</scri
+[BROWSER log] [CustomCodeEditor] Sending OPEN_CODE_EDITOR to parent window
+[BROWSER log] [CustomCodeEditor] Message sent
+[BROWSER log] [Content Script] Received message from sidebar iframe: CLOSE_CODE_EDITOR {source: absmartly-sidebar, type: CLOSE_CODE_EDITOR}
+[BROWSER log] [Content Script] Received message from sidebar iframe: OPEN_CODE_EDITOR {source: absmartly-sidebar, type: OPEN_CODE_EDITOR, data: Object}
+[BROWSER log] [Content Script] Opening code editor with data: {section: headStart, value: <script>
+    console.log("Test injection");
+</script>
+</script>, sectionTitle: Start of <head> tag, placeholder: <!-- Add your HTML/JavaScript code here -->
+<script>
+  // Your code
+</script>, readOnly: false}
+[BROWSER log] [openCodeEditor] Function called with: {section: headStart, valueLength: 63, timestamp: 1760044629851}
+[BROWSER log] [openCodeEditor] After closeCodeEditor, now creating new container
+[BROWSER log] [Content Script] Sending confirmation back to sidebar
+[BROWSER log] [Content Script] Received message from sidebar iframe: CLOSE_CODE_EDITOR {source: absmartly-sidebar, type: CLOSE_CODE_EDITOR}
+✅ Modal closed
+✅ Code saved to component state
+
+🔄 STEP 9: Re-opening editor to verify code persists
+[BROWSER log] [CustomCodeEditor] Effect running - isOpen: true section: headStart value: <script>
+    console.log("Test injection");
+</scri
+[BROWSER log] [CustomCodeEditor] Sending OPEN_CODE_EDITOR to parent window
+[BROWSER log] [CustomCodeEditor] Message sent
+[BROWSER log] [Content Script] Received message from sidebar iframe: OPEN_CODE_EDITOR {source: absmartly-sidebar, type: OPEN_CODE_EDITOR, data: Object}
+[BROWSER log] [Content Script] Opening code editor with data: {section: headStart, value: <script>
+    console.log("Test injection");
+</script>
+</script>, sectionTitle: Start of <head> tag, placeholder: <!-- Add your HTML/JavaScript code here -->
+<script>
+  // Your code
+</script>, readOnly: false}
+[BROWSER log] [openCodeEditor] Function called with: {section: headStart, valueLength: 63, timestamp: 1760044630875}
+[BROWSER log] [openCodeEditor] After closeCodeEditor, now creating new container
+✅ Re-opened Start of <head>
+[BROWSER log] [Content Script] Sending confirmation back to sidebar
+📸 Screenshot saved before checking for modal
+✅ Editor modal re-appeared
+✅ Code persisted in UI state: <script>    console.log("Test injection");</script
+📸 Screenshot of reopened editor
+✅ Code persistence verified!
+[BROWSER log] [Content Script] Received message from sidebar iframe: CLOSE_CODE_EDITOR {source: absmartly-sidebar, type: CLOSE_CODE_EDITOR}
+  ✓   25 [chromium] › tests/e2e/experiment-code-injection.spec.ts:44:7 › Experiment Code Injection UI › code injection UI exists and code editor can be opened (12.7s)
+✅ Test page loaded
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+
+📂 Injecting sidebar
+✅ Sidebar visible
+
+🔍 Verifying Header component in experiment list
+  📋 Sidebar body text: 
+    BETAExperimentsNo experiments foundSelect an option20 per page50 per page100 per pagePage 1Page 1
+    
+  
+
+
+  ✓ Header with "Experiments" title visible
+  ✓ Logo visible in header
+
+📋 Opening create experiment form
+  ✓ Clicked Create New Experiment button
+  ✓ Selected "From Scratch" option
+
+🔍 Verifying Header component in create form
+  ✓ Header shows "Create New Experiment" title
+  ✓ Back button visible in header
+  ✓ Logo visible in header
+
+📝 Filling experiment form
+  ✓ Filled experiment name: E2E Test Experiment 1760044632386
+  ✓ Name sync lock icon present
+  Selecting Unit Type...
+  ✓ Selected unit type
+  Selecting Applications...
+  ✓ Selected application
+
+🔍 Verifying create button text
+  ✓ Button shows "Create Experiment Draft" (not "Update Experiment")
+
+🔗 Testing name sync functionality
+  ✓ Display name synced: "Test Sync Name"
+  ✓ Display name unchanged after unlock: "Test Sync Name"
+
+📊 Verifying variants section
+  ✓ Found 2 Visual Editor buttons (using useExperimentVariants hook)
+
+🔄 Testing detail view dropdowns with existing experiment
+  ✓ Clicked back button
+  ✓ Opened existing experiment
+  ✓ Unit Type dropdown loaded
+  ✓ Owners dropdown loaded
+  ✓ Tags dropdown loaded
+
+🏷️  Verifying state labels in experiment list
+  ✓ State labels display correctly in list view
+
+📖 Opening first experiment
+  ✓ Clicked first experiment
+
+⏳ Verifying dropdowns loaded in detail view
+  ✓ Unit Type dropdown loaded
+  ✓ Owners dropdown loaded
+  ✓ Tags dropdown loaded
+
+🔍 Verifying Header component in detail view
+  ✓ Logo visible in header
+  ✓ Back button visible in header
+  ✓ Edit name button visible
+
+🎬 Verifying ExperimentActions component
+  ℹ️  No ExperimentActions buttons visible (may depend on permissions)
+
+🏷️  Verifying state label displays correctly
+  Badge text: "BETA"
+  ✓ Badge shows display label (not raw state value)
+  ℹ️  Badge shows: "BETA"
+
+⏳ Verifying dropdowns loaded properly
+  ✓ Unit Type dropdown loaded
+  ✓ Owners dropdown loaded
+  ✓ Tags dropdown loaded
+
+💾 Verifying Save Changes button
+  ✓ Save Changes button visible
+  Experiment status: BETA
+  ℹ️  Save button enabled for status: BETA
+
+📊 Verifying variants with useExperimentVariants hook
+  ℹ️  No variants section visible (may be empty)
+
+◀️  Testing back navigation
+  ✓ Clicked back button
+  ✓ Returned to experiment list
+
+📋 Testing template selection
+  ✓ Clicked "From Scratch" option
+
+🔍 Verifying create form header
+  ✓ Header correctly shows "Create New Experiment" (not "Edit Experiment")
+
+🔍 Verifying button text
+  ✓ Button correctly shows "Create Experiment Draft" (not "Update Experiment")
+
+◀️  Navigating back to experiments list
+  ✓ Clicked back button
+  ✓ Returned to experiment list
+
+⚙️  Testing Settings view
+  ✓ Clicked settings button
+  ✓ Header shows "Settings" title
+  ✓ Logo visible in header
+  ✓ Back button visible in header
+
+◀️  Testing back from Settings
+  ✓ Clicked back button
+  ✓ Settings view closed
+
+✅ Comprehensive experiment flow test PASSED!
+  ✓   26 [chromium] › tests/e2e/experiment-flows.spec.ts:43:7 › Experiment Creation and Editing Flows › Create new experiment from scratch with Header component (12.8s)
+
+🚀 Starting Move Operation Test
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+⚙️ Setting API credentials...
+📄 Creating test page...
+💉 Injecting sidebar...
+🔬 Creating experiment with move change...
+  ✘   27 [chromium] › tests/e2e/move-operation-original-position.spec.ts:6:7 › Move Operation Original Position Preservation › should preserve original position when changing selector after move (4.7s)
+
+🚀 Starting Target Selector Change Test
+📝 Creating move change with Target A...
+🎯 Changing target from A to B...
+↩️ Testing restoration to original position...
+✅ Original position preserved when changing target selector!
+  ✓   28 [chromium] › tests/e2e/move-operation-original-position.spec.ts:268:7 › Move Operation Original Position Preservation › should preserve original position when changing target selector (3.9s)
+[CONSOLE] log: [ABsmartly] Content script executing - TOP OF FILE
+[CONSOLE] log: [ABsmartly] Content script marker set: true
+[CONSOLE] error: Failed to load resource: the server responded with a status of 401 ()
+[CONSOLE] error: ir
+[CONSOLE] error: Failed to load resource: the server responded with a status of 401 ()
+[CONSOLE] error: ir
+[CONSOLE] log: 🔵 INFO   | [plasmo/parcel-runtime]: Connected to HMR server for /Users/joalves/git_tree/absmartly-browser-extension/content.ts
 ✅ Test page loaded (test mode enabled)
 Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
 
 📂 STEP 1: Injecting sidebar
+[CONSOLE] log: 🔵 ABSmartly Extension: Sidebar script loaded
+[CONSOLE] log: [tabs/sidebar.tsx] Running in iframe, setting up message forwarding
+[CONSOLE] log: [tabs/sidebar.tsx] Message forwarding listener registered
+[CONSOLE] log: [tabs/sidebar.tsx] Incoming message listener registered
+[CONSOLE] log: 🔵 INFO   | [plasmo/parcel-runtime]: Connected to HMR server for /Users/joalves/git_tree/absmartly-browser-extension/.plasmo/tabs/sidebar.tsx
 ✅ Sidebar visible
 
 ⚙️ STEP 2: Navigating to Settings
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
 [CONSOLE] log: [SettingsView] checkAuthStatus called with endpoint: https://demo-2.absmartly.com/v1
-[CONSOLE] log: [SettingsView] Sending CHECK_AUTH message...
-[CONSOLE] log: [SettingsView] CHECK_AUTH response received: {success: false, error: Not authenticated}
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] All permissions already granted
+[CONSOLE] log: [SettingsView] Sending CHECK_AUTH message to background, requestId: auth_1760044655914
+[CONSOLE] log: [tabs/sidebar.tsx] Received message from background: CHECK_AUTH_RESULT
+[CONSOLE] log: [SettingsView] Received CHECK_AUTH response: {success: true, data: Object}
+[CONSOLE] log: [SettingsView] Auth check successful, user: {id: 3, email: jonas@absmartly.com, first_name: Jonas, last_name: Alves, avatar: Object}
 [CONSOLE] log: [SettingsView] checkAuthStatus finally block - setting checkingAuth to false
 ✅ Settings page loaded
 
@@ -28,35 +373,227 @@ Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
   ✓ Filled endpoint
   ✓ Filled API key
   🔄 Testing authentication before saving...
+  Current state - endpoint: https://demo-2.absmartly.com/v1 authMethod: apikey hasApiKey: [33mtrue[39m
+  ✓ Found Refresh button, about to click...
+[CONSOLE] log:   [EVALUATE] About to click Refresh button
 [CONSOLE] log: [SettingsView] checkAuthStatus called with endpoint: https://demo-2.absmartly.com/v1
-[CONSOLE] log: [SettingsView] Sending CHECK_AUTH message...
-  ✓ Clicked Refresh button
+[CONSOLE] log:   [EVALUATE] Click event dispatched
+  ✓ Clicked Refresh button, waiting for response...
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] All permissions already granted
+[CONSOLE] log: [SettingsView] Sending CHECK_AUTH message to background, requestId: auth_1760044656331
   📸 Debug screenshot saved after refresh
   Debug: auth-user-info visible? [33mfalse[39m
   Debug: auth-not-authenticated visible? [33mfalse[39m
-  ✘  1 [chromium] › tests/e2e/settings-auth.spec.ts:46:7 › Settings Authentication Tests › should show authenticated user data with API Key authentication (2.5s)
+  ✘   29 [chromium] › tests/e2e/settings-auth.spec.ts:44:7 › Settings Authentication Tests › should show authenticated user data with API Key authentication (3.4s)
+[CONSOLE] log: [ABsmartly] Content script executing - TOP OF FILE
+[CONSOLE] log: [ABsmartly] Content script marker set: true
+[CONSOLE] error: Failed to load resource: the server responded with a status of 401 ()
+[CONSOLE] error: ir
+[CONSOLE] log: 🔵 INFO   | [plasmo/parcel-runtime]: Connected to HMR server for /Users/joalves/git_tree/absmartly-browser-extension/content.ts
+[CONSOLE] error: Failed to load resource: the server responded with a status of 401 ()
+[CONSOLE] error: ir
+✅ Test page loaded (test mode enabled)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
 
+📂 STEP 1: Injecting sidebar
+[CONSOLE] log: 🔵 ABSmartly Extension: Sidebar script loaded
+[CONSOLE] log: [tabs/sidebar.tsx] Running in iframe, setting up message forwarding
+[CONSOLE] log: [tabs/sidebar.tsx] Message forwarding listener registered
+[CONSOLE] log: [tabs/sidebar.tsx] Incoming message listener registered
+[CONSOLE] log: 🔵 INFO   | [plasmo/parcel-runtime]: Connected to HMR server for /Users/joalves/git_tree/absmartly-browser-extension/.plasmo/tabs/sidebar.tsx
+✅ Sidebar visible
 
-  1) [chromium] › tests/e2e/settings-auth.spec.ts:46:7 › Settings Authentication Tests › should show authenticated user data with API Key authentication › Configure API Key authentication and test BEFORE saving 
+⚙️ STEP 2: Navigating to Settings
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] checkAuthStatus called with endpoint: https://demo-2.absmartly.com/v1
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] Permissions: {hasCookies: true, hasHost: true}
+[CONSOLE] log: [SettingsView] All permissions already granted
+[CONSOLE] log: [SettingsView] Sending CHECK_AUTH message to background, requestId: auth_1760044658790
+[CONSOLE] log: [tabs/sidebar.tsx] Received message from background: CHECK_AUTH_RESULT
+[CONSOLE] log: [SettingsView] Received CHECK_AUTH response: {success: true, data: Object}
+[CONSOLE] log: [SettingsView] Auth check successful, user: {id: 3, email: jonas@absmartly.com, first_name: Jonas, last_name: Alves, avatar: Object}
+[CONSOLE] log: [SettingsView] checkAuthStatus finally block - setting checkingAuth to false
+✅ Settings page loaded
 
-    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeTruthy[2m()[22m
+🔐 STEP 3: Configuring JWT authentication
+  ✓ Selected JWT authentication method
+  ✓ Filled endpoint
+  ✓ Cleared API key (not needed for JWT)
 
-    Received: [31mfalse[39m
+🔓 STEP 4: Authenticating with Google OAuth
+  ✓ User already authenticated (JWT cookie present)
 
-      133 |       console.log('  Debug: auth-not-authenticated visible?', isNotAuthVisible)
-      134 |
-    > 135 |       expect(hasUserInfoBeforeSave).toBeTruthy()
-          |                                     ^
-      136 |       console.log('  ✅ Shows authenticated state BEFORE saving!')
-      137 |
-      138 |       // Now save settings
-        at /Users/joalves/git_tree/absmartly-browser-extension/tests/e2e/settings-auth.spec.ts:135:37
-        at /Users/joalves/git_tree/absmartly-browser-extension/tests/e2e/settings-auth.spec.ts:84:5
+💾 STEP 5: Saving settings and verifying authentication
+  ✓ Clicked Save Settings
+  ✓ Authentication Status section visible
+  ⚠️  User not authenticated - JWT cookie may not be present
+  This is expected if running test without prior authentication
 
-  1 failed
-    [chromium] › tests/e2e/settings-auth.spec.ts:46:7 › Settings Authentication Tests › should show authenticated user data with API Key authentication 
+🔄 STEP 6: Testing auth method switching
+  ✓ Switched to API Key method
+  ✓ Filled API key
+  ✓ Switched back to JWT method
+  📸 Screenshot saved: settings-auth-switching.png
+  ✓   30 [chromium] › tests/e2e/settings-auth.spec.ts:223:7 › Settings Authentication Tests › should authenticate with JWT and Google OAuth (2.5s)
+Initial state: {
+  elementText: [32m'Test Change'[39m,
+  pluginExists: [33mtrue[39m,
+  hasExposureTracker: [33mtrue[39m,
+  experimentRegistered: [33mtrue[39m
+}
+✓ Plugin initialized and changes applied
+✓ Test setup complete
 
-To open last HTML report run:
-[36m[39m
-[36m  npx playwright show-report[39m
-[36m[39m
+📋 Testing URL Filter Configuration:
+Pattern: /products/*
+Mode: simple
+Match Type: path
+✓ URL filter config structure is correct
+
+📄 JSON Editor Payload:
+{
+  "changes": [
+    {
+      "selector": "#test-element",
+      "type": "text",
+      "value": "Filtered Test Change"
+    }
+  ],
+  "urlFilter": {
+    "include": [
+      "/products/*"
+    ],
+    "mode": "simple",
+    "matchType": "path"
+  }
+}
+✓ JSON payload contains all required URL filter fields
+✓ JSON payload is valid and parseable
+✓ Plugin can accept config with URL filter
+
+✅ URL Filter UI and JSON Verification Test PASSED!
+Summary:
+  • URL filter config structure validated
+  • JSON payload generated correctly
+  • JSON payload contains all required fields:
+    - urlFilter object
+    - include array with pattern
+    - mode (simple/regex)
+    - matchType (path/query/hash/domain/full-url)
+  • JSON payload is parseable
+  • Plugin accepts config with URL filter
+  ✓   31 [chromium] › tests/e2e/url-filter-ui.spec.ts:13:5 › URL filter UI and JSON verification (2.2s)
+Basic test element text: 
+      Original test content
+    
+  ✘   32 [chromium] › tests/e2e/url-filtering-debug.spec.ts:6:7 › URL Filtering Debug Tests › Debug: Basic plugin functionality without URL filter (2.2s)
+[BROWSER log] [TEST] Setting URL to /products/123
+[BROWSER log] [TEST] Current URL: http://localhost:3456/products/123
+[BROWSER log] [TEST] Pathname: /products/123
+[BROWSER log] [TEST] Hash: 
+[BROWSER log] [TEST] Injecting SDK mock
+[TEST] Loading plugin from public/absmartly-dom-changes-core.min.js
+[BROWSER log] [TEST] Creating context
+[BROWSER log] [SDK MOCK] Context constructor called
+[BROWSER log] [TEST] Getting DOMChangesPlugin constructor
+[BROWSER log] [TEST] DOMChangesPlugin constructor: function
+[BROWSER log] [TEST] Creating plugin instance
+[BROWSER log] [TEST] Plugin instance created: true
+[BROWSER log] [TEST] Initializing plugin...
+[BROWSER log] [SDK MOCK] ready() called
+[BROWSER log] [SDK MOCK] data() called
+[BROWSER log] [TEST] Plugin initialized successfully
+[BROWSER log] [TEST] Plugin registered at context.__domPlugin: true
+[BROWSER log] [TEST] ===== Testing URLMatcher Directly =====
+[BROWSER log] [TEST] URLMatcher exists: false
+[TEST] Final element text: 
+      Original test content
+    
+[TEST] Plugin state: {
+  "contextExists": true,
+  "pluginExists": true,
+  "pluginInitialized": true,
+  "currentURL": "http://localhost:3456/products/123",
+  "pathname": "/products/123",
+  "hash": ""
+}
+  ✘   33 [chromium] › tests/e2e/url-filtering-debug.spec.ts:83:7 › URL Filtering Debug Tests › Debug: Plugin with URL filter - comprehensive logging (3.2s)
+[BROWSER log] [TEST] Creating SDK mock
+[BROWSER log] [TEST] SDK mock created, absmartly.Context exists: function
+[TEST] Loading plugin
+[BROWSER log] [TEST] ABsmartlyDOM exists: true
+[BROWSER log] [TEST] DOMChangesPlugin exists: true
+[TEST] Plugin loaded: [33mtrue[39m
+[BROWSER log] [TEST] Creating context instance
+[BROWSER log] [SDK MOCK] Context constructor
+[BROWSER log] [TEST] Context created
+[BROWSER log] [TEST] Getting plugin constructor
+[BROWSER log] [TEST] Creating plugin with config: {
+  "autoApply": true,
+  "spa": true,
+  "dataSource": "customField",
+  "dataFieldName": "__dom_changes",
+  "debug": true
+}
+[BROWSER log] [TEST] Plugin instance created, calling initialize()
+[BROWSER log] [SDK MOCK] ready() returning resolved promise
+[BROWSER log] [SDK MOCK] data() returning: {
+  "experiments": [
+    {
+      "name": "test_exp",
+      "variants": [
+        {
+          "config": "{\"changes\":[]}"
+        },
+        {
+          "config": "{\"changes\":[{\"selector\":\"#test-element\",\"type\":\"text\",\"value\":\"Changed Text\"}]}"
+        }
+      ]
+    }
+  ]
+}
+[TEST] Final element text: 
+      Original test content
+    
+  ✘   34 [chromium] › tests/e2e/url-filtering-minimal.spec.ts:5:5 › Minimal test: Check SDK mock is working (3.5s)
+[TEST] Element text: Changed Text!
+  ✓   35 [chromium] › tests/e2e/url-filtering-working.spec.ts:6:7 › URL Filtering Tests - Fixed › Basic plugin functionality - using dataSource: variable (2.1s)
+[BROWSER log] [TEST] URL set to: http://localhost:3456/products/123
+[TEST] Element text on /products/123: Products Page Content
+  ✓   36 [chromium] › tests/e2e/url-filtering-working.spec.ts:81:7 › URL Filtering Tests - Fixed › URL filtering with path match (2.1s)
+[BROWSER log] [TEST] URL set to: http://localhost:3456/about
+[TEST] Element text on /about (should be unchanged): 
+      Original test content
+    
+  ✓   37 [chromium] › tests/e2e/url-filtering-working.spec.ts:169:7 › URL Filtering Tests - Fixed › URL filtering - no match when URL doesnt match (2.2s)
+
+📄 Loading test page with SDK
+[log] [ABsmartly] Content script executing - TOP OF FILE
+[log] [ABsmartly] Content script marker set: true
+  ✓ SDK mock injected
+
+🔌 Loading DOM changes plugin
+  ✓ Plugin loaded and initialized
+
+🔗 Navigating to /products/123
+  ✘   38 [chromium] › tests/e2e/url-filtering.spec.ts:41:7 › URL Filtering with DOM Changes › URL filtering on single variant - user assigned to filtered variant (3.1s)
+
+📄 Loading test page with SDK
+[log] [ABsmartly] Content script executing - TOP OF FILE
+[log] [ABsmartly] Content script marker set: true
+  ✓ SDK mock injected with multi-variant URL filters
+
+🔌 Loading DOM changes plugin
+  ✓ Plugin loaded and initialized
+
+🔗 Testing variant 1 on /products/123
+  ✘   39 [chromium] › tests/e2e/url-filtering.spec.ts:221:7 › URL Filtering with DOM Changes › Different URL filters on different variants - all variants tracked (2.7s)
+
+🔗 Testing path matching
+[log] [ABsmartly] Content script executing - TOP OF FILE
+[log] [ABsmartly] Content script marker set: true
+  ✘   40 [chromium] › tests/e2e/url-filtering.spec.ts:475:7 › URL Filtering with DOM Changes › URL filtering with matchType options (1.6s)
+Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp

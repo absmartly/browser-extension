@@ -1012,11 +1012,11 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           const cached = await cache.match(event.request)
 
           if (cached) {
-            debugLog('[Avatar Proxy] Returning cached avatar:', avatarUrl)
+            console.log('[Avatar Proxy] Returning cached avatar:', avatarUrl)
             return cached
           }
 
-          debugLog('[Avatar Proxy] Fetching avatar with auth:', avatarUrl, 'authMethod:', authMethod)
+          console.log('[Avatar Proxy] Fetching avatar with auth:', avatarUrl, 'authMethod:', authMethod)
 
           // Get config for endpoint (needed for JWT cookie lookup)
           const config = await getConfig()
@@ -1036,7 +1036,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           if (authMethod === 'jwt') {
             jwtToken = await getJWTCookie(config.apiEndpoint)
             if (!jwtToken) {
-              debugLog('[Avatar Proxy] No JWT token available, will try credentials')
+              console.log('[Avatar Proxy] No JWT token available, will try credentials')
             }
           }
 
@@ -1055,7 +1055,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           const response = await fetch(avatarUrl, fetchOptions)
 
           if (!response.ok) {
-            debugError('[Avatar Proxy] Fetch failed:', response.status)
+            console.error('[Avatar Proxy] Fetch failed:', response.status)
             return new Response('Avatar fetch failed', { status: response.status })
           }
 
@@ -1072,7 +1072,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 
           // Store in cache
           await cache.put(event.request, cachedResponse.clone())
-          debugLog('[Avatar Proxy] Cached avatar:', avatarUrl)
+          console.log('[Avatar Proxy] Cached avatar:', avatarUrl)
 
           return cachedResponse
         } catch (error) {
@@ -1080,7 +1080,6 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           console.error('[Avatar Proxy] Error:', error)
           console.error('[Avatar Proxy] Error stack:', error instanceof Error ? error.stack : 'No stack')
           console.error('[Avatar Proxy] Error message:', error instanceof Error ? error.message : String(error))
-          debugError('[Avatar Proxy] Error:', error)
           return new Response(`Avatar proxy error: ${error instanceof Error ? error.message : String(error)}`, { status: 500 })
         }
       })()
