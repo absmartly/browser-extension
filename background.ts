@@ -572,6 +572,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
     // Use checkAuthentication from auth.ts for consistent auth logic
+    console.log('[Background CHECK_AUTH] >>>>>> START - Received with requestId:', message.requestId)
     debugLog('[Background CHECK_AUTH] Received with requestId:', message.requestId)
 
     // Parse config from JSON if present (allows passing current form values)
@@ -579,8 +580,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.configJson) {
       try {
         configToUse = JSON.parse(message.configJson)
+        console.log('[Background CHECK_AUTH] Using config from message:', configToUse)
         debugLog('[Background CHECK_AUTH] Using config from message:', configToUse)
       } catch (e) {
+        console.error('[Background CHECK_AUTH] Failed to parse configJson:', e)
         debugError('[Background CHECK_AUTH] Failed to parse configJson:', e)
       }
     }
@@ -589,7 +592,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const configPromise = configToUse ? Promise.resolve(configToUse) : getConfig()
 
     configPromise.then(async config => {
+      console.log('[Background CHECK_AUTH] Got config, about to check auth')
       if (!config) {
+        console.log('[Background CHECK_AUTH] No config, sending error')
         // Send result as new message with requestId
         chrome.runtime.sendMessage({
           type: 'CHECK_AUTH_RESULT',
@@ -599,17 +604,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return
       }
 
+      console.log('[Background CHECK_AUTH] Calling checkAuthentication with config')
       debugLog('[Background CHECK_AUTH] Calling checkAuthentication with config')
       const result = await checkAuthentication(config)
+      console.log('[Background CHECK_AUTH] checkAuthentication returned:', { success: result.success, hasData: !!result.data })
       debugLog('[Background CHECK_AUTH] checkAuthentication returned:', { success: result.success, hasData: !!result.data })
 
       // Send result as new message with requestId so SettingsView listener can pick it up
+      console.log('[Background CHECK_AUTH] Sending CHECK_AUTH_RESULT')
       chrome.runtime.sendMessage({
         type: 'CHECK_AUTH_RESULT',
         requestId: message.requestId,
         result: result
       })
+      console.log('[Background CHECK_AUTH] <<<<<< END - Sent result for requestId:', message.requestId)
     }).catch(error => {
+      console.error('[Background CHECK_AUTH] Error in promise chain:', error)
       debugError('[Background CHECK_AUTH] Error:', error)
       // Send error result as new message with requestId
       chrome.runtime.sendMessage({
@@ -982,8 +992,12 @@ chrome.action.onClicked.addListener(async (tab) => {
 self.addEventListener('fetch', (event: FetchEvent) => {
   const url = new URL(event.request.url)
 
+  // Log all fetch requests to debug
+  console.log('[Avatar Proxy] Fetch event:', url.href)
+
   // Only intercept requests to our avatar proxy endpoint
   if (url.pathname === '/api/avatar' && url.searchParams.has('url')) {
+    console.log('[Avatar Proxy] Intercepting avatar request:', url.href)
     event.respondWith(
       (async () => {
         try {
@@ -1062,8 +1076,12 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 
           return cachedResponse
         } catch (error) {
+          // Use console.error for service worker context to ensure logging works
+          console.error('[Avatar Proxy] Error:', error)
+          console.error('[Avatar Proxy] Error stack:', error instanceof Error ? error.stack : 'No stack')
+          console.error('[Avatar Proxy] Error message:', error instanceof Error ? error.message : String(error))
           debugError('[Avatar Proxy] Error:', error)
-          return new Response('Avatar proxy error', { status: 500 })
+          return new Response(`Avatar proxy error: ${error instanceof Error ? error.message : String(error)}`, { status: 500 })
         }
       })()
     )

@@ -111,22 +111,28 @@ async function processFetchResponse(
     }
 
     // If we have an avatar base_url, create a proxy URL for it
+    // Wrap in try-catch to ensure avatar failures don't break auth
     if (userData.avatar?.base_url && userData.avatar?.file_name) {
-      const avatarUrl = `${baseUrl}${userData.avatar.base_url}/${userData.avatar.file_name}`
+      try {
+        const avatarUrl = `${baseUrl}${userData.avatar.base_url}/${userData.avatar.file_name}`
 
-      // Create a proper config object with the auth method for fetchAuthenticatedImage
-      const imageConfig = {
-        apiEndpoint: baseUrl,
-        authMethod: config.authMethod || 'jwt',
-        apiKey: config.apiKey
-      }
+        // Create a proper config object with the auth method for fetchAuthenticatedImage
+        const imageConfig = {
+          apiEndpoint: baseUrl,
+          authMethod: config.authMethod || 'jwt',
+          apiKey: config.apiKey
+        }
 
-      const avatarProxyUrl = await fetchAuthenticatedImage(avatarUrl, imageConfig as any)
-      if (avatarProxyUrl) {
-        minimalUser.avatarUrl = avatarProxyUrl
-        console.log('[Avatar] Created proxy URL for avatar')
-      } else {
-        console.error('[Avatar] Failed to create proxy URL for avatar')
+        const avatarProxyUrl = await fetchAuthenticatedImage(avatarUrl, imageConfig as any)
+        if (avatarProxyUrl) {
+          minimalUser.avatarUrl = avatarProxyUrl
+          console.log('[Avatar] Created proxy URL for avatar')
+        } else {
+          console.log('[Avatar] Skipping avatar (proxy URL not available)')
+        }
+      } catch (avatarError) {
+        // Avatar fetching failed, but don't fail the auth check
+        console.log('[Avatar] Skipping avatar due to error:', avatarError)
       }
     }
 
@@ -153,15 +159,23 @@ async function blobToBase64(blob: Blob): Promise<string> {
 
 /**
  * Returns a proxy URL for an authenticated image that will be fetched by the service worker
+ * In test environments without service workers, returns null to skip avatar loading
  * @param url - Full URL to the image (should already include base URL)
  * @param config - ABsmartly config with auth method and credentials
- * @returns Proxy URL that can be used in img src, or null if invalid
+ * @returns Proxy URL that can be used in img src, or null if service worker not available
  */
 export async function fetchAuthenticatedImage(
   url: string,
   config: ABsmartlyConfig
 ): Promise<string | null> {
   try {
+    // Check if we're in an extension context with service worker
+    // In test mode, chrome.runtime.getURL might work but service worker won't be running
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
+      console.log('[Avatar] Not in extension context, skipping avatar')
+      return null
+    }
+
     // Encode auth config in the proxy URL so service worker knows how to authenticate
     const params = new URLSearchParams({
       url: url,
