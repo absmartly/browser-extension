@@ -480,12 +480,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === "CHECK_AUTH") {
     // Special handler for auth check - use extracted authentication utility
     debugLog('[CHECK_AUTH] Received CHECK_AUTH request')
-    getConfig().then(async config => {
+
+    // Use passed config if provided, otherwise load from storage
+    const configPromise = message.config
+      ? Promise.resolve(message.config as ABsmartlyConfig)
+      : getConfig()
+
+    configPromise.then(async config => {
       debugLog('[CHECK_AUTH] Config loaded:', {
         hasApiKey: !!config?.apiKey,
         apiKeyLength: config?.apiKey?.length || 0,
         hasEndpoint: !!config?.apiEndpoint,
-        authMethod: config?.authMethod || 'not set'
+        authMethod: config?.authMethod || 'not set',
+        source: message.config ? 'passed from UI' : 'from storage'
       })
       try {
         const result = await checkAuthentication(config)
