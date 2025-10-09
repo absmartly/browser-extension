@@ -28,13 +28,11 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   debugLog('checkAuthentication: Fetching user from', fullAuthUrl)
 
   // Build fetch options with auth headers
-  // NOTE: Don't set 'mode' - let Chrome handle it with host_permissions
+  // NOTE: Don't set 'mode' or unnecessary headers to avoid CORS preflight
+  // With host_permissions, Chrome will handle CORS automatically
   const fetchOptions: RequestInit = {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
+    headers: {}
   }
 
   // Use ONLY the selected auth method - NO FALLBACKS
@@ -87,10 +85,13 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
 
     // Add timeout controller to prevent hanging
     const controller = new AbortController()
+    let timedOut = false
     const timeoutId = setTimeout(() => {
-      console.log('[auth.ts] Timeout reached, aborting request...')
+      console.log('[auth.ts] Timeout reached after 10s, aborting request...')
+      timedOut = true
       controller.abort()
     }, 10000)
+    console.log('[auth.ts] Timeout set for 10 seconds')
 
     try {
       console.log('[auth.ts] Calling fetch() now...')
@@ -98,8 +99,9 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
         ...fetchOptions,
         signal: controller.signal
       })
-      console.log('[auth.ts] fetch() returned! Status:', userResponse.status)
+      console.log('[auth.ts] fetch() returned! Status:', userResponse.status, 'TimedOut:', timedOut)
       clearTimeout(timeoutId)
+      console.log('[auth.ts] Timeout cleared')
 
       if (!userResponse.ok) {
         console.log('[auth.ts] Response not OK:', userResponse.status)
