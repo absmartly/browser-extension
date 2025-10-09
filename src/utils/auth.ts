@@ -31,7 +31,6 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   const fetchOptions: RequestInit = {
     method: 'GET',
     mode: 'cors',
-    credentials: 'omit',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
@@ -43,6 +42,8 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
 
   if (authMethod === 'jwt') {
     // JWT authentication - use cookies
+    fetchOptions.credentials = 'include'  // Send cookies for JWT
+
     const jwtToken = await getJWTCookie(config.apiEndpoint)
     if (!jwtToken) {
       debugLog('checkAuthentication: No JWT token available')
@@ -60,6 +61,8 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
     debugLog('checkAuthentication: Using JWT authentication')
   } else if (authMethod === 'apikey') {
     // API Key authentication
+    fetchOptions.credentials = 'omit'  // Don't send cookies for API Key
+
     if (!config.apiKey) {
       debugLog('checkAuthentication: No API key configured')
       return { success: false, error: 'No API key configured' }
