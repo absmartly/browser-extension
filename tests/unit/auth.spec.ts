@@ -17,6 +17,64 @@ import { getJWTCookie } from '../../src/utils/cookies'
 // Get test credentials from environment
 const TEST_API_KEY = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
 const TEST_API_ENDPOINT = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1'
+const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL
+const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD
+
+// Helper function to log in and get JWT cookie
+async function loginAndGetJWT(context: any, page: any): Promise<any> {
+  if (!TEST_USER_EMAIL || !TEST_USER_PASSWORD) {
+    console.log('⚠️ TEST_USER_EMAIL or TEST_USER_PASSWORD not configured')
+    return null
+  }
+
+  const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
+  
+  // Check if already logged in
+  let cookies = await context.cookies()
+  let jwtCookie = cookies.find((c: any) =>
+    c.name === 'jwt' ||
+    c.name === 'JWT' ||
+    (c.value.includes('.') && c.value.split('.').length === 3)
+  )
+
+  if (jwtCookie) {
+    console.log('✅ Already logged in')
+    return jwtCookie
+  }
+
+  console.log('Not logged in, attempting to log in with test credentials...')
+  
+  // Navigate to login page
+  await page.goto(`${baseUrl}/login`)
+  await page.waitForLoadState('networkidle')
+  
+  // Fill in email and password
+  await page.fill('input[type="email"], input[name="email"]', TEST_USER_EMAIL)
+  await page.fill('input[type="password"], input[name="password"]', TEST_USER_PASSWORD)
+  
+  // Click login button
+  await page.click('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")')
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(2000) // Wait for cookie to be set
+  
+  console.log('Login completed, checking for JWT cookie...')
+  
+  // Check for JWT cookie again
+  cookies = await context.cookies()
+  jwtCookie = cookies.find((c: any) =>
+    c.name === 'jwt' ||
+    c.name === 'JWT' ||
+    (c.value.includes('.') && c.value.split('.').length === 3)
+  )
+
+  if (jwtCookie) {
+    console.log('✅ Successfully logged in')
+  } else {
+    console.log('❌ Login failed - no JWT cookie found')
+  }
+  
+  return jwtCookie
+}
 
 test.describe('Authentication Utils - API Key', () => {
   test('checkAuthentication should authenticate with valid API Key', async () => {
@@ -113,24 +171,17 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     })
 
     try {
-      // Navigate to ABsmartly to potentially get JWT cookie
       const page = await context.newPage()
-      await page.goto(TEST_API_ENDPOINT.replace(/\/v1$/, ''))
+      const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
+      await page.goto(baseUrl)
       await page.waitForLoadState('networkidle')
 
       console.log('Opened ABsmartly page:', page.url())
 
-      // Check if user is logged in by looking for jwt cookie
-      const cookies = await context.cookies()
-      const jwtCookie = cookies.find(c =>
-        c.name === 'jwt' ||
-        c.name === 'JWT' ||
-        (c.value.includes('.') && c.value.split('.').length === 3)
-      )
+      // Attempt to log in and get JWT cookie
+      const jwtCookie = await loginAndGetJWT(context, page)
 
       if (!jwtCookie) {
-        console.log('⚠️ No JWT cookie found - user may not be logged in')
-        console.log('To test JWT authentication, manually log in to ABsmartly first')
         test.skip()
         return
       }
@@ -162,24 +213,17 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     })
 
     try {
-      // Navigate to ABsmartly to potentially get JWT cookie
       const page = await context.newPage()
-      await page.goto(TEST_API_ENDPOINT.replace(/\/v1$/, ''))
+      const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
+      await page.goto(baseUrl)
       await page.waitForLoadState('networkidle')
 
       console.log('Opened ABsmartly page:', page.url())
 
-      // Check if user is logged in
-      const cookies = await context.cookies()
-      const jwtCookie = cookies.find(c =>
-        c.name === 'jwt' ||
-        c.name === 'JWT' ||
-        (c.value.includes('.') && c.value.split('.').length === 3)
-      )
+      // Attempt to log in and get JWT cookie
+      const jwtCookie = await loginAndGetJWT(context, page)
 
       if (!jwtCookie) {
-        console.log('⚠️ No JWT cookie found - user may not be logged in')
-        console.log('To test JWT authentication, manually log in to ABsmartly first')
         test.skip()
         return
       }

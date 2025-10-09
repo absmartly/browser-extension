@@ -105,9 +105,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const checkAuthStatus = async (endpoint: string) => {
     setCheckingAuth(true)
     try {
-      // Send message to background script to check auth
+      // Send message to background script to check auth with current form values
       const response = await chrome.runtime.sendMessage({
-        type: 'CHECK_AUTH'
+        type: 'CHECK_AUTH',
+        config: {
+          apiEndpoint: endpoint,
+          apiKey: apiKey.trim(),
+          authMethod: authMethod
+        }
       })
       
       if (response.success && response.data) {
@@ -270,6 +275,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           <div className="text-sm font-medium text-gray-700">Authentication Status</div>
           {apiEndpoint && !checkingAuth && (
             <Button
+              id="auth-refresh-button"
               onClick={() => checkAuthStatus(apiEndpoint)}
               size="sm"
               variant="secondary"
@@ -326,7 +332,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           <div className="space-y-2" data-testid="auth-not-authenticated">
             <div className="text-sm text-gray-600">Not authenticated</div>
             {apiEndpoint && (
-              <Button 
+              <Button
+                id="authenticate-button"
                 onClick={handleAuthenticate}
                 size="sm"
                 variant="secondary"
@@ -353,6 +360,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         <div className="flex gap-4">
           <label className="flex items-center">
             <input
+              id="auth-method-jwt"
               type="radio"
               value="jwt"
               checked={authMethod === 'jwt'}
@@ -363,6 +371,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           </label>
           <label className="flex items-center">
             <input
+              id="auth-method-apikey"
               type="radio"
               value="apikey"
               checked={authMethod === 'apikey'}
@@ -381,6 +390,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       
       <div>
         <Input
+          id="api-key-input"
           label={`API Key ${authMethod === 'apikey' ? '(Required)' : '(Optional)'}`}
           type="password"
           value={apiKey}
@@ -547,10 +557,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       </div>
 
       <div className="flex gap-2 pt-2">
-        <Button onClick={handleSave} variant="primary">
+        <Button id="save-settings-button" onClick={handleSave} variant="primary">
           Save Settings
         </Button>
-        <Button onClick={onCancel} variant="secondary">
+        <Button id="cancel-button" onClick={onCancel} variant="secondary">
           Cancel
         </Button>
       </div>
