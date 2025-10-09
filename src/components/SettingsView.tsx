@@ -42,16 +42,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     loadConfig()
   }, [])
 
-  // Check cookie permission when auth method changes to JWT
+  // Check permissions when auth method changes
   useEffect(() => {
-    if (authMethod === 'jwt') {
-      checkCookiePermission()
-    }
+    checkCookiePermission()
   }, [authMethod])
 
-  // Show modal when JWT is selected but no cookie permission
+  // Show modal when no permissions are granted
   useEffect(() => {
-    if (authMethod === 'jwt' && cookiePermissionGranted === false && !loading) {
+    if (cookiePermissionGranted === false && !loading) {
       setShowCookieConsentModal(true)
     }
   }, [authMethod, cookiePermissionGranted, loading])
@@ -113,24 +111,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         // Store endpoint in localStorage for avatar URLs
         localStorage.setItem('absmartly-endpoint', loadedApiEndpoint)
 
-        // If using JWT auth, check cookie permission first (silently)
-        if (loadedAuthMethod === 'jwt') {
-          const hasPermission = await checkCookiePermission()
-          // Only auto-check auth if permission is granted
-          if (hasPermission) {
-            await checkAuthStatus(loadedApiEndpoint, {
-              apiKey: loadedApiKey,
-              authMethod: loadedAuthMethod
-            })
-          } else {
-            console.log('[SettingsView] Cookie permission not granted, skipping auto auth check')
-          }
-        } else {
-          // API key auth doesn't need cookie permission
+        // Check permissions first (silently)
+        const hasPermission = await checkCookiePermission()
+        // Only auto-check auth if permission is granted
+        if (hasPermission) {
           await checkAuthStatus(loadedApiEndpoint, {
             apiKey: loadedApiKey,
             authMethod: loadedAuthMethod
           })
+        } else {
+          console.log('[SettingsView] Permissions not granted, skipping auto auth check')
         }
       }
     } catch (error) {
@@ -140,67 +130,88 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     }
   }
 
-  const checkCookiePermission = async (): Promise<boolean> => {
+  // Check cookie and host permissions separately
+  const checkPermissions = async (): Promise<{ hasCookies: boolean; hasHost: boolean }> => {
     try {
-      const hasPermission = await chrome.permissions.contains({
-        permissions: ['cookies'],
+      const hasCookies = await chrome.permissions.contains({
+        permissions: ['cookies']
+      })
+
+      const hasHost = await chrome.permissions.contains({
         origins: ['https://*.absmartly.com/*']
       })
-      console.log('[SettingsView] Cookie permission check:', hasPermission)
-      setCookiePermissionGranted(hasPermission)
-      return hasPermission
+
+      console.log('[SettingsView] Permissions:', { hasCookies, hasHost })
+
+      return { hasCookies, hasHost }
     } catch (error) {
-      console.error('[SettingsView] Error checking permission:', error)
-      setCookiePermissionGranted(false)
-      return false
+      console.error('[SettingsView] Error checking permissions:', error)
+      return { hasCookies: false, hasHost: false }
     }
   }
 
-  const requestCookiePermission = async (): Promise<boolean> => {
+  // Request only missing permissions
+  const requestMissingPermissions = async (): Promise<boolean> => {
+    const { hasCookies, hasHost } = await checkPermissions()
+
+    if (hasCookies && hasHost) {
+      console.log('[SettingsView] All permissions already granted')
+      setCookiePermissionGranted(true)
+      return true
+    }
+
+    // Build request with only missing permissions
+    const request: chrome.permissions.Permissions = {}
+
+    if (!hasCookies) {
+      request.permissions = ['cookies']
+    }
+
+    if (!hasHost) {
+      request.origins = ['https://*.absmartly.com/*']
+    }
+
+    console.log('[SettingsView] Requesting missing permissions:', request)
+
     try {
-      // Check if permission is already granted
-      const hasPermission = await checkCookiePermission()
-
-      if (hasPermission) {
-        console.log('[SettingsView] Cookie permission already granted')
-        return true
-      }
-
-      // Request permission from user (must be in response to user action)
-      console.log('[SettingsView] Requesting cookie permission...')
-      const granted = await chrome.permissions.request({
-        permissions: ['cookies'],
-        origins: ['https://*.absmartly.com/*']
-      })
+      const granted = await chrome.permissions.request(request)
 
       if (granted) {
-        console.log('[SettingsView] ✅ User granted cookie permission')
+        console.log('[SettingsView] ✅ User granted missing permissions')
         setCookiePermissionGranted(true)
       } else {
-        console.log('[SettingsView] ❌ User denied cookie permission')
+        console.log('[SettingsView] ❌ User denied missing permissions')
         setCookiePermissionGranted(false)
       }
 
       return granted
     } catch (error) {
-      console.error('[SettingsView] Error requesting permission:', error)
+      console.error('[SettingsView] Error requesting missing permissions:', error)
       setCookiePermissionGranted(false)
       return false
     }
   }
 
+  const checkCookiePermission = async (): Promise<boolean> => {
+    const { hasCookies, hasHost } = await checkPermissions()
+    const hasAll = hasCookies && hasHost
+    setCookiePermissionGranted(hasAll)
+    return hasAll
+  }
+
+  const requestCookiePermission = async (): Promise<boolean> => {
+    return await requestMissingPermissions()
+  }
+
   const checkAuthStatus = async (endpoint: string, configOverride?: { apiKey: string; authMethod: 'jwt' | 'apikey' }) => {
     console.log('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
 
-    // If using JWT auth, ensure we have cookie permission first
-    const effectiveAuthMethod = configOverride?.authMethod || authMethod
-    if (effectiveAuthMethod === 'jwt') {
-      const hasPermission = await requestCookiePermission()
-      if (!hasPermission) {
-        setUser(null)
-        setErrors({ general: 'Cookie access permission is required for JWT authentication. Please try again and allow cookie access.' })
-        return
-      }
+    // Always request permissions (both host access and cookies for JWT)
+    const hasPermission = await requestCookiePermission()
+    if (!hasPermission) {
+      setUser(null)
+      setErrors({ general: 'Permission required to access ABsmartly. Please grant permission and try again.' })
+      return
     }
 
     setCheckingAuth(true)
@@ -273,9 +284,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         setUser(null)
 
         // Show specific error for permission issues
-        if (effectiveAuthMethod === 'jwt' && response.error?.includes('JWT token')) {
+        if (response.error?.includes('JWT token') || response.error?.includes('permission')) {
           setErrors({
-            general: 'Cookie permission required. Please grant permission to use JWT authentication.'
+            general: 'Permission required. Please grant access to ABsmartly domains.'
           })
         }
       }
@@ -285,14 +296,25 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
       // Show specific error for timeout
       if (error.message?.includes('timed out')) {
-        // If JWT auth timed out, re-request permission to ensure it's active
-        if (effectiveAuthMethod === 'jwt') {
-          console.log('[SettingsView] JWT auth timed out, re-requesting permission...')
+        console.log('[SettingsView] Auth timed out, checking permission status...')
+
+        // Check which permissions are missing
+        const { hasCookies, hasHost } = await checkPermissions()
+
+        if (!hasCookies || !hasHost) {
+          // At least one permission is missing, show modal to request it
+          const missingPerms = []
+          if (!hasCookies) missingPerms.push('cookies')
+          if (!hasHost) missingPerms.push('host access')
+
+          console.log('[SettingsView] Missing permissions:', missingPerms.join(', '))
           setShowCookieConsentModal(true)
           setErrors({
-            general: 'Authentication timed out. Please grant permission to access ABsmartly cookies.'
+            general: `Authentication timed out. Missing permissions: ${missingPerms.join(', ')}. Please grant permission to access ABsmartly.`
           })
         } else {
+          // All permissions granted, but auth still timed out (different issue)
+          console.log('[SettingsView] All permissions granted, but auth still timed out')
           setErrors({
             general: 'Authentication check timed out. Please check your connection and try again.'
           })
@@ -381,7 +403,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const handleCookieConsentDeny = () => {
     setShowCookieConsentModal(false)
     setErrors({
-      general: 'Cookie access is required for JWT authentication. Please use API Key authentication instead or grant cookie access.'
+      general: 'Access permission is required to communicate with ABsmartly. Please grant permission to continue.'
     })
   }
 
