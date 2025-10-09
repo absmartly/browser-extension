@@ -30,6 +30,8 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   // Build fetch options with auth headers
   const fetchOptions: RequestInit = {
     method: 'GET',
+    mode: 'cors',
+    credentials: 'omit',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
