@@ -3,6 +3,8 @@ import axios from 'axios'
 import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import { getJWTCookie } from '~src/utils/cookies'
+import { checkAuthentication } from '~src/utils/auth'
 
 // Storage instance
 const storage = new Storage()
@@ -143,100 +145,6 @@ async function openLoginPage() {
   // User not authenticated, open login page (without /login suffix)
   chrome.tabs.create({ url: baseUrl })
   return { authenticated: false }
-}
-
-// Helper function to get JWT cookie for a domain
-async function getJWTCookie(domain: string): Promise<string | null> {
-  try {
-    debugLog('=== getJWTCookie START ===')
-    debugLog('Input domain:', domain)
-    
-    // Parse the URL to get the base domain
-    let parsedUrl: URL
-    try {
-      parsedUrl = new URL(domain.startsWith('http') ? domain : `https://${domain}`)
-    } catch (e) {
-      debugError('Failed to parse URL:', domain, e)
-      return null
-    }
-    
-    const hostname = parsedUrl.hostname
-    const protocol = parsedUrl.protocol
-    const baseUrl = `${protocol}//${hostname}`
-    
-    debugLog('Parsed URL:', { hostname, protocol, baseUrl })
-    
-    // Try multiple strategies to find the JWT cookie
-    
-    // Strategy 1: Get cookies for the exact URL
-    debugLog('Strategy 1: Fetching cookies for exact URL:', baseUrl)
-    const urlCookies = await chrome.cookies.getAll({ url: baseUrl })
-    debugLog(`Found ${urlCookies.length} cookies for URL ${baseUrl}`)
-    
-    if (urlCookies.length > 0) {
-      debugLog('URL cookies:', urlCookies.map(c => `${c.name} (domain: ${c.domain})`))
-    }
-    
-    // Strategy 2: Get cookies for the domain (without subdomain)
-    const domainParts = hostname.split('.')
-    const baseDomain = domainParts.length > 2 
-      ? domainParts.slice(-2).join('.') 
-      : hostname
-    
-    debugLog('Strategy 2: Fetching cookies for base domain:', baseDomain)
-    const domainCookies = await chrome.cookies.getAll({ domain: baseDomain })
-    debugLog(`Found ${domainCookies.length} cookies for domain ${baseDomain}`)
-    
-    if (domainCookies.length > 0) {
-      debugLog('Domain cookies:', domainCookies.map(c => `${c.name} (domain: ${c.domain})`))
-    }
-    
-    // Strategy 3: Get cookies with dot prefix (for subdomain access)
-    debugLog('Strategy 3: Fetching cookies for .domain:', `.${baseDomain}`)
-    const dotDomainCookies = await chrome.cookies.getAll({ domain: `.${baseDomain}` })
-    debugLog(`Found ${dotDomainCookies.length} cookies for .${baseDomain}`)
-    
-    if (dotDomainCookies.length > 0) {
-      debugLog('.Domain cookies:', dotDomainCookies.map(c => `${c.name} (domain: ${c.domain})`))
-    }
-    
-    // Combine all cookies and look for JWT
-    const allCookies = [...urlCookies, ...domainCookies, ...dotDomainCookies]
-    const uniqueCookies = Array.from(new Map(allCookies.map(c => [`${c.name}-${c.value}`, c])).values())
-    
-    debugLog(`Total unique cookies found: ${uniqueCookies.length}`)
-
-    // Look for JWT cookie - check common ABsmartly cookie names
-    // Try exact matches first
-    let jwtCookie = uniqueCookies.find(cookie =>
-      cookie.name === 'jwt' || // ABsmartly typically uses lowercase 'jwt'
-      cookie.name === 'JWT' ||
-      cookie.name === 'access_token' ||
-      cookie.name === 'auth_token' ||
-      cookie.name === 'authorization'
-    )
-
-    // If not found, look for cookies that might contain JWT token (3 parts separated by dots)
-    if (!jwtCookie) {
-      jwtCookie = uniqueCookies.find(cookie => {
-        const value = cookie.value
-        return value && value.includes('.') && value.split('.').length === 3
-      })
-    }
-    
-    if (jwtCookie) {
-      debugLog(`✅ JWT cookie found: ${jwtCookie.name} (length: ${jwtCookie.value.length}, domain: ${jwtCookie.domain})`)
-      debugLog('=== getJWTCookie END (SUCCESS) ===')
-      return jwtCookie.value
-    }
-    
-    debugLog('❌ No JWT cookie found')
-    debugLog('=== getJWTCookie END (NOT FOUND) ===')
-    return null
-  } catch (error) {
-    debugError('Error getting JWT cookie:', error)
-    return null
-  }
 }
 
 // Helper function to make API requests with automatic JWT fallback
@@ -570,126 +478,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
-    // Special handler for auth check - directly check user authentication
+    // Special handler for auth check - use extracted authentication utility
+    debugLog('[CHECK_AUTH] Received CHECK_AUTH request')
     getConfig().then(async config => {
-      if (!config?.apiEndpoint) {
-        sendResponse({ success: false, error: 'No endpoint configured' })
-        return
-      }
-      
-      const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-      
+      debugLog('[CHECK_AUTH] Config loaded:', {
+        hasApiKey: !!config?.apiKey,
+        apiKeyLength: config?.apiKey?.length || 0,
+        hasEndpoint: !!config?.apiEndpoint,
+        authMethod: config?.authMethod || 'not set'
+      })
       try {
-        // Try to get user info directly from /auth/current-user
-        const fullAuthUrl = `${baseUrl}/auth/current-user`
-        debugLog('CHECK_AUTH: Fetching user from', fullAuthUrl)
-        
-        // Build auth headers
-        const authHeaders: any = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-        
-        // Use auth method from config
-        const authMethod = config.authMethod || 'jwt'
-        const shouldTryJwtFirst = authMethod === 'jwt'
-        
-        if (shouldTryJwtFirst) {
-          // Try JWT first
-          const jwtToken = await getJWTCookie(config.apiEndpoint)
-          if (jwtToken) {
-            authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
-              ? `JWT ${jwtToken}`
-              : `Bearer ${jwtToken}`
-            debugLog('CHECK_AUTH: Using JWT authentication')
-          } else if (config.apiKey) {
-            // Fallback to API key if JWT not available
-            authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-              ? `JWT ${config.apiKey}`
-              : `Api-Key ${config.apiKey}`
-            debugLog('CHECK_AUTH: Using API key as fallback')
-          }
-        } else if (config.apiKey) {
-          // Try API key first
-          authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-            ? `JWT ${config.apiKey}`
-            : `Api-Key ${config.apiKey}`
-          debugLog('CHECK_AUTH: Using API key authentication')
-        } else {
-          // No API key, try JWT as fallback
-          const jwtToken = await getJWTCookie(config.apiEndpoint)
-          if (jwtToken) {
-            authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
-              ? `JWT ${jwtToken}`
-              : `Bearer ${jwtToken}`
-            debugLog('CHECK_AUTH: Using JWT as fallback (no API key available)')
-          }
-        }
-        
-        try {
-          const userResponse = await axios.get(fullAuthUrl, {
-            withCredentials: false,
-            headers: authHeaders
-          })
-            
-            // Auth response received from /auth/current-user
-            
-            // If we have a user but no avatar object, fetch full user details
-            let finalUserData = userResponse.data
-            if (userResponse.data.user && userResponse.data.user.avatar_file_upload_id && !userResponse.data.user.avatar) {
-              try {
-                // Fetching full user details to get avatar
-                const fullUserResponse = await makeAPIRequest('GET', `/users/${userResponse.data.user.id}`)
-                if (fullUserResponse && fullUserResponse.user && fullUserResponse.user.avatar) {
-                  finalUserData.user.avatar = fullUserResponse.user.avatar
-                  // Successfully fetched avatar data
-                } else {
-                  // No avatar found in user response
-                }
-              } catch (avatarError) {
-                debugLog('Could not fetch full user details for avatar:', avatarError)
-              }
-            }
-            
-            sendResponse({ success: true, data: finalUserData })
-        } catch (authError) {
-          // If first attempt failed with API key, try with JWT
-          if (authError.response?.status === 401 && config.apiKey && !shouldTryJwtFirst) {
-            debugLog('CHECK_AUTH: API key failed, trying JWT fallback')
-            const jwtToken = await getJWTCookie(config.apiEndpoint)
-            
-            if (jwtToken) {
-              authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
-                ? `JWT ${jwtToken}`
-                : `Bearer ${jwtToken}`
-              
-              try {
-                const retryResponse = await axios.get(fullAuthUrl, {
-                  withCredentials: false,
-                  headers: authHeaders
-                })
-                
-                debugLog('CHECK_AUTH: JWT fallback successful')
-                
-                sendResponse({ success: true, data: retryResponse.data })
-              } catch (retryError) {
-                debugLog('CHECK_AUTH: JWT also failed')
-                sendResponse({ success: false, error: 'Not authenticated' })
-              }
-            } else {
-              sendResponse({ success: false, error: 'Not authenticated' })
-            }
-          } else {
-            debugLog('CHECK_AUTH: Authentication failed:', authError.response?.status)
-            sendResponse({ success: false, error: 'Not authenticated' })
-          }
-        }
+        const result = await checkAuthentication(config)
+        debugLog('[CHECK_AUTH] checkAuthentication result:', result)
+        sendResponse(result)
       } catch (error) {
-        debugError('Auth check error:', error)
+        debugError('[CHECK_AUTH] Auth check error:', error)
         sendResponse({ success: false, error: error.message || 'Auth check failed' })
       }
     }).catch(error => {
-      debugError('Config error:', error)
+      debugError('[CHECK_AUTH] Config error:', error)
       sendResponse({ success: false, error: 'Failed to get config' })
     })
     return true // Will respond asynchronously

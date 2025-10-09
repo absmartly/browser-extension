@@ -93,7 +93,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       if (loadedApiEndpoint) {
         // Store endpoint in localStorage for avatar URLs
         localStorage.setItem('absmartly-endpoint', loadedApiEndpoint)
-        checkAuthStatus(loadedApiEndpoint)
+        await checkAuthStatus(loadedApiEndpoint)
       }
     } catch (error) {
       debugError('[SettingsView] Failed to load config:', error)
@@ -161,6 +161,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         setAvatarDataUrl(null)
       }
     } catch (error) {
+      debugError('[SettingsView] CHECK_AUTH error:', error)
       setUser(null)
       setAvatarDataUrl(null)
     } finally {
@@ -215,11 +216,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
     try {
       await setConfig(config)
-      // Store endpoint in localStorage for avatar URLs
+      
+      // Store endpoint in localStorage for avatar URLs  
       if (apiEndpoint) {
         localStorage.setItem('absmartly-endpoint', apiEndpoint)
-        checkAuthStatus(apiEndpoint)
       }
+      
+      // Navigate away - auth check will happen when user returns to settings via loadConfig
       onSave(config)
     } catch (error) {
       debugError('Failed to save config:', error)
@@ -262,7 +265,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       )}
 
       {/* Authentication Status */}
-      <div className="bg-gray-50 p-3 rounded-md">
+      <div className="bg-gray-50 p-3 rounded-md" data-testid="auth-status-section">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-medium text-gray-700">Authentication Status</div>
           {apiEndpoint && !checkingAuth && (
@@ -282,7 +285,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             Checking authentication...
           </div>
         ) : user && user.authenticated ? (
-          <div>
+          <div data-testid="auth-user-info">
             <div className="flex items-center space-x-3">
               <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
                 {(avatarDataUrl || user.picture) ? (
@@ -305,8 +308,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
                 )}
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-900">{user.name || 'User'}</div>
-                <div className="text-xs text-gray-600">{user.email || 'No email'}</div>
+                <div className="text-sm font-medium text-gray-900" data-testid="auth-user-name">{user.name || 'User'}</div>
+                <div className="text-xs text-gray-600" data-testid="auth-user-email">{user.email || 'No email'}</div>
               </div>
             </div>
             {/* Debug info - only show in development */}
@@ -320,7 +323,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             )}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2" data-testid="auth-not-authenticated">
             <div className="text-sm text-gray-600">Not authenticated</div>
             {apiEndpoint && (
               <Button 
@@ -333,7 +336,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             )}
           </div>
         )}
-      </div>
+            </div>
       
       <Input
         label="ABsmartly Endpoint"

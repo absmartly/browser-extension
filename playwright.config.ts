@@ -41,6 +41,8 @@ export default defineConfig({
         'e2e/**/*.spec.ts',
         // Include tests in root tests directory
         '*.spec.ts',
+        // Include unit tests
+        'unit/**/*.spec.ts',
         // Specifically include Monaco tests
         'e2e/monaco-automated.spec.ts'
       ]

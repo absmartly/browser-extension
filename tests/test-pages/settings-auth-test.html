@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings Authentication Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .test-info {
+      background: #f0f9ff;
+      border: 1px solid #0ea5e9;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .test-info h2 {
+      margin-top: 0;
+      color: #0284c7;
+    }
+
+    .test-info p {
+      margin: 10px 0;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>Settings Authentication Test Page</h1>
+
+  <div class="test-info">
+    <h2>Test Purpose</h2>
+    <p>This page is used to test the Settings authentication flow in the ABsmartly Browser Extension.</p>
+
+    <p><strong>Test Scenarios:</strong></p>
+    <ul>
+      <li>API Key authentication - verify user info displays correctly</li>
+      <li>JWT authentication - verify Google OAuth flow and user info</li>
+      <li>Authentication method switching</li>
+      <li>User profile and avatar display</li>
+    </ul>
+  </div>
+
+  <div id="test-content">
+    <p>The extension sidebar should appear on the right side of this page.</p>
+    <p>Use the sidebar to navigate to Settings and test authentication.</p>
+  </div>
+</body>
+</html>
