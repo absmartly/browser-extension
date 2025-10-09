@@ -23,7 +23,7 @@ export function CookieConsentModal({ isOpen, onGrant, onDeny }: CookieConsentMod
             ABsmartly Access Required
           </h3>
           <p className="text-sm text-gray-600 text-center">
-            To use JWT authentication and communicate with ABsmartly, this extension needs permission to access ABsmartly domains.
+            To communicate with ABsmartly, this extension needs permission to access ABsmartly domains.
           </p>
         </div>
 
@@ -32,8 +32,8 @@ export function CookieConsentModal({ isOpen, onGrant, onDeny }: CookieConsentMod
             <strong>What this allows:</strong>
           </p>
           <ul className="text-xs text-blue-800 mt-1 ml-4 list-disc space-y-1">
-            <li>Read your authentication cookie from ABsmartly.com</li>
             <li>Make API requests to ABsmartly (bypassing CORS restrictions)</li>
+            <li>Read authentication cookies from ABsmartly.com (for JWT auth)</li>
             <li>Fetch experiment data and user information</li>
           </ul>
         </div>
