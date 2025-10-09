@@ -24,8 +24,8 @@ test.describe('Settings Authentication Tests', () => {
       console.log(`[CONSOLE] ${msg.type()}: ${text}`)
     })
 
-    // Load test page
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
+    // Load test page from same domain as API to avoid CORS issues
+    await testPage.goto('https://demo-2.absmartly.com/')
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForLoadState('networkidle')
 
