@@ -424,6 +424,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true })
     return true
   }
+
+  // Return false for messages we don't handle to keep channel open for other listeners
+  return false
 })
 
 debugLog('[Visual Editor Content Script] Loaded and listening for messages')

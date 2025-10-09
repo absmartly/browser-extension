@@ -8,6 +8,8 @@ import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import axios from 'axios'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
+import { fetchAuthenticatedImage } from '~src/utils/fetch-authenticated-image'
+import { Storage } from "@plasmohq/storage"
 
 interface SettingsViewProps {
   onSave: (config: ABsmartlyConfig) => void
@@ -15,6 +17,7 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
+  const storage = new Storage()
   const [apiKey, setApiKey] = useState('')
   const [apiEndpoint, setApiEndpoint] = useState('')
   const [applicationName, setApplicationName] = useState('')
@@ -93,7 +96,11 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       if (loadedApiEndpoint) {
         // Store endpoint in localStorage for avatar URLs
         localStorage.setItem('absmartly-endpoint', loadedApiEndpoint)
-        await checkAuthStatus(loadedApiEndpoint)
+        // Pass loaded values directly to avoid race condition with state updates
+        await checkAuthStatus(loadedApiEndpoint, {
+          apiKey: loadedApiKey,
+          authMethod: loadedAuthMethod
+        })
       }
     } catch (error) {
       debugError('[SettingsView] Failed to load config:', error)
@@ -102,102 +109,136 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     }
   }
 
-  const checkAuthStatus = async (endpoint: string) => {
+  const checkAuthStatus = async (endpoint: string, configOverride?: { apiKey: string; authMethod: 'jwt' | 'apikey' }) => {
+    console.log('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
     setCheckingAuth(true)
     try {
-      // Send message to background script to check auth with current form values
-      const response = await chrome.runtime.sendMessage({
-        type: 'CHECK_AUTH',
-        config: {
-          apiEndpoint: endpoint,
-          apiKey: apiKey.trim(),
-          authMethod: authMethod
-        }
-      })
+      // Wake up service worker with a PING first (important for Manifest V3)
+      console.log('[SettingsView] Sending PING to wake up service worker...')
+      try {
+        const pingResponse = await chrome.runtime.sendMessage({ type: 'PING' })
+        console.log('[SettingsView] Service worker is awake, ping response:', pingResponse)
+      } catch (pingError) {
+        console.warn('[SettingsView] PING failed, service worker might be unresponsive:', pingError)
+      }
+      console.log('[SettingsView] Proceeding to CHECK_AUTH after PING')
+
+      // Send message to background script to check auth
+      // Pass config as stringified JSON to ensure proper serialization
+      console.log('[SettingsView] Sending CHECK_AUTH message...')
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      console.log('[SettingsView] Generated request ID:', requestId)
       
-      if (response.success && response.data) {
-        
-        // Check if user data is nested
-        const userData = response.data.user || response.data
-        
-        // Handle picture URL - construct it from base_url
-        let pictureUrl = null
-        
-        // Ensure endpoint doesn't have trailing slash or /v1 suffix for avatar URLs
-        const baseEndpoint = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-        
-        // Check for avatar object
-        const userAvatar = userData.avatar
-        
-        if (userAvatar && typeof userAvatar === 'object' && userAvatar.base_url) {
-          // Construct the full avatar URL: endpoint + base_url + /crop/64x64.webp
-          pictureUrl = `${baseEndpoint}${userAvatar.base_url}/crop/64x64.webp`
+      const configToSend = configOverride ? {
+        apiEndpoint: endpoint,
+        apiKey: configOverride.apiKey.trim(),
+        authMethod: configOverride.authMethod
+      } : null
+      
+      // Send CHECK_AUTH and wait for result
+      const response = await new Promise((resolve, reject) => {
+        // Set up listeners for the actual result (both chrome.runtime and window.postMessage for iframe mode)
+        const chromeListener = (message: any) => {
+          if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
+            console.log('[SettingsView] Received CHECK_AUTH_RESULT via chrome.runtime:', message.result)
+            cleanup()
+            resolve(message.result)
+          }
         }
         
-        // Create user object - handle both full user data and basic authenticated status
-        const userObject = {
-          id: userData.id || userData.user_id || 'authenticated',
-          email: userData.email || 'Authenticated User',
-          name: userData.first_name && userData.last_name 
-            ? `${userData.first_name} ${userData.last_name}`
-            : userData.first_name || userData.last_name || userData.email || 'Authenticated User',
-          picture: pictureUrl,
-          authenticated: userData.authenticated !== false // Default to true if not explicitly false
+        const windowListener = (event: MessageEvent) => {
+          if (event.data?.source === 'absmartly-extension-incoming' && 
+              event.data?.type === 'CHECK_AUTH_RESULT' && 
+              event.data?.requestId === requestId) {
+            console.log('[SettingsView] Received CHECK_AUTH_RESULT via postMessage:', event.data.result)
+            cleanup()
+            resolve(event.data.result)
+          }
         }
-        setUser(userObject)
         
-        // Fetch avatar image through background worker if URL exists
-        if (pictureUrl) {
-          chrome.runtime.sendMessage({
-            type: 'FETCH_AVATAR',
-            url: pictureUrl
-          }).then(avatarResponse => {
-            if (avatarResponse.success && avatarResponse.dataUrl) {
-              setAvatarDataUrl(avatarResponse.dataUrl)
-            } else {
-              debugError('Failed to fetch avatar:', avatarResponse.error)
+        const cleanup = () => {
+          chrome.runtime.onMessage.removeListener(chromeListener)
+          window.removeEventListener('message', windowListener)
+          clearTimeout(timeout)
+        }
+        
+        chrome.runtime.onMessage.addListener(chromeListener)
+        window.addEventListener('message', windowListener)
+        
+        // Set timeout in case result never arrives
+        const timeout = setTimeout(() => {
+          cleanup()
+          reject(new Error('CHECK_AUTH timeout'))
+        }, 15000)
+        
+        console.log('[SettingsView] Sending CHECK_AUTH message with callback...')
+        chrome.runtime.sendMessage({
+          type: 'CHECK_AUTH',
+          requestId: requestId,
+          configJson: configToSend ? JSON.stringify(configToSend) : null
+        }, (ackResponse) => {
+          console.log('[SettingsView] CHECK_AUTH acknowledgment received:', ackResponse)
+          if (chrome.runtime.lastError) {
+            console.error('[SettingsView] chrome.runtime.lastError:', chrome.runtime.lastError)
+            cleanup()
+            reject(new Error(chrome.runtime.lastError.message))
+          } else if (!ackResponse?.pending) {
+            // Not a pending response, this is the final result (shouldn't happen but handle it)
+            console.log('[SettingsView] Got final result in callback')
+            cleanup()
+            resolve(ackResponse)
+          }
+          // Otherwise wait for CHECK_AUTH_RESULT message
+        })
+      }) as any
+      console.log('[SettingsView] CHECK_AUTH final response received:', response)
+      
+      if (response.success) {
+        console.log('[SettingsView] Auth check successful, user:', response.data?.user)
+
+        const apiUser = response.data?.user
+        if (apiUser) {
+          // Construct name from first_name and last_name like CreateExperimentDropdown does
+          const name = apiUser.first_name || apiUser.last_name
+            ? `${apiUser.first_name || ''} ${apiUser.last_name || ''}`.trim()
+            : apiUser.email || 'User'
+
+          // Set user with constructed name and authenticated flag
+          setUser({ ...apiUser, name, authenticated: true })
+
+          // Fetch avatar if user has avatar data
+          if (apiUser.avatar?.base_url) {
+            const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+            const avatarUrl = `${baseUrl}${apiUser.avatar.base_url}/crop/32x32.webp`
+            console.log('[SettingsView] Fetching avatar from:', avatarUrl)
+
+            // Construct config for authenticated image fetch
+            const avatarConfig: ABsmartlyConfig = {
+              apiEndpoint: endpoint,
+              apiKey: configOverride?.apiKey,
+              authMethod: configOverride?.authMethod || 'jwt'
             }
-          }).catch(err => {
-            debugError('Error fetching avatar:', err)
-          })
+
+            fetchAuthenticatedImage(avatarUrl, avatarConfig).then(blobUrl => {
+              if (blobUrl) {
+                setAvatarDataUrl(blobUrl)
+                console.log('[SettingsView] Avatar fetched successfully')
+              }
+            })
+          }
+        } else {
+          setUser(null)
         }
       } else {
+        console.error('[SettingsView] Auth check failed:', response.error)
         setUser(null)
-        setAvatarDataUrl(null)
       }
     } catch (error) {
-      debugError('[SettingsView] CHECK_AUTH error:', error)
+      console.error('[SettingsView] Auth check failed:', error)
       setUser(null)
-      setAvatarDataUrl(null)
     } finally {
+      console.log('[SettingsView] checkAuthStatus finally block - setting checkingAuth to false')
       setCheckingAuth(false)
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-    
-    // API Key is required only when authMethod is 'apikey'
-    if (authMethod === 'apikey' && !apiKey.trim()) {
-      newErrors.apiKey = 'API Key is required when using API Key authentication'
-    }
-    
-    if (!apiEndpoint.trim()) {
-      newErrors.apiEndpoint = 'ABsmartly Endpoint is required'
-    } else if (!isValidUrl(apiEndpoint)) {
-      newErrors.apiEndpoint = 'Please enter a valid URL'
-    }
-    
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const isValidUrl = (url: string) => {
-    try {
-      new URL(url)
-      return true
-    } catch {
-      return false
     }
   }
 
@@ -276,7 +317,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           {apiEndpoint && !checkingAuth && (
             <Button
               id="auth-refresh-button"
-              onClick={() => checkAuthStatus(apiEndpoint)}
+              onClick={() => checkAuthStatus(apiEndpoint, { apiKey, authMethod })}
               size="sm"
               variant="secondary"
               className="text-xs"

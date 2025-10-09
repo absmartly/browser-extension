@@ -9,30 +9,8 @@ import { checkAuthentication } from '~src/utils/auth'
 // Storage instance
 const storage = new Storage()
 
-// Handle storage operations from content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'STORAGE_GET') {
-    const sessionStorage = new Storage({ area: "session" })
-    sessionStorage.get(message.key).then(value => {
-      debugLog('[Background] Storage GET:', message.key, '=', value)
-      sendResponse({ success: true, value })
-    }).catch(error => {
-      debugError('[Background] Storage GET error:', error)
-      sendResponse({ success: false, error: error.message })
-    })
-    return true // Keep the message channel open for async response
-  } else if (message.type === 'STORAGE_SET') {
-    const sessionStorage = new Storage({ area: "session" })
-    sessionStorage.set(message.key, message.value).then(() => {
-      debugLog('[Background] Storage SET:', message.key, '=', message.value)
-      sendResponse({ success: true })
-    }).catch(error => {
-      debugError('[Background] Storage SET error:', error)
-      sendResponse({ success: false, error: error.message })
-    })
-    return true // Keep the message channel open for async response
-  }
-})
+// Note: All message handling is done in the main listener below
+// This separate listener was causing issues by closing the message channel
 
 // Initialize config with environment variables on startup
 async function initializeConfig() {
@@ -358,6 +336,7 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
 
 // Listen for messages from sidebar and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[BACKGROUND] Message listener ENTERED! Type:', message?.type)
   debugLog('🔵 Background received message:', message.type, 'Full message:', message)
   
   // Test message
@@ -374,10 +353,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.tabs.sendMessage(tabs[0].id, message)
       }
     })
+    return false // No response needed
   } else if (message.type === "ELEMENT_SELECTED") {
     // Element picker returned a selector
     debugLog('Background received ELEMENT_SELECTED:', message)
-    
+
     // Store the result using Plasmo Storage for cross-browser compatibility
     const sessionStorage = new Storage({ area: "session" })
 
@@ -404,6 +384,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         })
       }
     })
+    return false // No response needed
   } else if (message.type === "GET_CURRENT_TAB_URL") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       sendResponse({ url: tabs[0]?.url || "" })
@@ -478,35 +459,88 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     sendResponse({ success: true })
   } else if (message.type === "CHECK_AUTH") {
-    // Special handler for auth check - use extracted authentication utility
-    debugLog('[CHECK_AUTH] Received CHECK_AUTH request')
+    // Handle auth check with proper async handling
+    const requestId = message.requestId
 
-    // Use passed config if provided, otherwise load from storage
-    const configPromise = message.config
-      ? Promise.resolve(message.config as ABsmartlyConfig)
-      : getConfig()
+    // Helper to send debug messages that will appear in page console
+    const sendDebug = (msg: string) => {
+      chrome.runtime.sendMessage({
+        type: 'DEBUG',
+        message: `[BG CHECK_AUTH ${requestId}] ${msg}`
+      }).catch(() => {})
+    }
 
-    configPromise.then(async config => {
-      debugLog('[CHECK_AUTH] Config loaded:', {
-        hasApiKey: !!config?.apiKey,
-        apiKeyLength: config?.apiKey?.length || 0,
-        hasEndpoint: !!config?.apiEndpoint,
-        authMethod: config?.authMethod || 'not set',
-        source: message.config ? 'passed from UI' : 'from storage'
-      })
+    sendDebug(`Received request, sender: ${JSON.stringify({
+      id: sender.id,
+      tabId: sender.tab?.id,
+      url: sender.url,
+      frameId: sender.frameId
+    })}`)
+
+    // Parse config from message
+    let config: ABsmartlyConfig | null = null
+    if (message.configJson) {
       try {
-        const result = await checkAuthentication(config)
-        debugLog('[CHECK_AUTH] checkAuthentication result:', result)
-        sendResponse(result)
+        config = JSON.parse(message.configJson) as ABsmartlyConfig
+        sendDebug(`Config parsed from JSON: authMethod=${config.authMethod}, hasApiKey=${!!config.apiKey}, apiKeyLength=${config.apiKey?.length}`)
       } catch (error) {
-        debugError('[CHECK_AUTH] Auth check error:', error)
-        sendResponse({ success: false, error: error.message || 'Auth check failed' })
+        sendDebug('Failed to parse config JSON')
+        sendResponse({ success: false, error: 'Invalid config' })
+        return false
       }
-    }).catch(error => {
-      debugError('[CHECK_AUTH] Config error:', error)
-      sendResponse({ success: false, error: 'Failed to get config' })
+    } else {
+      sendDebug('Will load config from storage')
+    }
+
+    // Start async operation - use Promise.resolve().then() instead of setTimeout
+    // setTimeout can hang in service workers that are terminating
+    sendDebug('Starting async auth check...')
+    Promise.resolve().then(async () => {
+      try {
+        sendDebug('Inside async handler')
+
+        if (!config) {
+          sendDebug('Loading config from storage...')
+          config = await getConfig()
+          sendDebug(`Config loaded: ${!!config}`)
+        }
+
+        sendDebug(`Calling checkAuthentication with config: endpoint=${config.apiEndpoint}, authMethod=${config.authMethod}`)
+        const result = await checkAuthentication(config)
+        sendDebug(`checkAuthentication returned! success=${result.success}, hasUser=${!!result.data?.user}`)
+
+        // Always broadcast via runtime.sendMessage since sidebar is an extension page
+        const resultMessage = {
+          type: 'CHECK_AUTH_RESULT',
+          requestId: requestId,
+          result: result
+        }
+
+        sendDebug('Broadcasting result via runtime.sendMessage...')
+        chrome.runtime.sendMessage(resultMessage)
+          .then(() => sendDebug('Result broadcast successful'))
+          .catch(err => sendDebug(`Failed to broadcast result: ${err}`))
+      } catch (error) {
+        sendDebug(`Error in async handler: ${error}`)
+        const errorMessage = {
+          type: 'CHECK_AUTH_RESULT',
+          requestId: requestId,
+          result: { success: false, error: error.message || 'Auth check failed' }
+        }
+
+        sendDebug('Broadcasting error via runtime.sendMessage...')
+        chrome.runtime.sendMessage(errorMessage)
+          .then(() => sendDebug('Error broadcast successful'))
+          .catch(err => sendDebug(`Failed to broadcast error: ${err}`))
+      }
+    }).catch(err => {
+      sendDebug(`Unhandled error in async handler: ${err}`)
     })
-    return true // Will respond asynchronously
+
+    // Send immediate acknowledgment
+    sendDebug('Sending immediate acknowledgment')
+    sendResponse({ success: true, pending: true, requestId: requestId })
+    return false // Synchronous initial response
   // START_VISUAL_EDITOR relay removed - sidebar now sends directly to content script
   } else if (message.type === "VISUAL_EDITOR_CHANGE") {
     debugLog('[Background] Visual editor change received:', message.change)
@@ -587,44 +621,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true, changesSaved: message.totalChanges })
     })
     
-    return true // Will respond asynchronously
-  } else if (message.type === "FETCH_AVATAR") {
-    // Fetch avatar image with authentication
-    getConfig().then(config => {
-      if (!config?.apiEndpoint) {
-        sendResponse({ success: false, error: 'No endpoint configured' })
-        return
-      }
-      
-      const headers: any = {
-        'Accept': 'image/*'
-      }
-      
-      // Add authorization if API key exists
-      if (config.apiKey) {
-        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-          ? `JWT ${config.apiKey}`
-          : `Api-Key ${config.apiKey}`
-        headers['Authorization'] = authHeader
-      }
-      
-      axios.get(message.url, {
-        headers,
-        withCredentials: !config.apiKey, // Use cookies if no API key
-        responseType: 'arraybuffer'
-      })
-      .then(response => {
-        // Convert image to base64 data URL
-        const contentType = response.headers['content-type'] || 'image/png'
-        const base64 = Buffer.from(response.data).toString('base64')
-        const dataUrl = `data:${contentType};base64,${base64}`
-        sendResponse({ success: true, dataUrl })
-      })
-      .catch(error => {
-        debugError('Avatar fetch error:', error)
-        sendResponse({ success: false, error: error.message })
-      })
-    })
     return true // Will respond asynchronously
   } else if (message.type === "REQUEST_INJECTION_CODE") {
     // Handle request from SDK plugin for custom code injection and config
