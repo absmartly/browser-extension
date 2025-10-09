@@ -108,8 +108,53 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     }
   }
 
+  const requestCookiePermission = async (): Promise<boolean> => {
+    try {
+      // Check if permission is already granted
+      const hasPermission = await chrome.permissions.contains({
+        permissions: ['cookies'],
+        origins: ['https://*.absmartly.com/*']
+      })
+
+      if (hasPermission) {
+        console.log('[SettingsView] Cookie permission already granted')
+        return true
+      }
+
+      // Request permission from user
+      console.log('[SettingsView] Requesting cookie permission...')
+      const granted = await chrome.permissions.request({
+        permissions: ['cookies'],
+        origins: ['https://*.absmartly.com/*']
+      })
+
+      if (granted) {
+        console.log('[SettingsView] ✅ User granted cookie permission')
+      } else {
+        console.log('[SettingsView] ❌ User denied cookie permission')
+      }
+
+      return granted
+    } catch (error) {
+      console.error('[SettingsView] Error requesting permission:', error)
+      return false
+    }
+  }
+
   const checkAuthStatus = async (endpoint: string, configOverride?: { apiKey: string; authMethod: 'jwt' | 'apikey' }) => {
     console.log('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
+
+    // If using JWT auth, ensure we have cookie permission first
+    const effectiveAuthMethod = configOverride?.authMethod || authMethod
+    if (effectiveAuthMethod === 'jwt') {
+      const hasPermission = await requestCookiePermission()
+      if (!hasPermission) {
+        setUser(null)
+        setErrors({ general: 'Cookie access permission is required for JWT authentication. Please try again and allow cookie access.' })
+        return
+      }
+    }
+
     setCheckingAuth(true)
     try {
       // Send CHECK_AUTH message to background script (which can bypass CORS)
@@ -186,6 +231,21 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       console.log('[SettingsView] checkAuthStatus finally block - setting checkingAuth to false')
       setCheckingAuth(false)
     }
+  }
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!apiEndpoint.trim()) {
+      newErrors.apiEndpoint = 'API Endpoint is required'
+    }
+
+    if (authMethod === 'apikey' && !apiKey.trim()) {
+      newErrors.apiKey = 'API Key is required when using API Key authentication'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const handleSave = async () => {
