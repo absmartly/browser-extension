@@ -178,15 +178,57 @@ test.describe('My Feature Tests', () => {
 
 **Avoid complex, fragile selectors. Use stable selectors or add data-testid to components.**
 
-**Selector priority** (best to worst):
-1. ✅ `data-testid` attributes (most stable)
-2. ✅ Semantic IDs (`#save-button`)
-3. ✅ ARIA labels (`button[aria-label="Close"]`)
-4. ⚠️ Text content (`button:has-text("Save")`)
-5. ❌ CSS classes (fragile)
-6. ❌ Complex combinators (very fragile)
+#### CRITICAL: Always Use ID Attributes for Test Page Elements
 
-**When selectors get complex, ADD data-testid to the component:**
+**ALL HTML elements in test pages that need to be selected MUST have id attributes:**
+
+```html
+<!-- ✅ GOOD: Every testable element has an id -->
+<div id="test-container">
+  <h1 id="test-title">Title</h1>
+  <p id="test-paragraph">Content</p>
+  <button id="test-button">Click</button>
+  <img id="test-image" src="image.jpg" />
+</div>
+
+<!-- ❌ BAD: No ids - fragile CSS selectors required -->
+<div class="container">
+  <h1 class="title">Title</h1>
+  <p class="content">Content</p>
+  <button class="btn">Click</button>
+</div>
+```
+
+**Why this matters:**
+- IDs provide stable, unique selectors that never change
+- CSS class-based selectors break when styling changes
+- Complex selectors (`.container > .section > button:nth-child(2)`) are fragile and hard to maintain
+- IDs make tests self-documenting - `#test-paragraph` is clearer than `.content > p:first-child`
+
+**In tests, always select by ID:**
+```typescript
+// ✅ GOOD: Select by ID
+await testPage.click('#test-button')
+const text = await testPage.textContent('#test-paragraph')
+
+// ❌ BAD: Complex CSS selector
+await testPage.click('.container > div > button.primary')
+```
+
+#### Selector Priority by Context
+
+**For HTML test page elements** (tests/test-pages/*.html):
+1. ✅ **ID attributes** (`#test-button`) - ALWAYS use this
+2. ❌ Never use class selectors or complex combinators
+
+**For React sidebar components**:
+1. ✅ `data-testid` attributes (most stable)
+2. ✅ ARIA labels (`button[aria-label="Close"]`)
+3. ⚠️ Text content (`button:has-text("Save")`)
+4. ❌ CSS classes (fragile)
+5. ❌ Complex combinators (very fragile)
+
+**When selectors get complex in React components, ADD data-testid:**
 
 ```tsx
 // ❌ BAD: Fragile selector
