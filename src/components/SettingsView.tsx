@@ -4,6 +4,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select } from './ui/Select'
 import { Header } from './Header'
+import { CookieConsentModal } from './CookieConsentModal'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import axios from 'axios'
@@ -35,6 +36,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [checkingAuth, setCheckingAuth] = useState(false)
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
   const [cookiePermissionGranted, setCookiePermissionGranted] = useState<boolean | null>(null)
+  const [showCookieConsentModal, setShowCookieConsentModal] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -46,6 +48,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       checkCookiePermission()
     }
   }, [authMethod])
+
+  // Show modal when JWT is selected but no cookie permission
+  useEffect(() => {
+    if (authMethod === 'jwt' && cookiePermissionGranted === false && !loading) {
+      setShowCookieConsentModal(true)
+    }
+  }, [authMethod, cookiePermissionGranted, loading])
 
   const loadConfig = async () => {
     try {
@@ -329,6 +338,23 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     }
   }
 
+  const handleCookieConsentGrant = async () => {
+    const granted = await requestCookiePermission()
+    setShowCookieConsentModal(false)
+
+    if (granted && apiEndpoint) {
+      // Permission granted, check auth
+      await checkAuthStatus(apiEndpoint, { apiKey, authMethod })
+    }
+  }
+
+  const handleCookieConsentDeny = () => {
+    setShowCookieConsentModal(false)
+    setErrors({
+      general: 'Cookie access is required for JWT authentication. Please use API Key authentication instead or grant cookie access.'
+    })
+  }
+
 
   if (loading) {
     return (
@@ -343,6 +369,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   return (
     <div className="p-4 space-y-4">
+      <CookieConsentModal
+        isOpen={showCookieConsentModal}
+        onGrant={handleCookieConsentGrant}
+        onDeny={handleCookieConsentDeny}
+      />
+
       <Header
         title="Settings"
         onBack={onCancel}
@@ -417,38 +449,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         ) : (
           <div className="space-y-2" data-testid="auth-not-authenticated">
             <div className="text-sm text-gray-600">Not authenticated</div>
-            {apiEndpoint && authMethod === 'jwt' && cookiePermissionGranted === false && (
-              <div className="space-y-2">
-                <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
-                  Cookie access permission is required for JWT authentication.
-                </div>
-                <Button
-                  id="grant-cookie-permission-button"
-                  onClick={async () => {
-                    const granted = await requestCookiePermission()
-                    if (granted) {
-                      // Permission granted, now check auth
-                      await checkAuthStatus(apiEndpoint, { apiKey, authMethod })
-                    }
-                  }}
-                  size="sm"
-                  variant="primary"
-                >
-                  Grant Cookie Access
-                </Button>
-              </div>
-            )}
-            {apiEndpoint && authMethod === 'jwt' && cookiePermissionGranted === true && (
-              <Button
-                id="authenticate-button"
-                onClick={handleAuthenticate}
-                size="sm"
-                variant="secondary"
-              >
-                Authenticate in ABsmartly
-              </Button>
-            )}
-            {apiEndpoint && authMethod === 'apikey' && (
+            {apiEndpoint && (
               <Button
                 id="authenticate-button"
                 onClick={handleAuthenticate}
