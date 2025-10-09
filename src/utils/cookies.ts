@@ -20,7 +20,7 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
       return null
     }
 
-    // Check if we have the cookies permission
+    // Check if we have the cookies permission (silently)
     if (chrome.permissions) {
       try {
         const hasPermission = await chrome.permissions.contains({
@@ -31,13 +31,14 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
 
         if (!hasPermission) {
           console.error('🔍 ❌ Cookies permission not granted!')
-          console.error('🔍 💡 The extension needs cookie access permission. It should be requested from the UI.')
+          console.error('🔍 💡 Please grant cookie access permission from the Settings page.')
           return null
-        } else {
-          console.log('🔍 ✅ Cookies permission is granted, proceeding...')
         }
+
+        console.log('🔍 ✅ Cookies permission is granted, proceeding...')
       } catch (err) {
         console.error('🔍 DEBUG: Error checking permissions:', err)
+        return null
       }
     }
 

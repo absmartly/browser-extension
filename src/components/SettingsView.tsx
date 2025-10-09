@@ -34,10 +34,18 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
   const [checkingAuth, setCheckingAuth] = useState(false)
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
+  const [cookiePermissionGranted, setCookiePermissionGranted] = useState<boolean | null>(null)
 
   useEffect(() => {
     loadConfig()
   }, [])
+
+  // Check cookie permission when auth method changes to JWT
+  useEffect(() => {
+    if (authMethod === 'jwt') {
+      checkCookiePermission()
+    }
+  }, [authMethod])
 
   const loadConfig = async () => {
     try {
@@ -95,11 +103,26 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       if (loadedApiEndpoint) {
         // Store endpoint in localStorage for avatar URLs
         localStorage.setItem('absmartly-endpoint', loadedApiEndpoint)
-        // Pass loaded values directly to avoid race condition with state updates
-        await checkAuthStatus(loadedApiEndpoint, {
-          apiKey: loadedApiKey,
-          authMethod: loadedAuthMethod
-        })
+
+        // If using JWT auth, check cookie permission first (silently)
+        if (loadedAuthMethod === 'jwt') {
+          const hasPermission = await checkCookiePermission()
+          // Only auto-check auth if permission is granted
+          if (hasPermission) {
+            await checkAuthStatus(loadedApiEndpoint, {
+              apiKey: loadedApiKey,
+              authMethod: loadedAuthMethod
+            })
+          } else {
+            console.log('[SettingsView] Cookie permission not granted, skipping auto auth check')
+          }
+        } else {
+          // API key auth doesn't need cookie permission
+          await checkAuthStatus(loadedApiEndpoint, {
+            apiKey: loadedApiKey,
+            authMethod: loadedAuthMethod
+          })
+        }
       }
     } catch (error) {
       debugError('[SettingsView] Failed to load config:', error)
@@ -108,20 +131,33 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     }
   }
 
-  const requestCookiePermission = async (): Promise<boolean> => {
+  const checkCookiePermission = async (): Promise<boolean> => {
     try {
-      // Check if permission is already granted
       const hasPermission = await chrome.permissions.contains({
         permissions: ['cookies'],
         origins: ['https://*.absmartly.com/*']
       })
+      console.log('[SettingsView] Cookie permission check:', hasPermission)
+      setCookiePermissionGranted(hasPermission)
+      return hasPermission
+    } catch (error) {
+      console.error('[SettingsView] Error checking permission:', error)
+      setCookiePermissionGranted(false)
+      return false
+    }
+  }
+
+  const requestCookiePermission = async (): Promise<boolean> => {
+    try {
+      // Check if permission is already granted
+      const hasPermission = await checkCookiePermission()
 
       if (hasPermission) {
         console.log('[SettingsView] Cookie permission already granted')
         return true
       }
 
-      // Request permission from user
+      // Request permission from user (must be in response to user action)
       console.log('[SettingsView] Requesting cookie permission...')
       const granted = await chrome.permissions.request({
         permissions: ['cookies'],
@@ -130,13 +166,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
       if (granted) {
         console.log('[SettingsView] ✅ User granted cookie permission')
+        setCookiePermissionGranted(true)
       } else {
         console.log('[SettingsView] ❌ User denied cookie permission')
+        setCookiePermissionGranted(false)
       }
 
       return granted
     } catch (error) {
       console.error('[SettingsView] Error requesting permission:', error)
+      setCookiePermissionGranted(false)
       return false
     }
   }
@@ -378,7 +417,38 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         ) : (
           <div className="space-y-2" data-testid="auth-not-authenticated">
             <div className="text-sm text-gray-600">Not authenticated</div>
-            {apiEndpoint && (
+            {apiEndpoint && authMethod === 'jwt' && cookiePermissionGranted === false && (
+              <div className="space-y-2">
+                <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
+                  Cookie access permission is required for JWT authentication.
+                </div>
+                <Button
+                  id="grant-cookie-permission-button"
+                  onClick={async () => {
+                    const granted = await requestCookiePermission()
+                    if (granted) {
+                      // Permission granted, now check auth
+                      await checkAuthStatus(apiEndpoint, { apiKey, authMethod })
+                    }
+                  }}
+                  size="sm"
+                  variant="primary"
+                >
+                  Grant Cookie Access
+                </Button>
+              </div>
+            )}
+            {apiEndpoint && authMethod === 'jwt' && cookiePermissionGranted === true && (
+              <Button
+                id="authenticate-button"
+                onClick={handleAuthenticate}
+                size="sm"
+                variant="secondary"
+              >
+                Authenticate in ABsmartly
+              </Button>
+            )}
+            {apiEndpoint && authMethod === 'apikey' && (
               <Button
                 id="authenticate-button"
                 onClick={handleAuthenticate}
