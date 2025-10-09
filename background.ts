@@ -3,7 +3,8 @@ import axios from 'axios'
 import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { checkAuthentication } from '~src/utils/auth'
+import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
+import { getJWTCookie } from '~src/utils/cookies'
 
 // Storage instance
 const storage = new Storage()
@@ -974,6 +975,84 @@ chrome.action.onClicked.addListener(async (tab) => {
     } catch (error) {
       debugError('[Background] Failed to inject sidebar:', error)
     }
+  }
+})
+
+// Service Worker fetch interceptor for avatar proxy
+// Intercepts requests to chrome-extension://[id]/api/avatar?url=... and fetches with authentication
+self.addEventListener('fetch', (event: FetchEvent) => {
+  const url = new URL(event.request.url)
+
+  // Only intercept requests to our avatar proxy endpoint
+  if (url.pathname === '/api/avatar' && url.searchParams.has('url')) {
+    event.respondWith(
+      (async () => {
+        try {
+          const avatarUrl = url.searchParams.get('url')!
+          const cacheKey = `avatar_cache_${avatarUrl}`
+
+          // Check cache first
+          const cache = await caches.open('absmartly-avatars-v1')
+          const cached = await cache.match(event.request)
+
+          if (cached) {
+            debugLog('[Avatar Proxy] Returning cached avatar:', avatarUrl)
+            return cached
+          }
+
+          debugLog('[Avatar Proxy] Fetching avatar with auth:', avatarUrl)
+
+          // Get config for authentication
+          const config = await getConfig()
+          if (!config?.apiEndpoint) {
+            return new Response('No endpoint configured', { status: 500 })
+          }
+
+          // Build authentication using utility function
+          const authMethod = config.authMethod || 'jwt'
+          let jwtToken: string | null = null
+          if (authMethod === 'jwt') {
+            jwtToken = await getJWTCookie(config.apiEndpoint)
+          }
+
+          const fetchOptions = buildAuthFetchOptions(authMethod, config, jwtToken, false)
+
+          // Add Accept header for images
+          fetchOptions.headers = {
+            ...fetchOptions.headers,
+            'Accept': 'image/*'
+          }
+
+          // Fetch the image with authentication
+          const response = await fetch(avatarUrl, fetchOptions)
+
+          if (!response.ok) {
+            debugError('[Avatar Proxy] Fetch failed:', response.status)
+            return new Response('Avatar fetch failed', { status: response.status })
+          }
+
+          // Create response with caching headers
+          const blob = await response.blob()
+          const cachedResponse = new Response(blob, {
+            status: 200,
+            headers: {
+              'Content-Type': response.headers.get('content-type') || 'image/png',
+              'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+              'Access-Control-Allow-Origin': '*'
+            }
+          })
+
+          // Store in cache
+          await cache.put(event.request, cachedResponse.clone())
+          debugLog('[Avatar Proxy] Cached avatar:', avatarUrl)
+
+          return cachedResponse
+        } catch (error) {
+          debugError('[Avatar Proxy] Error:', error)
+          return new Response('Avatar proxy error', { status: 500 })
+        }
+      })()
+    )
   }
 })
 
