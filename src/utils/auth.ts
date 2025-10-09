@@ -16,6 +16,7 @@ export interface AuthCheckResult {
  * @returns Promise with authentication result
  */
 export async function checkAuthentication(config: ABsmartlyConfig): Promise<AuthCheckResult> {
+  console.log('[auth.ts] checkAuthentication ENTERED!')
   if (!config?.apiEndpoint) {
     return { success: false, error: 'No endpoint configured' }
   }
@@ -23,6 +24,7 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
   const fullAuthUrl = `${baseUrl}/auth/current-user`
 
+  console.log('[auth.ts] About to fetch from:', fullAuthUrl)
   debugLog('checkAuthentication: Fetching user from', fullAuthUrl)
 
   // Build fetch options with auth headers
@@ -75,26 +77,26 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   }
 
   try {
-    debugLog('checkAuthentication: Making request with headers:', Object.keys(fetchOptions.headers || {}))
-    debugLog('checkAuthentication: About to call fetch()...')
+    console.log('[auth.ts] Making request with headers:', Object.keys(fetchOptions.headers || {}))
+    console.log('[auth.ts] About to call fetch()...')
 
     // Add timeout controller to prevent hanging
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
-      debugLog('checkAuthentication: Timeout reached, aborting request...')
+      console.log('[auth.ts] Timeout reached, aborting request...')
       controller.abort()
     }, 10000)
 
     try {
-      debugLog('checkAuthentication: Calling fetch() now...')
+      console.log('[auth.ts] Calling fetch() now...')
       const userResponse = await fetch(fullAuthUrl, {
         ...fetchOptions,
         signal: controller.signal
       })
-      debugLog('checkAuthentication: fetch() returned!')
+      console.log('[auth.ts] fetch() returned!')
       clearTimeout(timeoutId)
 
-      debugLog('checkAuthentication: Response status:', userResponse.status)
+      console.log('[auth.ts] Response status:', userResponse.status)
 
       if (!userResponse.ok) {
         debugError('checkAuthentication: Request failed with status:', userResponse.status)
@@ -102,7 +104,7 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
       }
 
       const responseData = await userResponse.json()
-      debugLog('checkAuthentication: Response data keys:', Object.keys(responseData || {}))
+      console.log('[auth.ts] Response data keys:', Object.keys(responseData || {}))
 
       // If we have a user but no avatar object, fetch full user details
       let finalUserData = responseData
@@ -111,7 +113,7 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
           // Fetching full user details to get avatar
           const userId = responseData.user.id
           const userDetailUrl = `${baseUrl}/v1/users/${userId}`
-          debugLog('checkAuthentication: Fetching avatar from', userDetailUrl)
+          console.log('[auth.ts] Fetching avatar from', userDetailUrl)
 
           const fullUserResponse = await fetch(userDetailUrl, {
             ...fetchOptions,
@@ -143,23 +145,26 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
           picture: userData.picture,
           avatar: userData.avatar?.base_url ? { base_url: userData.avatar.base_url } : undefined
         }
+        console.log('[auth.ts] Returning success with minimal user')
         return {
           success: true,
           data: { user: minimalUser }
         }
       }
 
+      console.log('[auth.ts] Returning success with full data')
       return { success: true, data: finalUserData }
     } catch (fetchError: any) {
       clearTimeout(timeoutId)
+      console.log('[auth.ts] Fetch error caught:', fetchError.name, fetchError.message)
       if (fetchError.name === 'AbortError') {
-        debugError('checkAuthentication: Request timed out after 10 seconds')
+        console.log('[auth.ts] Request timed out')
         return { success: false, error: 'Request timed out' }
       }
       throw fetchError
     }
   } catch (error: any) {
-    debugError('checkAuthentication: Unexpected error:', error)
+    console.log('[auth.ts] Outer error caught:', error)
     return { success: false, error: error.message || 'Auth check failed' }
   }
 }
