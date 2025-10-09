@@ -178,12 +178,13 @@ test.describe('My Feature Tests', () => {
 
 **Avoid complex, fragile selectors. Use stable selectors or add data-testid to components.**
 
-#### CRITICAL: Always Use ID Attributes for Test Page Elements
+#### CRITICAL: Always Use Real `id` Attributes Everywhere
 
-**ALL HTML elements in test pages that need to be selected MUST have id attributes:**
+**ALL elements that need to be selected in tests MUST have real HTML `id` attributes - both in test pages AND in React sidebar components:**
 
+**For HTML test pages:**
 ```html
-<!-- ✅ GOOD: Every testable element has an id -->
+<!-- ✅ GOOD: Every testable element has a real id attribute -->
 <div id="test-container">
   <h1 id="test-title">Title</h1>
   <p id="test-paragraph">Content</p>
@@ -194,52 +195,95 @@ test.describe('My Feature Tests', () => {
 <!-- ❌ BAD: No ids - fragile CSS selectors required -->
 <div class="container">
   <h1 class="title">Title</h1>
-  <p class="content">Content</p>
   <button class="btn">Click</button>
 </div>
 ```
 
-**Why this matters:**
+**For React sidebar components:**
+```tsx
+// ✅ GOOD: Add real id attribute to component
+<button id="create-experiment-button" onClick={handleCreate}>
+  Create Experiment
+</button>
+
+<input
+  id="experiment-name-input"
+  type="text"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+/>
+
+// ❌ BAD: Using data-testid
+<button data-testid="create-button" onClick={handleCreate}>Create</button>
+
+// ❌ BAD: Using class selectors
+<button className="bg-blue-500" onClick={handleCreate}>Create</button>
+```
+
+**Why real `id` attributes everywhere:**
+- IDs are native HTML attributes - simpler and more direct than `data-testid`
 - IDs provide stable, unique selectors that never change
 - CSS class-based selectors break when styling changes
 - Complex selectors (`.container > .section > button:nth-child(2)`) are fragile and hard to maintain
-- IDs make tests self-documenting - `#test-paragraph` is clearer than `.content > p:first-child`
+- IDs make tests self-documenting - `#create-experiment-button` is clearer than `[data-testid="create-btn"]`
+- Consistent approach across all test code - always use real IDs
 
-**In tests, always select by ID:**
+**In tests, always select by real ID:**
 ```typescript
-// ✅ GOOD: Select by ID
+// ✅ GOOD: Select by real id attribute (test pages)
 await testPage.click('#test-button')
-const text = await testPage.textContent('#test-paragraph')
+
+// ✅ GOOD: Select by real id attribute (sidebar components)
+await sidebar.locator('#create-experiment-button').click()
+await sidebar.locator('#experiment-name-input').fill('Test Experiment')
+
+// ❌ BAD: Using data-testid
+await sidebar.locator('[data-testid="create-button"]').click()
 
 // ❌ BAD: Complex CSS selector
-await testPage.click('.container > div > button.primary')
+await sidebar.locator('div.flex > div > button.bg-blue-500').click()
 ```
 
-#### Selector Priority by Context
+#### When to Add IDs to React Components
 
-**For HTML test page elements** (tests/test-pages/*.html):
-1. ✅ **ID attributes** (`#test-button`) - ALWAYS use this
-2. ❌ Never use class selectors or complex combinators
-
-**For React sidebar components**:
-1. ✅ `data-testid` attributes (most stable)
-2. ✅ ARIA labels (`button[aria-label="Close"]`)
-3. ⚠️ Text content (`button:has-text("Save")`)
-4. ❌ CSS classes (fragile)
-5. ❌ Complex combinators (very fragile)
-
-**When selectors get complex in React components, ADD data-testid:**
+**If a selector is complex or fragile, ALWAYS add a real `id` attribute to the component:**
 
 ```tsx
-// ❌ BAD: Fragile selector
-await sidebar.locator('div.flex > div > button.bg-blue-500').click()
+// ❌ BAD: Complex selector needed
+<div className="flex items-center">
+  <button className="bg-blue-500 text-white px-4 py-2" onClick={handleCreate}>
+    Create
+  </button>
+</div>
+// Test would need: sidebar.locator('div.flex button.bg-blue-500')
 
-// ✅ GOOD: Add data-testid to component
-<button data-testid="create-button" onClick={handleCreate}>Create</button>
-
-// Then use in test:
-await sidebar.locator('[data-testid="create-button"]').click()
+// ✅ GOOD: Add id to the component
+<div className="flex items-center">
+  <button
+    id="create-experiment-button"
+    className="bg-blue-500 text-white px-4 py-2"
+    onClick={handleCreate}
+  >
+    Create
+  </button>
+</div>
+// Test can use: sidebar.locator('#create-experiment-button')
 ```
+
+#### Selector Priority
+
+**For ALL elements (test pages AND sidebar components):**
+1. ✅ **Real `id` attributes** (`id="element-name"` → select with `#element-name`) - ALWAYS prefer this
+2. ⚠️ Text content (`button:has-text("Save")`) - Only when ID cannot be added (rare)
+3. ⚠️ ARIA labels (`button[aria-label="Close"]`) - Only when ID cannot be added (rare)
+4. ❌ Never use `data-testid` - use real `id` instead
+5. ❌ Never use CSS classes
+6. ❌ Never use complex combinators
+
+**When you need to select an element in a test and it doesn't have an ID:**
+1. Add a real `id` attribute to the component source code
+2. Use a descriptive, kebab-case name (e.g., `id="create-experiment-button"`)
+3. Then select with `#element-id` in the test
 
 ### Step 4: Key Testing Patterns
 

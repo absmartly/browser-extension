@@ -157,7 +157,7 @@ test.describe('Experiment Code Injection UI', () => {
       console.log('\n👆 STEP 5: Clicking Start of <head> section')
 
       const headStartSection = sidebar.locator('text=Start of <head>')
-      await headStartSection.click()
+      await click(sidebar, headStartSection)
       console.log('✅ Clicked Start of <head>')
       await debugWait(500)
     })
@@ -235,7 +235,7 @@ test.describe('Experiment Code Injection UI', () => {
 
       // Click Start of <head> again to re-open the editor
       const headStartSection = sidebar.locator('text=Start of <head>')
-      await headStartSection.click()
+      await click(sidebar, headStartSection)
       console.log('✅ Re-opened Start of <head>')
       await debugWait(3000)
 
