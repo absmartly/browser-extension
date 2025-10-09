@@ -506,7 +506,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         sendDebug(`Calling checkAuthentication with config: endpoint=${config.apiEndpoint}, authMethod=${config.authMethod}`)
+        console.log('[BACKGROUND] About to call checkAuthentication, config:', config)
         const result = await checkAuthentication(config)
+        console.log('[BACKGROUND] checkAuthentication call completed, result:', result)
         sendDebug(`checkAuthentication returned! success=${result.success}, hasUser=${!!result.data?.user}`)
 
         // Always broadcast via runtime.sendMessage since sidebar is an extension page

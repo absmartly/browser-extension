@@ -113,85 +113,48 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     console.log('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
     setCheckingAuth(true)
     try {
-      // Wake up service worker with a PING first (important for Manifest V3)
-      console.log('[SettingsView] Sending PING to wake up service worker...')
-      try {
-        const pingResponse = await chrome.runtime.sendMessage({ type: 'PING' })
-        console.log('[SettingsView] Service worker is awake, ping response:', pingResponse)
-      } catch (pingError) {
-        console.warn('[SettingsView] PING failed, service worker might be unresponsive:', pingError)
-      }
-      console.log('[SettingsView] Proceeding to CHECK_AUTH after PING')
-
-      // Send message to background script to check auth
-      // Pass config as stringified JSON to ensure proper serialization
-      console.log('[SettingsView] Sending CHECK_AUTH message...')
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(7)}`
-      console.log('[SettingsView] Generated request ID:', requestId)
-      
+      // Send CHECK_AUTH message to background script (which can bypass CORS)
       const configToSend = configOverride ? {
         apiEndpoint: endpoint,
         apiKey: configOverride.apiKey.trim(),
         authMethod: configOverride.authMethod
-      } : null
-      
-      // Send CHECK_AUTH and wait for result
-      const response = await new Promise((resolve, reject) => {
-        // Set up listeners for the actual result (both chrome.runtime and window.postMessage for iframe mode)
-        const chromeListener = (message: any) => {
+      } : {
+        apiEndpoint: endpoint,
+        authMethod: authMethod,
+        apiKey: apiKey
+      }
+
+      const requestId = `auth_${Date.now()}`
+      console.log('[SettingsView] Sending CHECK_AUTH message to background, requestId:', requestId)
+
+      // Set up listener for the response BEFORE sending the message
+      const responsePromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          chrome.runtime.onMessage.removeListener(listener)
+          reject(new Error('Auth check timed out'))
+        }, 15000)
+
+        const listener = (message: any) => {
           if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
-            console.log('[SettingsView] Received CHECK_AUTH_RESULT via chrome.runtime:', message.result)
-            cleanup()
+            clearTimeout(timeout)
+            chrome.runtime.onMessage.removeListener(listener)
             resolve(message.result)
           }
         }
-        
-        const windowListener = (event: MessageEvent) => {
-          if (event.data?.source === 'absmartly-extension-incoming' && 
-              event.data?.type === 'CHECK_AUTH_RESULT' && 
-              event.data?.requestId === requestId) {
-            console.log('[SettingsView] Received CHECK_AUTH_RESULT via postMessage:', event.data.result)
-            cleanup()
-            resolve(event.data.result)
-          }
-        }
-        
-        const cleanup = () => {
-          chrome.runtime.onMessage.removeListener(chromeListener)
-          window.removeEventListener('message', windowListener)
-          clearTimeout(timeout)
-        }
-        
-        chrome.runtime.onMessage.addListener(chromeListener)
-        window.addEventListener('message', windowListener)
-        
-        // Set timeout in case result never arrives
-        const timeout = setTimeout(() => {
-          cleanup()
-          reject(new Error('CHECK_AUTH timeout'))
-        }, 15000)
-        
-        console.log('[SettingsView] Sending CHECK_AUTH message with callback...')
-        chrome.runtime.sendMessage({
-          type: 'CHECK_AUTH',
-          requestId: requestId,
-          configJson: configToSend ? JSON.stringify(configToSend) : null
-        }, (ackResponse) => {
-          console.log('[SettingsView] CHECK_AUTH acknowledgment received:', ackResponse)
-          if (chrome.runtime.lastError) {
-            console.error('[SettingsView] chrome.runtime.lastError:', chrome.runtime.lastError)
-            cleanup()
-            reject(new Error(chrome.runtime.lastError.message))
-          } else if (!ackResponse?.pending) {
-            // Not a pending response, this is the final result (shouldn't happen but handle it)
-            console.log('[SettingsView] Got final result in callback')
-            cleanup()
-            resolve(ackResponse)
-          }
-          // Otherwise wait for CHECK_AUTH_RESULT message
-        })
-      }) as any
-      console.log('[SettingsView] CHECK_AUTH final response received:', response)
+
+        chrome.runtime.onMessage.addListener(listener)
+      })
+
+      // Send the CHECK_AUTH message
+      chrome.runtime.sendMessage({
+        type: 'CHECK_AUTH',
+        requestId: requestId,
+        configJson: JSON.stringify(configToSend)
+      })
+
+      // Wait for response
+      const response: any = await responsePromise
+      console.log('[SettingsView] Received CHECK_AUTH response:', response)
       
       if (response.success) {
         console.log('[SettingsView] Auth check successful, user:', response.data?.user)
