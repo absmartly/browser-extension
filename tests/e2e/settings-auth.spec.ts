@@ -18,12 +18,10 @@ test.describe('Settings Authentication Tests', () => {
       (msg) => msg.text().includes('[ABsmartly]') || msg.text().includes('[Background]') || msg.text().includes('CHECK_AUTH') || msg.text().includes('[SettingsView]')
     )
     
-    // Also listen to all pages/frames for console logs
+    // Also listen to ALL console logs (for debugging)
     testPage.on('console', async (msg) => {
       const text = msg.text()
-      if (text.includes('[SettingsView]') || text.includes('CHECK_AUTH')) {
-        console.log(`[CONSOLE] ${msg.type()}: ${text}`)
-      }
+      console.log(`[CONSOLE] ${msg.type()}: ${text}`)
     })
 
     // Load test page
@@ -108,16 +106,37 @@ test.describe('Settings Authentication Tests', () => {
 
       // Test authentication BEFORE saving by clicking Refresh
       console.log('  🔄 Testing authentication before saving...')
+      console.log('  Current state - endpoint:', 'https://demo-2.absmartly.com/v1', 'authMethod:', 'apikey', 'hasApiKey:', !!testApiKey)
+
       const refreshButton = sidebar.locator('#auth-refresh-button')
-      await refreshButton.evaluate((btn: HTMLElement) =>
+      console.log('  ✓ Found Refresh button, about to click...')
+      await debugWait(2000)
+
+      await refreshButton.evaluate((btn: HTMLElement) => {
+        console.log('  [EVALUATE] About to click Refresh button')
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      )
-      console.log('  ✓ Clicked Refresh button')
-      await debugWait(3000) // Wait for auth check to complete
+        console.log('  [EVALUATE] Click event dispatched')
+      })
+      console.log('  ✓ Clicked Refresh button, waiting for response...')
+      await debugWait(15000) // Wait longer for auth check to complete
+
+      // Take debug screenshot to see what's displayed
+      await testPage.screenshot({
+        path: 'test-results/auth-after-refresh-debug.png',
+        fullPage: true
+      })
+      console.log('  📸 Debug screenshot saved after refresh')
 
       // Should show authenticated even WITHOUT saving
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
       const hasUserInfoBeforeSave = await authUserInfo.isVisible({ timeout: 5000 }).catch(() => false)
+
+      // Log what we see
+      const notAuthEl = sidebar.locator('[data-testid="auth-not-authenticated"]')
+      const isNotAuthVisible = await notAuthEl.isVisible().catch(() => false)
+      console.log('  Debug: auth-user-info visible?', hasUserInfoBeforeSave)
+      console.log('  Debug: auth-not-authenticated visible?', isNotAuthVisible)
+
       expect(hasUserInfoBeforeSave).toBeTruthy()
       console.log('  ✅ Shows authenticated state BEFORE saving!')
 

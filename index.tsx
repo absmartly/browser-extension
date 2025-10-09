@@ -34,6 +34,37 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         }, '*')
 
         console.log('[index.tsx] Sent mock response for REQUEST_INJECTION_CODE')
+      } else {
+        // Forward all other messages to background script using real chrome.runtime
+        // (This is needed because in test mode, messages are sent via postMessage polyfill,
+        // but we still need to reach the actual background script)
+        console.log('[index.tsx] Forwarding message to background script:', event.data.type)
+
+        // Extract the original message (without polyfill metadata)
+        const { source, responseId, ...originalMessage } = event.data
+
+        // Forward to background script using real chrome.runtime
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage(originalMessage).then(response => {
+            // Send response back to content script via postMessage
+            window.postMessage({
+              source: 'absmartly-extension',
+              responseId: responseId,
+              response: response
+            }, '*')
+            console.log('[index.tsx] Forwarded response from background:', response)
+          }).catch(error => {
+            console.error('[index.tsx] Error forwarding message to background:', error)
+            // Send error response back
+            window.postMessage({
+              source: 'absmartly-extension',
+              responseId: responseId,
+              response: { success: false, error: error.message || 'Message forwarding failed' }
+            }, '*')
+          })
+        } else {
+          console.error('[index.tsx] Cannot forward message - chrome.runtime not available')
+        }
       }
     }
   })

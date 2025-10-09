@@ -7,6 +7,84 @@ const storage = new Storage()
 // This script will be injected programmatically by the background script
 console.log('🔵 ABSmartly Extension: Sidebar script loaded')
 
+// In test mode, listen for polyfilled chrome.runtime.sendMessage calls via postMessage
+// and forward them to the background script
+if (window.parent !== window) {
+  // We're in an iframe (test mode)
+  console.log('[tabs/sidebar.tsx] Running in iframe, setting up message forwarding')
+
+  window.addEventListener('message', (event) => {
+    if (event.data?.source === 'absmartly-content-script' && event.data?.responseId) {
+      console.log('[tabs/sidebar.tsx] Received polyfilled message:', event.data.type, 'responseId:', event.data.responseId)
+
+      // Mock the background script's response for REQUEST_INJECTION_CODE
+      if (event.data.type === 'REQUEST_INJECTION_CODE') {
+        const response = {
+          data: null, // No custom code in test
+          config: null // No config in test
+        }
+
+        window.postMessage({
+          source: 'absmartly-extension',
+          responseId: event.data.responseId,
+          response: response
+        }, '*')
+
+        console.log('[tabs/sidebar.tsx] Sent mock response for REQUEST_INJECTION_CODE')
+      } else {
+        // Forward all other messages to background script using real chrome.runtime
+        console.log('[tabs/sidebar.tsx] Forwarding message to background script:', event.data.type)
+
+        // Extract the original message (without polyfill metadata)
+        const { source, responseId, ...originalMessage } = event.data
+
+        // Forward to background script using real chrome.runtime
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage(originalMessage).then(response => {
+            // Send response back to content script via postMessage
+            window.postMessage({
+              source: 'absmartly-extension',
+              responseId: responseId,
+              response: response
+            }, '*')
+            console.log('[tabs/sidebar.tsx] Forwarded response from background:', response)
+          }).catch(error => {
+            console.error('[tabs/sidebar.tsx] Error forwarding message to background:', error)
+            // Send error response back
+            window.postMessage({
+              source: 'absmartly-extension',
+              responseId: responseId,
+              response: { success: false, error: error.message || 'Message forwarding failed' }
+            }, '*')
+          })
+        } else {
+          console.error('[tabs/sidebar.tsx] Cannot forward message - chrome.runtime not available')
+        }
+      }
+    }
+  })
+
+  console.log('[tabs/sidebar.tsx] Message forwarding listener registered')
+  
+  // Also listen for messages FROM background script and forward them to iframe content
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[tabs/sidebar.tsx] Received message from background:', message.type)
+
+    // Log DEBUG messages directly
+    if (message.type === 'DEBUG') {
+      console.log(message.message)
+    }
+
+    // Forward to iframe content as a regular message event
+    window.postMessage({
+      source: 'absmartly-extension-incoming',
+      ...message
+    }, '*')
+    return false
+  })
+  console.log('[tabs/sidebar.tsx] Incoming message listener registered')
+}
+
 // Lazy load the ExtensionUI to avoid bundling issues
 const ExtensionUI = lazy(() => import("~src/components/ExtensionUI"))
 
