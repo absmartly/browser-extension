@@ -34,7 +34,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
   const [checkingAuth, setCheckingAuth] = useState(false)
-  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [cookiePermissionGranted, setCookiePermissionGranted] = useState<boolean | null>(null)
   const [showCookieConsentModal, setShowCookieConsentModal] = useState(false)
 
@@ -272,9 +272,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           // Set user with constructed name and authenticated flag
           setUser({ ...apiUser, name, authenticated: true })
 
-          // Set avatar data URL if available from background script
-          if (apiUser.avatarDataUrl) {
-            setAvatarDataUrl(apiUser.avatarDataUrl)
+          // Set avatar URL if available from background script
+          if (apiUser.avatarUrl) {
+            setAvatarUrl(apiUser.avatarUrl)
           }
         } else {
           setUser(null)
@@ -464,13 +464,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           <div data-testid="auth-user-info">
             <div className="flex items-center space-x-3">
               <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                {(avatarDataUrl || user.picture) ? (
-                  <img 
-                    src={avatarDataUrl || user.picture} 
-                    alt={user.name || 'User'} 
+                {(avatarUrl || user.picture) ? (
+                  <img
+                    src={avatarUrl || user.picture}
+                    alt={user.name || 'User'}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      debugError('Avatar failed to load:', avatarDataUrl || user.picture)
+                      debugError('Avatar failed to load:', avatarUrl || user.picture)
                       e.currentTarget.style.display = 'none'
                     }}
                   />

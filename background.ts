@@ -4,7 +4,6 @@ import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
-import { getJWTCookie } from '~src/utils/cookies'
 
 // Storage instance
 const storage = new Storage()
@@ -989,6 +988,9 @@ self.addEventListener('fetch', (event: FetchEvent) => {
       (async () => {
         try {
           const avatarUrl = url.searchParams.get('url')!
+          const authMethod = url.searchParams.get('authMethod') || 'jwt'
+          const apiKey = url.searchParams.get('apiKey')
+
           const cacheKey = `avatar_cache_${avatarUrl}`
 
           // Check cache first
@@ -1000,22 +1002,34 @@ self.addEventListener('fetch', (event: FetchEvent) => {
             return cached
           }
 
-          debugLog('[Avatar Proxy] Fetching avatar with auth:', avatarUrl)
+          debugLog('[Avatar Proxy] Fetching avatar with auth:', avatarUrl, 'authMethod:', authMethod)
 
-          // Get config for authentication
+          // Get config for endpoint (needed for JWT cookie lookup)
           const config = await getConfig()
           if (!config?.apiEndpoint) {
             return new Response('No endpoint configured', { status: 500 })
           }
 
+          // Create a temporary config with auth params from URL
+          const avatarConfig: ABsmartlyConfig = {
+            ...config,
+            authMethod: authMethod as 'jwt' | 'apikey',
+            apiKey: apiKey || config.apiKey
+          }
+
           // Build authentication using utility function
-          const authMethod = config.authMethod || 'jwt'
           let jwtToken: string | null = null
           if (authMethod === 'jwt') {
             jwtToken = await getJWTCookie(config.apiEndpoint)
+            if (!jwtToken) {
+              debugLog('[Avatar Proxy] No JWT token available, will try credentials')
+            }
           }
 
-          const fetchOptions = buildAuthFetchOptions(authMethod, config, jwtToken, false)
+          // For service worker context, prefer Authorization header when token is available
+          // Service workers can't reliably send cookies, so we use the header when possible
+          const useAuthHeader = authMethod === 'jwt' && !!jwtToken
+          const fetchOptions = buildAuthFetchOptions(authMethod, avatarConfig, jwtToken, useAuthHeader)
 
           // Add Accept header for images
           fetchOptions.headers = {
