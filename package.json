@@ -70,7 +70,9 @@
       "cookies"
     ],
     "host_permissions": [
-      "<all_urls>"
+      "https://*/*",
+      "http://*/*",
+      "file:///*"
     ],
     "web_accessible_resources": [
       {
