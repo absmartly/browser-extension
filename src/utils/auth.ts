@@ -28,9 +28,9 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   debugLog('checkAuthentication: Fetching user from', fullAuthUrl)
 
   // Build fetch options with auth headers
+  // NOTE: Don't set 'mode' - let Chrome handle it with host_permissions
   const fetchOptions: RequestInit = {
     method: 'GET',
-    mode: 'cors',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
