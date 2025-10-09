@@ -98,22 +98,22 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
         ...fetchOptions,
         signal: controller.signal
       })
-      console.log('[auth.ts] fetch() returned!')
+      console.log('[auth.ts] fetch() returned! Status:', userResponse.status)
       clearTimeout(timeoutId)
 
-      console.log('[auth.ts] Response status:', userResponse.status)
-
       if (!userResponse.ok) {
-        debugError('checkAuthentication: Request failed with status:', userResponse.status)
+        console.log('[auth.ts] Response not OK:', userResponse.status)
         return { success: false, error: 'Not authenticated' }
       }
 
+      console.log('[auth.ts] About to parse JSON...')
       const responseData = await userResponse.json()
-      console.log('[auth.ts] Response data keys:', Object.keys(responseData || {}))
+      console.log('[auth.ts] JSON parsed, keys:', Object.keys(responseData || {}))
 
       // If we have a user but no avatar object, fetch full user details
       let finalUserData = responseData
       if (responseData.user && responseData.user.avatar_file_upload_id && !responseData.user.avatar) {
+        console.log('[auth.ts] Need to fetch avatar, user has avatar_file_upload_id')
         try {
           // Fetching full user details to get avatar
           const userId = responseData.user.id
@@ -124,19 +124,23 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
             ...fetchOptions,
             signal: controller.signal
           })
+          console.log('[auth.ts] Avatar fetch returned, status:', fullUserResponse.status)
 
           if (fullUserResponse.ok) {
             const fullUserData = await fullUserResponse.json()
+            console.log('[auth.ts] Avatar response parsed')
             if (fullUserData && fullUserData.user && fullUserData.user.avatar) {
               finalUserData.user.avatar = fullUserData.user.avatar
-              debugLog('checkAuthentication: Successfully fetched avatar data')
+              console.log('[auth.ts] Avatar data added to user')
             } else {
-              debugLog('checkAuthentication: No avatar found in user response')
+              console.log('[auth.ts] No avatar in response')
             }
           }
         } catch (avatarError) {
-          debugLog('checkAuthentication: Could not fetch full user details for avatar:', avatarError)
+          console.log('[auth.ts] Avatar fetch error:', avatarError)
         }
+      } else {
+        console.log('[auth.ts] No avatar fetch needed')
       }
 
       // Return only essential user fields to minimize data transfer
