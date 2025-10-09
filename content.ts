@@ -28,13 +28,23 @@ const sendMessageToExtension = (message: any) => {
   // Check if sidebar iframe exists (only in test mode)
   const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
 
+  // Determine the correct source based on message type
+  // Visual editor messages should use 'absmartly-visual-editor' source
+  // Code editor messages should use 'absmartly-content-script' source
+  const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
+                  message.type === 'VISUAL_EDITOR_STOPPED' ||
+                  message.type === 'DISABLE_PREVIEW' ||
+                  message.type === 'ELEMENT_SELECTED')
+    ? 'absmartly-visual-editor'
+    : 'absmartly-content-script'
+
   if (sidebarIframe && sidebarIframe.contentWindow) {
     // Test mode: send to sidebar iframe
     sidebarIframe.contentWindow.postMessage({
-      source: 'absmartly-content-script',
+      source: source,
       ...message
     }, '*')
-    debugLog(`Sent ${message.type} to sidebar iframe (test mode)`)
+    debugLog(`Sent ${message.type} to sidebar iframe (test mode) with source: ${source}`)
   } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
     // Production: use chrome.runtime.sendMessage
     chrome.runtime.sendMessage(message).catch(err => {
@@ -68,6 +78,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
     })
 
     chrome.runtime.sendMessage = function(message: any, callback?: (response: any) => void) {
+      // Determine the correct source based on message type
+      const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
+                      message.type === 'VISUAL_EDITOR_STOPPED' ||
+                      message.type === 'DISABLE_PREVIEW' ||
+                      message.type === 'ELEMENT_SELECTED')
+        ? 'absmartly-visual-editor'
+        : 'absmartly-content-script'
+
       if (callback) {
         // Generate unique ID for this request
         const responseId = `${message.type}_${Date.now()}_${Math.random()}`
@@ -75,7 +93,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
 
         // Send request to sidebar with response ID
         sidebarIframe.contentWindow!.postMessage({
-          source: 'absmartly-content-script',
+          source: source,
           responseId: responseId,
           ...message
         }, '*')
@@ -90,7 +108,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
       } else {
         // No callback, just send the message
         sidebarIframe.contentWindow!.postMessage({
-          source: 'absmartly-content-script',
+          source: source,
           ...message
         }, '*')
       }

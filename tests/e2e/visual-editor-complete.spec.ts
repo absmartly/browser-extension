@@ -501,7 +501,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(appliedChanges.button2Display).toBe('none')
       console.log('  ✓ Delete change applied: button-2 is hidden (display:none)')
 
-      expect(appliedChanges.testContainerHTML).toContain('<h2>HTML Edited!</h2>')
+      // The h2 might have an empty class attribute, so check more flexibly
+      expect(appliedChanges.testContainerHTML).toMatch(/<h2[^>]*>HTML Edited!<\/h2>/)
       expect(appliedChanges.testContainerHTML).toContain('<p>New paragraph content</p>')
       console.log('  ✓ HTML change applied: test-container has new HTML')
       
