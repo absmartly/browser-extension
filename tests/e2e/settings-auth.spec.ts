@@ -81,11 +81,11 @@ test.describe('Settings Authentication Tests', () => {
       await debugWait()
     })
 
-    await test.step('Configure API Key authentication', async () => {
+    await test.step('Configure API Key authentication and test BEFORE saving', async () => {
       console.log('\n🔑 STEP 3: Configuring API Key authentication')
 
       // Select API Key authentication method
-      const apiKeyRadio = sidebar.locator('input[type="radio"][value="apikey"]')
+      const apiKeyRadio = sidebar.locator('#auth-method-apikey')
       await apiKeyRadio.evaluate((radio: HTMLInputElement) => {
         radio.checked = true
         radio.dispatchEvent(new Event('change', { bubbles: true }))
@@ -93,21 +93,36 @@ test.describe('Settings Authentication Tests', () => {
       console.log('  ✓ Selected API Key authentication method')
       await debugWait()
 
-      // Fill in endpoint (use ID to be specific)
-      const endpointInput = sidebar.locator('input#absmartly-endpoint')
+      // Fill in endpoint
+      const endpointInput = sidebar.locator('#absmartly-endpoint')
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
       console.log('  ✓ Filled endpoint')
       await debugWait()
 
-      // Fill in API key (using environment variable or test key)
-      const apiKeyInput = sidebar.locator('input[type="password"]')
+      // Fill in API key
+      const apiKeyInput = sidebar.locator('#api-key-input')
       const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-api-key'
       await apiKeyInput.fill(testApiKey)
       console.log('  ✓ Filled API key')
       await debugWait()
 
-      // Save settings
-      const saveButton = sidebar.locator('button:has-text("Save Settings")')
+      // Test authentication BEFORE saving by clicking Refresh
+      console.log('  🔄 Testing authentication before saving...')
+      const refreshButton = sidebar.locator('#auth-refresh-button')
+      await refreshButton.evaluate((btn: HTMLElement) =>
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      )
+      console.log('  ✓ Clicked Refresh button')
+      await debugWait(3000) // Wait for auth check to complete
+
+      // Should show authenticated even WITHOUT saving
+      const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
+      const hasUserInfoBeforeSave = await authUserInfo.isVisible({ timeout: 5000 }).catch(() => false)
+      expect(hasUserInfoBeforeSave).toBeTruthy()
+      console.log('  ✅ Shows authenticated state BEFORE saving!')
+
+      // Now save settings
+      const saveButton = sidebar.locator('#save-settings-button')
       await saveButton.evaluate((btn: HTMLElement) =>
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       )
@@ -163,10 +178,10 @@ test.describe('Settings Authentication Tests', () => {
       await debugWait()
     })
 
-    await test.step.skip('Verify Refresh button updates auth status', async () => {
+    await test.step('Verify Refresh button updates auth status', async () => {
       console.log('\n🔄 STEP 5: Testing Refresh button')
 
-      const refreshButton = sidebar.locator('button:has-text("Refresh")')
+      const refreshButton = sidebar.locator('#auth-refresh-button')
       await expect(refreshButton).toBeVisible()
 
       await refreshButton.evaluate((btn: HTMLElement) =>
@@ -222,7 +237,7 @@ test.describe('Settings Authentication Tests', () => {
       console.log('\n🔐 STEP 3: Configuring JWT authentication')
 
       // Select JWT authentication method (default)
-      const jwtRadio = sidebar.locator('input[type="radio"][value="jwt"]')
+      const jwtRadio = sidebar.locator('#auth-method-jwt')
       await jwtRadio.evaluate((radio: HTMLInputElement) => {
         radio.checked = true
         radio.dispatchEvent(new Event('change', { bubbles: true }))
@@ -230,14 +245,14 @@ test.describe('Settings Authentication Tests', () => {
       console.log('  ✓ Selected JWT authentication method')
       await debugWait()
 
-      // Fill in endpoint (use ID to be specific)
-      const endpointInput = sidebar.locator('input#absmartly-endpoint')
+      // Fill in endpoint
+      const endpointInput = sidebar.locator('#absmartly-endpoint')
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
       console.log('  ✓ Filled endpoint')
       await debugWait()
 
       // API key should be optional for JWT
-      const apiKeyInput = sidebar.locator('input[type="password"]')
+      const apiKeyInput = sidebar.locator('#api-key-input')
       await apiKeyInput.fill('') // Clear any existing value
       console.log('  ✓ Cleared API key (not needed for JWT)')
       await debugWait()
@@ -247,7 +262,7 @@ test.describe('Settings Authentication Tests', () => {
       console.log('\n🔓 STEP 4: Authenticating with Google OAuth')
 
       // Check if user is already authenticated
-      const authButton = sidebar.locator('button:has-text("Authenticate in ABsmartly")')
+      const authButton = sidebar.locator('#authenticate-button')
       const needsAuth = await authButton.isVisible().catch(() => false)
 
       if (needsAuth) {
@@ -299,7 +314,7 @@ test.describe('Settings Authentication Tests', () => {
       console.log('\n💾 STEP 5: Saving settings and verifying authentication')
 
       // Save settings
-      const saveButton = sidebar.locator('button:has-text("Save Settings")')
+      const saveButton = sidebar.locator('#save-settings-button')
       await saveButton.evaluate((btn: HTMLElement) =>
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       )
@@ -351,7 +366,7 @@ test.describe('Settings Authentication Tests', () => {
       console.log('\n🔄 STEP 6: Testing auth method switching')
 
       // Switch back to API Key
-      const apiKeyRadio = sidebar.locator('input[type="radio"][value="apikey"]')
+      const apiKeyRadio = sidebar.locator('#auth-method-apikey')
       await apiKeyRadio.evaluate((radio: HTMLInputElement) => {
         radio.checked = true
         radio.dispatchEvent(new Event('change', { bubbles: true }))
@@ -360,7 +375,7 @@ test.describe('Settings Authentication Tests', () => {
       await debugWait(1000)
 
       // Add an API key
-      const apiKeyInput = sidebar.locator('input[type="password"]')
+      const apiKeyInput = sidebar.locator('#api-key-input')
       const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-api-key'
       await apiKeyInput.fill(testApiKey)
       console.log('  ✓ Filled API key')
@@ -374,7 +389,7 @@ test.describe('Settings Authentication Tests', () => {
       }
 
       // Switch back to JWT
-      const jwtRadio = sidebar.locator('input[type="radio"][value="jwt"]')
+      const jwtRadio = sidebar.locator('#auth-method-jwt')
       await jwtRadio.evaluate((radio: HTMLInputElement) => {
         radio.checked = true
         radio.dispatchEvent(new Event('change', { bubbles: true }))
