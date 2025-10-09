@@ -110,7 +110,7 @@ async function processFetchResponse(
       } : undefined
     }
 
-    // If we have an avatar base_url, fetch the actual image as a data URL
+    // If we have an avatar base_url, create a proxy URL for it
     if (userData.avatar?.base_url && userData.avatar?.file_name) {
       const avatarUrl = `${baseUrl}${userData.avatar.base_url}/${userData.avatar.file_name}`
 
@@ -121,12 +121,12 @@ async function processFetchResponse(
         apiKey: config.apiKey
       }
 
-      const avatarDataUrl = await fetchAuthenticatedImage(avatarUrl, imageConfig as any)
-      if (avatarDataUrl) {
-        minimalUser.avatarDataUrl = avatarDataUrl
-        console.log('[Avatar] Successfully fetched and converted avatar to data URL')
+      const avatarProxyUrl = await fetchAuthenticatedImage(avatarUrl, imageConfig as any)
+      if (avatarProxyUrl) {
+        minimalUser.avatarUrl = avatarProxyUrl
+        console.log('[Avatar] Created proxy URL for avatar')
       } else {
-        console.error('[Avatar] Failed to fetch avatar image')
+        console.error('[Avatar] Failed to create proxy URL for avatar')
       }
     }
 
@@ -152,41 +152,32 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Fetches an image from the API with proper authentication and returns a base64 data URL
+ * Returns a proxy URL for an authenticated image that will be fetched by the service worker
  * @param url - Full URL to the image (should already include base URL)
- * @param config - ABsmartly config containing auth method and credentials
- * @returns Base64 data URL that can be used in img src, or null if fetch fails
+ * @param config - ABsmartly config with auth method and credentials
+ * @returns Proxy URL that can be used in img src, or null if invalid
  */
 export async function fetchAuthenticatedImage(
   url: string,
   config: ABsmartlyConfig
 ): Promise<string | null> {
   try {
-    const authMethod = config.authMethod || 'jwt'
-    let jwtToken: string | null = null
+    // Encode auth config in the proxy URL so service worker knows how to authenticate
+    const params = new URLSearchParams({
+      url: url,
+      authMethod: config.authMethod || 'jwt'
+    })
 
-    // For JWT, get the token
-    if (authMethod === 'jwt') {
-      jwtToken = await getJWTCookie(config.apiEndpoint)
+    // Include API key if using API key auth
+    if (config.authMethod === 'apikey' && config.apiKey) {
+      params.set('apiKey', config.apiKey)
     }
 
-    // Build fetch options using our helper (use Strategy 1 for images too)
-    const fetchOptions = buildAuthFetchOptions(authMethod, config, jwtToken, false)
-
-    console.log('[Avatar] Fetching avatar from:', url)
-    const response = await fetch(url, fetchOptions)
-
-    if (response.ok) {
-      const blob = await response.blob()
-      const dataUrl = await blobToBase64(blob)
-      console.log('[Avatar] Successfully converted to base64 data URL')
-      return dataUrl
-    }
-
-    console.error('[Avatar] Image fetch failed:', response.status, url)
-    return null
+    const proxyUrl = `${chrome.runtime.getURL('/api/avatar')}?${params.toString()}`
+    console.log('[Avatar] Created proxy URL with auth context:', proxyUrl.replace(/apiKey=[^&]+/, 'apiKey=***'))
+    return proxyUrl
   } catch (error) {
-    console.error('[Avatar] Image fetch error:', error)
+    console.error('[Avatar] Error creating proxy URL:', error)
     return null
   }
 }
