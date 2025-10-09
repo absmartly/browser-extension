@@ -8,7 +8,6 @@ import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import axios from 'axios'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
-import { fetchAuthenticatedImage } from '~src/utils/fetch-authenticated-image'
 import { Storage } from "@plasmohq/storage"
 
 interface SettingsViewProps {
@@ -169,25 +168,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           // Set user with constructed name and authenticated flag
           setUser({ ...apiUser, name, authenticated: true })
 
-          // Fetch avatar if user has avatar data
-          if (apiUser.avatar?.base_url) {
-            const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-            const avatarUrl = `${baseUrl}${apiUser.avatar.base_url}/crop/32x32.webp`
-            console.log('[SettingsView] Fetching avatar from:', avatarUrl)
-
-            // Construct config for authenticated image fetch
-            const avatarConfig: ABsmartlyConfig = {
-              apiEndpoint: endpoint,
-              apiKey: configOverride?.apiKey,
-              authMethod: configOverride?.authMethod || 'jwt'
-            }
-
-            fetchAuthenticatedImage(avatarUrl, avatarConfig).then(blobUrl => {
-              if (blobUrl) {
-                setAvatarDataUrl(blobUrl)
-                console.log('[SettingsView] Avatar fetched successfully')
-              }
-            })
+          // Set avatar data URL if available from background script
+          if (apiUser.avatarDataUrl) {
+            setAvatarDataUrl(apiUser.avatarDataUrl)
           }
         } else {
           setUser(null)
