@@ -223,8 +223,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       const responsePromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           chrome.runtime.onMessage.removeListener(listener)
-          reject(new Error('Auth check timed out (5s)'))
-        }, 5000)
+          reject(new Error('Auth check timed out (3s)'))
+        }, 3000)
 
         const listener = (message: any) => {
           if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
