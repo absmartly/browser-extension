@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { PlusCircleIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline"
 import { useABsmartly } from "~src/hooks/useABsmartly"
-import { fetchAuthenticatedImage } from "~src/utils/fetch-authenticated-image"
+import { fetchAuthenticatedImage } from "~src/utils/auth"
 
 interface CreateExperimentDropdownProps {
   onCreateFromScratch: () => void
