@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { debugLog, debugError } from './debug'
 import { getJWTCookie } from './cookies'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
@@ -22,129 +21,142 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
   }
 
   const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+  const fullAuthUrl = `${baseUrl}/auth/current-user`
 
-  try {
-    // Try to get user info directly from /auth/current-user
-    const fullAuthUrl = `${baseUrl}/auth/current-user`
-    debugLog('checkAuthentication: Fetching user from', fullAuthUrl)
+  debugLog('checkAuthentication: Fetching user from', fullAuthUrl)
 
-    // Build auth headers
-    const authHeaders: any = {
+  // Build fetch options with auth headers
+  const fetchOptions: RequestInit = {
+    method: 'GET',
+    headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }
+  }
 
-    // Use auth method from config
-    const authMethod = config.authMethod || 'jwt'
-    const shouldTryJwtFirst = authMethod === 'jwt'
+  // Use ONLY the selected auth method - NO FALLBACKS
+  const authMethod = config.authMethod || 'jwt'
 
-    if (shouldTryJwtFirst) {
-      // Try JWT first
-      const jwtToken = await getJWTCookie(config.apiEndpoint)
-      if (jwtToken) {
-        authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
-          ? `JWT ${jwtToken}`
-          : `Bearer ${jwtToken}`
-        debugLog('checkAuthentication: Using JWT authentication')
-      } else if (config.apiKey) {
-        // Fallback to API key if JWT not available
-        authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-          ? `JWT ${config.apiKey}`
-          : `Api-Key ${config.apiKey}`
-        debugLog('checkAuthentication: Using API key as fallback')
-      }
-    } else if (config.apiKey) {
-      // Try API key first
-      authHeaders['Authorization'] = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-        ? `JWT ${config.apiKey}`
-        : `Api-Key ${config.apiKey}`
-      debugLog('checkAuthentication: Using API key authentication')
-      debugLog('checkAuthentication: API key length:', config.apiKey?.length)
-      debugLog('checkAuthentication: Authorization header:', authHeaders['Authorization']?.substring(0, 20) + '...')
-    } else {
-      // No API key, try JWT as fallback
-      const jwtToken = await getJWTCookie(config.apiEndpoint)
-      if (jwtToken) {
-        authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
-          ? `JWT ${jwtToken}`
-          : `Bearer ${jwtToken}`
-        debugLog('checkAuthentication: Using JWT as fallback (no API key available)')
-      }
+  if (authMethod === 'jwt') {
+    // JWT authentication - use cookies
+    const jwtToken = await getJWTCookie(config.apiEndpoint)
+    if (!jwtToken) {
+      debugLog('checkAuthentication: No JWT token available')
+      return { success: false, error: 'No JWT token available' }
     }
 
+    const authHeader = jwtToken.includes('.') && jwtToken.split('.').length === 3
+      ? `JWT ${jwtToken}`
+      : `Bearer ${jwtToken}`
+
+    fetchOptions.headers = {
+      ...fetchOptions.headers,
+      'Authorization': authHeader
+    }
+    debugLog('checkAuthentication: Using JWT authentication')
+  } else if (authMethod === 'apikey') {
+    // API Key authentication
+    if (!config.apiKey) {
+      debugLog('checkAuthentication: No API key configured')
+      return { success: false, error: 'No API key configured' }
+    }
+
+    const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+      ? `JWT ${config.apiKey}`
+      : `Api-Key ${config.apiKey}`
+
+    fetchOptions.headers = {
+      ...fetchOptions.headers,
+      'Authorization': authHeader
+    }
+    debugLog('checkAuthentication: Using API key authentication')
+  } else {
+    return { success: false, error: `Unknown auth method: ${authMethod}` }
+  }
+
+  try {
+    debugLog('checkAuthentication: Making request with headers:', Object.keys(fetchOptions.headers || {}))
+    debugLog('checkAuthentication: About to call fetch()...')
+
+    // Add timeout controller to prevent hanging
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      debugLog('checkAuthentication: Timeout reached, aborting request...')
+      controller.abort()
+    }, 10000)
+
     try {
-      debugLog('checkAuthentication: Making request to', fullAuthUrl)
-      debugLog('checkAuthentication: With headers:', Object.keys(authHeaders))
-
-      const userResponse = await axios.get(fullAuthUrl, {
-        withCredentials: false,
-        headers: authHeaders
+      debugLog('checkAuthentication: Calling fetch() now...')
+      const userResponse = await fetch(fullAuthUrl, {
+        ...fetchOptions,
+        signal: controller.signal
       })
+      debugLog('checkAuthentication: fetch() returned!')
+      clearTimeout(timeoutId)
 
-      debugLog('checkAuthentication: Response received, status:', userResponse.status)
-      debugLog('checkAuthentication: Response data keys:', Object.keys(userResponse.data || {}))
+      debugLog('checkAuthentication: Response status:', userResponse.status)
 
-      // Auth response received from /auth/current-user
+      if (!userResponse.ok) {
+        debugError('checkAuthentication: Request failed with status:', userResponse.status)
+        return { success: false, error: 'Not authenticated' }
+      }
+
+      const responseData = await userResponse.json()
+      debugLog('checkAuthentication: Response data keys:', Object.keys(responseData || {}))
 
       // If we have a user but no avatar object, fetch full user details
-      let finalUserData = userResponse.data
-      if (userResponse.data.user && userResponse.data.user.avatar_file_upload_id && !userResponse.data.user.avatar) {
+      let finalUserData = responseData
+      if (responseData.user && responseData.user.avatar_file_upload_id && !responseData.user.avatar) {
         try {
           // Fetching full user details to get avatar
-          const userId = userResponse.data.user.id
+          const userId = responseData.user.id
           const userDetailUrl = `${baseUrl}/v1/users/${userId}`
           debugLog('checkAuthentication: Fetching avatar from', userDetailUrl)
 
-          const fullUserResponse = await axios.get(userDetailUrl, {
-            withCredentials: false,
-            headers: authHeaders
+          const fullUserResponse = await fetch(userDetailUrl, {
+            ...fetchOptions,
+            signal: controller.signal
           })
 
-          if (fullUserResponse.data && fullUserResponse.data.user && fullUserResponse.data.user.avatar) {
-            finalUserData.user.avatar = fullUserResponse.data.user.avatar
-            debugLog('checkAuthentication: Successfully fetched avatar data')
-          } else {
-            debugLog('checkAuthentication: No avatar found in user response')
+          if (fullUserResponse.ok) {
+            const fullUserData = await fullUserResponse.json()
+            if (fullUserData && fullUserData.user && fullUserData.user.avatar) {
+              finalUserData.user.avatar = fullUserData.user.avatar
+              debugLog('checkAuthentication: Successfully fetched avatar data')
+            } else {
+              debugLog('checkAuthentication: No avatar found in user response')
+            }
           }
         } catch (avatarError) {
           debugLog('checkAuthentication: Could not fetch full user details for avatar:', avatarError)
         }
       }
 
-      return { success: true, data: finalUserData }
-    } catch (authError: any) {
-      debugError('checkAuthentication: Auth request failed:', authError.response?.status, authError.message)
-
-      // If first attempt failed with API key, try with JWT
-      if (authError.response?.status === 401 && config.apiKey && !shouldTryJwtFirst) {
-        debugLog('checkAuthentication: API key failed (401), trying JWT fallback')
-        const jwtToken = await getJWTCookie(config.apiEndpoint)
-
-        if (jwtToken) {
-          authHeaders['Authorization'] = jwtToken.includes('.') && jwtToken.split('.').length === 3
-            ? `JWT ${jwtToken}`
-            : `Bearer ${jwtToken}`
-
-          try {
-            const retryResponse = await axios.get(fullAuthUrl, {
-              withCredentials: false,
-              headers: authHeaders
-            })
-
-            debugLog('checkAuthentication: JWT fallback successful')
-
-            return { success: true, data: retryResponse.data }
-          } catch (retryError) {
-            debugLog('checkAuthentication: JWT also failed')
-            return { success: false, error: 'Not authenticated' }
-          }
-        } else {
-          return { success: false, error: 'Not authenticated' }
+      // Return only essential user fields to minimize data transfer
+      const userData = finalUserData.user
+      if (userData) {
+        const minimalUser = {
+          id: userData.id,
+          email: userData.email,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          picture: userData.picture,
+          avatar: userData.avatar?.base_url ? { base_url: userData.avatar.base_url } : undefined
         }
-      } else {
-        debugLog('checkAuthentication: Authentication failed:', authError.response?.status)
-        return { success: false, error: 'Not authenticated' }
+        return {
+          success: true,
+          data: { user: minimalUser }
+        }
       }
+
+      return { success: true, data: finalUserData }
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        debugError('checkAuthentication: Request timed out after 10 seconds')
+        return { success: false, error: 'Request timed out' }
+      }
+      throw fetchError
     }
   } catch (error: any) {
     debugError('checkAuthentication: Unexpected error:', error)
