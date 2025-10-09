@@ -285,9 +285,26 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
       // Show specific error for timeout
       if (error.message?.includes('timed out')) {
-        setErrors({
-          general: 'Authentication check timed out. Please check your connection and try again.'
-        })
+        // If JWT auth timed out, likely a permission issue - re-show consent modal
+        if (effectiveAuthMethod === 'jwt') {
+          console.log('[SettingsView] JWT auth timed out, checking permission status...')
+          const hasPermission = await checkCookiePermission()
+          if (!hasPermission) {
+            console.log('[SettingsView] No permission found, re-showing consent modal')
+            setShowCookieConsentModal(true)
+            setErrors({
+              general: 'Authentication timed out. Please grant permission to access ABsmartly cookies.'
+            })
+          } else {
+            setErrors({
+              general: 'Authentication check timed out. Please check your connection and try again.'
+            })
+          }
+        } else {
+          setErrors({
+            general: 'Authentication check timed out. Please check your connection and try again.'
+          })
+        }
       }
     } finally {
       console.log('[SettingsView] checkAuthStatus finally block - setting checkingAuth to false')
