@@ -16,7 +16,7 @@ export interface AuthCheckResult {
  * @param useAuthHeader - For JWT: true = use Authorization header, false = use credentials only
  * @returns Fetch options with appropriate auth configuration
  */
-function buildAuthFetchOptions(
+export function buildAuthFetchOptions(
   authMethod: string,
   config: ABsmartlyConfig,
   jwtToken: string | null,
