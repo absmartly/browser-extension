@@ -21,7 +21,6 @@ export function useExperimentSave({ experiment, domFieldName }: UseExperimentSav
     onSave?: (experiment: Partial<Experiment>) => Promise<void>
   ) => {
     const config = await getConfig()
-    const storageType = config?.domChangesStorageType || 'variable'
     const fieldName = config?.domChangesFieldName || '__dom_changes'
 
     // If editing existing experiment
@@ -30,7 +29,6 @@ export function useExperimentSave({ experiment, domFieldName }: UseExperimentSav
         experiment,
         formData,
         currentVariants,
-        storageType,
         fieldName,
         onUpdate
       )
@@ -126,7 +124,6 @@ async function saveExistingExperiment(
   experiment: Experiment,
   formData: any,
   currentVariants: VariantData[],
-  storageType: string,
   fieldName: string,
   onUpdate: (id: number, updates: Partial<Experiment>) => void
 ) {
@@ -145,20 +142,6 @@ async function saveExistingExperiment(
 
     const fullExperiment = fullExperimentResponse.data.experiment || fullExperimentResponse.data
 
-    // Check if custom field exists when using custom_field storage
-    if (storageType === 'custom_field') {
-      const hasCustomField = fullExperiment.custom_section_field_values &&
-        Object.values(fullExperiment.custom_section_field_values).some((field: any) =>
-          field.custom_section_field?.sdk_field_name === fieldName &&
-          field.custom_section_field?.available_in_sdk === true
-        )
-
-      if (!hasCustomField) {
-        alert(`Error: Custom field with SDK name "${fieldName}" not found or not available in SDK. Please check your experiment configuration.`)
-        return
-      }
-    }
-
     // Prepare DOM changes payload
     const domChangesPayload: Record<string, DOMChange[]> = {}
     currentVariants.forEach((variant) => {
@@ -176,9 +159,8 @@ async function saveExistingExperiment(
 
       let config = { ...variant.variables }
 
-      if (storageType === 'variable') {
-        config[fieldName] = variant.dom_changes || []
-      }
+      // Always store DOM changes in variables
+      config[fieldName] = variant.dom_changes || []
 
       return {
         variant: existingVariant?.variant ?? index,
@@ -257,11 +239,6 @@ async function saveExistingExperiment(
           custom_section_field: field.custom_section_field,
           id: fieldId,
           default_value: field.default_value || field.value
-        }
-
-        if (storageType === 'custom_field' &&
-            field.custom_section_field?.sdk_field_name === fieldName) {
-          customFieldsObj[fieldId].value = JSON.stringify(domChangesPayload)
         }
       })
 
