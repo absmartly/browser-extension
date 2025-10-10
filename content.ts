@@ -455,6 +455,13 @@ document.documentElement.appendChild(debugDiv)
 // Expose a global function for testing
 ;(window as any).__absmartlyContentLoaded = true
 
+// ALSO inject into page context (content scripts run in isolated context)
+// Tests run in page context and need access to this variable
+const scriptTag = document.createElement('script')
+scriptTag.textContent = 'window.__absmartlyContentLoaded = true;'
+document.documentElement.appendChild(scriptTag)
+scriptTag.remove()
+
 // Send a message to the page to confirm we're loaded
 window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '*')
 
@@ -797,7 +804,9 @@ async function ensureSDKPluginInjected() {
 // Listen for messages from the injected script and SDK plugin
 window.addEventListener('message', async (event) => {
   // Only accept messages from the same origin
-  if (event.origin !== window.location.origin) return
+  // Allow file:// protocol for testing (origin is "null" for file:// URLs)
+  const isFileProtocol = window.location.protocol === 'file:' || event.origin === 'null'
+  if (!isFileProtocol && event.origin !== window.location.origin) return
 
   // Handle visual editor closed message
   if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_CLOSED') {
@@ -815,14 +824,19 @@ window.addEventListener('message', async (event) => {
 
   // Handle messages from the injected script (absmartly-page)
   if (event.data && event.data.source === 'absmartly-page') {
+    console.log('[Content Script] ✅ Received message from page:', event.data.type, event.data)
     debugLog('[Content Script] Received message from page:', event.data)
 
     if (event.data.type === 'SDK_EVENT') {
+      console.log('[Content Script] 🔵 Forwarding SDK_EVENT to background:', event.data.payload)
       // Forward SDK events to background script for buffering
       chrome.runtime.sendMessage({
         type: 'SDK_EVENT',
         payload: event.data.payload
+      }).then(() => {
+        console.log('[Content Script] ✅ SDK_EVENT sent to background successfully')
       }).catch(err => {
+        console.error('[Content Script] ❌ Failed to send SDK_EVENT to background:', err)
         debugError('[Content Script] Failed to send SDK_EVENT to background:', err)
       })
     } else if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
