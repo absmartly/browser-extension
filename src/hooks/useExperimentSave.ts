@@ -1,24 +1,6 @@
 import { debugError } from '~src/utils/debug'
-
-// Helper function to check if DOM changes exist (handles both array and object formats)
-function hasDOMChanges(domChanges: any): boolean {
-  if (!domChanges) return false
-  
-  // Old format: array
-  if (Array.isArray(domChanges)) {
-    return domChanges.length > 0
-  }
-  
-  // New format: { changes: [...], urlFilter?: ..., ... }
-  if (typeof domChanges === 'object' && 'changes' in domChanges) {
-    return Array.isArray(domChanges.changes) && domChanges.changes.length > 0
-  }
-  
-  return false
-}
 import { getConfig } from '~src/utils/storage'
 import type { Experiment } from '~src/types/absmartly'
-import type { DOMChange } from '~src/types/dom-changes'
 import type { VariantData } from './useExperimentVariants'
 
 interface UseExperimentSaveOptions {
@@ -74,21 +56,12 @@ async function createNewExperiment(
   domFieldName: string,
   onSave: (experiment: Partial<Experiment>) => Promise<void>
 ) {
-  // Prepare variants with DOM changes
-  const preparedVariants = currentVariants.map((v, index) => {
-    const config: any = { ...v.variables }
-
-    // Include DOM changes only if not empty
-    if (hasDOMChanges(v.dom_changes)) {
-      config[domFieldName] = v.dom_changes
-    }
-
-    return {
-      variant: index,
-      name: v.name,
-      config: JSON.stringify(config)
-    }
-  })
+  // Prepare variants - use full config as-is
+  const preparedVariants = currentVariants.map((v, index) => ({
+    variant: index,
+    name: v.name,
+    config: JSON.stringify(v.config)
+  }))
 
   const experimentData: any = {
     ...formData,
@@ -159,32 +132,17 @@ async function saveExistingExperiment(
 
     const fullExperiment = fullExperimentResponse.data.experiment || fullExperimentResponse.data
 
-    // Prepare DOM changes payload
-    const domChangesPayload: Record<string, DOMChange[]> = {}
-    currentVariants.forEach((variant) => {
-      if (variant.dom_changes && variant.dom_changes.length > 0) {
-        domChangesPayload[variant.name] = variant.dom_changes
-      }
-    })
-
-    // Create updated variants
+    // Create updated variants - use full config as-is
     const updatedVariants = currentVariants.map((variant, index) => {
       const existingVariant = fullExperiment.variants?.find((v: any) => {
         const expVariantKey = v.name || `Variant ${v.variant}`
         return expVariantKey === variant.name
       })
 
-      let config = { ...variant.variables }
-
-      // Only include DOM changes if not empty
-      if (hasDOMChanges(variant.dom_changes)) {
-        config[fieldName] = variant.dom_changes
-      }
-
       return {
         variant: existingVariant?.variant ?? index,
         name: variant.name,
-        config: JSON.stringify(config)
+        config: JSON.stringify(variant.config)
       }
     })
 

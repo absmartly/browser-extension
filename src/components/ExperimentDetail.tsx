@@ -116,29 +116,32 @@ export function ExperimentDetail({
 
   // Helper functions for code injection
   const extractInjectionCode = (variant: Variant): ExperimentInjectionCode | undefined => {
-    if (!variant || !variant.variables) return undefined
-    const injectHtml = variant.variables.__inject_html
+    if (!variant || !variant.config) return undefined
+    const injectHtml = variant.config.__inject_html
     if (!injectHtml) return undefined
     return typeof injectHtml === 'string' ? JSON.parse(injectHtml) : injectHtml
   }
 
   const extractDomChangesUrlFilter = (variant: Variant): URLFilter | undefined => {
-    if (!variant) return undefined
-    const domChanges: DOMChangesData = variant.dom_changes
+    if (!variant || !variant.config) return undefined
+    const domChanges: DOMChangesData = variant.config.__dom_changes
     if (!domChanges || Array.isArray(domChanges)) return undefined
     return domChanges.urlFilter
   }
 
   const handleInjectionCodeChange = (code: ExperimentInjectionCode) => {
+    debugLog('🔧 handleInjectionCodeChange called with code:', code)
+    debugLog('🔧 Current currentVariants[0]:', currentVariants[0])
     const updatedVariants = [...currentVariants]
     if (updatedVariants[0]) {
       updatedVariants[0] = {
         ...updatedVariants[0],
-        variables: {
-          ...updatedVariants[0].variables,
+        config: {
+          ...updatedVariants[0].config,
           __inject_html: code
         }
       }
+      debugLog('🔧 Updated variant config:', updatedVariants[0].config)
       handleVariantsChange(updatedVariants, true)
     }
   }
@@ -286,19 +289,20 @@ export function ExperimentDetail({
         {/* Variants Section */}
         {currentVariants.length > 0 && (
           <VariantList
-            initialVariants={initialVariants}
+            initialVariants={currentVariants}
             experimentId={experiment.id}
             experimentName={experiment.name}
             onVariantsChange={handleVariantsChange}
             canEdit={true}
             canAddRemove={canAddVariants}
+            domFieldName={domFieldName}
           />
         )}
 
         {/* Code Injection Section - Only for control variant */}
         {currentVariants.length > 0 && currentVariants[0] && (() => {
           const canEditValue = experiment.state !== 'running' && experiment.state !== 'development'
-          console.log('[ExperimentDetail] Rendering CodeInjection - Experiment state:', experiment.state, 'canEdit:', canEditValue)
+          debugLog('[ExperimentDetail] Rendering CodeInjection - Experiment state:', experiment.state, 'canEdit:', canEditValue)
           return (
             <ExperimentCodeInjection
               experimentId={experiment.id}
