@@ -159,8 +159,10 @@ async function saveExistingExperiment(
 
       let config = { ...variant.variables }
 
-      // Always store DOM changes in variables
-      config[fieldName] = variant.dom_changes || []
+      // Only include DOM changes if not empty
+      if (variant.dom_changes && variant.dom_changes.length > 0) {
+        config[fieldName] = variant.dom_changes
+      }
 
       return {
         variant: existingVariant?.variant ?? index,
