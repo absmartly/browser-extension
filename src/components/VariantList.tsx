@@ -13,8 +13,42 @@ const storage = new Storage({ area: "local" })
 
 export interface Variant {
   name: string
-  variables: Record<string, any>
-  dom_changes: DOMChangesData // Now supports both legacy array and new config format
+  config: Record<string, any>  // Full variables payload including __dom_changes, __inject_html, etc.
+}
+
+// Helper to get DOM changes from config
+function getDOMChangesFromConfig(config: Record<string, any> | undefined, domFieldName: string = '__dom_changes'): DOMChangesData {
+  if (!config) return { changes: [] }
+  const domData = config[domFieldName]
+  if (!domData) return { changes: [] }
+  // Handle both legacy array and new config format
+  if (Array.isArray(domData)) return { changes: domData }
+  return domData
+}
+
+// Helper to update config with DOM changes
+function setDOMChangesInConfig(config: Record<string, any>, domChanges: DOMChangesData, domFieldName: string = '__dom_changes'): Record<string, any> {
+  const newConfig = { ...config }
+  // Only include DOM changes if not empty
+  if (Array.isArray(domChanges.changes) && domChanges.changes.length > 0) {
+    newConfig[domFieldName] = domChanges
+  } else if (!Array.isArray(domChanges.changes)) {
+    // If it's already an object with changes, include it
+    newConfig[domFieldName] = domChanges
+  } else {
+    // Remove if empty
+    delete newConfig[domFieldName]
+  }
+  return newConfig
+}
+
+// Helper to filter out special fields for Variables display
+function getVariablesForDisplay(config: Record<string, any>, domFieldName: string, fieldsToExclude: string[] = ['__inject_html']): Record<string, any> {
+  const filtered = { ...config }
+  // Add the configurable DOM field name to exclusions
+  const allExclusions = [...fieldsToExclude, domFieldName]
+  allExclusions.forEach(field => delete filtered[field])
+  return filtered
 }
 
 // Helper to get changes array from DOMChangesData
@@ -24,14 +58,6 @@ function getChangesArray(data: DOMChangesData): DOMChange[] {
 
 // Helper to get config from DOMChangesData (or create default)
 function getChangesConfig(data: DOMChangesData): DOMChangesConfig {
-  if (Array.isArray(data)) {
-    return { changes: data }
-  }
-  return data
-}
-
-// Helper to convert legacy array format to new format
-function normalizeToNewFormat(data: DOMChangesData): DOMChangesConfig {
   if (Array.isArray(data)) {
     return { changes: data }
   }
@@ -50,6 +76,8 @@ interface VariantListProps {
   canEdit?: boolean
   // Can add/remove variants (disabled for running experiments)
   canAddRemove?: boolean
+  // DOM changes field name from config (required)
+  domFieldName: string
 }
 
 export function VariantList({
@@ -58,7 +86,8 @@ export function VariantList({
   experimentName,
   onVariantsChange,
   canEdit = true,
-  canAddRemove = true
+  canAddRemove = true,
+  domFieldName
 }: VariantListProps) {
   const [variants, setVariants] = useState<Variant[]>(initialVariants)
   const [previewEnabled, setPreviewEnabled] = useState(false)
@@ -70,31 +99,34 @@ export function VariantList({
   const [newVariableName, setNewVariableName] = useState('')
   const [newVariableValue, setNewVariableValue] = useState('')
   const newVarNameInputRef = useRef<HTMLInputElement>(null)
+  const newVarValueInputRef = useRef<HTMLInputElement>(null)
   const justUpdatedRef = useRef(false)
 
-  // Load saved changes from storage on mount
+  // Load saved changes from storage on mount ONLY if not already provided by parent
   useEffect(() => {
     const loadSavedChanges = async () => {
+      // If parent already provided initialVariants, use those instead of loading from storage
+      // This prevents overwriting fresh parent data with stale storage data
+      if (initialVariants.length > 0) {
+        debugLog('📦 Skipping storage load - using fresh data from parent')
+        return
+      }
+
       const storageKey = `experiment-${experimentId}-variants`
       try {
         const savedVariants = await storage.get(storageKey)
         if (savedVariants && Array.isArray(savedVariants)) {
-          // Convert all variants to new format
-          const normalizedVariants = savedVariants.map(v => ({
-            ...v,
-            dom_changes: normalizeToNewFormat(v.dom_changes || [])
-          }))
-          debugLog('📦 Restoring saved variants from storage (normalized):', normalizedVariants)
-          setVariants(normalizedVariants)
+          debugLog('📦 Restoring saved variants from storage:', savedVariants)
+          setVariants(savedVariants)
           // Notify parent that we have unsaved changes
-          onVariantsChange(normalizedVariants, true)
+          onVariantsChange(savedVariants, true)
         }
       } catch (error) {
         debugError('Failed to load saved variants:', error)
       }
     }
     loadSavedChanges()
-  }, [experimentId])
+  }, [experimentId, initialVariants.length])
 
   // Sync with parent when initialVariants change
   // This ensures we always have the latest data from parent (e.g., when __inject_html changes)
@@ -103,16 +135,17 @@ export function VariantList({
     // This prevents a feedback loop where adding a variable causes us to overwrite it
     if (justUpdatedRef.current) {
       justUpdatedRef.current = false
+      debugLog('📊 VariantList: Skipping sync (justUpdated)')
       return
     }
 
+    debugLog('📊 VariantList: Syncing from parent, initialVariants:', initialVariants)
+    debugLog('📊 VariantList: First variant config:', initialVariants[0]?.config)
     // Sync from parent (for external updates like __inject_html edits)
-    // Convert all variants to new format
-    const normalizedVariants = initialVariants.map(v => ({
-      ...v,
-      dom_changes: normalizeToNewFormat(v.dom_changes || [])
-    }))
-    setVariants(normalizedVariants)
+    setVariants(initialVariants)
+    // Also save to storage so it persists
+    saveToStorage(initialVariants)
+    debugLog('📊 VariantList: Saved to storage')
   }, [initialVariants, experimentId])
 
   // Cleanup storage and preview on unmount
@@ -152,8 +185,7 @@ export function VariantList({
       ...variants,
       {
         name: `Variant ${variants.length}`,
-        variables: {},
-        dom_changes: { changes: [] } // Use new format for new variants
+        config: {} // Empty config for new variants
       }
     ]
     updateVariants(newVariants)
@@ -172,16 +204,18 @@ export function VariantList({
 
   const updateVariantDOMChanges = (index: number, changes: DOMChange[], options?: { isReorder?: boolean }) => {
     const newVariants = [...variants]
-    const currentData = newVariants[index].dom_changes
+    const domChangesData = getDOMChangesFromConfig(newVariants[index].config, domFieldName)
 
     // Always preserve URL filter and global defaults from the config
-    const currentConfig = getChangesConfig(currentData)
+    const currentConfig = getChangesConfig(domChangesData)
+    const updatedDOMChanges: DOMChangesData = {
+      ...currentConfig,
+      changes
+    }
+
     newVariants[index] = {
       ...newVariants[index],
-      dom_changes: {
-        ...currentConfig,
-        changes
-      }
+      config: setDOMChangesInConfig(newVariants[index].config, updatedDOMChanges, domFieldName)
     }
 
     updateVariants(newVariants)
@@ -203,17 +237,19 @@ export function VariantList({
     }
   }
 
-  const updateVariantDOMConfig = (index: number, config: Partial<Omit<DOMChangesConfig, 'changes'>>) => {
+  const updateVariantDOMConfig = (index: number, configUpdate: Partial<Omit<DOMChangesConfig, 'changes'>>) => {
     const newVariants = [...variants]
-    const currentData = newVariants[index].dom_changes
-    const currentConfig = getChangesConfig(currentData)
+    const domChangesData = getDOMChangesFromConfig(newVariants[index].config, domFieldName)
+    const currentDOMConfig = getChangesConfig(domChangesData)
+
+    const updatedDOMChanges: DOMChangesData = {
+      ...currentDOMConfig,
+      ...configUpdate
+    }
 
     newVariants[index] = {
       ...newVariants[index],
-      dom_changes: {
-        ...currentConfig,
-        ...config
-      }
+      config: setDOMChangesInConfig(newVariants[index].config, updatedDOMChanges, domFieldName)
     }
 
     updateVariants(newVariants)
@@ -230,15 +266,30 @@ export function VariantList({
   }
 
   const saveNewVariable = (index: number) => {
-    const key = newVariableName.trim()
-    if (!key) return
+    let key = newVariableName.trim()
+    let value = newVariableValue
+
+    // FALLBACK: If state is empty, read directly from input refs
+    // This handles cases where React state hasn't updated yet (e.g., in E2E tests)
+    if (!key && newVarNameInputRef.current) {
+      key = newVarNameInputRef.current.value.trim()
+      debugLog('📝 Read key from ref:', key)
+    }
+    if (!value && newVarValueInputRef.current) {
+      value = newVarValueInputRef.current.value
+      debugLog('📝 Read value from ref:', value)
+    }
+
+    if (!key) {
+      return
+    }
 
     const newVariants = [...variants]
-    let parsedValue: any = newVariableValue
+    let parsedValue: any = value
     try {
       // Try to parse as JSON if it looks like JSON
-      if (newVariableValue.startsWith('{') || newVariableValue.startsWith('[')) {
-        parsedValue = JSON.parse(newVariableValue)
+      if (value && (value.startsWith('{') || value.startsWith('['))) {
+        parsedValue = JSON.parse(value)
       }
     } catch {
       // Keep as string if parsing fails
@@ -246,7 +297,7 @@ export function VariantList({
 
     newVariants[index] = {
       ...newVariants[index],
-      variables: { ...newVariants[index].variables, [key]: parsedValue }
+      config: { ...newVariants[index].config, [key]: parsedValue }
     }
     updateVariants(newVariants)
     setAddingVariableForVariant(null)
@@ -273,16 +324,16 @@ export function VariantList({
     }
     newVariants[index] = {
       ...newVariants[index],
-      variables: { ...newVariants[index].variables, [key]: parsedValue }
+      config: { ...newVariants[index].config, [key]: parsedValue }
     }
     updateVariants(newVariants)
   }
 
   const deleteVariantVariable = (index: number, key: string) => {
     const newVariants = [...variants]
-    const newVariables = { ...newVariants[index].variables }
-    delete newVariables[key]
-    newVariants[index] = { ...newVariants[index], variables: newVariables }
+    const newConfig = { ...newVariants[index].config }
+    delete newConfig[key]
+    newVariants[index] = { ...newVariants[index], config: newConfig }
     updateVariants(newVariants)
   }
 
@@ -291,8 +342,8 @@ export function VariantList({
     setActivePreviewVariant(enabled ? variantIndex : null)
 
     if (enabled && variants[variantIndex]) {
-      const domChanges = variants[variantIndex].dom_changes || { changes: [] }
-      const changes = getChangesArray(domChanges)
+      const domChangesData = getDOMChangesFromConfig(variants[variantIndex].config, domFieldName)
+      const changes = getChangesArray(domChangesData)
       const variantName = variants[variantIndex].name
 
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -377,7 +428,7 @@ export function VariantList({
               <div>
                 <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
                 <div className="space-y-2">
-                  {Object.entries(variant.variables).map(([key, value]) => (
+                  {Object.entries(getVariablesForDisplay(variant.config, domFieldName)).map(([key, value]) => (
                     <div key={key} className="flex items-center gap-2">
                       <Input
                         value={key}
@@ -418,6 +469,7 @@ export function VariantList({
                         className="flex-1 text-sm"
                       />
                       <Input
+                        ref={newVarValueInputRef}
                         value={newVariableValue}
                         onChange={(e) => setNewVariableValue(e.target.value)}
                         onKeyDown={(e) => {
@@ -467,14 +519,14 @@ export function VariantList({
               {/* URL Filter Section */}
               <URLFilterSection
                 variantIndex={index}
-                config={getChangesConfig(variant.dom_changes)}
+                config={getChangesConfig(getDOMChangesFromConfig(variant.config, domFieldName))}
                 onConfigChange={(config) => updateVariantDOMConfig(index, config)}
                 canEdit={canEdit}
               />
 
               {/* Global Defaults Section */}
               <GlobalDefaultsSection
-                config={getChangesConfig(variant.dom_changes)}
+                config={getChangesConfig(getDOMChangesFromConfig(variant.config, domFieldName))}
                 onConfigChange={(config) => updateVariantDOMConfig(index, config)}
                 canEdit={canEdit}
               />
@@ -484,7 +536,7 @@ export function VariantList({
                 variantName={variant.name}
                 variantIndex={index}
                 experimentName={experimentName}
-                changes={getChangesArray(variant.dom_changes)}
+                changes={getChangesArray(getDOMChangesFromConfig(variant.config, domFieldName))}
                 onChange={(changes) => updateVariantDOMChanges(index, changes)}
                 previewEnabled={previewEnabled && activePreviewVariant === index}
                 onPreviewToggle={(enabled) => {

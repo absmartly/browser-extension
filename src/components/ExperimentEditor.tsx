@@ -130,15 +130,15 @@ export function ExperimentEditor({
 
   // Helper functions for code injection
   const extractInjectionCode = (variant: Variant): ExperimentInjectionCode | undefined => {
-    if (!variant || !variant.variables) return undefined
-    const injectHtml = variant.variables.__inject_html
+    if (!variant || !variant.config) return undefined
+    const injectHtml = variant.config.__inject_html
     if (!injectHtml) return undefined
     return typeof injectHtml === 'string' ? JSON.parse(injectHtml) : injectHtml
   }
 
   const extractDomChangesUrlFilter = (variant: Variant): URLFilter | undefined => {
-    if (!variant) return undefined
-    const domChanges: DOMChangesData = variant.dom_changes
+    if (!variant || !variant.config) return undefined
+    const domChanges: DOMChangesData = variant.config[domFieldName]
     if (!domChanges || Array.isArray(domChanges)) return undefined
     return domChanges.urlFilter
   }
@@ -148,8 +148,8 @@ export function ExperimentEditor({
     if (updatedVariants[0]) {
       updatedVariants[0] = {
         ...updatedVariants[0],
-        variables: {
-          ...updatedVariants[0].variables,
+        config: {
+          ...updatedVariants[0].config,
           __inject_html: code
         }
       }
@@ -282,7 +282,7 @@ export function ExperimentEditor({
 
         {/* Variants */}
         <VariantList
-          initialVariants={initialVariants}
+          initialVariants={currentVariants}
           experimentId={experiment?.id || 0}
           experimentName={formData.name}
           onVariantsChange={(variants, hasChanges) => {
@@ -301,6 +301,7 @@ export function ExperimentEditor({
           }}
           canEdit={true}
           canAddRemove={true}
+          domFieldName={domFieldName}
         />
 
         {/* Code Injection Section - Only for control variant */}

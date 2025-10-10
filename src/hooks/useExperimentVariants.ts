@@ -1,12 +1,20 @@
 import { useState, useMemo } from 'react'
 import { debugError } from '~src/utils/debug'
 import type { Experiment } from '~src/types/absmartly'
-import type { DOMChange, DOMChangesData } from '~src/types/dom-changes'
 
+/**
+ * VariantData now stores the FULL config payload as a single object.
+ * This includes:
+ * - Custom variables (hello: "world", foo: "bar", etc.)
+ * - __inject_html: The HTML/JS injection code
+ * - __dom_changes: The DOM changes with urlFilter and other metadata
+ *
+ * The UI will filter out __inject_html and __dom_changes when displaying
+ * the Variables section, but they remain in the config for proper storage.
+ */
 export interface VariantData {
   name: string
-  variables: Record<string, any>
-  dom_changes: DOMChangesData
+  config: Record<string, any>  // Full variables payload including special fields
 }
 
 interface UseExperimentVariantsOptions {
@@ -19,50 +27,25 @@ export function useExperimentVariants({
   experiment,
   domFieldName = '__dom_changes',
   defaultVariants = [
-    { name: 'Control', variables: {}, dom_changes: [] },
-    { name: 'Variant 1', variables: {}, dom_changes: [] }
+    { name: 'Control', config: {} },
+    { name: 'Variant 1', config: {} }
   ]
 }: UseExperimentVariantsOptions = {}) {
 
   const initialVariants = useMemo<VariantData[]>(() => {
     if (experiment?.variants) {
       return experiment.variants.map(v => {
-        let dom_changes: DOMChange[] = []
-        let variables: Record<string, any> = {}
+        let config: Record<string, any> = {}
 
         try {
-          const config = JSON.parse(v.config || '{}')
-
-          // Handle both old format (array) and new format (object with changes)
-          if (config[domFieldName]) {
-            // Old format: array of DOM changes
-            if (Array.isArray(config[domFieldName])) {
-              dom_changes = config[domFieldName]
-            }
-            // New format: object with changes property
-            else if (typeof config[domFieldName] === 'object' && config[domFieldName].changes) {
-              dom_changes = config[domFieldName]
-            }
-            
-            // Remove DOM changes from variables if they exist
-            if (dom_changes) {
-              const tempConfig = { ...config }
-              delete tempConfig[domFieldName]
-              variables = tempConfig
-            } else {
-              variables = config
-            }
-          } else {
-            variables = config
-          }
+          config = JSON.parse(v.config || '{}')
         } catch (e) {
           debugError('Failed to parse variant config:', e)
         }
 
         return {
           name: v.name || `Variant ${v.variant}`,
-          variables,
-          dom_changes
+          config  // Store full config as-is, no splitting
         }
       })
     }
