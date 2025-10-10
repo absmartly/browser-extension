@@ -71,7 +71,6 @@ async function initializeConfig() {
     apiEndpoint: storedConfig?.apiEndpoint || '',
     applicationId: storedConfig?.applicationId,
     authMethod: storedConfig?.authMethod || defaultAuthMethod,
-    domChangesStorageType: storedConfig?.domChangesStorageType,
     domChangesFieldName: storedConfig?.domChangesFieldName
   }
   

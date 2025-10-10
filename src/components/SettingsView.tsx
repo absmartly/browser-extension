@@ -21,7 +21,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [apiKey, setApiKey] = useState('')
   const [apiEndpoint, setApiEndpoint] = useState('')
   const [applicationName, setApplicationName] = useState('')
-  const [domChangesStorageType, setDomChangesStorageType] = useState<'variable' | 'custom_field'>('variable')
   const [domChangesFieldName, setDomChangesFieldName] = useState('__dom_changes')
   const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt') // Default to JWT
   const [sdkWindowProperty, setSdkWindowProperty] = useState('') // Add SDK window property state
@@ -62,7 +61,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedApiKey = config?.apiKey || ''
       let loadedApiEndpoint = config?.apiEndpoint || ''
       let loadedApplicationName = config?.applicationName || ''
-      let loadedDomChangesStorageType = config?.domChangesStorageType || 'variable'
       let loadedDomChangesFieldName = config?.domChangesFieldName || '__dom_changes'
       let loadedAuthMethod = config?.authMethod || 'jwt' // Default to JWT
       let loadedSdkWindowProperty = config?.sdkWindowProperty || ''
@@ -96,7 +94,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setApiKey(loadedApiKey)
       setApiEndpoint(loadedApiEndpoint)
       setApplicationName(loadedApplicationName)
-      setDomChangesStorageType(loadedDomChangesStorageType)
       setDomChangesFieldName(loadedDomChangesFieldName)
       setAuthMethod(loadedAuthMethod)
       setSdkWindowProperty(loadedSdkWindowProperty)
@@ -231,39 +228,23 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       console.log('[SettingsView] Sending CHECK_AUTH message to background, requestId:', requestId)
 
       // Set up listener for the response BEFORE sending the message
-      // Need to listen on BOTH chrome.runtime.onMessage AND window.postMessage
-      // because in iframe context (tests), messages are forwarded via postMessage
+      // Use single chrome.runtime.onMessage listener (polyfill handles iframe context)
       const responsePromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          chrome.runtime.onMessage.removeListener(chromeListener)
-          window.removeEventListener('message', postMessageListener)
+          chrome.runtime.onMessage.removeListener(listener)
           reject(new Error('Auth check timed out (3s)'))
         }, 3000)
 
-        // Listener for chrome.runtime.onMessage (normal context)
-        const chromeListener = (message: any) => {
+        // Single unified listener for chrome.runtime.onMessage
+        const listener = (message: any) => {
           if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
             clearTimeout(timeout)
-            chrome.runtime.onMessage.removeListener(chromeListener)
-            window.removeEventListener('message', postMessageListener)
+            chrome.runtime.onMessage.removeListener(listener)
             resolve(message.result)
           }
         }
 
-        // Listener for window.postMessage (iframe context)
-        const postMessageListener = (event: MessageEvent) => {
-          if (event.data?.source === 'absmartly-extension-incoming' &&
-              event.data?.type === 'CHECK_AUTH_RESULT' &&
-              event.data?.requestId === requestId) {
-            clearTimeout(timeout)
-            chrome.runtime.onMessage.removeListener(chromeListener)
-            window.removeEventListener('message', postMessageListener)
-            resolve(event.data.result)
-          }
-        }
-
-        chrome.runtime.onMessage.addListener(chromeListener)
-        window.addEventListener('message', postMessageListener)
+        chrome.runtime.onMessage.addListener(listener)
       })
 
       // Send the CHECK_AUTH message
@@ -367,7 +348,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       apiEndpoint,
       sdkEndpoint: sdkEndpoint.trim() || undefined,
       applicationName: applicationName.trim() || undefined,
-      domChangesStorageType,
       domChangesFieldName: domChangesFieldName.trim() || '__dom_changes',
       authMethod,
       sdkWindowProperty: sdkWindowProperty.trim() || undefined,
@@ -607,44 +587,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       <div className="space-y-3 border-t pt-4 mt-4">
         <h3 className="text-sm font-medium text-gray-700">DOM Changes Storage</h3>
         
-        <div className="space-y-2">
-          <label className="text-sm text-gray-600">Storage Type</label>
-          <div className="flex gap-4">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="variable"
-                checked={domChangesStorageType === 'variable'}
-                onChange={(e) => setDomChangesStorageType(e.target.value as 'variable')}
-                className="mr-2"
-              />
-              <span className="text-sm">Variable (Default)</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="custom_field"
-                checked={domChangesStorageType === 'custom_field'}
-                onChange={(e) => setDomChangesStorageType(e.target.value as 'custom_field')}
-                className="mr-2"
-              />
-              <span className="text-sm">Custom Field</span>
-            </label>
-          </div>
-        </div>
-        
         <div>
           <Input
-            label={domChangesStorageType === 'variable' ? 'Variable Name' : 'Custom Field Name'}
+            label="Variable Name"
             type="text"
             value={domChangesFieldName}
             onChange={(e) => setDomChangesFieldName(e.target.value)}
             placeholder="__dom_changes"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {domChangesStorageType === 'variable' 
-              ? 'The name of the variable that will store DOM changes in each variant'
-              : 'The SDK field name of the custom field. Must exist in the experiment.'}
+            The name of the variable that will store DOM changes in each variant
           </p>
         </div>
       </div>
