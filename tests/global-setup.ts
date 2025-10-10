@@ -21,12 +21,12 @@ async function globalSetup(config: FullConfig) {
       // Set environment variable to disable shadow DOM for tests
       process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM = 'true'
 
-      execSync('npm run build', {
+      execSync('plasmo build --tag=dev --src-path=.', {
         cwd: rootDir,
         stdio: 'inherit',
         env: { ...process.env, PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true' }
       })
-      console.log('✅ Extension built successfully (with shadow DOM disabled for tests)')
+      console.log('✅ Extension built successfully in DEV mode (with shadow DOM disabled for tests)')
     } catch (error) {
       console.error('❌ Failed to build extension:', error)
       throw new Error('Extension build failed. Please fix build errors and try again.')

@@ -1,48 +1,17 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
-import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
-import http from 'http'
-import fs from 'fs'
+import { injectSidebar, debugWait } from './utils/test-helpers'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test.html')
 
-// Simple HTTP server to serve test page (needed because content scripts don't work reliably with file:// URLs)
-let testServer: http.Server | null = null
-let testServerUrl: string | null = null
-
-test.beforeAll(async () => {
-  // Start a simple HTTP server
-  const testPageContent = fs.readFileSync(TEST_PAGE_PATH, 'utf-8')
-  testServer = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/html' })
-    res.end(testPageContent)
-  })
-
-  await new Promise<void>((resolve) => {
-    testServer!.listen(0, '127.0.0.1', () => {
-      const address = testServer!.address() as any
-      testServerUrl = `http://127.0.0.1:${address.port}`
-      console.log(`Test server started at ${testServerUrl}`)
-      resolve()
-    })
-  })
-})
-
-test.afterAll(async () => {
-  if (testServer) {
-    await new Promise<void>((resolve) => testServer!.close(() => resolve()))
-    console.log('Test server stopped')
-  }
-})
-
 test.describe('Events Debug Page', () => {
-  test.skip('sidebar loads with auto-config from env vars', async ({ context, extensionId, extensionUrl }) => {
+  test('sidebar loads with auto-config from env vars', async ({ context, extensionId, extensionUrl }) => {
     console.log('\n🚀 Starting sidebar test with auto-config from env vars')
     console.log('Extension ID:', extensionId)
 
     const page = await context.newPage()
-    await page.goto(testServerUrl!)
+    await page.goto(`file://${TEST_PAGE_PATH}`)
     console.log('✅ Test page loaded')
 
     // Inject sidebar
@@ -103,7 +72,7 @@ test.describe('Events Debug Page', () => {
     console.log('Has config:', 'absmartly-config' in storage)
 
     const page = await context.newPage()
-    await page.goto(testServerUrl!)
+    await page.goto(`file://${TEST_PAGE_PATH}`)
     console.log('✅ Test page loaded')
 
     // Inject sidebar
@@ -142,59 +111,35 @@ test.describe('Events Debug Page', () => {
   test.describe('Event Capture and Display', () => {
     let testPage: Page
     let sidebar: any
-    let consoleMessages: Array<{ type: string; text: string }> = []
 
-    test.beforeEach(async ({ context, extensionUrl, extensionId, seedStorage }) => {
-      // Seed config FIRST, before creating page
-      await seedStorage({
-        'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-        'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-        'absmartly-env': 'production',
-        'absmartly-auth-method': 'apikey'
-      })
-
+    test.beforeEach(async ({ context, extensionUrl }) => {
       testPage = await context.newPage()
-
-      // Set up console logging to capture all messages
-      consoleMessages = setupConsoleLogging(testPage)
-
-      // Use HTTP server instead of file:// URL so content scripts work properly
-      await testPage.goto(testServerUrl!)
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
       await testPage.waitForLoadState('networkidle')
-      await testPage.waitForTimeout(500)
 
       sidebar = await injectSidebar(testPage, extensionUrl)
-      // Wait for sidebar to load config and show main UI
-      await testPage.waitForTimeout(1000)
+      await debugWait()
 
       // Open Events Debug Page
       const eventsButton = sidebar.locator('button[aria-label="Events Debug"]')
-      await eventsButton.waitFor({ timeout: 10000 }) // Wait for button to appear
       await eventsButton.evaluate((button) => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
-      await testPage.waitForTimeout(300)
+      await debugWait()
 
       // Wait for Events Debug Page to be fully loaded by checking for the initial state
       // The "0 events captured" text should be visible when the page loads
       await sidebar.locator('text=0 events captured').waitFor({ timeout: 5000 })
-      await testPage.waitForTimeout(300)
+      await debugWait()
     })
 
     test.afterEach(async () => {
-      // Print ALL console messages for debugging
-      console.log(`\n📋 Total console messages captured: ${consoleMessages.length}`)
-      console.log('📋 ALL messages:')
-      consoleMessages.forEach(msg => console.log(`  [${msg.type}] ${msg.text}`))
-
       if (testPage) await testPage.close()
     })
 
     test('captures and displays SDK events in real-time', async () => {
       await test.step('Trigger SDK ready event', async () => {
-        console.log('Sending SDK_EVENT via window.postMessage...')
         await testPage.evaluate(() => {
-          console.log('[TEST] About to send window.postMessage with SDK_EVENT')
           window.postMessage({
             source: 'absmartly-page',
             type: 'SDK_EVENT',
@@ -204,7 +149,6 @@ test.describe('Events Debug Page', () => {
               timestamp: new Date().toISOString()
             }
           }, '*')
-          console.log('[TEST] window.postMessage sent')
         })
         // Give time for event to propagate: page → content script → background → sidebar
         await testPage.waitForTimeout(500)
@@ -235,8 +179,9 @@ test.describe('Events Debug Page', () => {
         await expect(sidebar.locator('text=2 events captured')).toBeVisible()
 
         // Verify newest first (exposure should appear before ready)
-        const firstEventItem = sidebar.locator('[data-testid="event-item"]').first()
-        await expect(firstEventItem).toHaveAttribute('data-event-name', 'exposure')
+        const eventBadges = sidebar.locator('.px-2.py-0.5.text-xs.font-semibold.rounded')
+        const firstEvent = eventBadges.first()
+        await expect(firstEvent).toHaveText('exposure')
       })
     })
 
@@ -257,49 +202,40 @@ test.describe('Events Debug Page', () => {
       })
 
       await test.step('Click event to view details', async () => {
-        const eventItem = sidebar.locator('[data-testid="event-item"][data-event-name="exposure"]').first()
+        const eventItem = sidebar.locator('text=exposure').first()
         await eventItem.waitFor({ state: 'visible', timeout: 10000 })
-        await eventItem.click()
+        await eventItem.evaluate((el) => {
+          const container = el.closest('div[class*="cursor-pointer"]')
+          if (container) {
+            container.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          }
+        })
         await testPage.waitForTimeout(300)
       })
 
       await test.step('Verify event details displayed', async () => {
-        // Wait for modal to appear
-        const modal = sidebar.locator('.fixed.inset-0')
-        await expect(modal).toBeVisible({ timeout: 10000 })
-
-        await expect(modal.locator('text=Event Type')).toBeVisible()
-        await expect(modal.locator('text=Timestamp')).toBeVisible()
-        await expect(modal.locator('text=Event Data')).toBeVisible()
-        // Check that JSON data in modal contains the expected keys and values
-        await expect(modal.locator('pre', { hasText: 'experiment' })).toBeVisible()
-        await expect(modal.locator('pre', { hasText: 'test_exp' })).toBeVisible()
-        await expect(modal.locator('pre', { hasText: 'variant' })).toBeVisible()
+        await expect(sidebar.locator('text=Event Type')).toBeVisible()
+        await expect(sidebar.locator('text=Timestamp')).toBeVisible()
+        await expect(sidebar.locator('text=Event Data')).toBeVisible()
+        await expect(sidebar.locator('text="experiment"')).toBeVisible()
+        await expect(sidebar.locator('text="test_exp"')).toBeVisible()
       })
 
       await test.step('Verify event is highlighted', async () => {
-        // Event highlighting is not implemented yet - skip this check
-        // TODO: Implement event highlighting when an event is selected
+        const eventItem = sidebar.locator('text=exposure').first()
+        const container = eventItem.locator('..')
+        await expect(container).toHaveClass(/bg-blue-50/)
       })
     })
 
     test('pause and resume functionality', async () => {
-      // Clear any events first to ensure clean state
-      await test.step('Clear events before test', async () => {
-        const clearButton = sidebar.locator('button[title="Clear all events"]')
-        if (await clearButton.isVisible()) {
-          await clearButton.click()
-          await testPage.waitForTimeout(300)
-        }
-      })
-
       await test.step('Click pause button', async () => {
         const pauseButton = sidebar.locator('button[title="Pause"]')
         await expect(pauseButton).toBeVisible()
         await pauseButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify paused state', async () => {
@@ -319,7 +255,7 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify event not captured while paused', async () => {
@@ -332,7 +268,7 @@ test.describe('Events Debug Page', () => {
         await resumeButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify resumed state', async () => {
@@ -352,15 +288,12 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(1000) // Increased wait time for event to propagate
+        await debugWait()
       })
 
       await test.step('Verify event captured after resume', async () => {
-        await expect(sidebar.locator('text=exposure')).toBeVisible({ timeout: 10000 })
-        // Verify at least one event was captured after resume
-        const statusBar = sidebar.locator('.p-2.bg-gray-50.text-gray-600.text-sm.text-center.border-t')
-        await expect(statusBar).toContainText(/\d+ events? captured/, { timeout: 10000 })
-        await expect(statusBar).not.toContainText('0 events captured', { timeout: 10000 })
+        await expect(sidebar.locator('text=exposure')).toBeVisible()
+        await expect(sidebar.locator('text=1 event captured')).toBeVisible()
       })
     })
 
@@ -377,7 +310,7 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
 
         await testPage.evaluate(() => {
           window.postMessage({
@@ -390,7 +323,7 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify events exist', async () => {
@@ -403,7 +336,7 @@ test.describe('Events Debug Page', () => {
         await clearButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify events cleared', async () => {
@@ -433,7 +366,7 @@ test.describe('Events Debug Page', () => {
           await testPage.waitForTimeout(100)
         }
 
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify all event types displayed', async () => {
@@ -448,16 +381,13 @@ test.describe('Events Debug Page', () => {
 
       await test.step('Verify color coding', async () => {
         // Check that different events have different color classes
-        const errorItem = sidebar.locator('[data-testid="event-item"][data-event-name="error"]').first()
-        const errorBadge = errorItem.locator('[data-testid="event-badge"]')
+        const errorBadge = sidebar.locator('text=error').first()
         await expect(errorBadge).toHaveClass(/text-red-600/)
 
-        const readyItem = sidebar.locator('[data-testid="event-item"][data-event-name="ready"]').first()
-        const readyBadge = readyItem.locator('[data-testid="event-badge"]')
+        const readyBadge = sidebar.locator('text=ready').first()
         await expect(readyBadge).toHaveClass(/text-green-600/)
 
-        const exposureItem = sidebar.locator('[data-testid="event-item"][data-event-name="exposure"]').first()
-        const exposureBadge = exposureItem.locator('[data-testid="event-badge"]')
+        const exposureBadge = sidebar.locator('text=exposure').first()
         await expect(exposureBadge).toHaveClass(/text-orange-600/)
       })
     })
@@ -475,7 +405,7 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify timestamp format in list', async () => {
@@ -485,10 +415,14 @@ test.describe('Events Debug Page', () => {
       })
 
       await test.step('Click event and verify full timestamp in details', async () => {
-        const eventItem = sidebar.locator('[data-testid="event-item"][data-event-name="ready"]').first()
-        await eventItem.waitFor({ state: 'visible', timeout: 10000 })
-        await eventItem.click()
-        await testPage.waitForTimeout(500)
+        const eventItem = sidebar.locator('text=ready').first()
+        await eventItem.evaluate((el) => {
+          const container = el.closest('div[class*="cursor-pointer"]')
+          if (container) {
+            container.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          }
+        })
+        await debugWait()
 
         // Should show full date/time
         await expect(sidebar.locator('text=/1\\/1\\/2025/')).toBeVisible()
@@ -508,7 +442,7 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify event captured', async () => {
@@ -526,7 +460,7 @@ test.describe('Events Debug Page', () => {
             payload: {}
           }, '*')
         })
-        await testPage.waitForTimeout(500)
+        await debugWait()
       })
 
       await test.step('Verify event not captured', async () => {

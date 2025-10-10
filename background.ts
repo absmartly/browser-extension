@@ -61,37 +61,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true
   } else if (message.type === 'SDK_EVENT') {
+    console.log('[Background] 🔵 Received SDK_EVENT:', message.payload)
     // Buffer SDK events
     const sessionStorage = new Storage({ area: "session" })
 
     sessionStorage.get(EVENT_BUFFER_KEY).then(buffer => {
       const events = buffer || []
+      console.log('[Background] Current buffer size:', events.length)
 
       // Add new event to end of array (O(1) operation)
-      events.push({
+      const newEvent = {
         id: `${Date.now()}-${Math.random()}`,
         eventName: message.payload.eventName,
         data: message.payload.data,
         timestamp: message.payload.timestamp
-      })
+      }
+      events.push(newEvent)
+      console.log('[Background] ✅ Added event to buffer:', newEvent)
 
       // Keep only last MAX_BUFFER_SIZE events (newest at end)
       const trimmedEvents = events.slice(-MAX_BUFFER_SIZE)
 
       return sessionStorage.set(EVENT_BUFFER_KEY, trimmedEvents)
     }).then(() => {
+      console.log('[Background] ✅ Event buffered, now broadcasting...')
       debugLog('[Background] SDK event buffered:', message.payload.eventName)
 
       // Broadcast new event to all extension pages for real-time updates
       chrome.runtime.sendMessage({
         type: 'SDK_EVENT_BROADCAST',
         payload: message.payload
-      }).catch(() => {
-        // Ignore errors if no listeners
+      }).then(() => {
+        console.log('[Background] ✅ SDK_EVENT_BROADCAST sent successfully')
+      }).catch((err) => {
+        console.log('[Background] ⚠️ No listeners for SDK_EVENT_BROADCAST (this is normal if sidebar not open):', err?.message)
       })
 
       sendResponse({ success: true })
     }).catch(error => {
+      console.error('[Background] ❌ Failed to buffer event:', error)
       debugError('[Background] Failed to buffer event:', error)
       sendResponse({ success: false, error: error.message })
     })
@@ -939,8 +947,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Register content script for file:// URLs dynamically
 // This is needed because content scripts in manifest don't auto-inject on file:// URLs
-chrome.runtime.onInstalled.addListener(async () => {
+async function registerFileUrlContentScript() {
   try {
+    console.log('[Background] Registering content script for file:// URLs...')
     const manifest = chrome.runtime.getManifest()
     const contentScripts = manifest.content_scripts
     if (contentScripts && contentScripts.length > 0) {
@@ -955,10 +964,11 @@ chrome.runtime.onInstalled.addListener(async () => {
         allFrames: false
       }])
 
-      console.log('[Background] Registered dynamic content script for file:// URLs')
+      console.log('[Background] ✅ Registered dynamic content script for file:// URLs')
     }
   } catch (error) {
     // Script might already be registered, unregister and try again
+    console.log('[Background] Registration failed, trying to re-register...')
     try {
       await chrome.scripting.unregisterContentScripts({ ids: ['file-url-content-script'] })
       const manifest = chrome.runtime.getManifest()
@@ -972,13 +982,22 @@ chrome.runtime.onInstalled.addListener(async () => {
           runAt: 'document_idle',
           allFrames: false
         }])
-        console.log('[Background] Re-registered dynamic content script for file:// URLs')
+        console.log('[Background] ✅ Re-registered dynamic content script for file:// URLs')
       }
     } catch (retryError) {
-      console.error('[Background] Failed to register dynamic content script:', retryError)
+      console.error('[Background] ❌ Failed to register dynamic content script:', retryError)
     }
   }
-})
+}
+
+// Register on install
+chrome.runtime.onInstalled.addListener(registerFileUrlContentScript)
+
+// ALSO register on startup (important for tests where extension persists across runs)
+chrome.runtime.onStartup.addListener(registerFileUrlContentScript)
+
+// Register immediately on background script load (for first run)
+registerFileUrlContentScript()
 
 // Listen for tab updates (keeping for other purposes)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
