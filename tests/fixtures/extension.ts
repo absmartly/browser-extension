@@ -37,7 +37,7 @@ export const test = base.extend<ExtFixtures>({
     // Extension build is already ensured in global setup
     // Don't rebuild here to avoid multiple rebuilds per test
 
-    const extPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const extPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-prod')
 
     // Verify extension was built successfully
     if (!fs.existsSync(extPath)) {

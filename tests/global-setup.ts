@@ -7,7 +7,7 @@ async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...')
 
   const rootDir = path.join(__dirname, '..')
-  const buildDir = path.join(rootDir, 'build', 'chrome-mv3-dev')
+  const buildDir = path.join(rootDir, 'build', 'chrome-mv3-prod')
   const manifestPath = path.join(buildDir, 'manifest.json')
 
   // 1. Check if extension needs to be built
@@ -33,7 +33,7 @@ async function globalSetup(config: FullConfig) {
     }
   } else {
     console.log('✅ Extension already built')
-    console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.')
+    console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-prod/manifest.json to force rebuild.')
   }
 
   // 2. Copy test files to build directory
@@ -42,12 +42,19 @@ async function globalSetup(config: FullConfig) {
     fs.mkdirSync(testsDir, { recursive: true })
   }
 
-  // Copy seed.html
-  const seedSource = path.join(__dirname, 'seed.html')
-  const seedDest = path.join(testsDir, 'seed.html')
-  if (fs.existsSync(seedSource)) {
-    fs.copyFileSync(seedSource, seedDest)
+  // Copy seed.html and seed.js
+  const seedHtmlSource = path.join(__dirname, 'seed.html')
+  const seedHtmlDest = path.join(testsDir, 'seed.html')
+  if (fs.existsSync(seedHtmlSource)) {
+    fs.copyFileSync(seedHtmlSource, seedHtmlDest)
     console.log('✅ Copied seed.html to build directory')
+  }
+
+  const seedJsSource = path.join(__dirname, 'seed.js')
+  const seedJsDest = path.join(testsDir, 'seed.js')
+  if (fs.existsSync(seedJsSource)) {
+    fs.copyFileSync(seedJsSource, seedJsDest)
+    console.log('✅ Copied seed.js to build directory')
   }
 
   // Copy local test page
