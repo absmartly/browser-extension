@@ -14,7 +14,8 @@ import { oneDark } from '@codemirror/theme-one-dark'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
-  all_frames: false
+  all_frames: false,
+  run_at: "document_start" // Run as early as possible to intercept SDK before it initializes
 }
 
 // Mark that content script has loaded (for debugging)
@@ -225,6 +226,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     debugLog('[Visual Editor Content Script] Received message: TEST_CONNECTION')
     sendResponse({ success: true, message: 'Content script is loaded and ready' })
     return true
+  }
+
+  // Handle SDK plugin injection request
+  if (message.type === 'INJECT_SDK_PLUGIN') {
+    console.log('[Content Script] 📌 Received INJECT_SDK_PLUGIN message')
+    debugLog('[Visual Editor Content Script] Injecting SDK plugin on demand')
+    ensureSDKPluginInjected().then(() => {
+      sendResponse({ success: true })
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message })
+    })
+    return true // Keep message channel open for async response
   }
   
   // Handle element picker message
@@ -792,12 +805,23 @@ let sdkPluginInjecting = false
 
 async function ensureSDKPluginInjected() {
   if (!sdkPluginInjected && !sdkPluginInjecting) {
+    console.log('[Content Script] 🚀 Injecting SDK plugin...')
     sdkPluginInjecting = true
-    await injectSDKPluginScript()
-    sdkPluginInjected = true
-    sdkPluginInjecting = false
+    try {
+      await injectSDKPluginScript()
+      sdkPluginInjected = true
+      console.log('[Content Script] ✅ SDK plugin injected successfully')
+    } catch (error) {
+      console.error('[Content Script] ❌ Failed to inject SDK plugin:', error)
+    } finally {
+      sdkPluginInjecting = false
+    }
     // Give the script a moment to set up its message listener
     await new Promise(resolve => setTimeout(resolve, 50))
+  } else if (sdkPluginInjected) {
+    console.log('[Content Script] ℹ️ SDK plugin already injected')
+  } else if (sdkPluginInjecting) {
+    console.log('[Content Script] ⏳ SDK plugin injection already in progress')
   }
 }
 
@@ -806,7 +830,9 @@ window.addEventListener('message', async (event) => {
   // Only accept messages from the same origin
   // Allow file:// protocol for testing (origin is "null" for file:// URLs)
   const isFileProtocol = window.location.protocol === 'file:' || event.origin === 'null'
-  if (!isFileProtocol && event.origin !== window.location.origin) return
+  if (!isFileProtocol && event.origin !== window.location.origin) {
+    return
+  }
 
   // Handle visual editor closed message
   if (event.data && event.data.source === 'absmartly-visual-editor' && event.data.type === 'VISUAL_EDITOR_CLOSED') {
@@ -824,19 +850,14 @@ window.addEventListener('message', async (event) => {
 
   // Handle messages from the injected script (absmartly-page)
   if (event.data && event.data.source === 'absmartly-page') {
-    console.log('[Content Script] ✅ Received message from page:', event.data.type, event.data)
     debugLog('[Content Script] Received message from page:', event.data)
 
     if (event.data.type === 'SDK_EVENT') {
-      console.log('[Content Script] 🔵 Forwarding SDK_EVENT to background:', event.data.payload)
       // Forward SDK events to background script for buffering
       chrome.runtime.sendMessage({
         type: 'SDK_EVENT',
         payload: event.data.payload
-      }).then(() => {
-        console.log('[Content Script] ✅ SDK_EVENT sent to background successfully')
       }).catch(err => {
-        console.error('[Content Script] ❌ Failed to send SDK_EVENT to background:', err)
         debugError('[Content Script] Failed to send SDK_EVENT to background:', err)
       })
     } else if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
@@ -1196,3 +1217,9 @@ function closeJSONEditor() {
     jsonEditorInstance = null
   }
 }
+
+// Automatically inject SDK plugin on page load to capture SDK events passively
+// This allows the Events Debug page to receive events without needing to be opened first
+ensureSDKPluginInjected().catch(err => {
+  debugError('[Content Script] Failed to auto-inject SDK plugin:', err)
+})

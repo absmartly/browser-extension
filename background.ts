@@ -129,6 +129,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
 
     return true
+  } else if (message.type === 'ENSURE_SDK_PLUGIN_INJECTED') {
+    console.log('[Background] 📌 ENSURE_SDK_PLUGIN_INJECTED requested, forwarding to active tab')
+    // Forward to content script in active tab to inject SDK plugin
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'INJECT_SDK_PLUGIN' }, (response) => {
+          console.log('[Background] Content script injection response:', response)
+          sendResponse(response || { success: true })
+        })
+      } else {
+        console.warn('[Background] No active tab found for SDK plugin injection')
+        sendResponse({ success: false, error: 'No active tab' })
+      }
+    })
+    return true // Will respond asynchronously
   }
 })
 
