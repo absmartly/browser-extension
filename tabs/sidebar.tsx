@@ -65,25 +65,29 @@ if (window.parent !== window) {
   })
 
   console.log('[tabs/sidebar.tsx] Message forwarding listener registered')
-  
-  // Also listen for messages FROM background script and forward them to iframe content
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('[tabs/sidebar.tsx] Received message from background:', message.type)
-
-    // Log DEBUG messages directly
-    if (message.type === 'DEBUG') {
-      console.log(message.message)
-    }
-
-    // Forward to iframe content as a regular message event
-    window.postMessage({
-      source: 'absmartly-extension-incoming',
-      ...message
-    }, '*')
-    return false
-  })
-  console.log('[tabs/sidebar.tsx] Incoming message listener registered')
 }
+
+// Always listen for messages FROM background script (works in both iframe and standalone modes)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[tabs/sidebar.tsx] 🔵 Received message from background:', message.type, message)
+
+  // Log DEBUG messages directly
+  if (message.type === 'DEBUG') {
+    console.log(message.message)
+  }
+
+  // Forward to iframe content as a regular message event
+  // In iframe mode (dev), forward via window.postMessage
+  // In standalone mode (production), the window.postMessage will still work
+  // because EventsDebugPage listens for both chrome.runtime and window messages
+  window.postMessage({
+    source: 'absmartly-extension-incoming',
+    ...message
+  }, '*')
+
+  return false
+})
+console.log('[tabs/sidebar.tsx] ✅ Incoming message listener registered (for all contexts)')
 
 // Lazy load the ExtensionUI to avoid bundling issues
 const ExtensionUI = lazy(() => import("~src/components/ExtensionUI"))

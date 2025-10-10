@@ -27,7 +27,10 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
 
   useEffect(() => {
     console.log('[EventsDebugPage] 🔵 Component mounted, fetching buffered events...')
+
     // Fetch buffered events on mount
+    // Note: SDK plugin is now automatically injected when content script loads,
+    // so we don't need to manually trigger injection here
     chrome.runtime.sendMessage({ type: 'GET_BUFFERED_EVENTS' }, (response) => {
       console.log('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
       if (response?.success && response.events) {
@@ -41,8 +44,8 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
     // Listen for real-time SDK events broadcast from background script
     const handleRuntimeMessage = (
       message: any,
-      sender: chrome.runtime.MessageSender,
-      sendResponse: (response?: any) => void
+      sender?: chrome.runtime.MessageSender,
+      sendResponse?: (response?: any) => void
     ) => {
       console.log('[EventsDebugPage] 🔵 Received runtime message:', message.type, message)
       if (message.type === 'SDK_EVENT_BROADCAST' && !isPaused) {
@@ -63,11 +66,22 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       }
     }
 
-    console.log('[EventsDebugPage] ✅ Registered message listener')
+    // Listen for messages forwarded via window.postMessage (from sidebar.tsx in iframe mode)
+    const handleWindowMessage = (event: MessageEvent) => {
+      if (event.data?.source === 'absmartly-extension-incoming') {
+        console.log('[EventsDebugPage] 🔵 Received window message:', event.data.type, event.data)
+        handleRuntimeMessage(event.data)
+      }
+    }
+
+    console.log('[EventsDebugPage] ✅ Registered message listeners')
     chrome.runtime.onMessage.addListener(handleRuntimeMessage)
+    window.addEventListener('message', handleWindowMessage)
+
     return () => {
-      console.log('[EventsDebugPage] ❌ Removing message listener')
+      console.log('[EventsDebugPage] ❌ Removing message listeners')
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
+      window.removeEventListener('message', handleWindowMessage)
     }
   }, [isPaused])
 
