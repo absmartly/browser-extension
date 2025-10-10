@@ -231,21 +231,39 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       console.log('[SettingsView] Sending CHECK_AUTH message to background, requestId:', requestId)
 
       // Set up listener for the response BEFORE sending the message
+      // Need to listen on BOTH chrome.runtime.onMessage AND window.postMessage
+      // because in iframe context (tests), messages are forwarded via postMessage
       const responsePromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          chrome.runtime.onMessage.removeListener(listener)
+          chrome.runtime.onMessage.removeListener(chromeListener)
+          window.removeEventListener('message', postMessageListener)
           reject(new Error('Auth check timed out (3s)'))
         }, 3000)
 
-        const listener = (message: any) => {
+        // Listener for chrome.runtime.onMessage (normal context)
+        const chromeListener = (message: any) => {
           if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
             clearTimeout(timeout)
-            chrome.runtime.onMessage.removeListener(listener)
+            chrome.runtime.onMessage.removeListener(chromeListener)
+            window.removeEventListener('message', postMessageListener)
             resolve(message.result)
           }
         }
 
-        chrome.runtime.onMessage.addListener(listener)
+        // Listener for window.postMessage (iframe context)
+        const postMessageListener = (event: MessageEvent) => {
+          if (event.data?.source === 'absmartly-extension-incoming' &&
+              event.data?.type === 'CHECK_AUTH_RESULT' &&
+              event.data?.requestId === requestId) {
+            clearTimeout(timeout)
+            chrome.runtime.onMessage.removeListener(chromeListener)
+            window.removeEventListener('message', postMessageListener)
+            resolve(event.data.result)
+          }
+        }
+
+        chrome.runtime.onMessage.addListener(chromeListener)
+        window.addEventListener('message', postMessageListener)
       })
 
       // Send the CHECK_AUTH message
