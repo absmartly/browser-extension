@@ -1005,11 +1005,11 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           const authMethod = url.searchParams.get('authMethod') || 'jwt'
           const apiKey = url.searchParams.get('apiKey')
 
-          const cacheKey = `avatar_cache_${avatarUrl}`
-
-          // Check cache first
+          // Check cache first using the actual avatar URL (https://)
+          // Cache API doesn't support chrome-extension:// scheme, so we use the actual URL
           const cache = await caches.open('absmartly-avatars-v1')
-          const cached = await cache.match(event.request)
+          const cacheRequest = new Request(avatarUrl, { method: 'GET' })
+          const cached = await cache.match(cacheRequest)
 
           if (cached) {
             console.log('[Avatar Proxy] Returning cached avatar:', avatarUrl)
@@ -1070,8 +1070,8 @@ self.addEventListener('fetch', (event: FetchEvent) => {
             }
           })
 
-          // Store in cache
-          await cache.put(event.request, cachedResponse.clone())
+          // Store in cache using the actual avatar URL (Cache API doesn't support chrome-extension:// scheme)
+          await cache.put(cacheRequest, cachedResponse.clone())
           console.log('[Avatar Proxy] Cached avatar:', avatarUrl)
 
           return cachedResponse
