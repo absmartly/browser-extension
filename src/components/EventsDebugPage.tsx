@@ -6,6 +6,7 @@ import {
   ArrowPathIcon
 } from "@heroicons/react/24/outline"
 import { EventDetailsModal } from "./EventDetailsModal"
+import { Header } from "./Header"
 
 interface SDKEvent {
   id: string
@@ -14,7 +15,11 @@ interface SDKEvent {
   timestamp: string
 }
 
-export default function EventsDebugPage() {
+interface EventsDebugPageProps {
+  onBack: () => void
+}
+
+export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   const [events, setEvents] = useState<SDKEvent[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<SDKEvent | null>(null)
@@ -86,29 +91,31 @@ export default function EventsDebugPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-lg font-semibold">SDK Events</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setIsPaused(!isPaused)}
-            className="p-2 text-gray-700 hover:bg-gray-200 rounded"
-            title={isPaused ? "Resume" : "Pause"}>
-            {isPaused ? (
-              <PlayIcon className="w-5 h-5" />
-            ) : (
-              <PauseIcon className="w-5 h-5" />
-            )}
-          </button>
-          <button
-            onClick={clearEvents}
-            className="p-2 text-gray-700 hover:bg-gray-200 rounded"
-            title="Clear all events">
-            <TrashIcon className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+    <div className="p-4 flex flex-col h-full">
+      <Header
+        title="SDK Events"
+        onBack={onBack}
+        actions={
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className="p-2 text-gray-700 hover:bg-gray-200 rounded"
+              title={isPaused ? "Resume" : "Pause"}>
+              {isPaused ? (
+                <PlayIcon className="w-5 h-5" />
+              ) : (
+                <PauseIcon className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              onClick={clearEvents}
+              className="p-2 text-gray-700 hover:bg-gray-200 rounded"
+              title="Clear all events">
+              <TrashIcon className="w-5 h-5" />
+            </button>
+          </div>
+        }
+      />
 
       {/* Events List */}
       <div className="flex-1 overflow-y-auto">

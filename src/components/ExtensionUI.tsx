@@ -884,7 +884,7 @@ function SidebarContent() {
       )}
 
       {view === 'events' && (
-        <EventsDebugPage />
+        <EventsDebugPage onBack={() => setView('list')} />
       )}
 
       {(view === 'create' || view === 'edit') && (
