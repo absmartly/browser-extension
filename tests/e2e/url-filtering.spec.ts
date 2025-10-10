@@ -3,7 +3,7 @@ import { type Page } from '@playwright/test'
 import path from 'path'
 import { debugWait } from './utils/test-helpers'
 
-const TEST_PAGE_URL = '/url-filtering-test.html'
+const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'url-filtering-test.html')
 
 /**
  * E2E Tests for URL Filtering with DOM Changes
@@ -45,7 +45,7 @@ test.describe('URL Filtering with DOM Changes', () => {
       console.log('\n📄 Loading test page with SDK')
 
       // Create test page with SDK loaded
-      await testPage.goto(TEST_PAGE_URL)
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
       await testPage.waitForLoadState('networkidle')
 
       // Inject ABsmartly SDK mock
@@ -120,8 +120,8 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Load and initialize DOM changes plugin', async () => {
       console.log('\n🔌 Loading DOM changes plugin')
 
-      // Read the actual plugin file
-      const pluginPath = path.join(__dirname, '../../public/absmartly-dom-changes-core.min.js')
+      // Read the SDK plugin file from the dist directory
+      const pluginPath = path.join(__dirname, '../../../absmartly-sdk-plugins/dist/absmartly-sdk-plugins.dev.js')
       const fs = require('fs')
       const pluginCode = fs.readFileSync(pluginPath, 'utf-8')
 
@@ -132,8 +132,8 @@ test.describe('URL Filtering with DOM Changes', () => {
         // Create context
         const context = new (window as any).absmartly.Context()
 
-        // Plugin auto-initializes and registers itself as context.__domPlugin
-        const DOMChangesPlugin = (window as any).ABsmartlyDOM.DOMChangesPlugin
+        // Get DOMChangesPlugin from the SDK plugins bundle
+        const DOMChangesPlugin = (window as any).ABsmartlySDKPlugins.DOMChangesPlugin
         const plugin = new DOMChangesPlugin({
           context,
           autoApply: true,
@@ -224,7 +224,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Load page with SDK and plugin', async () => {
       console.log('\n📄 Loading test page with SDK')
 
-      await testPage.goto(TEST_PAGE_URL)
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
       await testPage.waitForLoadState('networkidle')
 
       // Inject ABsmartly SDK mock with multiple variants having different URL filters
@@ -478,7 +478,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Test path matching', async () => {
       console.log('\n🔗 Testing path matching')
 
-      await testPage.goto(TEST_PAGE_URL)
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
       await testPage.waitForLoadState('networkidle')
 
       await testPage.evaluate(() => {
@@ -565,7 +565,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Test query parameter matching', async () => {
       console.log('\n❓ Testing query parameter matching')
 
-      await testPage.goto(TEST_PAGE_URL)
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
       await testPage.waitForLoadState('networkidle')
 
       await testPage.evaluate(() => {
@@ -644,7 +644,7 @@ test.describe('URL Filtering with DOM Changes', () => {
     await test.step('Test hash matching', async () => {
       console.log('\n# Testing hash matching')
 
-      await testPage.goto(TEST_PAGE_URL)
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
       await testPage.waitForLoadState('networkidle')
 
       await testPage.evaluate(() => {

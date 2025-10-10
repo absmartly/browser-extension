@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { debugError } from '~src/utils/debug'
 import type { Experiment } from '~src/types/absmartly'
-import type { DOMChange } from '~src/types/dom-changes'
+import type { DOMChange, DOMChangesData } from '~src/types/dom-changes'
 
 export interface VariantData {
   name: string
   variables: Record<string, any>
-  dom_changes: DOMChange[]
+  dom_changes: DOMChangesData
 }
 
 interface UseExperimentVariantsOptions {
@@ -33,11 +33,25 @@ export function useExperimentVariants({
         try {
           const config = JSON.parse(v.config || '{}')
 
-          if (config[domFieldName] && Array.isArray(config[domFieldName])) {
-            dom_changes = config[domFieldName]
-            const tempConfig = { ...config }
-            delete tempConfig[domFieldName]
-            variables = tempConfig
+          // Handle both old format (array) and new format (object with changes)
+          if (config[domFieldName]) {
+            // Old format: array of DOM changes
+            if (Array.isArray(config[domFieldName])) {
+              dom_changes = config[domFieldName]
+            }
+            // New format: object with changes property
+            else if (typeof config[domFieldName] === 'object' && config[domFieldName].changes) {
+              dom_changes = config[domFieldName]
+            }
+            
+            // Remove DOM changes from variables if they exist
+            if (dom_changes) {
+              const tempConfig = { ...config }
+              delete tempConfig[domFieldName]
+              variables = tempConfig
+            } else {
+              variables = config
+            }
           } else {
             variables = config
           }

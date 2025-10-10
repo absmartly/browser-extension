@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, forwardRef } from 'react'
 import { clsx } from 'clsx'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
@@ -8,7 +8,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   showPasswordToggle?: boolean
 }
 
-export function Input({ label, error, className, id, showPasswordToggle, type, ...props }: InputProps) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ label, error, className, id, showPasswordToggle, type, ...props }, ref) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
   const [showPassword, setShowPassword] = useState(false)
   
@@ -30,6 +30,7 @@ export function Input({ label, error, className, id, showPasswordToggle, type, .
       )}
       <div className="relative">
         <input
+          ref={ref}
           id={inputId}
           type={actualType}
           className={clsx(
@@ -67,4 +68,4 @@ export function Input({ label, error, className, id, showPasswordToggle, type, .
       )}
     </div>
   )
-}
+})

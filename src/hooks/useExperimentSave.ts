@@ -1,4 +1,21 @@
 import { debugError } from '~src/utils/debug'
+
+// Helper function to check if DOM changes exist (handles both array and object formats)
+function hasDOMChanges(domChanges: any): boolean {
+  if (!domChanges) return false
+  
+  // Old format: array
+  if (Array.isArray(domChanges)) {
+    return domChanges.length > 0
+  }
+  
+  // New format: { changes: [...], urlFilter?: ..., ... }
+  if (typeof domChanges === 'object' && 'changes' in domChanges) {
+    return Array.isArray(domChanges.changes) && domChanges.changes.length > 0
+  }
+  
+  return false
+}
 import { getConfig } from '~src/utils/storage'
 import type { Experiment } from '~src/types/absmartly'
 import type { DOMChange } from '~src/types/dom-changes'
@@ -62,7 +79,7 @@ async function createNewExperiment(
     const config: any = { ...v.variables }
 
     // Include DOM changes only if not empty
-    if (v.dom_changes && v.dom_changes.length > 0) {
+    if (hasDOMChanges(v.dom_changes)) {
       config[domFieldName] = v.dom_changes
     }
 
@@ -160,7 +177,7 @@ async function saveExistingExperiment(
       let config = { ...variant.variables }
 
       // Only include DOM changes if not empty
-      if (variant.dom_changes && variant.dom_changes.length > 0) {
+      if (hasDOMChanges(variant.dom_changes)) {
         config[fieldName] = variant.dom_changes
       }
 

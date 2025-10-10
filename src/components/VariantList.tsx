@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { DOMChangesInlineEditor } from './DOMChangesInlineEditor'
-import { DOMChangesJSONEditor } from './DOMChangesJSONEditor'
+import { VariantConfigJSONEditor } from './VariantConfigJSONEditor'
 import { DOMChangeOptions } from './DOMChangeOptions'
 import type { DOMChange, DOMChangesData, DOMChangesConfig, URLFilter } from '~src/types/dom-changes'
 
@@ -66,6 +66,11 @@ export function VariantList({
   const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(null)
+  const [addingVariableForVariant, setAddingVariableForVariant] = useState<number | null>(null)
+  const [newVariableName, setNewVariableName] = useState('')
+  const [newVariableValue, setNewVariableValue] = useState('')
+  const newVarNameInputRef = useRef<HTMLInputElement>(null)
+  const justUpdatedRef = useRef(false)
 
   // Load saved changes from storage on mount
   useEffect(() => {
@@ -91,21 +96,23 @@ export function VariantList({
     loadSavedChanges()
   }, [experimentId])
 
-  // Sync with parent when initialVariants change (new experiment loaded)
-  // Only sync when experiment actually changes (not on every parent re-render)
+  // Sync with parent when initialVariants change
+  // This ensures we always have the latest data from parent (e.g., when __inject_html changes)
   useEffect(() => {
-    if (initialVariants.length > 0) {
-      // Only update if this is truly a new experiment (different ID)
-      // Don't sync if we already have variants from storage or user edits
-      if (variants.length === 0) {
-        // Convert all variants to new format
-        const normalizedVariants = initialVariants.map(v => ({
-          ...v,
-          dom_changes: normalizeToNewFormat(v.dom_changes || [])
-        }))
-        setVariants(normalizedVariants)
-      }
+    // Skip sync if this update came from our own onChange call
+    // This prevents a feedback loop where adding a variable causes us to overwrite it
+    if (justUpdatedRef.current) {
+      justUpdatedRef.current = false
+      return
     }
+
+    // Sync from parent (for external updates like __inject_html edits)
+    // Convert all variants to new format
+    const normalizedVariants = initialVariants.map(v => ({
+      ...v,
+      dom_changes: normalizeToNewFormat(v.dom_changes || [])
+    }))
+    setVariants(normalizedVariants)
   }, [initialVariants, experimentId])
 
   // Cleanup storage and preview on unmount
@@ -136,6 +143,7 @@ export function VariantList({
   const updateVariants = (updatedVariants: Variant[]) => {
     setVariants(updatedVariants)
     saveToStorage(updatedVariants)
+    justUpdatedRef.current = true // Mark that we're updating
     onVariantsChange(updatedVariants, true) // true = has unsaved changes
   }
 
@@ -212,15 +220,44 @@ export function VariantList({
   }
 
   const addVariantVariable = (index: number) => {
-    const key = prompt('Enter variable name:')
-    if (key) {
-      const newVariants = [...variants]
-      newVariants[index] = {
-        ...newVariants[index],
-        variables: { ...newVariants[index].variables, [key]: '' }
+    setAddingVariableForVariant(index)
+    setNewVariableName('')
+    setNewVariableValue('')
+    // Focus the input after state update
+    setTimeout(() => {
+      newVarNameInputRef.current?.focus()
+    }, 0)
+  }
+
+  const saveNewVariable = (index: number) => {
+    const key = newVariableName.trim()
+    if (!key) return
+
+    const newVariants = [...variants]
+    let parsedValue: any = newVariableValue
+    try {
+      // Try to parse as JSON if it looks like JSON
+      if (newVariableValue.startsWith('{') || newVariableValue.startsWith('[')) {
+        parsedValue = JSON.parse(newVariableValue)
       }
-      updateVariants(newVariants)
+    } catch {
+      // Keep as string if parsing fails
     }
+
+    newVariants[index] = {
+      ...newVariants[index],
+      variables: { ...newVariants[index].variables, [key]: parsedValue }
+    }
+    updateVariants(newVariants)
+    setAddingVariableForVariant(null)
+    setNewVariableName('')
+    setNewVariableValue('')
+  }
+
+  const cancelNewVariable = () => {
+    setAddingVariableForVariant(null)
+    setNewVariableName('')
+    setNewVariableValue('')
   }
 
   const updateVariantVariable = (index: number, key: string, value: string) => {
@@ -318,10 +355,10 @@ export function VariantList({
                 }}
                 size="sm"
                 variant="secondary"
-                title="Edit DOM Changes as JSON"
+                title="View Full Variant Configuration"
               >
                 <CodeBracketIcon className="h-4 w-4" />
-                JSON
+                Config
               </Button>
               {canEdit && canAddRemove && variants.length > 2 && (
                 <button
@@ -364,7 +401,56 @@ export function VariantList({
                       )}
                     </div>
                   ))}
-                  {canEdit && (
+                  {addingVariableForVariant === index && canEdit && (
+                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-200">
+                      <Input
+                        ref={newVarNameInputRef}
+                        value={newVariableName}
+                        onChange={(e) => setNewVariableName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            saveNewVariable(index)
+                          } else if (e.key === 'Escape') {
+                            cancelNewVariable()
+                          }
+                        }}
+                        placeholder="Variable name"
+                        className="flex-1 text-sm"
+                      />
+                      <Input
+                        value={newVariableValue}
+                        onChange={(e) => setNewVariableValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            saveNewVariable(index)
+                          } else if (e.key === 'Escape') {
+                            cancelNewVariable()
+                          }
+                        }}
+                        placeholder="Variable value"
+                        className="flex-1 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveNewVariable(index)}
+                        className="p-1 text-green-600 hover:text-green-800"
+                        title="Save variable"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelNewVariable}
+                        className="p-1 text-red-600 hover:text-red-800"
+                        title="Cancel"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  {canEdit && addingVariableForVariant !== index && (
                     <Button
                       type="button"
                       onClick={() => addVariantVariable(index)}
@@ -419,28 +505,24 @@ export function VariantList({
         ))}
       </div>
 
-      {/* JSON Editor Modal */}
+      {/* Config Editor Modal */}
       {jsonEditorVariant !== null && (
-        <DOMChangesJSONEditor
+        <VariantConfigJSONEditor
           isOpen={jsonEditorOpen}
           onClose={() => {
             setJsonEditorOpen(false)
             setJsonEditorVariant(null)
           }}
-          changes={variants[jsonEditorVariant]?.dom_changes}
-          onSave={(newData) => {
+          variant={variants[jsonEditorVariant]}
+          onSave={(updatedVariant) => {
             if (jsonEditorVariant !== null) {
               const newVariants = [...variants]
-              newVariants[jsonEditorVariant] = {
-                ...newVariants[jsonEditorVariant],
-                dom_changes: newData
-              }
+              newVariants[jsonEditorVariant] = updatedVariant
               updateVariants(newVariants)
             }
             setJsonEditorOpen(false)
             setJsonEditorVariant(null)
           }}
-          variantName={variants[jsonEditorVariant]?.name || ''}
         />
       )}
     </div>
