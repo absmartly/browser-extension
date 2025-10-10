@@ -67,20 +67,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sessionStorage.get(EVENT_BUFFER_KEY).then(buffer => {
       const events = buffer || []
 
-      // Add new event to beginning of array
-      events.unshift({
+      // Add new event to end of array (O(1) operation)
+      events.push({
         id: `${Date.now()}-${Math.random()}`,
         eventName: message.payload.eventName,
         data: message.payload.data,
         timestamp: message.payload.timestamp
       })
 
-      // Keep only last MAX_BUFFER_SIZE events
-      const trimmedEvents = events.slice(0, MAX_BUFFER_SIZE)
+      // Keep only last MAX_BUFFER_SIZE events (newest at end)
+      const trimmedEvents = events.slice(-MAX_BUFFER_SIZE)
 
       return sessionStorage.set(EVENT_BUFFER_KEY, trimmedEvents)
     }).then(() => {
       debugLog('[Background] SDK event buffered:', message.payload.eventName)
+
+      // Broadcast new event to all extension pages for real-time updates
+      chrome.runtime.sendMessage({
+        type: 'SDK_EVENT_BROADCAST',
+        payload: message.payload
+      }).catch(() => {
+        // Ignore errors if no listeners
+      })
+
       sendResponse({ success: true })
     }).catch(error => {
       debugError('[Background] Failed to buffer event:', error)
