@@ -61,7 +61,7 @@ export function ExperimentDetail({
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
 
   // Use hooks
-  const { initialVariants, currentVariants, hasUnsavedChanges, handleVariantsChange } = useExperimentVariants({
+  const { initialVariants, currentVariants, hasUnsavedChanges, setHasUnsavedChanges, handleVariantsChange } = useExperimentVariants({
     experiment,
     domFieldName
   })
@@ -109,6 +109,9 @@ export function ExperimentDetail({
     }
 
     await save(formData, currentVariants, onUpdate)
+    
+    // Reset unsaved changes flag after successful save
+    setHasUnsavedChanges(false)
   }
 
   // Helper functions for code injection
