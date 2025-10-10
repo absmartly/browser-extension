@@ -33,26 +33,26 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       }
     })
 
-    const handleMessage = (event: MessageEvent) => {
-      if (
-        event.data &&
-        event.data.source === "absmartly-page" &&
-        event.data.type === "SDK_EVENT"
-      ) {
-        if (!isPaused) {
-          const sdkEvent: SDKEvent = {
-            id: `${Date.now()}-${Math.random()}`,
-            eventName: event.data.payload.eventName,
-            data: event.data.payload.data,
-            timestamp: event.data.payload.timestamp
-          }
-          setEvents((prev) => [sdkEvent, ...prev])
+    // Listen for real-time SDK events broadcast from background script
+    const handleRuntimeMessage = (
+      message: any,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: any) => void
+    ) => {
+      if (message.type === 'SDK_EVENT_BROADCAST' && !isPaused) {
+        const sdkEvent: SDKEvent = {
+          id: `${Date.now()}-${Math.random()}`,
+          eventName: message.payload.eventName,
+          data: message.payload.data,
+          timestamp: message.payload.timestamp
         }
+        // Events are now stored newest-last, so append to end
+        setEvents((prev) => [...prev, sdkEvent])
       }
     }
 
-    window.addEventListener("message", handleMessage)
-    return () => window.removeEventListener("message", handleMessage)
+    chrome.runtime.onMessage.addListener(handleRuntimeMessage)
+    return () => chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
   }, [isPaused])
 
   const clearEvents = () => {
@@ -129,35 +129,43 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
           </div>
         ) : (
           <div className="p-4 space-y-2">
-            {events.map((event) => (
-              <div
-                key={event.id}
-                onClick={() => handleEventClick(event)}
-                className="p-3 border rounded-lg cursor-pointer hover:shadow-md transition-shadow bg-white">
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`px-2 py-0.5 text-xs font-semibold rounded border whitespace-nowrap ${getEventColor(
-                      event.eventName
-                    )}`}>
-                    {event.eventName}
-                  </span>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {formatTimestamp(event.timestamp)}
-                  </span>
-                </div>
-                {event.data && (
-                  <div className="text-xs text-gray-600 font-mono bg-gray-50 p-2 rounded mt-2 overflow-hidden">
-                    <div className="truncate">
-                      {typeof event.data === "object"
-                        ? JSON.stringify(event.data).substring(0, 100) +
-                          (JSON.stringify(event.data).length > 100 ? "..." : "")
-                        : String(event.data).substring(0, 100) +
-                          (String(event.data).length > 100 ? "..." : "")}
+            {/* Display events in reverse order (newest first) using reverse iteration */}
+            {(() => {
+              const eventElements = []
+              for (let i = events.length - 1; i >= 0; i--) {
+                const event = events[i]
+                eventElements.push(
+                  <div
+                    key={event.id}
+                    onClick={() => handleEventClick(event)}
+                    className="p-3 border rounded-lg cursor-pointer hover:shadow-md transition-shadow bg-white">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`px-2 py-0.5 text-xs font-semibold rounded border whitespace-nowrap ${getEventColor(
+                          event.eventName
+                        )}`}>
+                        {event.eventName}
+                      </span>
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        {formatTimestamp(event.timestamp)}
+                      </span>
                     </div>
+                    {event.data && (
+                      <div className="text-xs text-gray-600 font-mono bg-gray-50 p-2 rounded mt-2 overflow-hidden">
+                        <div className="truncate">
+                          {typeof event.data === "object"
+                            ? JSON.stringify(event.data).substring(0, 100) +
+                              (JSON.stringify(event.data).length > 100 ? "..." : "")
+                            : String(event.data).substring(0, 100) +
+                              (String(event.data).length > 100 ? "..." : "")}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                )
+              }
+              return eventElements
+            })()}
           </div>
         )}
       </div>
