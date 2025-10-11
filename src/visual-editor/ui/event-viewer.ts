@@ -217,7 +217,7 @@ export class EventViewer {
       }
 
       .event-viewer-header {
-        padding: 20px;
+        padding: 12px 16px;
         border-bottom: 1px solid #333;
         background: #252526;
         flex-shrink: 0;
@@ -225,48 +225,48 @@ export class EventViewer {
 
       .event-viewer-title {
         margin: 0;
-        font-size: 18px;
+        font-size: 15px;
         font-weight: 600;
         color: #e0e0e0;
       }
 
       .event-viewer-metadata {
-        padding: 20px;
+        padding: 12px 16px;
         background: #2d2d30;
         border-bottom: 1px solid #3e3e42;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 10px;
         flex-shrink: 0;
       }
 
       .event-viewer-field {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 4px;
       }
 
       .event-viewer-label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         color: #cccccc;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.5px;
       }
 
       .event-viewer-value {
-        padding: 12px 14px;
+        padding: 8px 10px;
         background: #1e1e1e;
         border: 1px solid #3e3e42;
-        border-radius: 4px;
+        border-radius: 3px;
         color: #ffffff;
-        font-size: 14px;
+        font-size: 13px;
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-        line-height: 1.4;
+        line-height: 1.3;
       }
 
       .event-viewer-data-label {
-        padding: 16px 20px 8px 20px;
+        padding: 10px 16px 6px 16px;
         background: #2d2d30;
         flex-shrink: 0;
       }
@@ -292,25 +292,25 @@ export class EventViewer {
       }
 
       .event-viewer-buttons {
-        padding: 16px 20px;
+        padding: 12px 16px;
         border-top: 1px solid #333;
         display: flex;
         justify-content: flex-end;
-        gap: 12px;
+        gap: 8px;
         background: #252526;
       }
 
       .event-viewer-button {
-        padding: 10px 20px;
+        padding: 8px 16px;
         border: none;
-        border-radius: 5px;
-        font-size: 14px;
+        border-radius: 4px;
+        font-size: 13px;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
       }
 
       .event-viewer-button-close {
@@ -323,7 +323,7 @@ export class EventViewer {
       }
 
       .event-viewer-button span {
-        font-size: 16px;
+        font-size: 14px;
       }
     `
   }
