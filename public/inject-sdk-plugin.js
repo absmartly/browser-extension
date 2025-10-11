@@ -668,22 +668,10 @@
   }
 
   /**
-   * Send message to extension - handles both test mode and production
+   * Send message to extension - always via content script
    */
   function sendMessageToExtension(message) {
-    // In test mode, send directly to sidebar iframe
-    const sidebarIframe = document.getElementById('absmartly-sidebar-iframe');
-    if (sidebarIframe && sidebarIframe.contentWindow) {
-      try {
-        sidebarIframe.contentWindow.postMessage(message, '*');
-        debugLog('[ABsmartly Extension] Message sent to sidebar iframe');
-        return;
-      } catch (error) {
-        debugWarn('[ABsmartly Extension] Failed to send to sidebar iframe:', error);
-      }
-    }
-
-    // In production, send via window.postMessage (content script will relay via chrome.runtime)
+    // Always send via window.postMessage (content script will relay to background)
     window.postMessage(message, '*');
   }
 
@@ -1457,7 +1445,7 @@
         }
         isInitializing = true;
 
-        const { customCode, config } = event.data.payload || {};
+        const { config } = event.data.payload || {};
         debugLog('[ABsmartly Extension] Received config from extension:', config);
         
         // Check again if plugin is already loaded
@@ -1574,7 +1562,7 @@
         }
 
         // Function to initialize both plugins in the correct order
-        async function initializePlugins(ctx, customCode, config) {
+        async function initializePlugins(ctx, config) {
           const context = ctx || cachedContext;
 
           if (!context) {
@@ -1673,25 +1661,6 @@
               domPlugin.initialize().then(() => {
                 debugLog('[ABsmartly Extension] DOMChangesPluginLite initialized successfully');
 
-                // Inject global custom code if provided (from extension settings)
-                if (customCode) {
-                  debugLog('[ABsmartly Extension] Injecting global custom code');
-                  try {
-                    // Parse the custom code object
-                    const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
-
-                    // Execute scripts for each location
-                    ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
-                      if (codeData[location]) {
-                        debugLog(`[ABsmartly Extension] Executing global scripts for ${location}`);
-                        executeScriptsInHTML(codeData[location], location);
-                      }
-                    });
-                  } catch (error) {
-                    debugError('[ABsmartly Extension] Failed to inject global custom code:', error);
-                  }
-                }
-
                 // Inject per-experiment custom code from __inject_html variables
                 try {
                   debugLog('[ABsmartly Extension] Checking for experiment-specific injection code');
@@ -1729,7 +1698,7 @@
 
         // Now initialize the plugins with the context and config we have (only if not already initialized)
         if (!isInitialized) {
-          initializePlugins(context, customCode, config);
+          initializePlugins(context, config);
           isInitialized = true;
         } else {
           debugLog('[ABsmartly Extension] Plugins already initialized, skipping');

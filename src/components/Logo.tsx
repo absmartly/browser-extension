@@ -1,3 +1,4 @@
+import React from "react"
 import logoUrl from "data-base64:~assets/logo.png"
 
 interface LogoProps {

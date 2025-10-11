@@ -861,20 +861,19 @@ window.addEventListener('message', async (event) => {
         debugError('[Content Script] Failed to send SDK_EVENT to background:', err)
       })
     } else if (event.data.type === 'REQUEST_CUSTOM_CODE' || event.data.type === 'SDK_CONTEXT_READY') {
-      // Get custom code and config from extension settings
+      // Get config from extension settings (per-experiment __inject_html only, no global custom code)
       const response = await chrome.runtime.sendMessage({
         type: 'REQUEST_INJECTION_CODE',
         source: 'content-script'
       })
 
-      const customCode = response?.data || null
       const config = response?.config || null
 
-      // Send custom code and config to the page
+      // Send config to the page for plugin initialization
       window.postMessage({
         source: 'absmartly-extension',
         type: 'INITIALIZE_PLUGIN',
-        payload: { customCode, config }
+        payload: { config }
       }, window.location.origin)
     } else if (event.data.type === 'REQUEST_SDK_INJECTION_CONFIG') {
       // Get SDK injection config from extension settings

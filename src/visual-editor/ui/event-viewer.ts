@@ -45,14 +45,48 @@ export class EventViewer {
 
     const titleEl = document.createElement('h3')
     titleEl.className = 'event-viewer-title'
-    titleEl.textContent = `Event: ${eventName}`
-
-    const timestampEl = document.createElement('span')
-    timestampEl.className = 'event-viewer-timestamp'
-    timestampEl.textContent = timestamp
+    titleEl.textContent = 'Event Details'
 
     header.appendChild(titleEl)
-    header.appendChild(timestampEl)
+
+    // Create metadata section
+    const metadataSection = document.createElement('div')
+    metadataSection.className = 'event-viewer-metadata'
+
+    // Event Type
+    const eventTypeContainer = document.createElement('div')
+    eventTypeContainer.className = 'event-viewer-field'
+    const eventTypeLabel = document.createElement('label')
+    eventTypeLabel.textContent = 'Event Type'
+    eventTypeLabel.className = 'event-viewer-label'
+    const eventTypeValue = document.createElement('div')
+    eventTypeValue.textContent = eventName
+    eventTypeValue.className = 'event-viewer-value'
+    eventTypeContainer.appendChild(eventTypeLabel)
+    eventTypeContainer.appendChild(eventTypeValue)
+
+    // Timestamp
+    const timestampContainer = document.createElement('div')
+    timestampContainer.className = 'event-viewer-field'
+    const timestampLabel = document.createElement('label')
+    timestampLabel.textContent = 'Timestamp'
+    timestampLabel.className = 'event-viewer-label'
+    const timestampValue = document.createElement('div')
+    timestampValue.textContent = timestamp
+    timestampValue.className = 'event-viewer-value'
+    timestampContainer.appendChild(timestampLabel)
+    timestampContainer.appendChild(timestampValue)
+
+    metadataSection.appendChild(eventTypeContainer)
+    metadataSection.appendChild(timestampContainer)
+
+    // Event Data Label
+    const dataLabelContainer = document.createElement('div')
+    dataLabelContainer.className = 'event-viewer-data-label'
+    const dataLabel = document.createElement('label')
+    dataLabel.textContent = 'Event Data'
+    dataLabel.className = 'event-viewer-label'
+    dataLabelContainer.appendChild(dataLabel)
 
     // Create viewer container
     const viewerContainer = document.createElement('div')
@@ -71,6 +105,8 @@ export class EventViewer {
 
     // Assemble container
     container.appendChild(header)
+    container.appendChild(metadataSection)
+    container.appendChild(dataLabelContainer)
     container.appendChild(viewerContainer)
     container.appendChild(buttonContainer)
     backdrop.appendChild(container)
@@ -183,10 +219,8 @@ export class EventViewer {
       .event-viewer-header {
         padding: 20px;
         border-bottom: 1px solid #333;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         background: #252526;
+        flex-shrink: 0;
       }
 
       .event-viewer-title {
@@ -196,16 +230,56 @@ export class EventViewer {
         color: #e0e0e0;
       }
 
-      .event-viewer-timestamp {
-        font-size: 13px;
-        color: #858585;
-        font-family: monospace;
+      .event-viewer-metadata {
+        padding: 20px;
+        background: #2d2d30;
+        border-bottom: 1px solid #3e3e42;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+
+      .event-viewer-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .event-viewer-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #cccccc;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+
+      .event-viewer-value {
+        padding: 12px 14px;
+        background: #1e1e1e;
+        border: 1px solid #3e3e42;
+        border-radius: 4px;
+        color: #ffffff;
+        font-size: 14px;
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+        line-height: 1.4;
+      }
+
+      .event-viewer-data-label {
+        padding: 16px 20px 8px 20px;
+        background: #2d2d30;
+        flex-shrink: 0;
+      }
+
+      .event-viewer-data-label .event-viewer-label {
+        color: #cccccc;
       }
 
       .event-viewer-codemirror-container {
         flex: 1;
         overflow: auto;
         background: #1e1e1e;
+        min-height: 0;
       }
 
       .event-viewer-codemirror-container .cm-editor {

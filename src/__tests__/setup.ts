@@ -24,3 +24,6 @@ Object.defineProperty(document, 'cookie', {
   writable: true,
   value: '',
 })
+
+// Mock Plasmo data-base64 asset imports
+jest.mock('data-base64:~assets/logo.png', () => 'data:image/png;base64,mocklogo', { virtual: true })
