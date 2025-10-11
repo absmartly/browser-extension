@@ -16,32 +16,61 @@ describe('EventsDebugPage', () => {
     }
   })
 
+  // Mock chrome.tabs.sendMessage
+  const mockTabsSendMessage = jest.fn()
+
+  // Store message listeners so we can trigger them in tests
+  const messageListeners: Array<(message: any, sender?: any, sendResponse?: any) => void> = []
+
   beforeAll(() => {
     // Mock chrome.runtime and chrome.tabs
     global.chrome = {
       runtime: {
         sendMessage: mockSendMessage,
         onMessage: {
-          addListener: jest.fn(),
-          removeListener: jest.fn()
+          addListener: jest.fn((listener) => {
+            messageListeners.push(listener)
+          }),
+          removeListener: jest.fn((listener) => {
+            const index = messageListeners.indexOf(listener)
+            if (index > -1) {
+              messageListeners.splice(index, 1)
+            }
+          })
         }
       },
       tabs: {
         query: jest.fn((query, callback) => {
           callback([{ id: 1 }])
         }),
-        sendMessage: jest.fn()
+        sendMessage: mockTabsSendMessage
       }
     } as any
   })
 
-  // Helper to dispatch SDK events wrapped in act()
+  // Helper to dispatch SDK events via chrome.runtime.onMessage (new behavior)
   const dispatchSDKEvent = (eventName: string, data: any = null, timestamp?: string) => {
+    act(() => {
+      // Trigger all registered message listeners with SDK_EVENT_BROADCAST
+      const message = {
+        type: 'SDK_EVENT_BROADCAST',
+        payload: {
+          eventName,
+          data,
+          timestamp: timestamp || new Date().toISOString()
+        }
+      }
+      messageListeners.forEach(listener => listener(message))
+    })
+  }
+
+  // Helper to dispatch SDK events via window.postMessage (forwarded from sidebar)
+  const dispatchSDKEventViaWindow = (eventName: string, data: any = null, timestamp?: string) => {
     act(() => {
       window.dispatchEvent(new MessageEvent('message', {
         data: {
-          source: 'absmartly-page',
-          type: 'SDK_EVENT',
+          source: 'absmartly-extension-incoming',
+          type: 'SDK_EVENT_BROADCAST',
           payload: {
             eventName,
             data,
@@ -54,6 +83,7 @@ describe('EventsDebugPage', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockTabsSendMessage.mockClear()
   })
 
   afterEach(() => {
@@ -62,7 +92,7 @@ describe('EventsDebugPage', () => {
 
   describe('Initial State', () => {
     it('renders empty state when no events', () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       expect(screen.getByText('SDK Events')).toBeInTheDocument()
       expect(screen.getByText('No events captured yet')).toBeInTheDocument()
@@ -71,7 +101,7 @@ describe('EventsDebugPage', () => {
     })
 
     it('renders pause and clear buttons', () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       const pauseButton = screen.getByTitle('Pause')
       const clearButton = screen.getByTitle('Clear all events')
@@ -82,8 +112,8 @@ describe('EventsDebugPage', () => {
   })
 
   describe('Event Capture', () => {
-    it('captures SDK events from postMessage', async () => {
-      render(<EventsDebugPage />)
+    it('captures SDK events from chrome.runtime.onMessage', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
 
       dispatchSDKEvent('ready', { experiments: ['exp1', 'exp2'] })
 
@@ -93,8 +123,19 @@ describe('EventsDebugPage', () => {
       })
     })
 
+    it('captures SDK events from window.postMessage (sidebar forwarding)', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
+
+      dispatchSDKEventViaWindow('ready', { experiments: ['exp1', 'exp2'] })
+
+      await waitFor(() => {
+        expect(screen.getByText('ready')).toBeInTheDocument()
+        expect(screen.getByText('1 event captured')).toBeInTheDocument()
+      })
+    })
+
     it('captures multiple events in chronological order (newest first)', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       // Send first event
       dispatchSDKEvent('ready', null, '2025-01-01T10:00:00.000Z')
@@ -113,7 +154,7 @@ describe('EventsDebugPage', () => {
     })
 
     it('displays different event types with correct colors', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       const eventTypes = ['error', 'ready', 'refresh', 'publish', 'exposure', 'goal', 'finalize']
 
@@ -131,7 +172,7 @@ describe('EventsDebugPage', () => {
 
   describe('Pause/Resume Functionality', () => {
     it('pauses event capture when pause button clicked', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       const pauseButton = screen.getByTitle('Pause')
       fireEvent.click(pauseButton)
@@ -151,7 +192,7 @@ describe('EventsDebugPage', () => {
     })
 
     it('resumes event capture when resume button clicked', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       // Pause first
       const pauseButton = screen.getByTitle('Pause')
@@ -182,8 +223,8 @@ describe('EventsDebugPage', () => {
   })
 
   describe('Clear Functionality', () => {
-    it('clears all events when clear button clicked', async () => {
-      render(<EventsDebugPage />)
+    it('shows confirmation dialog and clears events when confirmed', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
 
       // Add some events
       dispatchSDKEvent('ready', null)
@@ -194,10 +235,21 @@ describe('EventsDebugPage', () => {
         expect(screen.getByText('2 events captured')).toBeInTheDocument()
       })
 
-      // Clear events
+      // Click clear button
       const clearButton = screen.getByTitle('Clear all events')
       fireEvent.click(clearButton)
 
+      // Verify confirmation dialog appears
+      await waitFor(() => {
+        expect(screen.getByText('Clear All Events?')).toBeInTheDocument()
+        expect(screen.getByText(/This will clear all 2 captured events/)).toBeInTheDocument()
+      })
+
+      // Confirm clear
+      const confirmButton = screen.getByText('Clear All')
+      fireEvent.click(confirmButton)
+
+      // Verify events are cleared
       await waitFor(() => {
         expect(screen.getByText('No events captured yet')).toBeInTheDocument()
         expect(screen.getByText('0 events captured')).toBeInTheDocument()
@@ -206,39 +258,71 @@ describe('EventsDebugPage', () => {
       })
     })
 
-    it('clears selected event when clearing all events', async () => {
-      render(<EventsDebugPage />)
+    it('cancels clear when cancel button clicked', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
 
-      // Add event
-      dispatchSDKEvent('ready', { test: 'data' })
+      // Add some events
+      dispatchSDKEvent('ready', null)
 
       await waitFor(() => {
-        expect(screen.getByText('ready')).toBeInTheDocument()
+        expect(screen.getByText('1 event captured')).toBeInTheDocument()
       })
 
-      // Select event
-      const eventItem = screen.getByText('ready').closest('div')
-      if (eventItem) {
-        fireEvent.click(eventItem)
-      }
+      // Click clear button
+      const clearButton = screen.getByTitle('Clear all events')
+      fireEvent.click(clearButton)
+
+      // Verify confirmation dialog appears
+      await waitFor(() => {
+        expect(screen.getByText('Clear All Events?')).toBeInTheDocument()
+      })
+
+      // Click cancel
+      const cancelButton = screen.getByText('Cancel')
+      fireEvent.click(cancelButton)
+
+      // Verify events are still there
+      await waitFor(() => {
+        expect(screen.getByText('1 event captured')).toBeInTheDocument()
+        expect(screen.getByText('ready')).toBeInTheDocument()
+        expect(screen.queryByText('Clear All Events?')).not.toBeInTheDocument()
+      })
+    })
+
+    it('clears all events when confirmed', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
+
+      // Add events
+      dispatchSDKEvent('ready', { test: 'data' })
+      dispatchSDKEvent('exposure', { variant: 1 })
 
       await waitFor(() => {
-        expect(screen.getByText('Event Details')).toBeInTheDocument()
+        expect(screen.getByText('2 events captured')).toBeInTheDocument()
       })
 
       // Clear all
       const clearButton = screen.getByTitle('Clear all events')
       fireEvent.click(clearButton)
 
+      // Confirm clear
       await waitFor(() => {
-        expect(screen.getByText('Select an event to view details')).toBeInTheDocument()
+        expect(screen.getByText('Clear All Events?')).toBeInTheDocument()
+      })
+
+      const confirmButton = screen.getByText('Clear All')
+      fireEvent.click(confirmButton)
+
+      // Events should be cleared
+      await waitFor(() => {
+        expect(screen.getByText('No events captured yet')).toBeInTheDocument()
+        expect(screen.getByText('0 events captured')).toBeInTheDocument()
       })
     })
   })
 
-  describe('Event Selection and Details', () => {
-    it('displays event details when event is clicked', async () => {
-      render(<EventsDebugPage />)
+  describe('Event Selection and Event Viewer', () => {
+    it('opens event viewer when event is clicked', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
 
       const testData = { experiment: 'test_exp', variant: 1 }
       const timestamp = new Date().toISOString()
@@ -255,25 +339,59 @@ describe('EventsDebugPage', () => {
         fireEvent.click(eventItem)
       }
 
+      // Verify OPEN_EVENT_VIEWER message was sent
       await waitFor(() => {
-        // Verify event type is shown
-        const eventTypeBadges = screen.getAllByText('exposure')
-        expect(eventTypeBadges.length).toBeGreaterThan(1) // One in list, one in details
-
-        // Verify data is shown as JSON
-        const detailsPanel = screen.getByText('Event Data').parentElement
-        expect(detailsPanel).toHaveTextContent('experiment')
-        expect(detailsPanel).toHaveTextContent('test_exp')
+        expect(mockTabsSendMessage).toHaveBeenCalledWith(
+          1, // tab id
+          {
+            type: 'OPEN_EVENT_VIEWER',
+            data: {
+              eventName: 'exposure',
+              timestamp: expect.any(String),
+              value: JSON.stringify(testData, null, 2)
+            }
+          }
+        )
       })
     })
 
-    it('highlights selected event in list', async () => {
-      render(<EventsDebugPage />)
+    it('sends correct data for event with null data', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
 
-      // Add two events
       dispatchSDKEvent('ready', null)
 
-      dispatchSDKEvent('exposure', null)
+      await waitFor(() => {
+        expect(screen.getByText('ready')).toBeInTheDocument()
+      })
+
+      // Click event
+      const eventItem = screen.getByText('ready').closest('div')
+      if (eventItem) {
+        fireEvent.click(eventItem)
+      }
+
+      // Verify OPEN_EVENT_VIEWER message was sent with 'null' as value
+      await waitFor(() => {
+        expect(mockTabsSendMessage).toHaveBeenCalledWith(
+          1,
+          {
+            type: 'OPEN_EVENT_VIEWER',
+            data: {
+              eventName: 'ready',
+              timestamp: expect.any(String),
+              value: 'null'
+            }
+          }
+        )
+      })
+    })
+
+    it('opens event viewer for different events', async () => {
+      render(<EventsDebugPage onBack={() => {}} />)
+
+      // Add two events
+      dispatchSDKEvent('ready', { experiments: ['exp1'] })
+      dispatchSDKEvent('exposure', { variant: 2 })
 
       await waitFor(() => {
         expect(screen.getByText('2 events captured')).toBeInTheDocument()
@@ -281,22 +399,29 @@ describe('EventsDebugPage', () => {
 
       // Click first event (exposure - newest)
       const exposureBadge = screen.getByText('exposure')
-      // Get the parent container div (the one with cursor-pointer class)
-      const eventContainer = exposureBadge.closest('.cursor-pointer')
+      const eventContainer = exposureBadge.closest('[data-testid="event-item"]')
 
       if (eventContainer) {
         fireEvent.click(eventContainer)
-
-        await waitFor(() => {
-          expect(eventContainer).toHaveClass('bg-blue-50')
-        })
       }
+
+      await waitFor(() => {
+        expect(mockTabsSendMessage).toHaveBeenCalledWith(
+          1,
+          expect.objectContaining({
+            type: 'OPEN_EVENT_VIEWER',
+            data: expect.objectContaining({
+              eventName: 'exposure'
+            })
+          })
+        )
+      })
     })
   })
 
   describe('Event Data Formatting', () => {
     it('truncates long event data preview in list', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       const longData = {
         message: 'a'.repeat(150),
@@ -309,47 +434,20 @@ describe('EventsDebugPage', () => {
         expect(screen.getByText('goal')).toBeInTheDocument()
       })
 
-      // Preview should be truncated to 100 characters
+      // Preview should be truncated (max 100 chars + "..." = 103)
       const dataPreview = screen.getByText(/aaa/)
-      expect(dataPreview.textContent?.length).toBeLessThanOrEqual(100)
+      const fullDataLength = JSON.stringify(longData).length
+
+      // Verify truncation occurred
+      expect(dataPreview.textContent?.length).toBeLessThan(fullDataLength)
+      expect(dataPreview.textContent).toContain('...')
     })
 
-    it('shows full data in details panel', async () => {
-      render(<EventsDebugPage />)
-
-      const testData = {
-        experiment: 'test_exp',
-        variant: 1,
-        metadata: { foo: 'bar', baz: 123 }
-      }
-
-      dispatchSDKEvent('exposure', testData)
-
-      await waitFor(() => {
-        expect(screen.getByText('exposure')).toBeInTheDocument()
-      })
-
-      // Click event to view details
-      const eventItem = screen.getByText('exposure').closest('div')
-      if (eventItem) {
-        fireEvent.click(eventItem)
-      }
-
-      await waitFor(() => {
-        // Full JSON should be visible - check for text content
-        const detailsPanel = screen.getByText('Event Data').parentElement
-        expect(detailsPanel).toHaveTextContent('experiment')
-        expect(detailsPanel).toHaveTextContent('test_exp')
-        expect(detailsPanel).toHaveTextContent('metadata')
-        expect(detailsPanel).toHaveTextContent('foo')
-        expect(detailsPanel).toHaveTextContent('bar')
-      })
-    })
   })
 
   describe('Timestamp Formatting', () => {
     it('formats timestamp as HH:MM:SS.mmm in event list', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       const timestamp = '2025-01-01T14:30:45.123Z'
 
@@ -360,34 +458,11 @@ describe('EventsDebugPage', () => {
         expect(screen.getByText(/\d{2}:\d{2}:\d{2}\.\d{3}/)).toBeInTheDocument()
       })
     })
-
-    it('shows full timestamp in details panel', async () => {
-      render(<EventsDebugPage />)
-
-      const timestamp = '2025-01-01T14:30:45.123Z'
-
-      dispatchSDKEvent('ready', null, timestamp)
-
-      await waitFor(() => {
-        expect(screen.getByText('ready')).toBeInTheDocument()
-      })
-
-      // Click event
-      const eventItem = screen.getByText('ready').closest('div')
-      if (eventItem) {
-        fireEvent.click(eventItem)
-      }
-
-      await waitFor(() => {
-        // Should show full date/time
-        expect(screen.getByText(/1\/1\/2025/)).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Edge Cases', () => {
     it('handles events without data', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       dispatchSDKEvent('finalize', null)
 
@@ -398,7 +473,7 @@ describe('EventsDebugPage', () => {
     })
 
     it('ignores non-SDK events', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       // Send non-SDK event
       window.dispatchEvent(new MessageEvent('message', {
@@ -416,7 +491,7 @@ describe('EventsDebugPage', () => {
     })
 
     it('handles events while paused without losing existing events', async () => {
-      render(<EventsDebugPage />)
+      render(<EventsDebugPage onBack={() => {}} />)
 
       // Add first event
       dispatchSDKEvent('ready', null)

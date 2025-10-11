@@ -1,7 +1,7 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
 import { z } from 'zod'
-import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
+import type { ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
@@ -899,23 +899,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true // Will respond asynchronously
   } else if (message.type === "REQUEST_INJECTION_CODE") {
-    // Handle request from SDK plugin for custom code injection and config
+    // Handle request from SDK plugin for config (per-experiment __inject_html only)
     debugLog('Background received REQUEST_INJECTION_CODE from SDK plugin')
 
-    // Get both custom code and config
-    Promise.all([
-      storage.get("absmartly-custom-code") as Promise<CustomCode | null>,
-      getConfig()
-    ]).then(([customCode, config]) => {
-      // Prepare injection data for SDK plugin
-      const injectionData = {
-        headStart: customCode?.headStart || '',
-        headEnd: customCode?.headEnd || '',
-        bodyStart: customCode?.bodyStart || '',
-        bodyEnd: customCode?.bodyEnd || '',
-        styleTag: customCode?.styleTag || ''
-      }
-
+    // Get config only - custom code injection removed, keeping per-experiment __inject_html
+    getConfig().then((config) => {
       // Derive SDK endpoint if not set
       let sdkEndpoint = config?.sdkEndpoint
       if (!sdkEndpoint && config?.apiEndpoint) {
@@ -933,14 +921,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sdkUrl: config?.sdkUrl || ''
       }
 
-      debugLog('Sending custom code and config to SDK plugin:', { injectionData, configData })
+      debugLog('Sending config to SDK plugin:', { configData })
       sendResponse({
         success: true,
-        data: injectionData,
         config: configData
       })
     }).catch(error => {
-      debugError('Error retrieving custom code or config:', error)
+      debugError('Error retrieving config:', error)
       sendResponse({
         success: false,
         error: error.message
