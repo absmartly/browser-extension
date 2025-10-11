@@ -342,12 +342,12 @@ export class EventViewer {
       }
 
       .event-viewer-button-copy {
-        background: #0e639c;
-        color: #ffffff;
+        background: #3a3a3a;
+        color: #e0e0e0;
       }
 
       .event-viewer-button-copy:hover {
-        background: #1177bb;
+        background: #4a4a4a;
       }
 
       .event-viewer-button-success {
