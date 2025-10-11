@@ -5,7 +5,6 @@ import {
   PlayIcon,
   ArrowPathIcon
 } from "@heroicons/react/24/outline"
-import { EventDetailsModal } from "./EventDetailsModal"
 import { Header } from "./Header"
 
 interface SDKEvent {
@@ -22,8 +21,13 @@ interface EventsDebugPageProps {
 export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   const [events, setEvents] = useState<SDKEvent[]>([])
   const [isPaused, setIsPaused] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<SDKEvent | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+
+  // Use a ref for isPaused so the message handlers always see the current value
+  const isPausedRef = React.useRef(isPaused)
+  React.useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
 
   useEffect(() => {
     console.log('[EventsDebugPage] 🔵 Component mounted, fetching buffered events...')
@@ -48,21 +52,23 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       sendResponse?: (response?: any) => void
     ) => {
       console.log('[EventsDebugPage] 🔵 Received runtime message:', message.type, message)
-      if (message.type === 'SDK_EVENT_BROADCAST' && !isPaused) {
-        console.log('[EventsDebugPage] ✅ SDK_EVENT_BROADCAST received, adding event:', message.payload)
-        const sdkEvent: SDKEvent = {
-          id: `${Date.now()}-${Math.random()}`,
-          eventName: message.payload.eventName,
-          data: message.payload.data,
-          timestamp: message.payload.timestamp
+      if (message.type === 'SDK_EVENT_BROADCAST') {
+        if (!isPausedRef.current) {
+          console.log('[EventsDebugPage] ✅ SDK_EVENT_BROADCAST received, adding event:', message.payload)
+          const sdkEvent: SDKEvent = {
+            id: `${Date.now()}-${Math.random()}`,
+            eventName: message.payload.eventName,
+            data: message.payload.data,
+            timestamp: message.payload.timestamp
+          }
+          // Events are now stored newest-last, so append to end
+          setEvents((prev) => {
+            console.log('[EventsDebugPage] Adding event to list. Current count:', prev.length, 'New count:', prev.length + 1)
+            return [...prev, sdkEvent]
+          })
+        } else {
+          console.log('[EventsDebugPage] ⚠️ SDK_EVENT_BROADCAST received but capture is paused')
         }
-        // Events are now stored newest-last, so append to end
-        setEvents((prev) => {
-          console.log('[EventsDebugPage] Adding event to list. Current count:', prev.length, 'New count:', prev.length + 1)
-          return [...prev, sdkEvent]
-        })
-      } else if (message.type === 'SDK_EVENT_BROADCAST' && isPaused) {
-        console.log('[EventsDebugPage] ⚠️ SDK_EVENT_BROADCAST received but capture is paused')
       }
     }
 
@@ -83,17 +89,36 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
       window.removeEventListener('message', handleWindowMessage)
     }
-  }, [isPaused])
+  }, [])
 
-  const clearEvents = () => {
+  const handleClearClick = () => {
+    setShowClearConfirm(true)
+  }
+
+  const confirmClearEvents = () => {
     setEvents([])
-    setSelectedEvent(null)
     chrome.runtime.sendMessage({ type: 'CLEAR_BUFFERED_EVENTS' })
+    setShowClearConfirm(false)
+  }
+
+  const cancelClear = () => {
+    setShowClearConfirm(false)
   }
 
   const handleEventClick = (event: SDKEvent) => {
-    setSelectedEvent(event)
-    setIsModalOpen(true)
+    // Send message to content script to open event viewer (outside sidebar)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'OPEN_EVENT_VIEWER',
+          data: {
+            eventName: event.eventName,
+            timestamp: new Date(event.timestamp).toLocaleString(),
+            value: event.data ? JSON.stringify(event.data, null, 2) : 'null'
+          }
+        })
+      }
+    })
   }
 
   const getEventColor = (eventName: string) => {
@@ -138,7 +163,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
               )}
             </button>
             <button
-              onClick={clearEvents}
+              onClick={handleClearClick}
               className="p-2 text-gray-700 hover:bg-gray-200 rounded"
               title="Clear all events">
               <TrashIcon className="w-5 h-5" />
@@ -214,12 +239,31 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
         {events.length} event{events.length !== 1 ? "s" : ""} captured
       </div>
 
-      {/* Event Details Modal */}
-      <EventDetailsModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        event={selectedEvent}
-      />
+      {/* Clear Confirmation Dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Clear All Events?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will clear all {events.length} captured event{events.length !== 1 ? "s" : ""} from the list. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelClear}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={confirmClearEvents}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
