@@ -93,14 +93,19 @@ export class EventViewer {
     viewerContainer.id = 'event-codemirror-container'
     viewerContainer.className = 'event-viewer-codemirror-container'
 
-    // Create close button
+    // Create buttons
     const buttonContainer = document.createElement('div')
     buttonContainer.className = 'event-viewer-buttons'
+
+    const copyBtn = document.createElement('button')
+    copyBtn.className = 'event-viewer-button event-viewer-button-copy'
+    copyBtn.innerHTML = '<span>📋</span> Copy'
 
     const closeBtn = document.createElement('button')
     closeBtn.className = 'event-viewer-button event-viewer-button-close'
     closeBtn.innerHTML = '<span>✕</span> Close'
 
+    buttonContainer.appendChild(copyBtn)
     buttonContainer.appendChild(closeBtn)
 
     // Assemble container
@@ -137,6 +142,29 @@ export class EventViewer {
       this.editorView = new EditorView({
         state: startState,
         parent: viewerContainer
+      })
+
+      // Set up copy handler
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(jsonData)
+          const originalHTML = copyBtn.innerHTML
+          copyBtn.innerHTML = '<span>✓</span> Copied!'
+          copyBtn.classList.add('event-viewer-button-success')
+
+          setTimeout(() => {
+            copyBtn.innerHTML = originalHTML
+            copyBtn.classList.remove('event-viewer-button-success')
+          }, 2000)
+        } catch (err) {
+          console.error('Failed to copy:', err)
+          const originalHTML = copyBtn.innerHTML
+          copyBtn.innerHTML = '<span>✗</span> Failed'
+
+          setTimeout(() => {
+            copyBtn.innerHTML = originalHTML
+          }, 2000)
+        }
       })
 
       // Set up close handlers
@@ -311,6 +339,19 @@ export class EventViewer {
         display: flex;
         align-items: center;
         gap: 5px;
+      }
+
+      .event-viewer-button-copy {
+        background: #0e639c;
+        color: #ffffff;
+      }
+
+      .event-viewer-button-copy:hover {
+        background: #1177bb;
+      }
+
+      .event-viewer-button-success {
+        background: #16825d !important;
       }
 
       .event-viewer-button-close {
