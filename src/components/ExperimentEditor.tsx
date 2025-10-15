@@ -100,7 +100,7 @@ export function ExperimentEditor({
   const snakeToTitle = (snake: string): string => {
     return snake
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
   }
 
@@ -112,19 +112,19 @@ export function ExperimentEditor({
       .replace(/[^a-z0-9_]/g, '')
   }
 
-  const handleNameChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      name: value,
-      ...(namesSynced ? { display_name: snakeToTitle(value) } : {})
-    }))
-  }
-
   const handleDisplayNameChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
       display_name: value,
       ...(namesSynced ? { name: titleToSnake(value) } : {})
+    }))
+  }
+
+  const handleNameChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      name: value,
+      ...(namesSynced ? { display_name: snakeToTitle(value) } : {})
     }))
   }
 
@@ -187,6 +187,17 @@ export function ExperimentEditor({
             <div className="flex-1 space-y-3" style={{ paddingRight: '24px' }}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Name
+                </label>
+                <Input
+                  value={formData.display_name}
+                  onChange={(e) => handleDisplayNameChange(e.target.value)}
+                  placeholder="My Experiment"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Experiment Name
                 </label>
                 <Input
@@ -194,17 +205,6 @@ export function ExperimentEditor({
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="my_experiment_name"
                   required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Display Name
-                </label>
-                <Input
-                  value={formData.display_name}
-                  onChange={(e) => handleDisplayNameChange(e.target.value)}
-                  placeholder="My Experiment"
                 />
               </div>
             </div>
