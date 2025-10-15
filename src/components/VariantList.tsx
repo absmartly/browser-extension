@@ -409,7 +409,7 @@ export function VariantList({
                 title="View Full Variant Configuration"
               >
                 <CodeBracketIcon className="h-4 w-4" />
-                Config
+                Json
               </Button>
               {canEdit && canAddRemove && variants.length > 2 && (
                 <button
