@@ -7,7 +7,7 @@ async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...')
 
   const rootDir = path.join(__dirname, '..')
-  const buildDir = path.join(rootDir, 'build', 'chrome-mv3-prod')
+  const buildDir = path.join(rootDir, 'build', 'chrome-mv3-dev')
   const manifestPath = path.join(buildDir, 'manifest.json')
 
   // 1. Check if extension needs to be built
@@ -33,7 +33,7 @@ async function globalSetup(config: FullConfig) {
     }
   } else {
     console.log('✅ Extension already built')
-    console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-prod/manifest.json to force rebuild.')
+    console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.')
   }
 
   // 2. Copy test files to build directory

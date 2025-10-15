@@ -103,52 +103,7 @@ if (fs.existsSync(injectScriptSource)) {
   });
 }
 
-// Copy ABsmartly SDK Plugins (Lite version) from sibling directory
-const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-sdk-plugins', 'dist');
-const pluginDevSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.dev.js');
-const pluginProdSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.min.js');
 
-// Use dev build for both prod and dev directories
-let pluginSource = pluginDevSource;
-let pluginFilename = 'absmartly-sdk-plugins.dev.js';
-
-if (!fs.existsSync(pluginDevSource)) {
-  console.log('SDK plugins dev build not found, using production build');
-  pluginSource = pluginProdSource;
-  pluginFilename = 'absmartly-sdk-plugins.min.js';
-}
-
-if (fs.existsSync(pluginSource)) {
-  const pluginDestProd = path.join(buildDir, pluginFilename);
-  fs.copyFileSync(pluginSource, pluginDestProd);
-  console.log(`Copied ${pluginFilename} to prod build directory`);
-
-  // Also copy source map if using dev build
-  if (pluginSource === pluginDevSource) {
-    const mapSource = pluginDevSource + '.map';
-    if (fs.existsSync(mapSource)) {
-      const mapDestProd = path.join(buildDir, pluginFilename + '.map');
-      fs.copyFileSync(mapSource, mapDestProd);
-      console.log(`Copied ${pluginFilename}.map to prod build directory`);
-    }
-  }
-
-  if (fs.existsSync(devBuildDir)) {
-    const pluginDestDev = path.join(devBuildDir, pluginFilename);
-    fs.copyFileSync(pluginSource, pluginDestDev);
-    console.log(`Copied ${pluginFilename} to dev build directory`);
-
-    // Also copy source map for dev build
-    if (pluginSource === pluginDevSource) {
-      const mapSource = pluginDevSource + '.map';
-      if (fs.existsSync(mapSource)) {
-        const mapDestDev = path.join(devBuildDir, pluginFilename + '.map');
-        fs.copyFileSync(mapSource, mapDestDev);
-        console.log(`Copied ${pluginFilename}.map to dev build directory`);
-      }
-    }
-  }
-}
 
 // Copy visual editor bundled script
 if (fs.existsSync(visualEditorSource)) {
