@@ -90,10 +90,10 @@ const bridgeScript = `
               });
               break;
               
-            case 'javascript':
-              new Function('element', change.value)(element);
-              break;
-              
+            // JavaScript execution removed for security (prevents code injection)
+            // case 'javascript':
+            //   new Function('element', change.value)(element);
+            //   break;
             case 'move':
               // Find target element
               const target = document.querySelector(change.targetSelector);
