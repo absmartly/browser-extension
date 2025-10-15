@@ -103,3 +103,14 @@
 🔄 Building🔄 Building.                    🟢 DONE   | Extension re-packaged in 748ms! 🚀
 🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 643ms! 🚀
 🔄 Building🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 1223ms! 🚀
+🔄 Building🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 1084ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 602ms! 🚀
+🔄 Building🔄 Building.                    🟢 DONE   | Extension re-packaged in 535ms! 🚀
+🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 642ms! 🚀
+🔄 Building🔄 Building...                    🟢 DONE   | Extension re-packaged in 655ms! 🚀
+🔄 Building                    🔴 ERROR  | Build failed. To debug, run plasmo dev --verbose.
+🔴 ERROR  | Unexpected token `div`. Expected jsx identifier
+🔄 Building                    🔴 ERROR  | Build failed. To debug, run plasmo dev --verbose.
+🔴 ERROR  | Unexpected token `div`. Expected jsx identifier
+🔄 Building🔄 Building   🔄 Building.🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 2100ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 709ms! 🚀
