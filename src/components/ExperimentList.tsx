@@ -331,6 +331,19 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
               Reload Now
             </button>
             <button
+              onClick={async () => {
+                if (window.confirm('Clear all experiment overrides?')) {
+                  await saveOverrides({})
+                  setOverrides({})
+                  setShowReloadBanner(false)
+                  await reloadPageWithOverrides()
+                }
+              }}
+              className="px-3 py-1 text-xs font-medium text-red-600 hover:text-red-800 transition-colors"
+            >
+              Clear All
+            </button>
+            <button
               onClick={() => setShowReloadBanner(false)}
               className="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors"
             >
