@@ -5,8 +5,13 @@ import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/stor
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
 
-// Storage instance
+// Storage instances
 const storage = new Storage()
+// SECURITY: Use encrypted storage for sensitive data (API keys)
+const secureStorage = new Storage({
+  area: "local",
+  secretKeyring: true
+})
 
 // Handle storage operations from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -66,18 +71,23 @@ async function initializeConfig() {
     debugLog('[Background] Using auth method from environment:', envAuthMethod)
   }
 
+  // SECURITY: Get API key from secure storage
+  const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+
   const newConfig: ABsmartlyConfig = {
-    apiKey: storedConfig?.apiKey || '',
+    apiKey: storedConfig?.apiKey || secureApiKey || '',
     apiEndpoint: storedConfig?.apiEndpoint || '',
     applicationId: storedConfig?.applicationId,
     authMethod: storedConfig?.authMethod || defaultAuthMethod,
     domChangesFieldName: storedConfig?.domChangesFieldName
   }
-  
+
   if (!newConfig.apiKey && envApiKey) {
     newConfig.apiKey = envApiKey
+    // Store in secure storage instead of regular storage
+    await secureStorage.set("absmartly-apikey", envApiKey)
     updated = true
-    debugLog('[Background] Using API key from environment')
+    debugLog('[Background] Using API key from environment and storing securely')
   }
   
   if (!newConfig.apiEndpoint && envApiEndpoint) {
@@ -95,9 +105,11 @@ async function initializeConfig() {
   // Auth method is already handled in the config initialization above
 
   // Save updated config if we made changes
+  // SECURITY: Don't save API key in regular storage, it's in secure storage
   if (updated) {
-    await storage.set("absmartly-config", newConfig)
-    debugLog('[Background] Updated config with environment variables:', newConfig)
+    const configToStore = { ...newConfig, apiKey: '' }
+    await storage.set("absmartly-config", configToStore)
+    debugLog('[Background] Updated config with environment variables (API key stored securely)')
   } else {
     debugLog('[Background] No updates needed from environment variables')
   }
@@ -109,6 +121,11 @@ initializeConfig().catch(err => debugError('Init config error:', err))
 // Helper function to get config
 async function getConfig(): Promise<ABsmartlyConfig | null> {
   const config = await storage.get("absmartly-config") as ABsmartlyConfig | null
+  // SECURITY: Get API key from secure storage
+  if (config) {
+    const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+    config.apiKey = secureApiKey || config.apiKey || ''
+  }
   return config
 }
 
