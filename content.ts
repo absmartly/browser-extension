@@ -1100,10 +1100,23 @@ async function openJSONEditor(data: {
   // Close any existing editor
   closeJSONEditor()
   
+  // Temporarily disable VE if it's active (to prevent event conflicts)
+  const wasVEActive = isVisualEditorActive
+  if (wasVEActive && currentEditor) {
+    debugLog('[JSON Editor] Temporarily disabling VE while JSON editor is open')
+    currentEditor.disable()
+  }
+  
   jsonEditorInstance = new JSONEditor()
   
   const title = `Edit DOM Changes - ${data.variantName}`
   const result = await jsonEditorInstance.show(title, data.value)
+  
+  // Re-enable VE if it was active before
+  if (wasVEActive && currentEditor) {
+    debugLog('[JSON Editor] Re-enabling VE after JSON editor closed')
+    currentEditor.enable()
+  }
   
   if (result !== null) {
     // User saved changes
