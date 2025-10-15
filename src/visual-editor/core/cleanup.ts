@@ -111,8 +111,15 @@ export class Cleanup {
     const modifiedElements = document.querySelectorAll('[data-absmartly-original]')
 
     modifiedElements.forEach(element => {
+      let originalData: any = {}
       try {
-        const originalData = JSON.parse((element as HTMLElement).dataset.absmartlyOriginal || '{}')
+        originalData = JSON.parse((element as HTMLElement).dataset.absmartlyOriginal || '{}')
+      } catch (e) {
+        console.error('[Cleanup] Failed to parse original data:', e)
+        return // Skip this element if parsing fails
+      }
+
+      try {
         const htmlElement = element as HTMLElement
 
         // Restore text content if it was changed
@@ -177,8 +184,15 @@ export class Cleanup {
 
   // Method to restore a specific element to its original state
   restoreElement(element: Element): void {
+    let originalData: any = {}
     try {
-      const originalData = JSON.parse((element as HTMLElement).dataset.absmartlyOriginal || '{}')
+      originalData = JSON.parse((element as HTMLElement).dataset.absmartlyOriginal || '{}')
+    } catch (e) {
+      console.error('[Cleanup] Failed to parse original data:', e)
+      return // Skip this element if parsing fails
+    }
+
+    try {
       const htmlElement = element as HTMLElement
 
       if (originalData.textContent !== undefined) {
