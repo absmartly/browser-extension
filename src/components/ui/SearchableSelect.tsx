@@ -7,6 +7,7 @@ export interface SearchableSelectOption {
   display_name?: string
   type?: 'user' | 'team'
   color?: string
+  initials?: string
 }
 
 interface BaseSelectProps {
@@ -110,10 +111,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map(n => n[0])
+      .filter(part => part.length > 0)
+      .filter((part, i, arr) => part.length > 0 && (i === 0 || i === arr.length - 1))
+      .map(part => part[0].toUpperCase())
       .join('')
-      .toUpperCase()
-      .slice(0, 2)
   }
 
   const getDefaultColor = (index: number) => {
@@ -131,8 +132,13 @@ export function SearchableSelect(props: SearchableSelectProps) {
   }
 
   const defaultRenderOption = (option: SearchableSelectOption, isSelected: boolean, onSelect: () => void) => {
-    const initials = getInitials(option.display_name || option.name)
+    const initials = option.type === 'team' 
+      ? (option.initials || (option.display_name || option.name).charAt(0)).toUpperCase()
+      : getInitials(option.display_name || option.name)
     const colorClass = option.color || getDefaultColor(options.indexOf(option))
+    const shapeClass = option.type === 'team' ? 'rounded-md' : 'rounded-full'
+    const borderClass = option.type === 'team' ? 'border-[0.5px] border-border' : ''
+    const fontClass = option.type === 'team' ? 'font-semibold' : 'font-medium'
 
     return (
       <div
@@ -143,7 +149,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
         onClick={onSelect}
       >
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white text-xs font-medium`}>
+          <div className={`w-8 h-8 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-xs ${fontClass}`}>
             {initials}
           </div>
           <span className="text-sm text-gray-900">{option.display_name || option.name}</span>
@@ -158,15 +164,20 @@ export function SearchableSelect(props: SearchableSelectProps) {
   }
 
   const defaultRenderSelectedOption = (option: SearchableSelectOption, onRemove?: (e: React.MouseEvent) => void) => {
-    const initials = getInitials(option.display_name || option.name)
+    const initials = option.type === 'team' 
+      ? (option.initials || (option.display_name || option.name).charAt(0)).toUpperCase()
+      : getInitials(option.display_name || option.name)
     const colorClass = option.color || getDefaultColor(options.indexOf(option))
+    const shapeClass = option.type === 'team' ? 'rounded-md' : 'rounded-full'
+    const borderClass = option.type === 'team' ? 'border-[0.5px] border-border' : ''
+    const fontClass = option.type === 'team' ? 'font-semibold' : 'font-medium'
 
     return (
       <div
         key={option.id}
         className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-300 rounded-md text-sm"
       >
-        <div className={`w-5 h-5 rounded-full ${colorClass} flex items-center justify-center text-white text-[10px] font-medium`}>
+        <div className={`w-5 h-5 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-[10px] ${fontClass}`}>
           {initials}
         </div>
         <span className="text-gray-900">{option.display_name || option.name}</span>

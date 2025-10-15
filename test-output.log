@@ -1,11 +1,8 @@
-
-> absmartly-browser-extension@0.0.1 test:e2e
-> playwright test tests/e2e/variable-sync.spec.ts --reporter=list
-
 🚀 Starting global test setup...
 ✅ Extension already built
 ⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.
 ✅ Copied seed.html to build directory
+✅ Copied seed.js to build directory
 ✅ Copied local-test-page.html to build directory
 ✅ Loaded environment variables from .env.local
 ✅ API credentials found in environment
@@ -14,8 +11,8 @@
 
 Running 1 test using 1 worker
 
-✅ Test page loaded (test mode enabled)
 Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
+✅ Test page loaded (test mode enabled)
 
 📂 STEP 1: Injecting sidebar
 ✅ Sidebar visible
@@ -23,7 +20,7 @@ Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
 📋 STEP 2: Creating new experiment
   Clicked Create New Experiment button
   Selected "From Scratch"
-  Filled experiment name: Variable Sync Test 1760089853303
+  Filled experiment name: Variable Sync Test 1760105169742
   Selecting Unit Type...
   Selected unit type
   Selecting Application...
@@ -31,26 +28,85 @@ Extension ID: elelnihlihbhpkobodjiodoefdjpdcjp
 ✅ Experiment form filled
 
 💉 STEP 3: Adding injection code
-  Expanded Code Injection section
-  ✘  1 [chromium] › tests/e2e/variable-sync.spec.ts:37:7 › Variable Sync - __inject_html and DOM Changes Preservation › Should preserve __inject_html and DOM changes when adding custom variables (9.0s)
+  Expanded Custom Code Injection section
+  Clicked Start of <head> card
+  Code editor container visible
+  CodeMirror editor visible
+  Typed injection code
+  Saved injection code
+✅ Injection code added
+  Waited for injection code to sync
 
+🎨 STEP 4: Adding DOM changes via Visual Editor
+  Launched Visual Editor
+  Visual Editor active
+  Making text change...
+  Text change made
+  Saved VE changes
+✅ DOM changes added
 
-  1) [chromium] › tests/e2e/variable-sync.spec.ts:37:7 › Variable Sync - __inject_html and DOM Changes Preservation › Should preserve __inject_html and DOM changes when adding custom variables › Add __inject_html code 
+🔗 STEP 5: Adding URL filter
+  Expanded URL Filtering section
+  Selected simple URL filter mode
+  Added URL filter pattern: /test/*
+✅ URL filter configured
 
-    TimeoutError: locator.waitFor: Timeout 5000ms exceeded.
-    Call log:
-    [2m  - waiting for locator('#absmartly-sidebar-iframe').contentFrame().locator('textarea').filter({ hasText: /<script>/ }).or(locator('textarea[placeholder*="<script>"]')).first() to be visible[22m
+🔍 STEP 6: Verifying initial state (before custom variable)
+  ℹ️  __inject_html and __dom_changes are special fields, not regular variables
+  Opened Variant Config editor
+  Variant config JSON preview (first 500 chars):
+{  "__inject_html": {    "headStart": "<script>console.log(\"Test injection code!\")</script></script>"  },  "__dom_changes": {    "changes": [      {        "selector": "#test-title",        "type": "text",        "value": "Modified by VE!",        "enabled": true      }    ],    "urlFilter": {      "include": [        "/test/*"      ],      "mode": "simple",      "matchType": "path"    }  }}
+  ✓ __inject_html field present: true
+  ✓ __dom_changes field present: true
+  ✓ DOM changes content present: true
+  ✓ URL filter present: true
+✅ Initial state verified - all three elements present
 
+➕ STEP 7: Adding custom variable
+  Clicked Add Variable button
+  Typed variable name: hello
+  Typed variable value: there
+  Verifying inputs - name: "hello", value: "there"
+  Saved custom variable
+✅ Custom variable added
 
-      130 |       ).first()
-      131 |
-    > 132 |       await headStartTextarea.waitFor({ state: 'visible', timeout: 5000 })
-          |                               ^
-      133 |       await headStartTextarea.fill('<script>console.log("Test injection code!")</script>')
-      134 |       console.log('  Added injection code to Head Start')
-      135 |
-        at /Users/joalves/git_tree/absmartly-browser-extension/tests/e2e/variable-sync.spec.ts:132:31
-        at /Users/joalves/git_tree/absmartly-browser-extension/tests/e2e/variable-sync.spec.ts:111:5
+🔍 STEP 8: CRITICAL VERIFICATION - Checking if data was preserved
 
-  1 failed
-    [chromium] › tests/e2e/variable-sync.spec.ts:37:7 › Variable Sync - __inject_html and DOM Changes Preservation › Should preserve __inject_html and DOM changes when adding custom variables 
+  🔬 Checking for all data in Config editor...
+  ✓ Custom variable "hello" present: true
+  Opened Variant Config editor
+  ✓ Custom variable "hello" in config: true
+  ✓ __inject_html field in config: true
+  ✓ __dom_changes field in config: true
+  ✓ DOM changes content present: true
+  ✓ URL filter present: true
+
+✅ CRITICAL TEST PASSED!
+  All data preserved after adding custom variable:
+    ✓ __inject_html (in full config JSON)
+    ✓ __dom_changes with VE changes and URL filter (in full config JSON)
+    ✓ "hello"="there" custom variable
+
+➕ STEP 9: Adding second custom variable to double-check
+  Added second variable: foo = "bar"
+  ✓ hello: "there" - true
+  ✓ foo: "bar" - true
+  ✓ All variables in config - true
+  ✓ DOM changes in config - true
+
+✅ Second variable test passed - all data still preserved!
+
+🎉 ALL TESTS PASSED!
+  The sync feedback loop bug is FIXED!
+  ✓ __inject_html preserved when adding variables (visible in full config)
+  ✓ __dom_changes preserved when adding variables (visible in full config)
+  ✓ URL filters preserved when adding variables
+  ✓ Custom variables correctly added and visible
+  ✓  1 [chromium] › tests/e2e/variable-sync.spec.ts:45:7 › Variable Sync - __inject_html and DOM Changes Preservation › Should preserve __inject_html and DOM changes when adding custom variables (23.0s)
+
+  1 passed (23.4s)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m

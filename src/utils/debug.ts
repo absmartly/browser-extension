@@ -6,6 +6,7 @@
 // Check if debug mode is enabled
 const isDebugEnabled = (): boolean => {
   // Check localStorage first (for browser environment)
+  /*
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     return localStorage.getItem('ABSMARTLY_DEBUG') === 'true'
   }
@@ -14,7 +15,7 @@ const isDebugEnabled = (): boolean => {
   if (typeof process !== 'undefined' && process.env) {
     return process.env.ABSMARTLY_DEBUG === 'true'
   }
-  
+  */
   return false
 }
 

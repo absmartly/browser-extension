@@ -52,6 +52,8 @@ const OwnersField = React.memo(function OwnersField({
     id: `team-${team.team_id || team.id}`,
     name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
     display_name: team.display_name || team.name,
+    initials: team.initials,
+    color: team.color,
     type: 'team' as const
   })), [teams])
 
