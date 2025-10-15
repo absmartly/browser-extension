@@ -1,7 +1,7 @@
 {
-  "name": "absmartly-browser-extension",
-  "displayName": "ABsmartly Browser Extension",
-  "version": "0.0.1",
+  "name": "absmartly-launchpad",
+  "displayName": "ABsmartly LaunchPad",
+  "version": "0.0.2",
   "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
   "author": "Jonas Alves",
   "scripts": {
@@ -85,12 +85,7 @@
           "inject-sdk-plugin.js",
           "inject-sdk-plugin.*.js",
           "inject-sdk-plugin-mapping.json",
-          "absmartly-dom-changes.min.js",
-          "absmartly-dom-changes.dev.js",
-          "absmartly-dom-changes.dev.js.map",
-          "absmartly-sdk-plugins.dev.js",
-          "absmartly-sdk-plugins.dev.js.map",
-          "absmartly-sdk-plugins.min.js"
+          "absmartly-dom-changes-core.min.js"
         ],
         "matches": [
           "<all_urls>"

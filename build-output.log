@@ -1,0 +1,105 @@
+
+> absmartly-browser-extension@0.0.1 dev
+> plasmo dev --src-path=. & node scripts/dev-build.js --watch
+
+[Dev Build] Watching inject-sdk-plugin.js and visual-editor for changes...
+[Dev Build] Watching visual-editor directory for changes
+🟣 Plasmo v0.90.5
+🔴 The Browser Extension Framework
+🔵 INFO   | Starting the extension development server...
+🔵 INFO   | Building for target: chrome-mv3
+🔵 INFO   | Loaded environment variables from: [ '.env.development.local' ]
+🔄 Building[Dev Build] Building visual editor...
+🔄 Building.[Visual Editor Build] Building unified visual editor script...
+🔄 Building..🔄 Building...[Visual Editor Build] Running esbuild...
+🔄 Building   🔄 Building.🔄 Building..
+  ../absmartly-visual-editor-bundles/visual-editor-injection.bundle  182.8kb
+
+⚡ Done in 23ms
+[Visual Editor Build] Successfully built /Users/joalves/git_tree/absmartly-visual-editor-bundles/visual-editor-injection.bundle
+[Visual Editor Build] Copied to /Users/joalves/git_tree/absmartly-browser-extension/build/chrome-mv3-dev/src/injected/build/visual-editor-injection.js
+[Visual Editor Build] Copied to /Users/joalves/git_tree/absmartly-browser-extension/build/chrome-mv3-prod/src/injected/build/visual-editor-injection.js
+[Dev Build] Copied absmartly-sdk-plugins.dev.js
+[Dev Build] Copied absmartly-sdk-plugins.dev.js.map
+[Dev Build] Copied inject-sdk-plugin.js as inject-sdk-plugin.851f5a81.js
+[Dev Build] Updated inject-sdk-plugin-mapping.json
+[Dev Build] Added visual-editor-injection.js to web accessible resources
+🔄 Building...🔄 Building   🔄 Building.🔄 Building..                    🟢 DONE   | Extension re-packaged in 4526ms! 🚀
+🔄 Building🔄 Building...                    🟢 DONE   | Extension re-packaged in 508ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 492ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 116ms! 🚀
+🔄 Building🔄 Building.🔄 Building..🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 2129ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 74ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 29ms! 🚀
+🔄 Building🔄 Building.🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 1558ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 486ms! 🚀
+🔄 Building🔄 Building.🔄 Building..                    🟢 DONE   | Extension re-packaged in 1000ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 107ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 41ms! 🚀
+🔄 Building🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 1180ms! 🚀
+🔄 Building🔄 Building.                    🟢 DONE   | Extension re-packaged in 520ms! 🚀
+🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 641ms! 🚀
+🔄 Building🔄 Building...                    🟢 DONE   | Extension re-packaged in 440ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 591ms! 🚀
+🔄 Building🔄 Building.🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 1303ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 495ms! 🚀
+🔄 Building🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 1573ms! 🚀
+🔄 Building🔄 Building..🔄 Building...                    🟢 DONE   | Extension re-packaged in 1089ms! 🚀
+🔄 Building🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 806ms! 🚀
+🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 447ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 21ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 28ms! 🚀
+🔄 Building🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 1845ms! 🚀
+🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 549ms! 🚀
+🔄 Building🔄 Building...                    🟢 DONE   | Extension re-packaged in 743ms! 🚀
+🔄 Building🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 1870ms! 🚀
+🔄 Building🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 5353ms! 🚀
+🔄 Building🔄 Building.🔄 Building..🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 1809ms! 🚀
+🔄 Building🔄 Building.                    🟢 DONE   | Extension re-packaged in 628ms! 🚀
+🔵 INFO   | package.json changed, updating manifest overrides. You might need to restart the dev server.
+🔄 Building🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 4199ms! 🚀
+🔄 Building                    🟢 DONE   | Extension re-packaged in 160ms! 🚀
+🔄 Building🔄 Building.🔄 Building..                    🟢 DONE   | Extension re-packaged in 1224ms! 🚀
+🔵 INFO   | package.json changed, updating manifest overrides. You might need to restart the dev server.
+🔄 Building🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 4051ms! 🚀
+🔄 Building                    🔴 ERROR  | Build failed. To debug, run plasmo dev --verbose.
+🔴 ERROR  | Entry /Users/joalves/git\\\_tree/absmartly-browser-extension/.plasmo/chrome-mv3.plasmo.manifest.json does not exist
+🔄 Building🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 10150ms! 🚀
+[Dev Build] Change detected in inject-sdk-plugin.js
+[Dev Build] Building visual editor...
+[Visual Editor Build] Building unified visual editor script...
+[Visual Editor Build] Running esbuild...
+
+  ../absmartly-visual-editor-bundles/visual-editor-injection.bundle  182.8kb
+
+⚡ Done in 31ms
+[Visual Editor Build] Successfully built /Users/joalves/git_tree/absmartly-visual-editor-bundles/visual-editor-injection.bundle
+[Visual Editor Build] Copied to /Users/joalves/git_tree/absmartly-browser-extension/build/chrome-mv3-dev/src/injected/build/visual-editor-injection.js
+[Visual Editor Build] Copied to /Users/joalves/git_tree/absmartly-browser-extension/build/chrome-mv3-prod/src/injected/build/visual-editor-injection.js
+[Dev Build] SDK plugins dev build not found, using production build
+[Dev Build] Copied absmartly-sdk-plugins.min.js
+[Dev Build] Copied inject-sdk-plugin.js as inject-sdk-plugin.797731cb.js
+[Dev Build] Updated inject-sdk-plugin-mapping.json
+[Dev Build] Removed old version: inject-sdk-plugin.851f5a81.js
+[Dev Build] Added visual-editor-injection.js to web accessible resources
+[Dev Build] Change detected in inject-sdk-plugin.js
+[Dev Build] Building visual editor...
+[Visual Editor Build] Building unified visual editor script...
+[Visual Editor Build] Running esbuild...
+
+  ../absmartly-visual-editor-bundles/visual-editor-injection.bundle  182.8kb
+
+⚡ Done in 4ms
+[Visual Editor Build] Successfully built /Users/joalves/git_tree/absmartly-visual-editor-bundles/visual-editor-injection.bundle
+[Visual Editor Build] Copied to /Users/joalves/git_tree/absmartly-browser-extension/build/chrome-mv3-dev/src/injected/build/visual-editor-injection.js
+[Visual Editor Build] Copied to /Users/joalves/git_tree/absmartly-browser-extension/build/chrome-mv3-prod/src/injected/build/visual-editor-injection.js
+[Dev Build] SDK plugins dev build not found, using production build
+[Dev Build] Copied absmartly-sdk-plugins.min.js
+[Dev Build] Copied inject-sdk-plugin.js as inject-sdk-plugin.963944ca.js
+[Dev Build] Updated inject-sdk-plugin-mapping.json
+🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 772ms! 🚀
+🔄 Building🔄 Building...                    🟢 DONE   | Extension re-packaged in 512ms! 🚀
+🔄 Building🔄 Building                       🟢 DONE   | Extension re-packaged in 555ms! 🚀
+🔄 Building🔄 Building.                    🟢 DONE   | Extension re-packaged in 748ms! 🚀
+🔄 Building🔄 Building..                    🟢 DONE   | Extension re-packaged in 643ms! 🚀
+🔄 Building🔄 Building...🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 1223ms! 🚀

@@ -27,36 +27,7 @@ function copyWithHash() {
   // Build visual editor first
   buildVisualEditor();
 
-  // Copy SDK plugins bundle - use development build for dev builds (Lite version)
-  const sdkPluginDir = path.join(__dirname, '..', '..', 'absmartly-sdk-plugins', 'dist');
-  const pluginDevSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.dev.js');
-  const pluginProdSource = path.join(sdkPluginDir, 'absmartly-sdk-plugins.min.js');
 
-  // Try to use dev build from SDK plugin repo, fallback to production build
-  let pluginSource = pluginDevSource;
-  let pluginFilename = 'absmartly-sdk-plugins.dev.js';
-
-  if (!fs.existsSync(pluginDevSource)) {
-    console.log('[Dev Build] SDK plugins dev build not found, using production build');
-    pluginSource = pluginProdSource;
-    pluginFilename = 'absmartly-sdk-plugins.min.js';
-  }
-
-  if (fs.existsSync(pluginSource)) {
-    const pluginDest = path.join(devBuildDir, pluginFilename);
-    fs.copyFileSync(pluginSource, pluginDest);
-    console.log(`[Dev Build] Copied ${pluginFilename}`);
-
-    // Also copy source map if using dev build
-    if (pluginSource === pluginDevSource) {
-      const mapSource = pluginDevSource + '.map';
-      if (fs.existsSync(mapSource)) {
-        const mapDest = path.join(devBuildDir, pluginFilename + '.map');
-        fs.copyFileSync(mapSource, mapDest);
-        console.log(`[Dev Build] Copied ${pluginFilename}.map`);
-      }
-    }
-  }
 
   if (fs.existsSync(injectScriptSource)) {
     // Read the file content and generate a hash

@@ -1088,11 +1088,7 @@
     }
   }
 
-  // Check if we need to inject SDK first
-  let sdkInjectionConfig = null;
-  let sdkInjectionPending = false;
-
-  /**
+/**
    * Wait for SDK and custom code, then initialize
    */
   function waitForSDKAndInitialize() {
@@ -1102,13 +1098,7 @@
     const checkAndInit = () => {
       attempts++;
 
-      // If SDK injection is pending, wait for it
-      if (sdkInjectionPending) {
-        if (attempts < maxAttempts) {
-          setTimeout(checkAndInit, 200);
-        }
-        return;
-      }
+
 
       // Detect context only once
       if (!cachedContext) {
@@ -1183,14 +1173,6 @@
           type: 'SDK_CONTEXT_READY'
         }, '*');
       } else if (attempts < maxAttempts) {
-        // If config says to inject SDK and we haven't tried yet, request config and inject
-        if (!sdkInjectionConfig && attempts === 5) { // Check after 500ms
-          debugLog('[ABsmartly Extension] No SDK found, checking if we should inject it...');
-          window.postMessage({
-            source: 'absmartly-page',
-            type: 'REQUEST_SDK_INJECTION_CONFIG'
-          }, '*');
-        }
         setTimeout(checkAndInit, 100);
       } else {
         debugLog('[ABsmartly Extension] No ABsmartly SDK found after 5 seconds');
@@ -1261,25 +1243,7 @@
         return;
       }
 
-      if (event.data.type === 'SDK_INJECTION_CONFIG') {
-        const { config } = event.data.payload || {};
-        sdkInjectionConfig = config;
 
-        debugLog('[ABsmartly Extension] SDK injection config received:', {
-          injectSDK: config?.injectSDK,
-          cachedContext: cachedContext,
-          hasCachedContext: !!cachedContext
-        });
-
-        if (config?.injectSDK && !cachedContext) {
-          debugLog('[ABsmartly Extension] SDK injection enabled, injecting ABsmartly SDK...');
-          sdkInjectionPending = true;
-          injectABsmartlySDK(config);
-        } else {
-          debugLog('[ABsmartly Extension] SDK injection disabled or SDK already present');
-        }
-        return;
-      }
 
       if (event.data.type === 'INITIALIZE_PLUGIN') {
         // Prevent multiple initializations
@@ -1640,46 +1604,7 @@
     };
   };
 
-  // Function to inject ABsmartly SDK
-  function injectABsmartlySDK(config) {
-    debugLog('[ABsmartly Extension] Injecting ABsmartly SDK...');
 
-    // First, inject the SDK library from unpkg
-    const sdkLibScript = document.createElement('script');
-    sdkLibScript.src = 'https://unpkg.com/@absmartly/javascript-sdk/dist/absmartly.min.js';
-    sdkLibScript.onload = () => {
-      debugLog('[ABsmartly Extension] ABsmartly SDK library loaded');
-
-      // Now inject the SDK initialization script
-      const sdkUrl = config.sdkUrl || 'https://sdk.absmartly.com/sdk.js';
-      const sdkScript = document.createElement('script');
-
-      // Append current page query parameters to SDK URL
-      const queryString = window.location.search;
-      sdkScript.src = sdkUrl + queryString;
-      sdkScript.async = true;
-
-      sdkScript.onload = () => {
-        debugLog('[ABsmartly Extension] ABsmartly SDK loaded from:', sdkUrl + queryString);
-        sdkInjectionPending = false;
-        // SDK should now be available, let the check cycle find it
-      };
-
-      sdkScript.onerror = (error) => {
-        debugError('[ABsmartly Extension] Failed to load ABsmartly SDK:', error);
-        sdkInjectionPending = false;
-      };
-
-      document.head.appendChild(sdkScript);
-    };
-
-    sdkLibScript.onerror = (error) => {
-      debugError('[ABsmartly Extension] Failed to load ABsmartly SDK library:', error);
-      sdkInjectionPending = false;
-    };
-
-    document.head.appendChild(sdkLibScript);
-  }
 
   // Start the process
   if (document.readyState === 'loading') {

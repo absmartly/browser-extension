@@ -10,7 +10,7 @@ interface VariantConfigJSONEditorProps {
 
 /**
  * JSON editor for full variant configuration
- * Shows all variables (including __inject_html, __dom_changes, and custom variables)
+ * Shows all config fields (including __inject_html, __dom_changes, and custom variables)
  * This gives users complete visibility into what will be sent to the API
  */
 export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = ({
@@ -30,12 +30,9 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
   useEffect(() => {
     if (!isOpen) return
 
-    // Prepare the full variant config for display
-    // This includes all variables plus DOM changes
-    const fullConfig = {
-      ...variant.variables,
-      __dom_changes: variant.dom_changes
-    }
+    // Use the full variant config directly
+    // This includes __inject_html, __dom_changes, and all custom variables
+    const fullConfig = variant.config
 
     // Send message to content script to open the JSON editor
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -61,24 +58,21 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
             return
           }
 
-          // Extract __dom_changes if present
-          const { __dom_changes, ...variables } = parsedConfig
-
           // Validate DOM changes format if present
-          if (__dom_changes) {
-            if (!Array.isArray(__dom_changes)) {
-              if (typeof __dom_changes !== 'object' || !__dom_changes.changes || !Array.isArray(__dom_changes.changes)) {
+          if (parsedConfig.__dom_changes) {
+            const domChanges = parsedConfig.__dom_changes
+            if (!Array.isArray(domChanges)) {
+              if (typeof domChanges !== 'object' || !domChanges.changes || !Array.isArray(domChanges.changes)) {
                 console.error('__dom_changes must be either an array or an object with a changes array')
                 return
               }
             }
           }
 
-          // Create updated variant
+          // Create updated variant - keep full config as-is
           const updatedVariant: Variant = {
             name: variant.name,
-            variables,
-            dom_changes: __dom_changes || { changes: [] }
+            config: parsedConfig
           }
 
           onSaveRef.current(updatedVariant)
