@@ -1,9 +1,30 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
+import { z } from 'zod'
 import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
+
+// SECURITY: Zod schemas for input validation
+const ConfigSchema = z.object({
+  apiKey: z.string().optional(),
+  apiEndpoint: z.string().url(),
+  applicationId: z.number().int().positive().optional(),
+  authMethod: z.enum(['jwt', 'apikey']).optional(),
+  domChangesFieldName: z.string().optional(),
+  sdkEndpoint: z.string().url().optional(),
+  queryPrefix: z.string().optional(),
+  persistQueryToCookie: z.boolean().optional(),
+  injectSDK: z.boolean().optional(),
+  sdkUrl: z.string().url().optional()
+})
+
+const APIRequestSchema = z.object({
+  method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD']),
+  path: z.string().min(1),
+  data: z.any().optional()
+})
 
 // Storage instances
 const storage = new Storage()
@@ -536,6 +557,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === "API_REQUEST") {
     // Handle API requests
     debugLog('Background received API_REQUEST:', { method: message.method, path: message.path, data: message.data })
+
+    // SECURITY: Validate API request parameters
+    try {
+      APIRequestSchema.parse({
+        method: message.method,
+        path: message.path,
+        data: message.data
+      })
+    } catch (validationError) {
+      debugError('[Background] API request validation failed:', validationError)
+      sendResponse({
+        success: false,
+        error: 'Invalid API request parameters',
+        validationError: validationError instanceof z.ZodError ? validationError.errors : String(validationError)
+      })
+      return false
+    }
 
     makeAPIRequest(message.method, message.path, message.data)
       .then(data => {
