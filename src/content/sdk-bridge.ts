@@ -4,6 +4,7 @@
  */
 
 import type { DOMChange } from '../types/dom-changes'
+import DOMPurify from 'dompurify'
 
 declare global {
   interface Window {
@@ -65,7 +66,7 @@ const bridgeScript = `
               break;
               
             case 'html':
-              element.innerHTML = change.value;
+              element.innerHTML = DOMPurify.sanitize(change.value);
               break;
               
             case 'style':
@@ -171,7 +172,7 @@ const bridgeScript = `
               element.textContent = changeInfo.originalState.text;
               break;
             case 'html':
-              element.innerHTML = changeInfo.originalState.html;
+              element.innerHTML = DOMPurify.sanitize(changeInfo.originalState.html);
               break;
             case 'style':
               element.setAttribute('style', changeInfo.originalState.style);

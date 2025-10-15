@@ -6,6 +6,14 @@
 (function() {
   'use strict';
 
+  // Simple HTML sanitization to prevent XSS
+  function sanitizeHTML(html) {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.textContent = html; // This escapes all HTML
+    return temp.innerHTML;
+  }
+
   // Simple debug flag and functions
   const DEBUG = true;
   
@@ -91,7 +99,7 @@
           break;
 
         case 'html':
-          element.innerHTML = change.value;
+          element.innerHTML = sanitizeHTML(change.value);
           break;
 
         case 'style':
@@ -203,7 +211,7 @@
           // We prioritize innerHTML because it contains the complete structure
           // and textContent would be overwritten by innerHTML anyway
           if (originalData.innerHTML !== undefined) {
-            element.innerHTML = originalData.innerHTML;
+            element.innerHTML = sanitizeHTML(originalData.innerHTML);
             debugLog('[ABsmartly Page] Restored innerHTML from VE original');
           } else if (originalData.textContent !== undefined) {
             // Fallback to textContent if innerHTML not available
@@ -259,7 +267,7 @@
 
       // Restore innerHTML
       if (originalState.innerHTML !== undefined) {
-        element.innerHTML = originalState.innerHTML;
+        element.innerHTML = sanitizeHTML(originalState.innerHTML);
       }
 
       // Restore attributes
@@ -398,7 +406,7 @@
                 debugLog(`[ABsmartly Page] 📄 Storing original HTML (${originalData.innerHTML.length} chars):`, originalData.innerHTML.substring(0, 200));
               }
               debugLog(`[ABsmartly Page] 🔄 Replacing HTML content with:`, change.value?.substring(0, 200));
-              element.innerHTML = change.value;
+              element.innerHTML = sanitizeHTML(change.value);
               element.dataset.absmartlyModified = 'true';
               break;
               
@@ -554,7 +562,7 @@
           // Restore innerHTML
           if (originalData.innerHTML !== undefined) {
             debugLog(`[ABsmartly Page] 📄 Restoring HTML (${originalData.innerHTML.length} chars)`);
-            element.innerHTML = originalData.innerHTML;
+            element.innerHTML = sanitizeHTML(originalData.innerHTML);
           }
           
           // Restore attributes
@@ -747,7 +755,7 @@
     
     // Create a temporary container
     const temp = document.createElement('div');
-    temp.innerHTML = html;
+    temp.innerHTML = sanitizeHTML(html);
     
     // Find all script tags
     const scripts = temp.querySelectorAll('script');
