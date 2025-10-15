@@ -151,19 +151,41 @@ export function ExperimentDetail({
                          experiment.status !== 'running'
 
   const handleBack = () => {
+    // Cleanup function to stop VE and Preview
+    const cleanup = () => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          // Stop Visual Editor
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'STOP_VISUAL_EDITOR'
+          })
+          
+          // Remove Preview
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'remove',
+            experimentName: experiment.name
+          })
+        }
+      })
+    }
+
     if (hasUnsavedChanges) {
       if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
         const storageKey = `experiment-${experiment.id}-variants`
         debugLog('🧹 User chose to discard changes for experiment', experiment.id)
         storage.remove(storageKey).then(() => {
           debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+          cleanup()
           onBack()
         }).catch(error => {
           debugError('Failed to clear storage:', error)
+          cleanup()
           onBack()
         })
       }
     } else {
+      cleanup()
       onBack()
     }
   }

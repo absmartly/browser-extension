@@ -98,6 +98,14 @@ export function VariantList({
   const [addingVariableForVariant, setAddingVariableForVariant] = useState<number | null>(null)
   const [newVariableName, setNewVariableName] = useState('')
   const [newVariableValue, setNewVariableValue] = useState('')
+  const [expandedVariants, setExpandedVariants] = useState<Set<number>>(() => {
+    // Keep Control variant (index 0) collapsed by default, expand all others
+    const expanded = new Set<number>()
+    for (let i = 1; i < initialVariants.length; i++) {
+      expanded.add(i)
+    }
+    return expanded
+  })
   const newVarNameInputRef = useRef<HTMLInputElement>(null)
   const newVarValueInputRef = useRef<HTMLInputElement>(null)
   const justUpdatedRef = useRef(false)
@@ -388,9 +396,38 @@ export function VariantList({
       </div>
 
       <div className="space-y-2">
-        {variants.map((variant, index) => (
-          <div key={index} className="border border-gray-200 rounded-lg p-4">
-            <div className="mb-3 flex items-center gap-2">
+        {variants.map((variant, index) => {
+          const isExpanded = expandedVariants.has(index)
+          const isControl = index === 0
+          
+          return (
+          <div key={index} className={`border rounded-lg ${isControl ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}`}>
+            {/* Variant Header */}
+            <div className="px-4 py-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const newExpanded = new Set(expandedVariants)
+                  if (isExpanded) {
+                    newExpanded.delete(index)
+                  } else {
+                    newExpanded.add(index)
+                    // Show warning when expanding Control variant
+                    if (isControl) {
+                      alert('⚠️ Warning: You are editing the Control variant. Changes here affect the baseline for comparison.')
+                    }
+                  }
+                  setExpandedVariants(newExpanded)
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+              {isControl && (
+                <span className="px-2 py-0.5 text-xs font-medium text-yellow-800 bg-yellow-200 rounded">
+                  Control
+                </span>
+              )}
               <Input
                 className="flex-1 font-medium"
                 value={variant.name}
@@ -423,8 +460,9 @@ export function VariantList({
               )}
             </div>
 
-            {/* Variables Section */}
-            <div className="space-y-3">
+            {/* Collapsible Content */}
+            {isExpanded && (
+            <div className="px-4 pb-4 space-y-3 border-t border-gray-200 pt-3">
               <div>
                 <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
                 <div className="space-y-2">
@@ -553,8 +591,11 @@ export function VariantList({
                 activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
               />
             </div>
+            )}
           </div>
-        ))}
+        )
+        })}
+      }
       </div>
 
       {/* Config Editor Modal */}

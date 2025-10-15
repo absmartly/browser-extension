@@ -169,13 +169,34 @@ export function ExperimentEditor({
     await saveExperiment(formData, currentVariants, undefined, onSave)
   }
 
-
+  const handleCancel = () => {
+    // Cleanup function to stop VE and Preview
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        // Stop Visual Editor
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'STOP_VISUAL_EDITOR'
+        })
+        
+        // Remove Preview (use experiment name if available)
+        if (experiment?.name || formData.name) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'remove',
+            experimentName: experiment?.name || formData.name
+          })
+        }
+      }
+    })
+    
+    onCancel()
+  }
 
   return (
     <div className="p-4">
       <Header
         title={experiment?.id ? 'Edit Experiment' : 'Create New Experiment'}
-        onBack={onCancel}
+        onBack={handleCancel}
       />
 
       <form onSubmit={handleSubmit} className="space-y-4">
