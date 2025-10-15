@@ -1010,6 +1010,15 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           const authMethod = url.searchParams.get('authMethod') || 'jwt'
           const apiKey = url.searchParams.get('apiKey')
 
+          // SECURITY: Block SSRF attacks - prevent access to internal networks
+          const avatarHostUrl = new URL(avatarUrl)
+          const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.']
+
+          if (blockedHosts.some(h => avatarHostUrl.hostname.includes(h) || avatarHostUrl.hostname === h.replace('.', ''))) {
+            console.error('[Avatar Proxy] SSRF attempt blocked:', avatarUrl)
+            return new Response('Access to internal network addresses is blocked', { status: 403 })
+          }
+
           // Check cache first using the actual avatar URL (https://)
           // Cache API doesn't support chrome-extension:// scheme, so we use the actual URL
           const cache = await caches.open('absmartly-avatars-v1')
