@@ -450,6 +450,12 @@ async function makeAPIRequest(method: string, path: string, data?: any, retryWit
 
 // Listen for messages from sidebar and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Validate sender - only accept messages from our own extension
+  if (!sender.id || sender.id !== chrome.runtime.id) {
+    debugWarn('[Background] Rejected message from unauthorized sender:', sender)
+    return false
+  }
+  
   debugLog('🔵 Background received message:', message.type, 'Full message:', message)
   
   // Test message
