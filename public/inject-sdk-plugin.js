@@ -775,13 +775,14 @@
           // Add to appropriate location
           insertAtLocation(newScript, location);
         } else {
-          // Inline script - execute the code immediately
-          const code = script.textContent || script.innerText || '';
-          if (code) {
-            const fn = new Function(code);
-            fn();
-            debugLog(`[ABsmartly Extension] Successfully executed inline script from ${location}`);
-          }
+          // Inline script execution disabled for security (prevents code injection)
+          // const code = script.textContent || script.innerText || '';
+          // if (code) {
+          //   const fn = new Function(code);
+          //   fn();
+          //   debugLog(`[ABsmartly Extension] Successfully executed inline script from ${location}`);
+          // }
+          debugWarn(`[ABsmartly Extension] Inline script execution disabled for security from ${location}`);
         }
       } catch (error) {
         debugError(`[ABsmartly Extension] Failed to execute script from ${location}:`, error);
