@@ -98,7 +98,12 @@ export class ElementActions {
       if (!htmlElement.dataset.absmartlyOriginal) {
         htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
       }
-      const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+      let originalData: any = {}
+      try {
+        originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+      } catch (e) {
+        console.error('[ElementActions] Failed to parse original data:', e)
+      }
       if (!originalData.styles) {
         originalData.styles = {}
       }
@@ -199,7 +204,12 @@ export class ElementActions {
       })
     }
 
-    const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+    let originalData: any = {}
+    try {
+      originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+    } catch (e) {
+      console.error('[ElementActions] Failed to parse original data:', e)
+    }
     if (!originalData.styles) {
       originalData.styles = {}
     }
@@ -325,8 +335,13 @@ export class ElementActions {
 
           case 'text':
             // Check for original text in dataset
-            const originalData = htmlElement.dataset.absmartlyOriginal ?
-              JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            let originalData: any = null
+            try {
+              originalData = htmlElement.dataset.absmartlyOriginal ?
+                JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            } catch (e) {
+              console.error('[ElementActions] Failed to parse original data:', e)
+            }
             if (originalData?.text !== undefined) {
               htmlElement.textContent = originalData.text
               console.log('[ElementActions] Reverted text content')
@@ -335,8 +350,13 @@ export class ElementActions {
 
           case 'style':
             // Revert to original styles
-            const styleOrigData = htmlElement.dataset.absmartlyOriginal ?
-              JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            let styleOrigData: any = null
+            try {
+              styleOrigData = htmlElement.dataset.absmartlyOriginal ?
+                JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            } catch (e) {
+              console.error('[ElementActions] Failed to parse original data:', e)
+            }
             if (styleOrigData?.styles && change.value && typeof change.value === 'object') {
               // Restore original values for changed properties
               for (const prop in change.value) {
@@ -359,8 +379,13 @@ export class ElementActions {
 
           case 'html':
             // Revert HTML content
-            const origData = htmlElement.dataset.absmartlyOriginal ?
-              JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            let origData: any = null
+            try {
+              origData = htmlElement.dataset.absmartlyOriginal ?
+                JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+            } catch (e) {
+              console.error('[ElementActions] Failed to parse original data:', e)
+            }
             if (origData?.html !== undefined) {
               htmlElement.innerHTML = origData.html
               console.log('[ElementActions] Reverted HTML content')
@@ -451,7 +476,12 @@ export class ElementActions {
         if (!htmlElement.dataset.absmartlyOriginal) {
           htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
         }
-        const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+        let originalData: any = {}
+        try {
+          originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+        } catch (e) {
+          console.error('[ElementActions] Failed to parse original data:', e)
+        }
 
         switch (change.type) {
           case 'move':
