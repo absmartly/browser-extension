@@ -502,8 +502,40 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
       selector += `.${semanticClasses.join('.')}`
     }
     
-    // If we have some identifying features, return them
+    // If we have some identifying features, check if they're unique among siblings
     if (attributes.length > 0 || semanticClasses.length > 0) {
+      // Check if this selector is unique among siblings
+      if (element.parentElement) {
+        const siblings = Array.from(element.parentElement.children)
+        const matchingSiblings = siblings.filter(sibling => {
+          if (sibling === element || sibling.tagName !== element.tagName) return false
+
+          // Check if any of our attributes match
+          for (const attr of attributes) {
+            const attrMatch = attr.match(/\[([^=]+)="([^"]+)"\]/)
+            if (attrMatch) {
+              const [, attrName, attrValue] = attrMatch
+              if (sibling.getAttribute(attrName) === attrValue) return true
+            }
+          }
+
+          // Check if any of our classes match
+          if (semanticClasses.length > 0 && sibling.className) {
+            const siblingClasses = sibling.className.toString().split(/\s+/)
+            if (semanticClasses.some(cls => siblingClasses.includes(cls))) return true
+          }
+
+          return false
+        })
+
+        // If we have siblings with same attributes/classes, add position for disambiguation
+        if (matchingSiblings.length > 0) {
+          const sameTagSiblings = siblings.filter(child => child.tagName === element.tagName)
+          const index = sameTagSiblings.indexOf(element) + 1
+          return `${selector}:nth-of-type(${index})`
+        }
+      }
+
       return selector
     }
 
