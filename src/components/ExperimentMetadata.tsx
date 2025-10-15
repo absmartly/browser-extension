@@ -41,21 +41,33 @@ const OwnersField = React.memo(function OwnersField({
   canEdit: boolean
   onChange: (ownerIds: number[], teamIds: number[]) => void
 }) {
-  const ownerOptions = useMemo(() => owners.map(owner => ({
-    id: `user-${owner.user_id || owner.id}`,
-    name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email || `User ${owner.user_id || owner.id}`,
-    display_name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email,
-    type: 'user' as const
-  })), [owners])
+  const ownerOptions = useMemo(() => owners.map(owner => {
+    const avatar = owner.avatar?.base_url
+      ? `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp`
+      : undefined
+    return {
+      id: `user-${owner.user_id || owner.id}`,
+      name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email || `User ${owner.user_id || owner.id}`,
+      display_name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email,
+      avatar,
+      type: 'user' as const
+    }
+  }), [owners])
 
-  const teamOptions = useMemo(() => teams.map(team => ({
-    id: `team-${team.team_id || team.id}`,
-    name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
-    display_name: team.display_name || team.name,
-    initials: team.initials,
-    color: team.color,
-    type: 'team' as const
-  })), [teams])
+  const teamOptions = useMemo(() => teams.map(team => {
+    const avatar = team.avatar?.base_url
+      ? `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${team.avatar.base_url}/crop/32x32.webp`
+      : undefined
+    return {
+      id: `team-${team.team_id || team.id}`,
+      name: team.display_name || team.name || `Team ${team.team_id || team.id}`,
+      display_name: team.display_name || team.name,
+      initials: team.initials,
+      color: team.color,
+      avatar,
+      type: 'team' as const
+    }
+  }), [teams])
 
   const ownersOptions = useMemo(() => [...teamOptions, ...ownerOptions], [ownerOptions, teamOptions])
 
