@@ -405,7 +405,12 @@ export class VisualEditor {
             htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
           }
 
-          const originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+          let originalData: any = {}
+          try {
+            originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
+          } catch (e) {
+            console.error('[ABSmartly] Failed to parse original data:', e)
+          }
 
           // Store original values based on change type
           if (change.type === 'text' && !originalData.text) {
