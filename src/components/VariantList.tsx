@@ -704,6 +704,15 @@ function URLFilterSection({ config, onConfigChange, canEdit }: URLFilterSectionP
     }
   }
 
+  // Auto-save URL filter changes with debouncing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateURLFilter()
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [simplePatterns, excludePatterns, regexMode, matchType, mode])
+
   return (
     <div className="bg-blue-50 rounded-lg border border-blue-200">
       {/* Header with toggle */}
