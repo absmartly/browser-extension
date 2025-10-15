@@ -124,3 +124,5 @@
 🔄 Building🔄 Building...                    🟢 DONE   | Extension re-packaged in 565ms! 🚀
 🔄 Building🔄 Building   🔄 Building.                    🟢 DONE   | Extension re-packaged in 1195ms! 🚀
 🔄 Building🔄 Building..🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 1360ms! 🚀
+🔵 INFO   | package.json changed, updating manifest overrides. You might need to restart the dev server.
+🔄 Building🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building   🔄 Building.🔄 Building..🔄 Building...🔄 Building                       🟢 DONE   | Extension re-packaged in 4930ms! 🚀
