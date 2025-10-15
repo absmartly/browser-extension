@@ -8,6 +8,7 @@ export interface SearchableSelectOption {
   type?: 'user' | 'team'
   color?: string
   initials?: string
+  avatar?: string
 }
 
 interface BaseSelectProps {
@@ -59,7 +60,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const selectedOptions = mode === 'single'
-    ? (props.selectedId ? options.filter(opt => opt.id === props.selectedId) : [])
+    ? (props.selectedId !== null && props.selectedId !== undefined ? options.filter(opt => String(opt.id) === String(props.selectedId)) : [])
     : options.filter(opt => props.selectedIds.includes(opt.id))
 
   const filteredOptions = options.filter(opt =>
@@ -149,7 +150,19 @@ export function SearchableSelect(props: SearchableSelectProps) {
         onClick={onSelect}
       >
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-xs ${fontClass}`}>
+          {option.avatar ? (
+            <img
+              src={option.avatar}
+              alt={option.display_name || option.name}
+              className={`w-8 h-8 ${shapeClass} object-cover`}
+              onError={(e) => {
+                // Fallback to initials on error
+                e.currentTarget.style.display = 'none'
+                e.currentTarget.nextElementSibling?.classList.remove('hidden')
+              }}
+            />
+          ) : null}
+          <div className={`w-8 h-8 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-xs ${fontClass} ${option.avatar ? 'hidden' : ''}`}>
             {initials}
           </div>
           <span className="text-sm text-gray-900">{option.display_name || option.name}</span>
@@ -177,7 +190,18 @@ export function SearchableSelect(props: SearchableSelectProps) {
         key={option.id}
         className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-300 rounded-md text-sm"
       >
-        <div className={`w-5 h-5 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-[10px] ${fontClass}`}>
+        {option.avatar ? (
+          <img
+            src={option.avatar}
+            alt={option.display_name || option.name}
+            className={`w-5 h-5 ${shapeClass} object-cover`}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+              e.currentTarget.nextElementSibling?.classList.remove('hidden')
+            }}
+          />
+        ) : null}
+        <div className={`w-5 h-5 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-[10px] ${fontClass} ${option.avatar ? 'hidden' : ''}`}>
           {initials}
         </div>
         <span className="text-gray-900">{option.display_name || option.name}</span>
