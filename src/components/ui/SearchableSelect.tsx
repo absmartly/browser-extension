@@ -80,33 +80,25 @@ export function SearchableSelect(props: SearchableSelectProps) {
       
       // If dropdown is open and click is inside container
       if (containerRef.current && isOpen && target) {
-        // Check if clicking on search input or its icon - keep it open
-        const searchInput = target.closest('input[type="text"]')
-        if (searchInput) {
-          return
-        }
-        
-        // Check if clicking on search icon
-        if (target.closest('.relative')?.querySelector('input[type="text"]')) {
-          return
-        }
-        
-        // Check if clicking on dropdown options area - keep it open
+        // Check if clicking in the dropdown area (search or options) - keep it open
         const dropdownElement = containerRef.current.querySelector('[id$="-dropdown"]') ||
                                containerRef.current.querySelector('[data-testid$="-dropdown"]')
         
         if (dropdownElement && dropdownElement.contains(target)) {
-          // Check if we're in the options area (not the border/padding)
-          const optionsContainer = dropdownElement.querySelector('.max-h-60')
-          if (optionsContainer && optionsContainer.contains(target)) {
-            // Click is on an option - keep open (option handler will manage selection)
-            return
-          }
-          // Click is in search area - keep open
+          // Click is in dropdown - keep open
           return
         }
         
-        // Click is on label, trigger, or other parts - close it
+        // Check if clicking on the trigger - let its onClick handle the toggle
+        const triggerElement = containerRef.current.querySelector('[id$="-trigger"]') ||
+                              containerRef.current.querySelector('[data-testid$="-trigger"]')
+        
+        if (triggerElement && triggerElement.contains(target)) {
+          // Let the trigger's onClick handler manage the toggle
+          return
+        }
+        
+        // Click is on label or other areas - close it
         setIsOpen(false)
         setSearchTerm('')
       }
