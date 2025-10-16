@@ -401,7 +401,7 @@ export function VariantList({
           const isControl = index === 0
           
           return (
-          <div key={index} className={`border rounded-lg ${isControl ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}`}>
+          <div key={index} className={`border rounded-lg ${isControl ? 'border-gray-300 bg-gray-100' : 'border-gray-200'} ${isControl && !isExpanded ? 'opacity-60' : ''}`}>
             {/* Variant Header */}
             <div className="px-4 py-3 flex items-center gap-2">
               <button
@@ -412,10 +412,6 @@ export function VariantList({
                     newExpanded.delete(index)
                   } else {
                     newExpanded.add(index)
-                    // Show warning when expanding Control variant
-                    if (isControl) {
-                      alert('⚠️ Warning: You are editing the Control variant. Changes here affect the baseline for comparison.')
-                    }
                   }
                   setExpandedVariants(newExpanded)
                 }}
@@ -463,6 +459,17 @@ export function VariantList({
             {/* Collapsible Content */}
             {isExpanded && (
             <div className="px-4 pb-4 space-y-3 border-t border-gray-200 pt-3">
+              {/* Warning message for Control variant */}
+              {isControl && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+                  <svg className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="text-xs text-amber-800">
+                    <strong>Warning:</strong> You are editing the Control variant. Changes here affect the baseline for comparison.
+                  </div>
+                </div>
+              )}
               <div>
                 <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
                 <div className="space-y-2">
