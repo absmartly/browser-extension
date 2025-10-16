@@ -136,7 +136,12 @@ export function SearchableSelect(props: SearchableSelectProps) {
     const initials = option.type === 'team' 
       ? (option.initials || (option.display_name || option.name).charAt(0)).toUpperCase()
       : getInitials(option.display_name || option.name)
-    const colorClass = option.color || getDefaultColor(options.indexOf(option))
+    
+    // Check if color is a hex code or CSS class
+    const isHexColor = option.color?.startsWith('#')
+    const backgroundColor = isHexColor ? option.color : undefined
+    const colorClass = isHexColor ? '' : (option.color || getDefaultColor(options.indexOf(option)))
+    
     const shapeClass = option.type === 'team' ? 'rounded-md' : 'rounded-full'
     const borderClass = option.type === 'team' ? 'border-[0.5px] border-border' : ''
     const fontClass = option.type === 'team' ? 'font-semibold' : 'font-medium'
@@ -162,7 +167,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
               }}
             />
           ) : null}
-          <div className={`w-8 h-8 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-xs ${fontClass} ${option.avatar ? 'hidden' : ''}`}>
+          <div 
+            className={`w-8 h-8 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-xs ${fontClass} ${option.avatar ? 'hidden' : ''}`}
+            style={backgroundColor ? { backgroundColor } : undefined}
+          >
             {initials}
           </div>
           <span className="text-sm text-gray-900">{option.display_name || option.name}</span>
@@ -180,7 +188,12 @@ export function SearchableSelect(props: SearchableSelectProps) {
     const initials = option.type === 'team' 
       ? (option.initials || (option.display_name || option.name).charAt(0)).toUpperCase()
       : getInitials(option.display_name || option.name)
-    const colorClass = option.color || getDefaultColor(options.indexOf(option))
+    
+    // Check if color is a hex code or CSS class
+    const isHexColor = option.color?.startsWith('#')
+    const backgroundColor = isHexColor ? option.color : undefined
+    const colorClass = isHexColor ? '' : (option.color || getDefaultColor(options.indexOf(option)))
+    
     const shapeClass = option.type === 'team' ? 'rounded-md' : 'rounded-full'
     const borderClass = option.type === 'team' ? 'border-[0.5px] border-border' : ''
     const fontClass = option.type === 'team' ? 'font-semibold' : 'font-medium'
@@ -201,7 +214,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
             }}
           />
         ) : null}
-        <div className={`w-5 h-5 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-[10px] ${fontClass} ${option.avatar ? 'hidden' : ''}`}>
+        <div 
+          className={`w-5 h-5 ${shapeClass} ${colorClass} ${borderClass} flex items-center justify-center text-white text-[10px] ${fontClass} ${option.avatar ? 'hidden' : ''}`}
+          style={backgroundColor ? { backgroundColor } : undefined}
+        >
           {initials}
         </div>
         <span className="text-gray-900">{option.display_name || option.name}</span>
