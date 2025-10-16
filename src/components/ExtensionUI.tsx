@@ -22,6 +22,52 @@ import "~style.css"
 
 type View = 'list' | 'detail' | 'settings' | 'create' | 'edit'
 
+// Helper function to build API parameters from filter state
+const buildFilterParams = (filterState: any, page: number, size: number) => {
+  const params: any = {
+    page,
+    items: size,
+    iterations: 1,
+    previews: 1,
+    type: 'test'
+  }
+
+  // Add all filter parameters
+  if (filterState.search?.trim()) {
+    params.search = filterState.search.trim()
+  }
+
+  // Array filters - join with commas
+  if (filterState.state?.length > 0) {
+    params.state = filterState.state.join(',')
+  }
+  if (filterState.significance?.length > 0) {
+    params.significance = filterState.significance.join(',')
+  }
+  if (filterState.owners?.length > 0) {
+    params.owners = filterState.owners.join(',')
+  }
+  if (filterState.teams?.length > 0) {
+    params.teams = filterState.teams.join(',')
+  }
+  if (filterState.tags?.length > 0) {
+    params.tags = filterState.tags.join(',')
+  }
+  if (filterState.applications?.length > 0) {
+    params.applications = filterState.applications.join(',')
+  }
+
+  // Boolean filters
+  if (filterState.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
+  if (filterState.cleanup_needed === true) params.cleanup_needed = true
+  if (filterState.audience_mismatch === true) params.audience_mismatch = true
+  if (filterState.sample_size_reached === true) params.sample_size_reached = true
+  if (filterState.experiments_interact === true) params.experiments_interact = true
+  if (filterState.assignment_conflict === true) params.assignment_conflict = true
+
+  return params
+}
+
 function SidebarContent() {
   const [view, setView] = useState<View>('list')
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
@@ -305,58 +351,8 @@ function SidebarContent() {
     const activeFilters = customFilters || filters
     
     try {
-      // Always fetch fresh data when this function is called
-      // Cache is handled separately in loadCachedExperiments
-      const params: any = {
-        page: page,
-        items: size,
-        iterations: 1,
-        previews: 1,
-        type: 'test'
-      }
-      
-      // Add all filter parameters
-      if (activeFilters.search && activeFilters.search.trim()) {
-        params.search = activeFilters.search.trim()
-      }
-      
-      // State filter
-      if (activeFilters.state && activeFilters.state.length > 0) {
-        params.state = activeFilters.state.join(',')
-      }
-      
-      // Significance filter
-      if (activeFilters.significance && activeFilters.significance.length > 0) {
-        params.significance = activeFilters.significance.join(',')
-      }
-      
-      // Owners filter
-      if (activeFilters.owners && activeFilters.owners.length > 0) {
-        params.owners = activeFilters.owners.join(',')
-      }
-      
-      // Teams filter  
-      if (activeFilters.teams && activeFilters.teams.length > 0) {
-        params.teams = activeFilters.teams.join(',')
-      }
-      
-      // Tags filter
-      if (activeFilters.tags && activeFilters.tags.length > 0) {
-        params.tags = activeFilters.tags.join(',')
-      }
-      
-      // Applications filter
-      if (activeFilters.applications && activeFilters.applications.length > 0) {
-        params.applications = activeFilters.applications.join(',')
-      }
-      
-      // Boolean filters
-      if (activeFilters.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
-      if (activeFilters.cleanup_needed === true) params.cleanup_needed = true
-      if (activeFilters.audience_mismatch === true) params.audience_mismatch = true
-      if (activeFilters.sample_size_reached === true) params.sample_size_reached = true
-      if (activeFilters.experiments_interact === true) params.experiments_interact = true
-      if (activeFilters.assignment_conflict === true) params.assignment_conflict = true
+      // Build API parameters using helper function
+      const params = buildFilterParams(activeFilters, page, size)
       
       const response = await getExperiments(params)
       const experiments = response.experiments || []
@@ -574,56 +570,8 @@ function SidebarContent() {
     setError(null)
     
     try {
-      const params: any = {
-        page: page,
-        items: size,
-        iterations: 1,
-        previews: 1,
-        type: 'test'
-      }
-      
-      // Add all filter parameters using the passed filterState
-      if (filterState.search && filterState.search.trim()) {
-        params.search = filterState.search.trim()
-      }
-      
-      // State filter
-      if (filterState.state && filterState.state.length > 0) {
-        params.state = filterState.state.join(',')
-      }
-      
-      // Significance filter
-      if (filterState.significance && filterState.significance.length > 0) {
-        params.significance = filterState.significance.join(',')
-      }
-      
-      // Owners filter
-      if (filterState.owners && filterState.owners.length > 0) {
-        params.owners = filterState.owners.join(',')
-      }
-      
-      // Teams filter  
-      if (filterState.teams && filterState.teams.length > 0) {
-        params.teams = filterState.teams.join(',')
-      }
-      
-      // Tags filter
-      if (filterState.tags && filterState.tags.length > 0) {
-        params.tags = filterState.tags.join(',')
-      }
-      
-      // Applications filter
-      if (filterState.applications && filterState.applications.length > 0) {
-        params.applications = filterState.applications.join(',')
-      }
-      
-      // Boolean filters
-      if (filterState.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
-      if (filterState.cleanup_needed === true) params.cleanup_needed = true
-      if (filterState.audience_mismatch === true) params.audience_mismatch = true
-      if (filterState.sample_size_reached === true) params.sample_size_reached = true
-      if (filterState.experiments_interact === true) params.experiments_interact = true
-      if (filterState.assignment_conflict === true) params.assignment_conflict = true
+      // Build API parameters using helper function
+      const params = buildFilterParams(filterState, page, size)
       
       const response = await getExperiments(params)
       const experiments = response.experiments || []

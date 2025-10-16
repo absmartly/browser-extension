@@ -367,30 +367,6 @@ export function ExperimentDetail({
           >
             {hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
           </Button>
-          {/* TODO: Implement Start/Stop experiment functionality
-          {(experiment.state === 'ready' || experiment.state === 'created' || experiment.status === 'draft') && (
-            <Button
-              onClick={() => onStart(experiment.id)}
-              variant="secondary"
-              size="sm"
-              disabled={loading}
-            >
-              <PlayIcon className="h-4 w-4 mr-1" />
-              Start Experiment
-            </Button>
-          )}
-          {(experiment.state === 'running' || experiment.status === 'running') && (
-            <Button
-              onClick={() => onStop(experiment.id)}
-              variant="danger"
-              size="sm"
-              disabled={loading}
-            >
-              <StopIcon className="h-4 w-4 mr-1" />
-              Stop Experiment
-            </Button>
-          )}
-          */}
         </div>
       </div>
       

@@ -637,7 +637,7 @@ interface URLFilterSectionProps {
   canEdit: boolean
 }
 
-function URLFilterSection({ config, onConfigChange, canEdit }: URLFilterSectionProps) {
+const URLFilterSection = React.memo(function URLFilterSection({ config, onConfigChange, canEdit }: URLFilterSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const [mode, setMode] = useState<'all' | 'simple' | 'advanced'>(() => {
@@ -963,7 +963,7 @@ function URLFilterSection({ config, onConfigChange, canEdit }: URLFilterSectionP
       )}
     </div>
   )
-}
+})
 
 interface GlobalDefaultsSectionProps {
   config: DOMChangesConfig;
@@ -971,7 +971,7 @@ interface GlobalDefaultsSectionProps {
   canEdit: boolean;
 }
 
-function GlobalDefaultsSection({ config, onConfigChange, canEdit }: GlobalDefaultsSectionProps) {
+const GlobalDefaultsSection = React.memo(function GlobalDefaultsSection({ config, onConfigChange, canEdit }: GlobalDefaultsSectionProps) {
   const [isExpanded, setIsExpanded] = React.useState(false)
 
   return (
@@ -1008,4 +1008,4 @@ function GlobalDefaultsSection({ config, onConfigChange, canEdit }: GlobalDefaul
       )}
     </div>
   )
-}
+})
