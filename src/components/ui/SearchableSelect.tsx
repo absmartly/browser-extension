@@ -69,15 +69,34 @@ export function SearchableSelect(props: SearchableSelectProps) {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      
+      // Check if click is outside the container
+      if (containerRef.current && !containerRef.current.contains(target)) {
         setIsOpen(false)
         setSearchTerm('')
+        return
+      }
+      
+      // Also check if clicking on the trigger when already open should close
+      // This handles any label clicks that might be interfering
+      if (containerRef.current && isOpen) {
+        const triggerElement = containerRef.current.querySelector('[data-testid$="-trigger"]') || 
+                              containerRef.current.querySelector('[id$="-trigger"]')
+        
+        // If clicking inside trigger area and dropdown is open, let the onClick handler manage it
+        // Just ensure labels don't prevent this
+        if (triggerElement?.contains(target)) {
+          return
+        }
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside, true)
+      return () => document.removeEventListener('mousedown', handleClickOutside, true)
+    }
+  }, [isOpen])
 
   const handleSelectOption = (optionId: number | string) => {
     if (mode === 'single') {
