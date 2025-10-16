@@ -5,18 +5,20 @@
 
 // Check if debug mode is enabled
 const isDebugEnabled = (): boolean => {
-  // Check localStorage first (for browser environment)
-  /*
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    return localStorage.getItem('ABSMARTLY_DEBUG') === 'true'
+  // In production builds, debug is always disabled
+  if (process.env.NODE_ENV === 'production') {
+    return false
   }
   
-  // Check environment variable (for tests)
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env.ABSMARTLY_DEBUG === 'true'
+  // In development, check localStorage
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    const debugFlag = localStorage.getItem('ABSMARTLY_DEBUG')
+    // Default to true in development if not explicitly set to false
+    return debugFlag !== 'false'
   }
-  */
-  return false
+  
+  // Default to true in development
+  return true
 }
 
 /**
