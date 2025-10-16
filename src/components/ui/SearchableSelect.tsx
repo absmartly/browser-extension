@@ -80,12 +80,29 @@ export function SearchableSelect(props: SearchableSelectProps) {
       
       // If dropdown is open and click is inside container
       if (containerRef.current && isOpen && target) {
+        // Check if clicking on search input or its icon - keep it open
+        const searchInput = target.closest('input[type="text"]')
+        if (searchInput) {
+          return
+        }
+        
+        // Check if clicking on search icon
+        if (target.closest('.relative')?.querySelector('input[type="text"]')) {
+          return
+        }
+        
         // Check if clicking on dropdown options area - keep it open
         const dropdownElement = containerRef.current.querySelector('[id$="-dropdown"]') ||
                                containerRef.current.querySelector('[data-testid$="-dropdown"]')
         
         if (dropdownElement && dropdownElement.contains(target)) {
-          // Click is in dropdown area (options or search) - keep open
+          // Check if we're in the options area (not the border/padding)
+          const optionsContainer = dropdownElement.querySelector('.max-h-60')
+          if (optionsContainer && optionsContainer.contains(target)) {
+            // Click is on an option - keep open (option handler will manage selection)
+            return
+          }
+          // Click is in search area - keep open
           return
         }
         
