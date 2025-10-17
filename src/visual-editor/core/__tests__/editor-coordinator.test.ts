@@ -13,7 +13,6 @@ import UndoRedoManager from '../undo-redo-manager'
 import UIComponents from '../../ui/components'
 import EditModes from '../edit-modes'
 import Cleanup from '../cleanup'
-import { Toolbar } from '../../ui/toolbar'
 import { Notifications } from '../../ui/notifications'
 import type { DOMChange } from '../../types/visual-editor'
 
@@ -25,7 +24,6 @@ jest.mock('../undo-redo-manager')
 jest.mock('../../ui/components')
 jest.mock('../edit-modes')
 jest.mock('../cleanup')
-jest.mock('../../ui/toolbar')
 jest.mock('../../ui/notifications')
 jest.mock('../../utils/selector-generator', () => ({
   generateRobustSelector: jest.fn().mockReturnValue('.mock-selector')
@@ -103,7 +101,6 @@ describe('EditorCoordinator', () => {
   let mockUIComponents: jest.Mocked<UIComponents>
   let mockEditModes: jest.Mocked<EditModes>
   let mockCleanup: jest.Mocked<Cleanup>
-  let mockToolbar: jest.Mocked<Toolbar>
   let mockNotifications: jest.Mocked<Notifications>
   let mockCallbacks: jest.Mocked<EditorCoordinatorCallbacks>
 
@@ -151,7 +148,6 @@ describe('EditorCoordinator', () => {
     mockUIComponents = new UIComponents({} as any) as jest.Mocked<UIComponents>
     mockEditModes = new EditModes({} as any) as jest.Mocked<EditModes>
     mockCleanup = new Cleanup(mockStateManager) as jest.Mocked<Cleanup>
-    mockToolbar = new Toolbar({} as any) as jest.Mocked<Toolbar>
     mockNotifications = new Notifications() as jest.Mocked<Notifications>
 
     // Mock callbacks
@@ -197,11 +193,6 @@ describe('EditorCoordinator', () => {
     // Mock notifications
     mockNotifications.show = jest.fn()
 
-    // Mock toolbar methods
-    mockToolbar.updateChangesCount = jest.fn()
-    mockToolbar.updateUndoRedoButtons = jest.fn()
-    mockToolbar.remove = jest.fn()
-
     // Mock UI components
     mockUIComponents.removeBanner = jest.fn()
     mockUIComponents.updateBanner = jest.fn()
@@ -220,7 +211,7 @@ describe('EditorCoordinator', () => {
       mockUIComponents,
       mockEditModes,
       mockCleanup,
-      mockToolbar,
+      null, // toolbar removed - using UIComponents banner
       mockNotifications,
       mockCallbacks
     )
