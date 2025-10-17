@@ -4,6 +4,7 @@ import UndoRedoManager from './undo-redo-manager'
 import { Notifications } from '../ui/notifications'
 import ImageSourceDialog from '../ui/image-source-dialog'
 import type { DOMChange } from '../types/visual-editor'
+import DOMPurify from 'dompurify'
 
 export interface ElementActionsOptions {
   onChangesUpdate: (changes: DOMChange[]) => void
@@ -387,7 +388,7 @@ export class ElementActions {
               console.error('[ElementActions] Failed to parse original data:', e)
             }
             if (origData?.html !== undefined) {
-              htmlElement.innerHTML = origData.html
+              htmlElement.innerHTML = DOMPurify.sanitize(origData.html)
               console.log('[ElementActions] Reverted HTML content')
             }
             break
@@ -546,7 +547,7 @@ export class ElementActions {
                 htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
                 console.log('[ElementActions] Stored original innerHTML')
               }
-              htmlElement.innerHTML = change.value
+              htmlElement.innerHTML = DOMPurify.sanitize(change.value)
               console.log('[ElementActions] Applied HTML content')
             }
             break

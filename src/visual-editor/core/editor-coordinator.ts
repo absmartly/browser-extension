@@ -17,6 +17,7 @@ import { Notifications } from '../ui/notifications'
 import HtmlEditor from '../ui/html-editor'
 import ImageSourceDialog from '../ui/image-source-dialog'
 import type { DOMChange } from '../types/visual-editor'
+import DOMPurify from 'dompurify'
 
 export interface EditorCoordinatorCallbacks {
   onChangesUpdate: (changes: DOMChange[]) => void
@@ -467,7 +468,7 @@ export class EditorCoordinator {
     const newHtml = await this.htmlEditor.show(element, currentHtml)
 
     if (newHtml !== null && newHtml !== currentHtml) {
-      element.innerHTML = newHtml
+      element.innerHTML = DOMPurify.sanitize(newHtml)
 
       const selector = this.callbacks.getSelector(element as HTMLElement)
       const oldValue = originalState.innerHTML

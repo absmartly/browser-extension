@@ -9,8 +9,52 @@
   // Simple HTML sanitization to prevent XSS
   function sanitizeHTML(html) {
     if (!html) return '';
+
+    // Create a temporary element to parse the HTML
     const temp = document.createElement('div');
-    temp.textContent = html; // This escapes all HTML
+    temp.innerHTML = html;
+
+    // List of dangerous tags to remove
+    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'meta', 'base'];
+
+    // List of dangerous attributes to remove
+    const dangerousAttrs = ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'];
+
+    // Remove dangerous tags
+    dangerousTags.forEach(tag => {
+      const elements = temp.querySelectorAll(tag);
+      elements.forEach(el => el.remove());
+    });
+
+    // Remove dangerous attributes from all elements
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(el => {
+      // Remove event handler attributes
+      dangerousAttrs.forEach(attr => {
+        if (el.hasAttribute(attr)) {
+          el.removeAttribute(attr);
+        }
+      });
+
+      // Remove any attribute starting with 'on'
+      Array.from(el.attributes).forEach(attr => {
+        if (attr.name.toLowerCase().startsWith('on')) {
+          el.removeAttribute(attr.name);
+        }
+      });
+
+      // Sanitize href and src attributes
+      ['href', 'src'].forEach(attr => {
+        if (el.hasAttribute(attr)) {
+          const value = el.getAttribute(attr);
+          // Remove javascript: and data: URIs
+          if (value && /^(javascript|data):/i.test(value)) {
+            el.removeAttribute(attr);
+          }
+        }
+      });
+    });
+
     return temp.innerHTML;
   }
 
