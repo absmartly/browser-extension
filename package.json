@@ -88,9 +88,7 @@
           "assets/icon128.png",
           "assets/absmartly-logo-white.svg",
           "tabs/*",
-          "inject-sdk-plugin.js",
-          "inject-sdk-plugin.*.js",
-          "inject-sdk-plugin-mapping.json"
+          "absmartly-sdk-bridge.bundle.js"
         ],
         "matches": [
           "<all_urls>"
