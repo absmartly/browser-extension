@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/sdk-bridge/index.ts"],
+  "sourcesContent": ["/**\n * ABsmartly SDK Bridge - Main Entry Point\n *\n * This module bridges the ABsmartly browser extension with the ABsmartly SDK\n * running on the page. It handles SDK detection, plugin initialization,\n * DOM changes, and message passing.\n *\n * @module ABSmartlySDKBridge\n * @version 1.1.0\n */\n\n// Version\nexport const SDK_BRIDGE_VERSION = '1.1.0'\n\n// Temporary placeholder functions for testing build\nexport function getVariantAssignments(experimentNames: string[]) {\n  console.log('[SDK Bridge] getVariantAssignments called:', experimentNames)\n  return Promise.resolve({ assignments: {}, experimentsInContext: [] })\n}\n\nexport function getContextPath() {\n  console.log('[SDK Bridge] getContextPath called')\n  return {\n    found: false,\n    path: null,\n    hasContext: false,\n    hasPeek: false,\n    hasTreatment: false\n  }\n}\n\n// Log that we're loaded\nconsole.log('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAYO,MAAM,qBAAqB;AAG3B,WAAS,sBAAsB,iBAA2B;AAC/D,mBAAQ,IAAI,8CAA8C,eAAe,GAClE,QAAQ,QAAQ,EAAE,aAAa,CAAC,GAAG,sBAAsB,CAAC,EAAE,CAAC;AAAA,EACtE;AAHgB;AAKT,WAAS,iBAAiB;AAC/B,mBAAQ,IAAI,oCAAoC,GACzC;AAAA,MACL,OAAO;AAAA,MACP,MAAM;AAAA,MACN,YAAY;AAAA,MACZ,SAAS;AAAA,MACT,cAAc;AAAA,IAChB;AAAA,EACF;AATgB;AAYhB,UAAQ,IAAI,wCAAwC,kBAAkB;",
+  "names": []
+}
