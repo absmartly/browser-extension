@@ -214,30 +214,22 @@ test.describe('Experiment Data Persistence', () => {
     await test.step('Find and open the created experiment', async () => {
       console.log('\n🔎 STEP 9: Finding and opening created experiment')
 
-      // Wait for the newly created experiment to appear in the list
-      console.log('  Refreshing experiments list...')
-      await testPage.waitForTimeout(1500)
-
       // Try multiple strategies to find the experiment
+      console.log('  Searching for created experiment...')
       let experimentRow = null
       let foundOurExperiment = false
 
       // Strategy 1: Look for experiments with our naming pattern
-      for (let attempt = 0; attempt < 3 && !foundOurExperiment; attempt++) {
-        if (attempt > 0) {
-          console.log(`  Retry attempt ${attempt} to find experiment...`)
-          await testPage.waitForTimeout(1000)
-        }
-
-        const allExperiments = sidebar.locator('div[role="button"], [class*="cursor-pointer"]').filter({ hasText: /E2E.*Test|Persistence.*Test/i })
+      const allExperiments = sidebar.locator('div[role="button"], [class*="cursor-pointer"]').filter({ hasText: /E2E.*Test|Persistence.*Test/i })
+      
+      try {
+        await allExperiments.first().waitFor({ state: 'visible', timeout: 3000 })
         const count = await allExperiments.count()
         console.log(`  Found ${count} matching E2E test experiments`)
-
-        if (count > 0) {
-          experimentRow = allExperiments.first()
-          foundOurExperiment = true
-          break
-        }
+        experimentRow = allExperiments.first()
+        foundOurExperiment = true
+      } catch (e) {
+        console.log('  No matching E2E experiments found, trying fallback strategy...')
       }
 
       if (!foundOurExperiment) {
