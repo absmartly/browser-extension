@@ -21,12 +21,12 @@ async function globalSetup(config: FullConfig) {
       // Set environment variable to disable shadow DOM for tests
       process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM = 'true'
 
-      execSync('npm run build', {
+      execSync('plasmo build --tag=dev --src-path=.', {
         cwd: rootDir,
         stdio: 'inherit',
         env: { ...process.env, PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true' }
       })
-      console.log('✅ Extension built successfully (with shadow DOM disabled for tests)')
+      console.log('✅ Extension built successfully in DEV mode (with shadow DOM disabled for tests)')
     } catch (error) {
       console.error('❌ Failed to build extension:', error)
       throw new Error('Extension build failed. Please fix build errors and try again.')
@@ -65,17 +65,20 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Copied local-test-page.html to build directory')
   }
 
-  // 3. Load environment variables if .env.local exists
-  const envPath = path.join(rootDir, '.env.development.local')
+  // 3. Load environment variables from .env.dev.local
+  const envPath = path.join(rootDir, '.env.dev.local')
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, 'utf-8')
     envContent.split('\n').forEach(line => {
+      // Skip comments and empty lines
+      if (line.trim().startsWith('#') || !line.trim()) return
+
       const [key, value] = line.split('=')
       if (key && value) {
         process.env[key.trim()] = value.trim()
       }
     })
-    console.log('✅ Loaded environment variables from .env.local')
+    console.log('✅ Loaded environment variables from .env.dev.local')
   }
 
   // 4. Verify API credentials are available
