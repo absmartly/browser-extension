@@ -3,7 +3,7 @@ import { type Page } from '@playwright/test'
 import path from 'path'
 import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'simple-test.html')
+const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
 test.describe('Experiment Filtering Tests', () => {
   let testPage: Page

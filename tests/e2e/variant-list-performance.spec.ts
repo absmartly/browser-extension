@@ -3,7 +3,7 @@ import { type Page } from '@playwright/test'
 import path from 'path'
 import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'simple-test.html')
+const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
 test.describe('Variant List Performance Tests (React.memo)', () => {
   let testPage: Page
@@ -205,9 +205,9 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
     await test.step('Toggle global default options', async () => {
       console.log('\n🔧 Toggling options')
 
-      // Look for checkboxes
-      const importantCheckbox = sidebar.locator('input[type="checkbox"]:near(text=important), input[id*="important"]')
-      const waitCheckbox = sidebar.locator('input[type="checkbox"]:near(text=wait), input[id*="wait"]')
+      // Look for checkboxes - use simple selectors
+      const importantCheckbox = sidebar.locator('input[id*="important"]')
+      const waitCheckbox = sidebar.locator('input[id*="wait"]')
 
       if (await importantCheckbox.count() > 0) {
         // Toggle important flag
