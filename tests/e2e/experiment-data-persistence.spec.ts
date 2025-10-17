@@ -88,7 +88,6 @@ test.describe('Experiment Data Persistence', () => {
       const unitTypeContainer = sidebar.locator('label:has-text("Unit Type")').locator('..')
 
       await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
-      await testPage.waitForTimeout(800)
 
       let dropdownOpened = false
       for (let attempt = 0; attempt < 3 && !dropdownOpened; attempt++) {
@@ -99,7 +98,6 @@ test.describe('Experiment Data Persistence', () => {
 
         const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
         await unitTypeClickArea.click({ force: true })
-        await testPage.waitForTimeout(500)
 
         const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
         dropdownOpened = await unitTypeDropdown.isVisible().catch(() => false)
@@ -115,7 +113,6 @@ test.describe('Experiment Data Persistence', () => {
       console.log(`  Selected Unit Type: ${unitTypeName}`)
 
       await firstUnitOption.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       console.log('  ✓ Unit Type selected')
       await debugWait()
@@ -127,11 +124,9 @@ test.describe('Experiment Data Persistence', () => {
       const appContainer = sidebar.locator('label:has-text("Applications")').locator('..')
 
       await sidebar.locator('label:has-text("Applications")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
-      await testPage.waitForTimeout(800)
 
       const appClickArea = appContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
       await appClickArea.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       const appDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
       await appDropdown.waitFor({ state: 'visible', timeout: 2000 })
@@ -143,7 +138,6 @@ test.describe('Experiment Data Persistence', () => {
       console.log(`  Selected Application: ${appName}`)
 
       await firstAppOption.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       console.log('  ✓ Application selected')
       await debugWait()
@@ -155,11 +149,9 @@ test.describe('Experiment Data Persistence', () => {
       const ownersContainer = sidebar.locator('label:has-text("Owners")').locator('..')
 
       await sidebar.locator('label:has-text("Owners")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
-      await testPage.waitForTimeout(800)
 
       const ownersClickArea = ownersContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
       await ownersClickArea.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
       await ownersDropdown.waitFor({ state: 'visible', timeout: 2000 })
@@ -171,7 +163,6 @@ test.describe('Experiment Data Persistence', () => {
       console.log(`  Selected Owner: ${ownerName}`)
 
       await firstOwnerOption.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       console.log('  ✓ Owner selected')
       await debugWait()
@@ -183,11 +174,9 @@ test.describe('Experiment Data Persistence', () => {
       const tagsContainer = sidebar.locator('label:has-text("Tags")').locator('..')
 
       await sidebar.locator('label:has-text("Tags")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
-      await testPage.waitForTimeout(800)
 
       const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
       await tagsClickArea.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
       await tagsDropdown.waitFor({ state: 'visible', timeout: 2000 })
@@ -199,7 +188,6 @@ test.describe('Experiment Data Persistence', () => {
       console.log(`  Selected Tag: ${tagName}`)
 
       await firstTagOption.click({ force: true })
-      await testPage.waitForTimeout(500)
 
       console.log('  ✓ Tag selected')
       await debugWait()
@@ -215,12 +203,10 @@ test.describe('Experiment Data Persistence', () => {
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
 
-      await testPage.waitForTimeout(2000)
       console.log('  ✓ Experiment created')
 
       // Wait for redirect back to list
-      await sidebar.locator('text=Experiments').waitFor({ timeout: 3000 })
-      await testPage.waitForTimeout(1000)
+      await sidebar.locator('text=Experiments').waitFor({ timeout: 5000 })
       console.log('  ✓ Redirected to experiments list')
       await debugWait()
     })
@@ -228,12 +214,9 @@ test.describe('Experiment Data Persistence', () => {
     await test.step('Find and open the created experiment', async () => {
       console.log('\n🔎 STEP 9: Finding and opening created experiment')
 
-      // Wait longer for the newly created experiment to appear in the list
-      await testPage.waitForTimeout(3000)
-
-      // Refresh the experiments list by clicking away and back
+      // Wait for the newly created experiment to appear in the list
       console.log('  Refreshing experiments list...')
-      await testPage.waitForTimeout(1000)
+      await testPage.waitForTimeout(1500)
 
       // Try multiple strategies to find the experiment
       let experimentRow = null
@@ -243,7 +226,7 @@ test.describe('Experiment Data Persistence', () => {
       for (let attempt = 0; attempt < 3 && !foundOurExperiment; attempt++) {
         if (attempt > 0) {
           console.log(`  Retry attempt ${attempt} to find experiment...`)
-          await testPage.waitForTimeout(2000)
+          await testPage.waitForTimeout(1000)
         }
 
         const allExperiments = sidebar.locator('div[role="button"], [class*="cursor-pointer"]').filter({ hasText: /E2E.*Test|Persistence.*Test/i })
@@ -288,8 +271,6 @@ test.describe('Experiment Data Persistence', () => {
       await experimentRow.evaluate((row: HTMLElement) => {
         row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
-
-      await testPage.waitForTimeout(2000)
       console.log('  ✓ Opened experiment')
       await debugWait()
     })
