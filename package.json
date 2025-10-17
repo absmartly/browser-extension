@@ -5,8 +5,8 @@
   "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
   "author": "Jonas Alves",
   "scripts": {
-    "dev": "plasmo dev --src-path=. & node scripts/dev-build.js --watch",
-    "build": "plasmo build --src-path=. && node scripts/post-build.js",
+    "dev": "NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",
+    "build": "NODE_ENV=production plasmo build --src-path=. && node scripts/post-build.js",
     "package": "plasmo package --src-path=.",
     "test": "npm run test:unit && npm run test:e2e",
     "test:quick": "npm run test:unit && npm run test:e2e:visual-editor",

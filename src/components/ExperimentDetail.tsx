@@ -109,7 +109,15 @@ export function ExperimentDetail({
     }
 
     await save(formData, currentVariants, onUpdate)
-    
+
+    // Clear storage after successful save - changes are now in the API
+    const storageKey = `experiment-${experiment.id}-variants`
+    storage.remove(storageKey).then(() => {
+      debugLog('🧹 Cleared variant data from storage after save for experiment', experiment.id)
+    }).catch(error => {
+      debugError('Failed to clear storage after save:', error)
+    })
+
     // Reset unsaved changes flag after successful save
     setHasUnsavedChanges(false)
   }
@@ -134,6 +142,10 @@ export function ExperimentDetail({
     debugLog('🔧 Current currentVariants[0]:', currentVariants[0])
     const updatedVariants = [...currentVariants]
     if (updatedVariants[0]) {
+      // Check if the code has actually changed
+      const oldCode = updatedVariants[0].config.__inject_html
+      const codeChanged = JSON.stringify(oldCode) !== JSON.stringify(code)
+
       updatedVariants[0] = {
         ...updatedVariants[0],
         config: {
@@ -142,8 +154,13 @@ export function ExperimentDetail({
         }
       }
       debugLog('🔧 Updated variant config:', updatedVariants[0].config)
-      // Let the hook auto-detect if there are actual changes
-      handleVariantsChange(updatedVariants)
+      debugLog('🔧 Code changed:', codeChanged)
+      // Only mark as changed if the code actually changed
+      if (codeChanged) {
+        handleVariantsChange(updatedVariants, true)
+      } else {
+        handleVariantsChange(updatedVariants)
+      }
     }
   }
 
@@ -160,7 +177,7 @@ export function ExperimentDetail({
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'STOP_VISUAL_EDITOR'
           })
-          
+
           // Remove Preview
           chrome.tabs.sendMessage(tabs[0].id, {
             type: 'ABSMARTLY_PREVIEW',
@@ -175,6 +192,7 @@ export function ExperimentDetail({
       if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
         const storageKey = `experiment-${experiment.id}-variants`
         debugLog('🧹 User chose to discard changes for experiment', experiment.id)
+        // Clear storage only when discarding
         storage.remove(storageKey).then(() => {
           debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
           cleanup()

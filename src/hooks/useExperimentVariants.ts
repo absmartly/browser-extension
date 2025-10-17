@@ -58,14 +58,10 @@ export function useExperimentVariants({
   const handleVariantsChange = (variants: VariantData[], hasChanges?: boolean) => {
     setCurrentVariants(variants)
 
-    // Only set hasUnsavedChanges if explicitly passed, or auto-detect by comparing with initial
+    // Only set hasUnsavedChanges if explicitly passed
+    // Don't auto-detect - let the caller decide if there are changes
     if (hasChanges !== undefined) {
       setHasUnsavedChanges(hasChanges)
-    } else {
-      // Auto-detect changes by comparing stringified versions
-      const currentStr = JSON.stringify(variants)
-      const initialStr = JSON.stringify(initialVariants)
-      setHasUnsavedChanges(currentStr !== initialStr)
     }
   }
 

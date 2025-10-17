@@ -14,7 +14,6 @@ jest.mock('../context-menu')
 jest.mock('../../ui/components')
 jest.mock('../edit-modes')
 jest.mock('../cleanup')
-jest.mock('../../ui/toolbar')
 jest.mock('../../ui/notifications')
 jest.mock('../element-actions')
 jest.mock('../editor-coordinator')
@@ -45,7 +44,6 @@ import UndoRedoManager from '../undo-redo-manager'
 import UIComponents from '../../ui/components'
 import EditModes from '../edit-modes'
 import Cleanup from '../cleanup'
-import { Toolbar } from '../../ui/toolbar'
 import { Notifications } from '../../ui/notifications'
 import { ElementActions } from '../element-actions'
 import { EditorCoordinator } from '../editor-coordinator'
@@ -58,7 +56,6 @@ const MockContextMenu = ContextMenu as jest.MockedClass<typeof ContextMenu>
 const MockUIComponents = UIComponents as jest.MockedClass<typeof UIComponents>
 const MockEditModes = EditModes as jest.MockedClass<typeof EditModes>
 const MockCleanup = Cleanup as jest.MockedClass<typeof Cleanup>
-const MockToolbar = Toolbar as jest.MockedClass<typeof Toolbar>
 const MockNotifications = Notifications as jest.MockedClass<typeof Notifications>
 const MockElementActions = ElementActions as jest.MockedClass<typeof ElementActions>
 const MockEditorCoordinator = EditorCoordinator as jest.MockedClass<typeof EditorCoordinator>
@@ -142,7 +139,6 @@ describe('VisualEditor', () => {
       setAddChangeCallback: jest.fn()
     } as any))
     MockCleanup.mockImplementation(() => ({} as any))
-    MockToolbar.mockImplementation(() => ({} as any))
 
     // Setup DOM
     document.head.innerHTML = ''
@@ -230,7 +226,7 @@ describe('VisualEditor', () => {
         expect.any(Object), // UIComponents
         expect.any(Object), // EditModes
         expect.any(Object), // Cleanup
-        expect.any(Object), // Toolbar
+        expect.any(Object), // Notifications
         expect.any(Object), // Notifications
         expect.objectContaining({
           onChangesUpdate: mockOnChangesUpdate,
