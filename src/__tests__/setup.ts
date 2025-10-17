@@ -1,5 +1,12 @@
 // Test setup file
 import '@testing-library/jest-dom'
+import { TextEncoder, TextDecoder } from 'util'
+
+// Add TextEncoder/TextDecoder for jsdom environment
+Object.assign(global, {
+  TextEncoder,
+  TextDecoder,
+})
 
 // Mock chrome APIs for testing
 const chrome = {
