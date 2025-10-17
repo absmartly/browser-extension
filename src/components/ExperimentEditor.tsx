@@ -211,6 +211,7 @@ export function ExperimentEditor({
                   Display Name
                 </label>
                 <Input
+                  id="experiment-name-input"
                   value={formData.display_name}
                   onChange={(e) => handleDisplayNameChange(e.target.value)}
                   placeholder="My Experiment"
@@ -348,6 +349,7 @@ export function ExperimentEditor({
           )}
           <div className="flex gap-2">
             <Button
+              id="create-experiment-button"
               type="submit"
               variant="primary"
               disabled={loading}
