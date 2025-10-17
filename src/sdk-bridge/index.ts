@@ -9,25 +9,23 @@
  * @version 1.1.0
  */
 
+import { Orchestrator } from './core/orchestrator'
+
 // Version
 export const SDK_BRIDGE_VERSION = '1.1.0'
 
-// Temporary placeholder functions for testing build
-export function getVariantAssignments(experimentNames: string[]) {
-  console.log('[SDK Bridge] getVariantAssignments called:', experimentNames)
-  return Promise.resolve({ assignments: {}, experimentsInContext: [] })
-}
+// Create orchestrator instance
+const orchestrator = new Orchestrator()
 
-export function getContextPath() {
-  console.log('[SDK Bridge] getContextPath called')
-  return {
-    found: false,
-    path: null,
-    hasContext: false,
-    hasPeek: false,
-    hasTreatment: false
-  }
-}
+// Setup message listener for extension communication
+orchestrator.setupMessageListener()
+
+// Expose APIs for extension to call
+orchestrator.exposeVariantAssignments()
+orchestrator.exposeContextPath()
+
+// Start the initialization process
+orchestrator.start()
 
 // Log that we're loaded
 console.log('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)
