@@ -112,40 +112,26 @@ export function VariantList({
 
   // Reset flag on mount (clean slate for each experiment)
   useEffect(() => {
-    debugLog('🔄 VariantList: Mounting for experiment', experimentId, '- resetting justUpdatedRef to false')
     justUpdatedRef.current = false
   }, [experimentId])
 
   // Load saved changes from storage on mount ONLY if not already provided by parent
   useEffect(() => {
     const loadSavedChanges = async () => {
-      debugLog('📦 Storage load effect running - experimentId:', experimentId, 'initialVariants.length:', initialVariants.length, 'justUpdatedRef:', justUpdatedRef.current)
-
       // If parent already provided initialVariants, check storage for changes
       if (initialVariants.length > 0) {
         const storageKey = `experiment-${experimentId}-variants`
         try {
           const savedVariants = await storage.get(storageKey)
           if (savedVariants && Array.isArray(savedVariants)) {
-            debugLog('📦 Found saved variants in storage:', savedVariants)
-            debugLog('📦 Comparing with initial variants:', initialVariants)
-
             // Compare saved variants with initial variants to detect actual changes
             const hasActualChanges = JSON.stringify(savedVariants) !== JSON.stringify(initialVariants)
 
             if (hasActualChanges) {
-              debugLog('📦 Storage has different data than API, restoring saved variants')
-              debugLog('📦 Setting justUpdatedRef to true before calling onVariantsChange')
               setVariants(savedVariants)
               justUpdatedRef.current = true // Set flag before calling onChange
               onVariantsChange(savedVariants, true)
-              debugLog('📦 After onVariantsChange - justUpdatedRef:', justUpdatedRef.current)
-            } else {
-              debugLog('📦 Storage matches API data, no unsaved changes')
-              // Storage matches API, so no unsaved changes
             }
-          } else {
-            debugLog('📦 No saved variants in storage, using fresh data from parent')
           }
         } catch (error) {
           debugError('Failed to load saved variants:', error)
@@ -158,7 +144,6 @@ export function VariantList({
       try {
         const savedVariants = await storage.get(storageKey)
         if (savedVariants && Array.isArray(savedVariants)) {
-          debugLog('📦 Restoring saved variants from storage (legacy path):', savedVariants)
           setVariants(savedVariants)
           // Notify parent that we have unsaved changes
           justUpdatedRef.current = true
@@ -174,20 +159,14 @@ export function VariantList({
   // Sync with parent when initialVariants change
   // This ensures we always have the latest data from parent (e.g., when __inject_html changes)
   useEffect(() => {
-    debugLog('📊 VariantList: Sync effect running - justUpdatedRef:', justUpdatedRef.current, 'experimentId:', experimentId)
-
     // Skip sync if this update came from our own onChange call
     // This prevents a feedback loop where adding a variable causes us to overwrite it
     if (justUpdatedRef.current) {
-      debugLog('📊 VariantList: Skipping sync (justUpdated=true)')
       // IMPORTANT: Reset immediately so next sync can proceed
       justUpdatedRef.current = false
-      debugLog('📊 VariantList: Reset justUpdatedRef to false after skip')
       return
     }
 
-    debugLog('📊 VariantList: Syncing from parent, initialVariants:', initialVariants)
-    debugLog('📊 VariantList: First variant config:', initialVariants[0]?.config)
     // Sync from parent (for external updates like __inject_html edits)
     setVariants(initialVariants)
     // DON'T save to storage here - only save when user makes actual changes
@@ -197,8 +176,6 @@ export function VariantList({
   // Cleanup storage and preview on unmount
   useEffect(() => {
     return () => {
-      debugLog('🧹 VariantList unmounting, cleaning up')
-
       // Clear preview
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
@@ -220,12 +197,10 @@ export function VariantList({
   }
 
   const updateVariants = (updatedVariants: Variant[]) => {
-    debugLog('🔧 updateVariants called - setting justUpdatedRef to true')
     setVariants(updatedVariants)
     saveToStorage(updatedVariants)
     justUpdatedRef.current = true // Mark that we're updating (will be reset by sync useEffect)
     onVariantsChange(updatedVariants, true) // true = has unsaved changes
-    debugLog('🔧 updateVariants - after onVariantsChange, justUpdatedRef:', justUpdatedRef.current)
   }
 
   const addVariant = () => {
@@ -678,6 +653,7 @@ interface URLFilterSectionProps {
 
 const URLFilterSection = React.memo(function URLFilterSection({ config, onConfigChange, canEdit }: URLFilterSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const isFirstRenderRef = useRef(true)
 
   const [mode, setMode] = useState<'all' | 'simple' | 'advanced'>(() => {
     if (!config.urlFilter) return 'all'
@@ -750,8 +726,14 @@ const URLFilterSection = React.memo(function URLFilterSection({ config, onConfig
     }
   }
 
-  // Auto-save URL filter changes with debouncing
+  // Auto-save URL filter changes with debouncing (skip on first render)
   useEffect(() => {
+    // Skip the autosave on first render to avoid false "unsaved changes"
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      return
+    }
+
     const timer = setTimeout(() => {
       updateURLFilter()
     }, 500)
