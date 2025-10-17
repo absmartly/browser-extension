@@ -9,14 +9,14 @@ const isDebugEnabled = (): boolean => {
   if (process.env.NODE_ENV === 'production') {
     return false
   }
-  
+
   // In development, check localStorage
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     const debugFlag = localStorage.getItem('ABSMARTLY_DEBUG')
     // Default to true in development if not explicitly set to false
     return debugFlag !== 'false'
   }
-  
+
   // Default to true in development
   return true
 }

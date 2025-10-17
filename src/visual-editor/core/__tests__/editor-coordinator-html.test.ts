@@ -10,7 +10,6 @@ import UndoRedoManager from '../undo-redo-manager'
 import UIComponents from '../../ui/components'
 import EditModes from '../edit-modes'
 import Cleanup from '../cleanup'
-import { Toolbar } from '../../ui/toolbar'
 import { Notifications } from '../../ui/notifications'
 import HtmlEditor from '../../ui/html-editor'
 
@@ -62,7 +61,6 @@ describe('EditorCoordinator HTML Editor Integration', () => {
     const uiComponents = new UIComponents(stateManager)
     const editModes = new EditModes(stateManager)
     const cleanup = new Cleanup(stateManager)
-    const toolbar = new Toolbar(stateManager)
     const notifications = new Notifications()
 
     // Create coordinator
