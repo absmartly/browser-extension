@@ -227,6 +227,32 @@ async function initializeConfig() {
 // Initialize on startup
 initializeConfig().catch(err => debugError('Init config error:', err))
 
+// SECURITY: Allowed API endpoint domains to prevent token leakage
+const ALLOWED_API_DOMAINS = ['absmartly.com', 'absmartly.io']
+
+// Helper function to validate API endpoint domain
+function validateAPIEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint)
+    const hostname = url.hostname
+
+    // Check if hostname ends with any allowed domain
+    const isAllowed = ALLOWED_API_DOMAINS.some(domain =>
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    )
+
+    if (!isAllowed) {
+      debugError(`[Security] Invalid API endpoint domain: ${hostname}. Only ${ALLOWED_API_DOMAINS.join(', ')} domains are allowed.`)
+      return false
+    }
+
+    return true
+  } catch (e) {
+    debugError('[Security] Failed to parse API endpoint URL:', e)
+    return false
+  }
+}
+
 // Helper function to get config
 async function getConfig(): Promise<ABsmartlyConfig | null> {
   const config = await storage.get("absmartly-config") as ABsmartlyConfig | null
@@ -234,6 +260,11 @@ async function getConfig(): Promise<ABsmartlyConfig | null> {
   if (config) {
     const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
     config.apiKey = secureApiKey || config.apiKey || ''
+
+    // SECURITY: Validate API endpoint domain to prevent token leakage
+    if (config.apiEndpoint && !validateAPIEndpoint(config.apiEndpoint)) {
+      throw new Error('Invalid API endpoint: Only ABsmartly domains are allowed')
+    }
   }
   return config
 }
