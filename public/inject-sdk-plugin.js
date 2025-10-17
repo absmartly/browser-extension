@@ -668,15 +668,182 @@
   }
 
   /**
+   * Send message to extension - always via content script
+   */
+  function sendMessageToExtension(message) {
+    // Always send via window.postMessage (content script will relay to background)
+    window.postMessage(message, '*');
+  }
+
+  /**
+   * Intercept eventLogger calls and forward to extension
+   */
+  function interceptEventLogger(context) {
+    debugLog('[ABsmartly Extension] 🎯 interceptEventLogger called', {
+      hasContext: !!context,
+      alreadyIntercepted: context?.__eventLoggerIntercepted,
+      hasEventLogger: !!(context?.eventLogger),
+      has_eventLogger: context?._eventLogger !== undefined,
+      contextKeys: context ? Object.keys(context).filter(k => k.includes('event') || k.includes('logger')) : [],
+      // Log ALL context methods to understand the SDK version
+      allContextMethods: context ? Object.keys(context).filter(k => typeof context[k] === 'function') : [],
+      hasTreatment: context && typeof context.treatment === 'function',
+      hasReady: context && typeof context.ready === 'function',
+      hasPeek: context && typeof context.peek === 'function'
+    });
+
+    if (!context || context.__eventLoggerIntercepted) {
+      debugLog('[ABsmartly Extension] ⚠️ Skipping interception - no context or already intercepted');
+      return;
+    }
+
+    const originalEventLogger = context.eventLogger ? context.eventLogger() : null;
+    debugLog('[ABsmartly Extension] 📝 Original eventLogger:', {
+      hasMethod: !!context.eventLogger,
+      originalEventLogger: !!originalEventLogger,
+      typeOfOriginal: typeof originalEventLogger
+    });
+
+    // Create wrapper eventLogger
+    const wrappedEventLogger = (ctx, eventName, data) => {
+      debugLog('[ABsmartly Extension] 🔔 SDK Event:', { eventName, data });
+
+      const eventMessage = {
+        source: 'absmartly-page',
+        type: 'SDK_EVENT',
+        payload: {
+          eventName,
+          data: data ? JSON.parse(JSON.stringify(data)) : null,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      debugLog('[ABsmartly Extension] 📤 Sending SDK event via postMessage:', eventMessage);
+      // Send via unified message function
+      sendMessageToExtension(eventMessage);
+
+      // Call original eventLogger if it exists
+      if (originalEventLogger) {
+        originalEventLogger(ctx, eventName, data);
+      }
+    };
+
+    // Replace the eventLogger
+    if (context._eventLogger !== undefined) {
+      debugLog('[ABsmartly Extension] ✅ Replacing context._eventLogger');
+      context._eventLogger = wrappedEventLogger;
+    } else {
+      debugWarn('[ABsmartly Extension] ⚠️ context._eventLogger is undefined, cannot intercept');
+    }
+
+    context.__eventLoggerIntercepted = true;
+    debugLog('[ABsmartly Extension] ✅ EventLogger intercepted successfully');
+  }
+
+  /**
+   * Intercept SDK's createContext method to auto-intercept all new contexts
+   */
+  function interceptSDKCreateContext(sdk) {
+    if (!sdk || !sdk.createContext || sdk.__createContextIntercepted) {
+      return;
+    }
+
+    const originalCreateContext = sdk.createContext.bind(sdk);
+
+    sdk.createContext = async function(config) {
+      debugLog('[ABsmartly Extension] Intercepting createContext call');
+
+      // Call original createContext
+      const context = await originalCreateContext(config);
+
+      // Intercept the eventLogger on this new context
+      interceptEventLogger(context);
+
+      return context;
+    };
+
+    sdk.__createContextIntercepted = true;
+    debugLog('[ABsmartly Extension] SDK createContext intercepted successfully');
+  }
+
+  /**
+   * Intercept SDK constructor to intercept all SDK instances
+   */
+  function interceptSDKConstructor(sdkModule) {
+    if (!sdkModule || !sdkModule.SDK || sdkModule.SDK.__constructorIntercepted) {
+      return;
+    }
+
+    const OriginalSDK = sdkModule.SDK;
+
+    // Create a proxy constructor
+    sdkModule.SDK = function(config) {
+      debugLog('[ABsmartly Extension] Intercepting new SDK() call');
+
+      // Create SDK instance
+      const sdkInstance = new OriginalSDK(config);
+
+      // Intercept createContext on this SDK instance
+      if (sdkInstance && typeof sdkInstance.createContext === 'function') {
+        interceptSDKCreateContext(sdkInstance);
+      }
+
+      return sdkInstance;
+    };
+
+    // Copy static properties
+    Object.setPrototypeOf(sdkModule.SDK, OriginalSDK);
+    Object.assign(sdkModule.SDK, OriginalSDK);
+
+    sdkModule.SDK.__constructorIntercepted = true;
+    debugLog('[ABsmartly Extension] SDK constructor intercepted successfully');
+  }
+
+  /**
    * Detects ABsmartly SDK on the window object - uses cache if available
    */
   function detectABsmartlySDK() {
-    // Return cached context if we already found it
-    if (cachedContext) {
-      return { sdk: null, context: cachedContext };
+    // Check for SDK module (has SDK constructor)
+    const sdkModuleLocations = [
+      window.absmartly,
+      window.ABsmartly,
+      window.__absmartly
+    ];
+
+    for (const location of sdkModuleLocations) {
+      if (location && location.SDK && typeof location.SDK === 'function') {
+        debugLog('[ABsmartly Extension] SDK module found, intercepting SDK constructor');
+        interceptSDKConstructor(location);
+        break;
+      }
     }
 
-    // Check common SDK locations
+    // Check for SDK instances (have createContext method)
+    let sdk = null;
+    const sdkLocations = [
+      window.sdk,
+      window.absmartly,
+      window.ABsmartly,
+      window.__absmartly
+    ];
+
+    for (const location of sdkLocations) {
+      if (location && typeof location.createContext === 'function') {
+        sdk = location;
+        debugLog('[ABsmartly Extension] SDK instance found');
+
+        // Intercept createContext to auto-intercept all future contexts
+        interceptSDKCreateContext(sdk);
+        break;
+      }
+    }
+
+    // Return cached context if we already found it
+    if (cachedContext) {
+      return { sdk, context: cachedContext };
+    }
+
+    // Check common context locations
     const possibleLocations = [
       window.ABsmartlyContext,
       window.absmartly,
@@ -728,7 +895,7 @@
     // Cache the context and its location for future use
     if (context && !cachedContext) {
       cachedContext = context;
-      
+
       // Store where we found it
       if (window.ABsmartlyContext === context) {
         contextPropertyPath = 'ABsmartlyContext';
@@ -739,11 +906,24 @@
       } else {
         contextPropertyPath = 'unknown';
       }
-      
-      debugLog('[ABsmartly Extension] Context found and cached at:', contextPropertyPath);
+
+      debugLog('[ABsmartly Extension] ✅ Context found and cached at:', contextPropertyPath);
+      debugLog('[ABsmartly Extension] 📊 Context details:', {
+        hasTreatment: !!context.treatment,
+        hasPeek: !!context.peek,
+        hasData: !!context.data,
+        hasEventLogger: !!context.eventLogger,
+        has_eventLogger: context._eventLogger !== undefined,
+        contextType: typeof context
+      });
+
+      // Intercept eventLogger on this context
+      interceptEventLogger(context);
+    } else if (!context) {
+      debugWarn('[ABsmartly Extension] ⚠️ No context found after detection');
     }
 
-    return { sdk: null, context };
+    return { sdk, context };
   }
 
   /**
@@ -1101,17 +1281,20 @@
    * Wait for SDK and custom code, then initialize
    */
   function waitForSDKAndInitialize() {
+    debugLog('[ABsmartly Extension] 🚀 waitForSDKAndInitialize started');
     const maxAttempts = 50; // 5 seconds
     let attempts = 0;
 
     const checkAndInit = () => {
       attempts++;
-
-
+      debugLog(`[ABsmartly Extension] 🔍 Check attempt ${attempts}/${maxAttempts}`);
 
       // Detect context only once
       if (!cachedContext) {
+        debugLog('[ABsmartly Extension] 🔎 No cached context, detecting SDK...');
         detectABsmartlySDK();
+      } else {
+        debugLog('[ABsmartly Extension] ✅ Using cached context');
       }
       
       // Log context data when found (but only if context is ready)
@@ -1262,7 +1445,7 @@
         }
         isInitializing = true;
 
-        const { customCode, config } = event.data.payload || {};
+        const { config } = event.data.payload || {};
         debugLog('[ABsmartly Extension] Received config from extension:', config);
         
         // Check again if plugin is already loaded
@@ -1379,7 +1562,7 @@
         }
 
         // Function to initialize both plugins in the correct order
-        async function initializePlugins(ctx, customCode, config) {
+        async function initializePlugins(ctx, config) {
           const context = ctx || cachedContext;
 
           if (!context) {
@@ -1478,25 +1661,6 @@
               domPlugin.initialize().then(() => {
                 debugLog('[ABsmartly Extension] DOMChangesPluginLite initialized successfully');
 
-                // Inject global custom code if provided (from extension settings)
-                if (customCode) {
-                  debugLog('[ABsmartly Extension] Injecting global custom code');
-                  try {
-                    // Parse the custom code object
-                    const codeData = typeof customCode === 'string' ? JSON.parse(customCode) : customCode;
-
-                    // Execute scripts for each location
-                    ['headStart', 'headEnd', 'bodyStart', 'bodyEnd'].forEach(location => {
-                      if (codeData[location]) {
-                        debugLog(`[ABsmartly Extension] Executing global scripts for ${location}`);
-                        executeScriptsInHTML(codeData[location], location);
-                      }
-                    });
-                  } catch (error) {
-                    debugError('[ABsmartly Extension] Failed to inject global custom code:', error);
-                  }
-                }
-
                 // Inject per-experiment custom code from __inject_html variables
                 try {
                   debugLog('[ABsmartly Extension] Checking for experiment-specific injection code');
@@ -1534,7 +1698,7 @@
 
         // Now initialize the plugins with the context and config we have (only if not already initialized)
         if (!isInitialized) {
-          initializePlugins(context, customCode, config);
+          initializePlugins(context, config);
           isInitialized = true;
         } else {
           debugLog('[ABsmartly Extension] Plugins already initialized, skipping');

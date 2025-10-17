@@ -15,7 +15,28 @@ export function useABsmartly() {
 
   const loadConfig = async () => {
     try {
-      const savedConfig = await getConfig()
+      let savedConfig = await getConfig()
+
+      // If no config in storage, check environment variables
+      if (!savedConfig) {
+        const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+        const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
+        const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
+
+        // If env vars are available, create config from them
+        if (envApiKey && envApiEndpoint) {
+          savedConfig = {
+            apiKey: envApiKey,
+            apiEndpoint: envApiEndpoint,
+            applicationName: envApplicationName,
+            authMethod: 'apikey',
+            domChangesFieldName: '__dom_changes'
+          }
+          // Don't auto-save to storage - let user confirm in settings
+          console.log('[useABsmartly] Using config from environment variables (not saved to storage)')
+        }
+      }
+
       if (savedConfig) {
         setConfig(savedConfig)
       }

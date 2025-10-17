@@ -1,0 +1,472 @@
+import { test, expect } from '../fixtures/extension'
+import { type Page } from '@playwright/test'
+import path from 'path'
+import { injectSidebar, debugWait } from './utils/test-helpers'
+
+const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test.html')
+
+test.describe('Events Debug Page', () => {
+  test('sidebar loads with auto-config from env vars', async ({ context, extensionId, extensionUrl }) => {
+    console.log('\n🚀 Starting sidebar test with auto-config from env vars')
+    console.log('Extension ID:', extensionId)
+
+    const page = await context.newPage()
+    await page.goto(`file://${TEST_PAGE_PATH}`)
+    console.log('✅ Test page loaded')
+
+    // Inject sidebar
+    const sidebar = await injectSidebar(page, extensionUrl)
+    console.log('✅ Sidebar injected')
+
+    // Wait for iframe to load
+    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    console.log('✅ Sidebar iframe loaded')
+
+    // Check if sidebar loaded config from env vars and shows main UI
+    const sidebarHTML = await sidebar.locator('body').innerHTML()
+    console.log('Sidebar HTML length:', sidebarHTML.length)
+
+    const hasWelcomeText = sidebarHTML.includes('Welcome to ABsmartly') || sidebarHTML.includes('Configure Settings')
+    const hasExperimentsText = sidebarHTML.includes('Experiments')
+    const hasEventsButton = sidebarHTML.includes('Events Debug')
+    console.log('Has welcome screen:', hasWelcomeText)
+    console.log('Has experiments UI:', hasExperimentsText)
+    console.log('Has Events Debug button:', hasEventsButton)
+
+    // Should NOT show welcome screen (env vars should auto-populate config)
+    expect(hasWelcomeText).toBe(false)
+    // Should show main UI
+    expect(hasExperimentsText || hasEventsButton).toBe(true)
+    console.log('✅ Test passed - main UI shown with auto-config from env vars!')
+
+    await page.close()
+  })
+
+  test('sidebar loads with config (main UI)', async ({ context, extensionId, extensionUrl, seedStorage, getStorage }) => {
+    console.log('\n🚀 Starting sidebar test with config')
+    console.log('Extension ID:', extensionId)
+
+    // Seed config first
+    console.log('Seeding config...')
+    const config = {
+      apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
+      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      applicationId: null,
+      authMethod: 'apikey',
+      domChangesStorageType: null,
+      domChangesFieldName: null
+    }
+
+    await seedStorage({
+      'absmartly-config': config,
+      'plasmo:absmartly-config': config
+    })
+    console.log('✅ Config seeded')
+
+    // Wait for config to propagate to extension
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Verify storage
+    const storage = await getStorage()
+    console.log('Storage keys:', Object.keys(storage))
+    console.log('Has config:', 'absmartly-config' in storage)
+
+    const page = await context.newPage()
+    await page.goto(`file://${TEST_PAGE_PATH}`)
+    console.log('✅ Test page loaded')
+
+    // Inject sidebar
+    const sidebar = await injectSidebar(page, extensionUrl)
+    console.log('✅ Sidebar injected')
+
+    // Wait for iframe to load
+    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    console.log('✅ Sidebar iframe loaded')
+
+    // Give sidebar EXTRA time to load config from storage
+    console.log('Waiting for sidebar to load config...')
+    await page.waitForTimeout(5000)
+    console.log('Wait complete')
+
+    // Check if sidebar content shows main UI
+    const sidebarHTML = await sidebar.locator('body').innerHTML()
+    console.log('Sidebar HTML length:', sidebarHTML.length)
+
+    const hasWelcomeText = sidebarHTML.includes('Welcome to ABsmartly') || sidebarHTML.includes('Configure Settings')
+    const hasExperimentsText = sidebarHTML.includes('Experiments')
+    const hasEventsButton = sidebarHTML.includes('Events Debug')
+    console.log('Has welcome screen:', hasWelcomeText)
+    console.log('Has experiments UI:', hasExperimentsText)
+    console.log('Has Events Debug button:', hasEventsButton)
+
+    expect(hasWelcomeText).toBe(false)
+    expect(hasExperimentsText || hasEventsButton).toBe(true)
+
+    console.log('✅ Test passed - main UI shown with config!')
+
+    await page.close()
+  })
+
+  // Event functionality tests with beforeEach/afterEach setup
+  test.describe('Event Capture and Display', () => {
+    let testPage: Page
+    let sidebar: any
+
+    test.beforeEach(async ({ context, extensionUrl }) => {
+      testPage = await context.newPage()
+      await testPage.goto(`file://${TEST_PAGE_PATH}`)
+      await testPage.waitForLoadState('networkidle')
+
+      sidebar = await injectSidebar(testPage, extensionUrl)
+      await debugWait()
+
+      // Open Events Debug Page
+      const eventsButton = sidebar.locator('button[aria-label="Events Debug"]')
+      await eventsButton.evaluate((button) => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      await debugWait()
+
+      // Wait for Events Debug Page to be fully loaded by checking for the initial state
+      // The "0 events captured" text should be visible when the page loads
+      await sidebar.locator('text=0 events captured').waitFor({ timeout: 5000 })
+      await debugWait()
+    })
+
+    test.afterEach(async () => {
+      if (testPage) await testPage.close()
+    })
+
+    test('captures and displays SDK events in real-time', async () => {
+      await test.step('Trigger SDK ready event', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'ready',
+              data: { experiments: ['exp1', 'exp2'] },
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        // Give time for event to propagate: page → content script → background → sidebar
+        await testPage.waitForTimeout(500)
+      })
+
+      await test.step('Verify event appears in list', async () => {
+        await expect(sidebar.locator('text=ready')).toBeVisible({ timeout: 10000 })
+        await expect(sidebar.locator('text=1 event captured')).toBeVisible()
+      })
+
+      await test.step('Trigger exposure event', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'exposure',
+              data: { experiment: 'test_exp', variant: 1 },
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await testPage.waitForTimeout(500)
+      })
+
+      await test.step('Verify both events displayed', async () => {
+        await expect(sidebar.locator('text=exposure')).toBeVisible({ timeout: 10000 })
+        await expect(sidebar.locator('text=2 events captured')).toBeVisible()
+
+        // Verify newest first (exposure should appear before ready)
+        const eventBadges = sidebar.locator('.px-2.py-0.5.text-xs.font-semibold.rounded')
+        const firstEvent = eventBadges.first()
+        await expect(firstEvent).toHaveText('exposure')
+      })
+    })
+
+    test('displays event details when clicked', async () => {
+      await test.step('Trigger exposure event', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'exposure',
+              data: { experiment: 'test_exp', variant: 1 },
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await testPage.waitForTimeout(500)
+      })
+
+      await test.step('Click event to view details', async () => {
+        const eventItem = sidebar.locator('text=exposure').first()
+        await eventItem.waitFor({ state: 'visible', timeout: 10000 })
+        await eventItem.evaluate((el) => {
+          const container = el.closest('div[class*="cursor-pointer"]')
+          if (container) {
+            container.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          }
+        })
+        await testPage.waitForTimeout(300)
+      })
+
+      await test.step('Verify event details displayed', async () => {
+        await expect(sidebar.locator('text=Event Type')).toBeVisible()
+        await expect(sidebar.locator('text=Timestamp')).toBeVisible()
+        await expect(sidebar.locator('text=Event Data')).toBeVisible()
+        await expect(sidebar.locator('text="experiment"')).toBeVisible()
+        await expect(sidebar.locator('text="test_exp"')).toBeVisible()
+      })
+
+      await test.step('Verify event is highlighted', async () => {
+        const eventItem = sidebar.locator('text=exposure').first()
+        const container = eventItem.locator('..')
+        await expect(container).toHaveClass(/bg-blue-50/)
+      })
+    })
+
+    test('pause and resume functionality', async () => {
+      await test.step('Click pause button', async () => {
+        const pauseButton = sidebar.locator('button[title="Pause"]')
+        await expect(pauseButton).toBeVisible()
+        await pauseButton.evaluate((button) => {
+          button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify paused state', async () => {
+        await expect(sidebar.locator('text=Event capture paused')).toBeVisible()
+        await expect(sidebar.locator('button[title="Resume"]')).toBeVisible()
+      })
+
+      await test.step('Trigger event while paused', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'ready',
+              data: null,
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify event not captured while paused', async () => {
+        await expect(sidebar.locator('text=0 events captured')).toBeVisible()
+        await expect(sidebar.locator('text=ready')).not.toBeVisible()
+      })
+
+      await test.step('Click resume button', async () => {
+        const resumeButton = sidebar.locator('button[title="Resume"]')
+        await resumeButton.evaluate((button) => {
+          button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify resumed state', async () => {
+        await expect(sidebar.locator('text=Event capture paused')).not.toBeVisible()
+        await expect(sidebar.locator('button[title="Pause"]')).toBeVisible()
+      })
+
+      await test.step('Trigger event after resume', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'exposure',
+              data: { test: 'data' },
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify event captured after resume', async () => {
+        await expect(sidebar.locator('text=exposure')).toBeVisible()
+        await expect(sidebar.locator('text=1 event captured')).toBeVisible()
+      })
+    })
+
+    test('clear events functionality', async () => {
+      await test.step('Add multiple events', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'ready',
+              data: null,
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await debugWait()
+
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'exposure',
+              data: { experiment: 'test' },
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify events exist', async () => {
+        await expect(sidebar.locator('text=2 events captured')).toBeVisible()
+      })
+
+      await test.step('Click clear button', async () => {
+        const clearButton = sidebar.locator('button[title="Clear all events"]')
+        await expect(clearButton).toBeVisible()
+        await clearButton.evaluate((button) => {
+          button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify events cleared', async () => {
+        await expect(sidebar.locator('text=No events captured yet')).toBeVisible()
+        await expect(sidebar.locator('text=0 events captured')).toBeVisible()
+        await expect(sidebar.locator('text=ready')).not.toBeVisible()
+        await expect(sidebar.locator('text=exposure')).not.toBeVisible()
+      })
+    })
+
+    test('displays color-coded event types', async () => {
+      await test.step('Trigger different event types', async () => {
+        const eventTypes = ['error', 'ready', 'refresh', 'publish', 'exposure', 'goal', 'finalize']
+
+        for (const eventName of eventTypes) {
+          await testPage.evaluate((name) => {
+            window.postMessage({
+              source: 'absmartly-page',
+              type: 'SDK_EVENT',
+              payload: {
+                eventName: name,
+                data: null,
+                timestamp: new Date().toISOString()
+              }
+            }, '*')
+          }, eventName)
+          await testPage.waitForTimeout(100)
+        }
+
+        await debugWait()
+      })
+
+      await test.step('Verify all event types displayed', async () => {
+        await expect(sidebar.locator('text=7 events captured')).toBeVisible()
+
+        // Verify each event type appears
+        const eventTypes = ['error', 'ready', 'refresh', 'publish', 'exposure', 'goal', 'finalize']
+        for (const eventName of eventTypes) {
+          await expect(sidebar.locator(`text=${eventName}`).first()).toBeVisible()
+        }
+      })
+
+      await test.step('Verify color coding', async () => {
+        // Check that different events have different color classes
+        const errorBadge = sidebar.locator('text=error').first()
+        await expect(errorBadge).toHaveClass(/text-red-600/)
+
+        const readyBadge = sidebar.locator('text=ready').first()
+        await expect(readyBadge).toHaveClass(/text-green-600/)
+
+        const exposureBadge = sidebar.locator('text=exposure').first()
+        await expect(exposureBadge).toHaveClass(/text-orange-600/)
+      })
+    })
+
+    test('formats timestamps correctly', async () => {
+      await test.step('Trigger event with specific timestamp', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'ready',
+              data: null,
+              timestamp: '2025-01-01T14:30:45.123Z'
+            }
+          }, '*')
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify timestamp format in list', async () => {
+        // Should show time in HH:MM:SS.mmm format
+        const timestamp = sidebar.locator('text=/\\d{2}:\\d{2}:\\d{2}\\.\\d{3}/')
+        await expect(timestamp).toBeVisible()
+      })
+
+      await test.step('Click event and verify full timestamp in details', async () => {
+        const eventItem = sidebar.locator('text=ready').first()
+        await eventItem.evaluate((el) => {
+          const container = el.closest('div[class*="cursor-pointer"]')
+          if (container) {
+            container.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          }
+        })
+        await debugWait()
+
+        // Should show full date/time
+        await expect(sidebar.locator('text=/1\\/1\\/2025/')).toBeVisible()
+      })
+    })
+
+    test('handles events without data', async () => {
+      await test.step('Trigger event with null data', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'absmartly-page',
+            type: 'SDK_EVENT',
+            payload: {
+              eventName: 'finalize',
+              data: null,
+              timestamp: new Date().toISOString()
+            }
+          }, '*')
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify event captured', async () => {
+        await expect(sidebar.locator('text=finalize')).toBeVisible()
+        await expect(sidebar.locator('text=1 event captured')).toBeVisible()
+      })
+    })
+
+    test('ignores non-SDK events', async () => {
+      await test.step('Send non-SDK event', async () => {
+        await testPage.evaluate(() => {
+          window.postMessage({
+            source: 'other-source',
+            type: 'SOME_EVENT',
+            payload: {}
+          }, '*')
+        })
+        await debugWait()
+      })
+
+      await test.step('Verify event not captured', async () => {
+        await expect(sidebar.locator('text=No events captured yet')).toBeVisible()
+        await expect(sidebar.locator('text=0 events captured')).toBeVisible()
+      })
+    })
+  })
+})

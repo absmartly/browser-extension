@@ -1,7 +1,7 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
 import { z } from 'zod'
-import type { ABsmartlyConfig, CustomCode } from '~src/types/absmartly'
+import type { ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
@@ -34,6 +34,10 @@ const secureStorage = new Storage({
   secretKeyring: true
 })
 
+// Event buffering constants
+const EVENT_BUFFER_KEY = 'sdk_events_buffer'
+const MAX_BUFFER_SIZE = 1000
+
 // Handle storage operations from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'STORAGE_GET') {
@@ -45,7 +49,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       debugError('[Background] Storage GET error:', error)
       sendResponse({ success: false, error: error.message })
     })
-    return true // Keep the message channel open for async response
+    return true
   } else if (message.type === 'STORAGE_SET') {
     const sessionStorage = new Storage({ area: "session" })
     sessionStorage.set(message.key, message.value).then(() => {
@@ -55,7 +59,91 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       debugError('[Background] Storage SET error:', error)
       sendResponse({ success: false, error: error.message })
     })
-    return true // Keep the message channel open for async response
+    return true
+  } else if (message.type === 'SDK_EVENT') {
+    console.log('[Background] 🔵 Received SDK_EVENT:', message.payload)
+    // Buffer SDK events
+    const sessionStorage = new Storage({ area: "session" })
+
+    sessionStorage.get(EVENT_BUFFER_KEY).then(buffer => {
+      const events = buffer || []
+      console.log('[Background] Current buffer size:', events.length)
+
+      // Add new event to end of array (O(1) operation)
+      const newEvent = {
+        id: `${Date.now()}-${Math.random()}`,
+        eventName: message.payload.eventName,
+        data: message.payload.data,
+        timestamp: message.payload.timestamp
+      }
+      events.push(newEvent)
+      console.log('[Background] ✅ Added event to buffer:', newEvent)
+
+      // Keep only last MAX_BUFFER_SIZE events (newest at end)
+      const trimmedEvents = events.slice(-MAX_BUFFER_SIZE)
+
+      return sessionStorage.set(EVENT_BUFFER_KEY, trimmedEvents)
+    }).then(() => {
+      console.log('[Background] ✅ Event buffered, now broadcasting...')
+      debugLog('[Background] SDK event buffered:', message.payload.eventName)
+
+      // Broadcast new event to all extension pages for real-time updates
+      chrome.runtime.sendMessage({
+        type: 'SDK_EVENT_BROADCAST',
+        payload: message.payload
+      }).then(() => {
+        console.log('[Background] ✅ SDK_EVENT_BROADCAST sent successfully')
+      }).catch((err) => {
+        console.log('[Background] ⚠️ No listeners for SDK_EVENT_BROADCAST (this is normal if sidebar not open):', err?.message)
+      })
+
+      sendResponse({ success: true })
+    }).catch(error => {
+      console.error('[Background] ❌ Failed to buffer event:', error)
+      debugError('[Background] Failed to buffer event:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+
+    return true
+  } else if (message.type === 'GET_BUFFERED_EVENTS') {
+    const sessionStorage = new Storage({ area: "session" })
+
+    sessionStorage.get(EVENT_BUFFER_KEY).then(events => {
+      debugLog('[Background] Retrieved buffered events:', events?.length || 0)
+      sendResponse({ success: true, events: events || [] })
+    }).catch(error => {
+      debugError('[Background] Failed to get buffered events:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+
+    return true
+  } else if (message.type === 'CLEAR_BUFFERED_EVENTS') {
+    const sessionStorage = new Storage({ area: "session" })
+
+    sessionStorage.remove(EVENT_BUFFER_KEY).then(() => {
+      debugLog('[Background] Cleared buffered events')
+      sendResponse({ success: true })
+    }).catch(error => {
+      debugError('[Background] Failed to clear buffered events:', error)
+      sendResponse({ success: false, error: error.message })
+    })
+
+    return true
+  } else if (message.type === 'ENSURE_SDK_PLUGIN_INJECTED') {
+    console.log('[Background] 📌 ENSURE_SDK_PLUGIN_INJECTED requested, forwarding to active tab')
+    // Forward to content script in active tab to inject SDK plugin
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'INJECT_SDK_PLUGIN' }, (response) => {
+          console.log('[Background] Content script injection response:', response)
+          sendResponse(response || { success: true })
+        })
+      } else {
+        console.warn('[Background] No active tab found for SDK plugin injection')
+        sendResponse({ success: false, error: 'No active tab' })
+      }
+    })
+    return true // Will respond asynchronously
   }
 })
 
@@ -811,23 +899,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true // Will respond asynchronously
   } else if (message.type === "REQUEST_INJECTION_CODE") {
-    // Handle request from SDK plugin for custom code injection and config
+    // Handle request from SDK plugin for config (per-experiment __inject_html only)
     debugLog('Background received REQUEST_INJECTION_CODE from SDK plugin')
 
-    // Get both custom code and config
-    Promise.all([
-      storage.get("absmartly-custom-code") as Promise<CustomCode | null>,
-      getConfig()
-    ]).then(([customCode, config]) => {
-      // Prepare injection data for SDK plugin
-      const injectionData = {
-        headStart: customCode?.headStart || '',
-        headEnd: customCode?.headEnd || '',
-        bodyStart: customCode?.bodyStart || '',
-        bodyEnd: customCode?.bodyEnd || '',
-        styleTag: customCode?.styleTag || ''
-      }
-
+    // Get config only - custom code injection removed, keeping per-experiment __inject_html
+    getConfig().then((config) => {
       // Derive SDK endpoint if not set
       let sdkEndpoint = config?.sdkEndpoint
       if (!sdkEndpoint && config?.apiEndpoint) {
@@ -845,14 +921,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sdkUrl: config?.sdkUrl || ''
       }
 
-      debugLog('Sending custom code and config to SDK plugin:', { injectionData, configData })
+      debugLog('Sending config to SDK plugin:', { configData })
       sendResponse({
         success: true,
-        data: injectionData,
         config: configData
       })
     }).catch(error => {
-      debugError('Error retrieving custom code or config:', error)
+      debugError('Error retrieving config:', error)
       sendResponse({
         success: false,
         error: error.message
@@ -874,8 +949,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Register content script for file:// URLs dynamically
 // This is needed because content scripts in manifest don't auto-inject on file:// URLs
-chrome.runtime.onInstalled.addListener(async () => {
+async function registerFileUrlContentScript() {
   try {
+    console.log('[Background] Registering content script for file:// URLs...')
     const manifest = chrome.runtime.getManifest()
     const contentScripts = manifest.content_scripts
     if (contentScripts && contentScripts.length > 0) {
@@ -890,10 +966,11 @@ chrome.runtime.onInstalled.addListener(async () => {
         allFrames: false
       }])
 
-      console.log('[Background] Registered dynamic content script for file:// URLs')
+      console.log('[Background] ✅ Registered dynamic content script for file:// URLs')
     }
   } catch (error) {
     // Script might already be registered, unregister and try again
+    console.log('[Background] Registration failed, trying to re-register...')
     try {
       await chrome.scripting.unregisterContentScripts({ ids: ['file-url-content-script'] })
       const manifest = chrome.runtime.getManifest()
@@ -907,13 +984,22 @@ chrome.runtime.onInstalled.addListener(async () => {
           runAt: 'document_idle',
           allFrames: false
         }])
-        console.log('[Background] Re-registered dynamic content script for file:// URLs')
+        console.log('[Background] ✅ Re-registered dynamic content script for file:// URLs')
       }
     } catch (retryError) {
-      console.error('[Background] Failed to register dynamic content script:', retryError)
+      console.error('[Background] ❌ Failed to register dynamic content script:', retryError)
     }
   }
-})
+}
+
+// Register on install
+chrome.runtime.onInstalled.addListener(registerFileUrlContentScript)
+
+// ALSO register on startup (important for tests where extension persists across runs)
+chrome.runtime.onStartup.addListener(registerFileUrlContentScript)
+
+// Register immediately on background script load (for first run)
+registerFileUrlContentScript()
 
 // Listen for tab updates (keeping for other purposes)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {

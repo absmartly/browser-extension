@@ -7,6 +7,7 @@ import { ExperimentDetail } from "~src/components/ExperimentDetail"
 import { ExperimentEditor } from "~src/components/ExperimentEditor"
 import { ExperimentFilter } from "~src/components/ExperimentFilter"
 import { SettingsView } from "~src/components/SettingsView"
+import EventsDebugPage from "~src/components/EventsDebugPage"
 import { Pagination } from "~src/components/Pagination"
 import { Button } from "~src/components/ui/Button"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
@@ -14,13 +15,13 @@ import { Toast } from "~src/components/Toast"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment, ABsmartlyConfig } from "~src/types/absmartly"
 import type { SidebarState, ExperimentFilters } from "~src/types/storage-state"
-import { CogIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
+import { CogIcon, PlusIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline"
 import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
 import { Logo } from "~src/components/Logo"
 import "~style.css"
 
-type View = 'list' | 'detail' | 'settings' | 'create' | 'edit'
+type View = 'list' | 'detail' | 'settings' | 'create' | 'edit' | 'events'
 
 // Helper function to build API parameters from filter state
 const buildFilterParams = (filterState: any, page: number, size: number) => {
@@ -744,6 +745,14 @@ function SidebarContent() {
                   onOpenChange={setCreatePanelOpen}
                 />
                 <button
+                  onClick={() => setView('events')}
+                  className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  aria-label="Events Debug"
+                  title="Events Debug"
+                >
+                  <BoltIcon className="h-5 w-5 text-gray-600" />
+                </button>
+                <button
                   onClick={() => setView('settings')}
                   className="p-2 hover:bg-gray-100 rounded-md transition-colors"
                   aria-label="Settings"
@@ -873,7 +882,11 @@ function SidebarContent() {
           onCancel={() => setView('list')}
         />
       )}
-      
+
+      {view === 'events' && (
+        <EventsDebugPage onBack={() => setView('list')} />
+      )}
+
       {(view === 'create' || view === 'edit') && (
         <ExperimentEditor
           experiment={selectedExperiment}
