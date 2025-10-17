@@ -189,6 +189,23 @@ export function VariantList({
     }
   }, [experimentName])
 
+  // Listen for preview state changes from background script
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === 'PREVIEW_STATE_CHANGED' && message.enabled === false) {
+        // Turn off preview when Exit Preview button is clicked
+        setPreviewEnabled(false)
+        setActivePreviewVariant(null)
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(handleMessage)
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [])
+
   const saveToStorage = (updatedVariants: Variant[]) => {
     const storageKey = `experiment-${experimentId}-variants`
     storage.set(storageKey, updatedVariants).catch(error => {
