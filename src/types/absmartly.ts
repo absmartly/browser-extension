@@ -16,6 +16,7 @@ export interface Experiment {
   variants: Variant[]
   applications?: Application[]
   unit_type?: { unit_type_id: number; name?: string }
+  unit_type_id?: number  // API might return unit_type_id directly
   primary_metric?: { metric_id: number; name?: string }
   experiment_tags?: ExperimentTag[]
   context_ids?: string[]
