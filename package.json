@@ -84,11 +84,9 @@
           "assets/icon128.png",
           "assets/absmartly-logo-white.svg",
           "tabs/*",
-          "tests/*",
           "inject-sdk-plugin.js",
           "inject-sdk-plugin.*.js",
-          "inject-sdk-plugin-mapping.json",
-          "absmartly-dom-changes-core.min.js"
+          "inject-sdk-plugin-mapping.json"
         ],
         "matches": [
           "<all_urls>"
