@@ -738,60 +738,25 @@ function removePreviewHeader() {
   }
 }
 
-// Inject the SDK plugin initialization script into the page
+// Inject the SDK bridge bundle into the page
 async function injectSDKPluginScript(): Promise<void> {
-  return new Promise<void>(async (resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     try {
-      // First try to load the mapping file to get the hashed filename
-      const mappingUrl = chrome.runtime.getURL('inject-sdk-plugin-mapping.json')
-      const response = await fetch(mappingUrl)
-
-      let scriptFilename = 'inject-sdk-plugin.js' // fallback
-
-      if (response.ok) {
-        const mapping = await response.json()
-        scriptFilename = mapping.filename
-        debugLog('[Content Script] Loading hashed inject script:', scriptFilename)
-      } else {
-        debugLog('[Content Script] No mapping file found, using default filename')
-      }
-
       const script = document.createElement('script')
-      script.src = chrome.runtime.getURL(scriptFilename)
+      script.src = chrome.runtime.getURL('absmartly-sdk-bridge.bundle.js')
       script.onload = () => {
-        debugLog('[Content Script] Inject script loaded:', scriptFilename)
+        debugLog('[Content Script] SDK bridge bundle loaded')
         script.remove()
         resolve()
       }
       script.onerror = () => {
-        debugError('[Content Script] Failed to load inject script:', scriptFilename)
-        // Fallback to non-hashed version
-        if (scriptFilename !== 'inject-sdk-plugin.js') {
-          debugLog('[Content Script] Trying fallback: inject-sdk-plugin.js')
-          const fallbackScript = document.createElement('script')
-          fallbackScript.src = chrome.runtime.getURL('inject-sdk-plugin.js')
-          fallbackScript.onload = () => {
-            fallbackScript.remove()
-            resolve()
-          }
-          fallbackScript.onerror = () => reject(new Error('Failed to load fallback script'))
-          document.documentElement.appendChild(fallbackScript)
-        } else {
-          reject(new Error('Failed to load inject script'))
-        }
+        debugError('[Content Script] Failed to load SDK bridge bundle')
+        reject(new Error('Failed to load SDK bridge bundle'))
       }
       document.documentElement.appendChild(script)
     } catch (error) {
-      debugError('[Content Script] Error loading inject script:', error)
-      // Fallback to direct load
-      const script = document.createElement('script')
-      script.src = chrome.runtime.getURL('inject-sdk-plugin.js')
-      script.onload = () => {
-        script.remove()
-        resolve()
-      }
-      script.onerror = () => reject(error)
-      document.documentElement.appendChild(script)
+      debugError('[Content Script] Error loading SDK bridge bundle:', error)
+      reject(error)
     }
   })
 }
