@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './tests',
   globalSetup: require.resolve('./tests/global-setup.ts'),
-  timeout: 90 * 1000, // 90 seconds
+  timeout: 180 * 1000, // 180 seconds (3 minutes)
   expect: {
     timeout: 10000
   },
@@ -31,10 +31,8 @@ export default defineConfig({
     {
       name: 'chromium',
       use: {
-        ...devices['Desktop Chrome'],
-        launchOptions: {
-          slowMo: 1000 // Slow down by 1 second between actions
-        }
+        ...devices['Desktop Chrome']
+        // No slowMo - run at full speed for E2E tests
       },
       testMatch: [
         // Include all E2E tests

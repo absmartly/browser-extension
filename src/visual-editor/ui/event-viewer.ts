@@ -12,10 +12,11 @@ import { searchKeymap } from '@codemirror/search'
 
 export class EventViewer {
   private viewerHost: HTMLElement | null = null
+  private shadowRoot: ShadowRoot | null = null
   private editorView: EditorView | null = null
 
   show(eventName: string, timestamp: string, jsonData: string): void {
-    // Create viewer host in regular DOM
+    // Create viewer host with Shadow DOM to avoid CSP issues
     this.viewerHost = document.createElement('div')
     this.viewerHost.id = 'absmartly-event-viewer-host'
     this.viewerHost.style.cssText = `
@@ -28,10 +29,13 @@ export class EventViewer {
       pointer-events: auto;
     `
 
+    // Create Shadow DOM to isolate from page's CSP
+    this.shadowRoot = this.viewerHost.attachShadow({ mode: 'open' })
+
+    // Add styles directly to Shadow DOM (no CSP issues)
     const viewerStyle = document.createElement('style')
-    viewerStyle.id = 'absmartly-event-viewer-styles'
     viewerStyle.textContent = this.getViewerStyles()
-    document.head.appendChild(viewerStyle)
+    this.shadowRoot.appendChild(viewerStyle)
 
     // Create viewer elements
     const backdrop = document.createElement('div')
@@ -116,7 +120,8 @@ export class EventViewer {
     container.appendChild(buttonContainer)
     backdrop.appendChild(container)
 
-    this.viewerHost.appendChild(backdrop)
+    // Append to shadow root for CSP isolation
+    this.shadowRoot.appendChild(backdrop)
     document.body.appendChild(this.viewerHost)
 
     // Create CodeMirror viewer (read-only)
@@ -206,12 +211,10 @@ export class EventViewer {
 
       this.viewerHost.remove()
       this.viewerHost = null
+      this.shadowRoot = null // Clear shadow root reference
     }
 
-    const style = document.getElementById('absmartly-event-viewer-styles')
-    if (style) {
-      style.remove()
-    }
+    // No need to remove style from head anymore - it's in shadow root
 
     // Notify extension that viewer was closed
     chrome.runtime.sendMessage({ type: 'EVENT_VIEWER_CLOSE' })
