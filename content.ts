@@ -70,6 +70,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
 
     // Listen for responses from sidebar
     window.addEventListener('message', (event) => {
+      // SECURITY: Only accept messages from sidebar iframe or same window
+      if (event.source !== window && event.source !== sidebarIframe?.contentWindow) {
+        return
+      }
+
       if (event.data?.source === 'absmartly-extension' && event.data?.responseId) {
         const callback = responseCallbacks.get(event.data.responseId)
         if (callback) {
