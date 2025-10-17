@@ -68,7 +68,7 @@ export function ExperimentDetail({
   const { save } = useExperimentSave({ experiment, domFieldName })
   const [metadata, setMetadata] = useState({
     percentage_of_traffic: experiment.percentage_of_traffic || 100,
-    unit_type_id: experiment.unit_type?.unit_type_id || null,
+    unit_type_id: experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
     application_ids: experiment.applications?.map(a => a.application_id || a.id) || [],
     owner_ids: experiment.owners?.map(o => o.user_id || o.id) || [],
     team_ids: experiment.teams?.map(t => t.team_id || t.id) || [],

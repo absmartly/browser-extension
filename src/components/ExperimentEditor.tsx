@@ -48,7 +48,7 @@ export function ExperimentEditor({
     percentages: experiment?.percentages || '50/50',
     audience_strict: experiment?.audience_strict ?? false,
     audience: experiment?.audience || '{"filter":[{"and":[]}]}',
-    unit_type_id: experiment?.unit_type?.unit_type_id || null,
+    unit_type_id: experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
     application_ids: experiment?.applications?.map(a => a.application_id) || [],
     owner_ids: experiment?.owners?.map(o => o.user_id || o.id) || [],
     team_ids: experiment?.teams?.map(t => t.team_id || t.id) || [],
