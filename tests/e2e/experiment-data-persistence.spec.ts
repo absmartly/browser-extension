@@ -89,22 +89,19 @@ test.describe('Experiment Data Persistence', () => {
 
       await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
 
-      let dropdownOpened = false
-      for (let attempt = 0; attempt < 3 && !dropdownOpened; attempt++) {
-        if (attempt > 0) {
-          console.log(`  Retry attempt ${attempt} to open Unit Type dropdown`)
-          await testPage.waitForTimeout(500)
-        }
-
-        const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
-        await unitTypeClickArea.click({ force: true })
-
-        const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-        dropdownOpened = await unitTypeDropdown.isVisible().catch(() => false)
-      }
-
+      const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
       const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-      await unitTypeDropdown.waitFor({ state: 'visible', timeout: 2000 })
+      
+      // Retry clicking until dropdown appears (sometimes needs multiple attempts)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await unitTypeClickArea.click({ force: true })
+        try {
+          await unitTypeDropdown.waitFor({ state: 'visible', timeout: 500 })
+          break
+        } catch (e) {
+          if (attempt === 2) throw e
+        }
+      }
 
       const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
       await firstUnitOption.waitFor({ state: 'visible', timeout: 2000 })
