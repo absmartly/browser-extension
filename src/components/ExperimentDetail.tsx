@@ -142,7 +142,8 @@ export function ExperimentDetail({
         }
       }
       debugLog('🔧 Updated variant config:', updatedVariants[0].config)
-      handleVariantsChange(updatedVariants, true)
+      // Let the hook auto-detect if there are actual changes
+      handleVariantsChange(updatedVariants)
     }
   }
 
@@ -322,20 +323,16 @@ export function ExperimentDetail({
         )}
 
         {/* Code Injection Section - Only for control variant */}
-        {currentVariants.length > 0 && currentVariants[0] && (() => {
-          const canEditValue = experiment.state !== 'running' && experiment.state !== 'development'
-          debugLog('[ExperimentDetail] Rendering CodeInjection - Experiment state:', experiment.state, 'canEdit:', canEditValue)
-          return (
-            <ExperimentCodeInjection
-              experimentId={experiment.id}
-              variantIndex={0}
-              initialCode={extractInjectionCode(currentVariants[0])}
-              domChangesUrlFilter={extractDomChangesUrlFilter(currentVariants[0])}
-              onChange={handleInjectionCodeChange}
-              canEdit={canEditValue}
-            />
-          )
-        })()}
+        {currentVariants.length > 0 && currentVariants[0] && (
+          <ExperimentCodeInjection
+            experimentId={experiment.id}
+            variantIndex={0}
+            initialCode={extractInjectionCode(currentVariants[0])}
+            domChangesUrlFilter={extractDomChangesUrlFilter(currentVariants[0])}
+            onChange={handleInjectionCodeChange}
+            canEdit={experiment.state !== 'running' && experiment.state !== 'development'}
+          />
+        )}
 
         {/* Warning for running/development experiments */}
         {(experiment.state === 'running' || experiment.state === 'development') && (
