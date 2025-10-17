@@ -2,6 +2,11 @@ import { Storage } from '@plasmohq/storage'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 
 const storage = new Storage()
+// SECURITY: Use encrypted storage for sensitive data (API keys)
+const secureStorage = new Storage({
+  area: "local",
+  secretKeyring: true
+})
 
 export const STORAGE_KEYS = {
   CONFIG: 'absmartly-config',
@@ -10,11 +15,28 @@ export const STORAGE_KEYS = {
 } as const
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
-  return await storage.get(STORAGE_KEYS.CONFIG)
+  const config = await storage.get(STORAGE_KEYS.CONFIG) as ABsmartlyConfig | null
+  // SECURITY: Get API key from secure storage
+  if (config) {
+    const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+    config.apiKey = secureApiKey || config.apiKey || ''
+  }
+  return config
 }
 
 export async function setConfig(config: ABsmartlyConfig): Promise<void> {
-  await storage.set(STORAGE_KEYS.CONFIG, config)
+  // SECURITY: Don't store API key in regular storage
+  // Store it in encrypted storage instead
+  if (config.apiKey) {
+    await secureStorage.set("absmartly-apikey", config.apiKey)
+  } else {
+    // Remove API key from secure storage if empty
+    await secureStorage.remove("absmartly-apikey")
+  }
+
+  // Store config without API key in regular storage
+  const configToStore = { ...config, apiKey: '' }
+  await storage.set(STORAGE_KEYS.CONFIG, configToStore)
 }
 
 export async function getRecentExperiments(): Promise<number[]> {
