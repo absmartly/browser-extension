@@ -465,17 +465,11 @@ debugDiv.style.display = 'none'
 debugDiv.textContent = 'ABSmartly Content Script Loaded at ' + new Date().toISOString()
 document.documentElement.appendChild(debugDiv)
 
-// Expose a global function for testing
+// Expose a global function for testing (content script context only)
 ;(window as any).__absmartlyContentLoaded = true
 
-// ALSO inject into page context (content scripts run in isolated context)
-// Tests run in page context and need access to this variable
-const scriptTag = document.createElement('script')
-scriptTag.textContent = 'window.__absmartlyContentLoaded = true;'
-document.documentElement.appendChild(scriptTag)
-scriptTag.remove()
-
-// Send a message to the page to confirm we're loaded
+// Send a message to the page to confirm we're loaded (CSP-safe communication)
+// Tests can listen for this message instead of checking a global variable
 window.postMessage({ type: 'ABSMARTLY_CONTENT_READY', timestamp: Date.now() }, '*')
 
 // Listen for messages from the visual editor and test messages
