@@ -12,9 +12,10 @@ describe('OverrideManager', () => {
   let mockLogger: jest.Mocked<typeof Logger>
   let mockCookies: Record<string, string>
 
+  // Setup mock cookies once before all tests
   beforeAll(() => {
-    // Mock document.cookie for JSDOM once
     mockCookies = {}
+    // Mock document.cookie once
     Object.defineProperty(document, 'cookie', {
       get: () => {
         return Object.entries(mockCookies)
