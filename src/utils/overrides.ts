@@ -175,14 +175,14 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
             document.cookie = 'absmartly_overrides=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
           } else {
             // Serialize to compact format using shared utility
-            const serializeOverrides = (overrides, devEnv) => {
-              const parts = []
+            const serializeOverrides = (overrides: any, devEnv: any) => {
+              const parts: string[] = []
               for (const [name, value] of Object.entries(overrides)) {
                 const encodedName = encodeURIComponent(name)
                 if (typeof value === 'number') {
                   parts.push(`${encodedName}:${value}`)
                 } else {
-                  const v = value
+                  const v = value as { variant: number; env?: number; id?: number }
                   if (v.env !== undefined && v.env !== 0) {
                     if (v.id !== undefined) {
                       parts.push(`${encodedName}:${v.variant}.${v.env}.${v.id}`)
