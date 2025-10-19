@@ -4,10 +4,10 @@
 
 export interface DOMChangesInlineState {
   variantName: string
-  editingChange: any
+  editingChange: unknown
   pickingForField: string
   dragDropMode?: boolean
-  changes?: any[]
+  changes?: unknown[]
 }
 
 export interface ElementPickerResult {
@@ -25,7 +25,7 @@ export interface DragDropResult {
 
 export interface VisualEditorChanges {
   variantName: string
-  changes: any[]
+  changes: unknown[]
 }
 
 export interface SidebarState {
@@ -34,9 +34,17 @@ export interface SidebarState {
 }
 
 export interface ExperimentFilters {
+  search?: string
   state?: string[]
-  application?: number
-  owner?: number
-  team?: number
-  tag?: number
+  significance?: string[]
+  owners?: number[]
+  teams?: number[]
+  tags?: number[]
+  applications?: number[]
+  sample_ratio_mismatch?: boolean
+  cleanup_needed?: boolean
+  audience_mismatch?: boolean
+  sample_size_reached?: boolean
+  experiments_interact?: boolean
+  assignment_conflict?: boolean
 }
