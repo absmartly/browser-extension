@@ -317,6 +317,8 @@ describe('Orchestrator', () => {
       orchestrator.start()
       jest.runOnlyPendingTimers()
 
+      // Flush all promises in the microtask queue
+      await Promise.resolve()
       await Promise.resolve()
 
       expect(Logger.error).toHaveBeenCalledWith(
@@ -672,8 +674,10 @@ describe('Orchestrator', () => {
     it('should send SDK_EVENT message', () => {
       const postMessageSpy = jest.spyOn(window, 'postMessage')
 
-      const mockInterceptor = mockSDKInterceptor as any
-      const onSDKEvent = mockInterceptor.constructor.mock.calls[0][0].onSDKEvent
+      // Get the onSDKEvent callback from the SDKInterceptor constructor
+      const SDKInterceptorConstructor = SDKInterceptor as jest.MockedClass<typeof SDKInterceptor>
+      const constructorCall = SDKInterceptorConstructor.mock.calls[SDKInterceptorConstructor.mock.calls.length - 1]
+      const onSDKEvent = constructorCall[0].onSDKEvent
 
       onSDKEvent('exposure', { experimentName: 'test-exp', variant: 0 })
 

@@ -24,12 +24,30 @@ const chrome = {
   },
 }
 
-Object.assign(global, { chrome })
+// Add global mock cookies and chrome API
+;(global as any).__mockCookies = {}
+;(global as any).chrome = chrome
 
-// Mock document.cookie for browser environment tests
 Object.defineProperty(document, 'cookie', {
-  writable: true,
-  value: '',
+  get: () => {
+    return Object.entries((global as any).__mockCookies)
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ')
+  },
+  set: (cookieString: string) => {
+    const [nameValue] = cookieString.split(';')
+    const eqIndex = nameValue.indexOf('=')
+    if (eqIndex > 0) {
+      const name = nameValue.substring(0, eqIndex).trim()
+      const value = nameValue.substring(eqIndex + 1).trim()
+      if (value) {
+        (global as any).__mockCookies[name] = value
+      } else {
+        delete (global as any).__mockCookies[name]
+      }
+    }
+  },
+  configurable: true
 })
 
 // Mock Plasmo data-base64 asset imports

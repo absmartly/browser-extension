@@ -100,10 +100,18 @@ export class OverrideManager {
   checkOverridesCookie(): void {
     try {
       // Just check if cookie exists - OverridesPlugin handles all parsing and application
-      const cookieValue = document.cookie
+      const row = document.cookie
         .split('; ')
         .find((row) => row.startsWith(`${this.cookieName}=`))
-        ?.split('=')[1]
+
+      let cookieValue: string | undefined
+      if (row) {
+        // Use substring to preserve values with = signs
+        const eqIndex = row.indexOf('=')
+        if (eqIndex !== -1) {
+          cookieValue = row.substring(eqIndex + 1)
+        }
+      }
 
       if (cookieValue) {
         Logger.log(
@@ -133,12 +141,18 @@ export class OverrideManager {
    */
   getCookieValue(): string | null {
     try {
-      const cookieValue = document.cookie
+      const row = document.cookie
         .split('; ')
         .find((row) => row.startsWith(`${this.cookieName}=`))
-        ?.split('=')[1]
 
-      return cookieValue || null
+      if (!row) return null
+
+      // Use substring to preserve values with = signs
+      const eqIndex = row.indexOf('=')
+      if (eqIndex === -1) return null
+
+      const value = row.substring(eqIndex + 1)
+      return value || null
     } catch (error) {
       Logger.error('[ABsmartly Extension] Error getting cookie value:', error)
       return null

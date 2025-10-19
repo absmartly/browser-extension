@@ -473,8 +473,8 @@ export class Orchestrator {
         found: !!this.state.cachedContext,
         path: this.state.contextPropertyPath || null,
         hasContext: !!this.state.cachedContext,
-        hasPeek: this.state.cachedContext && typeof this.state.cachedContext.peek === 'function',
-        hasTreatment: this.state.cachedContext && typeof this.state.cachedContext.treatment === 'function'
+        hasPeek: !!(this.state.cachedContext && typeof this.state.cachedContext.peek === 'function'),
+        hasTreatment: !!(this.state.cachedContext && typeof this.state.cachedContext.treatment === 'function')
       }
     }
   }
