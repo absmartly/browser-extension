@@ -148,8 +148,15 @@ export class CodeInjector {
           // External script - create a new script element
           const newScript = document.createElement('script')
           newScript.src = script.src
-          newScript.async = script.async
-          newScript.defer = script.defer
+
+          // Copy async/defer attributes (check both property and attribute for JSDOM compatibility)
+          if (script.async || script.hasAttribute('async')) {
+            newScript.async = true
+          }
+          if (script.defer || script.hasAttribute('defer')) {
+            newScript.defer = true
+          }
+
           newScript.setAttribute('data-absmartly-injected', location)
 
           // Add to appropriate location
