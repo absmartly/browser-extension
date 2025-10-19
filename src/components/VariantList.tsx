@@ -11,13 +11,15 @@ import type { DOMChange, DOMChangesData, DOMChangesConfig, URLFilter } from '~sr
 
 const storage = new Storage({ area: "local" })
 
+export type VariantConfig = Record<string, unknown>
+
 export interface Variant {
   name: string
-  config: Record<string, any>  // Full variables payload including __dom_changes, __inject_html, etc.
+  config: VariantConfig  // Full variables payload including __dom_changes, __inject_html, etc.
 }
 
 // Helper to get DOM changes from config
-function getDOMChangesFromConfig(config: Record<string, any> | undefined, domFieldName: string = '__dom_changes'): DOMChangesData {
+function getDOMChangesFromConfig(config: VariantConfig | undefined, domFieldName: string = '__dom_changes'): DOMChangesData {
   if (!config) return { changes: [] }
   const domData = config[domFieldName]
   if (!domData) return { changes: [] }
@@ -27,7 +29,7 @@ function getDOMChangesFromConfig(config: Record<string, any> | undefined, domFie
 }
 
 // Helper to update config with DOM changes
-function setDOMChangesInConfig(config: Record<string, any>, domChanges: DOMChangesData, domFieldName: string = '__dom_changes'): Record<string, any> {
+function setDOMChangesInConfig(config: VariantConfig, domChanges: DOMChangesData, domFieldName: string = '__dom_changes'): VariantConfig {
   const newConfig = { ...config }
   // Only include DOM changes if not empty
   if (Array.isArray(domChanges.changes) && domChanges.changes.length > 0) {
@@ -43,7 +45,7 @@ function setDOMChangesInConfig(config: Record<string, any>, domChanges: DOMChang
 }
 
 // Helper to filter out special fields for Variables display
-function getVariablesForDisplay(config: Record<string, any>, domFieldName: string, fieldsToExclude: string[] = ['__inject_html']): Record<string, any> {
+function getVariablesForDisplay(config: VariantConfig, domFieldName: string, fieldsToExclude: string[] = ['__inject_html']): VariantConfig {
   const filtered = { ...config }
   // Add the configurable DOM field name to exclusions
   const allExclusions = [...fieldsToExclude, domFieldName]
@@ -191,8 +193,8 @@ export function VariantList({
 
   // Listen for preview state changes from background script
   useEffect(() => {
-    const handleMessage = (message: any) => {
-      if (message.type === 'PREVIEW_STATE_CHANGED' && message.enabled === false) {
+    const handleMessage = (message: unknown) => {
+      if (typeof message === 'object' && message !== null && 'type' in message && message.type === 'PREVIEW_STATE_CHANGED' && 'enabled' in message && message.enabled === false) {
         // Turn off preview when Exit Preview button is clicked
         setPreviewEnabled(false)
         setActivePreviewVariant(null)
@@ -325,7 +327,7 @@ export function VariantList({
     }
 
     const newVariants = [...variants]
-    let parsedValue: any = value
+    let parsedValue: unknown = value
     try {
       // Try to parse as JSON if it looks like JSON
       if (value && (value.startsWith('{') || value.startsWith('['))) {
@@ -353,7 +355,7 @@ export function VariantList({
 
   const updateVariantVariable = (index: number, key: string, value: string) => {
     const newVariants = [...variants]
-    let parsedValue: any = value
+    let parsedValue: unknown = value
     try {
       // Try to parse as JSON if it looks like JSON
       if (value.startsWith('{') || value.startsWith('[')) {
