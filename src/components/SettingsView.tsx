@@ -9,6 +9,11 @@ import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
 import { getConfig, setConfig } from '~src/utils/storage'
 import axios from 'axios'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
+import { AuthenticationStatusSection } from './settings/AuthenticationStatusSection'
+import { DOMChangesStorageSection } from './settings/DOMChangesStorageSection'
+import { SDKConfigSection } from './settings/SDKConfigSection'
+import { QueryStringOverridesSection } from './settings/QueryStringOverridesSection'
+import { SDKInjectionSection } from './settings/SDKInjectionSection'
 import { Storage } from "@plasmohq/storage"
 
 interface SettingsViewProps {
@@ -438,80 +443,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       )}
 
       {/* Authentication Status */}
-      <div className="bg-gray-50 p-3 rounded-md" data-testid="auth-status-section">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-medium text-gray-700">Authentication Status</div>
-          {apiEndpoint && !checkingAuth && (
-            <Button
-              id="auth-refresh-button"
-              onClick={() => checkAuthStatus(apiEndpoint, { apiKey, authMethod })}
-              size="sm"
-              variant="secondary"
-              className="text-xs"
-            >
-              Refresh
-            </Button>
-          )}
-        </div>
-        {checkingAuth ? (
-          <div className="flex items-center text-sm text-gray-600">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-            Checking authentication...
-          </div>
-        ) : user && user.authenticated ? (
-          <div data-testid="auth-user-info">
-            <div className="flex items-center space-x-3">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                {(avatarUrl || user.picture) ? (
-                  <img
-                    src={avatarUrl || user.picture}
-                    alt={user.name || 'User'}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      debugError('Avatar failed to load:', avatarUrl || user.picture)
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <div 
-                    className="w-full h-full flex items-center justify-center text-white text-sm font-medium"
-                    style={{ backgroundColor: getAvatarColor(user.name || 'User') }}
-                  >
-                    {getInitials(user.name || 'User')}
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900" data-testid="auth-user-name">{user.name || 'User'}</div>
-                <div className="text-xs text-gray-600" data-testid="auth-user-email">{user.email || 'No email'}</div>
-              </div>
-            </div>
-            {/* Debug info - only show in development */}
-            {process.env.NODE_ENV === 'development' && (
-              <details className="mt-2">
-                <summary className="text-xs text-gray-500 cursor-pointer">Debug info</summary>
-                <pre className="text-xs mt-1 p-2 bg-gray-100 rounded overflow-auto">
-{JSON.stringify(user, null, 2)}
-                </pre>
-              </details>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2" data-testid="auth-not-authenticated">
-            <div className="text-sm text-gray-600">Not authenticated</div>
-            {apiEndpoint && (
-              <Button
-                id="authenticate-button"
-                onClick={handleAuthenticate}
-                size="sm"
-                variant="secondary"
-              >
-                Authenticate in ABsmartly
-              </Button>
-            )}
-          </div>
-        )}
-            </div>
+      <AuthenticationStatusSection
+        checkingAuth={checkingAuth}
+        user={user}
+        avatarUrl={avatarUrl}
+        apiEndpoint={apiEndpoint}
+        apiKey={apiKey}
+        authMethod={authMethod}
+        onCheckAuth={checkAuthStatus}
+        onAuthenticate={handleAuthenticate}
+      />
       
       <Input
         label="ABsmartly Endpoint"
@@ -584,117 +525,34 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       />
       
       {/* DOM Changes Storage Settings */}
-      <div className="space-y-3 border-t pt-4 mt-4">
-        <h3 className="text-sm font-medium text-gray-700">DOM Changes Storage</h3>
-        
-        <div>
-          <Input
-            label="Variable Name"
-            type="text"
-            value={domChangesFieldName}
-            onChange={(e) => setDomChangesFieldName(e.target.value)}
-            placeholder="__dom_changes"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            The name of the variable that will store DOM changes in each variant
-          </p>
-        </div>
-      </div>
+      <DOMChangesStorageSection
+        domChangesFieldName={domChangesFieldName}
+        onDomChangesFieldNameChange={setDomChangesFieldName}
+      />
       
       {/* SDK Configuration */}
-      <div className="border-t pt-4 mt-4">
-        <Input
-          label="SDK Window Property (Optional)"
-          type="text"
-          value={sdkWindowProperty}
-          onChange={(e) => setSdkWindowProperty(e.target.value)}
-          placeholder="e.g., ABsmartlyContext or sdk.context"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          The window property where the ABsmartly SDK context is stored. Leave empty to use automatic detection.
-        </p>
-
-        <div className="mt-4">
-          <Input
-            label="SDK Endpoint (Optional)"
-            type="url"
-            value={sdkEndpoint}
-            onChange={(e) => setSdkEndpoint(e.target.value)}
-            placeholder="e.g., https://demo.absmartly.io"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            SDK collector endpoint for fetching development experiments. Defaults to API endpoint with .io domain.
-          </p>
-        </div>
-      </div>
+      <SDKConfigSection
+        sdkWindowProperty={sdkWindowProperty}
+        sdkEndpoint={sdkEndpoint}
+        onSdkWindowPropertyChange={setSdkWindowProperty}
+        onSdkEndpointChange={setSdkEndpoint}
+      />
 
       {/* Query String Override Configuration */}
-      <div className="border-t pt-4 mt-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Query String Overrides</h3>
-
-        <Input
-          label="Query Parameter Prefix"
-          type="text"
-          value={queryPrefix}
-          onChange={(e) => setQueryPrefix(e.target.value)}
-          placeholder="_exp_"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          Prefix for query parameters (e.g., ?_exp_button_color=1)
-        </p>
-
-        <div className="mt-4 flex items-center">
-          <input
-            id="persistQueryToCookie"
-            type="checkbox"
-            checked={persistQueryToCookie}
-            onChange={(e) => setPersistQueryToCookie(e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <label htmlFor="persistQueryToCookie" className="ml-2 block text-sm text-gray-700">
-            Persist query string overrides to cookie
-          </label>
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          When enabled, query string overrides will be saved to a cookie for persistence across page loads.
-        </p>
-      </div>
+      <QueryStringOverridesSection
+        queryPrefix={queryPrefix}
+        persistQueryToCookie={persistQueryToCookie}
+        onQueryPrefixChange={setQueryPrefix}
+        onPersistQueryToCookieChange={setPersistQueryToCookie}
+      />
 
       {/* SDK Injection Settings */}
-      <div className="border-t pt-4 mt-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">SDK Injection</h3>
-
-        <div className="flex items-center">
-          <input
-            id="injectSDK"
-            type="checkbox"
-            checked={injectSDK}
-            onChange={(e) => setInjectSDK(e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <label htmlFor="injectSDK" className="ml-2 block text-sm text-gray-700">
-            Inject ABsmartly SDK if not detected
-          </label>
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          When enabled, the extension will inject the ABsmartly SDK (including all plugins) on pages where it's not already present.
-        </p>
-
-        {injectSDK && (
-          <div className="mt-4">
-            <Input
-              label="Custom SDK URL (Optional)"
-              type="url"
-              value={sdkUrl}
-              onChange={(e) => setSdkUrl(e.target.value)}
-              placeholder="https://sdk.absmartly.com/sdk.js"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Custom URL for the SDK script. Leave empty to use the default SDK URL with current page's query parameters.
-            </p>
-          </div>
-        )}
-      </div>
+      <SDKInjectionSection
+        injectSDK={injectSDK}
+        sdkUrl={sdkUrl}
+        onInjectSDKChange={setInjectSDK}
+        onSdkUrlChange={setSdkUrl}
+      />
 
       <div className="flex gap-2 pt-2">
         <Button id="save-settings-button" onClick={handleSave} variant="primary">
