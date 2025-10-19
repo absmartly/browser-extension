@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
@@ -377,7 +377,7 @@ export function VariantList({
     updateVariants(newVariants)
   }
 
-  const handlePreviewToggle = (enabled: boolean, variantIndex: number) => {
+  const handlePreviewToggle = useCallback((enabled: boolean, variantIndex: number) => {
     setPreviewEnabled(enabled)
     setActivePreviewVariant(enabled ? variantIndex : null)
 
@@ -408,7 +408,7 @@ export function VariantList({
         }
       })
     }
-  }
+  }, [variants, experimentName, domFieldName])
 
   return (
     <div className="space-y-4">
