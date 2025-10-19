@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
@@ -412,6 +412,12 @@ export function VariantList({
     }
   }, [variants, experimentName, domFieldName])
 
+  // Pre-compute display variables for all variants to avoid repeated calculations in render
+  const variantsDisplayVariables = useMemo(
+    () => variants.map(variant => getVariablesForDisplay(variant.config, domFieldName)),
+    [variants, domFieldName]
+  )
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -507,7 +513,7 @@ export function VariantList({
               <div>
                 <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
                 <div className="space-y-2">
-                  {Object.entries(getVariablesForDisplay(variant.config, domFieldName)).map(([key, value]) => (
+                  {Object.entries(variantsDisplayVariables[index]).map(([key, value]) => (
                     <div key={key} className="flex items-center gap-2">
                       <Input
                         value={key}
