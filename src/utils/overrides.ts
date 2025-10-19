@@ -1,4 +1,5 @@
 import { Storage } from '@plasmohq/storage'
+import { parseCookieValue, serializeOverrides, generateCookieParserScript } from './cookie-serialization'
 
 export const OVERRIDES_COOKIE_NAME = 'absmartly_overrides'
 export const OVERRIDES_STORAGE_KEY = 'experiment_overrides'
@@ -29,52 +30,8 @@ export interface ExperimentOverrides {
  * New format uses comma to separate experiments and dot to separate values
  */
 export function parseCookieFormat(cookieValue: string): { overrides: ExperimentOverrides, devEnv?: string } {
-  if (!cookieValue) return { overrides: {} }
-
   try {
-    let devEnv: string | undefined
-    let experimentsStr = cookieValue
-
-    // Check if dev environment is included
-    if (cookieValue.startsWith('devEnv=')) {
-      const parts = cookieValue.split('|')
-      const devEnvPart = parts[0].substring(7) // Remove 'devEnv=' prefix
-      devEnv = decodeURIComponent(devEnvPart)
-      experimentsStr = parts[1] || ''
-    }
-
-    const overrides: ExperimentOverrides = {}
-    if (experimentsStr) {
-      const experiments = experimentsStr.split(',')
-
-      for (const exp of experiments) {
-        const [name, values] = exp.split(':')
-        if (!name || !values) continue
-
-        const decodedName = decodeURIComponent(name)
-        const parts = values.split('.')
-
-        if (parts.length === 1) {
-          // Simple format: just variant (running experiment)
-          overrides[decodedName] = parseInt(parts[0], 10)
-        } else if (parts.length === 2) {
-          // Format: variant.env
-          overrides[decodedName] = {
-            variant: parseInt(parts[0], 10),
-            env: parseInt(parts[1], 10)
-          }
-        } else {
-          // Full format: variant.env.id
-          overrides[decodedName] = {
-            variant: parseInt(parts[0], 10),
-            env: parseInt(parts[1], 10),
-            id: parseInt(parts[2], 10)
-          }
-        }
-      }
-    }
-
-    return { overrides, devEnv }
+    return parseCookieValue(cookieValue)
   } catch (error) {
     console.warn('Failed to parse override cookie:', error)
     return { overrides: {} }
@@ -86,92 +43,11 @@ export function parseCookieFormat(cookieValue: string): { overrides: ExperimentO
  * New format uses comma to separate experiments and dot to separate values
  */
 export function serializeToCookieFormat(overrides: ExperimentOverrides, devEnv?: string | null): string {
-  const parts: string[] = []
-
-  for (const [name, value] of Object.entries(overrides)) {
-    const encodedName = encodeURIComponent(name)
-
-    if (typeof value === 'number') {
-      // Simple format for running experiments
-      parts.push(`${encodedName}:${value}`)
-    } else {
-      // Extended format with env and optional id
-      if (value.env !== undefined && value.env !== ENV_TYPE.PRODUCTION) {
-        if (value.id !== undefined) {
-          // Full format: variant.env.id
-          parts.push(`${encodedName}:${value.variant}.${value.env}.${value.id}`)
-        } else {
-          // Format without id: variant.env
-          parts.push(`${encodedName}:${value.variant}.${value.env}`)
-        }
-      } else {
-        // Running experiment stored as object (shouldn't happen, but handle it)
-        parts.push(`${encodedName}:${value.variant}`)
-      }
-    }
-  }
-
-  const experimentsStr = parts.join(',')
-
-  // Include dev environment if provided
-  if (devEnv) {
-    return `devEnv=${encodeURIComponent(devEnv)}|${experimentsStr}`
-  }
-
-  return experimentsStr
+  return serializeOverrides(overrides, devEnv)
 }
 
 export function getCookieOverridesScript(): string {
-  return `
-    (() => {
-      const cookieValue = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('${OVERRIDES_COOKIE_NAME}='))
-        ?.split('=')[1];
-      if (!cookieValue) return {};
-
-      // Parse compact format with experiment ID
-      let devEnv = undefined;
-      let experimentsStr = cookieValue;
-
-      // Check if dev environment is included
-      if (cookieValue.startsWith('devEnv=')) {
-        const parts = cookieValue.split('|');
-        devEnv = decodeURIComponent(parts[0].substring(7));
-        experimentsStr = parts[1] || '';
-      }
-
-      const result = {};
-      if (experimentsStr) {
-        const experiments = experimentsStr.split(',');
-
-        for (const exp of experiments) {
-          const [name, values] = exp.split(':');
-          if (!name || !values) continue;
-
-          const decodedName = decodeURIComponent(name);
-          const parts = values.split('.');
-
-          if (parts.length === 1) {
-            result[decodedName] = parseInt(parts[0], 10);
-          } else if (parts.length === 2) {
-            result[decodedName] = {
-              variant: parseInt(parts[0], 10),
-              env: parseInt(parts[1], 10)
-            };
-          } else {
-            result[decodedName] = {
-              variant: parseInt(parts[0], 10),
-              env: parseInt(parts[1], 10),
-              id: parseInt(parts[2], 10)
-            };
-          }
-        }
-      }
-
-      return result;
-    })()
-  `
+  return generateCookieParserScript(OVERRIDES_COOKIE_NAME)
 }
 
 export function setCookieOverridesScript(overrides: ExperimentOverrides): string {
@@ -298,32 +174,31 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
             // Clear cookie if no overrides and no dev environment
             document.cookie = 'absmartly_overrides=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
           } else {
-            // Serialize to compact format (new format)
-            const parts = []
-            for (const [name, value] of Object.entries(overrides)) {
-              const encodedName = encodeURIComponent(name)
-              if (typeof value === 'number') {
-                parts.push(`${encodedName}:${value}`)
-              } else {
-                const v = value as any
-                if (v.env !== undefined && v.env !== 0) {
-                  if (v.id !== undefined) {
-                    parts.push(`${encodedName}:${v.variant}.${v.env}.${v.id}`)
-                  } else {
-                    parts.push(`${encodedName}:${v.variant}.${v.env}`)
-                  }
+            // Serialize to compact format using shared utility
+            const serializeOverrides = (overrides, devEnv) => {
+              const parts = []
+              for (const [name, value] of Object.entries(overrides)) {
+                const encodedName = encodeURIComponent(name)
+                if (typeof value === 'number') {
+                  parts.push(`${encodedName}:${value}`)
                 } else {
-                  parts.push(`${encodedName}:${v.variant}`)
+                  const v = value
+                  if (v.env !== undefined && v.env !== 0) {
+                    if (v.id !== undefined) {
+                      parts.push(`${encodedName}:${v.variant}.${v.env}.${v.id}`)
+                    } else {
+                      parts.push(`${encodedName}:${v.variant}.${v.env}`)
+                    }
+                  } else {
+                    parts.push(`${encodedName}:${v.variant}`)
+                  }
                 }
               }
+              const experimentsStr = parts.join(',')
+              return devEnv ? `devEnv=${encodeURIComponent(devEnv)}|${experimentsStr}` : experimentsStr
             }
 
-            // Include dev environment if provided
-            let cookieValue = parts.join(',')
-            if (devEnvName) {
-              cookieValue = `devEnv=${encodeURIComponent(devEnvName)}|${cookieValue}`
-            }
-
+            const cookieValue = serializeOverrides(overrides, devEnvName)
             console.log('[ABsmartly] Final cookie value:', cookieValue)
             const expires = new Date()
             expires.setDate(expires.getDate() + 30)
@@ -371,44 +246,51 @@ export async function loadOverridesFromCookie(): Promise<ExperimentOverrides> {
 
           if (!cookieValue) return {}
 
-          // Parse compact format with dev env
-          let devEnv = undefined
-          let experimentsStr = cookieValue
+          // Parse using shared utility logic
+          const parseCookieValue = (cookieValue) => {
+            if (!cookieValue) return { overrides: {} }
 
-          // Check if dev environment is included
-          if (cookieValue.startsWith('devEnv=')) {
-            const parts = cookieValue.split('|')
-            devEnv = decodeURIComponent(parts[0].substring(7))
-            experimentsStr = parts[1] || ''
-          }
+            let devEnv = undefined
+            let experimentsStr = cookieValue
 
-          const result: any = {}
-          if (experimentsStr) {
-            const experiments = experimentsStr.split(',')
+            if (cookieValue.startsWith('devEnv=')) {
+              const parts = cookieValue.split('|')
+              devEnv = decodeURIComponent(parts[0].substring(7))
+              experimentsStr = parts[1] || ''
+            }
 
-            for (const exp of experiments) {
-              const [name, values] = exp.split(':')
-              if (!name || !values) continue
+            const overrides = {}
+            if (experimentsStr) {
+              const experiments = experimentsStr.split(',')
 
-              const decodedName = decodeURIComponent(name)
-              const parts = values.split('.')
+              for (const exp of experiments) {
+                const [name, values] = exp.split(':')
+                if (!name || !values) continue
 
-              if (parts.length === 1) {
-                result[decodedName] = parseInt(parts[0], 10)
-              } else if (parts.length === 2) {
-                result[decodedName] = {
-                  variant: parseInt(parts[0], 10),
-                  env: parseInt(parts[1], 10)
-                }
-              } else {
-                result[decodedName] = {
-                  variant: parseInt(parts[0], 10),
-                  env: parseInt(parts[1], 10),
-                  id: parseInt(parts[2], 10)
+                const decodedName = decodeURIComponent(name)
+                const parts = values.split('.')
+
+                if (parts.length === 1) {
+                  overrides[decodedName] = parseInt(parts[0], 10)
+                } else if (parts.length === 2) {
+                  overrides[decodedName] = {
+                    variant: parseInt(parts[0], 10),
+                    env: parseInt(parts[1], 10)
+                  }
+                } else {
+                  overrides[decodedName] = {
+                    variant: parseInt(parts[0], 10),
+                    env: parseInt(parts[1], 10),
+                    id: parseInt(parts[2], 10)
+                  }
                 }
               }
             }
+
+            return { overrides, devEnv }
           }
+
+          const { overrides: result, devEnv } = parseCookieValue(cookieValue)
 
           // Store dev env if found (for migration purposes)
           if (devEnv && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
