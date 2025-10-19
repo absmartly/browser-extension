@@ -24,8 +24,8 @@ import "~style.css"
 type View = 'list' | 'detail' | 'settings' | 'create' | 'edit' | 'events'
 
 // Helper function to build API parameters from filter state
-const buildFilterParams = (filterState: any, page: number, size: number) => {
-  const params: any = {
+const buildFilterParams = (filterState: ExperimentFilters, page: number, size: number) => {
+  const params: Record<string, unknown> = {
     page,
     items: size,
     iterations: 1,
@@ -87,19 +87,19 @@ function SidebarContent() {
   const [hasMore, setHasMore] = useState(false)
   
   // Filter state - loaded from storage or default
-  const [filters, setFilters] = useState<any>(null)
+  const [filters, setFilters] = useState<ExperimentFilters | null>(null)
   const [filtersLoaded, setFiltersLoaded] = useState(false)
   
   // Favorite experiments state
   const [favoriteExperiments, setFavoriteExperiments] = useState<Set<number>>(new Set())
   
   // Resource states for ExperimentEditor
-  const [applications, setApplications] = useState<any[]>([])
-  const [unitTypes, setUnitTypes] = useState<any[]>([])
-  const [metrics, setMetrics] = useState<any[]>([])
-  const [tags, setTags] = useState<any[]>([])
-  const [owners, setOwners] = useState<any[]>([])
-  const [teams, setTeams] = useState<any[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
+  const [unitTypes, setUnitTypes] = useState<unknown[]>([])
+  const [metrics, setMetrics] = useState<unknown[]>([])
+  const [tags, setTags] = useState<ExperimentTag[]>([])
+  const [owners, setOwners] = useState<ExperimentUser[]>([])
+  const [teams, setTeams] = useState<ExperimentTeam[]>([])
   
   const {
     client,
@@ -129,7 +129,7 @@ function SidebarContent() {
 
   // Create experiment panel state
   const [createPanelOpen, setCreatePanelOpen] = useState(false)
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<Experiment[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templateSearchQuery, setTemplateSearchQuery] = useState("")
   
@@ -375,9 +375,10 @@ function SidebarContent() {
           // Continue without caching
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Check if this is an authentication error
-      if (err.isAuthError || err.message === 'AUTH_EXPIRED') {
+      const error = err as { isAuthError?: boolean; message?: string }
+      if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
         setIsAuthExpired(true)
         setError('Your session has expired. Please log in again.')
       } else {
@@ -486,7 +487,7 @@ function SidebarContent() {
     }
   }
 
-  const handleSettingsSave = (newConfig: any) => {
+  const handleSettingsSave = (newConfig: Partial<ABsmartlyConfig>) => {
     updateConfig(newConfig)
     setView('list')
   }
@@ -538,7 +539,7 @@ function SidebarContent() {
     }
   }
 
-  const handleFilterChange = (filterState: any) => {
+  const handleFilterChange = (filterState: ExperimentFilters) => {
     debugLog('handleFilterChange called with:', filterState)
     debugLog('Current filters:', filters)
     
@@ -566,7 +567,7 @@ function SidebarContent() {
   }
   
   // Helper function to load experiments with specific filters
-  const loadExperimentsWithFilters = async (filterState: any, page = currentPage, size = pageSize) => {
+  const loadExperimentsWithFilters = async (filterState: ExperimentFilters, page = currentPage, size = pageSize) => {
     setExperimentsLoading(true)
     setError(null)
     
@@ -618,7 +619,7 @@ function SidebarContent() {
       debugLog('Attempting to refresh experiments before login redirect...')
 
       // Try to fetch experiments directly to check if session is valid
-      const params: any = {
+      const params: Record<string, unknown> = {
         page: 1,
         items: pageSize,
         iterations: 1,
