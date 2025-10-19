@@ -10,37 +10,37 @@ jest.mock('../../utils/logger')
 describe('OverrideManager', () => {
   let manager: OverrideManager
   let mockLogger: jest.Mocked<typeof Logger>
-  let mockCookies: Record<string, string>
-
-  // Setup mock cookies once before all tests
-  beforeAll(() => {
-    mockCookies = {}
-    // Mock document.cookie once
-    Object.defineProperty(document, 'cookie', {
-      get: () => {
-        return Object.entries(mockCookies)
-          .map(([name, value]) => `${name}=${value}`)
-          .join('; ')
-      },
-      set: (cookieString: string) => {
-        const [nameValue] = cookieString.split(';')
-        const [name, value] = nameValue.split('=')
-        if (value) {
-          mockCookies[name.trim()] = value.trim()
-        } else {
-          delete mockCookies[name.trim()]
-        }
-      },
-      configurable: true
-    })
-  })
 
   beforeEach(() => {
     manager = new OverrideManager()
     mockLogger = Logger as jest.Mocked<typeof Logger>
     jest.clearAllMocks()
-    // Clear cookies
-    mockCookies = {}
+    // Clear all cookies from global mock (set up in setup.ts)
+    const mockCookies = (global as any).__mockCookies
+    Object.keys(mockCookies).forEach(key => delete mockCookies[key])
+
+    // Restore the cookie mock in case a test modified it
+    Object.defineProperty(document, 'cookie', {
+      get: () => {
+        return Object.entries((global as any).__mockCookies)
+          .map(([name, value]) => `${name}=${value}`)
+          .join('; ')
+      },
+      set: (cookieString: string) => {
+        const [nameValue] = cookieString.split(';')
+        const eqIndex = nameValue.indexOf('=')
+        if (eqIndex > 0) {
+          const name = nameValue.substring(0, eqIndex).trim()
+          const value = nameValue.substring(eqIndex + 1).trim()
+          if (value) {
+            (global as any).__mockCookies[name] = value
+          } else {
+            delete (global as any).__mockCookies[name]
+          }
+        }
+      },
+      configurable: true
+    })
   })
 
   describe('parseCookieOverrides', () => {

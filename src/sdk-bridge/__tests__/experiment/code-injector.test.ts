@@ -304,8 +304,9 @@ describe('CodeInjector', () => {
 
       injector.injectExperimentCode(context)
 
+      // Error is caught in executeScriptsInHTML, not in the outer try-catch
       expect(mockLogger.error).toHaveBeenCalledWith(
-        '[ABsmartly Extension] Error processing experiment 0:',
+        '[ABsmartly Extension] Failed to execute script from headStart:',
         expect.any(Error)
       )
     })
