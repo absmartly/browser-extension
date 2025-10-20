@@ -5,7 +5,7 @@ test.describe('MultiSelect Tags Widget', () => {
   test('should allow adding and removing CSS classes with pill-style tags', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -117,7 +117,7 @@ test.describe('MultiSelect Tags Widget', () => {
   test('should handle edge cases in MultiSelect tags', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

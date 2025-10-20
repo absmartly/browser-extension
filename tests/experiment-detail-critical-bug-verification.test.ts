@@ -5,7 +5,7 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
   test('Variables remain visible after API structure changes - Core Bug Fix Test', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -279,7 +279,7 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
   test('Edge case: Verify parseVariantConfig helper handles problematic data', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -436,7 +436,7 @@ test.describe('Critical Bug Fix Verification: Variables Disappearing', () => {
   test('User edits preservation during API data changes', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

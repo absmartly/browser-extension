@@ -5,7 +5,7 @@ test.describe('ExperimentEditor Component', () => {
   test('renders create experiment form with default values', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -83,7 +83,7 @@ test.describe('ExperimentEditor Component', () => {
   test('syncs experiment name and display name when lock is enabled', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -147,7 +147,7 @@ test.describe('ExperimentEditor Component', () => {
   test('allows independent editing when lock is disabled', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -222,7 +222,7 @@ test.describe('ExperimentEditor Component', () => {
   test('validates required fields before submission', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -289,7 +289,7 @@ test.describe('ExperimentEditor Component', () => {
   test('updates variant percentages when variants are added/removed', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -354,7 +354,7 @@ test.describe('ExperimentEditor Component', () => {
   test('integrates with VariantList for variant management', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -422,7 +422,7 @@ test.describe('ExperimentEditor Component', () => {
   test('renders edit mode for existing experiment', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -502,7 +502,7 @@ test.describe('ExperimentEditor Component', () => {
   test('parses variant config correctly on load', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

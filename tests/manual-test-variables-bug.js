@@ -8,7 +8,7 @@ async function testExperimentVariablesPersistence() {
 
   // Launch browser with extension loaded
   const browser = await puppeteer.launch({
-    headless: false, // Show browser for manual verification
+    headless: true, // Show browser for manual verification
     args: [
       `--disable-extensions-except=${__dirname}/../`,
       `--load-extension=${__dirname}/../`

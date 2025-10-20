@@ -384,7 +384,7 @@ var ABSmartlySDKBridge = (() => {
         try {
           if (script.src) {
             let newScript = document.createElement("script");
-            newScript.src = script.src, newScript.async = script.async, newScript.defer = script.defer, newScript.setAttribute("data-absmartly-injected", location), this.insertAtLocation(newScript, location);
+            newScript.src = script.src, (script.async || script.hasAttribute("async")) && (newScript.async = !0), (script.defer || script.hasAttribute("defer")) && (newScript.defer = !0), newScript.setAttribute("data-absmartly-injected", location), this.insertAtLocation(newScript, location);
           } else
             Logger.warn(
               `[ABsmartly Extension] Inline script execution disabled for security from ${location}`
@@ -451,8 +451,8 @@ var ABSmartlySDKBridge = (() => {
               Logger.warn(`[ABsmartly Extension] Invalid regex pattern: ${pattern}`, e);
             }
           else {
-            let regexPattern = pattern.replace(/\*/g, ".*").replace(/\?/g, ".");
-            if (new RegExp(`^${regexPattern}$`).test(matchTarget))
+            let escapedPattern = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+            if (new RegExp(`^${escapedPattern}$`).test(matchTarget))
               return Logger.log(`[ABsmartly Extension] URL excluded by pattern: ${pattern}`), !1;
           }
       if (includePatterns.length === 0)
@@ -466,8 +466,8 @@ var ABSmartlySDKBridge = (() => {
             Logger.warn(`[ABsmartly Extension] Invalid regex pattern: ${pattern}`, e);
           }
         else {
-          let regexPattern = pattern.replace(/\*/g, ".*").replace(/\?/g, ".");
-          if (new RegExp(`^${regexPattern}$`).test(matchTarget))
+          let escapedPattern = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+          if (new RegExp(`^${escapedPattern}$`).test(matchTarget))
             return Logger.log(`[ABsmartly Extension] URL matched by pattern: ${pattern}`), !0;
         }
       return Logger.log("[ABsmartly Extension] URL did not match any include patterns"), !1;
@@ -531,7 +531,11 @@ var ABSmartlySDKBridge = (() => {
      */
     checkOverridesCookie() {
       try {
-        let cookieValue = document.cookie.split("; ").find((row) => row.startsWith(`${this.cookieName}=`))?.split("=")[1];
+        let row = document.cookie.split("; ").find((row2) => row2.startsWith(`${this.cookieName}=`)), cookieValue;
+        if (row) {
+          let eqIndex = row.indexOf("=");
+          eqIndex !== -1 && (cookieValue = row.substring(eqIndex + 1));
+        }
         if (cookieValue) {
           if (Logger.log(
             "[ABsmartly Extension] Found absmartly_overrides cookie (will be handled by OverridesPlugin)"
@@ -553,7 +557,11 @@ var ABSmartlySDKBridge = (() => {
      */
     getCookieValue() {
       try {
-        return document.cookie.split("; ").find((row) => row.startsWith(`${this.cookieName}=`))?.split("=")[1] || null;
+        let row = document.cookie.split("; ").find((row2) => row2.startsWith(`${this.cookieName}=`));
+        if (!row)
+          return null;
+        let eqIndex = row.indexOf("=");
+        return eqIndex === -1 ? null : row.substring(eqIndex + 1) || null;
       } catch (error) {
         return Logger.error("[ABsmartly Extension] Error getting cookie value:", error), null;
       }
@@ -827,8 +835,8 @@ var ABSmartlySDKBridge = (() => {
         found: !!this.state.cachedContext,
         path: this.state.contextPropertyPath || null,
         hasContext: !!this.state.cachedContext,
-        hasPeek: this.state.cachedContext && typeof this.state.cachedContext.peek == "function",
-        hasTreatment: this.state.cachedContext && typeof this.state.cachedContext.treatment == "function"
+        hasPeek: !!(this.state.cachedContext && typeof this.state.cachedContext.peek == "function"),
+        hasTreatment: !!(this.state.cachedContext && typeof this.state.cachedContext.treatment == "function")
       });
     }
   };

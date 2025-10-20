@@ -5,7 +5,7 @@ test.describe('ExperimentDetail Component', () => {
   test('renders experiment details correctly', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -103,7 +103,7 @@ test.describe('ExperimentDetail Component', () => {
   test('shows variants with VariantList component', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -194,7 +194,7 @@ test.describe('ExperimentDetail Component', () => {
   test('allows editing display name', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -281,7 +281,7 @@ test.describe('ExperimentDetail Component', () => {
   test('shows variant variables correctly', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -375,7 +375,7 @@ test.describe('ExperimentDetail Component', () => {
   test('integrates with VariantList for variant management', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -455,7 +455,7 @@ test.describe('ExperimentDetail Component', () => {
   test('shows Save Changes button when variants are modified', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -536,7 +536,7 @@ test.describe('ExperimentDetail Component', () => {
   test('parses variant config with DOM changes correctly', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -646,7 +646,7 @@ test.describe('ExperimentDetail Component', () => {
   test('shows correct status badges for different experiment states', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -719,7 +719,7 @@ test.describe('ExperimentDetail Component', () => {
   test('restricts variant add/remove for running experiments', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

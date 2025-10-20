@@ -18,7 +18,7 @@ const test = base.extend<{
 
     // Launch Chrome with the extension loaded
     const context = await chromium.launchPersistentContext('', {
-      headless: false, // Extensions require headed mode
+      headless: true, // Extensions require headed mode
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,

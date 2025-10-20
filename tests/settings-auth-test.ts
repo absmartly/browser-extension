@@ -5,7 +5,7 @@ test.describe('Settings Authentication Features', () => {
   test('Updated settings page with authentication status', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

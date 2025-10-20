@@ -88,7 +88,7 @@ test.describe('Natural Language E2E Test with Mock Data', () => {
   })
   
   test('Show how DOM changes work on a real page', async () => {
-    const context = await chromium.launch({ headless: false })
+    const context = await chromium.launch({ headless: true })
     const page = await context.newPage()
     
     // Load test page

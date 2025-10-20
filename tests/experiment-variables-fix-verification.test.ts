@@ -5,7 +5,7 @@ test.describe('Critical Bug Fix Verification - Variables Disappearing', () => {
   test('Variables and DOM changes remain visible after clicking on experiment (Bug Fix Test)', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -262,7 +262,7 @@ test.describe('Critical Bug Fix Verification - Variables Disappearing', () => {
   test('Variables persist during edit operations (Related Bug Fix)', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
