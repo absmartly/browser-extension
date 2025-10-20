@@ -12,7 +12,6 @@ export const test = base.extend<ExtensionFixtures>({
   context: async ({}, use) => {
     const pathToExtension = path.join(process.cwd(), 'build/chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,

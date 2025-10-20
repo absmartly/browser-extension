@@ -4,7 +4,6 @@ import path from 'path'
 test('BUG FIX VERIFICATION: Variables no longer disappear (using real experiment data)', async () => {
   const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
   const context = await chromium.launchPersistentContext('', {
-    headless: true,
     args: [
       `--disable-extensions-except=${pathToExtension}`,
       `--load-extension=${pathToExtension}`

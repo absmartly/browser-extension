@@ -5,7 +5,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('renders code injection section collapsed by default', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -95,7 +94,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('shows badge with count of non-empty code sections', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -182,7 +180,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('expands to show code sections when clicked', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -281,7 +278,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('shows URL filtering section', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -388,7 +384,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('shows "Copy URL filter from DOM changes" button when DOM changes have URL filter', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -486,7 +481,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('disables editing for running experiments', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -579,7 +573,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('allows adding code to empty sections', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -666,7 +659,6 @@ test.describe('ExperimentCodeInjection Component', () => {
   test('updates Save Changes button when code is modified', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

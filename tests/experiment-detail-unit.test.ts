@@ -5,7 +5,6 @@ test.describe('Experiment Detail UI State', () => {
   test('Variables UI shows correctly with mock data', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

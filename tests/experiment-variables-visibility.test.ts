@@ -5,7 +5,6 @@ test.describe('Experiment Variables UI Visibility', () => {
   test('Variables and DOM changes remain visible in experiment detail view', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -181,7 +180,6 @@ test.describe('Experiment Variables UI Visibility', () => {
   test('Variables remain visible after clicking Cancel in edit mode', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
