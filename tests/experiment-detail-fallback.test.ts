@@ -7,7 +7,6 @@ test.describe('ExperimentDetail Variant Data Fallback', () => {
     console.log('Loading extension from:', pathToExtension)
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -200,7 +199,6 @@ test.describe('ExperimentDetail Variant Data Fallback', () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,

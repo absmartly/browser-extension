@@ -5,7 +5,6 @@ test.describe('Fixed Error Handling', () => {
   test('Extension no longer crashes with experiments.map error', async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
