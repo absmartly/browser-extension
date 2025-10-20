@@ -236,27 +236,4 @@ test.describe('Visual Editor Unified Tests', () => {
 
     console.log('\n🎉 Complete visual editor workflow test PASSED!')
   })
-
-  test('Step 3: Test Edit Text action', async () => {
-    // This test is replaced by the complete workflow test above
-    test.skip()
-  })
-
-  test.skip('Step 4: Test Delete action', async () => {
-    // This test is replaced by the complete workflow test above
-    test.skip()
-  })
-
-  test('Visual editor changes sync to sidebar', async ({ context, extensionUrl }) => {
-    // TODO: This test will verify that changes made in the visual editor
-    // appear in the sidebar's DOM changes editor
-    // This requires:
-    // 1. Opening sidebar in a separate page
-    // 2. Starting visual editor
-    // 3. Making changes in the visual editor
-    // 4. Checking if those changes appear in the sidebar's Monaco editor
-
-    console.log('⚠️  Sidebar sync test not yet implemented')
-    test.skip()
-  })
 })
