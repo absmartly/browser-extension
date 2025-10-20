@@ -7,7 +7,6 @@ test.describe('Environment Variables Auto-Loading', () => {
     console.log('Loading extension from:', pathToExtension)
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -69,7 +68,6 @@ test.describe('Environment Variables Auto-Loading', () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -141,7 +139,6 @@ test.describe('Environment Variables Auto-Loading', () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -210,7 +207,6 @@ test.describe('Environment Variables Auto-Loading', () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,

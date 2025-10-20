@@ -9,7 +9,6 @@ test.describe('ABSmartly Extension E2E Tests', () => {
     // Use dev build for testing
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

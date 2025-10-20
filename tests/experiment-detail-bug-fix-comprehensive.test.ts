@@ -8,7 +8,6 @@ test.describe('ExperimentDetail Bug Fix - Comprehensive Tests', () => {
   test.beforeEach(async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,

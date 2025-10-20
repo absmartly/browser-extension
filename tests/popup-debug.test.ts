@@ -6,7 +6,6 @@ test.describe('Debug Extension Loading', () => {
     // Launch Chrome with the extension
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-prod')
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

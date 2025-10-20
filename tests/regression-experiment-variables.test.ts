@@ -7,7 +7,6 @@ test.describe('Regression Tests for Experiment Variables Bug Fix', () => {
     console.log('Loading extension from:', pathToExtension)
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -294,7 +293,6 @@ test.describe('Regression Tests for Experiment Variables Bug Fix', () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -412,7 +410,6 @@ test.describe('Regression Tests for Experiment Variables Bug Fix', () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,

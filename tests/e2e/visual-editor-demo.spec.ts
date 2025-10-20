@@ -14,7 +14,6 @@ test.describe('Visual Editor Demo', () => {
     console.log('\n🚀 Starting Visual Editor Demo')
 
     const context = await chromium.launchPersistentContext('', {
-      headless: true,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`
