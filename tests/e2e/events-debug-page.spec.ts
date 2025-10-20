@@ -37,42 +37,6 @@ test.afterAll(async () => {
 })
 
 test.describe('Events Debug Page', () => {
-  test.skip('sidebar loads with auto-config from env vars', async ({ context, extensionId, extensionUrl }) => {
-    console.log('\n🚀 Starting sidebar test with auto-config from env vars')
-    console.log('Extension ID:', extensionId)
-
-    const page = await context.newPage()
-    await page.goto(testServerUrl!)
-    console.log('✅ Test page loaded')
-
-    // Inject sidebar
-    const sidebar = await injectSidebar(page, extensionUrl)
-    console.log('✅ Sidebar injected')
-
-    // Wait for iframe to load
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
-    console.log('✅ Sidebar iframe loaded')
-
-    // Check if sidebar loaded config from env vars and shows main UI
-    const sidebarHTML = await sidebar.locator('body').innerHTML()
-    console.log('Sidebar HTML length:', sidebarHTML.length)
-
-    const hasWelcomeText = sidebarHTML.includes('Welcome to ABsmartly') || sidebarHTML.includes('Configure Settings')
-    const hasExperimentsText = sidebarHTML.includes('Experiments')
-    const hasEventsButton = sidebarHTML.includes('Events Debug')
-    console.log('Has welcome screen:', hasWelcomeText)
-    console.log('Has experiments UI:', hasExperimentsText)
-    console.log('Has Events Debug button:', hasEventsButton)
-
-    // Should NOT show welcome screen (env vars should auto-populate config)
-    expect(hasWelcomeText).toBe(false)
-    // Should show main UI
-    expect(hasExperimentsText || hasEventsButton).toBe(true)
-    console.log('✅ Test passed - main UI shown with auto-config from env vars!')
-
-    await page.close()
-  })
-
   test('sidebar loads with config (main UI)', async ({ context, extensionId, extensionUrl, seedStorage, getStorage }) => {
     console.log('\n🚀 Starting sidebar test with config')
     console.log('Extension ID:', extensionId)

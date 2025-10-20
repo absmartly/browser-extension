@@ -271,8 +271,12 @@ export class CodeInjector {
           }
         } else {
           // Simple wildcard matching
-          const regexPattern = pattern.replace(/\*/g, '.*').replace(/\?/g, '.')
-          const regex = new RegExp(`^${regexPattern}$`)
+          // First escape regex special characters, then replace wildcards
+          const escapedPattern = pattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except * and ?
+            .replace(/\*/g, '.*') // Convert * to .*
+            .replace(/\?/g, '.') // Convert ? to .
+          const regex = new RegExp(`^${escapedPattern}$`)
           if (regex.test(matchTarget)) {
             Logger.log(`[ABsmartly Extension] URL excluded by pattern: ${pattern}`)
             return false
@@ -299,8 +303,12 @@ export class CodeInjector {
         }
       } else {
         // Simple wildcard matching
-        const regexPattern = pattern.replace(/\*/g, '.*').replace(/\?/g, '.')
-        const regex = new RegExp(`^${regexPattern}$`)
+        // First escape regex special characters, then replace wildcards
+        const escapedPattern = pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except * and ?
+          .replace(/\*/g, '.*') // Convert * to .*
+          .replace(/\?/g, '.') // Convert ? to .
+        const regex = new RegExp(`^${escapedPattern}$`)
         if (regex.test(matchTarget)) {
           Logger.log(`[ABsmartly Extension] URL matched by pattern: ${pattern}`)
           return true
