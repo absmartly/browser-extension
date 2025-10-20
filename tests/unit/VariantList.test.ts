@@ -9,7 +9,7 @@ test.describe('VariantList Component', () => {
   test('renders initial variants correctly', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -97,7 +97,7 @@ test.describe('VariantList Component', () => {
   test('allows adding a new variant', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -166,7 +166,7 @@ test.describe('VariantList Component', () => {
   test('allows removing a variant (when more than 2)', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -237,7 +237,7 @@ test.describe('VariantList Component', () => {
   test('does not show delete button when only 2 variants', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -293,7 +293,7 @@ test.describe('VariantList Component', () => {
   test('allows updating variant name', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -354,7 +354,7 @@ test.describe('VariantList Component', () => {
   test('allows adding variables to variant', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -423,7 +423,7 @@ test.describe('VariantList Component', () => {
   test('shows JSON editor button for each variant', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -479,7 +479,7 @@ test.describe('VariantList Component', () => {
   test('persists variant changes to storage', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
@@ -549,7 +549,7 @@ test.describe('VariantList Component', () => {
   test('calls onVariantsChange callback when variants are modified', async () => {
     const pathToExtension = path.join(__dirname, '../..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

@@ -73,7 +73,7 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
     const extensionPath = path.join(__dirname, '../../build/chrome-mv3-dev')
 
     context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,

@@ -6,7 +6,7 @@ test.describe('Debug Dev Extension', () => {
     // Use dev build for better error messages
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`

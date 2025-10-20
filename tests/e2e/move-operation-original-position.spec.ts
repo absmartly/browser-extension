@@ -15,7 +15,7 @@ test.describe('Move Operation Original Position Preservation', () => {
 
     // Launch browser with extension
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`
@@ -277,7 +277,7 @@ test.describe('Move Operation Original Position Preservation', () => {
 
     // Launch browser with extension
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`

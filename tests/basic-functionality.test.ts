@@ -8,7 +8,7 @@ test.describe('Basic Extension Functionality', () => {
   test.beforeAll(async () => {
     const pathToExtension = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
     context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`
