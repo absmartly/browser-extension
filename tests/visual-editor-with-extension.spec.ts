@@ -18,7 +18,7 @@ test.describe('Visual Editor Tests with Real Extension', () => {
 
     // Load the extension in a persistent context
     context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: true,
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,

@@ -32,7 +32,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome']
-        // No slowMo - run at full speed for E2E tests
+        // headless defaults to true, can be overridden with --headed flag
       },
       testMatch: [
         // Include all E2E tests
