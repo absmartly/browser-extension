@@ -1,21 +1,47 @@
 import React, { useState, useEffect, lazy, Suspense } from "react"
 import { Storage } from "@plasmohq/storage"
+import { setupMessageResponseHandler, setupMessageListener } from "~src/lib/messaging"
 import "~style.css"
 
 const storage = new Storage()
 
-// This script will be injected programmatically by the background script
 console.log('🔵 ABSmartly Extension: Sidebar script loaded')
 
-// In test mode, listen for polyfilled chrome.runtime.sendMessage calls via postMessage
-// and forward them to the background script
+// Setup test mode polyfill if running in iframe
 if (window.parent !== window) {
-  // We're in an iframe (test mode)
-  console.log('[tabs/sidebar.tsx] Running in iframe, setting up message forwarding')
+  console.log('[tabs/sidebar.tsx] Running in iframe (test mode), setting up message polyfill')
+  setupMessageResponseHandler()
 
+  // Setup listener for incoming messages from background
+  setupMessageListener((message, sendResponse) => {
+    console.log('[tabs/sidebar.tsx] Received message:', message.type)
+    // Let the message bubble through to normal chrome.runtime.onMessage handlers
+    // This allows existing code to work without modification
+    return false
+  })
+}
+
+// Listen for messages from background script (works in both iframe and standalone modes)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[tabs/sidebar.tsx] Chrome runtime message:', message.type)
+
+  // Forward to React components via window.postMessage
+  window.postMessage({
+    source: 'absmartly-extension-incoming',
+    ...message
+  }, '*')
+
+  return false
+})
+
+console.log('[tabs/sidebar.tsx] ✅ Message handlers set up')
+
+// Old polyfill code below - can be removed
+if (false && window.parent !== window) {
+  // Disabled old code
   window.addEventListener('message', (event) => {
     if (event.data?.source === 'absmartly-content-script' || event.data?.source === 'absmartly-visual-editor') {
-      console.log('[tabs/sidebar.tsx] Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
+      console.log('[tabs/sidebar.tsx] OLD POLYFILL - Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
 
       // Mock the background script's response for REQUEST_INJECTION_CODE
       if (event.data.type === 'REQUEST_INJECTION_CODE') {

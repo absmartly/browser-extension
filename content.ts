@@ -14,6 +14,7 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { setupMessageListener } from '~src/lib/messaging'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
