@@ -645,13 +645,14 @@ export function VariantList({
                 changes={getChangesArray(getDOMChangesFromConfig(variant.config, domFieldName))}
                 onChange={(changes) => updateVariantDOMChanges(index, changes)}
                 previewEnabled={previewEnabled && activePreviewVariant === index}
-                onPreviewToggle={(enabled) => {
+                onPreviewToggle={(enabled, variantIndex) => {
+                  debugLog('[VariantList] onPreviewToggle inline callback called:', { enabled, variantIndex, index })
                   // Check if another variant has VE active
                   if (activeVEVariant && activeVEVariant !== variant.name) {
                     alert(`Visual Editor is active for variant "${activeVEVariant}". Please close it first.`)
                     return
                   }
-                  handlePreviewToggle(enabled, index)
+                  handlePreviewToggle(enabled, variantIndex)
                 }}
                 activeVEVariant={activeVEVariant}
                 onVEStart={() => setActiveVEVariant(variant.name)}
