@@ -94,13 +94,28 @@ export function setupContentScriptMessageListener() {
   debugLog('[Messaging] Setting up content script test mode listener')
 
   window.addEventListener('message', (event) => {
+    debugLog('[Messaging DEBUG] Received window message event:', {
+      source: event.source === window ? 'window' : 'other',
+      origin: event.origin,
+      dataSource: event.data?.source,
+      dataType: event.data?.type
+    })
+
     // Accept messages from sidebar iframe (check it exists and matches source)
     const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
 
+    debugLog('[Messaging DEBUG] Sidebar iframe check:', {
+      iframeExists: !!sidebarIframe,
+      eventSourceMatchesIframe: sidebarIframe ? event.source === sidebarIframe.contentWindow : false
+    })
+
     // SECURITY: Only accept messages from sidebar iframe
     if (!sidebarIframe || event.source !== sidebarIframe.contentWindow) {
+      debugLog('[Messaging DEBUG] Rejecting message - iframe check failed')
       return
     }
+
+    debugLog('[Messaging DEBUG] Passed iframe check, checking message format')
 
     if (event.data?.source === 'absmartly-extension' && event.data?.type) {
       const message = event.data as ExtensionMessage
@@ -110,6 +125,8 @@ export function setupContentScriptMessageListener() {
       const listeners = chrome.runtime.onMessage.hasListeners()
         ? (chrome.runtime.onMessage as any)._listeners || []
         : []
+
+      debugLog('[Messaging DEBUG] Found', listeners.length, 'chrome.runtime.onMessage listeners')
 
       for (const listener of listeners) {
         const sendResponse = (response: any) => {
@@ -132,6 +149,13 @@ export function setupContentScriptMessageListener() {
           debugError('[Messaging] Error in listener:', e)
         }
       }
+    } else {
+      debugLog('[Messaging DEBUG] Message format check failed:', {
+        hasSource: !!event.data?.source,
+        source: event.data?.source,
+        hasType: !!event.data?.type,
+        type: event.data?.type
+      })
     }
   })
 }
