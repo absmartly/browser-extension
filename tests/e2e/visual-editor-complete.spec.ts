@@ -1,9 +1,8 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
-import path from 'path'
 import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
+const TEST_PAGE_URL = '/visual-editor-test.html'
 
 // Save experiment mode - set to true to actually save the experiment to the database
 // WARNING: This writes to the production database! Only use when needed.
@@ -62,7 +61,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[DOMChanges]')
     )
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
+    await testPage.goto(`${TEST_PAGE_URL}?use_shadow_dom_for_visual_editor_context_menu=0`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForLoadState('networkidle')
 
@@ -730,7 +729,10 @@ test.describe('Visual Editor Complete Workflow', () => {
     } catch (err) {
       console.log('⚠️  Save button not found or not clickable within 5 seconds')
     }
-      await debugWait()
+
+      // Save triggers stop() after 500ms delay, so wait for VE to exit
+      // and preview toolbar to appear
+      await debugWait(2000)
     })
 
     await test.step('Wait for sidebar to update', async () => {
@@ -886,11 +888,226 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
-    await test.step('Test preview mode toggle', async () => {
-      console.log('\n👁️ STEP 7: Testing preview mode removal')
+    await test.step('Test Exit Preview button from toolbar', async () => {
+      console.log('\n🚪 STEP 7: Testing Exit Preview button from toolbar')
 
-      // NOTE: Preview is already enabled after using the visual editor in step 4
-      // So the first click will DISABLE preview, and second click will re-enable it
+      // After VE exit, preview mode is still active with the preview toolbar visible
+      console.log('  Verifying preview toolbar is visible...')
+
+      // Take screenshot to debug
+      await testPage.screenshot({ path: 'test-results/after-ve-exit-before-toolbar-check.png', fullPage: true })
+      console.log('  📸 Screenshot: after-ve-exit-before-toolbar-check.png')
+
+      // Wait a bit for the toolbar to be created
+      await testPage.waitForTimeout(1000)
+
+      const toolbarVisible = await testPage.evaluate(() => {
+        const toolbar = document.getElementById('absmartly-preview-header')
+        console.log('  [Page] Toolbar element:', toolbar)
+        return toolbar !== null
+      })
+
+      console.log(`  Toolbar visible: ${toolbarVisible}`)
+
+      if (!toolbarVisible) {
+        // Take another screenshot to see what's happening
+        await testPage.screenshot({ path: 'test-results/toolbar-not-found.png', fullPage: true })
+        console.log('  📸 Screenshot: toolbar-not-found.png')
+
+        // Check VE state
+        const veState = await testPage.evaluate(() => {
+          return {
+            isVisualEditorActive: (window as any).__absmartlyVisualEditorActive,
+            hasVEChanges: !!(window as any).__absmartlyVEChanges
+          }
+        })
+        console.log('  VE state:', veState)
+      }
+
+      expect(toolbarVisible).toBe(true)
+      console.log('  ✓ Preview toolbar is visible')
+
+      // Capture current state before clicking Exit Preview
+      const beforeExitState = await testPage.evaluate(() => {
+        const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
+        const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]')
+        return {
+          modifiedElementsCount: modifiedElements.length,
+          experimentMarkersCount: experimentMarkers.length
+        }
+      })
+      console.log(`  Preview markers before exit: ${beforeExitState.modifiedElementsCount} modified, ${beforeExitState.experimentMarkersCount} experiment markers`)
+
+      // Start listening to console messages
+      const consoleMessages: string[] = []
+      const consoleListener = (msg: any) => {
+        const text = msg.text()
+        if (text.includes('DISABLE_PREVIEW') || text.includes('ABSMARTLY_PREVIEW') || text.includes('Preview') || text.includes('preview')) {
+          consoleMessages.push(text)
+        }
+      }
+      testPage.on('console', consoleListener)
+
+      // Click the Exit Preview button in the toolbar
+      console.log('  Clicking Exit Preview button...')
+      await testPage.evaluate(() => {
+        console.log('[TEST] About to click Exit Preview button')
+        const toolbar = document.getElementById('absmartly-preview-header')
+        if (!toolbar) {
+          throw new Error('Preview toolbar not found')
+        }
+
+        // Find button by text content
+        const buttons = Array.from(toolbar.querySelectorAll('button'))
+        const exitBtn = buttons.find(btn => btn.textContent?.includes('Exit Preview'))
+
+        if (!exitBtn) {
+          throw new Error('Exit Preview button not found in toolbar')
+        }
+
+        console.log('[TEST] Clicking Exit Preview button now...')
+        ;(exitBtn as HTMLButtonElement).click()
+        console.log('[TEST] Exit Preview button clicked')
+      })
+      console.log('  ✓ Clicked Exit Preview button')
+
+      // Debug: Check if sidebar iframe received the message
+      console.log('  🔍 Checking if sidebar iframe received DISABLE_PREVIEW...')
+      const sidebarReceivedMessage = await testPage.evaluate(() => {
+        const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+        if (!sidebarIframe || !sidebarIframe.contentWindow) {
+          console.log('[TEST DEBUG] Sidebar iframe not found or no contentWindow')
+          return false
+        }
+
+        // Check if there's a window message listener that received the message
+        return new Promise((resolve) => {
+          let messageReceived = false
+          const listener = (event: MessageEvent) => {
+            console.log('[TEST DEBUG] Message received by main page:', event.data?.type, event.data)
+            if (event.data?.type === 'DISABLE_PREVIEW') {
+              console.log('[TEST DEBUG] Main page received DISABLE_PREVIEW:', event.data)
+              messageReceived = true
+              window.removeEventListener('message', listener)
+              resolve(true)
+            }
+          }
+          window.addEventListener('message', listener)
+
+          // Timeout after 1000ms
+          setTimeout(() => {
+            window.removeEventListener('message', listener)
+            console.log(`[TEST DEBUG] Timeout reached, messageReceived: ${messageReceived}`)
+            resolve(messageReceived)
+          }, 1000)
+        })
+      })
+      console.log(`  Sidebar iframe received DISABLE_PREVIEW (main page listener): ${sidebarReceivedMessage}`)
+
+      // Debug: Check if content script received the message
+      console.log('  🔍 Checking if content script received ABSMARTLY_PREVIEW...')
+      const contentScriptReceivedMessage = await testPage.evaluate(() => {
+        return new Promise((resolve) => {
+          let messageReceived = false
+          const listener = (event: MessageEvent) => {
+            if (event.data?.type === 'ABSMARTLY_PREVIEW' && event.data?.action === 'remove') {
+              console.log('[TEST DEBUG] Content script received ABSMARTLY_PREVIEW remove:', event.data)
+              messageReceived = true
+              window.removeEventListener('message', listener)
+              resolve(true)
+            }
+            if (event.data?.source === 'absmartly-extension-incoming' && event.data?.type === 'ABSMARTLY_PREVIEW') {
+              console.log('[TEST DEBUG] Content script received forwarded message:', event.data)
+              messageReceived = true
+              window.removeEventListener('message', listener)
+              resolve(true)
+            }
+          }
+          window.addEventListener('message', listener)
+
+          // Timeout after 500ms
+          setTimeout(() => {
+            window.removeEventListener('message', listener)
+            resolve(messageReceived)
+          }, 500)
+        })
+      })
+      console.log(`  Content script received ABSMARTLY_PREVIEW: ${contentScriptReceivedMessage}`)
+
+      // Wait for changes to revert
+      await debugWait(2000)
+
+      // Stop listening and log messages
+      testPage.off('console', consoleListener)
+      console.log('  📋 Console messages during Exit Preview:')
+      consoleMessages.forEach(msg => console.log(`    ${msg}`))
+
+      // Verify the toolbar was removed
+      console.log('  Verifying preview toolbar was removed...')
+      const toolbarRemovedState = await testPage.evaluate(() => {
+        const toolbar = document.getElementById('absmartly-preview-header')
+        return {
+          toolbarRemoved: toolbar === null
+        }
+      })
+      expect(toolbarRemovedState.toolbarRemoved).toBe(true)
+      console.log('  ✓ Preview toolbar removed')
+
+      // Verify preview mode is completely disabled
+      console.log('  Verifying preview mode is completely disabled...')
+      const afterExitState = await testPage.evaluate(() => {
+        const paragraph = document.querySelector('#test-paragraph')
+        const button1 = document.querySelector('#button-1')
+        const button2 = document.querySelector('#button-2')
+        const testContainer = document.querySelector('#test-container')
+        const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
+        const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]')
+
+        return {
+          // Verify markers are removed
+          modifiedElementsCount: modifiedElements.length,
+          experimentMarkersCount: experimentMarkers.length,
+          // Verify changes are reverted
+          paragraphText: paragraph?.textContent,
+          button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
+          button2Visible: button2 ? window.getComputedStyle(button2).display !== 'none' : false,
+          testContainerHTML: testContainer?.innerHTML?.trim()
+        }
+      })
+
+      console.log('  After exit state:', afterExitState)
+      console.log(`  Remaining markers: ${afterExitState.modifiedElementsCount} modified, ${afterExitState.experimentMarkersCount} experiment markers`)
+
+      // Verify all markers removed
+      expect(afterExitState.modifiedElementsCount).toBe(0)
+      expect(afterExitState.experimentMarkersCount).toBe(0)
+      console.log('  ✓ All preview markers removed')
+
+      // Verify changes reverted
+      expect(afterExitState.paragraphText).not.toBe('Undo test 3')
+      expect(afterExitState.button1Visible).toBe(true)
+      expect(afterExitState.button2Visible).toBe(true)
+      expect(afterExitState.testContainerHTML).not.toContain('HTML Edited!')
+      console.log('  ✓ All changes reverted to original state')
+
+      // Verify preview toggle in sidebar is OFF
+      console.log('  Verifying preview toggle in sidebar is OFF...')
+      const previewToggle = sidebar.locator('label:has-text("Preview:") button').first()
+      const toggleState = await previewToggle.evaluate((btn) => {
+        return btn.classList.contains('bg-blue-600')
+      })
+      expect(toggleState).toBe(false)
+      console.log('  ✓ Preview toggle in sidebar is OFF')
+
+      console.log('✅ Exit Preview button test COMPLETED!')
+      await debugWait()
+    })
+
+    await test.step('Test preview mode toggle', async () => {
+      console.log('\n👁️ STEP 8: Testing preview mode toggle')
+
+      // NOTE: Preview is now disabled after clicking Exit Preview in step 7
+      // So the first click will ENABLE preview, and second click will DISABLE it
 
       // Listen for console messages from the page to debug (only in DEBUG mode)
       if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
@@ -903,27 +1120,23 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       const previewToggle = sidebar.locator('label:has-text("Preview:") button').first()
 
-      // Verify preview is currently enabled (from visual editor usage)
-      console.log('  Verifying preview is currently enabled...')
+      // Verify preview is currently disabled (from Exit Preview button in step 7)
+      console.log('  Verifying preview is currently disabled...')
       const initialPreviewState = await testPage.evaluate(() => {
         const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
-        const experimentNames = new Set()
-        modifiedElements.forEach(el => {
-          const expName = el.getAttribute('data-absmartly-experiment')
-          if (expName) experimentNames.add(expName)
-        })
+        const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]')
         return {
           modifiedElementsCount: modifiedElements.length,
-          experimentNames: Array.from(experimentNames)
+          experimentMarkersCount: experimentMarkers.length
         }
       })
-      expect(initialPreviewState.modifiedElementsCount).toBeGreaterThan(0)
-      console.log(`  ✓ Preview is enabled (${initialPreviewState.modifiedElementsCount} elements marked)`)
-      console.log(`  Experiment names in markers: ${initialPreviewState.experimentNames.join(', ')}`)
+      expect(initialPreviewState.modifiedElementsCount).toBe(0)
+      expect(initialPreviewState.experimentMarkersCount).toBe(0)
+      console.log('  ✓ Preview is disabled (no markers present)')
 
-      // Capture current state while preview is enabled
-      console.log('  Capturing element states with preview enabled...')
-      const previewEnabledStates = await testPage.evaluate(() => {
+      // Capture current state while preview is disabled
+      console.log('  Capturing element states with preview disabled...')
+      const previewDisabledStates = await testPage.evaluate(() => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
@@ -937,17 +1150,17 @@ test.describe('Visual Editor Complete Workflow', () => {
           testContainerHTML: testContainer?.innerHTML?.trim()
         }
       })
-      console.log('  States captured:', previewEnabledStates)
+      console.log('  States captured:', previewDisabledStates)
 
-      // First click: DISABLE preview (remove preview markers)
-      console.log('  Disabling preview mode...')
+      // First click: ENABLE preview (apply changes and add markers)
+      console.log('  Enabling preview mode...')
       await previewToggle.click({ timeout: 5000 })
-      console.log('  ✓ Preview mode disabled')
-      await debugWait(2000) // Wait for changes to revert
+      console.log('  ✓ Preview mode enabled')
+      await debugWait(2000) // Wait for changes to apply
 
-      // Verify all preview markers were removed (preview was disabled)
-      console.log('  Verifying all preview markers were removed...')
-      const disabledStates = await testPage.evaluate(() => {
+      // Verify preview markers were added (preview was enabled)
+      console.log('  Verifying preview markers were added...')
+      const enabledStates = await testPage.evaluate(() => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
@@ -965,163 +1178,86 @@ test.describe('Visual Editor Complete Workflow', () => {
         }
       })
 
-      console.log('  States after disabling:', disabledStates)
-      console.log(`  Modified elements remaining: ${disabledStates.stillModifiedCount}`)
-      console.log(`  Experiment markers remaining: ${disabledStates.experimentMarkersCount}`)
+      console.log('  States after enabling:', enabledStates)
+      console.log(`  Modified elements: ${enabledStates.stillModifiedCount}`)
+      console.log(`  Experiment markers: ${enabledStates.experimentMarkersCount}`)
 
-      // Verify all modification markers are removed
-      expect(disabledStates.stillModifiedCount).toBe(0)
-      expect(disabledStates.experimentMarkersCount).toBe(0)
-      console.log('  ✓ All data-absmartly attributes removed')
+      // Verify markers were added
+      expect(enabledStates.stillModifiedCount).toBeGreaterThan(0)
+      expect(enabledStates.experimentMarkersCount).toBeGreaterThan(0)
+      console.log('  ✓ Preview markers added')
 
-      // Verify elements were reverted to original state (preview OFF should revert changes)
-      expect(disabledStates.paragraphText).not.toBe('Modified text!')
-      console.log(`  ✓ Paragraph reverted to original: "${disabledStates.paragraphText}"`)
+      // Verify changes were applied (preview ON should apply changes)
+      expect(enabledStates.paragraphText).toBe('Undo test 3')
+      console.log(`  ✓ Paragraph changed: "${enabledStates.paragraphText}"`)
 
-      expect(disabledStates.button1Visible).toBe(true)
-      console.log('  ✓ Button-1 is visible again (display restored)')
+      expect(enabledStates.button1Visible).toBe(false)
+      console.log('  ✓ Button-1 is hidden (display: none applied)')
 
-      expect(disabledStates.button2Visible).toBe(true)
-      console.log('  ✓ Button-2 is visible again (restored from delete)')
+      expect(enabledStates.button2Visible).toBe(false)
+      console.log('  ✓ Button-2 is hidden (delete applied)')
 
-      expect(disabledStates.testContainerHTML).not.toBe('HTML Edited!')
-      console.log(`  ✓ Section title reverted: "${disabledStates.testContainerHTML}"`)
+      expect(enabledStates.testContainerHTML).toContain('HTML Edited!')
+      console.log(`  ✓ Section title changed: "${enabledStates.testContainerHTML}"`)
 
-      console.log('  ✓ All changes reverted when preview disabled')
+      console.log('  ✓ All changes applied when preview enabled')
       await debugWait()
 
-      // Second click: RE-ENABLE preview (add markers back)
-      console.log('  Re-enabling preview mode...')
+      // Second click: DISABLE preview (remove markers again)
+      console.log('  Disabling preview mode again...')
 
       // Take screenshot to see current state
-      await testPage.screenshot({ path: 'test-results/before-preview-reenable.png', fullPage: true })
-      console.log('  📸 Screenshot: before-preview-reenable.png')
+      await testPage.screenshot({ path: 'test-results/before-preview-disable.png', fullPage: true })
+      console.log('  📸 Screenshot: before-preview-disable.png')
 
-      // The preview toggle we need to click is in the "DOM Changes" section of Variant 1
-      // This is the same toggle we used before (the one that was working)
-      // It should be next to the text "Preview:" in the DOM Changes section
-      console.log('  Looking for DOM Changes preview toggle...')
+      // Click the same toggle to disable
+      await previewToggle.click({ timeout: 5000 })
+      console.log('  ✓ Preview toggle clicked')
 
-      // Use the original previewToggle locator from the beginning of the test
-      // This was: sidebar.locator('label:has-text("Preview:") button').first()
-      // But after disabling, we need to make sure we're clicking the right one
-
-      // Let's find the preview toggle that's specifically in the DOM Changes section
-      // by looking for the text "DOM Changes" nearby
-      const domChangesSection = sidebar.locator('text="DOM Changes"').first()
-      const domChangesVisible = await domChangesSection.isVisible({ timeout: 2000 }).catch(() => false)
-      console.log(`  DOM Changes section visible: ${domChangesVisible}`)
-
-      if (domChangesVisible) {
-        // Get the parent container and find the preview toggle within it
-        const domChangesContainer = sidebar.locator('text="DOM Changes"').locator('..')
-        const domChangesPreviewToggle = domChangesContainer.locator('label:has-text("Preview:") button').first()
-
-        const toggleVisible = await domChangesPreviewToggle.isVisible({ timeout: 2000 }).catch(() => false)
-        console.log(`  DOM Changes preview toggle visible: ${toggleVisible}`)
-
-        if (toggleVisible) {
-          await domChangesPreviewToggle.evaluate((button) => {
-            console.log('  [Sidebar] Dispatching click to DOM Changes preview toggle')
-            button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-          })
-          console.log('  ✓ Dispatched click event to DOM Changes preview toggle')
-        }
-      } else {
-        // Fallback to the original toggle
-        console.log('  ⚠️  Could not find DOM Changes section, using fallback')
-        await previewToggle.evaluate((button) => {
-          button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
-      }
-
-      // Wait for React state updates
-      await testPage.waitForTimeout(500)
+      // Wait for changes to revert
+      await debugWait(2000)
 
       // Take screenshot after click
-      await testPage.screenshot({ path: 'test-results/after-preview-reenable-click.png', fullPage: true })
-      console.log('  📸 Screenshot: after-preview-reenable-click.png')
+      await testPage.screenshot({ path: 'test-results/after-preview-disable-click.png', fullPage: true })
+      console.log('  📸 Screenshot: after-preview-disable-click.png')
 
-      // Wait for the plugin to re-apply changes
-      await testPage.waitForTimeout(3000)
-
-      // Check if changes were re-applied
-      const changesReapplied = await testPage.evaluate(() => {
-        const paragraph = document.querySelector('#test-paragraph')
-        const markers = document.querySelectorAll('[data-absmartly-modified], [data-absmartly-experiment]')
-        return {
-          paragraphText: paragraph?.textContent?.trim(),
-          markersCount: markers.length
-        }
-      })
-
-      console.log(`  Current state after re-enable: paragraphText="${changesReapplied.paragraphText}", markers=${changesReapplied.markersCount}`)
-
-      // If changes weren't re-applied, wait a bit more and check again
-      if (changesReapplied.paragraphText !== 'Undo test 3' && changesReapplied.markersCount === 0) {
-        console.log('  ⚠️  Changes not yet re-applied, waiting 2 more seconds...')
-        await testPage.waitForTimeout(2000)
-      }
-
-      // Verify changes were re-applied AND markers were added back
-      const reEnabledStates = await testPage.evaluate(() => {
+      // Verify changes were reverted AND markers were removed
+      const disabledAgainStates = await testPage.evaluate(() => {
         const paragraph = document.querySelector('#test-paragraph')
         const button1 = document.querySelector('#button-1')
         const button2 = document.querySelector('#button-2')
         const testContainer = document.querySelector('#test-container')
 
         return {
-          // Verify changes are re-applied
+          // Verify changes are reverted
           paragraphText: paragraph?.textContent?.trim(),
-          button1Display: button1 ? window.getComputedStyle(button1).display : null,
-          button2Display: button2 ? window.getComputedStyle(button2).display : null,
+          button1Visible: button1 ? window.getComputedStyle(button1).display !== 'none' : false,
+          button2Visible: button2 ? window.getComputedStyle(button2).display !== 'none' : false,
           testContainerHTML: testContainer?.innerHTML?.trim(),
-          // Verify markers are back
+          // Verify markers are removed
           modifiedElementsCount: document.querySelectorAll('[data-absmartly-modified]').length,
-          experimentMarkersCount: document.querySelectorAll('[data-absmartly-experiment]').length,
-          elementsWithOriginalsCount: document.querySelectorAll('[data-absmartly-original]').length
+          experimentMarkersCount: document.querySelectorAll('[data-absmartly-experiment]').length
         }
       })
 
-      console.log('  Re-enabled state:', reEnabledStates)
+      console.log('  Disabled again state:', disabledAgainStates)
 
-      // KNOWN ISSUE: Re-enabling preview after disabling defaults to Control variant instead of Variant 1
-      // The preview toggle shows "ON" in the sidebar, but the banner shows "Variant: Control"
-      // This means no changes are being applied even though the toggle state is ON
-      // This is a pre-existing bug in the extension's preview toggle functionality
+      // Verify all markers removed
+      expect(disabledAgainStates.modifiedElementsCount).toBe(0)
+      expect(disabledAgainStates.experimentMarkersCount).toBe(0)
+      console.log('  ✓ All preview markers removed again')
 
-      if (reEnabledStates.paragraphText === 'Undo test 3' && reEnabledStates.modifiedElementsCount > 0) {
-        // If it actually worked, great!
-        console.log('  ✓ Paragraph text re-applied: "Undo test 3"')
-        console.log('  ✓ Button-1 hidden again (display: none)')
-        expect(reEnabledStates.button1Display).toBe('none')
-      } else {
-        // Known issue: preview re-enable doesn't work correctly
-        console.log('  ⚠️  KNOWN ISSUE: Preview re-enable defaulting to Control variant')
-        console.log('  ⚠️  Expected: Changes should be re-applied for Variant 1')
-        console.log('  ⚠️  Actual: Preview enabled for Control variant (no changes)')
-        console.log('  ⚠️  This is a pre-existing bug, not caused by URL filter changes')
-        console.log('  ℹ️  Skipping re-enable assertions due to known issue')
-      }
-
-      // Skip remaining assertions if preview re-enable didn't work (known issue)
-      if (reEnabledStates.modifiedElementsCount > 0) {
-        // Only check these if preview actually worked
-        expect(reEnabledStates.testContainerHTML).toContain('HTML Edited!')
-        console.log('  ✓ Section title HTML re-applied')
-
-        expect(reEnabledStates.experimentMarkersCount).toBeGreaterThan(0)
-        console.log(`  ✓ Preview markers restored: ${reEnabledStates.experimentMarkersCount} elements marked`)
-      }
+      // Verify changes reverted
+      expect(disabledAgainStates.paragraphText).not.toBe('Undo test 3')
+      expect(disabledAgainStates.button1Visible).toBe(true)
+      expect(disabledAgainStates.button2Visible).toBe(true)
+      expect(disabledAgainStates.testContainerHTML).not.toContain('HTML Edited!')
+      console.log('  ✓ All changes reverted to original state again')
 
       console.log('✅ Preview mode toggle test COMPLETED!')
-      console.log('  • Preview was enabled after visual editor usage ✓')
+      console.log('  • Started with preview disabled (from Exit Preview button in step 7) ✓')
+      console.log('  • Enabling preview applied all changes and added markers ✓')
       console.log('  • Disabling preview reverted all changes and removed markers ✓')
-      if (reEnabledStates.modifiedElementsCount > 0) {
-        console.log('  • Re-enabling preview re-applied changes and added markers back ✓')
-      } else {
-        console.log('  • Re-enabling preview - ⚠️  Known issue with variant selection')
-      }
       await debugWait()
     })
 
