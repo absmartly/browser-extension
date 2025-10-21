@@ -725,19 +725,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true // Will respond asynchronously
   } else if (message.type === "DISABLE_PREVIEW") {
     // Forward disable preview message to active tab to remove preview
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'ABSMARTLY_PREVIEW',
-          action: 'remove',
-          experimentName: message.experimentName
-        }, () => {
-          // Ignore connection errors - tab might have navigated
-          if (chrome.runtime.lastError) {
-            console.log('Preview remove message failed (tab may have navigated):', chrome.runtime.lastError)
-          }
-        })
-      }
+    // Use chrome.runtime.sendMessage instead of chrome.tabs.sendMessage to support test mode
+    // where the sidebar iframe forwards messages to the content script via postMessage
+    chrome.runtime.sendMessage({
+      type: 'ABSMARTLY_PREVIEW',
+      action: 'remove',
+      experimentName: message.experimentName
+    }).catch(() => {
+      // Ignore errors if no extension pages are listening
     })
 
     // Also notify any open extension sidebars to update their preview toggle state
@@ -749,6 +744,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
 
     sendResponse({ success: true })
+    return true
   } else if (message.type === "CHECK_AUTH") {
     // Use checkAuthentication from auth.ts for consistent auth logic
     console.log('[Background CHECK_AUTH] >>>>>> START - Received with requestId:', message.requestId)
@@ -1055,32 +1051,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     }
     
     try {
-      // First, check if content script is already loaded and inject if needed
-      const [result] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          return !!(window as any).__absmartlyContentScriptLoaded
-        }
-      })
-
-      if (!result.result) {
-        debugLog('[Background] Content script not loaded, injecting now')
-        // Inject the content script (only needed for non-absmartly.com domains in production)
-        const manifest = chrome.runtime.getManifest()
-        const contentScripts = manifest.content_scripts
-        if (contentScripts && contentScripts.length > 0) {
-          const contentScriptFile = contentScripts[0].js[0]
-          debugLog('[Background] Injecting content script:', contentScriptFile)
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: [contentScriptFile]
-          })
-        } else {
-          debugError('[Background] No content script found in manifest')
-        }
-      }
-
-      // Now inject/toggle the sidebar
+      // Always execute the script - it will handle toggling if already exists
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {

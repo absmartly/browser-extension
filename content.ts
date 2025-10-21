@@ -16,11 +16,7 @@ import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
 
 export const config: PlasmoCSConfig = {
-  // In production, auto-inject only on absmartly.com domains
-  // In development/test, auto-inject on all URLs for easier testing
-  matches: process.env.NODE_ENV === 'production'
-    ? ["https://*.absmartly.com/*"]
-    : ["<all_urls>"],
+  matches: ["<all_urls>"],
   all_frames: false,
   run_at: "document_start" // Run as early as possible to intercept SDK before it initializes
 }
@@ -517,6 +513,86 @@ window.addEventListener('message', (event) => {
 
     if (event.data.type === 'CLOSE_CODE_EDITOR') {
       closeCodeEditor()
+      return
+    }
+  }
+
+  // Handle messages forwarded from background script via sidebar
+  // (sidebar forwards chrome.runtime messages as window.postMessage with this source)
+  if (event.data?.source === 'absmartly-extension-incoming') {
+    console.log('[Content Script] ✅ Received message from background (via sidebar):', event.data.type, event.data)
+    console.log('[Content Script] Event source:', event.source === window ? 'window' : 'iframe')
+    debugLog('[Content Script] Received message from background (via sidebar):', event.data.type)
+
+    // Handle ABSMARTLY_PREVIEW messages (e.g., from DISABLE_PREVIEW)
+    if (event.data.type === 'ABSMARTLY_PREVIEW' && event.data.action === 'remove') {
+      console.log('[Content Script] 🔴 Removing preview for experiment:', event.data.experimentName)
+
+      // Only remove preview header if visual editor is NOT active
+      if (!isVisualEditorActive) {
+        removePreviewHeader()
+      }
+
+      // Remove preview markers and revert changes directly
+      const experimentName = event.data.experimentName
+      console.log('[Content Script] Removing preview markers for:', experimentName)
+
+      // Find all elements with preview markers for this experiment
+      const markedElements = document.querySelectorAll(`[data-absmartly-experiment="${experimentName}"]`)
+      console.log(`[Content Script] Found ${markedElements.length} elements with preview markers`)
+
+      markedElements.forEach((element) => {
+        // Restore original values if they exist
+        const original = element.getAttribute('data-absmartly-original')
+        if (original) {
+          try {
+            const originalData = JSON.parse(original)
+            console.log('[Content Script] Restoring element:', element, 'to original:', originalData)
+
+            // Restore based on the visual editor's data format
+            // Format: { textContent, innerHTML, styles: { display, width, height } }
+            if (originalData.textContent !== undefined) {
+              element.textContent = originalData.textContent
+            }
+            if (originalData.innerHTML !== undefined) {
+              element.innerHTML = originalData.innerHTML
+            }
+            if (originalData.styles) {
+              const htmlElement = element as HTMLElement
+              // Restore display
+              if (originalData.styles.display !== undefined) {
+                htmlElement.style.display = originalData.styles.display
+              }
+              // Restore dimensions if they were stored
+              if (originalData.styles.width !== undefined) {
+                htmlElement.style.width = originalData.styles.width
+              }
+              if (originalData.styles.height !== undefined) {
+                htmlElement.style.height = originalData.styles.height
+              }
+            }
+          } catch (e) {
+            console.error('[Content Script] Error restoring element:', e)
+          }
+        }
+
+        // Remove markers
+        element.removeAttribute('data-absmartly-experiment')
+        element.removeAttribute('data-absmartly-original')
+        element.removeAttribute('data-absmartly-modified')
+      })
+
+      console.log('[Content Script] ✅ Preview markers removed and changes reverted')
+
+      // Also send message to SDK plugin in case it needs to do cleanup
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'REMOVE_PREVIEW',
+        payload: {
+          experimentName: event.data.experimentName
+        }
+      }, '*')
+
       return
     }
   }

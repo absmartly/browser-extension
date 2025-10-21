@@ -14,8 +14,8 @@ if (window.parent !== window) {
   console.log('[tabs/sidebar.tsx] Running in iframe, setting up message forwarding')
 
   window.addEventListener('message', (event) => {
-    if (event.data?.source === 'absmartly-content-script' && event.data?.responseId) {
-      console.log('[tabs/sidebar.tsx] Received polyfilled message:', event.data.type, 'responseId:', event.data.responseId)
+    if (event.data?.source === 'absmartly-content-script' || event.data?.source === 'absmartly-visual-editor') {
+      console.log('[tabs/sidebar.tsx] Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
 
       // Mock the background script's response for REQUEST_INJECTION_CODE
       if (event.data.type === 'REQUEST_INJECTION_CODE') {
@@ -41,21 +41,27 @@ if (window.parent !== window) {
         // Forward to background script using real chrome.runtime
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
           chrome.runtime.sendMessage(originalMessage).then(response => {
-            // Send response back to content script via postMessage
-            window.postMessage({
-              source: 'absmartly-extension',
-              responseId: responseId,
-              response: response
-            }, '*')
-            console.log('[tabs/sidebar.tsx] Forwarded response from background:', response)
+            // Only send response back if there was a responseId (meaning caller expects a response)
+            if (responseId) {
+              window.postMessage({
+                source: 'absmartly-extension',
+                responseId: responseId,
+                response: response
+              }, '*')
+              console.log('[tabs/sidebar.tsx] Forwarded response from background:', response)
+            } else {
+              console.log('[tabs/sidebar.tsx] Message forwarded successfully (no response expected)')
+            }
           }).catch(error => {
             console.error('[tabs/sidebar.tsx] Error forwarding message to background:', error)
-            // Send error response back
-            window.postMessage({
-              source: 'absmartly-extension',
-              responseId: responseId,
-              response: { success: false, error: error.message || 'Message forwarding failed' }
-            }, '*')
+            // Only send error response if there was a responseId
+            if (responseId) {
+              window.postMessage({
+                source: 'absmartly-extension',
+                responseId: responseId,
+                response: { success: false, error: error.message || 'Message forwarding failed' }
+              }, '*')
+            }
           })
         } else {
           console.error('[tabs/sidebar.tsx] Cannot forward message - chrome.runtime not available')
@@ -77,13 +83,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // Forward to iframe content as a regular message event
-  // In iframe mode (dev), forward via window.postMessage
+  // In iframe mode (dev), forward via window.postMessage to both parent and own window
   // In standalone mode (production), the window.postMessage will still work
   // because EventsDebugPage listens for both chrome.runtime and window messages
+
+  // Post to own window (for EventsDebugPage in standalone mode)
   window.postMessage({
     source: 'absmartly-extension-incoming',
     ...message
   }, '*')
+
+  // In iframe mode, also post to parent window (for content script)
+  if (window.parent !== window) {
+    console.log('[tabs/sidebar.tsx] Forwarding message to parent window:', message.type, message)
+    window.parent.postMessage({
+      source: 'absmartly-extension-incoming',
+      ...message
+    }, '*')
+  }
 
   return false
 })
