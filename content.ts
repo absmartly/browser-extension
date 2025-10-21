@@ -1,6 +1,9 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-// This is the main content script that will be injected into all web pages
+// Content script configuration:
+// - DEV mode: Auto-injects on all URLs for easier development and testing
+// - PRODUCTION mode: Uses invalid URL pattern to prevent auto-loading
+//   Content script is injected programmatically when user clicks extension icon
 import { VisualEditor, JSONEditor } from '~src/visual-editor'
 import { EventViewer } from '~src/visual-editor/ui/event-viewer'
 import { ElementPicker } from '~src/content/element-picker'
@@ -13,7 +16,11 @@ import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
 
 export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"],
+  // In production, auto-inject only on absmartly.com domains
+  // In development/test, auto-inject on all URLs for easier testing
+  matches: process.env.NODE_ENV === 'production'
+    ? ["https://*.absmartly.com/*"]
+    : ["<all_urls>"],
   all_frames: false,
   run_at: "document_start" // Run as early as possible to intercept SDK before it initializes
 }

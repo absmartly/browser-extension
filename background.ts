@@ -1055,7 +1055,32 @@ chrome.action.onClicked.addListener(async (tab) => {
     }
     
     try {
-      // Always execute the script - it will handle toggling if already exists
+      // First, check if content script is already loaded and inject if needed
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          return !!(window as any).__absmartlyContentScriptLoaded
+        }
+      })
+
+      if (!result.result) {
+        debugLog('[Background] Content script not loaded, injecting now')
+        // Inject the content script (only needed for non-absmartly.com domains in production)
+        const manifest = chrome.runtime.getManifest()
+        const contentScripts = manifest.content_scripts
+        if (contentScripts && contentScripts.length > 0) {
+          const contentScriptFile = contentScripts[0].js[0]
+          debugLog('[Background] Injecting content script:', contentScriptFile)
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: [contentScriptFile]
+          })
+        } else {
+          debugError('[Background] No content script found in manifest')
+        }
+      }
+
+      // Now inject/toggle the sidebar
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {
