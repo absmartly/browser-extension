@@ -383,6 +383,7 @@ export function VariantList({
   }
 
   const handlePreviewToggle = useCallback((enabled: boolean, variantIndex: number) => {
+    debugLog('[VariantList] handlePreviewToggle called:', { enabled, variantIndex })
     setPreviewEnabled(enabled)
     setActivePreviewVariant(enabled ? variantIndex : null)
 
@@ -390,6 +391,12 @@ export function VariantList({
       const domChangesData = getDOMChangesFromConfig(variants[variantIndex].config, domFieldName)
       const changes = getChangesArray(domChangesData)
       const variantName = variants[variantIndex].name
+
+      debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (apply):', {
+        experimentName,
+        variantName,
+        changesCount: changes.filter(c => c.enabled !== false).length
+      })
 
       sendMessage({
         type: 'ABSMARTLY_PREVIEW',
@@ -401,8 +408,12 @@ export function VariantList({
           experimentName: experimentName,
           variantName: variantName
         }
+      }).catch(error => {
+        debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (apply):', error)
       })
     } else {
+      debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (remove):', { experimentName })
+
       sendMessage({
         type: 'ABSMARTLY_PREVIEW',
         from: 'sidebar',
@@ -411,6 +422,8 @@ export function VariantList({
           action: 'remove',
           experimentName: experimentName
         }
+      }).catch(error => {
+        debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (remove):', error)
       })
     }
   }, [variants, experimentName, domFieldName])
