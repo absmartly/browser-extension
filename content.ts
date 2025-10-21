@@ -14,7 +14,7 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { setupMessageListener } from '~src/lib/messaging'
+import { setupContentScriptMessageListener } from '~src/lib/messaging'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -99,6 +99,9 @@ let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
 let isVisualEditorActive = false
 let isVisualEditorStarting = false
+
+// Setup message listener polyfill for test mode (iframe context)
+setupContentScriptMessageListener()
 
 // Initialize overrides on page load
 // This ensures storage is synced to cookie for SSR compatibility
@@ -320,11 +323,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Handle preview messages
   if (message.type === 'ABSMARTLY_PREVIEW') {
-    debugLog('[ABSmartly Content Script] Received preview message:', message.action)
+    // Extract payload data (new messaging API has data in payload)
+    const payload = message.payload || message
+    const action = payload.action
+    const changes = payload.changes
+    const experimentName = payload.experimentName
+    const variantName = payload.variantName
+    const experimentId = payload.experimentId
+
+    debugLog('[ABSmartly Content Script] Received preview message:', action)
 
     // If visual editor is active or starting, ignore preview update messages
     // The visual editor manages its own changes and we don't want conflicts
-    if ((isVisualEditorActive || isVisualEditorStarting) && message.action === 'update') {
+    if ((isVisualEditorActive || isVisualEditorStarting) && action === 'update') {
       debugLog('[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update')
       sendResponse({ success: true, message: 'Visual editor active, preview update ignored' })
       return true
@@ -334,40 +345,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     ;(async () => {
       await ensureSDKPluginInjected()
 
-      if (message.action === 'apply') {
+      if (action === 'apply') {
         // Create preview header (it will check visual editor state internally)
-        createPreviewHeader(message.experimentName, message.variantName)
+        createPreviewHeader(experimentName, variantName)
 
         // Send message to SDK plugin to preview changes
         window.postMessage({
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
           payload: {
-            changes: message.changes || [],
-            experimentName: message.experimentName,
-            variantName: message.variantName,
-            experimentId: message.experimentId
+            changes: changes || [],
+            experimentName: experimentName,
+            variantName: variantName,
+            experimentId: experimentId
           }
         }, '*')
 
         sendResponse({ success: true })
-      } else if (message.action === 'update') {
+      } else if (action === 'update') {
         // Update changes WITHOUT recreating the header
         // Just send the new changes to the SDK plugin with updateMode flag
         window.postMessage({
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
           payload: {
-            changes: message.changes || [],
-            experimentName: message.experimentName,
-            variantName: message.variantName,
-            experimentId: message.experimentId,
+            changes: changes || [],
+            experimentName: experimentName,
+            variantName: variantName,
+            experimentId: experimentId,
             updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
           }
         }, '*')
 
         sendResponse({ success: true })
-      } else if (message.action === 'remove') {
+      } else if (action === 'remove') {
         // Only remove preview header if visual editor is NOT active
         if (!isVisualEditorActive) {
           removePreviewHeader()
@@ -378,7 +389,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           source: 'absmartly-extension',
           type: 'REMOVE_PREVIEW',
           payload: {
-            experimentName: message.experimentName
+            experimentName: experimentName
           }
         }, '*')
 
