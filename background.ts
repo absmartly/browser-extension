@@ -723,28 +723,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false, error: error.message })
     })
     return true // Will respond asynchronously
-  } else if (message.type === "DISABLE_PREVIEW") {
-    // Forward disable preview message to active tab to remove preview
-    // Use chrome.runtime.sendMessage instead of chrome.tabs.sendMessage to support test mode
-    // where the sidebar iframe forwards messages to the content script via postMessage
-    chrome.runtime.sendMessage({
-      type: 'ABSMARTLY_PREVIEW',
-      action: 'remove',
-      experimentName: message.experimentName
-    }).catch(() => {
+  } else if (message.type === "PREVIEW_STATE_CHANGED") {
+    // Forward preview state change to all extension pages (sidebar, inline editor, etc.)
+    chrome.runtime.sendMessage(message).catch(() => {
       // Ignore errors if no extension pages are listening
     })
-
-    // Also notify any open extension sidebars to update their preview toggle state
-    chrome.runtime.sendMessage({
-      type: 'PREVIEW_STATE_CHANGED',
-      enabled: false
-    }).catch(() => {
-      // Ignore errors if no sidebar is open
-    })
-
     sendResponse({ success: true })
-    return true
   } else if (message.type === "CHECK_AUTH") {
     // Use checkAuthentication from auth.ts for consistent auth logic
     console.log('[Background CHECK_AUTH] >>>>>> START - Received with requestId:', message.requestId)
