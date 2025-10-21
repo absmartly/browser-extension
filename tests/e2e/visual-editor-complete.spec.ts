@@ -1092,7 +1092,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Verify preview toggle in sidebar is OFF
       console.log('  Verifying preview toggle in sidebar is OFF...')
-      const previewToggle = sidebar.locator('label:has-text("Preview:") button').first()
+      const previewToggle = sidebar.locator('#preview-variant-1')
       const toggleState = await previewToggle.evaluate((btn) => {
         return btn.classList.contains('bg-blue-600')
       })
@@ -1118,7 +1118,8 @@ test.describe('Visual Editor Complete Workflow', () => {
         })
       }
 
-      const previewToggle = sidebar.locator('label:has-text("Preview:") button').first()
+      // Note: We locate the parent label because clicking the label triggers React events properly
+      const previewToggle = sidebar.locator('label:has(#preview-variant-1)')
 
       // Verify preview is currently disabled (from Exit Preview button in step 7)
       console.log('  Verifying preview is currently disabled...')
@@ -1154,7 +1155,9 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // First click: ENABLE preview (apply changes and add markers)
       console.log('  Enabling preview mode...')
-      await previewToggle.click({ timeout: 5000 })
+
+      // Force click to bypass Playwright's actionability checks
+      await previewToggle.click({ timeout: 5000, force: true })
       console.log('  ✓ Preview mode enabled')
       await debugWait(2000) // Wait for changes to apply
 

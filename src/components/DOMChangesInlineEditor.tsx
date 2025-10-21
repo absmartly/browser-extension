@@ -1358,6 +1358,7 @@ export function DOMChangesInlineEditor({
             <span>Preview:</span>
             <button
               type="button"
+              id={`preview-variant-${variantIndex}`}
               data-variant-index={variantIndex}
               data-testid={`preview-toggle-variant-${variantIndex}`}
               onClick={() => {
