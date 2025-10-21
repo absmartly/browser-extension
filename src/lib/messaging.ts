@@ -1,4 +1,4 @@
-import { debugLog } from '~src/utils/debug'
+import { debugLog, debugError } from '../utils/debug'
 
 export type MessageSource = 'sidebar' | 'content' | 'background'
 export type MessageDestination = 'sidebar' | 'content' | 'background'
