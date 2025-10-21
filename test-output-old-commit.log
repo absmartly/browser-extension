@@ -1,0 +1,395 @@
+🚀 Starting global test setup...
+✅ Extension already built
+⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.
+✅ Copied seed.html to build directory
+✅ Copied seed.js to build directory
+✅ Copied local-test-page.html to build directory
+✅ Loaded environment variables from .env.dev.local
+✅ API credentials found in environment
+✅ Global setup completed successfully
+---
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify
+[1A[2K[chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify
+✅ Test page loaded (test mode enabled)
+
+[1A[2K  📋 Console messages so far: 28
+
+[1A[2KExtension ID: hmdfdmlfegajkklhbiijdpkdbaccnplj
+
+[1A[2K
+📂 STEP 1: Injecting sidebar
+
+[1A[2K✅ Sidebar visible
+
+[1A[2K
+📋 STEP 2: Creating new experiment
+
+[1A[2K  Dispatched click event to Create New Experiment button
+
+[1A[2K  Selecting "From Scratch" option...
+
+[1A[2K  ✓ Selected "From Scratch" option
+
+[1A[2K  Filled experiment name: E2E Test Experiment 1761061872921
+
+[1A[2K  Selecting Unit Type...
+
+[1A[2K  Selecting Unit Type...
+
+[1A[2K  ✓ Unit type select is enabled
+
+[1A[2K  ✓ Clicked unit type trigger
+
+[1A[2K  ✓ Selected unit type
+
+[1A[2K  Selecting Applications...
+
+[1A[2K  ✓ Clicked applications trigger
+
+[1A[2K  ✓ Selected application
+
+[1A[2K✅ Experiment form filled with required fields
+
+[1A[2K🎨 STEP 3: Clicking Visual Editor button
+
+[1A[2K  ✓ Visual Editor button is enabled (form validation complete)
+
+[1A[2K  ✓ Waited for React handlers to attach
+
+[1A[2K  ✓ Brought test page to front
+
+[1A[2K  ✓ Dispatched click event to Visual Editor button
+
+[1A[2K  ⏳ Waited 3s after VE button click
+
+[1A[2K  📋 Captured 239 console messages
+
+[1A[2K  📋 Content script/background messages: 6
+
+[1A[2K  Messages:
+    [log] [ABsmartly] Content script executing - TOP OF FILE
+    [log] [ABsmartly] Content script marker set: true
+    [log] [ABsmartly] SDK Bridge loaded successfully - version 1.1.0
+    [log] [ABsmartly] Message listener called! Message type: ABSMARTLY_PREVIEW
+    [log] [ABsmartly] Message listener called! Message type: CHECK_VISUAL_EDITOR_ACTIVE
+    [log] [ABsmartly] Message listener called! Message type: SET_VISUAL_EDITOR_STARTING
+
+[1A[2K  ❌ Found 1 error messages:
+
+[1A[2K    - Failed to save development environment: Error: Cannot access contents of url "file:///Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/test-pages/visual-editor-test.html?use_shadow_dom_for_visual_editor_context_menu=0". Extension manifest must request permission to access this host.
+
+[1A[2K  ⏳ Waiting for VE banner to appear...
+
+[1A[2K  📋 Total messages captured so far: 239
+
+[1A[2K✅ Visual editor active
+
+[1A[2K  Screenshot saved: sidebar-after-ve-launch.png
+
+[1A[2K
+🚫 STEP 3.5: Testing VE protection - all buttons should be disabled
+
+[1A[2K  Found 1 Visual Editor buttons
+
+[1A[2K  Button 0 disabled: true, title: "Visual Editor is already active for this variant"
+
+[1A[2K  ✅ All VE buttons correctly disabled when VE is active
+
+[1A[2K
+🧪 STEP 4: Testing visual editor context menu actions
+
+[1A[2K  Testing: Edit Text on #test-paragraph
+
+[1A[2K  ✓ Edit Text works
+
+[1A[2K  Testing: Hide on #button-1
+
+[1A[2K  ✓ Hide works
+
+[1A[2K  Testing: Delete on #button-2
+
+[1A[2K  ✓ Delete works
+
+[1A[2K  Testing: Edit HTML on #test-container
+
+[1A[2K  ✓ CodeMirror editor appeared
+
+[1A[2K  ✓ CodeMirror syntax highlighting: true
+
+[1A[2K  ✓ Updated HTML via CodeMirror
+
+[1A[2K  Looking for Save button...
+
+[1A[2K  Clicking Save button with JavaScript click...
+
+[1A[2K  Clicked Save button
+
+[1A[2K  Editor closed
+
+[1A[2K  ✓ Edit HTML with CodeMirror works
+
+[1A[2K  Testing: Change image source on img element
+
+[1A[2K  ✓ Added test image to page
+
+[1A[2K  ✓ Context menu opened for image
+
+[1A[2K  ✓ "Change image source" option is visible
+
+[1A[2K  ✓ Clicked "Change image source"
+
+[1A[2K  ✓ Image source dialog opened
+
+[1A[2K  ✓ Context menu closed after opening image dialog
+
+[1A[2K  ✓ Entered new image URL: https://via.placeholder.com/200
+
+[1A[2K  ✓ Clicked Apply button
+
+[1A[2K  ✓ Image source dialog closed after clicking Apply
+
+[1A[2K  ✅ Context menu did NOT reopen (bug is fixed!)
+
+[1A[2K  ✓ Image source updated to: https://via.placeholder.com/200
+
+[1A[2K✅ Visual editor actions tested (Edit Text, Hide, Delete, Edit HTML, Change Image Source)
+
+[1A[2K
+✓ Verifying DOM changes were actually applied...
+
+[1A[2K  Applied changes: {
+  paragraphText: [32m'Modified text!'[39m,
+  button1Display: [32m'none'[39m,
+  button2Display: [32m'none'[39m,
+  testContainerHTML: [32m'<h2>HTML Edited!</h2><p>New paragraph content</p><p></p>'[39m
+}
+
+[1A[2K  ✓ Text change applied: paragraph text is "Modified text!"
+
+[1A[2K  ✓ Hide change applied: button-1 is display:none
+
+[1A[2K  ✓ Delete change applied: button-2 is hidden (display:none)
+
+[1A[2K  ✓ HTML change applied: test-container has new HTML
+
+[1A[2K✅ All DOM changes verified and applied correctly
+
+[1A[2K
+🔄 Testing undo/redo with multiple changes to same element...
+
+[1A[2K  📝 Current text: "Modified text!"
+
+[1A[2K  ✏️  Making change 1: "Undo test 1"
+
+[1A[2K  ✓ Change 1 applied: "Undo test 1" (trackChange: null, undoAction: null)
+
+[1A[2K  ✏️  Making change 2: "Undo test 2"
+
+[1A[2K  ✓ Change 2 applied: "Undo test 2" (trackChange: null, undoAction: null)
+
+[1A[2K  ✏️  Making change 3: "Undo test 3"
+
+[1A[2K  ✓ Change 3 applied: "Undo test 3" (trackChange: null, undoAction: null)
+
+[1A[2K  ✓ Final text after changes: "Undo test 3"
+
+[1A[2K
+  ⏪ Testing undo with individual change tracking...
+
+[1A[2K  ✓ Undo 1: Text is now "Undo test 2"
+
+[1A[2K  ✓ Undo 2: Text is now "Undo test 1"
+
+[1A[2K  ✓ Undo 3: Text is now "Modified text!"
+
+[1A[2K
+  ⏩ Testing redo...
+
+[1A[2K  ✓ Redo 1: Text is now "Undo test 1"
+
+[1A[2K  ✓ Redo 2: Text is now "Undo test 2"
+
+[1A[2K  ✓ Redo 3: Text is now "Undo test 3"
+
+[1A[2K
+✅ Undo/redo with individual change tracking working correctly!
+
+[1A[2K  • Each change tracked individually for granular undo/redo
+
+[1A[2K  • 3 undos: "Undo test 3" -> "Undo test 2" -> "Undo test 1" -> "Modified text!"
+
+[1A[2K  • 3 redos: "Modified text!" -> "Undo test 1" -> "Undo test 2" -> "Undo test 3"
+
+[1A[2K
+🔘 Testing undo/redo button states...
+
+[1A[2K  ⏪ Undoing all changes to test undo button disabled state...
+
+[1A[2K  ✓ Undo button became disabled after 8 undos
+
+[1A[2K  ✓ Undo button is disabled when no more changes to undo
+
+[1A[2K
+  ⏩ Redoing all changes to test redo button disabled state...
+
+[1A[2K  ✓ Redo button became disabled after 8 redos
+
+[1A[2K  ✓ Redo button is disabled when no more changes to redo
+
+[1A[2K
+✅ Undo/redo button states test PASSED!
+
+[1A[2K  • Undo button disabled after 8 undos (no more history)
+
+[1A[2K  • Redo button disabled after 8 redos (caught up to current state)
+
+[1A[2K
+💾 STEP 5: Clicking Save button...
+
+[1A[2K✅ Save button clicked
+
+[1A[2K
+⏳ STEP 6: Waiting for sidebar to update after visual editor closes...
+
+[1A[2K
+📝 STEP 7: Verifying changes in sidebar...
+
+[1A[2K  Screenshot saved to test-results/sidebar-after-save.png
+
+[1A[2K  Inline editor exists: false
+
+[1A[2K  Sidebar HTML length: 41362 characters
+
+[1A[2K  Sidebar HTML: 
+    <div id="__plasmo" style="width: 100%; height: 100%; background-color: white; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, Oxygen, Ubuntu, Cantarell, &quot;Open Sans&quot;, &quot;Helvetica Neue&quot;, sans-serif; font-size: 14px; line-height: 1.5; color: rgb(17, 24, 39); overflow: auto;"><div class="w-full h-screen bg-white flex flex-col"><div class="p-4"><div class="mb-4 flex items-center justify-between gap-2"><div class="flex items-center gap-3 flex-1 min...
+
+[1A[2K  Elements with 'change' or 'card' in class: 5
+
+[1A[2KFound 5 DOM change cards in sidebar
+
+[1A[2KDOM Change cards content: Text#test-paragraphSet text to: "Undo test 3" Style#button-1display:none Remove#button-2Remove element HTML#test-containerReplace inner HTML(58 chars) Attribute#test-imagesrc="https://via.placeholder.com/200"
+
+[1A[2K
+Searching for HTML change...
+
+[1A[2KLooking for: #test-container and "<h2>HTML Edited!</h2><p>New paragraph content</p>"
+
+[1A[2KHas #test-container: [33mtrue[39m
+
+[1A[2KHas "<h2>HTML Edited!</h2><p>New paragraph content</p>": [33mfalse[39m
+
+[1A[2K
+  Verifying individual changes:
+
+[1A[2K  ✓ Edit Text: #test-paragraph → "Undo test 3"
+
+[1A[2K  ✓ Hide: #button-1 → display:none
+
+[1A[2K  ✓ Delete/Remove: #button-2
+
+[1A[2K  ✓ Edit HTML: #test-container → HTML change
+
+[1A[2K
+✅ All expected changes verified in sidebar
+
+[1A[2K
+🎉 Visual editor complete workflow test PASSED!
+
+[1A[2K✅ Successfully tested:
+
+[1A[2K  • Edit Text - Modified paragraph text
+
+[1A[2K  • Hide - Hid button element
+
+[1A[2K  • Delete - Deleted button element
+
+[1A[2K  • Edit HTML - Modified heading HTML
+
+[1A[2K  • Save to sidebar - Changes synced to DOM editor
+
+[1A[2K
+🔍 STEP 6.5: Verifying changes and markers after VE exit
+
+[1A[2K  Post-VE state: {
+  paragraphText: [32m'Undo test 3'[39m,
+  button1Display: [32m'none'[39m,
+  button2Display: [32m'none'[39m,
+  testContainerHTML: [32m'<h2>HTML Edited!</h2><p>New paragraph content</p><p></p>'[39m,
+  markedElementsCount: [33m5[39m,
+  elementsWithOriginalsCount: [33m5[39m,
+  experimentNames: [
+    [32m'e2e_test_experiment_1761061872921'[39m,
+    [32m'e2e_test_experiment_1761061872921'[39m,
+    [32m'e2e_test_experiment_1761061872921'[39m,
+    [32m'e2e_test_experiment_1761061872921'[39m,
+    [32m'e2e_test_experiment_1761061872921'[39m
+  ]
+}
+
+[1A[2K  ✓ All changes still applied after VE exit
+
+[1A[2K  ✓ Preview markers present: 5 elements marked
+
+[1A[2K  ✓ Original values preserved: 5 elements with data-absmartly-original
+
+[1A[2K
+👁️ STEP 7: Testing preview mode removal
+
+[1A[2K  Verifying preview is currently enabled...
+
+[1A[2K  ✓ Preview is enabled (5 elements marked)
+
+[1A[2K  Experiment names in markers: e2e_test_experiment_1761061872921
+
+[1A[2K  Capturing element states with preview enabled...
+
+[1A[2K  States captured: {
+  paragraphText: [32m'Undo test 3'[39m,
+  paragraphVisible: [33mtrue[39m,
+  button1Visible: [33mfalse[39m,
+  button2Visible: [33mfalse[39m,
+  testContainerHTML: [32m'<h2>HTML Edited!</h2><p>New paragraph content</p><p></p>'[39m
+}
+
+[1A[2K  Disabling preview mode...
+
+[1A[2K  ✓ Preview mode disabled
+
+[1A[2K  Verifying all preview markers were removed...
+
+[1A[2K  States after disabling: {
+  paragraphText: [32m'Undo test 3'[39m,
+  button1Visible: [33mfalse[39m,
+  button2Visible: [33mfalse[39m,
+  testContainerHTML: [32m'<h2>HTML Edited!</h2><p>New paragraph content</p><p></p>'[39m,
+  stillModifiedCount: [33m5[39m,
+  experimentMarkersCount: [33m6[39m
+}
+
+[1A[2K  Modified elements remaining: 5
+
+[1A[2K  Experiment markers remaining: 6
+
+[1A[2K  1) [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify › Test preview mode toggle 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m0[39m
+    Received: [31m5[39m
+
+      971 |
+      972 |       // Verify all modification markers are removed
+    > 973 |       expect(disabledStates.stillModifiedCount).toBe(0)
+          |                                                 ^
+      974 |       expect(disabledStates.experimentMarkersCount).toBe(0)
+      975 |       console.log('  ✓ All data-absmartly attributes removed')
+      976 |
+        at /Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/visual-editor-complete.spec.ts:973:49
+        at /Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/visual-editor-complete.spec.ts:889:5
+
+
+[1A[2K  1 failed
+    [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify 

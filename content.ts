@@ -28,39 +28,6 @@ w.__absmartlyContentScriptLoaded = true
 console.log('[ABsmartly] Content script marker set:', w.__absmartlyContentScriptLoaded)
 debugLog('[Visual Editor Content Script] Content script loaded')
 
-// Helper function to send messages - handles both test mode (iframe) and production (chrome.runtime)
-const sendMessageToExtension = (message: any) => {
-  // Check if sidebar iframe exists (only in test mode)
-  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-
-  // Determine the correct source based on message type
-  // Visual editor messages should use 'absmartly-visual-editor' source
-  // Code editor messages should use 'absmartly-content-script' source
-  const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
-                  message.type === 'VISUAL_EDITOR_STOPPED' ||
-                  message.type === 'DISABLE_PREVIEW' ||
-                  message.type === 'ELEMENT_SELECTED')
-    ? 'absmartly-visual-editor'
-    : 'absmartly-content-script'
-
-  if (sidebarIframe && sidebarIframe.contentWindow) {
-    // Test mode: send to sidebar iframe
-    sidebarIframe.contentWindow.postMessage({
-      source: source,
-      ...message
-    }, '*')
-    debugLog(`Sent ${message.type} to sidebar iframe (test mode) with source: ${source}`)
-  } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-    // Production: use chrome.runtime.sendMessage
-    chrome.runtime.sendMessage(message).catch(err => {
-      debugError(`Failed to send ${message.type} via chrome.runtime:`, err)
-    })
-    debugLog(`Sent ${message.type} via chrome.runtime (production mode)`)
-  } else {
-    debugError('No message transport available (neither iframe nor chrome.runtime)')
-  }
-}
-
 // Polyfill chrome.runtime.sendMessage for test mode
 // This handles messages that expect a response (like REQUEST_INJECTION_CODE)
 if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -91,8 +58,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
       // Determine the correct source based on message type
       const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
                       message.type === 'VISUAL_EDITOR_STOPPED' ||
-                      message.type === 'DISABLE_PREVIEW' ||
-                      message.type === 'ELEMENT_SELECTED')
+                      message.type === 'ELEMENT_SELECTED' ||
+                      message.type === 'PREVIEW_STATE_CHANGED')
         ? 'absmartly-visual-editor'
         : 'absmartly-content-script'
 
@@ -199,7 +166,7 @@ async function startVisualEditor(config: {
         console.log('[Visual Editor Content Script] AFTER debugLog - about to send message')
         console.log('[Visual Editor Content Script] NOW SENDING VISUAL_EDITOR_CHANGES message with', changes.length, 'changes')
 
-        sendMessageToExtension({
+        chrome.runtime.sendMessage({
           type: 'VISUAL_EDITOR_CHANGES',
           variantName: config.variantName,
           changes: changes
@@ -259,7 +226,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     elementPicker.start((selector: string) => {
       debugLog('[Visual Editor Content Script] Element selected:', selector)
       // Send the selected element back to the extension
-      sendMessageToExtension({
+      chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
         selector: selector
       })
@@ -517,86 +484,6 @@ window.addEventListener('message', (event) => {
     }
   }
 
-  // Handle messages forwarded from background script via sidebar
-  // (sidebar forwards chrome.runtime messages as window.postMessage with this source)
-  if (event.data?.source === 'absmartly-extension-incoming') {
-    console.log('[Content Script] ✅ Received message from background (via sidebar):', event.data.type, event.data)
-    console.log('[Content Script] Event source:', event.source === window ? 'window' : 'iframe')
-    debugLog('[Content Script] Received message from background (via sidebar):', event.data.type)
-
-    // Handle ABSMARTLY_PREVIEW messages (e.g., from DISABLE_PREVIEW)
-    if (event.data.type === 'ABSMARTLY_PREVIEW' && event.data.action === 'remove') {
-      console.log('[Content Script] 🔴 Removing preview for experiment:', event.data.experimentName)
-
-      // Only remove preview header if visual editor is NOT active
-      if (!isVisualEditorActive) {
-        removePreviewHeader()
-      }
-
-      // Remove preview markers and revert changes directly
-      const experimentName = event.data.experimentName
-      console.log('[Content Script] Removing preview markers for:', experimentName)
-
-      // Find all elements with preview markers for this experiment
-      const markedElements = document.querySelectorAll(`[data-absmartly-experiment="${experimentName}"]`)
-      console.log(`[Content Script] Found ${markedElements.length} elements with preview markers`)
-
-      markedElements.forEach((element) => {
-        // Restore original values if they exist
-        const original = element.getAttribute('data-absmartly-original')
-        if (original) {
-          try {
-            const originalData = JSON.parse(original)
-            console.log('[Content Script] Restoring element:', element, 'to original:', originalData)
-
-            // Restore based on the visual editor's data format
-            // Format: { textContent, innerHTML, styles: { display, width, height } }
-            if (originalData.textContent !== undefined) {
-              element.textContent = originalData.textContent
-            }
-            if (originalData.innerHTML !== undefined) {
-              element.innerHTML = originalData.innerHTML
-            }
-            if (originalData.styles) {
-              const htmlElement = element as HTMLElement
-              // Restore display
-              if (originalData.styles.display !== undefined) {
-                htmlElement.style.display = originalData.styles.display
-              }
-              // Restore dimensions if they were stored
-              if (originalData.styles.width !== undefined) {
-                htmlElement.style.width = originalData.styles.width
-              }
-              if (originalData.styles.height !== undefined) {
-                htmlElement.style.height = originalData.styles.height
-              }
-            }
-          } catch (e) {
-            console.error('[Content Script] Error restoring element:', e)
-          }
-        }
-
-        // Remove markers
-        element.removeAttribute('data-absmartly-experiment')
-        element.removeAttribute('data-absmartly-original')
-        element.removeAttribute('data-absmartly-modified')
-      })
-
-      console.log('[Content Script] ✅ Preview markers removed and changes reverted')
-
-      // Also send message to SDK plugin in case it needs to do cleanup
-      window.postMessage({
-        source: 'absmartly-extension',
-        type: 'REMOVE_PREVIEW',
-        payload: {
-          experimentName: event.data.experimentName
-        }
-      }, '*')
-
-      return
-    }
-  }
-
   // Handle test messages for programmatic sidebar control
   if (event.data.source === 'absmartly-tests') {
     if (event.data.type === 'TEST_OPEN_SIDEBAR') {
@@ -669,7 +556,7 @@ window.addEventListener('message', (event) => {
       isVisualEditorStarting = false
 
       // Send message to extension that visual editor was stopped
-      sendMessageToExtension({
+      chrome.runtime.sendMessage({
         type: 'VISUAL_EDITOR_STOPPED',
         changes: changes
       })
@@ -801,10 +688,50 @@ function createPreviewHeader(experimentName: string, variantName: string) {
     // Remove preview header immediately
     removePreviewHeader()
 
-    // Send message back to extension to disable preview
-    sendMessageToExtension({
-      type: 'DISABLE_PREVIEW',
-      experimentName: experimentName
+    // Remove preview markers and revert DOM changes directly
+    const markedElements = document.querySelectorAll(`[data-absmartly-experiment="${experimentName}"]`)
+    console.log(`[Content Script] Found ${markedElements.length} elements with preview markers`)
+
+    markedElements.forEach((element) => {
+      // Restore original values if they exist
+      const original = element.getAttribute('data-absmartly-original')
+      if (original) {
+        try {
+          const originalData = JSON.parse(original)
+          // Restore based on the visual editor's data format
+          if (originalData.textContent !== undefined) {
+            element.textContent = originalData.textContent
+          }
+          if (originalData.innerHTML !== undefined) {
+            element.innerHTML = originalData.innerHTML
+          }
+          if (originalData.styles) {
+            const htmlElement = element as HTMLElement
+            if (originalData.styles.display !== undefined) {
+              htmlElement.style.display = originalData.styles.display
+            }
+            if (originalData.styles.width !== undefined) {
+              htmlElement.style.width = originalData.styles.width
+            }
+            if (originalData.styles.height !== undefined) {
+              htmlElement.style.height = originalData.styles.height
+            }
+          }
+        } catch (e) {
+          console.error('[Content Script] Error restoring element:', e)
+        }
+      }
+
+      // Remove markers
+      element.removeAttribute('data-absmartly-experiment')
+      element.removeAttribute('data-absmartly-original')
+      element.removeAttribute('data-absmartly-modified')
+    })
+
+    // Notify sidebar to turn off preview toggle
+    chrome.runtime.sendMessage({
+      type: 'PREVIEW_STATE_CHANGED',
+      enabled: false
     })
   }
 
@@ -1048,7 +975,7 @@ function openCodeEditor(data: {
   closeBtn.onmouseover = () => closeBtn.style.backgroundColor = '#f3f4f6'
   closeBtn.onmouseout = () => closeBtn.style.backgroundColor = 'transparent'
   closeBtn.onclick = () => {
-    sendMessageToExtension({ type: 'CODE_EDITOR_CLOSE' })
+    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1128,7 +1055,7 @@ function openCodeEditor(data: {
   cancelBtn.onmouseover = () => cancelBtn.style.backgroundColor = '#f9fafb'
   cancelBtn.onmouseout = () => cancelBtn.style.backgroundColor = 'white'
   cancelBtn.onclick = () => {
-    sendMessageToExtension({ type: 'CODE_EDITOR_CLOSE' })
+    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1154,7 +1081,7 @@ function openCodeEditor(data: {
     saveBtn.onmouseout = () => saveBtn.style.backgroundColor = '#3b82f6'
     saveBtn.onclick = () => {
       const value = codeEditorView?.state.doc.toString() || ''
-      sendMessageToExtension({
+      chrome.runtime.sendMessage({
         type: 'CODE_EDITOR_SAVE',
         value
       })

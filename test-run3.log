@@ -1,0 +1,47 @@
+🚀 Starting global test setup...
+📦 Extension not built. Building now...
+🟣 Plasmo v0.90.5
+🔴 The Browser Extension Framework
+🔵 INFO   | Prepare to bundle the extension...
+🔵 INFO   | Building for target: chrome-mv3
+🔵 INFO   | Loaded environment variables from: [ '.env.dev.local' ]
+🔴 ERROR  | Invalid Web Extension manifest
+❌ Failed to build extension: Error: Command failed: plasmo build --tag=dev --src-path=.
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at globalSetup (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/global-setup.ts:24:15)
+    at Object.setup (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/runner/tasks.js:173:33)
+    at taskLoop (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/runner/taskRunner.js:62:11)
+    at TaskRunner.runDeferCleanup (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/runner/taskRunner.js:78:5)
+    at TaskRunner.run (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/runner/taskRunner.js:42:33)
+    at runTasks (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/runner/tasks.js:79:18)
+    at runAllTestsWithConfig (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/runner/testRunner.js:392:18)
+    at runTests (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/program.js:188:18)
+    at i.<anonymous> (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/node_modules/playwright/lib/program.js:64:7) {
+  status: 1,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 48718,
+  stdout: null,
+  stderr: null
+}
+Error: Extension build failed. Please fix build errors and try again.
+
+   at global-setup.ts:32
+
+  30 |     } catch (error) {
+  31 |       console.error('❌ Failed to build extension:', error)
+> 32 |       throw new Error('Extension build failed. Please fix build errors and try again.')
+     |             ^
+  33 |     }
+  34 |   } else {
+  35 |     console.log('✅ Extension already built')
+    at globalSetup (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/global-setup.ts:32:13)
+
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
