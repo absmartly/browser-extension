@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
+import { sendMessage } from '~src/lib/messaging'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon } from '@heroicons/react/24/outline'
@@ -390,25 +391,25 @@ export function VariantList({
       const changes = getChangesArray(domChangesData)
       const variantName = variants[variantIndex].name
 
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'apply',
-            changes: changes.filter(c => c.enabled !== false),
-            experimentName: experimentName,
-            variantName: variantName
-          })
+      sendMessage({
+        type: 'ABSMARTLY_PREVIEW',
+        from: 'sidebar',
+        to: 'content',
+        payload: {
+          action: 'apply',
+          changes: changes.filter(c => c.enabled !== false),
+          experimentName: experimentName,
+          variantName: variantName
         }
       })
     } else {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experimentName
-          })
+      sendMessage({
+        type: 'ABSMARTLY_PREVIEW',
+        from: 'sidebar',
+        to: 'content',
+        payload: {
+          action: 'remove',
+          experimentName: experimentName
         }
       })
     }
