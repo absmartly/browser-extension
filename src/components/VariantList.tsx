@@ -481,7 +481,12 @@ export function VariantList({
                 }}
                 size="sm"
                 variant="secondary"
-                title="View Full Variant Configuration"
+                disabled={activeVEVariant !== null}
+                title={
+                  activeVEVariant
+                    ? `Cannot edit JSON while Visual Editor is active for "${activeVEVariant}"`
+                    : "View Full Variant Configuration"
+                }
               >
                 <CodeBracketIcon className="h-4 w-4" />
                 Json
