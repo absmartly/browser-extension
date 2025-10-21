@@ -1,0 +1,81 @@
+🚀 Starting global test setup...
+✅ Extension already built
+⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.
+✅ Copied seed.html to build directory
+✅ Copied seed.js to build directory
+✅ Copied local-test-page.html to build directory
+✅ Loaded environment variables from .env.dev.local
+✅ API credentials found in environment
+✅ Global setup completed successfully
+---
+
+Running 1 test using 1 worker
+
+✅ Test page loaded (test mode enabled)
+  📋 Console messages so far: 0
+Extension ID: hmdfdmlfegajkklhbiijdpkdbaccnplj
+
+📂 STEP 1: Injecting sidebar
+  [Test] Content script not loaded, injecting now...
+  [Test] ✅ Content script injected
+✅ Sidebar visible
+
+📋 STEP 2: Creating new experiment
+  Dispatched click event to Create New Experiment button
+  Selecting "From Scratch" option...
+  ✓ Selected "From Scratch" option
+  Filled experiment name: E2E Test Experiment 1761059381773
+  Selecting Unit Type...
+  Selecting Unit Type...
+  ✓ Unit type select is enabled
+  ✓ Clicked unit type trigger
+  ✓ Selected unit type
+  Selecting Applications...
+  ✓ Clicked applications trigger
+  ✓ Selected application
+✅ Experiment form filled with required fields
+🎨 STEP 3: Clicking Visual Editor button
+  ✓ Visual Editor button is enabled (form validation complete)
+  ✓ Waited for React handlers to attach
+  ✓ Brought test page to front
+  ✓ Dispatched click event to Visual Editor button
+  ⏳ Waited 3s after VE button click
+  📋 Captured 136 console messages
+  📋 Content script/background messages: 2
+  Messages:
+    [log] [ABsmartly] Content script executing - TOP OF FILE
+    [log] [ABsmartly] Content script marker set: true
+  ❌ Found 3 error messages:
+    - WebSocket connection to 'ws://localhost:1815/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED
+    - WebSocket connection to 'ws://localhost:1815/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED
+    - Failed to save development environment: Error: Cannot access contents of url "file:///Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/test-pages/visual-editor-test.html?use_shadow_dom_for_visual_editor_context_menu=0". Extension manifest must request permission to access this host.
+  ⏳ Waiting for VE banner to appear...
+  📋 Total messages captured so far: 136
+  Screenshot saved: before-ve-banner-wait.png
+  ✘  1 [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify (18.5s)
+
+
+  1) [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify › Activate Visual Editor 
+
+    TimeoutError: locator.waitFor: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#absmartly-visual-editor-banner-host') to be visible[22m
+
+
+      251 |
+      252 |     // Wait for VE banner to appear (more reliable than checking window variable)
+    > 253 |     await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
+          |                                                                    ^
+      254 |     console.log('✅ Visual editor active')
+      255 |
+      256 |       // Take screenshot to see sidebar state after VE activates
+        at /Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/visual-editor-complete.spec.ts:253:68
+        at /Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/visual-editor-complete.spec.ts:178:5
+
+  1 failed
+    [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify 
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m

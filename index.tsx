@@ -16,8 +16,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
   // In test mode, listen for polyfilled chrome.runtime.sendMessage calls via postMessage
   window.addEventListener('message', (event) => {
-    if (event.data?.source === 'absmartly-content-script' && event.data?.responseId) {
-      console.log('[index.tsx] Received polyfilled message:', event.data.type, 'responseId:', event.data.responseId)
+    if ((event.data?.source === 'absmartly-content-script' || event.data?.source === 'absmartly-visual-editor') && event.data?.responseId) {
+      console.log('[index.tsx] Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
 
       // Mock the background script's response for REQUEST_INJECTION_CODE
       if (event.data.type === 'REQUEST_INJECTION_CODE') {

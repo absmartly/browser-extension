@@ -1,0 +1,53 @@
+🚀 Starting global test setup...
+📦 Extension not built. Building now...
+🟣 Plasmo v0.90.5
+🔴 The Browser Extension Framework
+🔵 INFO   | Prepare to bundle the extension...
+🔵 INFO   | Building for target: chrome-mv3
+🔵 INFO   | Loaded environment variables from: [ '.env.dev.local' ]
+🟢 DONE   | Finished in 2837ms!
+✅ Extension built successfully in DEV mode (with shadow DOM disabled for tests)
+✅ Copied seed.html to build directory
+✅ Copied seed.js to build directory
+✅ Copied local-test-page.html to build directory
+✅ Loaded environment variables from .env.dev.local
+✅ API credentials found in environment
+✅ Global setup completed successfully
+---
+
+Running 1 test using 1 worker
+
+✅ Test page loaded (test mode enabled)
+  📋 Console messages so far: 24
+Extension ID: hmdfdmlfegajkklhbiijdpkdbaccnplj
+
+📂 STEP 1: Injecting sidebar
+  ✘  1 [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify (1.0m)
+
+
+  1) [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify › Inject sidebar 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: page.waitForFunction: Target page, context or browser has been closed
+
+       at e2e/utils/test-helpers.ts:12
+
+      10 |   // Content script auto-injects in dev builds (NODE_ENV !== 'production')
+      11 |   // Just wait for it to be ready
+    > 12 |   await page.waitForFunction(() => !!(window as any).__absmartlyContentScriptLoaded, { timeout: 10000 })
+         |              ^
+      13 |   console.log('  [Test] ✅ Content script loaded')
+      14 |
+      15 |   await page.evaluate((extUrl) => {
+        at injectSidebar (/Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/utils/test-helpers.ts:12:14)
+        at /Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/visual-editor-complete.spec.ts:89:36
+        at /Users/joalves/git_tree/ext-dev6-refactor-sdk-plugin/tests/e2e/visual-editor-complete.spec.ts:87:16
+
+  1 failed
+    [chromium] › tests/e2e/visual-editor-complete.spec.ts:82:7 › Visual Editor Complete Workflow › Complete workflow: sidebar → experiment → visual editor → actions → save → verify 
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
