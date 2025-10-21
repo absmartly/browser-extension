@@ -45,7 +45,7 @@ interface DOMChangesInlineEditorProps {
   changes: DOMChange[]
   onChange: (changes: DOMChange[]) => void
   previewEnabled: boolean
-  onPreviewToggle: (enabled: boolean, variantIndex: number) => void
+  onPreviewToggle: (enabled: boolean) => void
   activeVEVariant: string | null
   onVEStart: () => void
   onVEStop: () => void
@@ -87,10 +87,12 @@ export function DOMChangesInlineEditor({
   onVEStop,
   activePreviewVariantName
 }: DOMChangesInlineEditorProps) {
-  // Debug variantIndex prop
-  useEffect(() => {
-    console.log('[DOMChangesInlineEditor] variantIndex prop:', variantIndex)
-  }, [variantIndex])
+  // Debug props at component entry
+  console.log('[DOMChangesInlineEditor] Component rendered:', {
+    variantName,
+    variantIndex,
+    previewEnabled
+  })
 
   // Debug activeVEVariant prop changes
   useEffect(() => {
@@ -1360,7 +1362,7 @@ export function DOMChangesInlineEditor({
               data-testid={`preview-toggle-variant-${variantIndex}`}
               onClick={() => {
                 console.log('[DOMChangesInlineEditor] Preview toggle clicked:', { previewEnabled, variantIndex })
-                onPreviewToggle(!previewEnabled, variantIndex)
+                onPreviewToggle(!previewEnabled)
               }}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 previewEnabled ? 'bg-blue-600' : 'bg-gray-200'
