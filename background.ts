@@ -5,6 +5,7 @@ import type { ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication, buildAuthFetchOptions } from '~src/utils/auth'
+import type { ExtensionMessage } from '~src/lib/messaging'
 
 // SECURITY: Zod schemas for input validation
 const ConfigSchema = z.object({
@@ -40,6 +41,42 @@ const MAX_BUFFER_SIZE = 1000
 
 // Handle storage operations from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // NEW UNIFIED MESSAGE ROUTER
+  // Route messages based on 'to' field if present (new message format)
+  if (message.from && message.to) {
+    const extensionMessage = message as ExtensionMessage
+    debugLog(`[Background Router] Received message: ${extensionMessage.type} from ${extensionMessage.from} to ${extensionMessage.to}`)
+
+    // Route to appropriate destination
+    if (extensionMessage.to === 'content') {
+      // Forward to content script via tabs.sendMessage
+      chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, extensionMessage).then(response => {
+            sendResponse(response)
+          }).catch(error => {
+            debugError('[Background Router] Error forwarding to content:', error)
+            sendResponse({ error: error.message })
+          })
+        } else {
+          sendResponse({ error: 'No active tab found' })
+        }
+      })
+      return true
+    } else if (extensionMessage.to === 'sidebar') {
+      // Forward to sidebar via runtime.sendMessage
+      chrome.runtime.sendMessage(extensionMessage).then(response => {
+        sendResponse(response)
+      }).catch(error => {
+        debugError('[Background Router] Error forwarding to sidebar:', error)
+        sendResponse({ error: error.message })
+      })
+      return true
+    }
+    // If to === 'background', fall through to handle below
+  }
+
+  // EXISTING MESSAGE HANDLERS (for backward compatibility)
   if (message.type === 'STORAGE_GET') {
     const sessionStorage = new Storage({ area: "session" })
     sessionStorage.get(message.key).then(value => {
