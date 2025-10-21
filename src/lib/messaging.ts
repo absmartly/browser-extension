@@ -91,18 +91,14 @@ export function setupMessageResponseHandler() {
 
 // For content script - convert incoming postMessage to chrome.runtime.onMessage calls
 export function setupContentScriptMessageListener() {
-  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-
-  if (!sidebarIframe) {
-    debugLog('[Messaging] No sidebar iframe found, test mode listener not needed')
-    return
-  }
-
   debugLog('[Messaging] Setting up content script test mode listener')
 
   window.addEventListener('message', (event) => {
+    // Accept messages from sidebar iframe (check it exists and matches source)
+    const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
     // SECURITY: Only accept messages from sidebar iframe
-    if (event.source !== sidebarIframe?.contentWindow) {
+    if (!sidebarIframe || event.source !== sidebarIframe.contentWindow) {
       return
     }
 
