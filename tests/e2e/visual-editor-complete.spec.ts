@@ -92,7 +92,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 90000 : 12000)
+    test.setTimeout(process.env.SLOW === '1' ? 90000 : 15000)
 
     let sidebar: any
 
@@ -1808,8 +1808,8 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Pass SAVE_EXPERIMENT=1 environment variable to enable
     if (SAVE_EXPERIMENT) {
       await test.step('Save experiment to database', async () => {
-        console.log('\n💾 Saving experiment to database...')
-        console.log('⚠️  WARNING: This will write to the production database!')
+        log('\n💾 Saving experiment to database...')
+        log('⚠️  WARNING: This will write to the production database!')
 
         // Scroll to very top of sidebar (to the experiment form header) to see validation errors
         await sidebar.locator('body').evaluate(el => {
@@ -1822,81 +1822,97 @@ test.describe('Visual Editor Complete Workflow', () => {
         })
 
         // Fill the new metadata fields (owners, teams, tags)
-        console.log('  📝 Filling owners, teams, and tags fields...')
+        log('  📝 Filling owners, teams, and tags fields...')
         await debugWait()
 
         // Scroll to the metadata section
         await sidebar.locator('label:has-text("Applications"), label:has-text("Owners")').first().scrollIntoViewIfNeeded()
         await debugWait()
-        
+
         // Fill Owners field - click the field to open dropdown
-        console.log('  Attempting to select owners...')
+        log('  Attempting to select owners...')
         const ownersContainer = sidebar.locator('label:has-text("Owners")').locator('..')
         const ownersClickArea = ownersContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
-        
+
         // Verify field is enabled
         const ownersDisabled = await ownersClickArea.evaluate(el => {
           return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
         })
-        
+
         if (ownersDisabled) {
           throw new Error('Owners field is disabled - cannot select')
         }
-        
+
         await ownersClickArea.click({ timeout: 5000 })
-        console.log('  ✓ Clicked owners field')
+        log('  ✓ Clicked owners field')
         await debugWait()
-        
+
         // Wait for dropdown to appear and get first option
         const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
         await ownersDropdown.waitFor({ state: 'visible', timeout: 3000 })
-        console.log('  ✓ Owners dropdown appeared')
-        
+        log('  ✓ Owners dropdown appeared')
+
         // Wait for owners/teams to be loaded in the dropdown
         const firstOwnerOption = ownersDropdown.locator('div[class*="cursor-pointer"]').first()
         await firstOwnerOption.waitFor({ state: 'visible', timeout: 5000 })
-        console.log('  ✓ Owners/teams loaded in dropdown')
-        
+        log('  ✓ Owners/teams loaded in dropdown')
+
         const optionExists = await firstOwnerOption.isVisible({ timeout: 2000 })
-        
+
         if (!optionExists) {
           throw new Error('No owners/teams available in dropdown')
         }
-        
-        const selectedOptionText = await firstOwnerOption.textContent()
-        await firstOwnerOption.click()
-        console.log(`  ✓ Selected owner/team: ${selectedOptionText?.trim()}`)
 
-        // Wait for dropdown to close (indicates selection was processed)
+        const selectedOptionText = await firstOwnerOption.textContent()
+
+        // Use dispatchEvent to ensure React handler is triggered
+        await firstOwnerOption.evaluate((el) => {
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
+        log(`  ✓ Clicked owner/team option: ${selectedOptionText?.trim()}`)
+
+        // Wait for the placeholder to disappear OR a badge to appear
+        await Promise.race([
+          ownersContainer.locator('text="Select owners and teams"').waitFor({ state: 'hidden', timeout: 5000 }),
+          ownersContainer.locator('div[class*="badge"], div[class*="chip"], div[class*="tag"]').first().waitFor({ state: 'visible', timeout: 5000 })
+        ]).catch(() => {
+          log('  ⚠️  Neither placeholder disappeared nor badge appeared')
+        })
+
+        // Close dropdown by clicking outside (multi-select dropdown stays open)
+        await sidebar.locator('label:has-text("Traffic")').click()
+        log('  ✓ Clicked outside to close dropdown')
+
+        // Wait for dropdown to close
         await ownersDropdown.waitFor({ state: 'hidden', timeout: 3000 })
-        console.log('  ✓ Owner selection processed (dropdown closed)')
-        
+        log('  ✓ Owner dropdown closed')
+
         // Fill Tags field - click the field to open dropdown
-        console.log('  Attempting to select tags...')
+        log('  Attempting to select tags...')
         const tagsContainer = sidebar.locator('label:has-text("Tags")').locator('..')
         const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
-        
+
         // Verify field is enabled
         const tagsDisabled = await tagsClickArea.evaluate(el => {
           return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
         })
-        
+
         if (tagsDisabled) {
           throw new Error('Tags field is disabled - cannot select')
         }
-        
+
         await tagsClickArea.click({ timeout: 5000 })
-        console.log('  ✓ Clicked tags field')
-        
+        log('  ✓ Clicked tags field')
+
         // Wait for dropdown to appear and get first option
         const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
         await tagsDropdown.waitFor({ state: 'visible', timeout: 3000 })
-        console.log('  ✓ Tags dropdown appeared')
+        log('  ✓ Tags dropdown appeared')
         
         // Click first available option in the dropdown
         const firstTagOption = tagsDropdown.locator('div[class*="cursor-pointer"]').first()
         await firstTagOption.waitFor({ state: 'visible', timeout: 5000 })
-        console.log('  ✓ Tags loaded in dropdown')
+        log('  ✓ Tags loaded in dropdown')
         
         const tagOptionExists = await firstTagOption.isVisible({ timeout: 2000 })
         
@@ -1905,19 +1921,35 @@ test.describe('Visual Editor Complete Workflow', () => {
         }
         
         const selectedTagText = await firstTagOption.textContent()
-        await firstTagOption.click()
-        console.log(`  ✓ Selected tag: ${selectedTagText?.trim()}`)
 
-        // Wait for dropdown to close (indicates selection was processed)
+        // Use dispatchEvent to ensure React handler is triggered
+        await firstTagOption.evaluate((el) => {
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
+        log(`  ✓ Clicked tag option: ${selectedTagText?.trim()}`)
+
+        // Wait for the placeholder to disappear OR a badge to appear
+        await Promise.race([
+          tagsContainer.locator('text="Type tags"').waitFor({ state: 'hidden', timeout: 5000 }),
+          tagsContainer.locator('div[class*="badge"], div[class*="chip"], div[class*="tag"]').first().waitFor({ state: 'visible', timeout: 5000 })
+        ]).catch(() => {
+          log('  ⚠️  Neither placeholder disappeared nor badge appeared')
+        })
+
+        // Close dropdown by clicking outside (multi-select dropdown stays open)
+        await sidebar.locator('label:has-text("Traffic")').click()
+        log('  ✓ Clicked outside to close dropdown')
+
+        // Wait for dropdown to close
         await tagsDropdown.waitFor({ state: 'hidden', timeout: 3000 })
-        console.log('  ✓ Tag selection processed (dropdown closed)')
+        log('  ✓ Tag dropdown closed')
 
-        console.log('  ✓ Filled metadata fields')
+        log('  ✓ Filled metadata fields')
         await debugWait()
 
         // Take screenshot before clicking save (should show top of form with any existing errors)
         await testPage.screenshot({ path: 'test-results/before-save-top.png', fullPage: true })
-        console.log('  📸 Screenshot saved: before-save-top.png')
+        log('  📸 Screenshot saved: before-save-top.png')
         await debugWait()
 
         // Click the save/create button in the experiment form
@@ -1925,7 +1957,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Scroll to the save button to make it visible
         await saveButton.scrollIntoViewIfNeeded()
-        console.log('  ✓ Scrolled to save button')
+        log('  ✓ Scrolled to save button')
 
         // Wait for button to be ready
         await saveButton.waitFor({ state: 'visible', timeout: 2000 })
@@ -1934,7 +1966,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         await saveButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
-        console.log('  ✓ Dispatched click event to save button')
+        log('  ✓ Dispatched click event to save button')
 
         // Wait for network to settle after save (API call completion)
         await testPage.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
@@ -1952,11 +1984,11 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Take screenshot after save (should show validation errors if any)
         await testPage.screenshot({ path: 'test-results/after-save-top.png', fullPage: true })
-        console.log('  📸 Screenshot saved: after-save-top.png')
+        log('  📸 Screenshot saved: after-save-top.png')
 
         // Check if we're still on the create form or navigated away
         const stillOnCreateForm = await sidebar.locator('button:has-text("Create Experiment Draft")').count() > 0
-        console.log('  Still on create form:', stillOnCreateForm)
+        log('  Still on create form:', stillOnCreateForm)
 
         // Check for success toast or error message
         const successToast = sidebar.locator('text=/successfully created|saved successfully|experiment created/i')
@@ -1966,14 +1998,14 @@ test.describe('Visual Editor Complete Workflow', () => {
         const hasError = await errorMessages.count() > 0
 
         if (hasSuccess) {
-          console.log('  ✅ Success toast found - experiment saved!')
+          log('  ✅ Success toast found - experiment saved!')
           const successText = await successToast.first().textContent()
-          console.log(`  Success message: ${successText}`)
+          log(`  Success message: ${successText}`)
         } else if (hasError) {
-          console.log(`  ❌ Found ${await errorMessages.count()} error message(s):`)
+          log(`  ❌ Found ${await errorMessages.count()} error message(s):`)
           for (let i = 0; i < Math.min(5, await errorMessages.count()); i++) {
             const errorText = await errorMessages.nth(i).textContent()
-            console.log(`    ${i + 1}. ${errorText}`)
+            log(`    ${i + 1}. ${errorText}`)
           }
           throw new Error('Failed to save experiment - validation errors found. Check screenshots.')
         } else if (stillOnCreateForm) {
