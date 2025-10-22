@@ -1616,8 +1616,13 @@ test.describe('Visual Editor Complete Workflow', () => {
       })
       log('✓ Dispatched click event to Visual Editor button')
 
-      // Wait a moment for VE to initialize
-      await testPage.waitForTimeout(1000)
+      // Wait for VE banner to appear
+      try {
+        await testPage.locator('.banner').waitFor({ state: 'visible', timeout: 5000 })
+        log('✓ VE banner appeared')
+      } catch (e) {
+        log('⚠️  VE banner did not appear - checking page state...')
+      }
 
       // Take screenshot after clicking VE button
       await testPage.screenshot({ path: 'test-results/step11-after-ve-click.png', fullPage: true })
@@ -1861,15 +1866,27 @@ test.describe('Visual Editor Complete Workflow', () => {
         const selectedOptionText = await firstOwnerOption.textContent()
         await firstOwnerOption.click()
         console.log(`  ✓ Selected owner/team: ${selectedOptionText?.trim()}`)
-        
+
         // Verify selection was made - check for selected badge
+        // Wait for React to re-render after selection
         const selectedBadge = ownersContainer.locator('div[class*="inline-flex"]', { hasText: selectedOptionText?.trim() || '' })
-        const badgeVisible = await selectedBadge.isVisible({ timeout: 2000 })
-        
-        if (!badgeVisible) {
+
+        try {
+          await selectedBadge.waitFor({ state: 'visible', timeout: 5000 })
+          console.log('  ✓ Verified owner selection badge appeared')
+        } catch (e) {
+          // Debug: Check what badges exist
+          const allBadges = await ownersContainer.locator('div[class*="inline-flex"]').count()
+          console.log(`  ⚠️  Badge not found for "${selectedOptionText?.trim()}". Total badges visible: ${allBadges}`)
+
+          // Try to find any badge content
+          if (allBadges > 0) {
+            const badgeTexts = await ownersContainer.locator('div[class*="inline-flex"]').allTextContents()
+            console.log('  Badge texts:', badgeTexts)
+          }
+
           throw new Error(`Owner selection failed - badge not visible for "${selectedOptionText?.trim()}"`)
         }
-        console.log('  ✓ Verified owner selection badge appeared')
         
         // Click outside to close dropdown
         await sidebar.locator('label:has-text("Traffic")').click()
