@@ -255,11 +255,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
-    const isActive = isVisualEditorActive || isVisualEditorStarting || !!(window as any).__absmartlyVisualEditorActive
+    const isActive = isVisualEditorActive || isVisualEditorStarting
     debugLog('[Visual Editor Content Script] CHECK_VISUAL_EDITOR_ACTIVE:', {
       isVisualEditorActive,
       isVisualEditorStarting,
-      windowFlag: !!(window as any).__absmartlyVisualEditorActive,
       result: isActive
     })
     sendResponse(isActive)

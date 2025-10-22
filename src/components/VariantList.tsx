@@ -461,6 +461,7 @@ export function VariantList({
             {/* Variant Header */}
             <div className="px-4 py-3 flex items-center gap-2">
               <button
+                id={`variant-toggle-${index}`}
                 type="button"
                 onClick={() => {
                   const newExpanded = new Set(expandedVariants)
@@ -488,6 +489,7 @@ export function VariantList({
                 disabled={!canEdit}
               />
               <Button
+                id={`json-editor-button-variant-${index}`}
                 type="button"
                 onClick={() => {
                   setJsonEditorVariant(index)
