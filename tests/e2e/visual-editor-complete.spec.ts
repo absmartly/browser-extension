@@ -9,10 +9,20 @@ const TEST_PAGE_URL = '/visual-editor-test.html'
 // Pass SAVE_EXPERIMENT=1 environment variable to enable: SAVE_EXPERIMENT=1 npx playwright test ...
 const SAVE_EXPERIMENT = process.env.SAVE_EXPERIMENT === '1'
 
+// Logging function with elapsed time since test start
+const testStartTime = Date.now()
+function log(message: string) {
+  const elapsed = ((Date.now() - testStartTime) / 1000).toFixed(3)
+  console.log(`[+${elapsed}s] ${message}`)
+}
+
 // Helper to wait for visual editor to be active
 async function waitForVisualEditorActive(page: Page, timeout = 10000) {
   await page.waitForFunction(
-    () => (window as any).__absmartlyVisualEditorActive === true,
+    () => {
+      const editor = (window as any).__absmartlyVisualEditor
+      return editor && editor.isActive === true
+    },
     { timeout }
   )
 }
@@ -20,13 +30,15 @@ async function waitForVisualEditorActive(page: Page, timeout = 10000) {
 // Helper to click element in visual editor
 async function clickElementInEditor(page: Page, selector: string) {
   await page.click(selector)
-  await page.waitForTimeout(200)
+  // Wait for overlay to appear after click
+  await page.locator('#absmartly-overlay-container').waitFor({ state: 'attached', timeout: 2000 }).catch(() => {})
 }
 
 // Helper to right-click element
 async function rightClickElement(page: Page, selector: string) {
   await page.click(selector, { button: 'right' })
-  await page.waitForTimeout(300)
+  // Wait for context menu to appear
+  await page.locator('#absmartly-menu-container').waitFor({ state: 'attached', timeout: 2000 })
 }
 
 // Helper to check if context menu is open
@@ -45,7 +57,8 @@ async function clickContextMenuItem(page: Page, itemText: string) {
       (item as HTMLElement).click()
     }
   }, itemText)
-  await page.waitForTimeout(300)
+  // Wait for menu to disappear after click
+  await page.locator('#absmartly-menu-container').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
 }
 
 test.describe('Visual Editor Complete Workflow', () => {
@@ -79,7 +92,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
+    test.setTimeout(process.env.SLOW === '1' ? 90000 : 12000)
 
     let sidebar: any
 
@@ -401,7 +414,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Insert at the beginning of body to ensure it's visible
       document.body.insertBefore(img, document.body.firstChild)
     })
-    await testPage.waitForTimeout(500)
+    // Wait for image to be loaded
+    await testPage.locator('#test-image').waitFor({ state: 'visible', timeout: 2000 })
     console.log('  ✓ Added test image to page')
 
     // Scroll to the image and click to open context menu
@@ -453,10 +467,12 @@ test.describe('Visual Editor Complete Workflow', () => {
       }
     })
     console.log('  ✓ Clicked Apply button')
-    await testPage.waitForTimeout(500)
+
+    // Wait for modal to close
+    await testPage.locator('#absmartly-image-dialog-host').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
 
     // Verify the modal closed
-    const dialogStillVisible = await testPage.locator('#absmartly-image-dialog-host').isVisible({ timeout: 1000 }).catch(() => false)
+    const dialogStillVisible = await testPage.locator('#absmartly-image-dialog-host').isVisible({ timeout: 500 }).catch(() => false)
     expect(dialogStillVisible).toBe(false)
     console.log('  ✓ Image source dialog closed after clicking Apply')
 
@@ -889,7 +905,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     await test.step('Test Exit Preview button from toolbar', async () => {
-      console.log('\n🚪 STEP 7: Testing Exit Preview button from toolbar')
+      console.log('\n🚪 STEP 8: Testing Exit Preview button from toolbar')
 
       // After VE exit, preview mode is still active with the preview toolbar visible
       console.log('  Verifying preview toolbar is visible...')
@@ -898,8 +914,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       await testPage.screenshot({ path: 'test-results/after-ve-exit-before-toolbar-check.png', fullPage: true })
       console.log('  📸 Screenshot: after-ve-exit-before-toolbar-check.png')
 
-      // Wait a bit for the toolbar to be created
-      await testPage.waitForTimeout(1000)
+      // Wait for toolbar to appear
+      await testPage.locator('#absmartly-preview-header').waitFor({ state: 'attached', timeout: 3000 }).catch(() => {})
 
       const toolbarVisible = await testPage.evaluate(() => {
         const toolbar = document.getElementById('absmartly-preview-header')
@@ -916,8 +932,9 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Check VE state
         const veState = await testPage.evaluate(() => {
+          const editor = (window as any).__absmartlyVisualEditor
           return {
-            isVisualEditorActive: (window as any).__absmartlyVisualEditorActive,
+            isVisualEditorActive: editor && editor.isActive,
             hasVEChanges: !!(window as any).__absmartlyVEChanges
           }
         })
@@ -1104,7 +1121,7 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     await test.step('Test preview mode toggle', async () => {
-      console.log('\n👁️ STEP 8: Testing preview mode toggle')
+      console.log('\n👁️ STEP 9: Testing preview mode toggle')
 
       // NOTE: Preview is now disabled after clicking Exit Preview in step 7
       // So the first click will ENABLE preview, and second click will DISABLE it
@@ -1207,111 +1224,76 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
-    await test.step.skip('Add URL filter and verify JSON payload', async () => {
-      // TODO: This test step is skipped due to a complex state management issue:
-      // When creating "From Scratch" experiments, the variant config is not properly
-      // updated with DOM changes until after the experiment is saved to the API.
-      // The JSON editor shows the config that will be sent to the API, but in this
-      // unsaved state, it shows {}. This needs deeper investigation of how VE
-      // communicates changes back to the experiment editor.
-      return
+    await test.step('Add URL filter and verify JSON payload', async () => {
       console.log('\n🔗 STEP 7.5: Adding URL filter and verifying JSON payload')
 
       // Take screenshot to see current state
       await testPage.screenshot({ path: 'test-results/before-url-filter-test.png', fullPage: true })
       console.log('  📸 Screenshot: before-url-filter-test.png')
 
-      // Disable preview if it's enabled (look for the toggle button for variant 1)
+      // Scroll sidebar to top to ensure Variant 1 is visible
+      await sidebar.locator('body').evaluate(el => el.scrollTop = 0)
+
+      // First, expand Variant 1 section if collapsed
+      const variant1Toggle = sidebar.locator('#variant-toggle-1')
+      await variant1Toggle.waitFor({ state: 'attached', timeout: 3000 })
+
+      // Check if variant is collapsed by checking the button text
+      const isCollapsed = await variant1Toggle.evaluate((btn) => {
+        return btn.textContent?.includes('▶') || false
+      })
+
+      if (isCollapsed) {
+        await variant1Toggle.click()
+        // Wait for URL Filtering button to appear after expansion
+        await sidebar.locator('#url-filtering-toggle-variant-1').waitFor({ state: 'visible', timeout: 3000 })
+        console.log('  ✓ Expanded Variant 1 section')
+      } else {
+        console.log('  ✓ Variant 1 already expanded')
+      }
+
+      // Disable preview using ID if enabled
       const variant1PreviewToggle = sidebar.locator('[data-testid="preview-toggle-variant-1"]')
       const toggleExists = await variant1PreviewToggle.isVisible({ timeout: 2000 }).catch(() => false)
 
       if (toggleExists) {
-        // Check if preview is enabled by looking at the class (bg-blue-600 means enabled)
         const isEnabled = await variant1PreviewToggle.evaluate((btn) => {
           return btn.className.includes('bg-blue-600')
         })
 
         if (isEnabled) {
           await variant1PreviewToggle.click()
-          await testPage.waitForTimeout(1000)
           console.log('  ✓ Disabled preview mode for Variant 1')
         } else {
           console.log('  ✓ Preview already disabled for Variant 1')
         }
-      } else {
-        console.log('  ⚠️  Variant 1 preview toggle not found')
-        await testPage.screenshot({ path: 'test-results/toggle-not-found.png', fullPage: true })
       }
 
-      // Find Variant 1 section using the preview toggle as anchor
-      console.log('  Looking for Variant 1 section...')
-      const variant1Section = sidebar.locator('[data-testid="preview-toggle-variant-1"]').locator('..')
-      await variant1Section.scrollIntoViewIfNeeded()
-      console.log('  ✓ Found and scrolled to Variant 1 section')
+      // Use ID to find and expand URL Filtering section
+      const urlFilterButton = sidebar.locator('#url-filtering-toggle-variant-1')
+      await urlFilterButton.waitFor({ state: 'visible', timeout: 3000 })
+      await urlFilterButton.click()
 
-      // Find and click the URL Filtering section to expand it
-      const urlFilterButton = sidebar.locator('button:has-text("URL Filtering")').first()
-      await urlFilterButton.scrollIntoViewIfNeeded()
+      // Wait for mode select to appear after expansion
+      const modeSelect = sidebar.locator('#url-filter-mode-variant-1')
+      await modeSelect.waitFor({ state: 'visible', timeout: 3000 })
+      console.log('  ✓ Expanded URL Filtering section')
 
-      // Check if it's already expanded
-      const isExpanded = await sidebar.locator('select[value="all"], select[value="simple"], select[value="advanced"]').first().isVisible({ timeout: 1000 }).catch(() => false)
-
-      if (!isExpanded) {
-        await urlFilterButton.click()
-        console.log('  ✓ Expanded URL Filtering section')
-        await testPage.waitForTimeout(500)
-      } else {
-        console.log('  ✓ URL Filtering section already expanded')
-      }
-
-      // Take screenshot after expanding
-      await testPage.screenshot({ path: 'test-results/after-url-filter-expand.png', fullPage: true })
-      console.log('  📸 Screenshot: after-url-filter-expand.png')
-
-      // Select "simple" mode (should be visible now)
-      console.log('  Looking for mode select dropdown...')
-      // The dropdown is within the URL Filtering section and has "Apply on all pages" as one option
-      const modeSelect = sidebar.locator('select').filter({ has: sidebar.locator('option:has-text("Apply on all pages")') }).first()
-      const modeSelectVisible = await modeSelect.isVisible({ timeout: 5000 }).catch(() => false)
-      console.log(`  Mode select visible: ${modeSelectVisible}`)
-
-      if (!modeSelectVisible) {
-        throw new Error('Mode select dropdown not found after expanding URL Filtering')
-      }
-
+      // Select "simple" mode
       await modeSelect.selectOption('simple')
       console.log('  ✓ Selected simple URL filter mode')
-      await testPage.waitForTimeout(1000)
 
-      // Take screenshot after selecting simple mode
-      await testPage.screenshot({ path: 'test-results/after-simple-mode.png', fullPage: true })
-      console.log('  📸 Screenshot: after-simple-mode.png')
+      // Wait for pattern input to appear after mode change
+      const patternInput = sidebar.locator('#url-filter-pattern-variant-1-0')
+      await patternInput.waitFor({ state: 'visible', timeout: 3000 })
 
-      // The simple mode UI shows "Match against:" dropdown with "Path only" already selected
-      // and has a pattern input field. Let's verify the pattern field exists and update it
-      console.log('  Looking for pattern input field in URL Filtering section...')
-
-      // Find the input with placeholder containing /products
-      const patternInput = sidebar.locator('input[placeholder*="/products/*"]').first()
-      const patternExists = await patternInput.isVisible({ timeout: 10000 }).catch(() => false)
-      console.log(`  Pattern input visible: ${patternExists}`)
-
-      if (!patternExists) {
-        // Take a screenshot to see what's there
-        await testPage.screenshot({ path: 'test-results/pattern-not-found.png', fullPage: true })
-        console.log('  📸 Screenshot: pattern-not-found.png')
-        throw new Error('Could not find pattern input field with placeholder /products/*')
-      }
-
-      const currentValue = await patternInput.inputValue()
-      console.log(`  Current pattern value: "${currentValue}"`)
-
+      // Fill pattern
       await patternInput.fill('/test-path/*')
-      // Trigger blur to ensure onChange fires
       await patternInput.blur()
       console.log('  ✓ Updated URL filter pattern to: /test-path/*')
-      // Wait for debounce (500ms) + extra time for React state update
-      await testPage.waitForTimeout(1500)
+
+      // Wait for debounce (500ms in URLFilterSection) + React state update to trigger save
+      await testPage.waitForTimeout(1000)
 
       // Debug: Check what's in the sidebar's variant config
       const variantConfigDebug = await testPage.evaluate(() => {
@@ -1351,20 +1333,16 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Now open the JSON editor for variant 1 to verify the URL filter is in the payload
       console.log('  Opening JSON editor to verify URL filter...')
 
-      // Find the variant 1 container first
-      const variant1Container = sidebar.locator('[data-testid="preview-toggle-variant-1"]').locator('..')
-      await variant1Container.scrollIntoViewIfNeeded()
-
-      // Find the JSON button within variant 1's container (not Control's)
-      const jsonButton = variant1Container.locator('button:has-text("JSON")').first()
-      await jsonButton.scrollIntoViewIfNeeded()
+      // Use ID to find JSON button for variant 1
+      const jsonButton = sidebar.locator('#json-editor-button-variant-1')
+      await jsonButton.waitFor({ state: 'visible', timeout: 3000 })
       await jsonButton.click()
       console.log('  ✓ Clicked JSON editor button for Variant 1')
-      await testPage.waitForTimeout(1000)
 
       // The CodeMirror editor appears in the page, not in the sidebar
       // Look for the json-editor-title class or CodeMirror container
       const jsonEditorInPage = testPage.locator('.json-editor-title, .cm-editor').first()
+      await jsonEditorInPage.waitFor({ state: 'visible', timeout: 3000 })
       const editorVisible = await jsonEditorInPage.isVisible({ timeout: 10000 }).catch(() => false)
       console.log(`  JSON editor visible in page: ${editorVisible}`)
 
@@ -1374,6 +1352,10 @@ test.describe('Visual Editor Complete Workflow', () => {
       }
 
       console.log('  ✓ JSON editor modal opened')
+
+      // Take screenshot of JSON editor
+      await testPage.screenshot({ path: 'test-results/json-editor-opened.png', fullPage: true })
+      console.log('  📸 Screenshot: json-editor-opened.png')
 
       // Get the JSON editor content from CodeMirror
       const jsonContent = await testPage.evaluate(() => {
@@ -1407,7 +1389,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       await closeButton.click()
       console.log('  ✓ Closed JSON editor')
 
-      await testPage.waitForTimeout(500)
+      // Wait for editor to disappear
+      await jsonEditorInPage.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
 
       console.log('✅ URL filter test PASSED!')
       console.log('  • Added URL filter with path pattern: /test-path/*')
@@ -1418,12 +1401,12 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     await testPage.evaluate(() => {
-      console.log('\n🔄 STEP 8: Testing second VE launch')
+      console.log('\n🔄 STEP 10: Testing second VE launch')
     })
 
     // Test launching a second VE instance after the first one has been closed
     await test.step('Test launching second VE instance', async () => {
-      console.log('\n🔄 Testing ability to launch VE a second time...')
+      console.log('\n🔄 STEP 10: Testing ability to launch VE a second time...')
 
       // Verify test page is still valid
       if (testPage.isClosed()) {
@@ -1432,7 +1415,8 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Check if VE is still running and exit it
       const veActive = await testPage.evaluate(() => {
-        return (window as any).__absmartlyVisualEditorActive === true
+        const editor = (window as any).__absmartlyVisualEditor
+        return editor && editor.isActive === true
       })
 
       if (veActive) {
@@ -1447,7 +1431,8 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         // Wait for VE to fully exit
         await testPage.waitForFunction(() => {
-          return (window as any).__absmartlyVisualEditorActive !== true
+          const editor = (window as any).__absmartlyVisualEditor
+          return !editor || editor.isActive !== true
         }, { timeout: 5000 })
         console.log('  ✓ VE exited successfully')
       }
@@ -1530,10 +1515,18 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Wait for VE to exit
       await testPage.waitForFunction(() => {
-        return (window as any).__absmartlyVisualEditorActive !== true
+        const editor = (window as any).__absmartlyVisualEditor
+        return !editor || editor.isActive !== true
       }, { timeout: 5000 })
       console.log('  🚪 VE exited - waiting for sidebar to update...')
-      
+
+      // Wait for VE DOM cleanup - banner and overlay should be removed
+      await testPage.waitForFunction(() => {
+        const banner = document.querySelector('.absmartly-banner')
+        const overlay = document.querySelector('#absmartly-overlay-container')
+        return banner === null && overlay === null
+      }, { timeout: 3000 }).catch(() => console.log('  ⚠️  VE elements still present'))
+
       // Wait for sidebar to clear activeVEVariant state (onVEStop callback)
       console.log('  ✓ Waited for sidebar state cleanup')
 
@@ -1544,13 +1537,12 @@ test.describe('Visual Editor Complete Workflow', () => {
     })
 
     await testPage.evaluate(() => {
-      console.log('\n🔄 STEP 9: Testing discard changes functionality')
+      console.log('\n🔄 STEP 11: Testing discard changes functionality')
     })
 
     // Test that discarding changes properly cleans up the page
-    // SKIPPED: This test causes the page to crash on third VE launch
-    await test.step.skip('Test discarding changes cleans up page correctly', async () => {
-      console.log('\n🗑️  Testing discard changes functionality...')
+    await test.step('Test discarding changes cleans up page correctly', async () => {
+      console.log('\n🗑️  STEP 11: Testing discard changes functionality...')
 
       // Get fresh sidebar reference
       const freshSidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -1610,19 +1602,134 @@ test.describe('Visual Editor Complete Workflow', () => {
         throw new Error('VE button never became enabled after 10 seconds')
       }
 
+      // Take screenshot before clicking VE button
+      await testPage.screenshot({ path: 'test-results/step11-before-ve-click.png', fullPage: true })
+      log('📸 Screenshot: step11-before-ve-click.png')
+
+      // Check for any leftover VE elements before clicking
+      const beforeClickState = await testPage.evaluate(() => {
+        const banner = document.querySelector('.absmartly-banner')
+        const overlay = document.querySelector('#absmartly-overlay-container')
+        const allDivs = Array.from(document.querySelectorAll('body > div')).map(d => ({
+          class: d.className,
+          id: d.id,
+          children: d.children.length
+        }))
+        return {
+          bannerExists: banner !== null,
+          overlayExists: overlay !== null,
+          bodyDivCount: document.querySelectorAll('body > div').length,
+          bodyDivs: allDivs
+        }
+      })
+      log(`Before VE click: banner=${beforeClickState.bannerExists}, overlay=${beforeClickState.overlayExists}, body divs=${beforeClickState.bodyDivCount}`)
+      log(`Body div details: ${JSON.stringify(beforeClickState.bodyDivs, null, 2)}`)
+
       // Use dispatchEvent to ensure React handler is triggered in headless mode
       await veButtons.nth(0).evaluate((button) => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
-      console.log('  ✓ Dispatched click event to Visual Editor button')
+      log('✓ Dispatched click event to Visual Editor button')
 
-      // Wait for VE to be active
+      // Wait a moment for VE to initialize
+      await testPage.waitForTimeout(1000)
+
+      // Take screenshot after clicking VE button
+      await testPage.screenshot({ path: 'test-results/step11-after-ve-click.png', fullPage: true })
+      log('📸 Screenshot: step11-after-ve-click.png')
+
+      // Capture console messages after VE button click
+      const recentMessages = allConsoleMessages.slice(-40)
+      log(`📋 Recent console messages (last 40):`)
+      recentMessages.forEach(msg => {
+        log(`  [${msg.type}] ${msg.text}`)
+      })
+
+      // Check for "already active" message which would indicate early return
+      const hasAlreadyActive = recentMessages.some(m => m.text.includes('already active'))
+      if (hasAlreadyActive) {
+        log(`⚠️  VE returned "already active" - flag from previous session not cleaned up!`)
+      }
+
+      // Debug: Check what's preventing VE from activating
+      log('Checking VE activation conditions...')
+      const initialState = await testPage.evaluate(() => {
+        const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
+        const banner = bannerHost?.querySelector('.banner')
+        const overlay = document.querySelector('#absmartly-overlay-container')
+        const ve = (window as any).__absmartlyVisualEditor
+        const allDivs = Array.from(document.querySelectorAll('body > div')).map(d => ({
+          class: d.className,
+          id: d.id,
+          children: d.children.length,
+          display: (d as HTMLElement).style.display
+        }))
+        return {
+          bannerHostExists: bannerHost !== null,
+          bannerExists: banner !== null,
+          bannerHTML: banner ? banner.outerHTML.substring(0, 200) : null,
+          overlayExists: overlay !== null,
+          veInstanceExists: ve !== undefined,
+          veIsActive: ve && ve.isActive,
+          bodyDivCount: document.querySelectorAll('body > div').length,
+          bodyDivs: allDivs
+        }
+      })
+      log(`After VE click state:`)
+      log(`  bannerHost=${initialState.bannerHostExists}, banner=${initialState.bannerExists}, overlay=${initialState.overlayExists}`)
+      log(`  veInstance=${initialState.veInstanceExists}, veIsActive=${initialState.veIsActive}`)
+      log(`  bodyDivs=${initialState.bodyDivCount}`)
+      log(`Body div details: ${JSON.stringify(initialState.bodyDivs, null, 2)}`)
+      if (initialState.bannerHTML) {
+        log(`Banner HTML preview: ${initialState.bannerHTML}`)
+      }
+
+      // Wait for each condition separately to see which one fails
+      log('Step 1: Waiting for VE banner to appear...')
+      try {
+        await testPage.waitForFunction(() => {
+          // Banner is inside #absmartly-visual-editor-banner-host with class "banner"
+          const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
+          const banner = bannerHost?.querySelector('.banner')
+          return banner !== null
+        }, { timeout: 3000 })
+        log('✓ Banner appeared')
+      } catch (err) {
+        log('❌ Banner never appeared!')
+
+        // Debug: Check if VE instance exists but banner creation failed
+        const debugInfo = await testPage.evaluate(() => {
+          const ve = (window as any).__absmartlyVisualEditor
+          const bannerHost = document.getElementById('absmartly-visual-editor-banner-host')
+          const banner = bannerHost?.querySelector('.banner')
+          return {
+            veExists: ve !== undefined,
+            veIsActive: ve && ve.isActive,
+            bannerHostExists: bannerHost !== null,
+            bannerExists: banner !== null,
+            bannerHostChildren: bannerHost?.children.length || 0
+          }
+        })
+        log(`Debug info: ${JSON.stringify(debugInfo, null, 2)}`)
+        throw err
+      }
+
+      log('✓ Visual editor fully activated (banner present)')
+
+      // Wait for VE to be fully initialized by checking if event handlers are attached
+      // The undo button starts disabled and VE attaches handlers after initialization
+      log('Waiting for VE event handlers to attach...')
       await testPage.waitForFunction(() => {
-        const banner = document.querySelector('.absmartly-banner')
-        const active = (window as any).__absmartlyVisualEditorActive
-        return banner !== null && active === true
+        // Check if clicking on elements would trigger VE handlers
+        const para = document.querySelector('#test-paragraph')
+        if (!para) return false
+
+        // VE is ready when elements have the absmartly hover listener
+        // We can verify by checking if the banner has interactive buttons
+        const banner = document.querySelector('#absmartly-visual-editor-banner-host .banner')
+        return banner !== null && banner.children.length > 0
       }, { timeout: 3000 })
-      console.log('  ✓ Visual editor active')
+      log('✓ VE event handlers attached')
 
       // Make a change to the paragraph
       const paragraph = testPage.locator('#test-paragraph')
@@ -1631,7 +1738,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       const contextMenu = testPage.locator('.menu-container')
       await expect(contextMenu).toBeVisible()
 
-      const editTextButton = contextMenu.locator('button:has-text("Edit Text")')
+      const editTextButton = testPage.locator('.menu-item:has-text("Edit Text")')
       await editTextButton.click()
 
       // Wait for editable
@@ -1666,10 +1773,20 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Set up dialog handler to click "Yes" to discard
       testPage.once('dialog', async dialog => {
         console.log(`  💬 Dialog appeared: "${dialog.message()}"`)
-        expect(dialog.message()).toContain('discard')
+        expect(dialog.message()).toContain('unsaved changes')
         await dialog.accept()
         console.log('  ✓ Accepted dialog (discarded changes)')
       })
+
+      // Capture console messages during Exit click
+      const consoleMessages: string[] = []
+      const consoleHandler = (msg: any) => {
+        const text = msg.text()
+        if (text.includes('UIComponents') || text.includes('CLEANUP') || text.includes('RESTORE') || text.includes('STOP METHOD') || text.includes('EditorCoordinator') || text.includes('teardown')) {
+          consoleMessages.push(text)
+        }
+      }
+      testPage.on('console', consoleHandler)
 
       await exitButton.click()
 
@@ -1678,6 +1795,10 @@ test.describe('Visual Editor Complete Workflow', () => {
         return document.querySelector('.absmartly-toolbar') === null
       })
       console.log('  🚪 Exited visual editor')
+
+      // Print captured console messages
+      console.log('\n  📋 Console messages during exit:')
+      consoleMessages.forEach(msg => console.log(`     ${msg}`))
 
       // BUG: The page should revert to original text, but currently keeps the discarded change
       // Wait a moment for cleanup to happen
@@ -1688,8 +1809,15 @@ test.describe('Visual Editor Complete Workflow', () => {
         return para?.textContent?.trim()
       })
 
+      // Remove console handler
+      testPage.off('console', consoleHandler)
+
       console.log(`  📝 Text after discard: "${textAfterDiscard}"`)
       console.log(`  📝 Expected original: "${originalText}"`)
+
+      // Take screenshot to visually verify the bug
+      await testPage.screenshot({ path: 'test-results/step11-after-discard.png', fullPage: true })
+      console.log('  📸 Screenshot saved: step11-after-discard.png')
 
       // This SHOULD pass, but will FAIL due to the bug
       expect(textAfterDiscard).toBe(originalText)
@@ -1845,8 +1973,8 @@ test.describe('Visual Editor Complete Workflow', () => {
         await saveButton.scrollIntoViewIfNeeded()
         console.log('  ✓ Scrolled to save button')
 
-        // Wait for React state updates before clicking
-        await testPage.waitForTimeout(200)
+        // Wait for button to be ready
+        await saveButton.waitFor({ state: 'visible', timeout: 2000 })
 
         // Use dispatchEvent to ensure React handler is triggered in headless mode
         await saveButton.evaluate((button) => {
@@ -1854,8 +1982,8 @@ test.describe('Visual Editor Complete Workflow', () => {
         })
         console.log('  ✓ Dispatched click event to save button')
 
-        // Wait for the click event to be processed
-        await testPage.waitForTimeout(500)
+        // Wait for network to settle after save (API call completion)
+        await testPage.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
 
         // Wait for response
 

@@ -21,9 +21,17 @@ export class UndoRedoManager {
   private changes: ChangeRecord[] = []
   private currentIndex: number = -1 // Points to the current change (-1 means no changes)
   private maxStackSize: number = 100
+  private onChangeAddedCallback: (() => void) | null = null
 
   constructor(maxStackSize: number = 100) {
     this.maxStackSize = maxStackSize
+  }
+
+  /**
+   * Set a callback that will be called whenever a change is added
+   */
+  setOnChangeAdded(callback: () => void): void {
+    this.onChangeAddedCallback = callback
   }
 
   /**
@@ -42,10 +50,15 @@ export class UndoRedoManager {
 
     // Truncate future changes (anything after currentIndex)
     this.changes = this.changes.slice(0, this.currentIndex + 1)
-    
+
     // Add new change
     this.changes.push(record)
     this.currentIndex++
+
+    // Notify that a change was added
+    if (this.onChangeAddedCallback) {
+      this.onChangeAddedCallback()
+    }
 
     // Limit stack size
     if (this.changes.length > this.maxStackSize) {

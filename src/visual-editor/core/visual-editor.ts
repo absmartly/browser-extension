@@ -72,11 +72,20 @@ export class VisualEditor {
     this.contextMenu = new ContextMenu(this.stateManager, options.useShadowDOM)
     this.undoRedoManager = new UndoRedoManager()
 
+    // Set callback to mark unsaved changes when any change is added
+    this.undoRedoManager.setOnChangeAdded(() => {
+      this.hasUnsavedChanges = true
+      console.log('[VisualEditor] Change added - hasUnsavedChanges set to true')
+    })
+
     // Add initial changes to undoRedoManager if provided
+    // These are pre-loaded changes, so don't mark as unsaved
     if (options.initialChanges && options.initialChanges.length > 0) {
       options.initialChanges.forEach(change => {
         this.undoRedoManager.addChange(change, null)
       })
+      // Reset unsaved flag since these are pre-existing changes
+      this.hasUnsavedChanges = false
     }
 
     this.uiComponents = new UIComponents(this.stateManager)
@@ -89,6 +98,7 @@ export class VisualEditor {
     this.editModes.setAddChangeCallback((change) => {
       console.log('[VisualEditor] EditModes addChange callback triggered with:', change)
       this.undoRedoManager.addChange(change, null)
+      // hasUnsavedChanges is automatically set by undoRedoManager callback
     })
 
     // Initialize element actions
@@ -144,12 +154,7 @@ export class VisualEditor {
     console.log('[ABSmartly] Starting unified visual editor - Version:', this.VERSION)
     console.log('[ABSmartly] Build timestamp:', new Date().toISOString())
 
-    // Check if we already have the editor
-    if ((window as any).__absmartlyVisualEditorActive) {
-      console.log('[ABSmartly] Visual editor already active')
-      return { success: true, already: true }
-    }
-
+    // Check if already active (single source of truth: this.isActive)
     if (this.isActive) {
       console.log('[ABSmartly] Already active, returning')
       return { success: true, already: true }
@@ -159,7 +164,6 @@ export class VisualEditor {
 
     // Mark as active
     this.isActive = true
-    ;(window as any).__absmartlyVisualEditorActive = true
 
     // Keep preview header visible when visual editor starts
     // Users should see both the preview header and visual editor UI
@@ -205,7 +209,6 @@ export class VisualEditor {
     console.trace('[ABSmartly] Stop called from:')
 
     this.isActive = false
-    ;(window as any).__absmartlyVisualEditorActive = false
 
     // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []
@@ -225,8 +228,15 @@ export class VisualEditor {
     // If changes were saved, DON'T restore original values (preview mode will re-apply with markers)
     // If changes were discarded, DO restore original values
     const shouldRestoreOriginalValues = this.hasUnsavedChanges
-    console.log('[ABSmartly] Teardown with restoreOriginalValues:', shouldRestoreOriginalValues)
+    console.log('[ABSmartly] ===== STOP METHOD DEBUG =====')
+    console.log('[ABSmartly] hasUnsavedChanges:', this.hasUnsavedChanges)
+    console.log('[ABSmartly] shouldRestoreOriginalValues:', shouldRestoreOriginalValues)
+    console.log('[ABSmartly] Elements with data-absmartly-original BEFORE teardown:',
+      document.querySelectorAll('[data-absmartly-original]').length)
+    console.log('[ABSmartly] Calling coordinator.teardownAll with restoreOriginalValues:', shouldRestoreOriginalValues)
     this.coordinator.teardownAll(shouldRestoreOriginalValues)
+    console.log('[ABSmartly] Elements with data-absmartly-original AFTER teardown:',
+      document.querySelectorAll('[data-absmartly-original]').length)
 
     // Remove styles
     this.removeStyles()
