@@ -39,7 +39,28 @@ SAVE_EXPERIMENT=1 npx playwright test tests/e2e/visual-editor-complete.spec.ts
 
 **CRITICAL: NEVER use grep, tail, head, or any output filtering!** Always run the test command without any pipes or filters. We need to see the FULL output to debug issues properly.
 
-**CRITICAL: NEVER use `waitForTimeout()` in tests!** Always wait for specific elements or conditions using `waitForSelector()`, `waitForFunction()`, or `expect().toBeVisible()`. Random timeouts make tests flaky and don't verify actual state.
+**🚨 ABSOLUTELY FORBIDDEN: NEVER EVER USE `waitForTimeout()` IN TESTS! 🚨**
+
+This is a **HARD RULE** with **ZERO exceptions**:
+- ❌ `waitForTimeout()` is **FORBIDDEN** - DO NOT USE IT UNDER ANY CIRCUMSTANCES
+- ✅ Instead use: `waitFor({ state: 'visible' })`, `waitFor({ state: 'hidden' })`, `waitForSelector()`, `waitForFunction()`, or `expect().toBeVisible()`
+- ❌ Random timeouts make tests flaky, unreliable, and can cause page crashes
+- ✅ Always wait for specific DOM states, element visibility, or conditions
+
+**Examples of correct waits:**
+```typescript
+// ✅ Wait for element to appear
+await element.waitFor({ state: 'visible' })
+
+// ✅ Wait for element to disappear
+await dropdown.waitFor({ state: 'hidden' })
+
+// ✅ Wait for condition
+await page.waitForFunction(() => document.querySelector('.banner') !== null)
+
+// ❌ FORBIDDEN - NEVER DO THIS
+await page.waitForTimeout(1000)
+```
 
 **Never run all tests** - always run the specific test file as shown above.
 
