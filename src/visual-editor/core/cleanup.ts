@@ -174,9 +174,6 @@ export class Cleanup {
   }
 
   private clearGlobalMarkers(): void {
-    // Clear global window markers
-    delete (window as any).__absmartlyVisualEditorActive
-
     // Remove any global styles we may have added
     const globalStyles = document.querySelectorAll('style[data-absmartly]')
     globalStyles.forEach(style => style.remove())
