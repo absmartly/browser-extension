@@ -5,6 +5,9 @@
 .mcp.json.bk
 .mcp.json
 
+# claude tasks
+.claude/tasks/
+
 public/*.{min,dev}.js
 react.production.min.js
 playwright-report/
