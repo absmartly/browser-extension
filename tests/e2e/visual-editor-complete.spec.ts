@@ -955,16 +955,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       })
       console.log(`  Preview markers before exit: ${beforeExitState.modifiedElementsCount} modified, ${beforeExitState.experimentMarkersCount} experiment markers`)
 
-      // Start listening to console messages
-      const consoleMessages: string[] = []
-      const consoleListener = (msg: any) => {
-        const text = msg.text()
-        if (text.includes('DISABLE_PREVIEW') || text.includes('ABSMARTLY_PREVIEW') || text.includes('Preview') || text.includes('preview')) {
-          consoleMessages.push(text)
-        }
-      }
-      testPage.on('console', consoleListener)
-
       // Click the Exit Preview button in the toolbar
       console.log('  Clicking Exit Preview button...')
       await testPage.evaluate(() => {
@@ -1053,11 +1043,6 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // Wait for changes to revert
       await debugWait(2000)
-
-      // Stop listening and log messages
-      testPage.off('console', consoleListener)
-      console.log('  📋 Console messages during Exit Preview:')
-      consoleMessages.forEach(msg => console.log(`    ${msg}`))
 
       // Verify the toolbar was removed
       console.log('  Verifying preview toolbar was removed...')
@@ -1778,16 +1763,6 @@ test.describe('Visual Editor Complete Workflow', () => {
         console.log('  ✓ Accepted dialog (discarded changes)')
       })
 
-      // Capture console messages during Exit click
-      const consoleMessages: string[] = []
-      const consoleHandler = (msg: any) => {
-        const text = msg.text()
-        if (text.includes('UIComponents') || text.includes('CLEANUP') || text.includes('RESTORE') || text.includes('STOP METHOD') || text.includes('EditorCoordinator') || text.includes('teardown')) {
-          consoleMessages.push(text)
-        }
-      }
-      testPage.on('console', consoleHandler)
-
       await exitButton.click()
 
       // Wait for VE to exit
@@ -1796,21 +1771,11 @@ test.describe('Visual Editor Complete Workflow', () => {
       })
       console.log('  🚪 Exited visual editor')
 
-      // Print captured console messages
-      console.log('\n  📋 Console messages during exit:')
-      consoleMessages.forEach(msg => console.log(`     ${msg}`))
-
-      // BUG: The page should revert to original text, but currently keeps the discarded change
-      // Wait a moment for cleanup to happen
-
       // Check if the change was properly cleaned up
       const textAfterDiscard = await testPage.evaluate(() => {
         const para = document.querySelector('#test-paragraph')
         return para?.textContent?.trim()
       })
-
-      // Remove console handler
-      testPage.off('console', consoleHandler)
 
       console.log(`  📝 Text after discard: "${textAfterDiscard}"`)
       console.log(`  📝 Expected original: "${originalText}"`)

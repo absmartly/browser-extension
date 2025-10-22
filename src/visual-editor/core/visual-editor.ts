@@ -75,7 +75,6 @@ export class VisualEditor {
     // Set callback to mark unsaved changes when any change is added
     this.undoRedoManager.setOnChangeAdded(() => {
       this.hasUnsavedChanges = true
-      console.log('[VisualEditor] Change added - hasUnsavedChanges set to true')
     })
 
     // Add initial changes to undoRedoManager if provided
@@ -228,15 +227,8 @@ export class VisualEditor {
     // If changes were saved, DON'T restore original values (preview mode will re-apply with markers)
     // If changes were discarded, DO restore original values
     const shouldRestoreOriginalValues = this.hasUnsavedChanges
-    console.log('[ABSmartly] ===== STOP METHOD DEBUG =====')
-    console.log('[ABSmartly] hasUnsavedChanges:', this.hasUnsavedChanges)
-    console.log('[ABSmartly] shouldRestoreOriginalValues:', shouldRestoreOriginalValues)
-    console.log('[ABSmartly] Elements with data-absmartly-original BEFORE teardown:',
-      document.querySelectorAll('[data-absmartly-original]').length)
-    console.log('[ABSmartly] Calling coordinator.teardownAll with restoreOriginalValues:', shouldRestoreOriginalValues)
+    console.log('[ABSmartly] Teardown with restoreOriginalValues:', shouldRestoreOriginalValues)
     this.coordinator.teardownAll(shouldRestoreOriginalValues)
-    console.log('[ABSmartly] Elements with data-absmartly-original AFTER teardown:',
-      document.querySelectorAll('[data-absmartly-original]').length)
 
     // Remove styles
     this.removeStyles()
