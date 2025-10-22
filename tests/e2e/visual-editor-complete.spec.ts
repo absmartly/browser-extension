@@ -1811,15 +1811,27 @@ test.describe('Visual Editor Complete Workflow', () => {
         log('\n💾 Saving experiment to database...')
         log('⚠️  WARNING: This will write to the production database!')
 
-        // Scroll to very top of sidebar (to the experiment form header) to see validation errors
-        await sidebar.locator('body').evaluate(el => {
-          el.scrollTop = 0
-          // Also scroll within any scrollable containers
-          const scrollableElements = el.querySelectorAll('[style*="overflow"]')
-          scrollableElements.forEach(elem => {
-            if (elem instanceof HTMLElement) elem.scrollTop = 0
-          })
-        })
+        // After the discard test:
+        // - VE toolbar is removed (VE is stopped)
+        // - Preview mode is still active (this is intentional - user might want to keep previewing)
+        // - The sidebar is still on the Create New Experiment form
+
+        // We need to exit preview mode before we can save
+        log('  🔄 Exiting preview mode...')
+        const exitPreviewBtn = testPage.locator('button:has-text("Exit Preview")')
+        const isPreviewActive = await exitPreviewBtn.isVisible().catch(() => false)
+
+        if (isPreviewActive) {
+          log('  ⚠️  Preview mode is active (expected after VE exit)')
+          await exitPreviewBtn.click()
+          log('  ✓ Clicked Exit Preview')
+          await debugWait()
+          await exitPreviewBtn.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
+          log('  ✓ Preview mode disabled')
+          await debugWait()
+        } else {
+          log('  ✓ Preview mode already disabled')
+        }
 
         // Fill the new metadata fields (owners, teams, tags)
         log('  📝 Filling owners, teams, and tags fields...')
@@ -1846,6 +1858,7 @@ test.describe('Visual Editor Complete Workflow', () => {
         await ownersClickArea.click({ timeout: 5000 })
         log('  ✓ Clicked owners field')
         await debugWait()
+        await debugWait()
 
         // Wait for dropdown to appear and get first option
         const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
@@ -1870,6 +1883,7 @@ test.describe('Visual Editor Complete Workflow', () => {
           el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
         log(`  ✓ Clicked owner/team option: ${selectedOptionText?.trim()}`)
+        await debugWait()
 
         // Wait for the placeholder to disappear OR a badge to appear
         await Promise.race([
@@ -1882,10 +1896,12 @@ test.describe('Visual Editor Complete Workflow', () => {
         // Close dropdown by clicking outside (multi-select dropdown stays open)
         await sidebar.locator('label:has-text("Traffic")').click()
         log('  ✓ Clicked outside to close dropdown')
+        await debugWait()
 
         // Wait for dropdown to close
         await ownersDropdown.waitFor({ state: 'hidden', timeout: 3000 })
         log('  ✓ Owner dropdown closed')
+        await debugWait()
 
         // Fill Tags field - click the field to open dropdown
         log('  Attempting to select tags...')
@@ -1903,11 +1919,13 @@ test.describe('Visual Editor Complete Workflow', () => {
 
         await tagsClickArea.click({ timeout: 5000 })
         log('  ✓ Clicked tags field')
+        await debugWait()
 
         // Wait for dropdown to appear and get first option
         const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
         await tagsDropdown.waitFor({ state: 'visible', timeout: 3000 })
         log('  ✓ Tags dropdown appeared')
+        await debugWait()
         
         // Click first available option in the dropdown
         const firstTagOption = tagsDropdown.locator('div[class*="cursor-pointer"]').first()
@@ -1927,6 +1945,7 @@ test.describe('Visual Editor Complete Workflow', () => {
           el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
         log(`  ✓ Clicked tag option: ${selectedTagText?.trim()}`)
+        await debugWait()
 
         // Wait for the placeholder to disappear OR a badge to appear
         await Promise.race([
@@ -1939,10 +1958,12 @@ test.describe('Visual Editor Complete Workflow', () => {
         // Close dropdown by clicking outside (multi-select dropdown stays open)
         await sidebar.locator('label:has-text("Traffic")').click()
         log('  ✓ Clicked outside to close dropdown')
+        await debugWait()
 
         // Wait for dropdown to close
         await tagsDropdown.waitFor({ state: 'hidden', timeout: 3000 })
         log('  ✓ Tag dropdown closed')
+        await debugWait()
 
         log('  ✓ Filled metadata fields')
         await debugWait()
@@ -1952,24 +1973,43 @@ test.describe('Visual Editor Complete Workflow', () => {
         log('  📸 Screenshot saved: before-save-top.png')
         await debugWait()
 
-        // Click the save/create button in the experiment form
-        const saveButton = sidebar.locator('button:has-text("Create Experiment Draft"), button:has-text("Save")')
+        // Submit the form instead of clicking the button
+        // This ensures the form's onSubmit handler is properly triggered
+        const form = sidebar.locator('form')
 
-        // Scroll to the save button to make it visible
+        // Scroll to the submit button area to make it visible
+        const saveButton = sidebar.locator('#create-experiment-button')
         await saveButton.scrollIntoViewIfNeeded()
         log('  ✓ Scrolled to save button')
+        await debugWait()
 
-        // Wait for button to be ready
+        // Wait for form and button to be ready
+        await form.waitFor({ state: 'visible', timeout: 2000 })
         await saveButton.waitFor({ state: 'visible', timeout: 2000 })
+        await debugWait()
 
-        // Use dispatchEvent to ensure React handler is triggered in headless mode
-        await saveButton.evaluate((button) => {
-          button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        // Check if button is enabled
+        const isDisabled = await saveButton.evaluate((btn) => btn.hasAttribute('disabled'))
+        log(`  Button disabled: ${isDisabled}`)
+
+        if (isDisabled) {
+          // Wait for button to become enabled
+          await saveButton.waitFor({ state: 'enabled', timeout: 5000 })
+          log('  ✓ Button became enabled')
+        }
+
+        // Submit the form directly to trigger React's onSubmit handler
+        await form.evaluate((f) => {
+          f.requestSubmit()
         })
-        log('  ✓ Dispatched click event to save button')
+        log('  ✓ Submitted form')
+        await debugWait()
 
-        // Wait for network to settle after save (API call completion)
-        await testPage.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+        // Wait for network activity (API call)
+        await testPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+          log('  ⚠️  Network did not reach idle state')
+        })
+        await debugWait()
 
         // Wait for response
 
@@ -1986,38 +2026,44 @@ test.describe('Visual Editor Complete Workflow', () => {
         await testPage.screenshot({ path: 'test-results/after-save-top.png', fullPage: true })
         log('  📸 Screenshot saved: after-save-top.png')
 
-        // Check if we're still on the create form or navigated away
-        const stillOnCreateForm = await sidebar.locator('button:has-text("Create Experiment Draft")').count() > 0
-        log('  Still on create form:', stillOnCreateForm)
+        // Wait for navigation to experiments list (which happens on successful save)
+        // or for error messages to appear (if save failed)
+        log('  ⏳ Waiting for save to complete...')
 
-        // Check for success toast or error message
-        const successToast = sidebar.locator('text=/successfully created|saved successfully|experiment created/i')
-        const errorMessages = sidebar.locator('text=/error|required|must select|please|is required/i')
+        try {
+          // Wait for experiments list header to appear (indicates successful save and navigation)
+          await sidebar.locator('text="Experiments"').first().waitFor({ state: 'visible', timeout: 3000 })
+          log('  ✅ Experiment saved successfully - navigated to experiments list')
+        } catch (e) {
+          // If we didn't navigate to experiments list, check for errors
+          log('  ❌ Did not navigate to experiments list within 3 seconds')
 
-        const hasSuccess = await successToast.count() > 0
-        const hasError = await errorMessages.count() > 0
+          // Check for validation errors
+          const errorMessages = sidebar.locator('text=/error|required|must select|please|is required/i')
+          const hasError = await errorMessages.count() > 0
 
-        if (hasSuccess) {
-          log('  ✅ Success toast found - experiment saved!')
-          const successText = await successToast.first().textContent()
-          log(`  Success message: ${successText}`)
-        } else if (hasError) {
-          log(`  ❌ Found ${await errorMessages.count()} error message(s):`)
-          for (let i = 0; i < Math.min(5, await errorMessages.count()); i++) {
-            const errorText = await errorMessages.nth(i).textContent()
-            log(`    ${i + 1}. ${errorText}`)
+          if (hasError) {
+            log(`  ❌ Found ${await errorMessages.count()} error message(s):`)
+            for (let i = 0; i < Math.min(5, await errorMessages.count()); i++) {
+              const errorText = await errorMessages.nth(i).textContent()
+              log(`    ${i + 1}. ${errorText}`)
+            }
+            throw new Error('Failed to save experiment - validation errors found. Check screenshots.')
+          } else {
+            log('  ❌ No validation errors visible, but save did not complete')
+            log('  This might be a network issue or the API call was blocked')
+            throw new Error('Experiment save failed - did not navigate to experiments list. Check screenshots: before-save-top.png and after-save-top.png')
           }
-          throw new Error('Failed to save experiment - validation errors found. Check screenshots.')
-        } else if (stillOnCreateForm) {
-          console.log('  ❌ Still on create form - save failed')
-          console.log('  This likely means validation failed but errors are not visible.')
-          console.log('  Check the screenshots to see what fields are missing.')
-          throw new Error('Experiment save failed - still on create form with no success message. Check screenshots: before-save-top.png and after-save-top.png')
-        } else {
-          console.log('  ✅ Navigated away from create form - experiment saved successfully')
         }
 
         console.log(`  📊 Experiment name: ${experimentName}`)
+
+        // In SLOW mode, keep the page open for 5 seconds at the end
+        if (process.env.SLOW === '1') {
+          log('  ⏸️  Keeping page open for 5 seconds...')
+          await testPage.waitForTimeout(5000)
+          log('  ✓ Done')
+        }
       })
     } else {
       await test.step.skip('Save experiment to database', async () => {})
