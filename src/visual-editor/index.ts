@@ -83,7 +83,8 @@ export function initializeVisualEditor(
  * Check if visual editor is currently active
  */
 export function isVisualEditorActive(): boolean {
-  return !!(window as any).__absmartlyVisualEditorActive
+  const editor = getCurrentVisualEditor()
+  return editor ? editor.isActive : false
 }
 
 /**

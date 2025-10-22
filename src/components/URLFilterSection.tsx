@@ -5,12 +5,13 @@ import { Input } from './ui/input'
 import type { DOMChangesConfig } from '../types/dom-changes'
 
 interface URLFilterSectionProps {
+  variantIndex: number
   config: DOMChangesConfig
   onConfigChange: (config: Partial<Omit<DOMChangesConfig, 'changes'>>) => void
   canEdit: boolean
 }
 
-const URLFilterSection = React.memo(function URLFilterSection({ config, onConfigChange, canEdit }: URLFilterSectionProps) {
+const URLFilterSection = React.memo(function URLFilterSection({ variantIndex, config, onConfigChange, canEdit }: URLFilterSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isFirstRenderRef = useRef(true)
 
@@ -104,6 +105,7 @@ const URLFilterSection = React.memo(function URLFilterSection({ config, onConfig
     <div className="bg-blue-50 rounded-lg border border-blue-200">
       {/* Header with toggle */}
       <button
+        id={`url-filtering-toggle-variant-${variantIndex}`}
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-blue-100 transition-colors rounded-lg"
@@ -117,6 +119,7 @@ const URLFilterSection = React.memo(function URLFilterSection({ config, onConfig
         <div className="px-4 pb-4 space-y-3 border-t border-blue-200 pt-3">
           {/* Mode selector */}
           <select
+            id={`url-filter-mode-variant-${variantIndex}`}
             value={mode}
             onChange={(e) => {
               const newMode = e.target.value as 'all' | 'simple' | 'advanced'
@@ -172,6 +175,7 @@ const URLFilterSection = React.memo(function URLFilterSection({ config, onConfig
           {(simplePatterns.length > 0 ? simplePatterns : ['']).map((pattern, i) => (
             <div key={i} className="flex gap-2">
               <Input
+                id={`url-filter-pattern-variant-${variantIndex}-${i}`}
                 value={pattern}
                 onChange={(e) => {
                   const newPatterns = [...simplePatterns]

@@ -13,16 +13,35 @@ ABsmartly Browser Extension - A Plasmo-based browser extension for visual A/B te
 npm run dev                # Start dev server with hot reload (runs plasmo dev and SDK plugin watcher)
 
 # Building
+npm run build:dev         # Development build (REQUIRED before running tests!)
 npm run build             # Production build for all browsers
 npm run package           # Package extension for distribution
 
 # Testing
-npm test                  # Run Playwright tests
+# IMPORTANT: Always build first with npm run build:dev before running tests!
+SAVE_EXPERIMENT=1 npx playwright test tests/e2e/visual-editor-complete.spec.ts  # Run specific E2E test
+npm test                  # Run all Playwright tests
 npm run test:ui          # Run tests with UI mode
 
 # Linting & Formatting
 npx prettier --write .   # Format code with Prettier
 ```
+
+## CRITICAL Testing Notes
+
+**ALWAYS run `npm run build:dev` before running E2E tests!** The tests use the built extension from `build/chrome-mv3-dev/`, not the source files. If you modify React components or add IDs for testing, you MUST rebuild first.
+
+**For E2E tests, ALWAYS use the full command:**
+```bash
+npm run build:dev
+SAVE_EXPERIMENT=1 npx playwright test tests/e2e/visual-editor-complete.spec.ts
+```
+
+**CRITICAL: NEVER use grep, tail, head, or any output filtering!** Always run the test command without any pipes or filters. We need to see the FULL output to debug issues properly.
+
+**CRITICAL: NEVER use `waitForTimeout()` in tests!** Always wait for specific elements or conditions using `waitForSelector()`, `waitForFunction()`, or `expect().toBeVisible()`. Random timeouts make tests flaky and don't verify actual state.
+
+**Never run all tests** - always run the specific test file as shown above.
 
 ## Architecture & Structure
 
