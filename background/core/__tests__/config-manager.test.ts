@@ -1,10 +1,10 @@
 import { Storage } from '@plasmohq/storage'
 import {
-  validateAPIEndpoint,
   validateConfig,
   getConfig,
   initializeConfig
 } from '../config-manager'
+import { validateAPIEndpoint } from '../../utils/security'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 
 jest.mock('~src/utils/debug', () => ({
