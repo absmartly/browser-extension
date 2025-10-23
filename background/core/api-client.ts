@@ -3,7 +3,22 @@ import axios, { AxiosError } from 'axios'
 import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { debugLog, debugError } from '~src/utils/debug'
-import { getConfig } from './config-manager'
+import { getConfig as getConfigWithStorages } from './config-manager'
+
+// Create storage instances for API client
+const storage = new Storage()
+const secureStorage = new Storage({
+  area: "local",
+  secretKeyring: true
+} as any)
+
+/**
+ * Gets configuration from storage
+ * @returns The configuration or null if not found
+ */
+async function getConfig(): Promise<ABsmartlyConfig | null> {
+  return getConfigWithStorages(storage, secureStorage)
+}
 
 const APIRequestSchema = z.object({
   method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD']),
@@ -110,18 +125,20 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
 
 /**
  * Opens the ABsmartly login page if user is not authenticated
- * @param config - ABsmartly configuration
+ * @param config - ABsmartly configuration (optional, will load from storage if not provided)
  * @returns Result indicating if user is authenticated
  */
-export async function openLoginPage(config: ABsmartlyConfig | null): Promise<{ authenticated: boolean }> {
-  if (!config?.apiEndpoint) {
+export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ authenticated: boolean }> {
+  const actualConfig = config || await getConfig()
+
+  if (!actualConfig?.apiEndpoint) {
     return { authenticated: false }
   }
 
-  const baseUrl = config.apiEndpoint.replace(/\/v1$/, '')
+  const baseUrl = actualConfig.apiEndpoint.replace(/\/v1$/, '')
 
   try {
-    const response = await makeAPIRequest('GET', '/auth/current-user', undefined, false, config)
+    const response = await makeAPIRequest('GET', '/auth/current-user', undefined, false, actualConfig)
 
     if (response) {
       debugLog('User is already authenticated')
@@ -210,7 +227,7 @@ export async function makeAPIRequest(
 ): Promise<any> {
   debugLog('=== makeAPIRequest called ===', { method, path, data })
 
-  const config = configOverride
+  const config = configOverride || await getConfig()
 
   if (!config?.apiEndpoint) {
     throw new Error('No API endpoint configured')
@@ -226,13 +243,15 @@ export async function makeAPIRequest(
   const authMethod = config.authMethod || 'jwt'
   const headers = await buildHeaders(config)
 
-  const cleanEndpoint = config.apiEndpoint.replace(/\/+$/, '')
-  const baseURL = cleanEndpoint.endsWith('/v1')
-    ? cleanEndpoint
-    : `${cleanEndpoint}/v1`
+  // Always strip /v1 from endpoint, we'll add it back in the path if needed
+  const baseURL = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
 
   const cleanPath = path.startsWith('/') ? path : `/${path}`
-  let url = `${baseURL}${cleanPath}`
+
+  // Auth endpoints don't use /v1, other endpoints do
+  const finalPath = cleanPath.startsWith('/auth') ? cleanPath : `/v1${cleanPath}`
+
+  let url = `${baseURL}${finalPath}`
   let requestData = undefined
 
   if (method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD') {
@@ -248,6 +267,13 @@ export async function makeAPIRequest(
   } else {
     requestData = data
   }
+
+  console.log('\n=== AXIOS REQUEST ===')
+  console.log('URL:', url)
+  console.log('Method:', method)
+  console.log('Headers:', JSON.stringify(headers, null, 2))
+  console.log('Request Data:', requestData)
+  console.log('====================\n')
 
   debugLog('Making axios request:', {
     method,
