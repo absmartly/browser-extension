@@ -66,7 +66,7 @@ export interface ABsmartlyConfig {
   domChangesFieldName?: string
   authMethod?: 'jwt' | 'apikey'  // New field for auth method preference
   sdkWindowProperty?: string  // Window property where SDK context is stored (e.g., 'ABsmartlyContext', 'window.sdk.context')
-  queryPrefix?: string  // Query parameter prefix for overrides (e.g., '_exp_')
+  queryPrefix?: string  // Query parameter prefix for overrides (e.g., '_')
   persistQueryToCookie?: boolean  // Whether to persist query overrides to cookie
   injectSDK?: boolean  // Whether to inject the ABsmartly SDK if not detected
   sdkUrl?: string  // Custom SDK URL (defaults to https://sdk.absmartly.com/sdk.js)

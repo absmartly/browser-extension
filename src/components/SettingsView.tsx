@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { DEFAULT_CONFIG } from '../config/defaults'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
@@ -30,7 +31,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt') // Default to JWT
   const [sdkWindowProperty, setSdkWindowProperty] = useState('') // Add SDK window property state
   const [sdkEndpoint, setSdkEndpoint] = useState('') // SDK endpoint for collector
-  const [queryPrefix, setQueryPrefix] = useState('_exp_') // Query parameter prefix
+  const [queryPrefix, setQueryPrefix] = useState<string>(DEFAULT_CONFIG.queryPrefix) // Query parameter prefix
   const [persistQueryToCookie, setPersistQueryToCookie] = useState(true) // Persist query to cookie
   const [injectSDK, setInjectSDK] = useState(false) // Whether to inject SDK if not detected
   const [sdkUrl, setSdkUrl] = useState('') // Custom SDK URL
@@ -70,7 +71,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedAuthMethod = config?.authMethod || 'jwt' // Default to JWT
       let loadedSdkWindowProperty = config?.sdkWindowProperty || ''
       let loadedSdkEndpoint = config?.sdkEndpoint || ''
-      let loadedQueryPrefix = config?.queryPrefix || '_exp_'
+      let loadedQueryPrefix = config?.queryPrefix || DEFAULT_CONFIG.queryPrefix
       let loadedPersistQueryToCookie = config?.persistQueryToCookie ?? true
       let loadedInjectSDK = config?.injectSDK ?? false
       let loadedSdkUrl = config?.sdkUrl || ''
@@ -356,7 +357,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       domChangesFieldName: domChangesFieldName.trim() || '__dom_changes',
       authMethod,
       sdkWindowProperty: sdkWindowProperty.trim() || undefined,
-      queryPrefix: queryPrefix.trim() || '_exp_',
+      queryPrefix: queryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
       persistQueryToCookie,
       injectSDK,
       sdkUrl: sdkUrl.trim() || undefined
