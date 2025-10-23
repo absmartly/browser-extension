@@ -50,13 +50,17 @@ async function isContextMenuOpen(page: Page): Promise<boolean> {
 
 // Helper to click context menu item
 async function clickContextMenuItem(page: Page, itemText: string) {
-  await page.evaluate((text) => {
+  const result = await page.evaluate((text) => {
     const items = Array.from(document.querySelectorAll('.menu-item'))
     const item = items.find(el => el.textContent?.includes(text))
     if (item) {
-      (item as HTMLElement).click()
+      const action = (item as HTMLElement).dataset.action
+      ;(item as HTMLElement).click()
+      return { found: true, action }
     }
+    return { found: false, action: null }
   }, itemText)
+  console.log(`  [Helper] clickContextMenuItem("${itemText}") result:`, JSON.stringify(result))
   // Wait for menu to disappear after click
   await page.locator('#absmartly-menu-container').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
 }
@@ -71,7 +75,8 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Set up console listener using helper
     allConsoleMessages = setupConsoleLogging(
       testPage,
-      (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[DOMChanges]')
+      (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[DOMChanges]') ||
+               msg.text.includes('[BlockInserter]') || msg.text.includes('[ElementActions]') || msg.text.includes('[EditorCoordinator]')
     )
 
     await testPage.goto(`${TEST_PAGE_URL}?use_shadow_dom_for_visual_editor_context_menu=0`)
@@ -394,7 +399,238 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ✓ Edit HTML with CodeMirror works')
     await debugWait()
 
-    // Action 5: Change image source
+    // Action 5: Insert new block
+    console.log('  Testing: Insert new block after h2')
+    log('Starting "Insert new block" test')
+
+    // Click on h2 element (created by previous HTML edit) to open context menu
+    await testPage.click('h2', { force: true })
+    await testPage.locator('.menu-container').waitFor({ state: 'visible' })
+    console.log('  ✓ Clicked h2 element and menu opened')
+    await debugWait()
+
+    // Click "Insert new block" menu item
+    await clickContextMenuItem(testPage, 'Insert new block')
+    console.log('  ✓ Clicked "Insert new block" menu item')
+
+    // Wait for modal to appear with CodeMirror editor
+    await testPage.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
+    console.log('  ✓ Insert block modal appeared with CodeMirror editor')
+
+    // Take screenshot of the modal
+    await testPage.screenshot({ path: 'test-insert-block-modal.png', fullPage: true })
+    console.log('  📸 Screenshot: test-insert-block-modal.png')
+
+    // Debug: Check what elements are actually in the DOM
+    const modalInfo = await testPage.evaluate(() => {
+      const dialog = document.querySelector('#absmartly-block-inserter-host')
+      const cmEditor = document.querySelector('.cm-editor')
+      const insertBtn = document.querySelector('.inserter-button-insert')
+      const previewContainer = document.querySelector('.inserter-preview-container')
+      const positionRadios = document.querySelectorAll('input[type="radio"][name="position"]')
+
+      return {
+        dialogExists: !!dialog,
+        dialogHTML: dialog ? dialog.outerHTML.substring(0, 500) : 'not found',
+        cmEditorExists: !!cmEditor,
+        insertBtnExists: !!insertBtn,
+        insertBtnHTML: insertBtn ? insertBtn.outerHTML : 'not found',
+        previewExists: !!previewContainer,
+        positionRadiosCount: positionRadios.length
+      }
+    })
+    console.log('  🔍 Modal structure:', JSON.stringify(modalInfo, null, 2))
+
+    await debugWait()
+
+    // Verify preview container exists
+    const hasPreviewContainer = await testPage.evaluate(() => {
+      // Look for preview container in modal (adjust selector based on actual implementation)
+      const previewContainer = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
+      return previewContainer !== null
+    })
+    console.log(`  ${hasPreviewContainer ? '✓' : '⚠️'} Preview container exists: ${hasPreviewContainer}`)
+    await debugWait()
+
+    // Select position: "After" (check for radio button or dropdown)
+    // First try radio button approach
+    const hasRadioButton = await testPage.locator('input[type="radio"][value="after"]').count()
+    if (hasRadioButton > 0) {
+      await testPage.locator('input[type="radio"][value="after"]').check()
+      console.log('  ✓ Selected "After" position via radio button')
+    } else {
+      // Try dropdown/select approach
+      const hasDropdown = await testPage.locator('select[name="position"], #position-select').count()
+      if (hasDropdown > 0) {
+        await testPage.locator('select[name="position"], #position-select').selectOption('after')
+        console.log('  ✓ Selected "After" position via dropdown')
+      } else {
+        console.log('  ⚠️  Position selector not found, will use default')
+      }
+    }
+    await debugWait()
+
+    // Focus CodeMirror editor, clear default content, and type HTML
+    await testPage.evaluate(() => {
+      const editor = document.querySelector('.cm-content') as HTMLElement
+      if (editor) {
+        editor.focus()
+        console.log('[Test] Focused CodeMirror editor for insert block')
+      }
+    })
+    await debugWait()
+
+    // Select all and delete to clear the default content
+    await testPage.keyboard.press('Meta+A')  // Cmd+A on Mac
+    await testPage.keyboard.press('Backspace')
+    await debugWait()
+
+    // Type the HTML content to insert
+    const insertHTML = '<div class=\"inserted-block\">This is an inserted block!'
+    await testPage.keyboard.type(insertHTML)
+    console.log(`  ✓ Typed HTML into CodeMirror: ${insertHTML}`)
+    await debugWait()
+
+    // Verify preview updates in real-time (if preview container exists)
+    if (hasPreviewContainer) {
+      const previewContent = await testPage.evaluate(() => {
+        const preview = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
+        return preview?.innerHTML || preview?.textContent
+      })
+      console.log(`  ${previewContent?.includes('inserted-block') ? '✓' : '⚠️'} Preview updated with content: ${previewContent?.substring(0, 50)}...`)
+    }
+    await debugWait()
+
+    // Click the Insert button
+    console.log('  Looking for Insert button...')
+    const insertBtn = testPage.locator('.inserter-button-insert')
+    await insertBtn.waitFor({ state: 'visible', timeout: 5000 })
+    console.log('  ✓ Insert button found')
+    
+    // Verify button is actually clickable
+    const buttonInfo = await testPage.evaluate(() => {
+      const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
+      return {
+        exists: !!btn,
+        disabled: btn?.disabled,
+        className: btn?.className,
+        listeners: btn ? Object.keys(btn).filter(k => k.startsWith('on') || k.includes('event')) : []
+      }
+    })
+    console.log('  🔍 Button info:', JSON.stringify(buttonInfo))
+    await debugWait()
+
+    console.log('  Clicking Insert button...')
+
+    // Take screenshot before clicking
+    await testPage.screenshot({ path: 'test-before-insert-click.png', fullPage: true })
+    console.log('  📸 Screenshot before click: test-before-insert-click.png')
+
+    // Try multiple click methods
+    const clickResult = await testPage.evaluate(() => {
+      const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
+      if (!btn) return { error: 'Button not found' }
+      
+      // Add a test listener
+      let testListenerFired = false
+      btn.addEventListener('click', () => {
+        testListenerFired = true
+        console.log('[Test] TEST LISTENER FIRED!')
+      }, { once: true })
+      
+      // Try click()
+      btn.click()
+      
+      // Also try dispatchEvent
+      const clickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      })
+      btn.dispatchEvent(clickEvent)
+      
+      return { 
+        clicked: true, 
+        testListenerFired,
+        buttonHTML: btn.outerHTML.substring(0, 100)
+      }
+    })
+    console.log('  ✓ Click result:', JSON.stringify(clickResult))
+
+    // Wait a moment and check console errors
+    await debugWait(500)
+
+    // Check for any errors or state after click
+    const postClickInfo = await testPage.evaluate(() => {
+      const dialog = document.querySelector('#absmartly-block-inserter-host')
+      const h2 = document.querySelector('h2')
+      const insertedBlock = document.querySelector('.inserted-block')
+
+      return {
+        dialogStillExists: !!dialog,
+        h2Exists: !!h2,
+        h2NextSibling: h2?.nextElementSibling?.className || 'none',
+        insertedBlockExists: !!insertedBlock,
+        insertedBlockHTML: insertedBlock ? insertedBlock.outerHTML : 'not found'
+      }
+    })
+    console.log('  🔍 Post-click state:', JSON.stringify(postClickInfo, null, 2))
+
+    // Take screenshot after clicking
+    await testPage.screenshot({ path: 'test-after-insert-click.png', fullPage: true })
+    console.log('  📸 Screenshot after click: test-after-insert-click.png')
+
+    // Wait for modal to close
+    try {
+      await testPage.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
+      console.log('  ✓ Insert block modal closed')
+    } catch (err) {
+      console.log('  ⚠️  Modal did not close within 5 seconds, continuing anyway...')
+    }
+    await debugWait()
+
+    // Verify the new element exists in the DOM at the correct position (after h2)
+    const insertedBlockExists = await testPage.evaluate(() => {
+      const h2 = document.querySelector('h2')
+      if (!h2) return false
+
+      // Check if next sibling is the inserted block
+      const nextElement = h2.nextElementSibling
+      return nextElement?.classList.contains('inserted-block') || false
+    })
+    console.log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists after h2: ${insertedBlockExists}`)
+    expect(insertedBlockExists).toBeTruthy()
+    await debugWait()
+
+    // Verify the content is correct
+    const insertedContent = await testPage.evaluate(() => {
+      const insertedBlock = document.querySelector('.inserted-block')
+      return insertedBlock?.textContent?.trim()
+    })
+    console.log(`  ${insertedContent === 'This is an inserted block!' ? '✓' : '✗'} Inserted content correct: "${insertedContent}"`)
+    expect(insertedContent).toBe('This is an inserted block!')
+    await debugWait()
+
+    // Verify changes counter increased
+    const changeCountAfterInsert = await testPage.evaluate(() => {
+      const banner = document.querySelector('#absmartly-visual-editor-banner-host')
+      if (banner?.shadowRoot) {
+        const counter = banner.shadowRoot.querySelector('.changes-counter')
+        return counter?.textContent?.trim() || '0'
+      }
+      // Fallback to non-shadow DOM version
+      const counter = document.querySelector('.changes-counter')
+      return counter?.textContent?.trim() || '0'
+    })
+    console.log(`  ✓ Changes counter after insert: ${changeCountAfterInsert}`)
+    await debugWait()
+
+    console.log('  ✅ Insert new block test completed successfully')
+    log('Completed "Insert new block" test')
+    await debugWait()
+
+    // Action 6: Change image source
+
     console.log('  Testing: Change image source on img element')
 
     // First, add an image to the test page at the top

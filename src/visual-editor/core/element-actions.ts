@@ -3,6 +3,7 @@ import StateManager from './state-manager'
 import UndoRedoManager from './undo-redo-manager'
 import { Notifications } from '../ui/notifications'
 import ImageSourceDialog from '../ui/image-source-dialog'
+import BlockInserter from '../ui/block-inserter'
 import type { DOMChange } from '../types/visual-editor'
 import DOMPurify from 'dompurify'
 
@@ -19,6 +20,7 @@ export class ElementActions {
   private undoRedoManager: UndoRedoManager
   private notifications: Notifications
   private imageSourceDialog: ImageSourceDialog
+  private blockInserter: BlockInserter
   private options: ElementActionsOptions
 
   // UI state
@@ -36,6 +38,7 @@ export class ElementActions {
     this.undoRedoManager = undoRedoManager
     this.notifications = notifications
     this.imageSourceDialog = new ImageSourceDialog()
+    this.blockInserter = new BlockInserter()
     this.options = options
 
     // Listen to state changes to keep local state in sync
@@ -306,9 +309,61 @@ export class ElementActions {
     )
   }
 
-  public insertNewBlock(): void {
-    // Placeholder - will implement comprehensive insert dialog
-    this.notifications.show('Insert new block: Coming soon!', '', 'info')
+  public async insertNewBlock(): Promise<void> {
+    if (!this.selectedElement) {
+      return
+    }
+
+    try {
+      const options = await this.blockInserter.show(this.selectedElement)
+      if (!options) {
+        return
+      }
+
+      const sanitizedHtml = DOMPurify.sanitize(options.html)
+      const referenceElement = this.selectedElement
+      const referenceSelector = this.getSelector(referenceElement)
+
+      if (options.position === 'before') {
+        referenceElement.insertAdjacentHTML('beforebegin', sanitizedHtml)
+      } else {
+        referenceElement.insertAdjacentHTML('afterend', sanitizedHtml)
+      }
+
+      const insertedElement = options.position === 'before'
+        ? referenceElement.previousElementSibling
+        : referenceElement.nextElementSibling
+
+      if (insertedElement) {
+        const htmlElement = insertedElement as HTMLElement
+        htmlElement.dataset.absmartlyModified = 'true'
+        const config = this.stateManager.getConfig()
+        htmlElement.dataset.absmartlyExperiment = config.experimentName || '__preview__'
+
+        const change: any = {
+          selector: referenceSelector,
+          type: 'insert',
+          html: sanitizedHtml,
+          position: options.position,
+          enabled: true
+        }
+
+        this.undoRedoManager.addChange(change, null)
+
+        this.notifications.show(
+          `HTML block inserted ${options.position} selected element`,
+          '',
+          'success'
+        )
+
+        this.selectElement(htmlElement)
+      } else {
+        this.notifications.show('Element inserted but could not be selected', '', 'warning')
+      }
+    } catch (error) {
+      console.error('[ElementActions] Failed to insert new block:', error)
+      this.notifications.show('Failed to insert element', '', 'error')
+    }
   }
 
   public showRelativeElementSelector(): void {

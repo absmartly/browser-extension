@@ -337,7 +337,9 @@ export class EditorCoordinator {
         break
 
       case 'insert-block':
+        console.log('[EditorCoordinator] insert-block action triggered')
         this.callbacks.insertNewBlock()
+        console.log('[EditorCoordinator] insertNewBlock callback called')
         break
 
       case 'select-relative':
