@@ -47,7 +47,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue([])
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("exposure", { experiment: "test" }, Date.now())
+      await bufferSDKEvent({ eventName: "exposure", data: { experiment: "test" }, timestamp: Date.now() })
 
       expect(mockSessionStorage.set).toHaveBeenCalledWith(
         "sdk_events_buffer",
@@ -73,7 +73,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue(existingEvents)
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("goal", { goal: "conversion" }, Date.now())
+      await bufferSDKEvent({ eventName: "goal", data: { goal: "conversion" }, timestamp: Date.now() })
 
       expect(mockSessionStorage.set).toHaveBeenCalledWith(
         "sdk_events_buffer",
@@ -95,7 +95,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue(existingEvents)
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("new-event", {}, Date.now())
+      await bufferSDKEvent({ eventName: "new-event", data: {}, timestamp: Date.now() })
 
       const savedBuffer = mockSessionStorage.set.mock.calls[0][1]
       expect(savedBuffer).toHaveLength(1000)
@@ -105,7 +105,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue([])
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("event1", {}, 1000)
+      await bufferSDKEvent({ eventName: "event1", data: {}, timestamp: 1000 })
 
       const firstCall = mockSessionStorage.set.mock.calls[0][1][0]
       const firstId = firstCall.id
@@ -121,7 +121,7 @@ describe("event-buffer", () => {
       mockSessionStorage.set.mockResolvedValue(undefined)
 
       const timestamp = Date.now()
-      await bufferSDKEvent("exposure", { experiment: "test" }, timestamp)
+      await bufferSDKEvent({ eventName: "exposure", data: { experiment: "test" }, timestamp })
 
       expect(mockSendMessage).toHaveBeenCalledWith({
         type: "SDK_EVENT_BROADCAST",
@@ -138,13 +138,13 @@ describe("event-buffer", () => {
       mockSessionStorage.set.mockResolvedValue(undefined)
       mockSendMessage.mockRejectedValue(new Error("No listeners"))
 
-      await expect(bufferSDKEvent("exposure", {}, Date.now())).resolves.not.toThrow()
+      await expect(bufferSDKEvent({ eventName: "exposure", data: {}, timestamp: Date.now() })).resolves.not.toThrow()
     })
 
     it("should throw error on storage failure", async () => {
       mockSessionStorage.get.mockRejectedValue(new Error("Storage error"))
 
-      await expect(bufferSDKEvent("exposure", {}, Date.now())).rejects.toThrow("Storage error")
+      await expect(bufferSDKEvent({ eventName: "exposure", data: {}, timestamp: Date.now() })).rejects.toThrow("Storage error")
     })
 
     it("should keep newest events when trimming", async () => {
@@ -165,7 +165,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue([oldEvent, newerEvent])
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("newest", {}, 3000)
+      await bufferSDKEvent({ eventName: "newest", data: {}, timestamp: 3000 })
 
       const savedBuffer = mockSessionStorage.set.mock.calls[0][1]
       expect(savedBuffer[savedBuffer.length - 1]).toMatchObject({
@@ -239,7 +239,7 @@ describe("event-buffer", () => {
       const eventData = { foo: "bar" }
       const timestamp = Date.now()
 
-      await bufferSDKEvent(eventName, eventData, timestamp)
+      await bufferSDKEvent({ eventName, data: eventData, timestamp })
 
       const savedEvent = mockSessionStorage.set.mock.calls[0][1][0]
 
@@ -267,7 +267,7 @@ describe("event-buffer", () => {
         boolean: true
       }
 
-      await bufferSDKEvent("complex", complexData, Date.now())
+      await bufferSDKEvent({ eventName: "complex", data: complexData, timestamp: Date.now() })
 
       const savedEvent = mockSessionStorage.set.mock.calls[0][1][0]
       expect(savedEvent.data).toEqual(complexData)
@@ -286,7 +286,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue(events)
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("new", {}, 1000)
+      await bufferSDKEvent({ eventName: "new", data: {}, timestamp: 1000 })
 
       const savedBuffer = mockSessionStorage.set.mock.calls[0][1]
       expect(savedBuffer).toHaveLength(1000)
@@ -303,7 +303,7 @@ describe("event-buffer", () => {
       mockSessionStorage.get.mockResolvedValue(events)
       mockSessionStorage.set.mockResolvedValue(undefined)
 
-      await bufferSDKEvent("newest", { index: 1000 }, 1000)
+      await bufferSDKEvent({ eventName: "newest", data: { index: 1000 }, timestamp: 1000 })
 
       const savedBuffer = mockSessionStorage.set.mock.calls[0][1]
       expect(savedBuffer[0].data.index).toBe(1)

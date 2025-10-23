@@ -8,20 +8,19 @@ export interface SDKEvent {
   id: string
   eventName: string
   data: any
-  timestamp: number
+  timestamp: number | string
 }
 
 /**
  * Buffers an SDK event and broadcasts it to all extension pages
- * @param eventName Name of the SDK event
- * @param data Event data
- * @param timestamp Event timestamp
+ * @param payload Event payload containing eventName, data, and timestamp
  */
-export async function bufferSDKEvent(
-  eventName: string,
-  data: any,
-  timestamp: number
-): Promise<void> {
+export async function bufferSDKEvent(payload: {
+  eventName: string
+  data: any
+  timestamp: number | string
+}): Promise<void> {
+  const { eventName, data, timestamp } = payload
   console.log("[Background] 🔵 Received SDK_EVENT:", { eventName, data, timestamp })
 
   const sessionStorage = new Storage({ area: "session" })
