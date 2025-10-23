@@ -645,13 +645,123 @@ describe('ElementActions', () => {
   })
 
   describe('Insert New Block', () => {
-    it('should show placeholder notification for insert new block', () => {
-      elementActions.insertNewBlock()
+    it('should not insert when no element is selected', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: null
+      })
+
+      await elementActions.insertNewBlock()
+
+      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+    })
+
+    it('should insert block when dialog returns options', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv
+      })
+
+      mockGenerateRobustSelector.mockReturnValue('#test-div')
+      mockStateManager.getConfig.mockReturnValue({
+        variantName: 'test-variant',
+        experimentName: 'test-experiment',
+        logoUrl: 'test-logo.png'
+      })
+
+      const mockShow = jest.fn().mockResolvedValue({
+        html: '<div class="inserted">New Block</div>',
+        position: 'after'
+      })
+      ;(elementActions as any).blockInserter.show = mockShow
+
+      await elementActions.insertNewBlock()
+
+      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: '#test-div',
+          type: 'insert',
+          html: '<div class="inserted">New Block</div>',
+          position: 'after',
+          enabled: true
+        }),
+        null
+      )
+      expect(mockNotifications.show).toHaveBeenCalledWith(
+        'HTML block inserted after selected element',
+        '',
+        'success'
+      )
+    })
+
+    it('should not insert when dialog is cancelled', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv
+      })
+
+      const mockShow = jest.fn().mockResolvedValue(null)
+      ;(elementActions as any).blockInserter.show = mockShow
+
+      await elementActions.insertNewBlock()
+
+      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+      expect(mockNotifications.show).not.toHaveBeenCalled()
+    })
+
+    it('should handle errors gracefully', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv
+      })
+
+      const mockShow = jest.fn().mockRejectedValue(new Error('Dialog error'))
+      ;(elementActions as any).blockInserter.show = mockShow
+
+      await elementActions.insertNewBlock()
 
       expect(mockNotifications.show).toHaveBeenCalledWith(
-        'Insert new block: Coming soon!',
+        'Failed to insert element',
         '',
-        'info'
+        'error'
+      )
+    })
+
+    it('should sanitize HTML before insertion', async () => {
+      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      stateChangeCallback({
+        ...mockStateManager.getState(),
+        selectedElement: testDiv
+      })
+
+      mockGenerateRobustSelector.mockReturnValue('#test-div')
+      mockStateManager.getConfig.mockReturnValue({
+        variantName: 'test-variant',
+        experimentName: 'test-experiment',
+        logoUrl: 'test-logo.png'
+      })
+
+      const mockShow = jest.fn().mockResolvedValue({
+        html: '<div class="safe">Safe Content</div>',
+        position: 'before'
+      })
+      ;(elementActions as any).blockInserter.show = mockShow
+
+      await elementActions.insertNewBlock()
+
+      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: '#test-div',
+          type: 'insert',
+          html: '<div class="safe">Safe Content</div>',
+          position: 'before',
+          enabled: true
+        }),
+        null
       )
     })
   })
