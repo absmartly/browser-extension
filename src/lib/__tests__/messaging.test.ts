@@ -1,9 +1,21 @@
-import { sendMessage, setupMessageResponseHandler, setupContentScriptMessageListener } from '../messaging'
 import type { ExtensionMessage } from '../messaging'
+
+// We'll dynamically import the module in tests to handle test mode mocking
+let sendMessage: any
+let setupMessageResponseHandler: any
+let setupContentScriptMessageListener: any
 
 describe('Messaging System', () => {
   describe('sendMessage - Production Mode', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+      jest.resetModules()
+
+      // Set up production mode window BEFORE importing
+      global.window = {
+        self: global.window,
+        top: global.window,
+      } as any
+
       // Mock chrome API
       global.chrome = {
         runtime: {
@@ -15,11 +27,11 @@ describe('Messaging System', () => {
         },
       } as any
 
-      // Mock window to simulate production (not in iframe)
-      global.window = {
-        self: global.window,
-        top: global.window,
-      } as any
+      // Import module after mocks are set up
+      const messaging = await import('../messaging')
+      sendMessage = messaging.sendMessage
+      setupMessageResponseHandler = messaging.setupMessageResponseHandler
+      setupContentScriptMessageListener = messaging.setupContentScriptMessageListener
     })
 
     afterEach(() => {
@@ -109,20 +121,48 @@ describe('Messaging System', () => {
 
   describe('sendMessage - Test Mode (iframe)', () => {
     let mockParentWindow: any
+    let addEventListenerSpy: jest.Mock
 
-    beforeEach(() => {
+    beforeEach(async () => {
+      jest.resetModules()
+
       mockParentWindow = {
-        postMessage: jest.fn()
+        postMessage: jest.fn(),
+        // Add a marker to differentiate it from self
+        __isMockParent: true
       }
 
-      // Mock window to simulate test mode (in iframe)
-      global.window = {
-        self: {} as Window,
-        top: mockParentWindow as Window,
-        parent: mockParentWindow,
-        addEventListener: jest.fn(),
-        postMessage: jest.fn()
+      addEventListenerSpy = jest.fn()
+
+      // Create a separate object for self to ensure self !== top
+      const selfWindow = {
+        __isMockSelf: true
       } as any
+
+      // Mock window to simulate test mode (in iframe) BEFORE importing
+      // Use Object.defineProperty to ensure self and top are truly different
+      const mockWindow: any = {}
+      Object.defineProperty(mockWindow, 'self', {
+        value: selfWindow,
+        writable: false,
+        enumerable: true
+      })
+      Object.defineProperty(mockWindow, 'top', {
+        value: mockParentWindow,
+        writable: false,
+        enumerable: true
+      })
+      mockWindow.parent = mockParentWindow
+      mockWindow.addEventListener = addEventListenerSpy
+      mockWindow.postMessage = jest.fn()
+
+      global.window = mockWindow
+
+      // Import module after mocks are set up
+      const messaging = await import('../messaging')
+      sendMessage = messaging.sendMessage
+      setupMessageResponseHandler = messaging.setupMessageResponseHandler
+      setupContentScriptMessageListener = messaging.setupContentScriptMessageListener
     })
 
     afterEach(() => {
@@ -167,7 +207,7 @@ describe('Messaging System', () => {
 
       // Setup response handler first
       let messageEvent: any
-      ;(window.addEventListener as any).mockImplementation((event: string, handler: Function) => {
+      addEventListenerSpy.mockImplementation((event: string, handler: Function) => {
         if (event === 'message') {
           messageEvent = handler
         }
@@ -217,15 +257,22 @@ describe('Messaging System', () => {
     let mockSidebarIframe: any
     let mockListeners: Function[]
     let mockGetElementById: jest.Mock
+    let addEventListenerSpy: jest.Mock
 
-    beforeEach(() => {
+    beforeEach(async () => {
+      jest.resetModules()
+
+      // Initialize mockListeners array BEFORE creating the spy
       mockListeners = []
+
+      // Create a stable contentWindow object that will be reused
+      const stableContentWindow = {
+        postMessage: jest.fn()
+      }
 
       mockSidebarIframe = {
         id: 'absmartly-sidebar-iframe',
-        contentWindow: {
-          postMessage: jest.fn()
-        }
+        contentWindow: stableContentWindow
       }
 
       mockGetElementById = jest.fn().mockImplementation((id: string) => {
@@ -239,13 +286,20 @@ describe('Messaging System', () => {
         getElementById: mockGetElementById
       } as any
 
-      global.window = {
-        addEventListener: jest.fn().mockImplementation((event: string, handler: Function) => {
-          if (event === 'message') {
-            mockListeners.push(handler)
-          }
-        })
-      } as any
+      // Create spy that captures handlers into mockListeners
+      const captureListener = (event: string, handler: Function) => {
+        if (event === 'message') {
+          mockListeners.push(handler)
+        }
+      }
+
+      addEventListenerSpy = jest.fn(captureListener)
+
+      // Set window.addEventListener on the global window object
+      if (!global.window) {
+        global.window = {} as any
+      }
+      global.window.addEventListener = addEventListenerSpy as any
 
       global.chrome = {
         runtime: {
@@ -255,6 +309,12 @@ describe('Messaging System', () => {
           }
         }
       } as any
+
+      // Import module after mocks are set up
+      const messaging = await import('../messaging')
+      sendMessage = messaging.sendMessage
+      setupMessageResponseHandler = messaging.setupMessageResponseHandler
+      setupContentScriptMessageListener = messaging.setupContentScriptMessageListener
     })
 
     afterEach(() => {
@@ -264,7 +324,11 @@ describe('Messaging System', () => {
     it('should set up window message listener for sidebar iframe', () => {
       setupContentScriptMessageListener()
 
-      expect(window.addEventListener).toHaveBeenCalledWith('message', expect.any(Function))
+      // Check if addEventListener was called
+      expect(addEventListenerSpy).toHaveBeenCalled()
+      expect(addEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function))
+      // Verify listener was captured
+      expect(mockListeners.length).toBe(1)
     })
 
     it('should forward postMessage to chrome.runtime.onMessage listeners', () => {
@@ -272,6 +336,14 @@ describe('Messaging System', () => {
       ;(chrome.runtime.onMessage as any)._listeners = [mockOnMessageListener]
 
       setupContentScriptMessageListener()
+
+      // Verify listener was added
+      expect(mockListeners.length).toBeGreaterThan(0)
+
+      // Verify mock getElementById works correctly
+      const iframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+      expect(iframe).toBe(mockSidebarIframe)
+      expect(iframe?.contentWindow).toBe(mockSidebarIframe.contentWindow)
 
       // Simulate postMessage from sidebar
       const messageEvent = {
@@ -284,6 +356,9 @@ describe('Messaging System', () => {
           payload: { action: 'apply' }
         }
       }
+
+      // Verify source matches
+      expect(messageEvent.source).toBe(mockSidebarIframe.contentWindow)
 
       mockListeners[0](messageEvent)
 
@@ -357,23 +432,32 @@ describe('Messaging System', () => {
 
       setupContentScriptMessageListener()
 
-      // Should still add listener but log that iframe not found
-      expect(window.addEventListener).not.toHaveBeenCalled()
+      // Should still add window listener (security check happens inside the handler)
+      expect(addEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function))
     })
   })
 
   describe('Message Routing', () => {
-    it('should preserve all message fields when routing', async () => {
+    beforeEach(async () => {
+      jest.resetModules()
+
+      global.window = {
+        self: global.window,
+        top: global.window,
+      } as any
+
       global.chrome = {
         runtime: {
           sendMessage: jest.fn().mockResolvedValue({ success: true }),
         }
       } as any
 
-      global.window = {
-        self: global.window,
-        top: global.window,
-      } as any
+      // Import module after mocks are set up
+      const messaging = await import('../messaging')
+      sendMessage = messaging.sendMessage
+    })
+
+    it('should preserve all message fields when routing', async () => {
 
       const message: ExtensionMessage = {
         type: 'CUSTOM_MESSAGE',
