@@ -1,4 +1,5 @@
 import React from 'react'
+import { DEFAULT_CONFIG } from '../../config/defaults'
 import { Input } from '../ui/Input'
 
 interface QueryStringOverridesSectionProps {
@@ -23,10 +24,10 @@ export const QueryStringOverridesSection = React.memo(function QueryStringOverri
         type="text"
         value={queryPrefix}
         onChange={(e) => onQueryPrefixChange(e.target.value)}
-        placeholder="_exp_"
+        placeholder={DEFAULT_CONFIG.queryPrefix}
       />
       <p className="mt-1 text-xs text-gray-500">
-        Prefix for query parameters (e.g., ?_exp_button_color=1)
+        Prefix for query parameters (e.g., ?{DEFAULT_CONFIG.queryPrefix}button_color=1)
       </p>
 
       <div className="mt-4 flex items-center">

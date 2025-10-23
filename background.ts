@@ -1,6 +1,7 @@
 import { Storage } from "@plasmohq/storage"
 import axios from 'axios'
 import { z } from 'zod'
+import { DEFAULT_CONFIG } from '~src/config/defaults'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
@@ -963,10 +964,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const configData = {
         apiEndpoint: config?.apiEndpoint,
         sdkEndpoint: sdkEndpoint,
-        queryPrefix: config?.queryPrefix || '_exp_',
-        persistQueryToCookie: config?.persistQueryToCookie ?? true,
-        injectSDK: config?.injectSDK ?? false,
-        sdkUrl: config?.sdkUrl || ''
+        queryPrefix: config?.queryPrefix || DEFAULT_CONFIG.queryPrefix,
+        persistQueryToCookie: config?.persistQueryToCookie ?? DEFAULT_CONFIG.persistQueryToCookie,
+        injectSDK: config?.injectSDK ?? DEFAULT_CONFIG.injectSDK,
+        sdkUrl: config?.sdkUrl || DEFAULT_CONFIG.sdkUrl
       }
 
       debugLog('Sending config to SDK plugin:', { configData })
