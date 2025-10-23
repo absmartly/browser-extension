@@ -128,35 +128,45 @@ describe('Messaging System', () => {
 
       mockParentWindow = {
         postMessage: jest.fn(),
-        // Add a marker to differentiate it from self
         __isMockParent: true
       }
 
       addEventListenerSpy = jest.fn()
 
-      // Create a separate object for self to ensure self !== top
+      // Create a separate object for self window to ensure self !== top
       const selfWindow = {
-        __isMockSelf: true
-      } as any
+        __isMockSelf: true,
+        addEventListener: addEventListenerSpy,
+        postMessage: jest.fn()
+      }
 
-      // Mock window to simulate test mode (in iframe) BEFORE importing
-      // Use Object.defineProperty to ensure self and top are truly different
-      const mockWindow: any = {}
-      Object.defineProperty(mockWindow, 'self', {
+      // CRITICAL: In jsdom, window.top is NOT configurable, but window.self IS configurable
+      // For isTestMode() to return true, we need window.self !== window.top
+      // Since we can't change window.top, we change window.self to point to a different object
+      Object.defineProperty(window, 'self', {
         value: selfWindow,
-        writable: false,
-        enumerable: true
+        writable: true,
+        configurable: true
       })
-      Object.defineProperty(mockWindow, 'top', {
-        value: mockParentWindow,
-        writable: false,
-        enumerable: true
-      })
-      mockWindow.parent = mockParentWindow
-      mockWindow.addEventListener = addEventListenerSpy
-      mockWindow.postMessage = jest.fn()
 
-      global.window = mockWindow
+      // We can mock window.parent since it's typically configurable
+      try {
+        Object.defineProperty(window, 'parent', {
+          value: mockParentWindow,
+          writable: true,
+          configurable: true
+        })
+      } catch (e) {
+        // If parent is not configurable, that's okay for these tests
+      }
+
+      // Mock window.addEventListener to use our spy
+      window.addEventListener = addEventListenerSpy as any
+
+      // Verify the setup is correct
+      if (window.self === window.top) {
+        throw new Error('Test setup error: window.self === window.top. They must be different for test mode!')
+      }
 
       // Import module after mocks are set up
       const messaging = await import('../messaging')
@@ -167,6 +177,14 @@ describe('Messaging System', () => {
 
     afterEach(() => {
       jest.clearAllMocks()
+
+      // Restore window.self to point back to window for production mode tests
+      // This prevents test mode from bleeding into subsequent tests
+      Object.defineProperty(window, 'self', {
+        value: window,
+        writable: true,
+        configurable: true
+      })
     })
 
     it('should send message via window.parent.postMessage in test mode', async () => {
@@ -282,9 +300,8 @@ describe('Messaging System', () => {
         return null
       })
 
-      global.document = {
-        getElementById: mockGetElementById
-      } as any
+      // Mock document.getElementById on the actual document object (jsdom)
+      document.getElementById = mockGetElementById as any
 
       // Create spy that captures handlers into mockListeners
       const captureListener = (event: string, handler: Function) => {
@@ -295,11 +312,8 @@ describe('Messaging System', () => {
 
       addEventListenerSpy = jest.fn(captureListener)
 
-      // Set window.addEventListener on the global window object
-      if (!global.window) {
-        global.window = {} as any
-      }
-      global.window.addEventListener = addEventListenerSpy as any
+      // Set window.addEventListener on the actual window object (jsdom)
+      window.addEventListener = addEventListenerSpy as any
 
       global.chrome = {
         runtime: {
