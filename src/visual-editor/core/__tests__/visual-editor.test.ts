@@ -266,8 +266,8 @@ describe('VisualEditor', () => {
       )
     })
 
-    it('should return already active when global flag is set', () => {
-      ;(window as any).__absmartlyVisualEditorActive = true
+    it('should return already active when editor is already active via isActive flag', () => {
+      editor['isActive'] = true
 
       const result = editor.start()
 
@@ -908,9 +908,7 @@ describe('initVisualEditor', () => {
     expect(window.postMessage).toBeDefined()
   })
 
-  it('should return already active when global editor exists', () => {
-    ;(window as any).__absmartlyVisualEditorActive = true
-
+  it('should create new editor and start it when called', () => {
     const result = initVisualEditor(
       'test-variant',
       'test-experiment',
@@ -918,7 +916,10 @@ describe('initVisualEditor', () => {
       []
     )
 
-    expect(result).toEqual({ success: true, already: true })
+    // Should create and start successfully
+    expect(result).toEqual({ success: true })
+    expect((window as any).__absmartlyVisualEditor).toBeDefined()
+    expect((window as any).__absmartlyVisualEditor).toBeInstanceOf(VisualEditor)
   })
 
   it('should store editor instance globally', () => {
