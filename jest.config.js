@@ -2,7 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/background'],
   testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)', '**/?(*.)+(spec|test).(ts|tsx|js)'],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
@@ -22,8 +22,11 @@ module.exports = {
   },
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
+    'background/**/*.{ts,js}',
     '!src/**/*.d.ts',
     '!src/**/index.ts',
+    '!background/**/*.d.ts',
+    '!background/**/index.ts',
   ],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleNameMapper: {
@@ -36,5 +39,8 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(@plasmohq/storage|pify))',
   ],
+  moduleNameMapper: {
+    '^~(.*)$': '<rootDir>/$1',
+  },
   verbose: true,
 }
