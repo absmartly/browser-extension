@@ -114,13 +114,15 @@ export class EventHandlers {
       return
     }
 
-    // Ignore clicks on our UI (banner, editor hosts, toolbar, preview header, hierarchy panel, and image dialog)
+    // Ignore clicks on our UI (banner, editor hosts, toolbar, preview header, hierarchy panel, image dialog, and block inserter)
     if (target.id === 'absmartly-visual-editor-banner-host' ||
         target.closest('#absmartly-visual-editor-banner-host') ||
         target.id === 'absmartly-html-editor-host' ||
         target.closest('#absmartly-html-editor-host') ||
         target.id === 'absmartly-image-dialog-host' ||
         target.closest('#absmartly-image-dialog-host') ||
+        target.id === 'absmartly-block-inserter-host' ||
+        target.closest('#absmartly-block-inserter-host') ||
         target.closest('.absmartly-toolbar') ||
         target.id === 'absmartly-preview-header' ||
         target.closest('#absmartly-preview-header') ||
