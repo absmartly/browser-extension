@@ -216,6 +216,7 @@ describe('Messaging System', () => {
   describe('setupContentScriptMessageListener', () => {
     let mockSidebarIframe: any
     let mockListeners: Function[]
+    let mockGetElementById: jest.Mock
 
     beforeEach(() => {
       mockListeners = []
@@ -227,13 +228,15 @@ describe('Messaging System', () => {
         }
       }
 
+      mockGetElementById = jest.fn().mockImplementation((id: string) => {
+        if (id === 'absmartly-sidebar-iframe') {
+          return mockSidebarIframe
+        }
+        return null
+      })
+
       global.document = {
-        getElementById: jest.fn().mockImplementation((id: string) => {
-          if (id === 'absmartly-sidebar-iframe') {
-            return mockSidebarIframe
-          }
-          return null
-        })
+        getElementById: mockGetElementById
       } as any
 
       global.window = {
@@ -350,7 +353,7 @@ describe('Messaging System', () => {
     })
 
     it('should not set up listener if sidebar iframe not found', () => {
-      (document.getElementById as any).mockReturnValue(null)
+      mockGetElementById.mockReturnValue(null)
 
       setupContentScriptMessageListener()
 
