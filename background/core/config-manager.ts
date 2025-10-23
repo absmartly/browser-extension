@@ -1,7 +1,8 @@
 import { Storage } from "@plasmohq/storage"
 import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
-import { debugLog, debugError } from '~src/utils/debug'
+import { debugLog } from '~src/utils/debug'
+import { validateAPIEndpoint } from '../utils/security'
 
 const ConfigSchema = z.object({
   apiKey: z.string().optional(),
@@ -15,34 +16,6 @@ const ConfigSchema = z.object({
   injectSDK: z.boolean().optional(),
   sdkUrl: z.string().url().optional()
 })
-
-const ALLOWED_API_DOMAINS = ['absmartly.com', 'absmartly.io']
-
-/**
- * Validates an API endpoint domain to prevent token leakage
- * @param endpoint - The API endpoint URL to validate
- * @returns True if the endpoint is allowed, false otherwise
- */
-export function validateAPIEndpoint(endpoint: string): boolean {
-  try {
-    const url = new URL(endpoint)
-    const hostname = url.hostname
-
-    const isAllowed = ALLOWED_API_DOMAINS.some(domain =>
-      hostname === domain || hostname.endsWith(`.${domain}`)
-    )
-
-    if (!isAllowed) {
-      debugError(`[Security] Invalid API endpoint domain: ${hostname}. Only ${ALLOWED_API_DOMAINS.join(', ')} domains are allowed.`)
-      return false
-    }
-
-    return true
-  } catch (e) {
-    debugError('[Security] Failed to parse API endpoint URL:', e)
-    return false
-  }
-}
 
 /**
  * Validates a configuration object using Zod schema

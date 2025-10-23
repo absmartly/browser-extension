@@ -3,6 +3,7 @@ import { buildAuthFetchOptions } from '~src/utils/auth'
 import { getJWTCookie } from '~src/utils/cookies'
 import { Storage } from '@plasmohq/storage'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
+import { getConfig as getConfigFromManager } from '../core/config-manager'
 
 /**
  * Avatar Proxy Module
@@ -39,14 +40,10 @@ export function isBlockedHost(hostname: string): boolean {
 
 /**
  * Get config from storage with secure API key retrieval
+ * Uses the canonical config manager implementation
  */
 async function getConfig(): Promise<ABsmartlyConfig | null> {
-  const config = await storage.get("absmartly-config") as ABsmartlyConfig | null
-  if (config) {
-    const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
-    config.apiKey = secureApiKey || config.apiKey || ''
-  }
-  return config
+  return getConfigFromManager(storage, secureStorage)
 }
 
 /**

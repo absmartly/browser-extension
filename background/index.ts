@@ -34,14 +34,6 @@ export {
 
 // Handler modules
 export {
-  validateAPIEndpoint,
-  getConfig as getAuthConfig,
-  getJWTCookie as getAuthJWTCookie,
-  openLoginPage as openAuthLoginPage,
-  makeAPIRequest as makeAuthAPIRequest
-} from './handlers/auth-handler'
-
-export {
   handleStorageGet,
   handleStorageSet,
   handleStorageRemove,
@@ -79,7 +71,7 @@ export {
 } from './utils/validation'
 
 export {
-  validateAPIEndpoint as validateAPIEndpointSecurity,
+  validateAPIEndpoint,
   isSSRFSafe,
   validateAvatarUrl,
   validateExtensionSender,
