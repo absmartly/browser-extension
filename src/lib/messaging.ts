@@ -18,14 +18,16 @@ function generateRequestId(): string {
   return `msg_${Date.now()}_${++messageIdCounter}`
 }
 
-const isTestMode = typeof window !== 'undefined' && window.self !== window.top
+function isTestMode(): boolean {
+  return typeof window !== 'undefined' && window.self !== window.top
+}
 
 export async function sendMessage(message: ExtensionMessage): Promise<any> {
   message.requestId = message.requestId || generateRequestId()
 
   debugLog(`[Messaging] Sending ${message.type} from ${message.from} to ${message.to}`, message)
 
-  if (isTestMode) {
+  if (isTestMode()) {
     return sendMessageTestMode(message)
   } else {
     return sendMessageProd(message)
@@ -76,7 +78,7 @@ async function sendMessageTestMode(message: ExtensionMessage): Promise<any> {
 const pendingResponses = new Map<string, (response: any) => void>()
 
 export function setupMessageResponseHandler() {
-  if (!isTestMode) return
+  if (!isTestMode()) return
 
   window.addEventListener('message', (event) => {
     if (event.data?.source === 'absmartly-extension-response' && event.data?.requestId) {
