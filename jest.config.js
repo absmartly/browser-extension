@@ -26,6 +26,9 @@ module.exports = {
     '!src/**/index.ts',
   ],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+  moduleNameMapper: {
+    '^~src/(.*)$': '<rootDir>/src/$1',
+  },
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
     '<rootDir>/tests/', // Ignore Playwright tests
