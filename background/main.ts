@@ -42,7 +42,7 @@ import {
 } from './handlers/avatar-proxy'
 
 // Import validation
-import { validateAPIRequest } from './utils/validation'
+import { safeValidateAPIRequest } from './utils/validation'
 
 // Storage instances for message handlers
 const storage = new Storage()
@@ -247,23 +247,6 @@ export function initializeBackgroundScript() {
         path: message.path,
         data: message.data
       })
-
-      // Validate API request parameters
-      const validation = validateAPIRequest({
-        method: message.method,
-        path: message.path,
-        data: message.data
-      })
-
-      if (!validation.valid) {
-        debugError('[Background] API request validation failed:', validation.error)
-        sendResponse({
-          success: false,
-          error: 'Invalid API request parameters',
-          validationError: validation.error
-        })
-        return false
-      }
 
       makeAPIRequest(message.method, message.path, message.data)
         .then(data => {
