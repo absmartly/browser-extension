@@ -14,9 +14,11 @@ test.describe('Visual Editor Demo', () => {
     console.log('\n🚀 Starting Visual Editor Demo')
 
     const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`
+        '--enable-file-cookies',
       ],
       viewport: { width: 1920, height: 1080 },
       slowMo: 200 // Slower for demo purposes

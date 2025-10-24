@@ -39,22 +39,28 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test.beforeAll(async () => {
     // Setup extension context
     const pathToExtension = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    console.log('📂 Launching browser with extension from:', pathToExtension)
     context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
+        '--enable-file-cookies',
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor'
       ]
     })
+    console.log('✅ Browser context created')
 
     // Get extension ID
+    console.log('🔍 Getting extension ID...')
     let [background] = context.serviceWorkers()
     if (!background) {
+      console.log('⏳ Waiting for service worker...')
       background = await context.waitForEvent('serviceworker', { timeout: 10000 })
     }
     extensionId = background.url().split('/')[2]
-    console.log('Extension ID:', extensionId)
+    console.log('✅ Extension ID:', extensionId)
 
     // Use HTTP server instead of file:// URL
     testPageUrl = 'http://localhost:3456/persistence-test.html'

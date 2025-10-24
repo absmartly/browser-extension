@@ -18,9 +18,11 @@ test.describe('Visual Editor Tests with Real Extension', () => {
 
     // Load the extension in a persistent context
     context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
+        '--enable-file-cookies',
         '--auto-open-devtools-for-tabs'
       ],
       slowMo: 500 // Slow down actions by 500ms

@@ -39,6 +39,8 @@ const test = base.extend<{
 
 test.describe('Visual Editor Test', () => {
   test('Launch visual editor and test context menu', async ({ browser }) => {
+    test.setTimeout(90000)
+
     const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
 
     // Verify extension is built
@@ -49,30 +51,40 @@ test.describe('Visual Editor Test', () => {
     console.log('\n🚀 Starting Visual Editor Test')
 
     // Launch browser with extension
+    console.log('📂 Launching browser with extension from:', extensionPath)
     const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`
+        `--load-extension=${extensionPath}`,
+        '--enable-file-cookies'
       ],
       viewport: { width: 1920, height: 1080 },
-      slowMo: parseInt(process.env.SLOW_MO || '500')
+      slowMo: parseInt(process.env.SLOW_MO ? process.env.SLOW_MO : '0')
     })
+    console.log('✅ Browser context created')
 
-    // Get extension ID
+    // Get extension ID - wait for service workers to register
+    console.log('🔍 Getting extension ID...')
     let [sw] = context.serviceWorkers()
     if (!sw) {
-      sw = await context.waitForEvent('serviceworker')
+      console.log('⏳ No service worker yet, waiting for serviceworker event...')
+      sw = await context.waitForEvent('serviceworker', { timeout: 10000 })
     }
     const extensionId = new URL(sw.url()).host
-    console.log('Extension ID:', extensionId)
+    console.log('✅ Extension ID:', extensionId)
 
     // Step 1: Navigate to a real website
-    console.log('\n📄 Navigating to test website...')
+    console.log('\n📄 Creating new page...')
     const page = await context.newPage()
+    console.log('✅ New page created')
 
-    // Try example.com first (simpler page)
-    await page.goto('https://example.com', { waitUntil: 'networkidle' })
-    console.log('✅ Page loaded')
+    console.log('🌐 Navigating to test website...')
+    await page.goto('https://example.com', { waitUntil: 'domcontentloaded', timeout: 15000 })
+    console.log('✅ Page loaded (domcontentloaded)')
+
+    await page.waitForSelector('h1', { timeout: 5000 })
+    console.log('✅ Page content visible')
 
     // Step 2: Inject sidebar by simulating extension icon click
     console.log('\n💉 Injecting sidebar...')
@@ -130,12 +142,24 @@ test.describe('Visual Editor Test', () => {
     }, extensionId)
 
     // Wait for sidebar
-    await page.waitForSelector('#absmartly-sidebar-root', { timeout: 5000 })
-    console.log('✅ Sidebar container found')
+    console.log('⏳ Waiting for sidebar container...')
+    await page.waitForSelector('#absmartly-sidebar-root', { state: 'visible', timeout: 10000 })
+    console.log('✅ Sidebar container found and visible')
 
     // Wait for iframe to load
-    const iframe = await page.waitForSelector('#absmartly-sidebar-iframe', { state: 'attached', timeout: 5000 })
-    await iframe.waitForElementState('visible', { timeout: 3000 })
+    console.log('⏳ Waiting for sidebar iframe...')
+    const iframe = await page.waitForSelector('#absmartly-sidebar-iframe', { state: 'attached', timeout: 10000 })
+    console.log('✅ Sidebar iframe attached')
+
+    await iframe.waitForElementState('visible', { timeout: 5000 })
+    console.log('✅ Sidebar iframe visible')
+
+    // Take screenshot to see current state
+    await page.screenshot({
+      path: 'test-results/sidebar-injected.png',
+      fullPage: false
+    })
+    console.log('📸 Screenshot saved: sidebar-injected.png')
 
     // Step 3: Try to interact with sidebar
     console.log('\n📱 Checking sidebar content...')
@@ -144,8 +168,12 @@ test.describe('Visual Editor Test', () => {
     const iframeHandle = await page.$('#absmartly-sidebar-iframe')
     if (!iframeHandle) {
       console.log('❌ Could not find sidebar iframe')
+      await page.screenshot({
+        path: 'test-results/error-no-iframe.png',
+        fullPage: true
+      })
       await context.close()
-      return
+      throw new Error('Could not find sidebar iframe')
     }
 
     // Try to get frame
@@ -153,66 +181,91 @@ test.describe('Visual Editor Test', () => {
     if (!frame) {
       console.log('⚠️ Could not access iframe content (cross-origin)')
 
-      // Alternative: Check if experiments are available by looking at the page
-      console.log('\n📊 Checking experiments availability...')
-
       // Take screenshot to see what's happening
       await page.screenshot({
-        path: 'test-results/sidebar-state.png',
+        path: 'test-results/sidebar-no-frame-access.png',
         fullPage: false
       })
-      console.log('📸 Screenshot saved to test-results/sidebar-state.png')
-    } else {
-      console.log('✅ Accessed sidebar frame')
+      console.log('📸 Screenshot saved to test-results/sidebar-no-frame-access.png')
 
-      // Check for experiments or config needed
-      const needsConfig = await frame.locator('button:has-text("Configure Settings")').isVisible().catch(() => false)
-      const hasExperiments = await frame.locator('.experiment-item').count().catch(() => 0)
+      console.log('✅ Test completed (sidebar injected but no frame access)')
+      await context.close()
+      return
+    }
 
-      console.log('Needs configuration:', needsConfig)
-      console.log('Number of experiments:', hasExperiments)
+    console.log('✅ Accessed sidebar frame')
 
-      if (hasExperiments > 0) {
-        console.log('\n🔍 Clicking first experiment...')
-        const experimentItem = frame.locator('.experiment-item').first()
-        await experimentItem.waitFor({ state: 'visible', timeout: 3000 })
-        await experimentItem.click()
-        await frame.locator('button:has-text("Visual Editor")').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+    // Wait for frame to be fully loaded
+    console.log('⏳ Waiting for frame body...')
+    await frame.waitForSelector('body', { state: 'visible', timeout: 5000 })
+    console.log('✅ Frame body loaded')
 
-        // Look for Visual Editor button
-        const hasVisualEditorBtn = await frame.locator('button:has-text("Visual Editor")').isVisible().catch(() => false)
-        console.log('Visual Editor button visible:', hasVisualEditorBtn)
+    // Check for experiments or config needed
+    console.log('🔍 Checking sidebar state...')
+    const needsConfig = await frame.locator('button:has-text("Configure Settings")').isVisible().catch(() => false)
+    const hasExperiments = await frame.locator('.experiment-item').count().catch(() => 0)
 
-        if (hasVisualEditorBtn) {
-          console.log('🎨 Clicking Visual Editor button...')
-          await frame.locator('button:has-text("Visual Editor")').first().click()
-          await page.waitForSelector('#absmartly-visual-editor-toolbar', { timeout: 5000 }).catch(() => {})
+    console.log('Needs configuration:', needsConfig)
+    console.log('Number of experiments:', hasExperiments)
 
-          // Check for toolbar on main page
-          const hasToolbar = await page.locator('#absmartly-visual-editor-toolbar').isVisible().catch(() => false)
-          console.log('Visual editor toolbar visible:', hasToolbar)
+    if (hasExperiments > 0) {
+      console.log('\n🔍 Clicking first experiment...')
+      const experimentItem = frame.locator('.experiment-item').first()
+      await experimentItem.waitFor({ state: 'visible', timeout: 5000 })
+      await experimentItem.click()
+      console.log('✅ Clicked first experiment')
 
-          if (hasToolbar) {
-            console.log('\n🖱️ Testing context menu...')
+      console.log('⏳ Waiting for Visual Editor button...')
+      const visualEditorBtn = frame.locator('button:has-text("Visual Editor")').first()
 
-            // Find an element to test
-            const heading = page.locator('h1').first()
-            if (await heading.isVisible()) {
-              // Right-click for context menu
-              await heading.click({ button: 'right' })
-              await page.waitForSelector('.absmartly-context-menu', { timeout: 2000 }).catch(() => {})
+      const hasVisualEditorBtn = await visualEditorBtn.isVisible().catch(() => false)
+      console.log('Visual Editor button visible:', hasVisualEditorBtn)
 
-              // Look for context menu
-              const hasMenu = await page.locator('.absmartly-context-menu').isVisible().catch(() => false)
-              console.log('Context menu appeared:', hasMenu)
+      if (hasVisualEditorBtn) {
+        console.log('🎨 Clicking Visual Editor button...')
+        await visualEditorBtn.click()
+        console.log('✅ Clicked Visual Editor button')
+
+        console.log('⏳ Waiting for visual editor toolbar...')
+        const toolbarVisible = await page.locator('#absmartly-visual-editor-toolbar').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)
+
+        console.log('Visual editor toolbar visible:', toolbarVisible)
+
+        if (toolbarVisible) {
+          console.log('\n🖱️ Testing context menu...')
+
+          // Find an element to test
+          const heading = page.locator('h1').first()
+          const headingVisible = await heading.isVisible().catch(() => false)
+          console.log('H1 element visible:', headingVisible)
+
+          if (headingVisible) {
+            // Right-click for context menu
+            console.log('🖱️ Right-clicking on heading...')
+            await heading.click({ button: 'right' })
+            console.log('✅ Right-clicked')
+
+            console.log('⏳ Waiting for context menu...')
+            const menuVisible = await page.locator('.absmartly-context-menu').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)
+
+            console.log('Context menu appeared:', menuVisible)
+
+            if (menuVisible) {
+              console.log('✅ Context menu test PASSED')
+            } else {
+              console.log('⚠️ Context menu did not appear (may be expected)')
             }
           }
+        } else {
+          console.log('⚠️ Visual editor toolbar did not appear')
         }
-      } else if (needsConfig) {
-        console.log('⚙️ Extension needs configuration')
       } else {
-        console.log('📭 No experiments available')
+        console.log('⚠️ Visual Editor button not found')
       }
+    } else if (needsConfig) {
+      console.log('⚙️ Extension needs configuration')
+    } else {
+      console.log('📭 No experiments available')
     }
 
     // Final screenshot

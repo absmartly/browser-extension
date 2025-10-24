@@ -1,5 +1,5 @@
-import { test, expect, type Page, type Browser } from '@playwright/test'
-import path from 'path'
+import { test, expect } from '../fixtures/extension'
+import { type Page } from '@playwright/test'
 
 /**
  * Comprehensive E2E Tests for Visual Editor Initialization and Startup
@@ -90,26 +90,24 @@ async function getVisualEditorStatus(page: Page): Promise<any> {
 }
 
 test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', () => {
-  let testPagePath: string
+  let testPage: Page
 
-  test.beforeAll(() => {
-    testPagePath = path.join(__dirname, 'test-page.html')
-  })
+  test.beforeEach(async ({ context }) => {
+    testPage = await context.newPage()
 
-  test.beforeEach(async ({ page }) => {
     // Navigate to test page
-    await page.goto(`file://${testPagePath}`)
+    await testPage.goto('file://' + __dirname + '/test-page.html')
 
     // Wait for page to fully load
-    await page.waitForSelector('body', { timeout: 5000 })
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Wait for content script to be ready
-    await page.waitForFunction(() => {
+    await testPage.waitForFunction(() => {
       return (window as any).__absmartlyContentScriptLoaded === true
     }, { timeout: 5000 })
 
     // Inject comprehensive test helper functions
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       (window as any).testHelpers = {
         // Check if visual editor is active
         isVisualEditorActive: function() {
@@ -220,13 +218,17 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
     })
 
     // Verify test page loaded correctly
-    await expect(page.locator('[data-testid="main-title"]')).toContainText('Visual Editor Test Page')
+    await expect(testPage.locator('[data-testid="main-title"]')).toContainText('Visual Editor Test Page')
+  })
+
+  test.afterEach(async () => {
+    if (testPage) await testPage.close()
   })
 
   test.describe('1. Script Injection and API Exposure', () => {
-    test('should inject content script and be ready for messages', async ({ page }) => {
+    test('should inject content script and be ready for messages', async () => {
       // Verify content script loaded
-      const flags = await page.evaluate(() => {
+      const flags = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getGlobalFlags()
       })
@@ -236,9 +238,9 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(flags.hasEditorInstance).toBeFalsy()
     })
 
-    test('should handle content script messages without errors', async ({ page }) => {
+    test('should handle content script messages without errors', async () => {
       // Send a test message
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -246,7 +248,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(result.success).toBe(true)
 
       // Verify editor is active
-      const flags = await page.evaluate(() => {
+      const flags = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getGlobalFlags()
       })
@@ -257,8 +259,8 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
   })
 
   test.describe('2. initVisualEditor Function with Various Parameters', () => {
-    test('should initialize with basic valid parameters', async ({ page }) => {
-      const result = await startVisualEditor(page, {
+    test('should initialize with basic valid parameters', async () => {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -266,11 +268,11 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(result.success).toBe(true)
 
       // Verify editor is marked as active
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
 
-    test('should handle edge case parameters gracefully', async ({ page }) => {
+    test('should handle edge case parameters gracefully', async () => {
       const testCases = [
         { variant: '', experiment: '' },
         { variant: 'very-long-variant-name-that-exceeds-normal-limits', experiment: 'very-long-experiment-name' },
@@ -280,7 +282,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
 
       for (const testCase of testCases) {
         // Clear previous state
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           const editor = (window as any).__absmartlyVisualEditor
           if (editor && typeof editor.stop === 'function') {
             editor.stop()
@@ -289,7 +291,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
           ;(window as any).__absmartlyVisualEditor = null
         })
 
-        const result = await startVisualEditor(page, {
+        const result = await startVisualEditor(testPage, {
           variantName: testCase.variant,
           experimentName: testCase.experiment
         })
@@ -299,7 +301,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       }
     })
 
-    test('should initialize with pre-existing DOM changes', async ({ page }) => {
+    test('should initialize with pre-existing DOM changes', async () => {
       const initialChanges = [
         {
           selector: '[data-testid="main-title"]',
@@ -318,7 +320,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
         }
       ]
 
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment',
         changes: initialChanges
@@ -327,26 +329,26 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(result.success).toBe(true)
 
       // Verify changes are stored in the editor
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(Array.isArray(status.changes)).toBe(true)
     })
   })
 
   test.describe('3. Toolbar Creation and Display', () => {
-    test('should create and display toolbar after initialization', async ({ page }) => {
+    test('should create and display toolbar after initialization', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for toolbar/overlay to be created
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.hasToolbar()
       }, { timeout: 5000 })
 
-      const toolbarInfo = await page.evaluate(() => {
+      const toolbarInfo = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         const hasToolbar = helpers.hasToolbar()
 
@@ -360,29 +362,29 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(toolbarInfo.hasToolbar || toolbarInfo.overlayExists).toBe(true)
     })
 
-    test('should handle toolbar interactions properly', async ({ page }) => {
+    test('should handle toolbar interactions properly', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for initialization
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Test toolbar presence
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
   })
 
   test.describe('4. Multiple Initialization Attempts', () => {
-    test('should handle multiple initialization attempts gracefully', async ({ page }) => {
+    test('should handle multiple initialization attempts gracefully', async () => {
       // First initialization
-      const firstResult = await startVisualEditor(page, {
+      const firstResult = await startVisualEditor(testPage, {
         variantName: 'variant-1',
         experimentName: 'experiment-1'
       })
@@ -390,7 +392,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(firstResult.success).toBe(true)
 
       // Second initialization (should handle gracefully)
-      const secondResult = await startVisualEditor(page, {
+      const secondResult = await startVisualEditor(testPage, {
         variantName: 'variant-2',
         experimentName: 'experiment-2'
       })
@@ -398,7 +400,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(secondResult.success).toBe(true)
 
       // Third initialization
-      const thirdResult = await startVisualEditor(page, {
+      const thirdResult = await startVisualEditor(testPage, {
         variantName: 'variant-3',
         experimentName: 'experiment-3',
         changes: [{ selector: '.test', type: 'text', value: 'test' }]
@@ -407,10 +409,10 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(thirdResult.success).toBe(true)
     })
 
-    test('should maintain consistent state across multiple attempts', async ({ page }) => {
+    test('should maintain consistent state across multiple attempts', async () => {
       // Initialize multiple times and check state consistency
       for (let i = 0; i < 5; i++) {
-        const result = await startVisualEditor(page, {
+        const result = await startVisualEditor(testPage, {
           variantName: `variant-${i}`,
           experimentName: `experiment-${i}`
         })
@@ -418,7 +420,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
         expect(result.success).toBe(true)
 
         // Verify state remains consistent
-        const flags = await page.evaluate(() => {
+        const flags = await testPage.evaluate(() => {
           const helpers = (window as any).testHelpers as TestHelpers
           return helpers.getGlobalFlags()
         })
@@ -430,9 +432,9 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
   })
 
   test.describe('5. Global State Flags Management', () => {
-    test('should set and manage global state flags correctly', async ({ page }) => {
+    test('should set and manage global state flags correctly', async () => {
       // Check initial global state
-      const initialState = await page.evaluate(() => {
+      const initialState = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getGlobalFlags()
       })
@@ -442,13 +444,13 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(initialState.hasContentScriptLoaded).toBe(true)
 
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Check active state
-      const activeState = await page.evaluate(() => {
+      const activeState = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getGlobalFlags()
       })
@@ -457,7 +459,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(activeState.hasEditorInstance).toBe(true)
 
       // Stop editor if possible
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const editor = (window as any).__absmartlyVisualEditor
         if (editor && typeof editor.stop === 'function') {
           editor.stop()
@@ -465,7 +467,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       })
 
       // Check inactive state
-      const inactiveState = await page.evaluate(() => {
+      const inactiveState = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getGlobalFlags()
       })
@@ -473,23 +475,23 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(inactiveState.visualEditorActive).toBe(false)
     })
 
-    test('should prevent multiple concurrent active flags', async ({ page }) => {
+    test('should prevent multiple concurrent active flags', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'variant-1',
         experimentName: 'experiment-1'
       })
 
       // Try to initialize multiple times
       for (let i = 0; i < 3; i++) {
-        await startVisualEditor(page, {
+        await startVisualEditor(testPage, {
           variantName: `variant-${i}`,
           experimentName: `experiment-${i}`
         })
       }
 
       // Verify only one active flag exists
-      const activeCount = await page.evaluate(() => {
+      const activeCount = await testPage.evaluate(() => {
         return (window as any).__absmartlyVisualEditorActive === true ? 1 : 0
       })
 
@@ -498,9 +500,9 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
   })
 
   test.describe('6. Style Injection and CSS Classes', () => {
-    test('should inject required styles on initialization', async ({ page }) => {
+    test('should inject required styles on initialization', async () => {
       // Check no styles before initialization
-      const initialStyles = await page.evaluate(() => {
+      const initialStyles = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return {
           absmartlyStyles: helpers.getABSmartlyStyles().length,
@@ -513,19 +515,19 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(initialStyles.hasMainStyles).toBe(false)
 
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for styles to be injected
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getABSmartlyStyles().length > 0 || helpers.hasVisualEditorStyles()
       })
 
       // Verify styles are injected
-      const postInitStyles = await page.evaluate(() => {
+      const postInitStyles = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return {
           absmartlyStyles: helpers.getABSmartlyStyles().length,
@@ -537,21 +539,21 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(postInitStyles.absmartlyStyles).toBeGreaterThan(0)
     })
 
-    test('should inject CSS classes for editor functionality', async ({ page }) => {
+    test('should inject CSS classes for editor functionality', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for editor to be active
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Check for CSS classes in stylesheets
-      const hasStyles = await page.evaluate(() => {
+      const hasStyles = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         const stylesheetContents = helpers.getStylesheetContents()
         const allCSS = stylesheetContents.join('\n')
@@ -562,21 +564,21 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(hasStyles).toBe(true)
     })
 
-    test('should clean up styles on editor stop', async ({ page }) => {
+    test('should clean up styles on editor stop', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Verify styles are present
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getABSmartlyStyles().length > 0 || helpers.hasVisualEditorStyles()
       })
 
       // Stop the editor
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const editor = (window as any).__absmartlyVisualEditor
         if (editor && typeof editor.stop === 'function') {
           editor.stop()
@@ -584,7 +586,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       })
 
       // Styles might be cleaned up or remain (depends on implementation)
-      const stylesAfterStop = await page.evaluate(() => {
+      const stylesAfterStop = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return {
           absmartlyStyles: helpers.getABSmartlyStyles().length,
@@ -598,16 +600,16 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
   })
 
   test.describe('7. Initialization in Different Page States', () => {
-    test('should initialize in loading page state', async ({ page }) => {
+    test('should initialize in loading page state', async () => {
       // Navigate to page but don't wait for complete load
-      await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded' })
+      await testPage.goto('file://' + __dirname + '/test-page.html', { waitUntil: 'domcontentloaded' })
 
       // Wait for content script
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         return (window as any).__absmartlyContentScriptLoaded === true
       }, { timeout: 5000 })
 
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -615,24 +617,24 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(result.success).toBe(true)
 
       // Wait for page to fully load and verify editor still works
-      await page.waitForSelector('body', { timeout: 5000 })
+      await testPage.waitForSelector('body', { timeout: 5000 })
 
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
 
-    test('should initialize in interactive page state', async ({ page }) => {
-      await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded' })
+    test('should initialize in interactive page state', async () => {
+      await testPage.goto('file://' + __dirname + '/test-page.html', { waitUntil: 'domcontentloaded' })
 
       // Wait for interactive state
-      await page.waitForFunction(() => document.readyState === 'interactive' || document.readyState === 'complete')
+      await testPage.waitForFunction(() => document.readyState === 'interactive' || document.readyState === 'complete')
 
       // Wait for content script
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         return (window as any).__absmartlyContentScriptLoaded === true
       }, { timeout: 5000 })
 
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -640,18 +642,18 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(result.success).toBe(true)
     })
 
-    test('should initialize in complete page state', async ({ page }) => {
-      await page.goto(`file://${testPagePath}`, { waitUntil: 'networkidle' })
+    test('should initialize in complete page state', async () => {
+      await testPage.goto('file://' + __dirname + '/test-page.html', { waitUntil: 'networkidle' })
 
       // Ensure page is completely loaded
-      await page.waitForFunction(() => document.readyState === 'complete')
+      await testPage.waitForFunction(() => document.readyState === 'complete')
 
       // Wait for content script
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         return (window as any).__absmartlyContentScriptLoaded === true
       }, { timeout: 5000 })
 
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -659,27 +661,27 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(result.success).toBe(true)
 
       // Verify all page elements are accessible
-      await expect(page.locator('[data-testid="main-title"]')).toBeVisible()
-      await expect(page.locator('[data-testid="subtitle"]')).toBeVisible()
+      await expect(testPage.locator('[data-testid="main-title"]')).toBeVisible()
+      await expect(testPage.locator('[data-testid="subtitle"]')).toBeVisible()
     })
   })
 
   test.describe('8. Core Modules Initialization', () => {
-    test('should initialize all core modules correctly', async ({ page }) => {
+    test('should initialize all core modules correctly', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for editor to be active
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Check core modules initialization
-      const coreModules = await page.evaluate(() => {
+      const coreModules = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.getCoreModules()
       })
@@ -703,15 +705,15 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       }
     })
 
-    test('should verify module integration and communication', async ({ page }) => {
+    test('should verify module integration and communication', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Test module integration
-      const moduleIntegration = await page.evaluate(() => {
+      const moduleIntegration = await testPage.evaluate(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         const editor = helpers.getVisualEditor()
 
@@ -738,35 +740,35 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
   })
 
   test.describe('9. Real Browser Interaction Testing', () => {
-    test('should handle real mouse interactions after initialization', async ({ page }) => {
+    test('should handle real mouse interactions after initialization', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for initialization
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testHelpers as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Test real mouse hover on page elements
-      const title = page.locator('[data-testid="main-title"]')
+      const title = testPage.locator('[data-testid="main-title"]')
       await title.hover()
 
       // Test real click interactions
-      const button = page.locator('#nav-home')
+      const button = testPage.locator('#nav-home')
       await button.click()
 
       // Verify editor remains active after real interactions
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
 
-    test('should handle page resize and viewport changes', async ({ page }) => {
+    test('should handle page resize and viewport changes', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -778,29 +780,29 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       ]
 
       for (const viewport of viewports) {
-        await page.setViewportSize(viewport)
+        await testPage.setViewportSize(viewport)
 
         // Wait a moment for resize to settle
-        await page.waitForFunction(() => true, { timeout: 500 })
+        await testPage.waitForFunction(() => true, { timeout: 500 })
 
         // Verify editor remains functional after resize
-        const status = await getVisualEditorStatus(page)
+        const status = await getVisualEditorStatus(testPage)
         expect(status.active).toBe(true)
 
         // Verify page elements are still accessible
-        await expect(page.locator('[data-testid="main-title"]')).toBeVisible()
+        await expect(testPage.locator('[data-testid="main-title"]')).toBeVisible()
       }
     })
 
-    test('should handle dynamic DOM changes during editor operation', async ({ page }) => {
+    test('should handle dynamic DOM changes during editor operation', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Add dynamic elements to the page
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const container = document.querySelector('.container')
         if (container) {
           const newElement = document.createElement('div')
@@ -816,7 +818,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       })
 
       // Verify editor continues to work with dynamic elements
-      const dynamicElement = page.locator('#dynamic-test-element')
+      const dynamicElement = testPage.locator('#dynamic-test-element')
       await expect(dynamicElement).toBeVisible()
 
       // Test interaction with dynamic element
@@ -824,15 +826,15 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       await dynamicElement.click()
 
       // Verify editor is still active
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
   })
 
   test.describe('10. Error Handling and Edge Cases', () => {
-    test('should handle initialization with corrupted DOM gracefully', async ({ page }) => {
+    test('should handle initialization with corrupted DOM gracefully', async () => {
       // Corrupt some DOM elements
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const title = document.querySelector('[data-testid="main-title"]')
         if (title) {
           // Remove some attributes to simulate corruption
@@ -842,7 +844,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       })
 
       // Try to initialize editor
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -851,17 +853,17 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(typeof result.success).toBe('boolean')
     })
 
-    test('should handle memory constraints and cleanup', async ({ page }) => {
+    test('should handle memory constraints and cleanup', async () => {
       // Initialize and stop editor multiple times to test memory handling
       for (let i = 0; i < 10; i++) {
         // Initialize
-        await startVisualEditor(page, {
+        await startVisualEditor(testPage, {
           variantName: `variant-${i}`,
           experimentName: `experiment-${i}`
         })
 
         // Stop if possible
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           const editor = (window as any).__absmartlyVisualEditor
           if (editor && typeof editor.stop === 'function') {
             editor.stop()
@@ -873,7 +875,7 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       }
 
       // Final initialization should still work
-      const finalResult = await startVisualEditor(page, {
+      const finalResult = await startVisualEditor(testPage, {
         variantName: 'final-variant',
         experimentName: 'final-experiment'
       })
@@ -881,9 +883,9 @@ test.describe('Visual Editor Initialization and Startup - Comprehensive Tests', 
       expect(finalResult.success).toBe(true)
     })
 
-    test('should handle concurrent initialization attempts', async ({ page }) => {
+    test('should handle concurrent initialization attempts', async () => {
       // Try multiple simultaneous initializations
-      const concurrentResults = await page.evaluate(() => {
+      const concurrentResults = await testPage.evaluate(() => {
         const promises = []
         for (let i = 0; i < 5; i++) {
           promises.push(new Promise(resolve => {
