@@ -10,6 +10,10 @@
 
 public/*.{min,dev}.js
 react.production.min.js
+
+# Generated SDK bridge bundle
+public/absmartly-sdk-bridge.bundle.js
+public/absmartly-sdk-bridge.bundle.js.map
 playwright-report/
 playwright-report/index.html
 test-results
