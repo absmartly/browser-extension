@@ -38,7 +38,7 @@ export class Orchestrator {
 
   constructor(config: OrchestratorConfig = {}) {
     this.config = {
-      maxAttempts: config.maxAttempts || 50, // 5 seconds at 100ms intervals
+      maxAttempts: config.maxAttempts || 5, // 0.5 seconds at 100ms intervals
       attemptInterval: config.attemptInterval || 100,
       debug: config.debug !== false
     }
