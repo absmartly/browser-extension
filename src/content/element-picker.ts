@@ -173,7 +173,7 @@ export class ElementPicker {
     this.highlightedElement = null
   }
 
-  private generateSelector(element: Element): string {
+  private generateSelector(element: Element, debug = false): string {
     // Try increasingly specific selectors until we find a unique one
     const maxParentLevels = [2, 3, 4, 5]
 
@@ -188,11 +188,13 @@ export class ElementPicker {
       const matches = document.querySelectorAll(selector)
 
       if (matches.length === 1 && matches[0] === element) {
-        console.log(`[ElementPicker] Found unique selector with ${levels} parent levels: ${selector}`)
+        if (debug) {
+          console.log(`[ElementPicker] Found unique selector with ${levels} parent levels: ${selector}`)
+        }
         return selector
       }
 
-      if (matches.length > 1) {
+      if (matches.length > 1 && debug) {
         console.warn(`[ElementPicker] Selector matched ${matches.length} elements (tried ${levels} parent levels): ${selector}`)
         console.log('[ElementPicker] Matched elements and their ancestors:')
         matches.forEach((match, index) => {
@@ -216,7 +218,9 @@ export class ElementPicker {
     }
 
     // If still not unique, use a very specific positional selector
-    console.error('[ElementPicker] Could not generate unique selector, using positional fallback')
+    if (debug) {
+      console.error('[ElementPicker] Could not generate unique selector, using positional fallback')
+    }
     const parts: string[] = []
     let current: Element | null = element
     let depth = 0
@@ -242,7 +246,9 @@ export class ElementPicker {
     }
 
     const positionalSelector = parts.join(' > ')
-    console.log('[ElementPicker] Using positional selector:', positionalSelector)
+    if (debug) {
+      console.log('[ElementPicker] Using positional selector:', positionalSelector)
+    }
     return positionalSelector
   }
 
@@ -257,15 +263,13 @@ export class ElementPicker {
 
   private handleClick = (e: MouseEvent) => {
     if (!this.isActive) return
-    
-    console.log('ElementPicker handling click')
+
     e.preventDefault()
     e.stopPropagation()
-    
+
     const element = document.elementFromPoint(e.clientX, e.clientY)
     if (element) {
-      const selector = this.generateSelector(element)
-      console.log('Generated selector:', selector)
+      const selector = this.generateSelector(element, true) // Enable debug logging on click
       this.selectedElement = element
       
       // Send message with the selected element
