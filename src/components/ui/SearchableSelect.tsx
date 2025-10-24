@@ -164,15 +164,15 @@ export function SearchableSelect(props: SearchableSelectProps) {
   }
 
   const defaultRenderOption = (option: SearchableSelectOption, isSelected: boolean, onSelect: () => void) => {
-    const initials = option.type === 'team' 
+    const initials = option.type === 'team'
       ? (option.initials || (option.display_name || option.name).charAt(0)).toUpperCase()
       : getInitials(option.display_name || option.name)
-    
+
     // Check if color is a hex code or CSS class
     const isHexColor = option.color?.startsWith('#')
     const backgroundColor = isHexColor ? option.color : undefined
     const colorClass = isHexColor ? '' : (option.color || getDefaultColor(options.indexOf(option)))
-    
+
     const shapeClass = option.type === 'team' ? 'rounded-md' : 'rounded-full'
     const borderClass = option.type === 'team' ? 'border-[0.5px] border-border' : ''
     const fontClass = option.type === 'team' ? 'font-semibold' : 'font-medium'
@@ -183,7 +183,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
         className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-gray-50 ${
           isSelected ? 'bg-blue-50' : ''
         }`}
-        onClick={onSelect}
+        onClick={(e) => {
+          e.stopPropagation()
+          onSelect()
+        }}
       >
         <div className="flex items-center gap-2">
           {option.avatar ? (
@@ -349,7 +352,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
           {mode === 'multi' && selectedOptions.length > 0 && (
             <div className="p-2 border-t border-gray-200">
               <button
-                onClick={handleClearAll}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleClearAll()
+                }}
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
                 Clear all
