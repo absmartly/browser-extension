@@ -96,30 +96,21 @@ export function setupContentScriptMessageListener() {
   debugLog('[Messaging] Setting up content script test mode listener')
 
   window.addEventListener('message', (event) => {
-    debugLog('[Messaging DEBUG] Received window message event:', {
-      source: event.source === window ? 'window' : 'other',
-      origin: event.origin,
-      dataSource: event.data?.source,
-      dataType: event.data?.type
-    })
+    // EARLY EXIT: Only process messages from our extension (before any logging)
+    if (event.data?.source !== 'absmartly-extension') {
+      return
+    }
 
     // Accept messages from sidebar iframe (check it exists and matches source)
     const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
 
-    debugLog('[Messaging DEBUG] Sidebar iframe check:', {
-      iframeExists: !!sidebarIframe,
-      eventSourceMatchesIframe: sidebarIframe ? event.source === sidebarIframe.contentWindow : false
-    })
-
     // SECURITY: Only accept messages from sidebar iframe
     if (!sidebarIframe || event.source !== sidebarIframe.contentWindow) {
-      debugLog('[Messaging DEBUG] Rejecting message - iframe check failed')
+      debugLog('[Messaging] Rejecting message - not from sidebar iframe')
       return
     }
 
-    debugLog('[Messaging DEBUG] Passed iframe check, checking message format')
-
-    if (event.data?.source === 'absmartly-extension' && event.data?.type) {
+    if (event.data?.type) {
       const message = event.data as ExtensionMessage
       debugLog('[Messaging] Content script received message from sidebar:', message.type)
 
@@ -127,8 +118,6 @@ export function setupContentScriptMessageListener() {
       const listeners = chrome.runtime.onMessage.hasListeners()
         ? (chrome.runtime.onMessage as any)._listeners || []
         : []
-
-      debugLog('[Messaging DEBUG] Found', listeners.length, 'chrome.runtime.onMessage listeners')
 
       for (const listener of listeners) {
         const sendResponse = (response: any) => {
@@ -151,13 +140,6 @@ export function setupContentScriptMessageListener() {
           debugError('[Messaging] Error in listener:', e)
         }
       }
-    } else {
-      debugLog('[Messaging DEBUG] Message format check failed:', {
-        hasSource: !!event.data?.source,
-        source: event.data?.source,
-        hasType: !!event.data?.type,
-        type: event.data?.type
-      })
     }
   })
 }
