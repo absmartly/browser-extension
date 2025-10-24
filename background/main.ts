@@ -201,12 +201,9 @@ export function initializeBackgroundScript() {
       })
     } else if (message.type === 'ELEMENT_SELECTED') {
       // Element picker returned a selector
-      debugLog('[Background] Received ELEMENT_SELECTED:', message)
-
       // Get the current state to find out which field we were picking for
       sessionStorage.get<DOMChangesInlineState>('domChangesInlineState').then(async (state) => {
         if (state && state.pickingForField) {
-          debugLog('[Background] Storing element picker result for field:', state.pickingForField)
 
           // Store the result
           await sessionStorage.set('elementPickerResult', {

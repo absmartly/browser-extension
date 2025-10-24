@@ -221,8 +221,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     
     elementPicker.start((selector: string) => {
-      debugLog('[Visual Editor Content Script] Element selected:', selector)
-      // Send the selected element back to the extension
       chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
         selector: selector
