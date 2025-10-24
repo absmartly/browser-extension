@@ -602,7 +602,7 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
 
   // For parent elements, be less specific but still include name attributes
   let selector = tagName
-  
+
   // Add name attributes for parent elements too
   if (attributes.length > 0) {
     selector += attributes[0] // Just use the first attribute for parents
@@ -613,13 +613,13 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
     }
   }
 
-  // Use nth-of-type for uniqueness if needed
-  if (element.parentElement && selector === tagName) {
+  // Always check if we need nth-of-type for disambiguation
+  if (element.parentElement) {
     const siblings = Array.from(element.parentElement.children)
       .filter(child => child.tagName === element.tagName)
     if (siblings.length > 1) {
       const index = siblings.indexOf(element) + 1
-      return `${tagName}:nth-of-type(${index})`
+      return `${selector}:nth-of-type(${index})`
     }
   }
 
