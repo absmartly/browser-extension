@@ -259,7 +259,8 @@ export class ElementPicker {
         }
       }
 
-      // Check if we need :nth-of-type
+      // ALWAYS check if we need :nth-of-type for disambiguation
+      // This is crucial for sites like Framer where many elements share the same data-framer-name
       if (ancestor.parentElement) {
         const siblings = Array.from(ancestor.parentElement.children).filter(
           child => child.tagName === ancestor.tagName
