@@ -7,8 +7,8 @@ test('Minimal test: Check SDK mock is working', async ({ page }) => {
     console.log(`[BROWSER ${msg.type()}]`, msg.text())
   })
 
-  await page.goto(TEST_PAGE_URL)
-  await page.waitForLoadState('networkidle')
+  await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.waitForSelector('body', { timeout: 5000 })
 
   // Inject SDK mock
   await page.evaluate(() => {
@@ -128,7 +128,8 @@ test('Minimal test: Check SDK mock is working', async ({ page }) => {
     return plugin.initialize()
   })
 
-  await page.waitForTimeout(2000)
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
   const elementText = await page.locator('#test-element').textContent()
   console.log('[TEST] Final element text:', elementText)

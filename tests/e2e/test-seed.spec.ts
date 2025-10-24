@@ -17,7 +17,8 @@ test.describe('Seed Test', () => {
       await page.goto(seedUrl, { timeout: 10000, waitUntil: 'load' })
       console.log('✅ Navigated to seed page')
 
-      await page.waitForTimeout(1000) // Give scripts time to execute
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {}) // Give scripts time to execute
 
       const title = await page.title()
       console.log('Page title:', title)

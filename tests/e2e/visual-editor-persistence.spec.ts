@@ -51,14 +51,13 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     // Get extension ID
     let [background] = context.serviceWorkers()
     if (!background) {
-      background = await context.waitForEvent('serviceworker')
+      background = await context.waitForEvent('serviceworker', { timeout: 10000 })
     }
     extensionId = background.url().split('/')[2]
     console.log('Extension ID:', extensionId)
 
-    // Create test page URL
-    const testPagePath = path.join(__dirname, '..', 'test-pages', 'persistence-test.html')
-    testPageUrl = `file://${testPagePath}`
+    // Use HTTP server instead of file:// URL
+    testPageUrl = 'http://localhost:3456/persistence-test.html'
   })
 
   test.afterAll(async () => {
@@ -74,8 +73,9 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     const page = await context.newPage()
 
     // Navigate to test page
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    // Wait for body to be ready
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Initialize visual editor with test configuration
     const changes: any[] = await page.evaluate(() => {
@@ -152,8 +152,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('2. Load editor with existing changes', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Prepare existing changes to load
     const existingChanges = [
@@ -222,8 +222,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     const page = await context.newPage()
 
     // First, create and save changes
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const savedChanges = await page.evaluate(() => {
       const changes = [
@@ -249,7 +249,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
     // Navigate to fresh page (reload)
     await page.reload()
-    await page.waitForLoadState('networkidle')
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Apply saved changes to fresh page
     const applicationResult = await page.evaluate(() => {
@@ -300,8 +300,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('4. Export/import change sets', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Create a comprehensive change set
     const originalChangeSet: ChangeSet = {
@@ -426,8 +426,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('5. Handle invalid change data gracefully', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Test various invalid change scenarios
     const invalidChangeTests = await page.evaluate(() => {
@@ -535,8 +535,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('6. Test change merging and deduplication', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const mergingResult = await page.evaluate(() => {
       // Simulate multiple changes to the same element
@@ -647,8 +647,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('7. Verify selector stability across page reloads', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Capture initial selectors and element properties
     const initialState = await page.evaluate(() => {
@@ -698,7 +698,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
     // Reload the page
     await page.reload()
-    await page.waitForLoadState('networkidle')
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Verify selector stability after reload
     const postReloadState = await page.evaluate(() => {
@@ -760,8 +760,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('8. Test with dynamic content and AJAX updates', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Simulate dynamic content updates
     const dynamicTestResult = await page.evaluate(() => {
@@ -852,8 +852,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('9. Cross-browser change compatibility', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Test browser-specific compatibility
     const compatibilityResult = await page.evaluate(() => {
@@ -952,8 +952,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('10. Performance with large change sets', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Create a large change set for performance testing
     const performanceResult = await page.evaluate(() => {
@@ -1096,8 +1096,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('11. Message passing to extension background - test postMessage API', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Test extension message passing
     const messagePassingResult = await page.evaluate(async () => {
@@ -1211,8 +1211,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('12. LocalStorage persistence of changes - verify storage APIs', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const storageTestResult = await page.evaluate(() => {
       const testData = {
@@ -1398,11 +1398,11 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     const tab1 = await context.newPage()
     const tab2 = await context.newPage()
 
-    await tab1.goto(testPageUrl)
-    await tab2.goto(testPageUrl)
+    await tab1.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await tab2.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await Promise.all([
-      tab1.waitForLoadState('networkidle'),
-      tab2.waitForLoadState('networkidle')
+      tab1.waitForSelector('body', { timeout: 5000 }),
+      tab2.waitForSelector('body', { timeout: 5000 })
     ])
 
     // Test cross-tab synchronization
@@ -1582,8 +1582,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('14. Reload page and verify changes persist - test page reload scenarios', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Setup persistent changes before reload
     const setupResult = await page.evaluate(() => {
@@ -1682,7 +1682,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     expect(setupResult.applicationResults.every((r: any) => r.applied)).toBeTruthy()
 
     // Perform hard reload
-    await page.reload({ waitUntil: 'networkidle' })
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Verify persistence after reload
     const postReloadResult = await page.evaluate(() => {
@@ -1792,8 +1793,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('15. Test with multiple variants/experiments - handle multiple change sets', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const multiVariantResult = await page.evaluate(() => {
       // Define multiple experiments with variants
@@ -2096,8 +2097,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('16. Conflict resolution for concurrent changes - test merge strategies', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const conflictResolutionResult = await page.evaluate(() => {
       // Simulate concurrent changes from different sources
@@ -2291,8 +2292,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('17. Backup and restore functionality - test export/import', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const backupRestoreResult = await page.evaluate(() => {
       // Create comprehensive data to backup
@@ -2537,8 +2538,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('18. Change validation before saving - verify data integrity', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const validationResult = await page.evaluate(() => {
       // Define validation rules
@@ -2781,8 +2782,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('19. Network failure handling - test offline scenarios', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Simulate network conditions
     await page.route('**/*', route => {
@@ -3047,8 +3048,8 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   test('20. Maximum change limit testing - test performance with many changes', async () => {
     const page = await context.newPage()
 
-    await page.goto(testPageUrl)
-    await page.waitForLoadState('networkidle')
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     const maxLimitResult = await page.evaluate(() => {
       const createManyElements = (count: number) => {

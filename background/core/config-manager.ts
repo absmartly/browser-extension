@@ -47,8 +47,14 @@ export async function getConfig(
   const config = await storage.get("absmartly-config") as ABsmartlyConfig | null
 
   if (config) {
-    const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
-    config.apiKey = secureApiKey || config.apiKey || ''
+    try {
+      const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+      config.apiKey = secureApiKey || config.apiKey || ''
+    } catch (error) {
+      // If secure storage fails (e.g., JSON parse error for legacy data), fall back to config.apiKey
+      debugLog('[Config] Failed to get API key from secure storage:', error)
+      config.apiKey = config.apiKey || ''
+    }
 
     if (config.apiEndpoint && !validateAPIEndpoint(config.apiEndpoint)) {
       throw new Error('Invalid API endpoint: Only ABsmartly domains are allowed')
@@ -92,7 +98,13 @@ export async function initializeConfig(
     debugLog('[Config] Using auth method from environment:', envAuthMethod)
   }
 
-  const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+  let secureApiKey: string | null = null
+  try {
+    secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+  } catch (error) {
+    // If secure storage fails (e.g., JSON parse error for legacy data), continue without it
+    debugLog('[Config] Failed to get API key from secure storage during init:', error)
+  }
 
   const newConfig: ABsmartlyConfig = {
     apiKey: storedConfig?.apiKey || secureApiKey || '',

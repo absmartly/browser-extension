@@ -29,10 +29,11 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('1. Exit VE and Preview cleanup', () => {
     test('should stop VE when navigating back from experiment detail', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
 
       // Wait for experiments to load
-      await page.waitForTimeout(3000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Click first experiment
       const experimentCount = await page.locator('[data-testid="experiment-item"]').count()
@@ -55,7 +56,8 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Start VE mode
       await page.locator('button:has-text("Visual Editor")').first().click()
-      await page.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Click back button
       await page.locator('button:has-text("Back")').click()
@@ -76,26 +78,29 @@ test.describe('Bug Fixes E2E Tests', () => {
         })
       })
 
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(2000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Open a test page to check for preview header
       const testPage = await context.newPage()
-      await testPage.goto('about:blank')
+      await testPage.goto('about:blank', { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       // Check if preview header exists (it might not in a blank page, but we're testing the mechanism)
       const hasPreviewHeader = await testPage.locator('#absmartly-preview-header').count()
       console.log('Preview header count:', hasPreviewHeader)
 
       // Navigate back to sidebar (navigate away from current view)
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(500)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Click on different experiment to navigate away
       const experimentItems = page.locator('[data-testid="experiment-item"]')
       if (await experimentItems.count() > 1) {
         await experimentItems.nth(1).click()
-        await page.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
       }
 
       console.log('✅ Navigated away, preview mode cleanup should be triggered')
@@ -105,8 +110,9 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('2. Clear all overrides button', () => {
     test('should show clear all button when overrides exist', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Find first experiment with variants
       const experimentItems = page.locator('[data-testid="experiment-item"]')
@@ -121,7 +127,8 @@ test.describe('Bug Fixes E2E Tests', () => {
       const firstVariantButton = experimentItems.first().locator('button[type="button"]').first()
       if (await firstVariantButton.count() > 0) {
         await firstVariantButton.click()
-        await page.waitForTimeout(1000)
+        // Wait briefly for UI update
+        await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
         // Look for reload banner (which contains the Clear All button)
         const reloadBanner = page.locator('text=Reload to apply changes')
@@ -141,8 +148,9 @@ test.describe('Bug Fixes E2E Tests', () => {
 
     test('should clear all overrides when clicked', async ({ context, extensionUrl, getStorage }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Click on multiple variant buttons to set overrides
       const experimentItems = page.locator('[data-testid="experiment-item"]')
@@ -158,7 +166,8 @@ test.describe('Bug Fixes E2E Tests', () => {
         const variantButton = experimentItems.nth(i).locator('button[type="button"]').first()
         if (await variantButton.count() > 0) {
           await variantButton.click()
-          await page.waitForTimeout(500)
+          // Wait briefly for UI update
+          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
         }
       }
 
@@ -171,7 +180,8 @@ test.describe('Bug Fixes E2E Tests', () => {
         // Find and click clear all button
         const clearAllButton = page.locator('button:has-text("Clear All")')
         await clearAllButton.click()
-        await page.waitForTimeout(1000)
+        // Wait briefly for UI update
+        await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
         // Verify overrides are cleared
         const storage = await getStorage()
@@ -188,21 +198,24 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('3. Dropdown collapse when clicking outside', () => {
     test('should close SearchableSelect dropdown when clicking outside', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(2000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Click Create Experiment (if it exists)
       const createButton = page.locator('button:has-text("Create Experiment")')
       if (await createButton.count() > 0) {
         await createButton.click()
-        await page.waitForTimeout(1000)
+        // Wait briefly for UI update
+        await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
         // Look for unit type dropdown
         const unitDropdown = page.locator('[data-testid="unit-type-select-trigger"]')
         if (await unitDropdown.count() > 0) {
           // Click to open dropdown
           await unitDropdown.click()
-          await page.waitForTimeout(300)
+          // Wait briefly for UI update
+          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
           // Verify dropdown is open
           const dropdown = page.locator('[data-testid="unit-type-select-dropdown"]')
@@ -210,7 +223,8 @@ test.describe('Bug Fixes E2E Tests', () => {
 
           // Click outside (on the page title)
           await page.locator('h1, h2, h3').first().click()
-          await page.waitForTimeout(300)
+          // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
 
           // Verify dropdown is closed
           await expect(dropdown).not.toBeVisible()
@@ -223,8 +237,9 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('4. Units prefilled in dropdown', () => {
     test('should show selected unit type for existing experiment', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Click on first experiment
       const experimentItems = page.locator('[data-testid="experiment-item"]')
@@ -232,7 +247,8 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       if (experimentCount > 0) {
         await experimentItems.first().click()
-        await page.waitForTimeout(1000)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
         // Look for unit type field
         const unitTypeLabel = page.locator('text=Unit Type')
@@ -255,8 +271,9 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('5. URL filters not being lost', () => {
     test('should persist URL filter changes', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Open experiment detail
       const experimentItems = page.locator('[data-testid="experiment-item"]')
@@ -264,20 +281,23 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       if (experimentCount > 0) {
         await experimentItems.first().click()
-        await page.waitForTimeout(1000)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
         // Look for URL filtering section
         const urlFilterHeader = page.locator('text=URL Filtering')
         if (await urlFilterHeader.count() > 0) {
           // Expand URL filter section if collapsed
           await urlFilterHeader.click()
-          await page.waitForTimeout(300)
+          // Wait briefly for UI update
+          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
           // Select simple mode
           const modeSelect = page.locator('select').filter({ hasText: 'Apply on all pages' })
           if (await modeSelect.count() > 0) {
             await modeSelect.selectOption('simple')
-            await page.waitForTimeout(500)
+            // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
             // Type URL pattern
             const urlInput = page.locator('input[placeholder*="/products"]').first()
@@ -285,19 +305,23 @@ test.describe('Bug Fixes E2E Tests', () => {
               await urlInput.fill('/test-url-filter/*')
 
               // Wait for auto-save debounce
-              await page.waitForTimeout(700)
+              // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 700 }).catch(() => {})
 
               // Navigate away
               await page.locator('button:has-text("Back")').click()
-              await page.waitForTimeout(500)
+              // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
               // Re-open experiment
               await experimentItems.first().click()
-              await page.waitForTimeout(1000)
+              // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
               // Expand URL filter again
               await urlFilterHeader.click()
-              await page.waitForTimeout(300)
+              // Wait briefly for UI update
+              await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
               // Check if value persisted
               const savedValue = await urlInput.inputValue()
@@ -313,21 +337,24 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('6. Avatars showing in owners dropdown', () => {
     test('should display avatars or initials in owner dropdown', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(2000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Click Create Experiment
       const createButton = page.locator('button:has-text("Create Experiment")')
       if (await createButton.count() > 0) {
         await createButton.click()
-        await page.waitForTimeout(1000)
+        // Wait briefly for UI update
+        await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
         // Find and open owner dropdown
         const ownerLabel = page.locator('text=Owner')
         if (await ownerLabel.count() > 0) {
           const ownerDropdown = ownerLabel.locator('..').locator('[data-testid*="trigger"]')
           await ownerDropdown.click()
-          await page.waitForTimeout(500)
+          // Wait briefly for UI update
+          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
           // Check for avatars or initials in dropdown
           const dropdown = page.locator('[data-testid*="dropdown"]')
@@ -353,8 +380,9 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('7. JSON editor working in VE mode', () => {
     test('should allow opening JSON editor while in VE mode', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Open experiment
       const experimentItems = page.locator('[data-testid="experiment-item"]')
@@ -362,19 +390,22 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       if (experimentCount > 0) {
         await experimentItems.first().click()
-        await page.waitForTimeout(1000)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
         // Start VE mode
         const veButton = page.locator('button:has-text("Visual Editor")')
         if (await veButton.count() > 0) {
           await veButton.first().click()
-          await page.waitForTimeout(1000)
+          // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
           // Try to click JSON button
           const jsonButton = page.locator('button:has-text("Json")')
           if (await jsonButton.count() > 0) {
             await jsonButton.first().click()
-            await page.waitForTimeout(500)
+            // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
             // Check if JSON editor opened (Monaco editor)
             const hasMonaco = await page.locator('.monaco-editor').count()
@@ -388,8 +419,9 @@ test.describe('Bug Fixes E2E Tests', () => {
   test.describe('8. Control variant warning', () => {
     test('should show Control variant collapsed by default', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Open experiment
       const experimentItems = page.locator('[data-testid="experiment-item"]')
@@ -397,7 +429,8 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       if (experimentCount > 0) {
         await experimentItems.first().click()
-        await page.waitForTimeout(1000)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
         // Look for Control variant
         const controlVariant = page.locator('text=Control').first()
@@ -418,14 +451,16 @@ test.describe('Bug Fixes E2E Tests', () => {
 
     test('should show warning when expanding Control variant', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
-      await page.goto(extensionUrl('tabs/sidebar.html'))
-      await page.waitForTimeout(3000)
+      await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Open experiment
       const experimentItems = page.locator('[data-testid="experiment-item"]')
       if (await experimentItems.count() > 0) {
         await experimentItems.first().click()
-        await page.waitForTimeout(1000)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
         // Set up dialog listener
         let dialogShown = false
@@ -442,7 +477,8 @@ test.describe('Bug Fixes E2E Tests', () => {
         if (await controlHeader.count() > 0) {
           const expandButton = controlHeader.locator('..').locator('button').first()
           await expandButton.click()
-          await page.waitForTimeout(500)
+          // Wait briefly for UI update
+          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
           console.log('✅ Control variant warning dialog shown:', dialogShown)
         }

@@ -78,9 +78,9 @@ test.describe('Events Debug Page', () => {
     await sidebar.locator('body').waitFor({ timeout: 10000 })
     console.log('✅ Sidebar iframe loaded')
 
-    // Give sidebar EXTRA time to load config from storage
+    // Wait for sidebar to load config from storage - wait for Events Debug button to appear
     console.log('Waiting for sidebar to load config...')
-    await page.waitForTimeout(5000)
+    await sidebar.locator('button[aria-label="Events Debug"]').waitFor({ timeout: 10000 })
     console.log('Wait complete')
 
     // Check if sidebar content shows main UI
@@ -124,25 +124,27 @@ test.describe('Events Debug Page', () => {
 
       // Use HTTP server instead of file:// URL so content scripts work properly
       await testPage.goto(testServerUrl!)
-      await testPage.waitForLoadState('networkidle')
-      await testPage.waitForTimeout(500)
+      await testPage.waitForSelector('body', { timeout: 5000 })
 
       sidebar = await injectSidebar(testPage, extensionUrl)
-      // Wait for sidebar to load config and show main UI
-      await testPage.waitForTimeout(1000)
 
-      // Open Events Debug Page
+      // Open Events Debug Page - wait for button to appear first
       const eventsButton = sidebar.locator('button[aria-label="Events Debug"]')
-      await eventsButton.waitFor({ timeout: 10000 }) // Wait for button to appear
-      await eventsButton.evaluate((button) => {
-        button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      })
-      await testPage.waitForTimeout(300)
+      await eventsButton.waitFor({ state: 'visible', timeout: 10000 })
+      await eventsButton.click()
 
-      // Wait for Events Debug Page to be fully loaded by checking for the initial state
-      // The "0 events captured" text should be visible when the page loads
-      await sidebar.locator('text=0 events captured').waitFor({ timeout: 5000 })
-      await testPage.waitForTimeout(300)
+      // Wait for Events Debug Page to be fully loaded by checking for the event count
+      const eventCount = sidebar.locator('#events-debug-event-count')
+      await eventCount.waitFor({ state: 'visible', timeout: 5000 })
+
+      // Clear any buffered events to start each test fresh
+      const eventCountText = await eventCount.textContent()
+      if (eventCountText && !eventCountText.includes('0 events captured')) {
+        const clearButton = sidebar.locator('button[title="Clear all events"]')
+        await clearButton.click()
+        // Wait for events to be cleared
+        await sidebar.locator('#events-debug-event-count:has-text("0 events captured")').waitFor({ state: 'visible', timeout: 5000 })
+      }
     })
 
     test.afterEach(async () => {
@@ -170,13 +172,11 @@ test.describe('Events Debug Page', () => {
           }, '*')
           console.log('[TEST] window.postMessage sent')
         })
-        // Give time for event to propagate: page → content script → background → sidebar
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify event appears in list', async () => {
-        await expect(sidebar.locator('text=ready')).toBeVisible({ timeout: 10000 })
-        await expect(sidebar.locator('text=1 event captured')).toBeVisible()
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="ready"]').first()).toBeVisible({ timeout: 10000 })
+        await expect(sidebar.locator('#events-debug-event-count:has-text("1 event captured")')).toBeVisible()
       })
 
       await test.step('Trigger exposure event', async () => {
@@ -191,12 +191,11 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify both events displayed', async () => {
-        await expect(sidebar.locator('text=exposure')).toBeVisible({ timeout: 10000 })
-        await expect(sidebar.locator('text=2 events captured')).toBeVisible()
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="exposure"]')).toBeVisible({ timeout: 10000 })
+        await expect(sidebar.locator('#events-debug-event-count:has-text("2 events captured")')).toBeVisible()
 
         // Verify newest first (exposure should appear before ready)
         const firstEventItem = sidebar.locator('[data-testid="event-item"]').first()
@@ -217,20 +216,19 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
-      await test.step('Click event to view details', async () => {
+      await test.step('Wait for event to appear and click', async () => {
+        // Wait for the exposure event to appear first
         const eventItem = sidebar.locator('[data-testid="event-item"][data-event-name="exposure"]').first()
         await eventItem.waitFor({ state: 'visible', timeout: 10000 })
         await eventItem.click()
-        await testPage.waitForTimeout(300)
       })
 
       await test.step('Verify event details displayed', async () => {
-        // Wait for modal to appear
-        const modal = sidebar.locator('.fixed.inset-0')
-        await expect(modal).toBeVisible({ timeout: 10000 })
+        // Wait for modal to appear - using a more reliable selector
+        const modal = sidebar.locator('.fixed.inset-0').first()
+        await modal.waitFor({ state: 'visible', timeout: 10000 })
 
         await expect(modal.locator('text=Event Type')).toBeVisible()
         await expect(modal.locator('text=Timestamp')).toBeVisible()
@@ -253,7 +251,6 @@ test.describe('Events Debug Page', () => {
         const clearButton = sidebar.locator('button[title="Clear all events"]')
         if (await clearButton.isVisible()) {
           await clearButton.click()
-          await testPage.waitForTimeout(300)
         }
       })
 
@@ -263,11 +260,10 @@ test.describe('Events Debug Page', () => {
         await pauseButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify paused state', async () => {
-        await expect(sidebar.locator('text=Event capture paused')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-pause-status:has-text("Event capture paused")')).toBeVisible()
         await expect(sidebar.locator('button[title="Resume"]')).toBeVisible()
       })
 
@@ -283,12 +279,11 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify event not captured while paused', async () => {
-        await expect(sidebar.locator('text=0 events captured')).toBeVisible()
-        await expect(sidebar.locator('text=ready')).not.toBeVisible()
+        await expect(sidebar.locator('#events-debug-event-count:has-text("0 events captured")')).toBeVisible()
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="ready"]')).not.toBeVisible()
       })
 
       await test.step('Click resume button', async () => {
@@ -296,11 +291,10 @@ test.describe('Events Debug Page', () => {
         await resumeButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify resumed state', async () => {
-        await expect(sidebar.locator('text=Event capture paused')).not.toBeVisible()
+        await expect(sidebar.locator('#events-debug-pause-status')).not.toBeVisible()
         await expect(sidebar.locator('button[title="Pause"]')).toBeVisible()
       })
 
@@ -316,13 +310,12 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(1000) // Increased wait time for event to propagate
       })
 
       await test.step('Verify event captured after resume', async () => {
-        await expect(sidebar.locator('text=exposure')).toBeVisible({ timeout: 10000 })
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="exposure"]')).toBeVisible({ timeout: 10000 })
         // Verify at least one event was captured after resume
-        const statusBar = sidebar.locator('.p-2.bg-gray-50.text-gray-600.text-sm.text-center.border-t')
+        const statusBar = sidebar.locator('#events-debug-event-count')
         await expect(statusBar).toContainText(/\d+ events? captured/, { timeout: 10000 })
         await expect(statusBar).not.toContainText('0 events captured', { timeout: 10000 })
       })
@@ -341,7 +334,6 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
 
         await testPage.evaluate(() => {
           window.postMessage({
@@ -354,11 +346,10 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify events exist', async () => {
-        await expect(sidebar.locator('text=2 events captured')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-event-count:has-text("2 events captured")')).toBeVisible()
       })
 
       await test.step('Click clear button', async () => {
@@ -367,14 +358,13 @@ test.describe('Events Debug Page', () => {
         await clearButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify events cleared', async () => {
-        await expect(sidebar.locator('text=No events captured yet')).toBeVisible()
-        await expect(sidebar.locator('text=0 events captured')).toBeVisible()
-        await expect(sidebar.locator('text=ready')).not.toBeVisible()
-        await expect(sidebar.locator('text=exposure')).not.toBeVisible()
+        await expect(sidebar.locator('#events-debug-empty-state:has-text("No events captured yet")')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-event-count:has-text("0 events captured")')).toBeVisible()
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="ready"]')).not.toBeVisible()
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="exposure"]')).not.toBeVisible()
       })
     })
 
@@ -394,19 +384,17 @@ test.describe('Events Debug Page', () => {
               }
             }, '*')
           }, eventName)
-          await testPage.waitForTimeout(100)
         }
 
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify all event types displayed', async () => {
-        await expect(sidebar.locator('text=7 events captured')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-event-count:has-text("7 events captured")')).toBeVisible()
 
         // Verify each event type appears
         const eventTypes = ['error', 'ready', 'refresh', 'publish', 'exposure', 'goal', 'finalize']
         for (const eventName of eventTypes) {
-          await expect(sidebar.locator(`text=${eventName}`).first()).toBeVisible()
+          await expect(sidebar.locator(`[data-testid="event-item"][data-event-name="${eventName}"]`).first()).toBeVisible()
         }
       })
 
@@ -439,12 +427,12 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify timestamp format in list', async () => {
-        // Should show time in HH:MM:SS.mmm format
-        const timestamp = sidebar.locator('text=/\\d{2}:\\d{2}:\\d{2}\\.\\d{3}/')
+        // Should show time in HH:MM:SS.mmm format - scope to first event item
+        const eventItem = sidebar.locator('[data-testid="event-item"][data-event-name="ready"]').first()
+        const timestamp = eventItem.locator('text=/\\d{2}:\\d{2}:\\d{2}\\.\\d{3}/')
         await expect(timestamp).toBeVisible()
       })
 
@@ -452,7 +440,6 @@ test.describe('Events Debug Page', () => {
         const eventItem = sidebar.locator('[data-testid="event-item"][data-event-name="ready"]').first()
         await eventItem.waitFor({ state: 'visible', timeout: 10000 })
         await eventItem.click()
-        await testPage.waitForTimeout(500)
 
         // Should show full date/time
         await expect(sidebar.locator('text=/1\\/1\\/2025/')).toBeVisible()
@@ -472,12 +459,11 @@ test.describe('Events Debug Page', () => {
             }
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify event captured', async () => {
-        await expect(sidebar.locator('text=finalize')).toBeVisible()
-        await expect(sidebar.locator('text=1 event captured')).toBeVisible()
+        await expect(sidebar.locator('[data-testid="event-item"][data-event-name="finalize"]')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-event-count:has-text("1 event captured")')).toBeVisible()
       })
     })
 
@@ -490,12 +476,11 @@ test.describe('Events Debug Page', () => {
             payload: {}
           }, '*')
         })
-        await testPage.waitForTimeout(500)
       })
 
       await test.step('Verify event not captured', async () => {
-        await expect(sidebar.locator('text=No events captured yet')).toBeVisible()
-        await expect(sidebar.locator('text=0 events captured')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-empty-state:has-text("No events captured yet")')).toBeVisible()
+        await expect(sidebar.locator('#events-debug-event-count:has-text("0 events captured")')).toBeVisible()
       })
     })
   })

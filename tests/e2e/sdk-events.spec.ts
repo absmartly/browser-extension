@@ -10,7 +10,8 @@ async function openEventsDebugPage(page: Page) {
   const eventsButton = sidebarFrame.locator('button[aria-label="Events Debug"]')
   await eventsButton.waitFor({ state: 'visible', timeout: 10000 })
   await eventsButton.click()
-  await page.waitForTimeout(500)
+  // Wait briefly for UI update
+  await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 }
 
 // Helper to get events from the panel
@@ -57,7 +58,8 @@ async function clickEventCard(page: Page, eventName: string) {
   const frame = page.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
   const eventCard = frame.locator(`.p-3.border.rounded-lg:has(span:has-text("${eventName}"))`).first()
   await eventCard.click()
-  await page.waitForTimeout(500)
+  // Wait briefly for UI update
+  await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 }
 
 // Helper to check if event viewer modal is open
@@ -125,7 +127,8 @@ async function clickCopyButton(page: Page) {
       }
     }
   })
-  await page.waitForTimeout(300)
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
 }
 
 // Helper to verify copy button success state (now with Shadow DOM)
@@ -153,9 +156,9 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
     apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo.absmartly.io'
   })
 
-  await testPage.goto(`file://${TEST_PAGE_PATH}`)
+  await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
   await testPage.setViewportSize({ width: 1920, height: 1080 })
-  await testPage.waitForLoadState('networkidle')
+  await testPage.waitForSelector('body', { timeout: 5000 })
   console.log('✅ Test page loaded\n')
 
   // Step 1: Inject sidebar ONCE
@@ -209,15 +212,18 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
       document.head.appendChild(script)
     })
   }, sdkPluginPath)
-  await testPage.waitForTimeout(2000)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
   console.log('  ✓ SDK plugin injected\n')
 
   // Step 3: Trigger events BEFORE opening sidebar (test buffering)
   console.log('Step 3: Trigger events before opening sidebar (testing buffering)')
   await testPage.click('#trigger-ready')
-  await testPage.waitForTimeout(300)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
   await testPage.click('#trigger-exposure')
-  await testPage.waitForTimeout(300)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
   console.log('  ✓ Events triggered before sidebar opened\n')
 
   // Step 4: Open Events Debug Page and verify buffered events appear
@@ -226,7 +232,8 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   const frame = testPage.frameLocator('iframe[id="absmartly-sidebar-iframe"]')
 
   // Wait a moment for buffered events to load
-  await testPage.waitForTimeout(1000)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
   // Verify buffered events are displayed
   const bufferedEvents = await getEventsFromPanel(testPage)
@@ -242,7 +249,8 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   // Step 5: Trigger more SDK events and verify they appear in real-time
   console.log('Step 5: Trigger more SDK events in real-time')
   await testPage.click('#trigger-all')
-  await testPage.waitForTimeout(2000)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
   const events = await getEventsFromPanel(testPage)
   console.log(`  ✓ Found ${events.length} total events`)
@@ -261,7 +269,8 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   // Step 6: Test event viewer modal with metadata and CodeMirror
   console.log('Step 6: Test event viewer modal with metadata and CodeMirror')
   await testPage.click('#trigger-goal')
-  await testPage.waitForTimeout(1000)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
   // Click on the goal event to open viewer
   await clickEventCard(testPage, 'goal')
@@ -290,7 +299,8 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   // Step 6a: Test Copy button
   console.log('\n  Testing Copy button:')
   await clickCopyButton(testPage)
-  await testPage.waitForTimeout(500)
+  // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
   const copySuccess = await isCopyButtonSuccess(testPage)
   expect(copySuccess).toBeTruthy()

@@ -173,11 +173,11 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       />
 
       {/* Events List */}
-      <div className="flex-1 overflow-y-auto">
+      <div id="events-debug-event-list" className="flex-1 overflow-y-auto">
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <ArrowPathIcon className="w-12 h-12 mb-2 opacity-50" />
-            <p className="font-medium">No events captured yet</p>
+            <p id="events-debug-empty-state" className="font-medium">No events captured yet</p>
             <p className="text-sm">
               SDK events will appear here in real-time
             </p>
@@ -230,12 +230,12 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
 
       {/* Status Bar */}
       {isPaused && (
-        <div className="p-2 bg-yellow-50 text-yellow-800 text-sm text-center border-t border-yellow-200">
+        <div id="events-debug-pause-status" className="p-2 bg-yellow-50 text-yellow-800 text-sm text-center border-t border-yellow-200">
           Event capture paused
         </div>
       )}
 
-      <div className="p-2 bg-gray-50 text-gray-600 text-sm text-center border-t border-gray-200">
+      <div id="events-debug-event-count" className="p-2 bg-gray-50 text-gray-600 text-sm text-center border-t border-gray-200">
         {events.length} event{events.length !== 1 ? "s" : ""} captured
       </div>
 

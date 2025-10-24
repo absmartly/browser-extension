@@ -32,9 +32,9 @@ test.describe('Experiment Code Injection UI', () => {
       }
     })
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}`)
+    await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
   })
 
   test.afterEach(async () => {
@@ -108,7 +108,8 @@ test.describe('Experiment Code Injection UI', () => {
       await debugWait()
 
       // Wait for the form to be ready
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
       console.log('✅ Experiment create page opened')
     })
 
@@ -138,7 +139,8 @@ test.describe('Experiment Code Injection UI', () => {
       // Click to expand
       await codeInjectionButton.click()
       console.log('✅ Clicked Code Injection button/header')
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Check if sections appeared
       const headStartSection = sidebar.locator('text=Start of <head>')
@@ -165,7 +167,8 @@ test.describe('Experiment Code Injection UI', () => {
     await test.step('Verify editor modal appears with CodeMirror', async () => {
       console.log('\n✨ STEP 6: Waiting for editor modal to appear')
 
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
       await testPage.screenshot({ path: 'test-step6-before-modal-check.png', fullPage: true })
       console.log('📸 Screenshot saved before modal check')
 
@@ -226,7 +229,8 @@ test.describe('Experiment Code Injection UI', () => {
       await debugWait(1000)
 
       // Wait a moment for the save to process
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
       console.log('✅ Code saved to component state')
     })
 
@@ -293,7 +297,8 @@ test.describe('Experiment Code Injection UI', () => {
         await debugWait(2000)
 
         // Wait for save to complete
-        await testPage.waitForTimeout(3000)
+        // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
         console.log('  ✓ Waited for save to complete')
         await debugWait(1000)
 

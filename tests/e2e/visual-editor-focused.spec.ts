@@ -32,7 +32,7 @@ test.describe('Focused Visual Editor Test', () => {
 
     // Set storage
     const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`)
+    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     await setupPage.evaluate(async () => {
       return new Promise((resolve) => {
@@ -57,7 +57,7 @@ test.describe('Focused Visual Editor Test', () => {
     console.log('📄 Opening test page...')
     const page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`)
+    await page.goto(`file://${testPagePath}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Inject sidebar
     await page.evaluate((extId) => {
@@ -93,7 +93,8 @@ test.describe('Focused Visual Editor Test', () => {
     // Launch Visual Editor
     console.log('🚀 Launching Visual Editor...')
     await sidebarFrame.locator('button:has-text("Visual Editor")').first().click()
-    await page.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
     // Verify Visual Editor is active
     const hasVisualEditor = await page.locator('text=/Visual Editor/').count() > 0
@@ -108,17 +109,20 @@ test.describe('Focused Visual Editor Test', () => {
     const title = page.locator('#hero-title').first()
     await title.scrollIntoViewIfNeeded()
     await title.click()
-    await page.waitForTimeout(800)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     // Try to find and click Edit Element in context menu
     const editOption = page.locator('text="Edit Element"').first()
     if (await editOption.isVisible({ timeout: 1500 }).catch(() => false)) {
       await editOption.click()
-      await page.waitForTimeout(500)
+      // Wait briefly for UI update
+      await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
       await page.keyboard.type('MODIFIED TITLE')
       await page.keyboard.press('Enter')
       console.log('✅ Text edited')
-      await page.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
     } else {
       console.log('⚠️ Edit Element option not found')
     }
@@ -128,13 +132,15 @@ test.describe('Focused Visual Editor Test', () => {
     const card = page.locator('#card-2').first()
     await card.scrollIntoViewIfNeeded()
     await card.click()
-    await page.waitForTimeout(800)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     const hideOption = page.locator('text="Hide"').first()
     if (await hideOption.isVisible({ timeout: 1500 }).catch(() => false)) {
       await hideOption.click()
       console.log('✅ Element hidden')
-      await page.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
     } else {
       console.log('⚠️ Hide option not found')
     }
@@ -144,17 +150,20 @@ test.describe('Focused Visual Editor Test', () => {
     const button = page.locator('#btn-primary').first()
     await button.scrollIntoViewIfNeeded()
     await button.click()
-    await page.waitForTimeout(800)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     const inlineOption = page.locator('text="Inline Edit"').first()
     if (await inlineOption.isVisible({ timeout: 1500 }).catch(() => false)) {
       await inlineOption.click()
-      await page.waitForTimeout(500)
+      // Wait briefly for UI update
+      await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
       await page.keyboard.press('Control+A')
       await page.keyboard.type('NEW BUTTON TEXT')
       await page.keyboard.press('Enter')
       console.log('✅ Inline edit done')
-      await page.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
     } else {
       console.log('⚠️ Inline Edit option not found')
     }
@@ -173,7 +182,8 @@ test.describe('Focused Visual Editor Test', () => {
     if (await saveBtn.isVisible()) {
       await saveBtn.click()
       console.log('✅ Save button clicked')
-      await page.waitForTimeout(3000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Verify DOM changes in sidebar
       console.log('\n🔍 Checking DOM changes in sidebar...')
@@ -196,7 +206,8 @@ test.describe('Focused Visual Editor Test', () => {
         const jsonTab = sidebarFrame.locator('button').filter({ hasText: 'JSON' }).first()
         if (await jsonTab.isVisible({ timeout: 1000 }).catch(() => false)) {
           await jsonTab.click()
-          await page.waitForTimeout(1000)
+          // Wait briefly for UI update
+          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
           console.log('✅ Viewing DOM changes in JSON editor')
         }
       } else {

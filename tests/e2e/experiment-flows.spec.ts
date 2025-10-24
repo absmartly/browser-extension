@@ -29,9 +29,9 @@ test.describe('Experiment Creation and Editing Flows', () => {
       (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]')
     )
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}`)
+    await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     console.log('✅ Test page loaded')
   })
@@ -134,19 +134,22 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
       // Wait for loading to finish - the placeholder should not say "Loading..."
       await sidebar.locator('label:has-text("Unit Type")').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
-      await testPage.waitForTimeout(800)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 800 }).catch(() => {})
 
       // Try to open dropdown with retry
       let dropdownOpened = false
       for (let attempt = 0; attempt < 3 && !dropdownOpened; attempt++) {
         if (attempt > 0) {
           console.log(`  Retry attempt ${attempt} to open Unit Type dropdown`)
-          await testPage.waitForTimeout(500)
+          // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
         }
 
         const unitTypeClickArea = unitTypeContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
         await unitTypeClickArea.click({ force: true })
-        await testPage.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
         const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
         dropdownOpened = await unitTypeDropdown.isVisible().catch(() => false)
@@ -252,7 +255,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await sidebar.locator('text=Experiments').waitFor({ timeout: 2000 })
 
       // Wait for experiments to load
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Find any experiment in the list (not the one we just created, since it's not saved)
       const hasExperiments = await waitForExperiments(sidebar)
@@ -269,7 +273,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
 
       // Wait for detail view to load
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Check Unit Type dropdown
       const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
@@ -369,7 +374,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('\n⏳ Verifying dropdowns loaded in detail view')
 
       // Wait a moment for data to load
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Check Unit Type dropdown
       const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
@@ -490,7 +496,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('\n⏳ Verifying dropdowns loaded properly')
 
       // Wait a moment for data to load
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Check Unit Type dropdown
       const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
@@ -576,7 +583,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
       await backButton.click()
       console.log('  ✓ Clicked back button')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Should return to experiment list - check for either heading or create button
       const experimentList = sidebar.locator('h2:has-text("Experiments"), div:has-text("Experiments")')
@@ -662,7 +670,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
       await backButton.click()
       console.log('  ✓ Clicked back button')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Check for either heading or create button
       const experimentList = sidebar.locator('h2:has-text("Experiments"), div:has-text("Experiments")')

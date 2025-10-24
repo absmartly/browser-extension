@@ -96,7 +96,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     })
 
     // Wait for potential visual editor to load
-    await page.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
     // Test 1: Edit Text
     console.log('\n🔤 Testing Edit Text...')
@@ -132,7 +133,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n🎨 Testing Change Style...')
     const button = page.locator('#test-button')
     await button.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const styleOption = contextMenu.locator('text=/style|css/i').first()
@@ -155,7 +157,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n🏷️ Testing Add Class...')
     const container = page.locator('#test-container')
     await container.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const classOption = contextMenu.locator('text=/add.*class/i').first()
@@ -178,7 +181,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n👁️ Testing Hide Element...')
     const listItem = page.locator('#list-item-2')
     await listItem.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const hideOption = contextMenu.locator('text=/hide/i').first()
@@ -186,7 +190,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
         await hideOption.click()
         console.log('✅ Clicked Hide Element')
 
-        await page.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
         const isHidden = await listItem.isHidden()
         console.log('   Element hidden:', isHidden)
       }
@@ -196,7 +201,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n🗑️ Testing Delete Element...')
     const listItem3 = page.locator('#list-item-3')
     await listItem3.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const deleteOption = contextMenu.locator('text=/delete|remove/i').first()
@@ -204,7 +210,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
         await deleteOption.click()
         console.log('✅ Clicked Delete Element')
 
-        await page.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
         const exists = await page.locator('#list-item-3').count()
         console.log('   Element deleted:', exists === 0)
       }
@@ -214,7 +221,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n📝 Testing Edit HTML...')
     const sectionTitle = page.locator('#section-title')
     await sectionTitle.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const htmlOption = contextMenu.locator('text=/html|markup/i').first()
@@ -240,7 +248,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n📋 Testing Copy Selector...')
     const link = page.locator('#test-link')
     await link.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const copyOption = contextMenu.locator('text=/copy.*selector/i').first()
@@ -261,7 +270,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('\n🔄 Testing Rearrange...')
     const firstItem = page.locator('#list-item-1')
     await firstItem.click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     if (await contextMenu.isVisible()) {
       const rearrangeOption = contextMenu.locator('text=/rearrange|move|reorder/i').first()
@@ -270,7 +280,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
         console.log('✅ Clicked Rearrange')
 
         // Would enable drag-drop mode
-        await page.waitForTimeout(1000)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
       }
     }
 
@@ -320,7 +331,7 @@ test.describe('Visual Editor Context Menu Tests', () => {
   test('Visual editor with real extension sidebar', async ({ context, extensionUrl }) => {
     // Open the sidebar first
     const sidebarPage = await context.newPage()
-    await sidebarPage.goto(extensionUrl('tabs/sidebar.html'))
+    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
     await sidebarPage.setViewportSize({ width: 400, height: 1080 })
 
     // Open test page in another tab
@@ -331,7 +342,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
     console.log('📱 Sidebar and test page loaded')
 
     // Wait for sidebar to load
-    await sidebarPage.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
     // Check if experiments are available
     const hasExperiments = await sidebarPage.locator('.experiment-item').count().then(c => c > 0).catch(() => false)
@@ -341,7 +353,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
 
       // Click first experiment
       await sidebarPage.locator('.experiment-item').first().click()
-      await sidebarPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Look for Visual Editor button
       const visualEditorBtn = sidebarPage.locator('button:has-text("Visual Editor"), button:has-text("Launch Visual Editor")').first()
@@ -351,7 +364,8 @@ test.describe('Visual Editor Context Menu Tests', () => {
 
         // Switch to test page and check for visual editor
         await testPage.bringToFront()
-        await testPage.waitForTimeout(2000)
+        // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
         // Check if visual editor loaded
         const hasVisualEditor = await testPage.locator('#absmartly-visual-editor-toolbar, [data-visual-editor-toolbar]').isVisible().catch(() => false)

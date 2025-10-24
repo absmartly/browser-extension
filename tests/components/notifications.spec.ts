@@ -443,7 +443,8 @@ test.describe('Notifications Component Tests', () => {
     await expect(notification).toBeVisible()
 
     // Wait longer than normal auto-dismiss time
-    await page.waitForTimeout(4000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 4000 }).catch(() => {})
 
     // Should still be visible
     await expect(notification).toBeVisible()

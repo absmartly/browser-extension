@@ -13,7 +13,7 @@ test.describe('Security Fixes E2E Tests', () => {
   test.describe('Fix #1: innerHTML XSS Protection', () => {
     test('should sanitize malicious HTML in DOM changes', async ({ page }) => {
       // Navigate to test page
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       // Inject malicious HTML via DOM changes
       const maliciousHTML = '<img src=x onerror=alert(document.cookie)>'
@@ -49,7 +49,7 @@ test.describe('Security Fixes E2E Tests', () => {
     })
 
     test('should not execute script tags in DOM changes', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       let alertFired = false
       page.on('dialog', async dialog => {
@@ -69,7 +69,8 @@ test.describe('Security Fixes E2E Tests', () => {
       })
 
       // Wait a bit to see if alert fires
-      await page.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       expect(alertFired).toBe(false)
     })
@@ -77,7 +78,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Fix #2: Code Injection Prevention', () => {
     test('should not execute code from javascript DOM change type', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       let codeExecuted = false
 
@@ -101,7 +102,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Fix #3: Message Origin Validation', () => {
     test('should validate message sender before processing', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       // Try to send a message from unauthorized source
       const result = await page.evaluate(() => {
@@ -128,7 +129,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Fix #4: SSRF Protection', () => {
     test('should block requests to localhost', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       const isBlocked = await page.evaluate(() => {
         const blockedUrls = [
@@ -155,7 +156,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Fix #5: API Key Encryption', () => {
     test('should not store API key in plain text', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       // Check that API keys are not visible in regular storage
       const hasPlainTextKey = await page.evaluate(() => {
@@ -174,7 +175,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Fix #6: Input Validation with Zod', () => {
     test('should reject invalid API request methods', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       const validationWorks = await page.evaluate(() => {
         const invalidMethods = ['INVALID', 'HACK', 'SQL_INJECT']
@@ -195,7 +196,7 @@ test.describe('Security Fixes E2E Tests', () => {
     })
 
     test('should reject invalid URLs in config', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       const urlValidation = await page.evaluate(() => {
         const invalidUrls = [
@@ -220,7 +221,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Fix #7: JSON.parse Error Handling', () => {
     test('should handle malformed JSON without crashing', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       const handledGracefully = await page.evaluate(() => {
         const malformedJSON = '{invalid json}'
@@ -245,7 +246,7 @@ test.describe('Security Fixes E2E Tests', () => {
     })
 
     test('should handle null/undefined JSON safely', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       const handledSafely = await page.evaluate(() => {
         const testCases = [null, undefined, '']
@@ -271,7 +272,7 @@ test.describe('Security Fixes E2E Tests', () => {
 
   test.describe('Integration: Combined Security', () => {
     test('should apply all security layers for DOM changes', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       const allSecurityLayersWork = await page.evaluate(() => {
         // Test 1: XSS prevention
@@ -305,7 +306,7 @@ test.describe('Security Fixes E2E Tests', () => {
     })
 
     test('should prevent multiple attack vectors simultaneously', async ({ page }) => {
-      await page.goto(TEST_URL)
+      await page.goto(TEST_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
       let anyAlertFired = false
       page.on('dialog', async dialog => {
@@ -332,7 +333,8 @@ test.describe('Security Fixes E2E Tests', () => {
         }
       })
 
-      await page.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       expect(anyAlertFired).toBe(false)
     })

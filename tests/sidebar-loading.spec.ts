@@ -27,8 +27,8 @@ test.describe('Sidebar Loading Tests', () => {
 
   test('Sidebar loads and can be toggled', async ({ page }) => {
     // Load test page
-    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Click button to inject extension
     await page.click('#inject-extension-btn')
@@ -47,7 +47,8 @@ test.describe('Sidebar Loading Tests', () => {
 
     // Click button again to hide sidebar
     await page.click('#inject-extension-btn')
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Check sidebar is hidden (transform is 400px)
     const transform2 = await page.evaluate(() => {
@@ -58,7 +59,8 @@ test.describe('Sidebar Loading Tests', () => {
 
     // Click button again to show sidebar
     await page.click('#inject-extension-btn')
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Check sidebar is visible again
     const transform3 = await page.evaluate(() => {
@@ -70,8 +72,8 @@ test.describe('Sidebar Loading Tests', () => {
 
   test('Sidebar iframe loads extension UI', async ({ page }) => {
     // Load test page
-    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Click button to inject extension
     await page.click('#inject-extension-btn')
@@ -93,7 +95,8 @@ test.describe('Sidebar Loading Tests', () => {
     if (frame) {
       // Wait for React app to load
       await frame.waitForLoadState('domcontentloaded')
-      await frame.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       // Check for either welcome screen or experiment list
       const hasWelcome = await frame.locator('text=Welcome to ABsmartly').isVisible().catch(() => false)

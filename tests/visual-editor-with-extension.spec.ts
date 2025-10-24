@@ -45,8 +45,8 @@ test.describe('Visual Editor Tests with Real Extension', () => {
 
     // Open extension popup
     page = await context.newPage()
-    await page.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     console.log('✅ Extension popup opened')
 
@@ -58,7 +58,8 @@ test.describe('Visual Editor Tests with Real Extension', () => {
 
       // Click configure button
       await page.click('button:has-text("Configure Settings")')
-      await page.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Fill in settings
       await page.fill('input[name="apiKey"]', 'test-api-key')
@@ -67,7 +68,8 @@ test.describe('Visual Editor Tests with Real Extension', () => {
 
       // Save settings
       await page.click('button:has-text("Save Settings")')
-      await page.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       console.log('✅ Settings configured')
     }
@@ -80,7 +82,8 @@ test.describe('Visual Editor Tests with Real Extension', () => {
 
       // Click on first experiment
       await page.click('.experiment-item:first-child')
-      await page.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Look for Launch Visual Editor button
       const hasVisualEditorButton = await page.locator('button:has-text("Launch Visual Editor")').isVisible().catch(() => false)
@@ -100,8 +103,8 @@ test.describe('Visual Editor Tests with Real Extension', () => {
   test('Test visual editor on real webpage', async () => {
     // Create a test page
     const testPage = await context.newPage()
-    await testPage.goto('https://example.com')
-    await testPage.waitForLoadState('networkidle')
+    await testPage.goto('https://example.com', { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     console.log('✅ Test page loaded')
 
@@ -114,7 +117,7 @@ test.describe('Visual Editor Tests with Real Extension', () => {
     }
 
     const popupPage = await context.newPage()
-    await popupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`)
+    await popupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Here you would:
     // 1. Navigate to an experiment

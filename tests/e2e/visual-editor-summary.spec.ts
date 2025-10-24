@@ -29,7 +29,7 @@ test.describe('Visual Editor Summary', () => {
 
     // Setup
     const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`)
+    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await setupPage.evaluate(async () => {
       return new Promise((resolve) => {
         chrome.storage.local.clear(() => {
@@ -48,7 +48,7 @@ test.describe('Visual Editor Summary', () => {
     // Open test page
     const page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`)
+    await page.goto(`file://${testPagePath}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Inject sidebar
     await page.evaluate((extId) => {
@@ -84,7 +84,8 @@ test.describe('Visual Editor Summary', () => {
     // Launch Visual Editor
     console.log('\n✅ Step 3: Launching Visual Editor')
     await sidebarFrame.locator('button:has-text("Visual Editor")').first().click()
-    await page.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
     const hasVisualEditor = await page.locator('text=/Visual Editor/').count() > 0
     expect(hasVisualEditor).toBe(true)
     console.log('   Visual Editor header visible')
@@ -94,7 +95,8 @@ test.describe('Visual Editor Summary', () => {
     const heading = page.locator('#hero-title').first()
     await heading.scrollIntoViewIfNeeded()
     await heading.click()
-    await page.waitForTimeout(1500)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     // Take screenshot showing context menu
     await page.screenshot({

@@ -21,7 +21,7 @@ test.describe('Experiment Filtering Tests', () => {
     // CRITICAL: Add query param to disable shadow DOM
     await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Enable test mode
     await testPage.evaluate(() => {

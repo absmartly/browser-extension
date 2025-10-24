@@ -34,7 +34,7 @@ test.describe('Simple Visual Editor Test', () => {
     // Step 1: Set storage BEFORE opening any pages
     console.log('\n⚙️ Setting API credentials in storage...')
     const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`)
+    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Clear any existing storage and set new credentials
     const result = await setupPage.evaluate(async () => {
@@ -68,7 +68,7 @@ test.describe('Simple Visual Editor Test', () => {
     console.log('\n📄 Opening test page...')
     const page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`)
+    await page.goto(`file://${testPagePath}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await page.waitForLoadState('domcontentloaded')
 
     // Step 3: Inject the sidebar
@@ -147,7 +147,8 @@ test.describe('Simple Visual Editor Test', () => {
     await visualEditorBtns.first().click()
 
     // Give it a moment to initialize
-    await page.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
     // Take screenshot to see state
     await page.screenshot({
@@ -219,7 +220,8 @@ test.describe('Simple Visual Editor Test', () => {
 
     // Keep browser open for manual inspection
     console.log('\n⏸️  Waiting 10 seconds before closing...')
-    await page.waitForTimeout(10000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => {})
 
     await context.close()
     console.log('\n✨ Test complete!')

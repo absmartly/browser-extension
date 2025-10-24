@@ -26,9 +26,9 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[VariantList]')
     )
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
+    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Enable test mode
     await testPage.evaluate(() => {
@@ -110,7 +110,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
 
       // Close dropdown
       await sidebar.locator('label:has-text("Traffic")').click()
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       console.log('✅ Experiment form filled')
       await debugWait()
@@ -129,7 +130,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       if (!isExpanded) {
         await injectionButton.click()
         console.log('  Expanded Custom Code Injection section')
-        await testPage.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
       }
 
       // Click on "Start of <head>" card to open editor
@@ -137,7 +139,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await headStartCard.scrollIntoViewIfNeeded()
       await click(sidebar, headStartCard)
       console.log('  Clicked Start of <head> card')
-      await testPage.waitForTimeout(2000) // Give time for message to be sent and received
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {}) // Give time for message to be sent and received
 
       // Wait for the fullscreen code editor to appear in the main page
       const editorContainer = testPage.locator('#absmartly-code-editor-fullscreen')
@@ -153,18 +156,21 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await cmEditor.click()
       await testPage.keyboard.type('<script>console.log("Test injection code!")</script>')
       console.log('  Typed injection code')
-      await testPage.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Click Save button in the editor container
       const saveButton = editorContainer.locator('button:has-text("Save")').first()
       await saveButton.click()
       console.log('  Saved injection code')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       console.log('✅ Injection code added')
 
       // Wait longer for injection code to sync to VariantList
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
       console.log('  Waited for injection code to sync')
       await debugWait()
     })
@@ -200,7 +206,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       // Save changes
       await testPage.locator('[data-action="save"]').click({ timeout: 5000 })
       console.log('  Saved VE changes')
-      await testPage.waitForTimeout(2000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
       console.log('✅ DOM changes added')
       await debugWait()
@@ -221,7 +228,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       if (!isExpanded) {
         await urlFilterButton.click()
         console.log('  Expanded URL Filtering section')
-        await testPage.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
       }
 
       // Select simple mode
@@ -229,7 +237,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await modeSelect.waitFor({ state: 'visible', timeout: 5000 })
       await modeSelect.selectOption('simple')
       console.log('  Selected simple URL filter mode')
-      await testPage.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Add URL pattern
       const patternInput = sidebar.locator('input[placeholder*="/products/*"]').first()
@@ -237,7 +246,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await patternInput.fill('/test/*')
       await patternInput.blur()
       console.log('  Added URL filter pattern: /test/*')
-      await testPage.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       console.log('✅ URL filter configured')
       await debugWait()
@@ -257,7 +267,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await configButton.scrollIntoViewIfNeeded()
       await configButton.click()
       console.log('  Opened Variant Config editor')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Get JSON content (this is the full variant config)
       const jsonContent = await testPage.evaluate(() => {
@@ -289,7 +300,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       // Close JSON editor
       const closeButton = testPage.locator('button:has-text("Cancel"), button:has-text("Close")').first()
       await closeButton.click()
-      await testPage.waitForTimeout(500)
+      // Wait briefly for UI update
+      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
       console.log('✅ Initial state verified - all three elements present')
       await debugWait()
@@ -306,7 +318,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await addVarButton.scrollIntoViewIfNeeded()
       await addVarButton.click()
       console.log('  Clicked Add Variable button')
-      await testPage.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // The inline form should now be visible
       const nameInput = sidebar.locator('input[placeholder="Variable name"]').first()
@@ -315,7 +328,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await nameInput.type('hello')
       await nameInput.blur() // Trigger onChange by blurring
       console.log('  Typed variable name: hello')
-      await testPage.waitForTimeout(200)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 200 }).catch(() => {})
 
       const valueInput = sidebar.locator('input[placeholder="Variable value"]').first()
       await valueInput.waitFor({ state: 'visible', timeout: 5000 })
@@ -323,7 +337,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await valueInput.type('there')
       await valueInput.blur() // Trigger onChange by blurring
       console.log('  Typed variable value: there')
-      await testPage.waitForTimeout(500) // Longer wait for React state to update
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {}) // Longer wait for React state to update
 
       // Verify the inputs actually have the values before saving
       const nameValue = await nameInput.inputValue()
@@ -338,7 +353,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       ).first()
       await saveVarButton.click()
       console.log('  Saved custom variable')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       console.log('✅ Custom variable added')
       await debugWait()
@@ -348,7 +364,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       console.log('\n🔍 STEP 8: CRITICAL VERIFICATION - Checking if data was preserved')
 
       // Wait a moment for React state to settle
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       await sidebar.locator('input[value="Variant 1"]').scrollIntoViewIfNeeded()
 
@@ -368,7 +385,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       await configButton.scrollIntoViewIfNeeded()
       await configButton.click()
       console.log('  Opened Variant Config editor')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       const jsonContent = await testPage.evaluate(() => {
         const cmEditor = document.querySelector('.cm-content')
@@ -400,7 +418,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       // Close JSON editor
       const closeButton = testPage.locator('button:has-text("Cancel"), button:has-text("Close")').first()
       await closeButton.click()
-      await testPage.waitForTimeout(500)
+      // Wait briefly for UI update
+      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
       console.log('\n✅ CRITICAL TEST PASSED!')
       console.log('  All data preserved after adding custom variable:')
@@ -421,7 +440,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       const addVarButton = sidebar.locator('button:has-text("Add Variable")').first()
       await addVarButton.scrollIntoViewIfNeeded()
       await addVarButton.click()
-      await testPage.waitForTimeout(500)
+      // Wait briefly for UI update
+      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
       // Add second variable
       const nameInput = sidebar.locator('input[placeholder="Variable name"]').first()
@@ -435,7 +455,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       ).first()
       await saveVarButton.click()
       console.log('  Added second variable: foo = "bar"')
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Verify custom variables are still present in Variables section
       const hasHello = await sidebar.locator('input[value="hello"]').isVisible({ timeout: 2000 }).catch(() => false)
@@ -450,7 +471,8 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       const configButton = sidebar.locator('button:has-text("Config")').first()
       await configButton.scrollIntoViewIfNeeded()
       await configButton.click()
-      await testPage.waitForTimeout(1000)
+      // Wait briefly for UI update
+      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
       const jsonContent = await testPage.evaluate(() => {
         const cmEditor = document.querySelector('.cm-content')

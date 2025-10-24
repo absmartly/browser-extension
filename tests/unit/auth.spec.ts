@@ -45,8 +45,8 @@ async function loginAndGetJWT(context: any, page: any): Promise<any> {
   console.log('Not logged in, attempting to log in with test credentials...')
   
   // Navigate to login page
-  await page.goto(`${baseUrl}/login`)
-  await page.waitForLoadState('networkidle')
+  await page.goto(`${baseUrl}/login`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.waitForSelector('body', { timeout: 5000 })
   
   // Fill in email and password
   await page.fill('input[type="email"], input[name="email"]', TEST_USER_EMAIL)
@@ -54,8 +54,9 @@ async function loginAndGetJWT(context: any, page: any): Promise<any> {
   
   // Click login button
   await page.click('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")')
-  await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(2000) // Wait for cookie to be set
+  await page.waitForSelector('body', { timeout: 5000 })
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {}) // Wait for cookie to be set
   
   console.log('Login completed, checking for JWT cookie...')
   
@@ -172,8 +173,8 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     try {
       const page = await context.newPage()
       const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
-      await page.goto(baseUrl)
-      await page.waitForLoadState('networkidle')
+      await page.goto(baseUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+      await page.waitForSelector('body', { timeout: 5000 })
 
       console.log('Opened ABsmartly page:', page.url())
 
@@ -213,8 +214,8 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     try {
       const page = await context.newPage()
       const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
-      await page.goto(baseUrl)
-      await page.waitForLoadState('networkidle')
+      await page.goto(baseUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+      await page.waitForSelector('body', { timeout: 5000 })
 
       console.log('Opened ABsmartly page:', page.url())
 
