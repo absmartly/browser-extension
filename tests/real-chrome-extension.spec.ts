@@ -18,9 +18,11 @@ const test = base.extend<{
 
     // Launch Chrome with the extension loaded
     const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
+        '--enable-file-cookies',
       ],
       // Slow down for debugging
       slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : undefined,

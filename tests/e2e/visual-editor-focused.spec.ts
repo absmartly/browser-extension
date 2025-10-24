@@ -15,9 +15,11 @@ test.describe('Focused Visual Editor Test', () => {
 
     // Launch browser with extension
     const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`
+        '--enable-file-cookies',
       ],
       viewport: { width: 1920, height: 1080 },
       slowMo: 50

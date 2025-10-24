@@ -15,9 +15,11 @@ test.describe('Visual Editor Summary', () => {
     console.log('================================')
 
     const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`
+        '--enable-file-cookies',
       ],
       viewport: { width: 1920, height: 1080 },
       slowMo: 100

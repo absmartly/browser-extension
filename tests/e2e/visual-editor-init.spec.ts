@@ -1,5 +1,5 @@
-import { test, expect, type Page, type Browser } from '@playwright/test'
-import path from 'path'
+import { test, expect } from '../fixtures/extension'
+import { type Page } from '@playwright/test'
 
 /**
  * Comprehensive E2E Tests for Visual Editor Initialization and Lifecycle
@@ -85,28 +85,24 @@ async function getVisualEditorStatus(page: Page): Promise<any> {
 }
 
 test.describe('Visual Editor Initialization and Lifecycle', () => {
-  let testPagePath: string
-  let extensionPath: string
+  let testPage: Page
 
-  test.beforeAll(() => {
-    testPagePath = path.join(__dirname, 'test-page.html')
-    extensionPath = path.join(__dirname, '../../build/chrome-mv3-dev')
-  })
+  test.beforeEach(async ({ context }) => {
+    testPage = await context.newPage()
 
-  test.beforeEach(async ({ page }) => {
     // Navigate to test page
-    await page.goto(`file://${testPagePath}`)
+    await testPage.goto('file://' + __dirname + '/test-page.html')
 
     // Wait for page to fully load
-    await page.waitForSelector('body', { timeout: 5000 })
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Wait for content script to be ready
-    await page.waitForFunction(() => {
+    await testPage.waitForFunction(() => {
       return (window as any).__absmartlyContentScriptLoaded === true
     }, { timeout: 5000 })
 
     // Inject test helper functions
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       (window as any).testFunctions = {
         isVisualEditorActive: function() {
           return (window as any).__absmartlyVisualEditorActive === true
@@ -144,20 +140,24 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
     })
 
     // Verify test page loaded correctly
-    await expect(page.locator('[data-testid="main-title"]')).toContainText('Visual Editor Test Page')
+    await expect(testPage.locator('[data-testid="main-title"]')).toContainText('Visual Editor Test Page')
+  })
+
+  test.afterEach(async () => {
+    if (testPage) await testPage.close()
   })
 
   test.describe('Basic Initialization', () => {
-    test('should load content script successfully', async ({ page }) => {
+    test('should load content script successfully', async () => {
       // Verify content script marker is set
-      const hasContentScript = await page.evaluate(() => {
+      const hasContentScript = await testPage.evaluate(() => {
         return (window as any).__absmartlyContentScriptLoaded === true
       })
 
       expect(hasContentScript).toBe(true)
 
       // Verify content ready message was posted
-      const hasContentReady = await page.evaluate(() => {
+      const hasContentReady = await testPage.evaluate(() => {
         return new Promise((resolve) => {
           let resolved = false
           const handler = (event: MessageEvent) => {
@@ -182,9 +182,9 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(typeof hasContentReady).toBe('boolean')
     })
 
-    test('should initialize visual editor with basic configuration', async ({ page }) => {
+    test('should initialize visual editor with basic configuration', async () => {
       // Initialize the visual editor via test message
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -192,13 +192,13 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(result.success).toBe(true)
 
       // Verify editor is marked as active
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
 
-    test('should handle multiple initialization attempts gracefully', async ({ page }) => {
+    test('should handle multiple initialization attempts gracefully', async () => {
       // First initialization
-      const firstResult = await startVisualEditor(page, {
+      const firstResult = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
@@ -206,11 +206,11 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(firstResult.success).toBe(true)
 
       // Get status after first init
-      const firstStatus = await getVisualEditorStatus(page)
+      const firstStatus = await getVisualEditorStatus(testPage)
       expect(firstStatus.active).toBe(true)
 
       // Second initialization (editor should already be active)
-      const secondResult = await startVisualEditor(page, {
+      const secondResult = await startVisualEditor(testPage, {
         variantName: 'test-variant-2',
         experimentName: 'test-experiment-2'
       })
@@ -221,9 +221,9 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
   })
 
   test.describe('Style Injection and Management', () => {
-    test('should inject required styles on initialization', async ({ page }) => {
+    test('should inject required styles on initialization', async () => {
       // Check no styles before initialization
-      const initialStyles = await page.evaluate(() => {
+      const initialStyles = await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.getABSmartlyStyles().length
       })
@@ -231,19 +231,19 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(initialStyles).toBe(0)
 
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for editor to fully initialize
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Verify styles are injected
-      const hasStyles = await page.evaluate(() => {
+      const hasStyles = await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.hasVisualEditorStyles() || helpers.getABSmartlyStyles().length > 0
       })
@@ -251,28 +251,28 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(hasStyles).toBe(true)
     })
 
-    test('should clean up styles on editor stop', async ({ page }) => {
+    test('should clean up styles on editor stop', async () => {
       // Initialize and start editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for editor to be active
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Verify styles are present
-      let hasStyles = await page.evaluate(() => {
+      let hasStyles = await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.hasVisualEditorStyles() || helpers.getABSmartlyStyles().length > 0
       })
       expect(hasStyles).toBe(true)
 
       // Stop the editor
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         const editor = helpers.getVisualEditor()
         if (editor) {
@@ -281,7 +281,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       })
 
       // Verify editor is no longer active
-      const isActive = await page.evaluate(() => {
+      const isActive = await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
@@ -290,21 +290,21 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
   })
 
   test.describe('Toolbar and UI Components', () => {
-    test('should display toolbar after initialization', async ({ page }) => {
+    test('should display toolbar after initialization', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for toolbar to appear (check for toolbar element or overlay)
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         return document.querySelector('#absmartly-visual-editor-overlay') !== null ||
                document.querySelector('[data-absmartly="toolbar"]') !== null
       }, { timeout: 5000 })
 
       // Check for overlay or toolbar presence
-      const hasUI = await page.evaluate(() => {
+      const hasUI = await testPage.evaluate(() => {
         const overlay = document.querySelector('#absmartly-visual-editor-overlay')
         const toolbar = document.querySelector('[data-absmartly="toolbar"]')
         return !!(overlay || toolbar)
@@ -313,27 +313,27 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(hasUI).toBe(true)
     })
 
-    test('should show notifications on editor start', async ({ page }) => {
+    test('should show notifications on editor start', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for initialization
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Check that editor is active (notifications might be transient)
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
     })
   })
 
   test.describe('Configuration Handling', () => {
-    test('should handle initial changes configuration', async ({ page }) => {
+    test('should handle initial changes configuration', async () => {
       const initialChanges = [
         {
           selector: '[data-testid="main-title"]',
@@ -348,7 +348,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       ]
 
       // Initialize with initial changes
-      const result = await startVisualEditor(page, {
+      const result = await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment',
         changes: initialChanges
@@ -357,12 +357,12 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(result.success).toBe(true)
 
       // Verify editor is active
-      const status = await getVisualEditorStatus(page)
+      const status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
       expect(Array.isArray(status.changes)).toBe(true)
     })
 
-    test('should handle different configuration options', async ({ page }) => {
+    test('should handle different configuration options', async () => {
       const configs = [
         { variant: 'control', experiment: 'test-1' },
         { variant: 'variant-a', experiment: 'test-2' },
@@ -371,7 +371,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
 
       for (const config of configs) {
         // Clear any existing editor
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           const helpers = (window as any).testFunctions as TestHelpers
           const editor = helpers.getVisualEditor()
           if (editor) {
@@ -382,7 +382,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
         })
 
         // Initialize with new config
-        const result = await startVisualEditor(page, {
+        const result = await startVisualEditor(testPage, {
           variantName: config.variant,
           experimentName: config.experiment
         })
@@ -393,10 +393,10 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
   })
 
   test.describe('Editor Lifecycle Management', () => {
-    test('should properly start and stop editor multiple times', async ({ page }) => {
+    test('should properly start and stop editor multiple times', async () => {
       for (let i = 0; i < 3; i++) {
         // Initialize editor
-        const initResult = await startVisualEditor(page, {
+        const initResult = await startVisualEditor(testPage, {
           variantName: `variant-${i}`,
           experimentName: `experiment-${i}`
         })
@@ -404,11 +404,11 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
         expect(initResult.success).toBe(true)
 
         // Verify active state
-        const activeStatus = await getVisualEditorStatus(page)
+        const activeStatus = await getVisualEditorStatus(testPage)
         expect(activeStatus.active).toBe(true)
 
         // Stop editor
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           const helpers = (window as any).testFunctions as TestHelpers
           const editor = helpers.getVisualEditor()
           if (editor) {
@@ -417,31 +417,31 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
         })
 
         // Verify inactive state
-        await page.waitForFunction(() => {
+        await testPage.waitForFunction(() => {
           const helpers = (window as any).testFunctions as TestHelpers
           return !helpers.isVisualEditorActive()
         })
 
         // Clear global state for next iteration
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           ;(window as any).__absmartlyVisualEditor = null
         })
       }
     })
 
-    test('should handle destroy method properly', async ({ page }) => {
+    test('should handle destroy method properly', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Verify editor is active
-      let status = await getVisualEditorStatus(page)
+      let status = await getVisualEditorStatus(testPage)
       expect(status.active).toBe(true)
 
       // Destroy editor
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         const editor = helpers.getVisualEditor()
         if (editor) {
@@ -450,12 +450,12 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       })
 
       // Verify editor is inactive
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return !helpers.isVisualEditorActive()
       })
 
-      const inactiveStatus = await page.evaluate(() => {
+      const inactiveStatus = await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
@@ -464,9 +464,9 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
   })
 
   test.describe('Global State Management', () => {
-    test('should maintain consistent global state', async ({ page }) => {
+    test('should maintain consistent global state', async () => {
       // Check initial global state
-      const initialState = await page.evaluate(() => {
+      const initialState = await testPage.evaluate(() => {
         return {
           hasActiveFlag: (window as any).__absmartlyVisualEditorActive,
           hasEditorInstance: (window as any).__absmartlyVisualEditor
@@ -477,13 +477,13 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(initialState.hasEditorInstance).toBeFalsy()
 
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Check active state
-      const activeState = await page.evaluate(() => {
+      const activeState = await testPage.evaluate(() => {
         return {
           hasActiveFlag: (window as any).__absmartlyVisualEditorActive,
           hasEditorInstance: !!((window as any).__absmartlyVisualEditor)
@@ -494,7 +494,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(activeState.hasEditorInstance).toBe(true)
 
       // Stop editor
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         const editor = helpers.getVisualEditor()
         if (editor) {
@@ -503,7 +503,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       })
 
       // Check inactive state
-      const inactiveState = await page.evaluate(() => {
+      const inactiveState = await testPage.evaluate(() => {
         return {
           hasActiveFlag: (window as any).__absmartlyVisualEditorActive,
           hasEditorInstance: !!((window as any).__absmartlyVisualEditor)
@@ -513,9 +513,9 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(inactiveState.hasActiveFlag).toBe(false)
     })
 
-    test('should prevent multiple concurrent editors', async ({ page }) => {
+    test('should prevent multiple concurrent editors', async () => {
       // Initialize first editor
-      const firstInit = await startVisualEditor(page, {
+      const firstInit = await startVisualEditor(testPage, {
         variantName: 'variant-1',
         experimentName: 'experiment-1'
       })
@@ -523,7 +523,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(firstInit.success).toBe(true)
 
       // Try to initialize second editor
-      const secondInit = await startVisualEditor(page, {
+      const secondInit = await startVisualEditor(testPage, {
         variantName: 'variant-2',
         experimentName: 'experiment-2'
       })
@@ -531,7 +531,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(secondInit.success).toBe(true)
 
       // Verify only one active flag
-      const activeCount = await page.evaluate(() => {
+      const activeCount = await testPage.evaluate(() => {
         return (window as any).__absmartlyVisualEditorActive === true ? 1 : 0
       })
 
@@ -540,37 +540,37 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
   })
 
   test.describe('Visual Regression Testing', () => {
-    test('should maintain visual consistency during initialization', async ({ page }) => {
+    test('should maintain visual consistency during initialization', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Wait for initialization
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
       // Verify page content is still accessible
-      await expect(page.locator('[data-testid="main-title"]')).toBeVisible()
-      await expect(page.locator('[data-testid="subtitle"]')).toBeVisible()
+      await expect(testPage.locator('[data-testid="main-title"]')).toBeVisible()
+      await expect(testPage.locator('[data-testid="subtitle"]')).toBeVisible()
     })
 
-    test('should maintain visual consistency during cleanup', async ({ page }) => {
+    test('should maintain visual consistency during cleanup', async () => {
       // Initialize and then stop editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         return helpers.isVisualEditorActive()
       })
 
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const helpers = (window as any).testFunctions as TestHelpers
         const editor = helpers.getVisualEditor()
         if (editor) {
@@ -579,13 +579,13 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       })
 
       // Verify page is back to normal
-      await expect(page.locator('[data-testid="main-title"]')).toBeVisible()
-      await expect(page.locator('[data-testid="subtitle"]')).toBeVisible()
+      await expect(testPage.locator('[data-testid="main-title"]')).toBeVisible()
+      await expect(testPage.locator('[data-testid="subtitle"]')).toBeVisible()
     })
   })
 
   test.describe('Error Handling and Edge Cases', () => {
-    test('should handle invalid configuration gracefully', async ({ page }) => {
+    test('should handle invalid configuration gracefully', async () => {
       // Test with empty values
       const invalidConfigs = [
         { variant: '', experiment: '' },
@@ -593,7 +593,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       ]
 
       for (const config of invalidConfigs) {
-        const result = await startVisualEditor(page, {
+        const result = await startVisualEditor(testPage, {
           variantName: config.variant,
           experimentName: config.experiment
         })
@@ -602,7 +602,7 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
         expect(typeof result.success).toBe('boolean')
 
         // Clear state for next iteration
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           const editor = (window as any).__absmartlyVisualEditor
           if (editor) {
             editor.destroy()
@@ -613,15 +613,15 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       }
     })
 
-    test('should handle DOM manipulation during initialization', async ({ page }) => {
+    test('should handle DOM manipulation during initialization', async () => {
       // Start initialization
-      const initPromise = startVisualEditor(page, {
+      const initPromise = startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
       // Simultaneously modify DOM
-      await page.evaluate(() => {
+      await testPage.evaluate(() => {
         const newElement = document.createElement('div')
         newElement.id = 'dynamic-element'
         newElement.textContent = 'Dynamically added element'
@@ -632,12 +632,12 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       expect(result.success).toBe(true)
 
       // Verify both editor and dynamic element are present
-      await expect(page.locator('#dynamic-element')).toBeVisible()
+      await expect(testPage.locator('#dynamic-element')).toBeVisible()
     })
   })
 
   test.describe('Browser Compatibility', () => {
-    test('should work with different viewport sizes', async ({ page }) => {
+    test('should work with different viewport sizes', async () => {
       const viewports = [
         { width: 1920, height: 1080 }, // Desktop
         { width: 1024, height: 768 },  // Tablet
@@ -645,16 +645,16 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       ]
 
       for (const viewport of viewports) {
-        await page.setViewportSize(viewport)
-        await page.reload()
-        await page.waitForSelector('body', { timeout: 5000 })
+        await testPage.setViewportSize(viewport)
+        await testPage.reload()
+        await testPage.waitForSelector('body', { timeout: 5000 })
 
         // Wait for content script
-        await page.waitForFunction(() => {
+        await testPage.waitForFunction(() => {
           return (window as any).__absmartlyContentScriptLoaded === true
         }, { timeout: 5000 })
 
-        const result = await startVisualEditor(page, {
+        const result = await startVisualEditor(testPage, {
           variantName: 'test-variant',
           experimentName: 'test-experiment'
         })
@@ -662,10 +662,10 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
         expect(result.success).toBe(true)
 
         // Verify page is still functional
-        await expect(page.locator('[data-testid="main-title"]')).toBeVisible()
+        await expect(testPage.locator('[data-testid="main-title"]')).toBeVisible()
 
         // Clean up for next iteration
-        await page.evaluate(() => {
+        await testPage.evaluate(() => {
           const helpers = (window as any).testFunctions as TestHelpers
           const editor = helpers.getVisualEditor()
           if (editor) {
@@ -675,33 +675,33 @@ test.describe('Visual Editor Initialization and Lifecycle', () => {
       }
     })
 
-    test('should handle page reload scenarios', async ({ page }) => {
+    test('should handle page reload scenarios', async () => {
       // Initialize editor
-      await startVisualEditor(page, {
+      await startVisualEditor(testPage, {
         variantName: 'test-variant',
         experimentName: 'test-experiment'
       })
 
-      const statusBefore = await getVisualEditorStatus(page)
+      const statusBefore = await getVisualEditorStatus(testPage)
       expect(statusBefore.active).toBe(true)
 
       // Reload page
-      await page.reload()
-      await page.waitForSelector('body', { timeout: 5000 })
+      await testPage.reload()
+      await testPage.waitForSelector('body', { timeout: 5000 })
 
       // Wait for content script to reload
-      await page.waitForFunction(() => {
+      await testPage.waitForFunction(() => {
         return (window as any).__absmartlyContentScriptLoaded === true
       }, { timeout: 5000 })
 
       // Verify editor state is reset
-      const isActiveAfter = await page.evaluate(() => {
+      const isActiveAfter = await testPage.evaluate(() => {
         return !!(window as any).__absmartlyVisualEditorActive
       })
       expect(isActiveAfter).toBe(false)
 
       // Verify editor can be initialized again
-      const reinitResult = await startVisualEditor(page, {
+      const reinitResult = await startVisualEditor(testPage, {
         variantName: 'test-variant-new',
         experimentName: 'test-experiment-new'
       })
