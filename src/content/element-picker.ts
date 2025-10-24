@@ -217,17 +217,77 @@ export class ElementPicker {
       }
     }
 
-    // If still not unique, use a very specific positional selector
-    // Build incrementally and stop as soon as we have a unique selector
+    // If still not unique, find the first diverging ancestor
+    // and use descendant selector for better performance
     if (debug) {
-      console.error('[ElementPicker] Could not generate unique selector, using positional fallback')
+      console.error('[ElementPicker] Could not generate unique selector, using smart positional fallback')
     }
-    const parts: string[] = []
-    let current: Element | null = element
-    let depth = 0
-    const maxDepth = 10
 
-    while (current && current !== document.body && depth < maxDepth) {
+    // Build ancestor chain
+    const ancestors: Element[] = []
+    let current: Element | null = element
+    while (current && current !== document.body && ancestors.length < 10) {
+      ancestors.push(current)
+      current = current.parentElement
+    }
+
+    // Find the first ancestor level where elements diverge
+    // by comparing attributes at each level for all matching target elements
+    const targetTag = element.tagName.toLowerCase()
+    const allTargets = Array.from(document.querySelectorAll(targetTag))
+
+    for (let ancestorDepth = 1; ancestorDepth < ancestors.length; ancestorDepth++) {
+      const ancestor = ancestors[ancestorDepth]
+      const tagName = ancestor.tagName.toLowerCase()
+
+      // Get data-* attributes for this ancestor
+      const dataAttrs = Array.from(ancestor.attributes).filter(attr => attr.name.startsWith('data-'))
+
+      // Try building a selector with this ancestor
+      let ancestorSelector = tagName
+
+      // Add data attributes if available
+      if (dataAttrs.length > 0) {
+        // Prefer data-framer-name and other stable attributes
+        const stableAttr = dataAttrs.find(attr =>
+          attr.name === 'data-framer-name' ||
+          attr.name === 'data-name' ||
+          attr.name === 'data-testid'
+        )
+        if (stableAttr) {
+          ancestorSelector = `${tagName}[${stableAttr.name}="${stableAttr.value}"]`
+        }
+      }
+
+      // Check if we need :nth-of-type
+      if (ancestor.parentElement) {
+        const siblings = Array.from(ancestor.parentElement.children).filter(
+          child => child.tagName === ancestor.tagName
+        )
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(ancestor) + 1
+          ancestorSelector += `:nth-of-type(${index})`
+        }
+      }
+
+      // Build selector: ancestor descendant target
+      const testSelector = `${ancestorSelector} ${targetTag}`
+      const matches = document.querySelectorAll(testSelector)
+
+      if (matches.length === 1 && matches[0] === element) {
+        if (debug) {
+          console.log(`[ElementPicker] Found unique selector using ancestor at depth ${ancestorDepth}:`, testSelector)
+        }
+        return testSelector
+      }
+    }
+
+    // Fallback to child combinator approach if descendant didn't work
+    const parts: string[] = []
+    current = element
+    let depth = 0
+
+    while (current && current !== document.body && depth < 10) {
       const tagName = current.tagName.toLowerCase()
       const parent = current.parentElement
 
@@ -248,7 +308,7 @@ export class ElementPicker {
       const matches = document.querySelectorAll(testSelector)
       if (matches.length === 1 && matches[0] === element) {
         if (debug) {
-          console.log(`[ElementPicker] Found unique positional selector at depth ${depth + 1}:`, testSelector)
+          console.log(`[ElementPicker] Found unique child combinator selector at depth ${depth + 1}:`, testSelector)
         }
         return testSelector
       }
