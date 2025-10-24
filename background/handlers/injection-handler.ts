@@ -8,12 +8,34 @@ import { debugLog, debugError } from '~src/utils/debug'
  */
 
 /**
+ * Check if we're running in test mode (Playwright tests)
+ * Detection: Chrome extensions in test mode will have tabs with file:// URLs
+ * In production, users don't typically have file:// URLs open
+ */
+async function isTestMode(): Promise<boolean> {
+  try {
+    // Check if any tabs are using file:// URLs
+    // This is a reliable indicator that we're running Playwright tests
+    const tabs = await chrome.tabs.query({})
+    const hasFileUrls = tabs.some(tab => tab.url?.startsWith('file://'))
+    return hasFileUrls
+  } catch {
+    return false
+  }
+}
+
+/**
  * Register content script for file:// URLs dynamically
- * This is needed because content scripts in manifest don't auto-inject on file:// URLs
+ * This is ONLY needed for Playwright E2E tests that use file:// URLs
+ * Production extension does NOT need file:// support
  */
 export async function registerFileUrlContentScript(): Promise<void> {
+  // Only register file:// URLs when running tests
+  if (!(await isTestMode())) {
+    return
+  }
+
   try {
-    console.log('[InjectionHandler] Registering content script for file:// URLs...')
     const manifest = chrome.runtime.getManifest()
     const contentScripts = manifest.content_scripts
     if (contentScripts && contentScripts.length > 0) {
@@ -27,10 +49,9 @@ export async function registerFileUrlContentScript(): Promise<void> {
         allFrames: false
       }])
 
-      console.log('[InjectionHandler] Successfully registered dynamic content script for file:// URLs')
+      console.log('[InjectionHandler] Test mode: Registered content script for file:// URLs')
     }
   } catch (error) {
-    console.log('[InjectionHandler] Registration failed, trying to re-register...')
     try {
       await chrome.scripting.unregisterContentScripts({ ids: ['file-url-content-script'] })
       const manifest = chrome.runtime.getManifest()
@@ -44,10 +65,10 @@ export async function registerFileUrlContentScript(): Promise<void> {
           runAt: 'document_idle',
           allFrames: false
         }])
-        console.log('[InjectionHandler] Successfully re-registered dynamic content script for file:// URLs')
+        console.log('[InjectionHandler] Test mode: Re-registered content script for file:// URLs')
       }
     } catch (retryError) {
-      console.error('[InjectionHandler] Failed to register dynamic content script:', retryError)
+      console.error('[InjectionHandler] Test mode: Failed to register file:// content script:', retryError)
     }
   }
 }
