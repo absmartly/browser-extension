@@ -91,12 +91,6 @@ export async function initializeConfig(
   })
 
   let updated = false
-  let defaultAuthMethod: 'jwt' | 'apikey' = 'jwt'
-
-  if (envAuthMethod) {
-    defaultAuthMethod = envAuthMethod as 'jwt' | 'apikey'
-    debugLog('[Config] Using auth method from environment:', envAuthMethod)
-  }
 
   let secureApiKey: string | null = null
   try {
@@ -104,6 +98,13 @@ export async function initializeConfig(
   } catch (error) {
     // If secure storage fails (e.g., JSON parse error for legacy data), continue without it
     debugLog('[Config] Failed to get API key from secure storage during init:', error)
+  }
+
+  // Only use environment auth method if no stored config exists
+  let defaultAuthMethod: 'jwt' | 'apikey' = 'jwt'
+  if (envAuthMethod && !storedConfig?.authMethod) {
+    defaultAuthMethod = envAuthMethod as 'jwt' | 'apikey'
+    debugLog('[Config] Using auth method from environment (no stored config):', envAuthMethod)
   }
 
   const newConfig: ABsmartlyConfig = {

@@ -34,6 +34,12 @@ export class BackgroundAPIClient {
   
   async getExperiments(params?: any): Promise<{experiments: Experiment[], total?: number, hasMore?: boolean}> {
     try {
+      // Add stack trace to see where this call is coming from
+      const stack = new Error().stack
+      debugLog('=== getExperiments called from: ===')
+      debugLog(stack?.split('\n').slice(2, 6).join('\n'))
+      debugLog('=== params:', params)
+
       const data = await this.makeRequest('GET', '/experiments', params)
       debugLog('API response structure:', data)
       
