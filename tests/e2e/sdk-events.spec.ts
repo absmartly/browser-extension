@@ -156,7 +156,7 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
     apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo.absmartly.io'
   })
 
-  await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
   await testPage.setViewportSize({ width: 1920, height: 1080 })
   await testPage.waitForSelector('body', { timeout: 5000 })
   console.log('✅ Test page loaded\n')

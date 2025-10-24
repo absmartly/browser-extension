@@ -32,7 +32,7 @@ test.describe('Experiment Code Injection UI', () => {
       }
     })
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForSelector('body', { timeout: 5000 })
   })

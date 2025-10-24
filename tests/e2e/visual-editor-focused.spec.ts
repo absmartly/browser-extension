@@ -34,7 +34,7 @@ test.describe('Focused Visual Editor Test', () => {
 
     // Set storage
     const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
     await setupPage.evaluate(async () => {
       return new Promise((resolve) => {
@@ -59,7 +59,7 @@ test.describe('Focused Visual Editor Test', () => {
     console.log('📄 Opening test page...')
     const page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
     // Inject sidebar
     await page.evaluate((extId) => {

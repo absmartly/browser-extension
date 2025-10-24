@@ -35,7 +35,7 @@ test.describe('API Integration Tests', () => {
 
     // 3) Load sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
 
     // Enable console logging for debugging
     page.on('console', msg => {
@@ -103,7 +103,7 @@ test.describe('API Integration Tests', () => {
 
     // Load sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
 
     // Wait for potential loading
     // TODO: Replace timeout with specific element wait
@@ -132,7 +132,7 @@ test.describe('API Integration Tests', () => {
     })
 
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
 
     // Wait for experiments to load
     // TODO: Replace timeout with specific element wait
@@ -177,7 +177,7 @@ test.describe('API Integration Tests', () => {
 
     // Open sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
 
     // Reload page
     await page.reload()

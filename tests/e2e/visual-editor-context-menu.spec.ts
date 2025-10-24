@@ -331,7 +331,7 @@ test.describe('Visual Editor Context Menu Tests', () => {
   test('Visual editor with real extension sidebar', async ({ context, extensionUrl }) => {
     // Open the sidebar first
     const sidebarPage = await context.newPage()
-    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
     await sidebarPage.setViewportSize({ width: 400, height: 1080 })
 
     // Open test page in another tab
