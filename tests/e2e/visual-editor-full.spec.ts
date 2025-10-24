@@ -27,7 +27,7 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
     // Step 1: Open the extension sidebar to get access to experiments
     console.log('\n📱 Opening extension sidebar...')
     const sidebarPage = await context.newPage()
-    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
     await sidebarPage.setViewportSize({ width: 400, height: 1080 })
 
     // Wait for sidebar to load
@@ -38,7 +38,7 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
     // Step 2: Open test page in new tab (this will have content script injected)
     console.log('📄 Opening test page...')
     const testPage = await context.newPage()
-    await testPage.goto(extensionUrl('test-page.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
+    await testPage.goto(extensionUrl('test-page.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
     await testPage.setViewportSize({ width: 1520, height: 1080 })
     await testPage.waitForSelector('body', { timeout: 5000 })
 

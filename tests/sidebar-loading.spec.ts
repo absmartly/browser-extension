@@ -27,7 +27,7 @@ test.describe('Sidebar Loading Tests', () => {
 
   test('Sidebar loads and can be toggled', async ({ page }) => {
     // Load test page
-    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Click button to inject extension
@@ -72,7 +72,7 @@ test.describe('Sidebar Loading Tests', () => {
 
   test('Sidebar iframe loads extension UI', async ({ page }) => {
     // Load test page
-    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${TEST_PAGE_PATH}?port=${serverPort}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Click button to inject extension

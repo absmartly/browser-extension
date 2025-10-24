@@ -44,7 +44,7 @@ test.describe('Visual Editor Workflow Tests', () => {
     fs.writeFileSync(tempTestPagePath, testPageContent)
 
     // Load the test page from the server (same origin as extension files)
-    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
     console.log('✅ Test page loaded')
 
@@ -124,7 +124,7 @@ test.describe('Visual Editor Workflow Tests', () => {
     fs.writeFileSync(tempTestPagePath, testPageContent)
 
     // Load test page from server (same origin)
-    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Re-initialize the background runner after page load

@@ -7,7 +7,7 @@ test('Minimal test: Check SDK mock is working', async ({ page }) => {
     console.log(`[BROWSER ${msg.type()}]`, msg.text())
   })
 
-  await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
   await page.waitForSelector('body', { timeout: 5000 })
 
   // Inject SDK mock

@@ -3,7 +3,7 @@ import { test } from '@playwright/test'
 test('Debug: Access plugin.instance', async ({ page }) => {
   page.on('console', msg => console.log(`[BROWSER]`, msg.text()))
   
-  await page.goto('http://localhost:3456/url-filtering-test.html', { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.goto('http://localhost:3456/url-filtering-test.html', { waitUntil: 'domcontentloaded', timeout: 10000 })
   await page.waitForSelector('body', { timeout: 5000 })
   await page.evaluate(() => { history.pushState({}, '', '/products/123') })
   await page.evaluate(() => {

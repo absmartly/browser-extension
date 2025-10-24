@@ -15,7 +15,7 @@ test('URL filter UI and JSON verification', async ({ page, context }) => {
   page.on('console', msg => console.log(`[BROWSER]`, msg.text()))
 
   // Navigate to test page
-  await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
   await page.waitForSelector('body', { timeout: 5000 })
 
   // Set current URL to /products/123 (to match our filter pattern)

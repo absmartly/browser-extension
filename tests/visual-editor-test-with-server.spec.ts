@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test'
 test.describe('Visual Editor Tests with Local Server', () => {
   test('Load sidebar through local server', async ({ page }) => {
     // Load the sidebar directly from the local server
-    await page.goto('http://localhost:8080/tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto('http://localhost:8080/tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 })
 
     // Wait for the sidebar to load
     await page.waitForSelector('body', { timeout: 5000 })

@@ -26,7 +26,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[VariantList]')
     )
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForSelector('body', { timeout: 5000 })
 

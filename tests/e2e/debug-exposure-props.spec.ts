@@ -7,7 +7,7 @@ test('Debug: Show all plugin properties', async ({ page }) => {
     console.log(`[BROWSER ${msg.type()}]`, msg.text())
   })
 
-  await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
   await page.waitForSelector('body', { timeout: 5000 })
 
   await page.evaluate(() => { history.pushState({}, '', '/products/123') })

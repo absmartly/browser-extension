@@ -44,7 +44,7 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
   test('Complete visual editor workflow - all context menu options', async () => {
     // Step 1: Create new page and load test HTML
     page = await context.newPage()
-    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Step 2: Open extension popup/sidebar
@@ -248,7 +248,7 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
 
   test('Preview header button does NOT wrap at any viewport width', async () => {
     page = await context.newPage()
-    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
     // Inject preview header
     await page.evaluate(() => {

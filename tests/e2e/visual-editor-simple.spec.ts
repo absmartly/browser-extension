@@ -36,7 +36,7 @@ test.describe('Simple Visual Editor Test', () => {
     // Step 1: Set storage BEFORE opening any pages
     console.log('\n⚙️ Setting API credentials in storage...')
     const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
     // Clear any existing storage and set new credentials
     const result = await setupPage.evaluate(async () => {
@@ -70,7 +70,7 @@ test.describe('Simple Visual Editor Test', () => {
     console.log('\n📄 Opening test page...')
     const page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForLoadState('domcontentloaded')
 
     // Step 3: Inject the sidebar
