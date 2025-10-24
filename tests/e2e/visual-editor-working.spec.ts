@@ -134,7 +134,8 @@ test.describe('Visual Editor Test', () => {
     console.log('✅ Sidebar container found')
 
     // Wait for iframe to load
-    await page.waitForTimeout(5000)
+    const iframe = await page.waitForSelector('#absmartly-sidebar-iframe', { state: 'attached', timeout: 5000 })
+    await iframe.waitForElementState('visible', { timeout: 3000 })
 
     // Step 3: Try to interact with sidebar
     console.log('\n📱 Checking sidebar content...')
@@ -173,8 +174,10 @@ test.describe('Visual Editor Test', () => {
 
       if (hasExperiments > 0) {
         console.log('\n🔍 Clicking first experiment...')
-        await frame.locator('.experiment-item').first().click()
-        await page.waitForTimeout(2000)
+        const experimentItem = frame.locator('.experiment-item').first()
+        await experimentItem.waitFor({ state: 'visible', timeout: 3000 })
+        await experimentItem.click()
+        await frame.locator('button:has-text("Visual Editor")').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
 
         // Look for Visual Editor button
         const hasVisualEditorBtn = await frame.locator('button:has-text("Visual Editor")').isVisible().catch(() => false)
@@ -183,7 +186,7 @@ test.describe('Visual Editor Test', () => {
         if (hasVisualEditorBtn) {
           console.log('🎨 Clicking Visual Editor button...')
           await frame.locator('button:has-text("Visual Editor")').first().click()
-          await page.waitForTimeout(3000)
+          await page.waitForSelector('#absmartly-visual-editor-toolbar', { timeout: 5000 }).catch(() => {})
 
           // Check for toolbar on main page
           const hasToolbar = await page.locator('#absmartly-visual-editor-toolbar').isVisible().catch(() => false)
@@ -197,7 +200,7 @@ test.describe('Visual Editor Test', () => {
             if (await heading.isVisible()) {
               // Right-click for context menu
               await heading.click({ button: 'right' })
-              await page.waitForTimeout(1000)
+              await page.waitForSelector('.absmartly-context-menu', { timeout: 2000 }).catch(() => {})
 
               // Look for context menu
               const hasMenu = await page.locator('.absmartly-context-menu').isVisible().catch(() => false)

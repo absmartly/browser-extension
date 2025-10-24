@@ -17,8 +17,8 @@ test.describe('Real ABsmartly Extension Workflow', () => {
 
   test('Complete real extension workflow with visual editor', async ({ page }) => {
     // Step 1: Open the test page
-    await page.goto(`file://${TEST_PAGE_PATH}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
     console.log('✅ Test page loaded')
 
     // Step 2: Click button to inject extension (simulates extension icon click)
@@ -52,7 +52,8 @@ test.describe('Real ABsmartly Extension Workflow', () => {
       await frame.click('button:has-text("Save")')
 
       // Wait for save and navigation back to experiment list
-      await frame.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
     }
 
     // Step 6: Look for experiments in the sidebar
@@ -111,7 +112,8 @@ test.describe('Real ABsmartly Extension Workflow', () => {
           await page.click('[data-action="apply"]')
         }
 
-        await page.waitForTimeout(500) // Let change apply
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {}) // Let change apply
       }
 
       // Step 12: Check changes counter
@@ -146,7 +148,7 @@ test.describe('Real ABsmartly Extension Workflow', () => {
   })
 
   test('Preview header never wraps at any viewport width', async ({ page }) => {
-    await page.goto(`file://${TEST_PAGE_PATH}`)
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Inject a preview header directly for testing
     await page.evaluate(() => {
@@ -228,7 +230,8 @@ test.describe('Real ABsmartly Extension Workflow', () => {
 
     for (const viewport of viewports) {
       await page.setViewportSize({ width: viewport.width, height: 800 })
-      await page.waitForTimeout(100) // Let layout settle
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 100 }).catch(() => {}) // Let layout settle
 
       // Measure header and button positions
       const measurements = await page.evaluate(() => {

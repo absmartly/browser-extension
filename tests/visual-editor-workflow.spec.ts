@@ -44,8 +44,8 @@ test.describe('Visual Editor Workflow Tests', () => {
     fs.writeFileSync(tempTestPagePath, testPageContent)
 
     // Load the test page from the server (same origin as extension files)
-    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
     console.log('✅ Test page loaded')
 
     // Re-initialize the background runner after page load to ensure it's available
@@ -80,7 +80,8 @@ test.describe('Visual Editor Workflow Tests', () => {
       await frame.click('button:has-text("Configure Settings")')
       console.log('✅ Clicked Configure Settings')
 
-      await frame.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Check for form fields
       const apiKeyInput = await frame.locator('input[name="apiKey"]').isVisible()
@@ -93,7 +94,8 @@ test.describe('Visual Editor Workflow Tests', () => {
       console.log('ℹ️ No welcome screen, checking for experiments')
 
       // Wait a bit longer for experiments to load
-      await frame.waitForTimeout(3000)
+      // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
       // Check if there are any experiments
       const experimentCount = await frame.locator('.experiment-item').count()
@@ -122,8 +124,8 @@ test.describe('Visual Editor Workflow Tests', () => {
     fs.writeFileSync(tempTestPagePath, testPageContent)
 
     // Load test page from server (same origin)
-    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Re-initialize the background runner after page load
     await backgroundRunner.initialize(EXTENSION_BUILD_PATH)
@@ -140,7 +142,8 @@ test.describe('Visual Editor Workflow Tests', () => {
     }
 
     await frame.waitForLoadState('domcontentloaded')
-    await frame.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
     // This test would need actual experiments to work fully
     // For now, we document what it should do:

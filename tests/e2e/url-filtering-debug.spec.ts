@@ -4,8 +4,8 @@ const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
 test.describe('URL Filtering Debug Tests', () => {
   test('Debug: Basic plugin functionality without URL filter', async ({ page }) => {
-    await page.goto(TEST_PAGE_URL)
-    await page.waitForLoadState('networkidle')
+    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Inject SDK mock WITHOUT URL filter
     await page.evaluate(() => {
@@ -73,7 +73,8 @@ test.describe('URL Filtering Debug Tests', () => {
       return plugin.initialize();
     })
 
-    await page.waitForTimeout(1000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
     const elementText = await page.locator('#test-element').textContent()
     console.log('Basic test element text:', elementText)
@@ -86,8 +87,8 @@ test.describe('URL Filtering Debug Tests', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL)
-    await page.waitForLoadState('networkidle')
+    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Set URL BEFORE plugin
     await page.evaluate(() => {
@@ -200,7 +201,8 @@ test.describe('URL Filtering Debug Tests', () => {
     })
 
     // Wait for any async operations
-    await page.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
     // Check URLMatcher directly
     await page.evaluate(() => {

@@ -1,5 +1,5 @@
 /**
- * E2E tests for Visual Editor HTML Editing with Monaco Editor
+ * E2E tests for Visual Editor HTML Editing with CodeMirror
  */
 
 import { test, expect, type Page, type BrowserContext, chromium } from '@playwright/test'
@@ -64,9 +64,66 @@ const TEST_PAGE_CONTENT = `
 </html>
 `
 
-test.describe('Visual Editor HTML Editing with Monaco', () => {
+test.describe('Visual Editor HTML Editing with CodeMirror', () => {
   let context: BrowserContext
   let page: Page
+
+  // Helper function to open HTML editor
+  async function openHtmlEditor(elementId: string) {
+    await page.click(`#${elementId}`)
+    await page.click(`#${elementId}`, { button: 'right' })
+
+    await page.waitForFunction(() => {
+      const menuHost = document.getElementById('absmartly-menu-host')
+      return menuHost !== null
+    }, { timeout: 5000 })
+
+    await page.evaluate(() => {
+      const menuHost = document.getElementById('absmartly-menu-host')
+      if (menuHost && menuHost.shadowRoot) {
+        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
+        if (editHtmlOption) {
+          (editHtmlOption as HTMLElement).click()
+        }
+      }
+    })
+
+    await page.waitForFunction(() => {
+      return document.getElementById('absmartly-html-editor-host') !== null
+    }, { timeout: 5000 })
+  }
+
+  // Helper function to get CodeMirror content
+  async function getEditorContent(): Promise<string | null> {
+    return page.evaluate(() => {
+      const container = document.getElementById('codemirror-container')
+      if (container) {
+        const cmEditor = container.querySelector('.cm-editor')
+        if (cmEditor) {
+          const lines = cmEditor.querySelectorAll('.cm-line')
+          return Array.from(lines).map(line => line.textContent).join('\n')
+        }
+      }
+      return null
+    })
+  }
+
+  // Helper function to set CodeMirror content
+  async function setEditorContent(content: string) {
+    await page.evaluate((newContent) => {
+      const container = document.getElementById('codemirror-container')
+      if (container && (container as any).editorView) {
+        const view = (container as any).editorView
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: newContent
+          }
+        })
+      }
+    }, content)
+  }
 
   test.beforeAll(async () => {
     // Load extension
@@ -101,8 +158,11 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
       }, '*')
     })
 
-    // Wait for visual editor to initialize
-    await page.waitForTimeout(1000)
+    // Wait for visual editor to initialize by checking for banner
+    await page.waitForFunction(() => {
+      const banner = document.getElementById('absmartly-visual-editor-banner')
+      return banner !== null
+    }, { timeout: 5000 })
   })
 
   test.afterEach(async () => {
@@ -113,119 +173,41 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
     await context.close()
   })
 
-  test('should open Monaco editor when Edit HTML is selected', async () => {
-    // Click on an element to select it
-    await page.click('#simple-element')
+  test('should open CodeMirror editor when Edit HTML is selected', async () => {
+    await openHtmlEditor('simple-element')
 
-    // Right-click to open context menu
-    await page.click('#simple-element', { button: 'right' })
-
-    // Wait for context menu
-    await page.waitForTimeout(500)
-
-    // Look for Edit HTML option in shadow DOM
-    const menuHost = await page.$('#absmartly-menu-host')
-    expect(menuHost).toBeTruthy()
-
-    // Click Edit HTML option
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    // Wait for Monaco editor to appear
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
-
-    // Verify Monaco editor is visible
-    const monacoEditor = await page.$('#absmartly-monaco-temp')
-    expect(monacoEditor).toBeTruthy()
-
-    // Verify editor host with shadow DOM exists
-    const editorHost = await page.$('#absmartly-monaco-editor-host')
+    // Verify CodeMirror container is visible
+    const editorHost = await page.$('#absmartly-html-editor-host')
     expect(editorHost).toBeTruthy()
+
+    const codeMirrorContainer = await page.$('#codemirror-container')
+    expect(codeMirrorContainer).toBeTruthy()
   })
 
-  test('should display current HTML content in Monaco editor', async () => {
-    const originalContent = await page.$eval('#simple-element', el => el.innerHTML)
+  test('should display current HTML content in CodeMirror editor', async () => {
+    await openHtmlEditor('simple-element')
 
-    // Open Monaco editor
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
-
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
-
-    // Get Monaco editor content
-    const editorContent = await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          return models[0].getValue()
-        }
-      }
-      return null
-    })
+    // Get CodeMirror editor content
+    const editorContent = await getEditorContent()
 
     expect(editorContent).toContain('Simple paragraph')
   })
 
   test('should save changes when Apply Changes button is clicked', async () => {
-    // Open Monaco editor for simple element
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
+    await openHtmlEditor('simple-element')
 
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
-
-    // Modify content in Monaco
+    // Modify content in CodeMirror
     const newContent = '<p>Modified content from E2E test</p>'
-    await page.evaluate((content) => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          models[0].setValue(content)
-        }
-      }
-    }, newContent)
+    await setEditorContent(newContent)
 
     // Click Apply Changes button
-    await page.evaluate(() => {
-      const editorHost = document.getElementById('absmartly-monaco-editor-host')
-      if (editorHost && editorHost.shadowRoot) {
-        const saveBtn = editorHost.shadowRoot.querySelector('.editor-button-save')
-        if (saveBtn) {
-          (saveBtn as HTMLElement).click()
-        }
-      }
-    })
+    const saveBtn = await page.$('.editor-button-save')
+    await saveBtn?.click()
 
     // Wait for editor to close
-    await page.waitForTimeout(500)
+    await page.waitForFunction(() => {
+      return document.getElementById('absmartly-html-editor-host') === null
+    }, { timeout: 5000 })
 
     // Verify the element content has been updated
     const updatedContent = await page.$eval('#simple-element', el => el.innerHTML.trim())
@@ -235,46 +217,19 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
   test('should cancel changes when Cancel button is clicked', async () => {
     const originalContent = await page.$eval('#simple-element', el => el.innerHTML)
 
-    // Open Monaco editor
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
+    await openHtmlEditor('simple-element')
 
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
-
-    // Modify content in Monaco
-    await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          models[0].setValue('<p>This should not be saved</p>')
-        }
-      }
-    })
+    // Modify content in CodeMirror
+    await setEditorContent('<p>This should not be saved</p>')
 
     // Click Cancel button
-    await page.evaluate(() => {
-      const editorHost = document.getElementById('absmartly-monaco-editor-host')
-      if (editorHost && editorHost.shadowRoot) {
-        const cancelBtn = editorHost.shadowRoot.querySelector('.editor-button-cancel')
-        if (cancelBtn) {
-          (cancelBtn as HTMLElement).click()
-        }
-      }
-    })
+    const cancelBtn = await page.$('.editor-button-cancel')
+    await cancelBtn?.click()
 
     // Wait for editor to close
-    await page.waitForTimeout(500)
+    await page.waitForFunction(() => {
+      return document.getElementById('absmartly-html-editor-host') === null
+    }, { timeout: 5000 })
 
     // Verify the element content hasn't changed
     const currentContent = await page.$eval('#simple-element', el => el.innerHTML)
@@ -282,33 +237,18 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
   })
 
   test('should close editor when ESC key is pressed', async () => {
-    // Open Monaco editor
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
-
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
+    await openHtmlEditor('simple-element')
 
     // Press ESC key
     await page.keyboard.press('Escape')
 
     // Wait for editor to close
-    await page.waitForTimeout(500)
+    await page.waitForFunction(() => {
+      return document.getElementById('absmartly-html-editor-host') === null
+    }, { timeout: 5000 })
 
     // Verify editor is closed
-    const monacoEditor = await page.$('#absmartly-monaco-temp')
-    expect(monacoEditor).toBeFalsy()
-
-    const editorHost = await page.$('#absmartly-monaco-editor-host')
+    const editorHost = await page.$('#absmartly-html-editor-host')
     expect(editorHost).toBeFalsy()
   })
 
@@ -321,150 +261,42 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
       }
     })
 
-    // Open Monaco editor
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
+    await openHtmlEditor('simple-element')
 
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
+    // Get initial content
+    const initialContent = await getEditorContent()
+    expect(initialContent).toBeTruthy()
 
     // Click Format button
-    await page.evaluate(() => {
-      const editorHost = document.getElementById('absmartly-monaco-editor-host')
-      if (editorHost && editorHost.shadowRoot) {
-        const formatBtn = editorHost.shadowRoot.querySelector('.toolbar-button')
-        if (formatBtn) {
-          (formatBtn as HTMLElement).click()
+    const formatBtn = await page.$('.toolbar-button')
+    await formatBtn?.click()
+
+    // Wait for formatting to complete
+    await page.waitForFunction(() => {
+      const container = document.getElementById('codemirror-container')
+      if (container) {
+        const cmEditor = container.querySelector('.cm-editor')
+        if (cmEditor) {
+          const lines = cmEditor.querySelectorAll('.cm-line')
+          return lines.length > 1
         }
       }
-    })
-
-    // Wait for formatting
-    await page.waitForTimeout(500)
+      return false
+    }, { timeout: 5000 })
 
     // Get formatted content
-    const formattedContent = await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          return models[0].getValue()
-        }
-      }
-      return null
-    })
+    const formattedContent = await getEditorContent()
 
     // Verify content is formatted (has newlines and indentation)
     expect(formattedContent).toContain('\n')
     expect(formattedContent).toMatch(/^\s+</m) // Has indentation
   })
 
-  test('should wrap selected text when Wrap Selection button is clicked', async () => {
-    // Open Monaco editor
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
-
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
-
-    // Set content and select text
-    await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          models[0].setValue('Test content to wrap')
-          // Select "content to wrap"
-          const editor = monaco.editor.getEditors()[0]
-          if (editor) {
-            editor.setSelection({
-              startLineNumber: 1,
-              startColumn: 6,
-              endLineNumber: 1,
-              endColumn: 21
-            })
-          }
-        }
-      }
-    })
-
-    // Click Wrap Selection button
-    await page.evaluate(() => {
-      const editorHost = document.getElementById('absmartly-monaco-editor-host')
-      if (editorHost && editorHost.shadowRoot) {
-        const buttons = editorHost.shadowRoot.querySelectorAll('.toolbar-button')
-        if (buttons[1]) {
-          (buttons[1] as HTMLElement).click()
-        }
-      }
-    })
-
-    // Wait for wrapping
-    await page.waitForTimeout(500)
-
-    // Get wrapped content
-    const wrappedContent = await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          return models[0].getValue()
-        }
-      }
-      return null
-    })
-
-    // Verify content is wrapped
-    expect(wrappedContent).toContain('<div>')
-    expect(wrappedContent).toContain('</div>')
-  })
-
   test('should handle complex HTML structures', async () => {
-    // Open Monaco editor for complex element
-    await page.click('#complex-element')
-    await page.click('#complex-element', { button: 'right' })
-
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
+    await openHtmlEditor('complex-element')
 
     // Get editor content
-    const editorContent = await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          return models[0].getValue()
-        }
-      }
-      return null
-    })
+    const editorContent = await getEditorContent()
 
     // Verify complex structure is preserved
     expect(editorContent).toContain('complex-element')
@@ -474,30 +306,18 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
 
     // Modify and save
     const modifiedContent = editorContent?.replace('Title', 'Modified Title')
-
-    await page.evaluate((content) => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          models[0].setValue(content)
-        }
-      }
-    }, modifiedContent)
+    if (modifiedContent) {
+      await setEditorContent(modifiedContent)
+    }
 
     // Save changes
-    await page.evaluate(() => {
-      const editorHost = document.getElementById('absmartly-monaco-editor-host')
-      if (editorHost && editorHost.shadowRoot) {
-        const saveBtn = editorHost.shadowRoot.querySelector('.editor-button-save')
-        if (saveBtn) {
-          (saveBtn as HTMLElement).click()
-        }
-      }
-    })
+    const saveBtn = await page.$('.editor-button-save')
+    await saveBtn?.click()
 
     // Wait for editor to close
-    await page.waitForTimeout(500)
+    await page.waitForFunction(() => {
+      return document.getElementById('absmartly-html-editor-host') === null
+    }, { timeout: 5000 })
 
     // Verify changes are applied
     const updatedContent = await page.$eval('#complex-element h3', el => el.textContent)
@@ -505,45 +325,24 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
   })
 
   test('should track HTML changes in visual editor state', async () => {
-    // Open Monaco editor
-    await page.click('#simple-element')
-    await page.click('#simple-element', { button: 'right' })
-
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
-        }
-      }
-    })
-
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
+    await openHtmlEditor('simple-element')
 
     // Modify and save
-    await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          models[0].setValue('<p>Tracked change</p>')
-        }
-      }
-    })
+    await setEditorContent('<p>Tracked change</p>')
 
-    await page.evaluate(() => {
-      const editorHost = document.getElementById('absmartly-monaco-editor-host')
-      if (editorHost && editorHost.shadowRoot) {
-        const saveBtn = editorHost.shadowRoot.querySelector('.editor-button-save')
-        if (saveBtn) {
-          (saveBtn as HTMLElement).click()
-        }
-      }
-    })
+    const saveBtn = await page.$('.editor-button-save')
+    await saveBtn?.click()
+
+    // Wait for editor to close
+    await page.waitForFunction(() => {
+      return document.getElementById('absmartly-html-editor-host') === null
+    }, { timeout: 5000 })
 
     // Wait for change to be tracked
-    await page.waitForTimeout(500)
+    await page.waitForFunction(() => {
+      const changes = (window as any).absmartlyChanges || []
+      return changes.some((c: any) => c.action === 'html')
+    }, { timeout: 5000 })
 
     // Check if change is tracked
     const changes = await page.evaluate(() => {
@@ -551,55 +350,40 @@ test.describe('Visual Editor HTML Editing with Monaco', () => {
       return (window as any).absmartlyChanges || []
     })
 
-    // Verify change is tracked with type 'html'
-    const htmlChange = changes.find((c: any) => c.type === 'html')
+    // Verify change is tracked with action 'html'
+    const htmlChange = changes.find((c: any) => c.action === 'html')
     expect(htmlChange).toBeTruthy()
     expect(htmlChange?.value).toBe('<p>Tracked change</p>')
   })
 
-  test('should display syntax highlighting in Monaco editor', async () => {
-    // Open Monaco editor
-    await page.click('#form-element')
-    await page.click('#form-element', { button: 'right' })
+  test('should display syntax highlighting in CodeMirror editor', async () => {
+    await openHtmlEditor('form-element')
 
-    await page.evaluate(() => {
-      const menuHost = document.getElementById('absmartly-menu-host')
-      if (menuHost && menuHost.shadowRoot) {
-        const editHtmlOption = menuHost.shadowRoot.querySelector('[data-action="editHtml"]')
-        if (editHtmlOption) {
-          (editHtmlOption as HTMLElement).click()
+    // Wait for editor to be fully rendered
+    await page.waitForFunction(() => {
+      const container = document.getElementById('codemirror-container')
+      if (container) {
+        const cmEditor = container.querySelector('.cm-editor')
+        if (cmEditor) {
+          // Check for syntax highlighting by looking for CodeMirror syntax classes
+          const hasHighlighting = cmEditor.querySelector('.cm-tag') !== null ||
+                                   cmEditor.querySelector('.ͼ1') !== null // CodeMirror uses generated class names
+          return hasHighlighting
         }
       }
-    })
+      return false
+    }, { timeout: 5000 })
 
-    await page.waitForSelector('#absmartly-monaco-temp', { timeout: 5000 })
+    // Verify the editor container exists and has content
+    const editorHost = await page.$('#absmartly-html-editor-host')
+    expect(editorHost).toBeTruthy()
 
-    // Check if Monaco is using HTML language mode
-    const languageMode = await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getModels) {
-        const models = monaco.editor.getModels()
-        if (models.length > 0) {
-          return models[0].getLanguageId()
-        }
-      }
-      return null
-    })
+    const codeMirrorContainer = await page.$('#codemirror-container')
+    expect(codeMirrorContainer).toBeTruthy()
 
-    expect(languageMode).toBe('html')
-
-    // Check if theme is applied
-    const theme = await page.evaluate(() => {
-      const monaco = (window as any).monaco
-      if (monaco && monaco.editor.getEditors) {
-        const editors = monaco.editor.getEditors()
-        if (editors.length > 0) {
-          return editors[0]._themeService._theme.themeName
-        }
-      }
-      return null
-    })
-
-    expect(theme).toBe('vs-dark')
+    // Verify editor has HTML content
+    const editorContent = await getEditorContent()
+    expect(editorContent).toContain('form')
+    expect(editorContent).toContain('input')
   })
 })

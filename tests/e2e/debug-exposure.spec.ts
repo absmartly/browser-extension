@@ -7,8 +7,8 @@ test('Debug: Check exposure tracker state', async ({ page }) => {
     console.log(`[BROWSER ${msg.type()}]`, msg.text())
   })
 
-  await page.goto(TEST_PAGE_URL)
-  await page.waitForLoadState('networkidle')
+  await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.waitForSelector('body', { timeout: 5000 })
 
   // Set URL
   await page.evaluate(() => {
@@ -77,7 +77,8 @@ test('Debug: Check exposure tracker state', async ({ page }) => {
     return plugin.initialize()
   })
 
-  await page.waitForTimeout(1000)
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
   // Debug exposure tracker state
   const debugInfo = await page.evaluate(() => {

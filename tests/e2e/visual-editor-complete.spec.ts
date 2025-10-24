@@ -79,9 +79,9 @@ test.describe('Visual Editor Complete Workflow', () => {
                msg.text.includes('[BlockInserter]') || msg.text.includes('[ElementActions]') || msg.text.includes('[EditorCoordinator]')
     )
 
-    await testPage.goto(`${TEST_PAGE_URL}?use_shadow_dom_for_visual_editor_context_menu=0`)
+    await testPage.goto(`${TEST_PAGE_URL}?use_shadow_dom_for_visual_editor_context_menu=0`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Enable test mode to disable shadow DOM for easier testing
     await testPage.evaluate(() => {
@@ -1514,7 +1514,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('  ✓ Updated URL filter pattern to: /test-path/*')
 
       // Wait for debounce (500ms in URLFilterSection) + React state update to trigger save
-      await testPage.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Debug: Check what's in the sidebar's variant config
       const variantConfigDebug = await testPage.evaluate(() => {
@@ -2297,7 +2298,8 @@ test.describe('Visual Editor Complete Workflow', () => {
         // In SLOW mode, keep the page open for 5 seconds at the end
         if (process.env.SLOW === '1') {
           log('  ⏸️  Keeping page open for 5 seconds...')
-          await testPage.waitForTimeout(5000)
+          // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
           log('  ✓ Done')
         }
       })

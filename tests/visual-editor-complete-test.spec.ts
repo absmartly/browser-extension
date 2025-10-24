@@ -37,8 +37,8 @@ test.describe('Complete Visual Editor Test', () => {
 
   test('Complete visual editor workflow', async ({ page }) => {
     // Step 1: Load the test page
-    await page.goto(`file://${TEST_PAGE_PATH}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
     console.log('✅ Test page loaded')
 
     // Step 2: Click button to inject extension
@@ -58,7 +58,8 @@ test.describe('Complete Visual Editor Test', () => {
 
     // Wait for sidebar to load
     await frame.waitForLoadState('domcontentloaded')
-    await frame.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
     console.log('✅ Sidebar loaded')
 
     // Step 5: Check if we see the welcome screen
@@ -69,7 +70,8 @@ test.describe('Complete Visual Editor Test', () => {
 
       // Click Configure Settings
       await frame.click('button:has-text("Configure Settings")')
-      await frame.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Fill in dummy settings
       await frame.fill('input[name="apiKey"]', 'test-api-key-12345')
@@ -78,7 +80,8 @@ test.describe('Complete Visual Editor Test', () => {
 
       // Save settings
       await frame.click('button:has-text("Save Settings")')
-      await frame.waitForTimeout(1000)
+      // TODO: Replace timeout with specific element wait
+    await frame.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
       console.log('✅ Settings saved')
     }
 
@@ -101,7 +104,7 @@ test.describe('Complete Visual Editor Test', () => {
     // This test would work if we had a way to launch the visual editor
     // For now, we can test that the page loads and sidebar works
 
-    await page.goto(`file://${TEST_PAGE_PATH}`)
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await page.evaluate(() => {
       // Simulate visual editor being active
       console.log('Would test visual editor context menu here')

@@ -48,15 +48,15 @@ test.describe('Real Chrome Extension Tests', () => {
     const page = await context.newPage();
 
     // Navigate to a test page
-    await page.goto('https://example.com');
-    await page.waitForLoadState('networkidle');
+    await page.goto('https://example.com', { waitUntil: \'domcontentloaded\', timeout: 10000 });
+    await page.waitForSelector('body', { timeout: 5000 });
 
     // Get extension popup/sidebar URL
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`;
 
     // Open extension sidebar in a new tab to test it
     const sidebarPage = await context.newPage();
-    await sidebarPage.goto(sidebarUrl);
+    await sidebarPage.goto(sidebarUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
     // Check if sidebar loads
     await expect(sidebarPage.locator('body')).toBeTruthy();
@@ -79,7 +79,7 @@ test.describe('Real Chrome Extension Tests', () => {
 
     // Open extension sidebar
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`;
-    await page.goto(sidebarUrl);
+    await page.goto(sidebarUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
     // Check if we need to configure
     const needsConfig = await page.locator('button:has-text("Configure Settings")').isVisible().catch(() => false);
@@ -106,7 +106,8 @@ test.describe('Real Chrome Extension Tests', () => {
       await page.click('button:has-text("Save Settings")');
 
       // Wait for navigation or success message
-      await page.waitForTimeout(2000);
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {});
 
       console.log('Extension configured successfully');
     } else {
@@ -138,10 +139,11 @@ test.describe('Real Chrome Extension Tests', () => {
 
     // Open extension sidebar
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`;
-    await page.goto(sidebarUrl);
+    await page.goto(sidebarUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
     // Wait for potential API calls
-    await page.waitForTimeout(5000);
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {});
 
     // Check if we captured any API calls
     if (apiCalls.length > 0) {
@@ -169,11 +171,11 @@ test.describe('Real Chrome Extension Tests', () => {
     const page = await context.newPage();
 
     // Navigate to a test page first
-    await page.goto('https://example.com');
+    await page.goto('https://example.com', { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
     // Open extension sidebar
     const sidebarPage = await context.newPage();
-    await sidebarPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`);
+    await sidebarPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
     // Look for experiments
     const hasExperiments = await sidebarPage.locator('.experiment-item').count().then(c => c > 0).catch(() => false);
@@ -207,7 +209,7 @@ test.describe('Extension Storage and Persistence', () => {
     const page = await context.newPage();
 
     // First, configure the extension
-    await page.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`);
+    await page.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
     const needsConfig = await page.locator('button:has-text("Configure Settings")').isVisible().catch(() => false);
 
@@ -222,14 +224,15 @@ test.describe('Extension Storage and Persistence', () => {
       await page.fill('input[name="environment"]', 'test');
 
       await page.click('button:has-text("Save Settings")');
-      await page.waitForTimeout(2000);
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {});
 
       // Close and reopen the sidebar
       await page.close();
 
       // Open a new page with the sidebar
       const newPage = await context.newPage();
-      await newPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`);
+      await newPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 });
 
       // Check if settings are persisted (should not show welcome screen)
       const stillNeedsConfig = await newPage.locator('button:has-text("Configure Settings")').isVisible().catch(() => false);
