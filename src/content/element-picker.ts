@@ -188,12 +188,40 @@ export class ElementPicker {
       const matches = document.querySelectorAll(selector)
 
       if (matches.length === 1 && matches[0] === element) {
+        if (debug) {
+          console.log(`[ElementPicker] Found unique selector with ${levels} parent levels: ${selector}`)
+        }
         return selector
+      }
+
+      if (matches.length > 1 && debug) {
+        console.warn(`[ElementPicker] Selector matched ${matches.length} elements (tried ${levels} parent levels): ${selector}`)
+        console.log('[ElementPicker] Matched elements and their ancestors:')
+        matches.forEach((match, index) => {
+          console.log(`\n  Element ${index + 1}:`, match)
+          let ancestor = match.parentElement
+          let depth = 0
+          while (ancestor && depth < 5) {
+            console.log(`    Ancestor ${depth + 1}:`, ancestor.tagName, {
+              id: ancestor.id || 'none',
+              classes: ancestor.className || 'none',
+              dataAttributes: Array.from(ancestor.attributes)
+                .filter(attr => attr.name.startsWith('data-'))
+                .map(attr => `${attr.name}="${attr.value}"`)
+                .join(', ') || 'none'
+            })
+            ancestor = ancestor.parentElement
+            depth++
+          }
+        })
       }
     }
 
     // If still not unique, find the first diverging ancestor
     // and use descendant selector for better performance
+    if (debug) {
+      console.error('[ElementPicker] Could not generate unique selector, using smart positional fallback')
+    }
 
     // Build ancestor chain
     const ancestors: Element[] = []
@@ -247,6 +275,9 @@ export class ElementPicker {
       const matches = document.querySelectorAll(testSelector)
 
       if (matches.length === 1 && matches[0] === element) {
+        if (debug) {
+          console.log(`[ElementPicker] Found unique selector using ancestor at depth ${ancestorDepth}:`, testSelector)
+        }
         return testSelector
       }
     }
@@ -276,6 +307,9 @@ export class ElementPicker {
       const testSelector = parts.join(' > ')
       const matches = document.querySelectorAll(testSelector)
       if (matches.length === 1 && matches[0] === element) {
+        if (debug) {
+          console.log(`[ElementPicker] Found unique child combinator selector at depth ${depth + 1}:`, testSelector)
+        }
         return testSelector
       }
 
@@ -284,6 +318,9 @@ export class ElementPicker {
     }
 
     const positionalSelector = parts.join(' > ')
+    if (debug) {
+      console.warn('[ElementPicker] Using positional selector (may not be unique):', positionalSelector)
+    }
     return positionalSelector
   }
 
@@ -304,8 +341,15 @@ export class ElementPicker {
 
     const element = document.elementFromPoint(e.clientX, e.clientY)
     if (element) {
-      const selector = this.generateSelector(element)
+      const selector = this.generateSelector(element, true) // Enable debug logging on click
       this.selectedElement = element
+
+      // Validate the final selector
+      const matches = document.querySelectorAll(selector)
+      console.log(`[ElementPicker] Final selector matches ${matches.length} element(s):`, selector)
+      if (matches.length !== 1) {
+        console.error('[ElementPicker] ⚠️ WARNING: Selector is not unique!')
+      }
 
       // Send message with the selected element
       chrome.runtime.sendMessage({
