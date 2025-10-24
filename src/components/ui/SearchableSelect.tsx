@@ -58,6 +58,8 @@ export function SearchableSelect(props: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
 
   const selectedOptions = mode === 'single'
     ? (props.selectedId !== null && props.selectedId !== undefined ? options.filter(opt => String(opt.id) === String(props.selectedId)) : [])
@@ -70,34 +72,28 @@ export function SearchableSelect(props: SearchableSelectProps) {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement
-      
+
       // Check if click is outside the container
       if (containerRef.current && !containerRef.current.contains(target)) {
         setIsOpen(false)
         setSearchTerm('')
         return
       }
-      
+
       // If dropdown is open and click is inside container
       if (containerRef.current && isOpen && target) {
         // Check if clicking in the dropdown area (search or options) - keep it open
-        const dropdownElement = containerRef.current.querySelector('[id$="-dropdown"]') ||
-                               containerRef.current.querySelector('[data-testid$="-dropdown"]')
-        
-        if (dropdownElement && dropdownElement.contains(target)) {
+        if (dropdownRef.current && dropdownRef.current.contains(target)) {
           // Click is in dropdown - keep open
           return
         }
-        
+
         // Check if clicking on the trigger - let its onClick handle the toggle
-        const triggerElement = containerRef.current.querySelector('[id$="-trigger"]') ||
-                              containerRef.current.querySelector('[data-testid$="-trigger"]')
-        
-        if (triggerElement && triggerElement.contains(target)) {
+        if (triggerRef.current && triggerRef.current.contains(target)) {
           // Let the trigger's onClick handler manage the toggle
           return
         }
-        
+
         // Click is on label or other areas - close it
         setIsOpen(false)
         setSearchTerm('')
@@ -282,6 +278,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
       </label>
 
       <div
+        ref={triggerRef}
         id={id ? `${id}-trigger` : undefined}
         className={`min-h-[42px] w-full border border-gray-300 rounded-md bg-white px-3 py-2 cursor-pointer ${
           disabled ? 'bg-gray-50 cursor-not-allowed' : ''
@@ -318,7 +315,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
       </div>
 
       {isOpen && !loading && !disabled && (
-        <div id={id ? `${id}-dropdown` : undefined} className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden" data-testid={dataTestId ? `${dataTestId}-dropdown` : undefined}>
+        <div ref={dropdownRef} id={id ? `${id}-dropdown` : undefined} className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden" data-testid={dataTestId ? `${dataTestId}-dropdown` : undefined}>
           {showSearch && (
             <div className="p-2 border-b border-gray-200">
               <div className="relative">
