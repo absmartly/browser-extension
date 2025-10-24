@@ -133,12 +133,9 @@ export function DOMChangesInlineEditor({
 
     // Start element picker
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      debugLog('Found tabs:', tabs)
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
         const tabUrl = tabs[0].url || 'unknown'
-
-        debugLog('Current tab URL:', tabUrl)
 
         // Check if this is a restricted page
         if (tabUrl.startsWith('chrome://') ||
@@ -151,29 +148,13 @@ export function DOMChangesInlineEditor({
           return
         }
 
-        debugLog('Sending START_ELEMENT_PICKER to tab:', tabId)
-
-        // First test if content script is loaded
+        // Send element picker message
         chrome.tabs.sendMessage(tabId, {
-          type: 'TEST_CONNECTION'
-        }, (testResponse) => {
+          type: 'START_ELEMENT_PICKER'
+        }, (response) => {
           if (chrome.runtime.lastError) {
-            debugError('Content script not responding to test:', chrome.runtime.lastError)
-            debugLog('Content script is not loaded. Please refresh the page and try again.')
-            return
+            debugError('Error starting element picker:', chrome.runtime.lastError)
           }
-          debugLog('Test connection successful:', testResponse)
-
-          // Now send the actual element picker message
-          chrome.tabs.sendMessage(tabId, {
-            type: 'START_ELEMENT_PICKER'
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              debugError('Error starting element picker:', chrome.runtime.lastError)
-            } else {
-              debugLog('Element picker started successfully:', response)
-            }
-          })
         })
       }
     })
@@ -775,46 +756,28 @@ export function DOMChangesInlineEditor({
     
     // Start element picker
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      debugLog('Found tabs:', tabs)
       if (tabs[0]?.id) {
         const tabId = tabs[0].id
         const tabUrl = tabs[0].url || 'unknown'
-        
-        debugLog('Current tab URL:', tabUrl)
-        
+
         // Check if this is a restricted page
-        if (tabUrl.startsWith('chrome://') || 
-            tabUrl.startsWith('chrome-extension://') || 
+        if (tabUrl.startsWith('chrome://') ||
+            tabUrl.startsWith('chrome-extension://') ||
             tabUrl.startsWith('edge://') ||
             tabUrl.includes('chrome.google.com/webstore')) {
           debugError('Content scripts cannot run on this page. Please try on a regular website.')
           return
         }
-        
-        // Send a test message first to check if content script is responding
-        debugLog('Sending test message to content script...')
+
+        // Send element picker message
         chrome.tabs.sendMessage(tabId, {
-          type: 'TEST_CONNECTION'
-        }, (testResponse) => {
+          type: 'START_ELEMENT_PICKER'
+        }, (response) => {
           if (chrome.runtime.lastError) {
-            debugError('Content script not responding to test:', chrome.runtime.lastError)
-            debugLog('Content script is not loaded. Please refresh the page and try again.')
-            return
+            debugError('Error starting element picker:', chrome.runtime.lastError)
           }
-          debugLog('Test connection successful:', testResponse)
-          
-          // Now send the actual element picker message
-          chrome.tabs.sendMessage(tabId, {
-            type: 'START_ELEMENT_PICKER'
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              debugError('Error starting element picker:', chrome.runtime.lastError)
-            } else {
-              debugLog('Element picker started successfully:', response)
-            }
-          })
         })
-        
+
         // The sidebar should remain open to receive the element selection
       } else {
         debugError('No active tab found!')
