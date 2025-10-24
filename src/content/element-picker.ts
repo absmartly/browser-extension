@@ -175,7 +175,7 @@ export class ElementPicker {
 
   private generateSelector(element: Element, debug = false): string {
     // Try increasingly specific selectors until we find a unique one
-    const maxParentLevels = [2, 3, 4, 5]
+    const maxParentLevels = [2, 3, 4, 5, 6, 7, 8]
 
     for (const levels of maxParentLevels) {
       const selector = generateRobustSelector(element, {
