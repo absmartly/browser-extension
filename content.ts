@@ -200,13 +200,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[ABsmartly] Message listener called! Message type:', message?.type)
   debugLog('[Visual Editor Content Script] Received message:', message.type)
   
-  // Handle test connection message
-  if (message.type === 'TEST_CONNECTION') {
-    debugLog('[Visual Editor Content Script] Received message: TEST_CONNECTION')
-    sendResponse({ success: true, message: 'Content script is loaded and ready' })
-    return true
-  }
-
   // Handle SDK plugin injection request
   if (message.type === 'INJECT_SDK_PLUGIN') {
     console.log('[Content Script] 📌 Received INJECT_SDK_PLUGIN message')
