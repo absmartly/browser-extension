@@ -12,6 +12,7 @@ import { Pagination } from "~src/components/Pagination"
 import { Button } from "~src/components/ui/Button"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
 import { Toast } from "~src/components/Toast"
+import { CookieConsentModal } from "~src/components/CookieConsentModal"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment, ABsmartlyConfig } from "~src/types/absmartly"
 import type { SidebarState, ExperimentFilters } from "~src/types/storage-state"
@@ -70,6 +71,13 @@ const buildFilterParams = (filterState: ExperimentFilters, page: number, size: n
 }
 
 function SidebarContent() {
+  // Track component renders
+  const renderCount = React.useRef(0)
+  React.useEffect(() => {
+    renderCount.current += 1
+    debugLog(`=== SidebarContent render #${renderCount.current} ===`)
+  })
+
   const [view, setView] = useState<View>('list')
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
@@ -78,6 +86,7 @@ function SidebarContent() {
   const [experimentDetailLoading, setExperimentDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isAuthExpired, setIsAuthExpired] = useState(false)
+  const [needsPermissions, setNeedsPermissions] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   
   // Pagination state
@@ -122,6 +131,126 @@ function SidebarContent() {
     getTeams,
     getTemplates
   } = useABsmartly()
+
+  // Handler to actually request permissions (called from modal button click)
+  const handleGrantPermissions = async () => {
+    console.log('[ExtensionUI] handleGrantPermissions called - requesting permissions')
+
+    try {
+      // First check what we currently have
+      const currentCookies = await chrome.permissions.contains({ permissions: ['cookies'] })
+      const currentHost = await chrome.permissions.contains({ origins: ['https://*.absmartly.com/*'] })
+      console.log('[ExtensionUI] Current permissions before request - cookies:', currentCookies, 'host:', currentHost)
+
+      // Request cookies permission first
+      console.log('[ExtensionUI] Requesting cookies permission...')
+      const cookiesGranted = await chrome.permissions.request({
+        permissions: ['cookies']
+      })
+      console.log('[ExtensionUI] Cookies permission result:', cookiesGranted)
+
+      // Request host permission separately
+      console.log('[ExtensionUI] Requesting host permission...')
+      const hostGranted = await chrome.permissions.request({
+        origins: ['https://*.absmartly.com/*']
+      })
+      console.log('[ExtensionUI] Host permission result:', hostGranted)
+
+      // Verify what we have now
+      const finalCookies = await chrome.permissions.contains({ permissions: ['cookies'] })
+      const finalHost = await chrome.permissions.contains({ origins: ['https://*.absmartly.com/*'] })
+      console.log('[ExtensionUI] Final permissions after request - cookies:', finalCookies, 'host:', finalHost)
+
+      if (cookiesGranted && hostGranted) {
+        console.log('[ExtensionUI] ✅ All permissions granted!')
+        setNeedsPermissions(false)
+
+        // Check if permissions were already granted (no dialog shown)
+        if (currentCookies && currentHost) {
+          console.log('[ExtensionUI] ⚠️ Permissions were already granted - JWT cookie might be missing or expired')
+          setError('You have permissions but authentication failed. Please log in to ABsmartly in your browser first.')
+          setToast({ message: 'Please log in to ABsmartly first', type: 'error' })
+        } else {
+          setToast({ message: 'Permissions granted. Reloading...', type: 'success' })
+          setTimeout(() => {
+            setIsAuthExpired(false)
+            setError(null)
+            loadExperiments(true)
+          }, 500)
+        }
+      } else {
+        console.error('[ExtensionUI] ❌ User denied some permissions - cookies:', cookiesGranted, 'host:', hostGranted)
+        setNeedsPermissions(false)
+        setError('Cookie and host permissions are required for JWT authentication.')
+      }
+    } catch (err) {
+      console.error('[ExtensionUI] Error requesting permissions:', err)
+      setNeedsPermissions(false)
+      setError('Failed to request permissions. Please try again.')
+    }
+  }
+
+  const handleDenyPermissions = useCallback(() => {
+    console.log('[ExtensionUI] User denied permissions')
+    setNeedsPermissions(false)
+    setError('Cookie permissions are required to use JWT authentication.')
+  }, [])
+
+  // Show permission modal when we get AUTH_EXPIRED
+  const requestPermissionsIfNeeded = useCallback(async (forceRequest = false): Promise<boolean> => {
+    console.log('[ExtensionUI] requestPermissionsIfNeeded called, forceRequest:', forceRequest)
+
+    // Only request permissions if using JWT auth
+    if (config?.authMethod !== 'jwt') {
+      console.log('[ExtensionUI] Not using JWT auth, skipping permission request')
+      return false
+    }
+
+    try {
+      // ALWAYS show modal when forceRequest is true (after 401 error)
+      if (forceRequest) {
+        console.log('[ExtensionUI] 🔐 Force requesting - showing permission modal...')
+        setNeedsPermissions(true)
+        return false
+      }
+
+      // Otherwise check if we already have permissions
+      const hasCookies = await chrome.permissions.contains({ permissions: ['cookies'] })
+      const hasHost = await chrome.permissions.contains({ origins: ['https://*.absmartly.com/*'] })
+
+      console.log('[ExtensionUI] Permission status - cookies:', hasCookies, 'host:', hasHost)
+
+      if (hasCookies && hasHost) {
+        console.log('[ExtensionUI] ✅ Already have all permissions')
+        return false
+      }
+
+      // Show the modal (user must click button to grant)
+      console.log('[ExtensionUI] 🔐 Missing permissions - showing modal...')
+      setNeedsPermissions(true)
+      return false // Will be granted via modal
+    } catch (err) {
+      console.error('[ExtensionUI] Error checking permissions:', err)
+      return false
+    }
+  }, [config?.authMethod])
+
+  // Check permissions on mount if using JWT
+  useEffect(() => {
+    if (config?.authMethod === 'jwt') {
+      console.log('[ExtensionUI] Checking permissions on mount (JWT auth detected)')
+      chrome.permissions.contains({
+        permissions: ['cookies'],
+        origins: ['https://*.absmartly.com/*']
+      }).then(hasPermission => {
+        if (!hasPermission) {
+          console.warn('[ExtensionUI] ⚠️ Missing cookie permissions! Will request on first API call.')
+        } else {
+          console.log('[ExtensionUI] ✅ Cookie permissions already granted')
+        }
+      })
+    }
+  }, [config?.authMethod])
 
   // Track if we've initialized experiments for this session
   const [hasInitialized, setHasInitialized] = useState(false)
@@ -184,7 +313,7 @@ function SidebarContent() {
 
       loadFavorites()
     }
-  }, [config, view, hasInitialized, filtersLoaded, filters])
+  }, [config, view, hasInitialized, filtersLoaded])
 
 
 
@@ -286,7 +415,18 @@ function SidebarContent() {
     try {
       const favoriteIds = await getFavorites()
       setFavoriteExperiments(new Set(favoriteIds))
-    } catch (error) {
+    } catch (err: unknown) {
+      const error = err as { isAuthError?: boolean; message?: string }
+      if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
+        console.log('[loadFavorites] AUTH_EXPIRED error detected')
+        // ALWAYS request permissions on 401 (forceRequest: true)
+        const permissionsGranted = await requestPermissionsIfNeeded(true)
+        if (permissionsGranted) {
+          // Retry loading after permissions granted
+          console.log('[loadFavorites] Retrying after permissions granted...')
+          setTimeout(() => loadFavorites(), 500)
+        }
+      }
       debugError('Failed to load favorites:', error)
       // Continue without favorites if the call fails
     }
@@ -319,12 +459,23 @@ function SidebarContent() {
 
       setOwners(ownersData || [])
         setTeams(teamsData || [])
-    } catch (error) {
+    } catch (err: unknown) {
+      const error = err as { isAuthError?: boolean; message?: string }
+      if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
+        console.log('[loadEditorResources] AUTH_EXPIRED error detected')
+        // ALWAYS request permissions on 401 (forceRequest: true)
+        const permissionsGranted = await requestPermissionsIfNeeded(true)
+        if (permissionsGranted) {
+          // Retry loading after permissions granted
+          console.log('[loadEditorResources] Retrying after permissions granted...')
+          setTimeout(() => loadEditorResources(), 500)
+        }
+      }
       debugError('Failed to load editor resources:', error)
       // Continue with empty arrays if the call fails
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [requestPermissionsIfNeeded])
 
   // Load editor resources when config is available (regardless of view)
   // This ensures resources are loaded when:
@@ -346,15 +497,20 @@ function SidebarContent() {
   }, [view, config, unitTypes.length, loadEditorResources])
 
   const loadExperiments = async (forceRefresh = false, page = currentPage, size = pageSize, customFilters = null) => {
+    const stack = new Error().stack
+    debugLog('=== loadExperiments called ===')
+    debugLog('Called from:', stack?.split('\n').slice(2, 5).join('\n'))
+    debugLog('Params:', { forceRefresh, page, size, hasCustomFilters: !!customFilters })
+
     setExperimentsLoading(true)
     setError(null)
-    
+
     const activeFilters = customFilters || filters
-    
+
     try {
       // Build API parameters using helper function
       const params = buildFilterParams(activeFilters, page, size)
-      
+
       const response = await getExperiments(params)
       const experiments = response.experiments || []
       
@@ -379,8 +535,22 @@ function SidebarContent() {
       // Check if this is an authentication error
       const error = err as { isAuthError?: boolean; message?: string }
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
+        console.log('[loadExperiments] AUTH_EXPIRED error detected')
         setIsAuthExpired(true)
-        setError('Your session has expired. Please log in again.')
+
+        // ALWAYS request permissions on 401 (forceRequest: true) because contains() is unreliable
+        const permissionsGranted = await requestPermissionsIfNeeded(true)
+
+        if (permissionsGranted) {
+          // Retry loading after permissions granted
+          console.log('[loadExperiments] Retrying after permissions granted...')
+          setTimeout(() => loadExperiments(true, page, size, customFilters), 500)
+        } else if (config?.authMethod === 'jwt') {
+          // User denied permissions
+          setError('Cookie permissions required for JWT authentication. Please reload and grant permissions.')
+        } else {
+          setError('Your session has expired. Please log in again.')
+        }
       } else {
         setError('Failed to load experiments. Please check your API settings.')
       }
@@ -568,13 +738,18 @@ function SidebarContent() {
   
   // Helper function to load experiments with specific filters
   const loadExperimentsWithFilters = async (filterState: ExperimentFilters, page = currentPage, size = pageSize) => {
+    const stack = new Error().stack
+    debugLog('=== loadExperimentsWithFilters called ===')
+    debugLog('Called from:', stack?.split('\n').slice(2, 5).join('\n'))
+    debugLog('Params:', { page, size, filterState })
+
     setExperimentsLoading(true)
     setError(null)
-    
+
     try {
       // Build API parameters using helper function
       const params = buildFilterParams(filterState, page, size)
-      
+
       const response = await getExperiments(params)
       const experiments = response.experiments || []
       
@@ -910,6 +1085,13 @@ function SidebarContent() {
           onClose={() => setToast(null)}
         />
       )}
+
+      {/* Cookie Consent Modal */}
+      <CookieConsentModal
+        isOpen={needsPermissions}
+        onGrant={handleGrantPermissions}
+        onDeny={handleDenyPermissions}
+      />
     </div>
   )
 }
