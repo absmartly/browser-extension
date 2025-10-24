@@ -353,7 +353,8 @@ function getDataAttributeSelector(element: Element): string | null {
       // Skip React and framework internal attributes
       if (attr.name.includes('reactid') ||
           attr.name.includes('key') ||
-          attr.name.includes('framer')) return false
+          attr.name.includes('framer') ||
+          attr.name === 'data-styles-preset') return false
       
       // Skip if the value looks auto-generated
       // Auto-generated values often start with numbers or are random strings
