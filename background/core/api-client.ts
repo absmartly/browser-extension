@@ -42,9 +42,6 @@ export function isAuthError(error: any): boolean {
  */
 export async function getJWTCookie(domain: string): Promise<string | null> {
   try {
-    debugLog('=== getJWTCookie START ===')
-    debugLog('Input domain:', domain)
-
     let parsedUrl: URL
     try {
       parsedUrl = new URL(domain.startsWith('http') ? domain : `https://${domain}`)
@@ -57,41 +54,18 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
     const protocol = parsedUrl.protocol
     const baseUrl = `${protocol}//${hostname}`
 
-    debugLog('Parsed URL:', { hostname, protocol, baseUrl })
-
-    debugLog('Strategy 1: Fetching cookies for exact URL:', baseUrl)
     const urlCookies = await chrome.cookies.getAll({ url: baseUrl })
-    debugLog(`Found ${urlCookies.length} cookies for URL ${baseUrl}`)
-
-    if (urlCookies.length > 0) {
-      debugLog('URL cookies:', urlCookies.map(c => `${c.name} (domain: ${c.domain})`))
-    }
 
     const domainParts = hostname.split('.')
     const baseDomain = domainParts.length > 2
       ? domainParts.slice(-2).join('.')
       : hostname
 
-    debugLog('Strategy 2: Fetching cookies for base domain:', baseDomain)
     const domainCookies = await chrome.cookies.getAll({ domain: baseDomain })
-    debugLog(`Found ${domainCookies.length} cookies for domain ${baseDomain}`)
-
-    if (domainCookies.length > 0) {
-      debugLog('Domain cookies:', domainCookies.map(c => `${c.name} (domain: ${c.domain})`))
-    }
-
-    debugLog('Strategy 3: Fetching cookies for .domain:', `.${baseDomain}`)
     const dotDomainCookies = await chrome.cookies.getAll({ domain: `.${baseDomain}` })
-    debugLog(`Found ${dotDomainCookies.length} cookies for .${baseDomain}`)
-
-    if (dotDomainCookies.length > 0) {
-      debugLog('.Domain cookies:', dotDomainCookies.map(c => `${c.name} (domain: ${c.domain})`))
-    }
 
     const allCookies = [...urlCookies, ...domainCookies, ...dotDomainCookies]
     const uniqueCookies = Array.from(new Map(allCookies.map(c => [`${c.name}-${c.value}`, c])).values())
-
-    debugLog(`Total unique cookies found: ${uniqueCookies.length}`)
 
     let jwtCookie = uniqueCookies.find(cookie =>
       cookie.name === 'jwt' ||
@@ -109,13 +83,9 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
     }
 
     if (jwtCookie) {
-      debugLog(`✅ JWT cookie found: ${jwtCookie.name} (length: ${jwtCookie.value.length}, domain: ${jwtCookie.domain})`)
-      debugLog('=== getJWTCookie END (SUCCESS) ===')
       return jwtCookie.value
     }
 
-    debugLog('❌ No JWT cookie found')
-    debugLog('=== getJWTCookie END (NOT FOUND) ===')
     return null
   } catch (error) {
     debugError('Error getting JWT cookie:', error)
@@ -168,9 +138,7 @@ async function buildHeaders(config: ABsmartlyConfig, useApiKey: boolean = true):
   const shouldTryJwtFirst = authMethod === 'jwt'
 
   if (shouldTryJwtFirst) {
-    debugLog('Using JWT authentication method...')
     const jwtToken = await getJWTCookie(config.apiEndpoint)
-    debugLog('JWT cookie result:', jwtToken ? `Found (length: ${jwtToken.length}, preview: ${jwtToken.substring(0, 20)}...)` : 'Not found')
 
     if (jwtToken) {
       if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
@@ -178,20 +146,15 @@ async function buildHeaders(config: ABsmartlyConfig, useApiKey: boolean = true):
       } else {
         headers['Authorization'] = `Bearer ${jwtToken}`
       }
-      debugLog('Using JWT from browser cookie, Authorization header:', headers['Authorization'].substring(0, 30) + '...')
-    } else {
-      debugLog('No JWT cookie available - user may need to log in to ABsmartly')
     }
     return headers
   } else {
     if (config.apiKey && useApiKey) {
-      debugLog('Using API key authentication method')
       const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
         ? `JWT ${config.apiKey}`
         : `Api-Key ${config.apiKey}`
       headers['Authorization'] = authHeader
     } else if (!config.apiKey) {
-      debugLog('No API key provided, attempting JWT fallback...')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
       if (jwtToken) {
         if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
@@ -199,9 +162,6 @@ async function buildHeaders(config: ABsmartlyConfig, useApiKey: boolean = true):
         } else {
           headers['Authorization'] = `Bearer ${jwtToken}`
         }
-        debugLog('Using JWT from cookie as fallback')
-      } else {
-        debugLog('No authentication method available')
       }
     }
   }
@@ -225,22 +185,12 @@ export async function makeAPIRequest(
   retryWithJWT: boolean = true,
   configOverride?: ABsmartlyConfig
 ): Promise<any> {
-  debugLog('=== makeAPIRequest called ===', { method, path, data })
-
   const config = configOverride || await getConfig()
 
   if (!config?.apiEndpoint) {
     throw new Error('No API endpoint configured')
   }
 
-  debugLog('Config loaded:', {
-    hasApiKey: !!config?.apiKey,
-    apiEndpoint: config?.apiEndpoint,
-    apiKeyLength: config?.apiKey?.length || 0,
-    authMethod: config?.authMethod || 'jwt'
-  })
-
-  const authMethod = config.authMethod || 'jwt'
   const headers = await buildHeaders(config)
 
   // Always strip /v1 from endpoint, we'll add it back in the path if needed
@@ -268,20 +218,6 @@ export async function makeAPIRequest(
     requestData = data
   }
 
-  console.log('\n=== AXIOS REQUEST ===')
-  console.log('URL:', url)
-  console.log('Method:', method)
-  console.log('Headers:', JSON.stringify(headers, null, 2))
-  console.log('Request Data:', requestData)
-  console.log('====================\n')
-
-  debugLog('Making axios request:', {
-    method,
-    url,
-    requestData,
-    authorization: headers.Authorization || 'None'
-  })
-
   try {
     const response = await axios({
       method,
@@ -296,77 +232,7 @@ export async function makeAPIRequest(
     const axiosError = error as AxiosError
     debugError('Request failed:', axiosError.response?.status, axiosError.response?.data)
 
-    if (isAuthError(error) && retryWithJWT) {
-      if (authMethod === 'apikey' && headers.Authorization?.startsWith('Api-Key')) {
-        debugLog('API key auth failed (401), retrying with JWT cookie...')
-
-        const jwtToken = await getJWTCookie(config.apiEndpoint)
-
-        if (jwtToken) {
-          const newHeaders: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-
-          if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
-            newHeaders['Authorization'] = `JWT ${jwtToken}`
-          } else {
-            newHeaders['Authorization'] = `Bearer ${jwtToken}`
-          }
-
-          debugLog('Retrying with JWT authorization:', newHeaders.Authorization)
-
-          try {
-            const response = await axios({
-              method,
-              url,
-              data: requestData,
-              headers: newHeaders,
-              withCredentials: false
-            })
-
-            debugLog('JWT fallback successful!')
-            return response.data
-          } catch (jwtError) {
-            debugError('JWT fallback also failed:', (jwtError as AxiosError).response?.status)
-            throw new Error('AUTH_EXPIRED')
-          }
-        } else {
-          debugLog('No JWT cookie available for retry')
-        }
-      } else if (authMethod === 'jwt' && config.apiKey && !headers.Authorization?.startsWith('Api-Key')) {
-        debugLog('JWT auth failed (401), retrying with API key...')
-
-        const newHeaders: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-
-        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-          ? `JWT ${config.apiKey}`
-          : `Api-Key ${config.apiKey}`
-        newHeaders['Authorization'] = authHeader
-
-        debugLog('Retrying with API key authorization')
-
-        try {
-          const response = await axios({
-            method,
-            url,
-            data: requestData,
-            headers: newHeaders,
-            withCredentials: false
-          })
-
-          debugLog('API key fallback successful!')
-          return response.data
-        } catch (apiKeyError) {
-          debugError('API key fallback also failed:', (apiKeyError as AxiosError).response?.status)
-          throw new Error('AUTH_EXPIRED')
-        }
-      }
-    }
-
+    // NO FALLBACKS - if auth fails, throw AUTH_EXPIRED immediately
     if (isAuthError(error)) {
       throw new Error('AUTH_EXPIRED')
     }
