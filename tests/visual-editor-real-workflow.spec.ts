@@ -20,9 +20,11 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
 
     // Load the extension in a persistent context
     context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
+        '--enable-file-cookies'
       ]
     })
 

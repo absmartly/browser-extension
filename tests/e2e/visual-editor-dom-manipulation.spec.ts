@@ -72,7 +72,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
     await page.evaluate(() => {
       (window as any).testHelpers = {
         isVisualEditorActive: function() {
-          return (window as any).__absmartlyVisualEditorActive === true;
+          const editor = (window as any).__absmartlyVisualEditor;
+          return editor && editor.isActive === true;
         },
         getVisualEditor: function() {
           return (window as any).__absmartlyVisualEditor;
@@ -120,10 +121,10 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
           return window.getComputedStyle(element).getPropertyValue(property);
         },
         hasContextMenu: function() {
-          return document.querySelector('.absmartly-context-menu') !== null;
+          return document.querySelector('#absmartly-menu-container') !== null;
         },
         getContextMenuItems: function() {
-          const menu = document.querySelector('.absmartly-context-menu');
+          const menu = document.querySelector('#absmartly-menu-container');
           if (!menu) return [];
           return Array.from(menu.querySelectorAll('.menu-item')).map(item =>
             item.textContent?.trim() || ''
@@ -157,7 +158,10 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
     expect(initResult.success).toBe(true)
 
     // Wait for editor to be fully active
-    await page.waitForFunction(() => (window as any).__absmartlyVisualEditorActive === true)
+    await page.waitForFunction(() => {
+      const editor = (window as any).__absmartlyVisualEditor
+      return editor && editor.isActive === true
+    })
 
     // Verify test page loaded correctly
     await expect(page.locator('[data-testid="main-title"]')).toContainText('Visual Editor Test Page')
@@ -276,9 +280,12 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       // Right-click to open context menu
       await page.click(targetSelector, { button: 'right' })
 
+      // Wait for context menu to appear
+      await page.locator('#absmartly-menu-container').waitFor({ state: 'attached', timeout: 2000 })
+
       // Check if context menu appears
       const hasContextMenu = await page.evaluate(() => {
-        return document.querySelector('.absmartly-context-menu') !== null
+        return document.querySelector('#absmartly-menu-container') !== null
       })
 
       expect(hasContextMenu).toBe(true)
@@ -290,9 +297,12 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.click(targetSelector)
       await page.click(targetSelector, { button: 'right' })
 
+      // Wait for context menu to appear
+      await page.locator('#absmartly-menu-container').waitFor({ state: 'attached', timeout: 2000 })
+
       // Check for expected menu items
       const menuItems = await page.evaluate(() => {
-        const menu = document.querySelector('.absmartly-context-menu')
+        const menu = document.querySelector('#absmartly-menu-container')
         if (!menu) return []
 
         return Array.from(menu.querySelectorAll('.menu-item')).map(item =>
@@ -315,14 +325,20 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.click(targetSelector)
       await page.click(targetSelector, { button: 'right' })
 
+      // Wait for menu to appear
+      await page.locator('#absmartly-menu-container').waitFor({ state: 'attached', timeout: 2000 })
+
       // Verify menu is open
-      await expect(page.locator('.absmartly-context-menu')).toBeVisible()
+      await expect(page.locator('#absmartly-menu-container')).toBeVisible()
 
       // Click elsewhere
       await page.click('body', { position: { x: 10, y: 10 } })
 
+      // Wait for menu to disappear
+      await page.locator('#absmartly-menu-container').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
+
       // Verify menu is closed
-      const menuVisible = await page.locator('.absmartly-context-menu').isVisible()
+      const menuVisible = await page.locator('#absmartly-menu-container').isVisible().catch(() => false)
       expect(menuVisible).toBe(false)
     })
   })
