@@ -18,7 +18,7 @@ test.describe('Focused Visual Editor Test', () => {
       channel: 'chromium',
       args: [
         `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`
+        `--load-extension=${extensionPath}`,
         '--enable-file-cookies',
       ],
       viewport: { width: 1920, height: 1080 },
