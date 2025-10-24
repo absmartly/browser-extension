@@ -218,14 +218,16 @@ export class ElementPicker {
     }
 
     // If still not unique, use a very specific positional selector
+    // Build incrementally and stop as soon as we have a unique selector
     if (debug) {
       console.error('[ElementPicker] Could not generate unique selector, using positional fallback')
     }
     const parts: string[] = []
     let current: Element | null = element
     let depth = 0
+    const maxDepth = 10
 
-    while (current && current !== document.body && depth < 10) {
+    while (current && current !== document.body && depth < maxDepth) {
       const tagName = current.tagName.toLowerCase()
       const parent = current.parentElement
 
@@ -241,13 +243,23 @@ export class ElementPicker {
         parts.unshift(tagName)
       }
 
+      // Check if current selector is unique
+      const testSelector = parts.join(' > ')
+      const matches = document.querySelectorAll(testSelector)
+      if (matches.length === 1 && matches[0] === element) {
+        if (debug) {
+          console.log(`[ElementPicker] Found unique positional selector at depth ${depth + 1}:`, testSelector)
+        }
+        return testSelector
+      }
+
       current = parent
       depth++
     }
 
     const positionalSelector = parts.join(' > ')
     if (debug) {
-      console.log('[ElementPicker] Using positional selector:', positionalSelector)
+      console.warn('[ElementPicker] Using positional selector (may not be unique):', positionalSelector)
     }
     return positionalSelector
   }
@@ -271,18 +283,24 @@ export class ElementPicker {
     if (element) {
       const selector = this.generateSelector(element, true) // Enable debug logging on click
       this.selectedElement = element
-      
+
+      // Validate the final selector
+      const matches = document.querySelectorAll(selector)
+      console.log(`[ElementPicker] Final selector matches ${matches.length} element(s):`, selector)
+      if (matches.length !== 1) {
+        console.error('[ElementPicker] ⚠️ WARNING: Selector is not unique!')
+      }
+
       // Send message with the selected element
       chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
         selector: selector
       })
-      
+
       if (this.callback) {
-        console.log('Calling callback with selector')
         this.callback(selector)
       }
-      
+
       this.stop()
     }
     

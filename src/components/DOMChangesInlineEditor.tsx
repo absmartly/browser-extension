@@ -87,12 +87,6 @@ export function DOMChangesInlineEditor({
   onVEStop,
   activePreviewVariantName
 }: DOMChangesInlineEditorProps) {
-  // Debug props at component entry
-  console.log('[DOMChangesInlineEditor] Component rendered:', {
-    variantName,
-    variantIndex,
-    previewEnabled
-  })
 
   // Debug activeVEVariant prop changes
   useEffect(() => {
@@ -360,8 +354,6 @@ export function DOMChangesInlineEditor({
   // Listen for visual editor changes
   useEffect(() => {
     const handleVisualEditorChanges = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-      console.log('[DOMChangesInlineEditor] Received message:', message.type, 'for variant:', message.variantName, 'my variant:', variantName)
-
       // Handle async operations
       if (message.type === 'VISUAL_EDITOR_CHANGES' && message.variantName === variantName) {
         (async () => {
@@ -492,27 +484,18 @@ export function DOMChangesInlineEditor({
 
     // Also listen for window.postMessage (test mode)
     const handleWindowMessage = (event: MessageEvent) => {
-      console.log('[DOMChangesInlineEditor] Window message received from:', event.origin, 'data:', event.data)
       // Only process messages from our visual editor
       if (event.data && event.data.source === 'absmartly-visual-editor') {
-        console.log('[DOMChangesInlineEditor] ✅ Processing visual editor window message:', event.data.type, 'variant:', event.data.variantName)
-        // Add visual indicator
-        document.body.style.border = '5px solid lime'
-        setTimeout(() => { document.body.style.border = '' }, 2000)
         handleVisualEditorChanges(event.data, {} as chrome.runtime.MessageSender, () => {})
       }
     }
-    console.log('[DOMChangesInlineEditor] Adding window message listener')
     window.addEventListener('message', handleWindowMessage)
 
     // Also listen for chrome.storage.session changes in test mode
     const handleStorageChange = (changes: {[key: string]: chrome.storage.StorageChange}) => {
-      console.log('[DOMChangesInlineEditor] Storage change detected:', Object.keys(changes))
       if (changes.visualEditorChanges) {
         const newValue = changes.visualEditorChanges.newValue
-        console.log('[DOMChangesInlineEditor] Visual editor changes updated in storage:', newValue)
         if (newValue && newValue.variantName === variantName) {
-          console.log('[DOMChangesInlineEditor] Processing changes from storage for variant:', variantName)
           // DEBUG: Add visual indicator
           document.body.style.border = '5px solid green'
           void handleVisualEditorChanges({
