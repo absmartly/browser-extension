@@ -71,11 +71,8 @@ export async function handleAvatarFetch(
     const cached = await cache.match(cacheRequest)
 
     if (cached) {
-      console.log('[AvatarProxy] Returning cached avatar:', avatarUrl)
       return cached
     }
-
-    console.log('[AvatarProxy] Fetching avatar with auth:', avatarUrl, 'authMethod:', authMethod)
 
     const config = await getConfig()
     if (!config?.apiEndpoint) {
@@ -96,14 +93,18 @@ export async function handleAvatarFetch(
       }
     }
 
+    // For service worker context, prefer Authorization header when token is available
+    // Service workers can't reliably send cookies, so we use the header when possible
     const useAuthHeader = authMethod === 'jwt' && !!jwtToken
     const fetchOptions = buildAuthFetchOptions(authMethod, avatarConfig, jwtToken, useAuthHeader)
 
+    // Add Accept header for images
     fetchOptions.headers = {
       ...fetchOptions.headers,
       'Accept': 'image/*'
     }
 
+    // Fetch the image with authentication
     const response = await fetch(avatarUrl, fetchOptions)
 
     if (!response.ok) {
@@ -122,7 +123,6 @@ export async function handleAvatarFetch(
     })
 
     await cache.put(cacheRequest, cachedResponse.clone())
-    console.log('[AvatarProxy] Cached avatar:', avatarUrl)
 
     return cachedResponse
   } catch (error) {
@@ -140,10 +140,7 @@ export async function handleAvatarFetch(
 export function handleFetchEvent(event: any): void {
   const url = new URL(event.request.url)
 
-  console.log('[AvatarProxy] Fetch event:', url.href)
-
   if (url.pathname === '/api/avatar' && url.searchParams.has('url')) {
-    console.log('[AvatarProxy] Intercepting avatar request:', url.href)
     event.respondWith(
       (async () => {
         const avatarUrl = url.searchParams.get('url')!
