@@ -23,8 +23,6 @@ if (window.parent !== window) {
 
 // Listen for messages from background script (works in both iframe and standalone modes)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[tabs/sidebar.tsx] Chrome runtime message:', message.type)
-
   // Forward to React components via window.postMessage
   window.postMessage({
     source: 'absmartly-extension-incoming',
@@ -33,8 +31,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return false
 })
-
-console.log('[tabs/sidebar.tsx] ✅ Message handlers set up')
 
 // Old polyfill code below - can be removed
 if (false && window.parent !== window) {
@@ -101,8 +97,6 @@ if (false && window.parent !== window) {
 
 // Always listen for messages FROM background script (works in both iframe and standalone modes)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[tabs/sidebar.tsx] 🔵 Received message from background:', message.type, message)
-
   // Log DEBUG messages directly
   if (message.type === 'DEBUG') {
     console.log(message.message)
@@ -121,7 +115,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // In iframe mode, also post to parent window (for content script)
   if (window.parent !== window) {
-    console.log('[tabs/sidebar.tsx] Forwarding message to parent window:', message.type, message)
     window.parent.postMessage({
       source: 'absmartly-extension-incoming',
       ...message
@@ -130,7 +123,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return false
 })
-console.log('[tabs/sidebar.tsx] ✅ Incoming message listener registered (for all contexts)')
 
 // Lazy load the ExtensionUI to avoid bundling issues
 const ExtensionUI = lazy(() => import("~src/components/ExtensionUI"))
