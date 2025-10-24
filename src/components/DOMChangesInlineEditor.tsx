@@ -486,6 +486,9 @@ export function DOMChangesInlineEditor({
     const handleWindowMessage = (event: MessageEvent) => {
       // Only process messages from our visual editor
       if (event.data && event.data.source === 'absmartly-visual-editor') {
+        // Add visual indicator
+        document.body.style.border = '5px solid lime'
+        setTimeout(() => { document.body.style.border = '' }, 2000)
         handleVisualEditorChanges(event.data, {} as chrome.runtime.MessageSender, () => {})
       }
     }
