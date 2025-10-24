@@ -118,6 +118,9 @@ export class HtmlEditor {
           parent: editorContainer
         })
 
+        // Store reference on container for testing
+        ;(editorContainer as any).editorView = this.editorView
+
         // Focus the editor
         this.editorView.focus()
       }, 10)

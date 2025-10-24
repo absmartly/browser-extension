@@ -57,7 +57,8 @@ test.describe('Visual Editor - Change Image Source', () => {
     await img.click({ button: 'right' })
 
     // Wait for context menu
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Check if the menu exists in shadow DOM
     const menuExists = await page.evaluate(() => {
@@ -94,7 +95,8 @@ test.describe('Visual Editor - Change Image Source', () => {
     const heroBanner = await page.locator('#hero-banner')
     await heroBanner.click({ button: 'right' })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     const menuExists = await page.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
@@ -124,7 +126,8 @@ test.describe('Visual Editor - Change Image Source', () => {
     const regularDiv = await page.locator('#regular-div')
     await regularDiv.click({ button: 'right' })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     const menuExists = await page.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
@@ -153,7 +156,8 @@ test.describe('Visual Editor - Change Image Source', () => {
     const regularDiv = await page.locator('#regular-div')
     await regularDiv.click({ button: 'right' })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     const result = await page.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
@@ -188,7 +192,8 @@ test.describe('Visual Editor - Change Image Source', () => {
 
     // Right-click on img
     await page.locator('#product-image').click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Click "Change image source" in context menu
     await page.evaluate(() => {
@@ -206,7 +211,8 @@ test.describe('Visual Editor - Change Image Source', () => {
     })
 
     // Wait for dialog to appear
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Enter new URL in dialog
     const newUrl = 'https://via.placeholder.com/200x150/95E1D3/FFFFFF?text=New+Image'
@@ -231,7 +237,8 @@ test.describe('Visual Editor - Change Image Source', () => {
     })
 
     // Wait for change to apply
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Verify src changed
     const newSrc = await page.locator('#product-image').getAttribute('src')
@@ -253,7 +260,8 @@ test.describe('Visual Editor - Change Image Source', () => {
 
     // Right-click on hero banner
     await page.locator('#hero-banner').click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Click "Change image source"
     await page.evaluate(() => {
@@ -270,7 +278,8 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Enter new URL
     const newUrl = 'https://via.placeholder.com/300x200/F38181/FFFFFF?text=New+BG'
@@ -294,7 +303,8 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Verify background-image changed
     const newBg = await page.evaluate(() => {
@@ -316,7 +326,8 @@ test.describe('Visual Editor - Change Image Source', () => {
 
     // Right-click and open dialog
     await page.locator('#product-image').click({ button: 'right' })
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     await page.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
@@ -332,7 +343,8 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Click Cancel button
     await page.evaluate(() => {
@@ -344,7 +356,8 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    await page.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
     // Verify src unchanged
     const finalSrc = await page.locator('#product-image').getAttribute('src')

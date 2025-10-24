@@ -27,7 +27,7 @@ test.describe('Settings Authentication Tests', () => {
     // Load test page from same domain as API to avoid CORS issues
     await testPage.goto('https://demo-2.absmartly.com/')
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Enable test mode
     await testPage.evaluate(() => {
@@ -299,7 +299,7 @@ test.describe('Settings Authentication Tests', () => {
 
         // Wait for OAuth page to open
         const oauthPage = await pagePromise
-        await oauthPage.waitForLoadState('networkidle')
+        await oauthPage.waitForSelector('body', { timeout: 5000 })
         console.log('  ✓ OAuth page opened:', oauthPage.url())
 
         await debugWait()

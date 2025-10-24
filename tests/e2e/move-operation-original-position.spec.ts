@@ -122,16 +122,16 @@ test.describe('Move Operation Original Position Preservation', () => {
       document.body.appendChild(container)
     }, extensionId)
 
-    await page.waitForSelector('#absmartly-sidebar-root')
-    const sidebarFrameElement = await page.$('#absmartly-sidebar-iframe')
-    const sidebarFrame = await sidebarFrameElement?.contentFrame()
+    await page.waitForSelector('#absmartly-sidebar-root', { timeout: 5000 })
+    const sidebarFrameElement = await page.waitForSelector('#absmartly-sidebar-iframe', { timeout: 5000 })
+    const sidebarFrame = await sidebarFrameElement.contentFrame()
 
     if (!sidebarFrame) {
       throw new Error('Could not access sidebar iframe')
     }
 
-    // Wait for sidebar to load
-    await page.waitForTimeout(3000)
+    // Wait for sidebar to load by checking for body element
+    await sidebarFrame.waitForSelector('body', { timeout: 5000 })
 
     // Create a mock experiment with move change
     console.log('🔬 Creating experiment with move change...')
@@ -163,7 +163,8 @@ test.describe('Move Operation Original Position Preservation', () => {
     const domChangesButton = await sidebarFrame.$('button:has-text("DOM Changes"), button:has-text("Edit Changes")')
     if (domChangesButton && await domChangesButton.isVisible().catch(() => false)) {
       await domChangesButton.click()
-      await page.waitForTimeout(1000)
+      // Wait for the editor to open
+      await sidebarFrame.locator('[data-testid="dom-changes-editor"], .dom-changes-editor').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
     }
 
     // Step 1: Verify the element is in its original position
@@ -201,18 +202,21 @@ test.describe('Move Operation Original Position Preservation', () => {
     const pickerButton = await sidebarFrame.$('[data-testid="pick-selector"], button[title*="Pick element"]')
     if (pickerButton && await pickerButton.isVisible().catch(() => false)) {
       await pickerButton.click()
-      await page.waitForTimeout(500)
+      // Wait for picker to activate
+      await page.waitForSelector('.absmartly-element-picker-active, [data-picker-active="true"]', { timeout: 2000 }).catch(() => {})
 
       // Click on item2 to select it
       await page.click('#item2')
-      await page.waitForTimeout(500)
+      // Wait for selector to update
+      await sidebarFrame.locator('input[value="#item2"], input[placeholder*="selector"]').waitFor({ timeout: 2000 }).catch(() => {})
     }
 
     // Save the change
     const saveButton = await sidebarFrame.$('button:has-text("Save"), button[title="Save"]')
     if (saveButton && await saveButton.isVisible().catch(() => false)) {
       await saveButton.click()
-      await page.waitForTimeout(500)
+      // Wait for save to complete
+      await sidebarFrame.locator('.save-success, .saved-indicator').waitFor({ state: 'visible', timeout: 2000 }).catch(() => {})
     }
 
     // Step 4: Turn off preview to test restoration
@@ -351,9 +355,9 @@ test.describe('Move Operation Original Position Preservation', () => {
       document.body.appendChild(container)
     }, extensionId)
 
-    await page.waitForSelector('#absmartly-sidebar-root')
+    await page.waitForSelector('#absmartly-sidebar-root', { timeout: 5000 })
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
-    await page.waitForTimeout(2000)
+    await sidebarFrame.locator('body').waitFor({ state: 'visible', timeout: 5000 })
 
     // Create move change with original position
     console.log('📝 Creating move change with Target A...')

@@ -4,17 +4,18 @@ import type { Page } from '@playwright/test'
 test.describe('Visual Editor Tests with Local Server', () => {
   test('Load sidebar through local server', async ({ page }) => {
     // Load the sidebar directly from the local server
-    await page.goto('http://localhost:8080/tabs/sidebar.html')
+    await page.goto('http://localhost:8080/tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Wait for the sidebar to load
-    await page.waitForLoadState('networkidle')
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Check if the sidebar content is loaded
     const hasContent = await page.locator('#__plasmo').isVisible().catch(() => false)
     console.log('Sidebar container visible:', hasContent)
 
     // Wait a bit for React to render
-    await page.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
     // Check for any visible text
     const bodyText = await page.textContent('body')
@@ -51,6 +52,7 @@ test.describe('Visual Editor Tests with Local Server', () => {
     })
 
     // Wait a bit more
-    await page.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
   })
 })

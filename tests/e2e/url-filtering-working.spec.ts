@@ -8,8 +8,8 @@ test.describe('URL Filtering Tests - Fixed', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL)
-    await page.waitForLoadState('networkidle')
+    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Inject SDK mock with data in variant.config
     await page.evaluate(() => {
@@ -70,7 +70,8 @@ test.describe('URL Filtering Tests - Fixed', () => {
       return plugin.initialize()
     })
 
-    await page.waitForTimeout(1000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
     const elementText = await page.locator('#test-element').textContent()
     console.log('[TEST] Element text:', elementText)
@@ -83,8 +84,8 @@ test.describe('URL Filtering Tests - Fixed', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL)
-    await page.waitForLoadState('networkidle')
+    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Set URL BEFORE plugin
     await page.evaluate(() => {
@@ -158,7 +159,8 @@ test.describe('URL Filtering Tests - Fixed', () => {
       return plugin.initialize()
     })
 
-    await page.waitForTimeout(1000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
     const elementText = await page.locator('#test-element').textContent()
     console.log('[TEST] Element text on /products/123:', elementText)
@@ -171,8 +173,8 @@ test.describe('URL Filtering Tests - Fixed', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL)
-    await page.waitForLoadState('networkidle')
+    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Set URL to non-matching path
     await page.evaluate(() => {
@@ -246,7 +248,8 @@ test.describe('URL Filtering Tests - Fixed', () => {
       return plugin.initialize()
     })
 
-    await page.waitForTimeout(1000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
     const elementText = await page.locator('#test-element').textContent()
     console.log('[TEST] Element text on /about (should be unchanged):', elementText)

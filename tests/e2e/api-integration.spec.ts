@@ -35,7 +35,7 @@ test.describe('API Integration Tests', () => {
 
     // 3) Load sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
 
     // Enable console logging for debugging
     page.on('console', msg => {
@@ -45,7 +45,7 @@ test.describe('API Integration Tests', () => {
     })
 
     // Wait for sidebar to load
-    await page.waitForLoadState('networkidle')
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // 4) Check if sidebar loaded properly
     const hasContent = await page.locator('body').isVisible()
@@ -68,7 +68,8 @@ test.describe('API Integration Tests', () => {
     expect(hasABsmartly || hasExperiments || hasEmptyState || hasConfigButton).toBeTruthy()
 
     // 5) Wait a bit for API calls to happen
-    await page.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
     // 6) Check if any API calls were made
     if (apiRequests.length > 0) {
@@ -102,10 +103,11 @@ test.describe('API Integration Tests', () => {
 
     // Load sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
 
     // Wait for potential loading
-    await page.waitForTimeout(5000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
 
     // Check for experiments or empty state
     const experimentCount = await page.locator('.experiment-item').count()
@@ -130,10 +132,11 @@ test.describe('API Integration Tests', () => {
     })
 
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
 
     // Wait for experiments to load
-    await page.waitForTimeout(5000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
 
     const experimentCount = await page.locator('.experiment-item').count()
 
@@ -174,7 +177,7 @@ test.describe('API Integration Tests', () => {
 
     // Open sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: \'domcontentloaded\', timeout: 10000 }))
 
     // Reload page
     await page.reload()

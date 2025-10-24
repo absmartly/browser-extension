@@ -42,8 +42,8 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
   test('Complete visual editor workflow - all context menu options', async () => {
     // Step 1: Create new page and load test HTML
     page = await context.newPage()
-    await page.goto(`file://${TEST_PAGE_PATH}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Step 2: Open extension popup/sidebar
     // First, we need to inject the content script
@@ -192,7 +192,8 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
         await page.click(`[data-action="${testCase.action}"]`)
 
         // Small delay for action to complete
-        await page.waitForTimeout(500)
+        // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
         // Verify the change
         if (testCase.expectedChange) {
@@ -245,7 +246,7 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
 
   test('Preview header button does NOT wrap at any viewport width', async () => {
     page = await context.newPage()
-    await page.goto(`file://${TEST_PAGE_PATH}`)
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Inject preview header
     await page.evaluate(() => {
@@ -320,7 +321,8 @@ test.describe('ABsmartly Visual Editor Real Workflow', () => {
 
     for (const width of viewportWidths) {
       await page.setViewportSize({ width, height: 800 })
-      await page.waitForTimeout(100)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 100 }).catch(() => {})
 
       // Check if button is on the same line
       const headerHeight = await page.$eval('#absmartly-preview-header', el => (el as HTMLElement).offsetHeight)

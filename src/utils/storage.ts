@@ -18,8 +18,14 @@ export async function getConfig(): Promise<ABsmartlyConfig | null> {
   const config = await storage.get(STORAGE_KEYS.CONFIG) as ABsmartlyConfig | null
   // SECURITY: Get API key from secure storage
   if (config) {
-    const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
-    config.apiKey = secureApiKey || config.apiKey || ''
+    try {
+      const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
+      config.apiKey = secureApiKey || config.apiKey || ''
+    } catch (error) {
+      // If secure storage fails (e.g., JSON parse error for legacy data), fall back to config.apiKey
+      console.warn('[Storage] Failed to get API key from secure storage:', error)
+      config.apiKey = config.apiKey || ''
+    }
   }
   return config
 }

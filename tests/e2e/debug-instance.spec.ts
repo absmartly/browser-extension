@@ -3,8 +3,8 @@ import { test } from '@playwright/test'
 test('Debug: Access plugin.instance', async ({ page }) => {
   page.on('console', msg => console.log(`[BROWSER]`, msg.text()))
   
-  await page.goto('http://localhost:3456/url-filtering-test.html')
-  await page.waitForLoadState('networkidle')
+  await page.goto('http://localhost:3456/url-filtering-test.html', { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.waitForSelector('body', { timeout: 5000 })
   await page.evaluate(() => { history.pushState({}, '', '/products/123') })
   await page.evaluate(() => {
     (window as any).absmartly = {
@@ -30,7 +30,8 @@ test('Debug: Access plugin.instance', async ({ page }) => {
     })
     return plugin.initialize()
   })
-  await page.waitForTimeout(1000)
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
   const info = await page.evaluate(() => {
     const wrapper = (window as any).__testContext.__domPlugin

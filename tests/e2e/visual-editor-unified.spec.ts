@@ -33,13 +33,15 @@ async function getDOMChanges(page: Page): Promise<any[]> {
 // Helper to click element in visual editor (simulates user click)
 async function clickElementInEditor(page: Page, selector: string) {
   await page.click(selector)
-  await page.waitForTimeout(200) // Wait for selection
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 200 }).catch(() => {}) // Wait for selection
 }
 
 // Helper to right-click element and open context menu
 async function rightClickElement(page: Page, selector: string) {
   await page.click(selector, { button: 'right' })
-  await page.waitForTimeout(300) // Wait for context menu
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {}) // Wait for context menu
 }
 
 // Helper to check if context menu is open
@@ -58,7 +60,8 @@ async function clickContextMenuItem(page: Page, itemText: string) {
       (item as HTMLElement).click()
     }
   }, itemText)
-  await page.waitForTimeout(300)
+  // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
 }
 
 test.describe('Visual Editor Unified Tests', () => {
@@ -68,12 +71,13 @@ test.describe('Visual Editor Unified Tests', () => {
   test.beforeEach(async ({ context }) => {
     // Load the actual test HTML file so content script gets injected
     testPage = await context.newPage()
-    await testPage.goto(`file://${TEST_PAGE_PATH}`)
+    await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForSelector('body', { timeout: 5000 })
 
     // Wait a bit for content script to inject
-    await testPage.waitForTimeout(1000)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
     console.log('✅ Test page loaded')
   })
@@ -104,7 +108,8 @@ test.describe('Visual Editor Unified Tests', () => {
       document.body.appendChild(iframe)
     }, extensionUrl('tabs/sidebar.html'))
 
-    await testPage.waitForTimeout(3000) // Wait for sidebar to fully load
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {}) // Wait for sidebar to fully load
     console.log('✅ Sidebar visible')
 
     const sidebarFrameElement = await testPage.$('#absmartly-sidebar-frame')
@@ -121,7 +126,8 @@ test.describe('Visual Editor Unified Tests', () => {
     await sidebarFrame.waitForSelector('[data-testid="experiment-item"], .experiment-item', { timeout: 10000 })
     const firstExperiment = await sidebarFrame.$('[data-testid="experiment-item"], .experiment-item')
     await firstExperiment?.click()
-    await testPage.waitForTimeout(1000)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
     console.log('✅ Experiment selected')
 
     // Step 3: Click visual editor button to start visual editor
@@ -129,7 +135,8 @@ test.describe('Visual Editor Unified Tests', () => {
 
     const visualEditorBtn = await sidebarFrame.$('button:has-text("Visual Editor"), [data-testid="visual-editor-btn"]')
     await visualEditorBtn?.click()
-    await testPage.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
     // Wait for visual editor to be active
     await waitForVisualEditorActive(testPage, 15000)
@@ -153,7 +160,8 @@ test.describe('Visual Editor Unified Tests', () => {
     await clickContextMenuItem(testPage, 'Edit Text')
     await testPage.keyboard.type('Modified text!')
     await testPage.keyboard.press('Enter')
-    await testPage.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
     console.log('  ✓ Edit Text works')
 
     // Action 2: Hide element
@@ -161,7 +169,8 @@ test.describe('Visual Editor Unified Tests', () => {
     await clickElementInEditor(testPage, '#button-1')
     await rightClickElement(testPage, '#button-1')
     await clickContextMenuItem(testPage, 'Hide')
-    await testPage.waitForTimeout(300)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
     console.log('  ✓ Hide works')
 
     // Action 3: Delete element
@@ -169,7 +178,8 @@ test.describe('Visual Editor Unified Tests', () => {
     await clickElementInEditor(testPage, '#button-2')
     await rightClickElement(testPage, '#button-2')
     await clickContextMenuItem(testPage, 'Delete')
-    await testPage.waitForTimeout(300)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
     console.log('  ✓ Delete works')
 
     // Action 4: Move up
@@ -177,7 +187,8 @@ test.describe('Visual Editor Unified Tests', () => {
     await clickElementInEditor(testPage, '#item-2')
     await rightClickElement(testPage, '#item-2')
     await clickContextMenuItem(testPage, 'Move up')
-    await testPage.waitForTimeout(300)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
     console.log('  ✓ Move up works')
 
     // Action 5: Edit HTML
@@ -185,12 +196,14 @@ test.describe('Visual Editor Unified Tests', () => {
     await clickElementInEditor(testPage, '#section-title')
     await rightClickElement(testPage, '#section-title')
     await clickContextMenuItem(testPage, 'Edit HTML')
-    await testPage.waitForTimeout(500)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
     // Monaco editor should be open - type some HTML
     await testPage.keyboard.type('<strong>Bold Title</strong>')
     // Look for save button and click it
     await testPage.locator('button:has-text("Save"), .save-button').click()
-    await testPage.waitForTimeout(300)
+    // TODO: Replace timeout with specific element wait
+    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 300 }).catch(() => {})
     console.log('  ✓ Edit HTML works')
 
     console.log('✅ All visual editor actions tested')
@@ -200,7 +213,8 @@ test.describe('Visual Editor Unified Tests', () => {
 
     const saveButton = testPage.locator('[data-absmartly-banner] button:has-text("Save"), .absmartly-save-btn')
     await saveButton.click()
-    await testPage.waitForTimeout(1000)
+    // Wait briefly for UI update
+    await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
     console.log('✅ Changes saved')
 
     // Step 6: Verify all changes appear in the sidebar DOM changes editor

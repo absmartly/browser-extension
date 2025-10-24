@@ -21,7 +21,8 @@ test.describe('Visual Editor Complete Test', () => {
     console.log('\n📄 Loading local test page...')
     const page = await context.newPage()
     const testPageUrl = `chrome-extension://${extensionId}/local-test-page.html`
-    await page.goto(testPageUrl, { waitUntil: 'networkidle' })
+    await page.goto(testPageUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.waitForSelector('body', { timeout: 5000 })
     await page.setViewportSize({ width: 1920, height: 1080 })
     console.log('✅ Test page loaded')
 
@@ -94,7 +95,8 @@ test.describe('Visual Editor Complete Test', () => {
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Wait for sidebar content to load
-    await page.waitForTimeout(5000) // Give time for API calls
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {}) // Give time for API calls
 
     // Check if we need to configure first
     const needsConfig = await sidebarFrame.locator('button:has-text("Configure Settings")').isVisible().catch(() => false)
@@ -126,7 +128,8 @@ test.describe('Visual Editor Complete Test', () => {
     // Step 4: Click on first experiment to go to details
     console.log('\n🔍 Opening experiment details...')
     await sidebarFrame.locator('.experiment-item').first().click()
-    await page.waitForTimeout(2000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
 
     // Step 5: Click Visual Editor button
     console.log('\n🎨 Launching Visual Editor...')
@@ -147,7 +150,8 @@ test.describe('Visual Editor Complete Test', () => {
     console.log('✅ Clicked Visual Editor button')
 
     // Wait for visual editor to activate on the page
-    await page.waitForTimeout(3000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
     // Step 6: Check if visual editor toolbar appeared
     console.log('\n🔧 Checking for Visual Editor toolbar...')
@@ -181,7 +185,8 @@ test.describe('Visual Editor Complete Test', () => {
 
       // Right-click to open context menu
       await heading.click({ button: 'right' })
-      await page.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       // Look for context menu
       const contextMenu = page.locator('.absmartly-context-menu').first()
@@ -216,7 +221,8 @@ test.describe('Visual Editor Complete Test', () => {
 
       // Right-click
       await button.click({ button: 'right' })
-      await page.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       const contextMenu = page.locator('.absmartly-context-menu').first()
       if (await contextMenu.isVisible()) {
@@ -241,7 +247,8 @@ test.describe('Visual Editor Complete Test', () => {
 
       // Right-click
       await para.click({ button: 'right' })
-      await page.waitForTimeout(500)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
 
       const contextMenu = page.locator('.absmartly-context-menu').first()
       if (await contextMenu.isVisible()) {
@@ -251,7 +258,8 @@ test.describe('Visual Editor Complete Test', () => {
           console.log('   Clicked Hide Element')
 
           // Check if element was hidden
-          await page.waitForTimeout(500)
+          // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
           const isHidden = await para.isHidden().catch(() => false)
           console.log('   Element hidden:', isHidden)
         }

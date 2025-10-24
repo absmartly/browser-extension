@@ -30,7 +30,7 @@ test.describe('Visual Editor Demo', () => {
 
     // Setup
     const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`)
+    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     await setupPage.evaluate(async () => {
       return new Promise((resolve) => {
@@ -50,7 +50,7 @@ test.describe('Visual Editor Demo', () => {
     // Open test page
     const page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`)
+    await page.goto(`file://${testPagePath}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
 
     // Inject sidebar
     await page.evaluate((extId) => {
@@ -86,7 +86,8 @@ test.describe('Visual Editor Demo', () => {
     // Launch Visual Editor
     console.log('🚀 Launching Visual Editor...')
     await sidebarFrame.locator('button:has-text("Visual Editor")').first().click()
-    await page.waitForTimeout(5000) // Wait for full initialization
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {}) // Wait for full initialization
 
     console.log('✅ Visual Editor launched')
 
@@ -98,7 +99,8 @@ test.describe('Visual Editor Demo', () => {
     const heading = page.locator('#hero-title').first()
     await heading.scrollIntoViewIfNeeded()
     await heading.click()
-    await page.waitForTimeout(2000)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     await page.screenshot({
       path: 'test-results/context-menu-heading.png',
@@ -112,7 +114,8 @@ test.describe('Visual Editor Demo', () => {
     const button = page.locator('#btn-primary').first()
     await button.scrollIntoViewIfNeeded()
     await button.click()
-    await page.waitForTimeout(2000)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     await page.screenshot({
       path: 'test-results/context-menu-button.png',
@@ -126,7 +129,8 @@ test.describe('Visual Editor Demo', () => {
     const card = page.locator('#card-1').first()
     await card.scrollIntoViewIfNeeded()
     await card.click()
-    await page.waitForTimeout(2000)
+    // Wait briefly for UI update
+    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     await page.screenshot({
       path: 'test-results/context-menu-card.png',
@@ -149,7 +153,8 @@ test.describe('Visual Editor Demo', () => {
     console.log('special handling as it may be rendered in shadow DOM or portal.')
 
     // Keep open briefly for observation
-    await page.waitForTimeout(5000)
+    // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
 
     await context.close()
     console.log('\n✨ Test complete!')

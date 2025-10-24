@@ -66,7 +66,7 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
     await page.goto(`file://${testPagePath}`)
 
     // Wait for page to fully load
-    await page.waitForLoadState('networkidle')
+    await page.waitForSelector('body', { timeout: 5000 })
 
     // Inject test helper functions
     await page.evaluate(() => {
@@ -180,7 +180,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.hover(targetSelector)
 
       // Wait a moment for hover effects to apply
-      await page.waitForTimeout(100)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 100 }).catch(() => {})
 
       // Check if hover styles are applied
       const isHovered = await page.evaluate((selector) => {
@@ -222,7 +223,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.click(firstSelector)
 
       // Wait for selection to be applied
-      await page.waitForTimeout(100)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 100 }).catch(() => {})
       await expect(page.locator(`${firstSelector}.absmartly-selected`)).toBeVisible()
 
       // Remove any menu host that might be blocking clicks
@@ -237,7 +239,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       await page.click(secondSelector)
 
       // Wait for selection change to be processed
-      await page.waitForTimeout(100)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 100 }).catch(() => {})
 
       // Verify first element is deselected
       const firstIsSelected = await page.evaluate((selector) => {
@@ -1140,7 +1143,8 @@ test.describe('Visual Editor DOM Manipulation - Comprehensive Tests', () => {
       })
 
       // Wait for update
-      await page.waitForTimeout(200)
+      // TODO: Replace timeout with specific element wait
+    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 200 }).catch(() => {})
 
       // Verify updated content can be selected and edited
       const targetSelector = '#editable-text-1'
