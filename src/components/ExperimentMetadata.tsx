@@ -42,7 +42,9 @@ const OwnersField = React.memo(function OwnersField({
   onChange: (ownerIds: number[], teamIds: number[]) => void
 }) {
   const ownerOptions = useMemo(() => owners.map(owner => {
-    const avatar = owner.avatar?.base_url
+    // Only create avatar URL if base_url exists and is not empty/null
+    const hasValidAvatar = owner.avatar?.base_url && owner.avatar.base_url.trim().length > 0
+    const avatar = hasValidAvatar
       ? `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp`
       : undefined
     return {
@@ -55,7 +57,9 @@ const OwnersField = React.memo(function OwnersField({
   }), [owners])
 
   const teamOptions = useMemo(() => teams.map(team => {
-    const avatar = team.avatar?.base_url
+    // Only create avatar URL if base_url exists and is not empty/null
+    const hasValidAvatar = team.avatar?.base_url && team.avatar.base_url.trim().length > 0
+    const avatar = hasValidAvatar
       ? `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${team.avatar.base_url}/crop/32x32.webp`
       : undefined
     return {
