@@ -8,7 +8,7 @@ test.describe('URL Filtering Tests - Fixed', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Inject SDK mock with data in variant.config
@@ -84,7 +84,7 @@ test.describe('URL Filtering Tests - Fixed', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Set URL BEFORE plugin
@@ -173,7 +173,7 @@ test.describe('URL Filtering Tests - Fixed', () => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
     })
 
-    await page.goto(TEST_PAGE_URL, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
     // Set URL to non-matching path

@@ -17,7 +17,7 @@ test.describe('Real ABsmartly Extension Workflow', () => {
 
   test('Complete real extension workflow with visual editor', async ({ page }) => {
     // Step 1: Open the test page
-    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
     console.log('✅ Test page loaded')
 
@@ -148,7 +148,7 @@ test.describe('Real ABsmartly Extension Workflow', () => {
   })
 
   test('Preview header never wraps at any viewport width', async ({ page }) => {
-    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+    await page.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
     // Inject a preview header directly for testing
     await page.evaluate(() => {

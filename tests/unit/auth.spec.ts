@@ -45,7 +45,7 @@ async function loginAndGetJWT(context: any, page: any): Promise<any> {
   console.log('Not logged in, attempting to log in with test credentials...')
   
   // Navigate to login page
-  await page.goto(`${baseUrl}/login`, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+  await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 10000 })
   await page.waitForSelector('body', { timeout: 5000 })
   
   // Fill in email and password
@@ -175,7 +175,7 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     try {
       const page = await context.newPage()
       const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
-      await page.goto(baseUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+      await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
       await page.waitForSelector('body', { timeout: 5000 })
 
       console.log('Opened ABsmartly page:', page.url())
@@ -218,7 +218,7 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     try {
       const page = await context.newPage()
       const baseUrl = TEST_API_ENDPOINT.replace(/\/v1$/, '')
-      await page.goto(baseUrl, { waitUntil: \'domcontentloaded\', timeout: 10000 })
+      await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
       await page.waitForSelector('body', { timeout: 5000 })
 
       console.log('Opened ABsmartly page:', page.url())
