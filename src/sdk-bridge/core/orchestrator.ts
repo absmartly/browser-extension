@@ -12,6 +12,7 @@ import { PluginDetector } from '../sdk/plugin-detector'
 import { SDKInterceptor } from '../sdk/sdk-interceptor'
 import { CodeInjector } from '../experiment/code-injector'
 import { OverrideManager } from '../experiment/override-manager'
+import { PreviewManager } from '../dom/preview-manager'
 
 export interface OrchestratorConfig {
   maxAttempts?: number
@@ -34,6 +35,7 @@ export class Orchestrator {
   private sdkInterceptor: SDKInterceptor
   private codeInjector: CodeInjector
   private overrideManager: OverrideManager
+  private previewManager: PreviewManager
   private messageListenerSet: boolean = false
 
   constructor(config: OrchestratorConfig = {}) {
@@ -59,6 +61,7 @@ export class Orchestrator {
     })
     this.codeInjector = new CodeInjector()
     this.overrideManager = new OverrideManager()
+    this.previewManager = new PreviewManager()
   }
 
   /**
@@ -235,6 +238,14 @@ export class Orchestrator {
         this.handleApplyOverrides(payload)
         break
 
+      case 'ABSMARTLY_PREVIEW':
+        if (payload?.action === 'apply') {
+          this.handlePreviewChanges(payload)
+        } else if (payload?.action === 'remove') {
+          this.handleRemovePreview(payload)
+        }
+        break
+
       case 'PREVIEW_CHANGES':
         this.handlePreviewChanges(payload)
         break
@@ -274,23 +285,38 @@ export class Orchestrator {
   }
 
   /**
-   * Handle preview changes message (delegates to external handler if available)
+   * Handle preview changes message (applies changes directly using PreviewManager)
    */
   private handlePreviewChanges(payload: any): void {
     Logger.log('[ABsmartly Page] Handling PREVIEW_CHANGES message')
-    const { changes, experimentName } = payload || {}
+    const { changes, experimentName, variantName } = payload || {}
     const expName = experimentName || '__preview__'
 
     Logger.log('[ABsmartly Page] Preview changes received for experiment:', expName)
+    Logger.log('[ABsmartly Page] Variant name:', variantName)
     Logger.log('[ABsmartly Page] Changes to apply:', changes)
 
-    // This would delegate to preview manager if we had one
-    // For now, just log that we received the request
-    Logger.log('[ABsmartly Page] Preview functionality requires external preview manager')
+    if (!changes || changes.length === 0) {
+      Logger.warn('[ABsmartly Page] No changes to apply')
+      return
+    }
+
+    // Apply changes using the PreviewManager
+    try {
+      Logger.log('[ABsmartly Page] Applying changes via PreviewManager')
+      let appliedCount = 0
+      changes.forEach((change: any) => {
+        const success = this.previewManager.applyPreviewChange(change, expName)
+        if (success) appliedCount++
+      })
+      Logger.log(`[ABsmartly Page] Applied ${appliedCount}/${changes.length} changes successfully`)
+    } catch (error) {
+      Logger.error('[ABsmartly Page] Error applying preview changes:', error)
+    }
   }
 
   /**
-   * Handle remove preview message (delegates to external handler if available)
+   * Handle remove preview message (removes changes directly using PreviewManager)
    */
   private handleRemovePreview(payload: any): void {
     Logger.log('[ABsmartly Page] Handling REMOVE_PREVIEW message')
@@ -299,9 +325,18 @@ export class Orchestrator {
 
     Logger.log('[ABsmartly Page] Removing preview changes for experiment:', expName)
 
-    // This would delegate to preview manager if we had one
-    // For now, just log that we received the request
-    Logger.log('[ABsmartly Page] Preview removal requires external preview manager')
+    // Remove changes using the PreviewManager
+    try {
+      Logger.log('[ABsmartly Page] Removing changes via PreviewManager')
+      const success = this.previewManager.removePreviewChanges(expName)
+      if (success) {
+        Logger.log('[ABsmartly Page] Changes removed successfully')
+      } else {
+        Logger.warn('[ABsmartly Page] No changes were removed (no elements found)')
+      }
+    } catch (error) {
+      Logger.error('[ABsmartly Page] Error removing preview changes:', error)
+    }
   }
 
   /**
