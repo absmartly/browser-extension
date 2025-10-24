@@ -14,7 +14,7 @@ const test = base.extend<{
     const context = await chromium.launchPersistentContext('', {
       args: [
         `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`
+        `--load-extension=${extensionPath}`,
       ],
       viewport: { width: 1920, height: 1080 },
       slowMo: parseInt(process.env.SLOW_MO || '0')
