@@ -26,6 +26,7 @@ describe('InjectionHandler', () => {
         executeScript: jest.fn()
       },
       tabs: {
+        query: jest.fn(),
         onUpdated: {
           addListener: jest.fn()
         }
@@ -48,6 +49,10 @@ describe('InjectionHandler', () => {
 
   describe('registerFileUrlContentScript', () => {
     it('should register content script for file:// URLs on first attempt', async () => {
+      // Mock test mode detection (file:// URLs present)
+      mockChrome.tabs.query.mockResolvedValue([
+        { url: 'file:///path/to/test.html' }
+      ])
       mockChrome.runtime.getManifest.mockReturnValue({
         content_scripts: [{
           js: ['content-script.js']
@@ -65,11 +70,15 @@ describe('InjectionHandler', () => {
         allFrames: false
       }])
       expect(console.log).toHaveBeenCalledWith(
-        '[InjectionHandler] Successfully registered dynamic content script for file:// URLs'
+        '[InjectionHandler] Test mode: Registered content script for file:// URLs'
       )
     })
 
     it('should handle already registered script by unregistering and re-registering', async () => {
+      // Mock test mode detection (file:// URLs present)
+      mockChrome.tabs.query.mockResolvedValue([
+        { url: 'file:///path/to/test.html' }
+      ])
       mockChrome.runtime.getManifest.mockReturnValue({
         content_scripts: [{
           js: ['content-script.js']
@@ -87,11 +96,15 @@ describe('InjectionHandler', () => {
       })
       expect(mockChrome.scripting.registerContentScripts).toHaveBeenCalledTimes(2)
       expect(console.log).toHaveBeenCalledWith(
-        '[InjectionHandler] Successfully re-registered dynamic content script for file:// URLs'
+        '[InjectionHandler] Test mode: Re-registered content script for file:// URLs'
       )
     })
 
     it('should handle re-registration failure', async () => {
+      // Mock test mode detection (file:// URLs present)
+      mockChrome.tabs.query.mockResolvedValue([
+        { url: 'file:///path/to/test.html' }
+      ])
       mockChrome.runtime.getManifest.mockReturnValue({
         content_scripts: [{
           js: ['content-script.js']
@@ -103,7 +116,7 @@ describe('InjectionHandler', () => {
       await registerFileUrlContentScript()
 
       expect(console.error).toHaveBeenCalledWith(
-        '[InjectionHandler] Failed to register dynamic content script:',
+        '[InjectionHandler] Test mode: Failed to register file:// content script:',
         expect.any(Error)
       )
     })
