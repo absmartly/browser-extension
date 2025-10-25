@@ -14,6 +14,7 @@ interface URLFilterSectionProps {
 const URLFilterSection = React.memo(function URLFilterSection({ variantIndex, config, onConfigChange, canEdit }: URLFilterSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isFirstRenderRef = useRef(true)
+  const [currentPath, setCurrentPath] = useState<string>('')
 
   const [mode, setMode] = useState<'all' | 'simple' | 'advanced'>(() => {
     if (!config.urlFilter) return 'all'
@@ -27,6 +28,22 @@ const URLFilterSection = React.memo(function URLFilterSection({ variantIndex, co
     if (Array.isArray(config.urlFilter)) return config.urlFilter
     return config.urlFilter.include || []
   })
+
+  // Get current tab's URL on mount
+  useEffect(() => {
+    const getCurrentTabPath = async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (tabs[0]?.url) {
+          const url = new URL(tabs[0].url)
+          setCurrentPath(url.pathname)
+        }
+      } catch (error) {
+        console.error('Failed to get current tab URL:', error)
+      }
+    }
+    getCurrentTabPath()
+  }, [])
 
   const [excludePatterns, setExcludePatterns] = useState<string[]>(() => {
     if (!config.urlFilter || typeof config.urlFilter === 'string' || Array.isArray(config.urlFilter)) {
@@ -128,7 +145,8 @@ const URLFilterSection = React.memo(function URLFilterSection({ variantIndex, co
                 onConfigChange({ urlFilter: undefined })
               } else if (newMode === 'simple' || newMode === 'advanced') {
                 if (simplePatterns.length === 0) {
-                  setSimplePatterns([''])
+                  // Pre-fill with current path if available, otherwise empty string
+                  setSimplePatterns([currentPath || ''])
                 }
               }
             }}
