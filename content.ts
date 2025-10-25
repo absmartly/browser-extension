@@ -751,7 +751,7 @@ function removePreviewHeader() {
 }
 
 // Inject the SDK bridge bundle into the page
-async function injectSDKPluginScript(): Promise<void> {
+async function injectSDKBridgeScript(): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     try {
       const script = document.createElement('script')
@@ -773,31 +773,31 @@ async function injectSDKPluginScript(): Promise<void> {
   })
 }
 
-// Don't automatically inject SDK plugin on every page
+// Don't automatically inject SDK bridge on every page
 // Only inject when the user actually opens the sidebar or uses extension features
 // This prevents breaking websites that don't need the SDK
-let sdkPluginInjected = false
-let sdkPluginInjecting = false
+let sdkBridgeInjected = false
+let sdkBridgeInjecting = false
 
 async function ensureSDKPluginInjected() {
-  if (!sdkPluginInjected && !sdkPluginInjecting) {
-    console.log('[Content Script] 🚀 Injecting SDK plugin...')
-    sdkPluginInjecting = true
+  if (!sdkBridgeInjected && !sdkBridgeInjecting) {
+    console.log('[Content Script] 🚀 Injecting SDK bridge...')
+    sdkBridgeInjecting = true
     try {
-      await injectSDKPluginScript()
-      sdkPluginInjected = true
-      console.log('[Content Script] ✅ SDK plugin injected successfully')
+      await injectSDKBridgeScript()
+      sdkBridgeInjected = true
+      console.log('[Content Script] ✅ SDK bridge injected successfully')
     } catch (error) {
-      console.error('[Content Script] ❌ Failed to inject SDK plugin:', error)
+      console.error('[Content Script] ❌ Failed to inject SDK bridge:', error)
     } finally {
-      sdkPluginInjecting = false
+      sdkBridgeInjecting = false
     }
     // Give the script a moment to set up its message listener
     await new Promise(resolve => setTimeout(resolve, 50))
-  } else if (sdkPluginInjected) {
-    console.log('[Content Script] ℹ️ SDK plugin already injected')
-  } else if (sdkPluginInjecting) {
-    console.log('[Content Script] ⏳ SDK plugin injection already in progress')
+  } else if (sdkBridgeInjected) {
+    console.log('[Content Script] ℹ️ SDK bridge already injected')
+  } else if (sdkBridgeInjecting) {
+    console.log('[Content Script] ⏳ SDK bridge injection already in progress')
   }
 }
 
@@ -1193,8 +1193,8 @@ function closeJSONEditor() {
   }
 }
 
-// Automatically inject SDK plugin on page load to capture SDK events passively
+// Automatically inject SDK bridge on page load to capture SDK events passively
 // This allows the Events Debug page to receive events without needing to be opened first
 ensureSDKPluginInjected().catch(err => {
-  debugError('[Content Script] Failed to auto-inject SDK plugin:', err)
+  debugError('[Content Script] Failed to auto-inject SDK bridge:', err)
 })
