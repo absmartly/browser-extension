@@ -766,25 +766,12 @@ test.describe('Visual Editor Complete Workflow', () => {
       await debugWait()
     })
 
-    await test.step('Test undo/redo functionality', async () => {
-      console.log('\n🔄 Testing undo/redo with multiple changes to same element...')
+    await test.step('Test undo/redo functionality for all change types', async () => {
+      console.log('\n🔄 Testing comprehensive undo/redo for all change types...')
 
-      // Get the current paragraph text (should be "Modified text!" from previous test)
-      const currentText = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  📝 Current text: "${currentText}"`)
-
-      // Make 3 more changes to the same paragraph
-      const textChanges = ['Undo test 1', 'Undo test 2', 'Undo test 3']
-
-      for (let i = 0; i < textChanges.length; i++) {
-        console.log(`  ✏️  Making change ${i + 1}: "${textChanges[i]}"`)
-
-        // Ensure all elements are deselected and context menu is removed
+      // Helper to deselect all elements
+      const deselectAll = async () => {
         await testPage.evaluate(() => {
-          // Deselect ALL elements (not just the paragraph)
           document.querySelectorAll('.absmartly-selected, .absmartly-editing').forEach(el => {
             el.classList.remove('absmartly-selected', 'absmartly-editing')
             if (el instanceof HTMLElement && el.contentEditable === 'true') {
@@ -792,129 +779,239 @@ test.describe('Visual Editor Complete Workflow', () => {
               el.blur()
             }
           })
-          // Remove any existing context menu
           document.getElementById('absmartly-menu-host')?.remove()
         })
-
-        // Click somewhere else first to deselect everything
         await testPage.locator('body').click({ position: { x: 5, y: 5 } })
-
-        // Left-click on paragraph to show context menu
-        // Use dispatchEvent to ensure menu handler is triggered in headless mode
-        await testPage.locator('#test-paragraph').evaluate((el) => {
-          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
-
-        // Wait for context menu and click Edit Text
-        await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-        // Use dispatchEvent for menu item click in headless mode
-        await testPage.locator('.menu-item:has-text("Edit Text")').evaluate((el) => {
-          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
-
-        // Wait for element to be editable
-        await testPage.waitForFunction(() => {
-          const para = document.querySelector('#test-paragraph')
-          return para?.getAttribute('contenteditable') === 'true'
-        })
-
-        // Clear and type new text
-        const paragraph = testPage.locator('#test-paragraph')
-        await paragraph.fill(textChanges[i])
-
-        // Explicitly blur the element to trigger save
-        await testPage.evaluate(() => {
-          const para = document.querySelector('#test-paragraph') as HTMLElement
-          para?.blur()
-        })
-
-        // Wait for change to be committed
-        await testPage.waitForFunction((expectedText) => {
-          const para = document.querySelector('#test-paragraph')
-          return para?.textContent?.trim() === expectedText
-        }, textChanges[i])
-
-        // DEBUG: Check what was stored in undo action
-        const debug = await testPage.evaluate(() => ({
-          trackChange: document.body.getAttribute('data-trackchange-newvalue'),
-          undoAction: document.body.getAttribute('data-undoaction-newvalue')
-        }))
-        console.log(`  ✓ Change ${i + 1} applied: "${textChanges[i]}" (trackChange: ${debug.trackChange}, undoAction: ${debug.undoAction})`)
       }
 
-      // Verify we're on the last change
-      const afterChanges = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
+      // Helper to click element and open context menu
+      const openContextMenu = async (selector: string) => {
+        await deselectAll()
+        await testPage.locator(selector).evaluate((el) => {
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
+        await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
+      }
+
+      // 1. TEST TEXT CHANGE UNDO/REDO
+      console.log('\n  1️⃣  Testing TEXT change undo/redo...')
+      const originalText = await testPage.locator('#test-paragraph').textContent()
+
+      await openContextMenu('#test-paragraph')
+      await testPage.locator('.menu-item:has-text("Edit Text")').evaluate((el) => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
-      expect(afterChanges).toBe('Undo test 3')
-      console.log(`  ✓ Final text after changes: "${afterChanges}"`)
+      await testPage.waitForFunction(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.getAttribute('contenteditable') === 'true'
+      })
+      await testPage.locator('#test-paragraph').fill('Text undo test')
+      await testPage.evaluate(() => {
+        const para = document.querySelector('#test-paragraph') as HTMLElement
+        para?.blur()
+      })
+      await testPage.waitForFunction(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.textContent?.trim() === 'Text undo test'
+      })
 
-      // Now test undo - changes are tracked individually, so we need 3 undo operations
-      // to go back from "Undo test 3" to "Modified text!"
-      console.log('\n  ⏪ Testing undo with individual change tracking...')
+      let currentText = await testPage.locator('#test-paragraph').textContent()
+      expect(currentText?.trim()).toBe('Text undo test')
+      console.log(`  ✓ Text changed to: "${currentText?.trim()}"`)
 
-      // Undo 1: "Undo test 3" -> "Undo test 2"
+      // Undo text change
       await testPage.locator('[data-action="undo"]').click()
-      const afterUndo1 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Undo 1: Text is now "${afterUndo1}"`)
-      expect(afterUndo1).toBe('Undo test 2')
+      currentText = await testPage.locator('#test-paragraph').textContent()
+      expect(currentText?.trim()).toBe(originalText?.trim())
+      console.log(`  ✓ Undo restored text to: "${currentText?.trim()}"`)
 
-      // Undo 2: "Undo test 2" -> "Undo test 1"
+      // Redo text change
+      await testPage.locator('[data-action="redo"]').click()
+      currentText = await testPage.locator('#test-paragraph').textContent()
+      expect(currentText?.trim()).toBe('Text undo test')
+      console.log(`  ✓ Redo reapplied text to: "${currentText?.trim()}"`)
+
+      // 2. TEST HTML CHANGE UNDO/REDO
+      console.log('\n  2️⃣  Testing HTML change undo/redo...')
+      const originalHtml = await testPage.locator('#test-paragraph').innerHTML()
+
+      await openContextMenu('#test-paragraph')
+      await testPage.locator('.menu-item:has-text("Edit HTML")').evaluate((el) => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      await testPage.waitForSelector('.html-editor-dialog', { state: 'visible' })
+
+      // Clear and type new HTML in CodeMirror
+      await testPage.evaluate(() => {
+        const cm = document.querySelector('.cm-content') as HTMLElement
+        if (cm) {
+          cm.textContent = '<strong>Bold HTML test</strong>'
+          cm.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+      })
+
+      await testPage.locator('.html-editor-dialog button:has-text("Save")').click()
+      await testPage.locator('.html-editor-dialog').waitFor({ state: 'hidden' })
+
+      let currentHtml = await testPage.locator('#test-paragraph').innerHTML()
+      expect(currentHtml).toContain('<strong>Bold HTML test</strong>')
+      console.log(`  ✓ HTML changed to contain: <strong>Bold HTML test</strong>`)
+
+      // Undo HTML change
       await testPage.locator('[data-action="undo"]').click()
-      const afterUndo2 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Undo 2: Text is now "${afterUndo2}"`)
-      expect(afterUndo2).toBe('Undo test 1')
+      currentHtml = await testPage.locator('#test-paragraph').innerHTML()
+      expect(currentHtml).toBe(originalHtml)
+      console.log(`  ✓ Undo restored original HTML`)
 
-      // Undo 3: "Undo test 1" -> "Modified text!"
+      // Redo HTML change
+      await testPage.locator('[data-action="redo"]').click()
+      currentHtml = await testPage.locator('#test-paragraph').innerHTML()
+      expect(currentHtml).toContain('<strong>Bold HTML test</strong>')
+      console.log(`  ✓ Redo reapplied HTML change`)
+
+      // 3. TEST STYLE CHANGE UNDO/REDO
+      console.log('\n  3️⃣  Testing STYLE change undo/redo...')
+      const originalColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
+
+      await openContextMenu('#test-paragraph')
+      await testPage.locator('.menu-item:has-text("Change Style")').evaluate((el) => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      await testPage.waitForSelector('.style-editor-dialog', { state: 'visible' })
+
+      // Add color style
+      await testPage.locator('input[name="color"]').fill('#ff0000')
+      await testPage.locator('.style-editor-dialog button:has-text("Apply")').click()
+      await testPage.locator('.style-editor-dialog').waitFor({ state: 'hidden' })
+
+      let currentColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
+      expect(currentColor).toBe('rgb(255, 0, 0)')
+      console.log(`  ✓ Style changed to color: ${currentColor}`)
+
+      // Undo style change
       await testPage.locator('[data-action="undo"]').click()
-      const afterUndo3 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Undo 3: Text is now "${afterUndo3}"`)
-      expect(afterUndo3).toBe('Modified text!')
+      currentColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
+      expect(currentColor).toBe(originalColor)
+      console.log(`  ✓ Undo restored original color`)
 
-      // Now test redo - should redo each change individually
-      console.log('\n  ⏩ Testing redo...')
-
-      // Redo 1: "Modified text!" -> "Undo test 1"
+      // Redo style change
       await testPage.locator('[data-action="redo"]').click()
-      const afterRedo1 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Redo 1: Text is now "${afterRedo1}"`)
-      expect(afterRedo1).toBe('Undo test 1')
+      currentColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
+      expect(currentColor).toBe('rgb(255, 0, 0)')
+      console.log(`  ✓ Redo reapplied style change`)
 
-      // Redo 2: "Undo test 1" -> "Undo test 2"
+      // 4. TEST HIDE/SHOW UNDO/REDO
+      console.log('\n  4️⃣  Testing HIDE/SHOW undo/redo...')
+      let isVisible = await testPage.locator('#test-paragraph').isVisible()
+      expect(isVisible).toBe(true)
+
+      await openContextMenu('#test-paragraph')
+      await testPage.locator('.menu-item:has-text("Hide Element")').evaluate((el) => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+
+      isVisible = await testPage.locator('#test-paragraph').isVisible()
+      expect(isVisible).toBe(false)
+      console.log(`  ✓ Element hidden`)
+
+      // Undo hide (should show)
+      await testPage.locator('[data-action="undo"]').click()
+      isVisible = await testPage.locator('#test-paragraph').isVisible()
+      expect(isVisible).toBe(true)
+      console.log(`  ✓ Undo showed element`)
+
+      // Redo hide
       await testPage.locator('[data-action="redo"]').click()
-      const afterRedo2 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Redo 2: Text is now "${afterRedo2}"`)
-      expect(afterRedo2).toBe('Undo test 2')
+      isVisible = await testPage.locator('#test-paragraph').isVisible()
+      expect(isVisible).toBe(false)
+      console.log(`  ✓ Redo hid element again`)
 
-      // Redo 3: "Undo test 2" -> "Undo test 3"
+      // Show it back for next tests
+      await testPage.locator('[data-action="undo"]').click()
+
+      // 5. TEST DELETE/RESTORE UNDO/REDO
+      console.log('\n  5️⃣  Testing DELETE/RESTORE undo/redo...')
+      let elementExists = await testPage.locator('#test-paragraph').count()
+      expect(elementExists).toBe(1)
+
+      await openContextMenu('#test-paragraph')
+      await testPage.locator('.menu-item:has-text("Delete Element")').evaluate((el) => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+
+      elementExists = await testPage.locator('#test-paragraph').count()
+      expect(elementExists).toBe(0)
+      console.log(`  ✓ Element deleted`)
+
+      // Undo delete (should restore)
+      await testPage.locator('[data-action="undo"]').click()
+      elementExists = await testPage.locator('#test-paragraph').count()
+      expect(elementExists).toBe(1)
+      console.log(`  ✓ Undo restored element`)
+
+      // Redo delete
       await testPage.locator('[data-action="redo"]').click()
-      const afterRedo3 = await testPage.evaluate(() => {
-        const para = document.querySelector('#test-paragraph')
-        return para?.textContent?.trim()
-      })
-      console.log(`  ✓ Redo 3: Text is now "${afterRedo3}"`)
-      expect(afterRedo3).toBe('Undo test 3')
+      elementExists = await testPage.locator('#test-paragraph').count()
+      expect(elementExists).toBe(0)
+      console.log(`  ✓ Redo deleted element again`)
 
-      console.log('\n✅ Undo/redo with individual change tracking working correctly!')
-      console.log('  • Each change tracked individually for granular undo/redo')
-      console.log(`  • 3 undos: "Undo test 3" -> "Undo test 2" -> "Undo test 1" -> "Modified text!"`)
-      console.log(`  • 3 redos: "Modified text!" -> "Undo test 1" -> "Undo test 2" -> "Undo test 3"`)
+      // Restore it back for next tests
+      await testPage.locator('[data-action="undo"]').click()
+
+      // 6. TEST INSERT BLOCK UNDO/REDO
+      console.log('\n  6️⃣  Testing INSERT BLOCK undo/redo...')
+      const initialBlockCount = await testPage.evaluate(() => {
+        return document.querySelectorAll('.inserted-test-block').length
+      })
+      expect(initialBlockCount).toBe(0)
+
+      await openContextMenu('#test-paragraph')
+      await testPage.locator('.menu-item:has-text("Insert HTML Block")').evaluate((el) => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      await testPage.waitForSelector('.inserter-container', { state: 'visible' })
+
+      // Type HTML in CodeMirror
+      await testPage.evaluate(() => {
+        const cm = document.querySelector('.cm-content') as HTMLElement
+        if (cm) {
+          cm.textContent = '<div class="inserted-test-block">Inserted block</div>'
+          cm.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+      })
+
+      await testPage.locator('.inserter-button-insert').click()
+      await testPage.locator('.inserter-container').waitFor({ state: 'hidden' })
+
+      let blockCount = await testPage.evaluate(() => {
+        return document.querySelectorAll('.inserted-test-block').length
+      })
+      expect(blockCount).toBe(1)
+      console.log(`  ✓ Block inserted`)
+
+      // Undo insert (should remove)
+      await testPage.locator('[data-action="undo"]').click()
+      blockCount = await testPage.evaluate(() => {
+        return document.querySelectorAll('.inserted-test-block').length
+      })
+      expect(blockCount).toBe(0)
+      console.log(`  ✓ Undo removed inserted block`)
+
+      // Redo insert
+      await testPage.locator('[data-action="redo"]').click()
+      blockCount = await testPage.evaluate(() => {
+        return document.querySelectorAll('.inserted-test-block').length
+      })
+      expect(blockCount).toBe(1)
+      console.log(`  ✓ Redo inserted block again`)
+
+      console.log('\n✅ All undo/redo tests PASSED!')
+      console.log('  ✓ Text change undo/redo works')
+      console.log('  ✓ HTML change undo/redo works')
+      console.log('  ✓ Style change undo/redo works')
+      console.log('  ✓ Hide/show undo/redo works')
+      console.log('  ✓ Delete/restore undo/redo works')
+      console.log('  ✓ Insert block undo/redo works')
     })
 
     await test.step('Test undo/redo button disabled states', async () => {
