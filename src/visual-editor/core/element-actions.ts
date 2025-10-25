@@ -9,6 +9,7 @@ import DOMPurify from 'dompurify'
 
 export interface ElementActionsOptions {
   onChangesUpdate: (changes: DOMChange[]) => void
+  setHoverEnabled?: (enabled: boolean) => void
 }
 
 /**
@@ -315,7 +316,14 @@ export class ElementActions {
     }
 
     try {
+      // Disable hover tooltips while block inserter is open
+      this.options.setHoverEnabled?.(false)
+
       const options = await this.blockInserter.show(this.selectedElement)
+
+      // Re-enable hover tooltips after block inserter closes
+      this.options.setHoverEnabled?.(true)
+
       if (!options) {
         return
       }
