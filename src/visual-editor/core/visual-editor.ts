@@ -108,6 +108,9 @@ export class VisualEditor {
       {
         onChangesUpdate: (changes: DOMChange[]) => {
           this.options.onChangesUpdate(changes)
+        },
+        setHoverEnabled: (enabled: boolean) => {
+          this.eventHandlers.setHoverEnabled(enabled)
         }
       }
     )
