@@ -465,6 +465,8 @@ export class EditorCoordinator {
 
     // Set editing mode to prevent selection while HTML editor is open
     this.eventHandlers.setEditing(true)
+    // Disable hover tooltips while editor is open
+    this.eventHandlers.setHoverEnabled(false)
 
     const currentHtml = element.innerHTML
     const newHtml = await this.htmlEditor.show(element, currentHtml)
@@ -487,8 +489,9 @@ export class EditorCoordinator {
       this.notifications.show('HTML updated successfully', '', 'success')
     }
 
-    // Clear editing mode after HTML editor closes
+    // Clear editing mode and re-enable hover tooltips after HTML editor closes
     this.eventHandlers.setEditing(false)
+    this.eventHandlers.setHoverEnabled(true)
   }
 
   handleSelectRelativeElement(element: Element): void {

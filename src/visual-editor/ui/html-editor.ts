@@ -9,6 +9,7 @@ import { EditorState } from '@codemirror/state'
 import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { basicSetup } from 'codemirror'
+import DOMPurify from 'dompurify'
 
 export class HtmlEditor {
   private stateManager: StateManager
@@ -21,6 +22,9 @@ export class HtmlEditor {
 
   async show(element: Element, currentHtml: string): Promise<string | null> {
     return new Promise((resolve) => {
+      // Store original HTML for cancellation
+      const originalHtml = element.innerHTML
+
       // Create editor host in regular DOM
       this.editorHost = document.createElement('div')
       this.editorHost.id = 'absmartly-html-editor-host'
@@ -51,7 +55,7 @@ export class HtmlEditor {
 
       const title = document.createElement('h3')
       title.className = 'editor-title'
-      title.textContent = 'Edit HTML'
+      title.textContent = 'Edit HTML (Live Preview)'
 
       const tagInfo = document.createElement('span')
       tagInfo.className = 'editor-tag-info'
@@ -59,6 +63,34 @@ export class HtmlEditor {
 
       header.appendChild(title)
       header.appendChild(tagInfo)
+
+      // Make header draggable
+      let isDragging = false
+      let currentX = 0
+      let currentY = 0
+      let initialX = 0
+      let initialY = 0
+
+      header.style.cursor = 'move'
+
+      header.addEventListener('mousedown', (e) => {
+        isDragging = true
+        initialX = e.clientX - currentX
+        initialY = e.clientY - currentY
+      })
+
+      document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          e.preventDefault()
+          currentX = e.clientX - initialX
+          currentY = e.clientY - initialY
+          container.style.transform = `translate(${currentX}px, ${currentY}px)`
+        }
+      })
+
+      document.addEventListener('mouseup', () => {
+        isDragging = false
+      })
 
       // Create editor container
       const editorContainer = document.createElement('div')
@@ -110,6 +142,18 @@ export class HtmlEditor {
             html(),
             oneDark,
             EditorView.lineWrapping,
+            // Add real-time preview on change
+            EditorView.updateListener.of((update) => {
+              if (update.docChanged) {
+                const newValue = update.state.doc.toString()
+                // Apply changes directly to the element for live preview
+                try {
+                  element.innerHTML = DOMPurify.sanitize(newValue)
+                } catch (err) {
+                  // Ignore errors during typing
+                }
+              }
+            })
           ]
         })
 
@@ -145,6 +189,8 @@ export class HtmlEditor {
       cancelBtn.addEventListener('click', (e) => {
         e.stopPropagation()
         e.preventDefault()
+        // Restore original HTML
+        element.innerHTML = originalHtml
         this.cleanup()
         resolve(null)
       })
@@ -164,6 +210,8 @@ export class HtmlEditor {
       const escapeHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape' && this.editorHost) {
           document.removeEventListener('keydown', escapeHandler)
+          // Restore original HTML
+          element.innerHTML = originalHtml
           this.cleanup()
           resolve(null)
         }
@@ -173,6 +221,8 @@ export class HtmlEditor {
       // Prevent backdrop clicks from closing (only click outside container)
       backdrop.addEventListener('click', (e) => {
         if (e.target === backdrop) {
+          // Restore original HTML
+          element.innerHTML = originalHtml
           this.cleanup()
           resolve(null)
         }
