@@ -207,14 +207,7 @@ function SidebarContent() {
     }
 
     try {
-      // ALWAYS show modal when forceRequest is true (after 401 error)
-      if (forceRequest) {
-        console.log('[ExtensionUI] 🔐 Force requesting - showing permission modal...')
-        setNeedsPermissions(true)
-        return false
-      }
-
-      // Otherwise check if we already have permissions
+      // Check if we already have permissions first
       const hasCookies = await chrome.permissions.contains({ permissions: ['cookies'] })
       const hasHost = await chrome.permissions.contains({ origins: ['https://*.absmartly.com/*'] })
 
@@ -419,7 +412,7 @@ function SidebarContent() {
       const error = err as { isAuthError?: boolean; message?: string }
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
         console.log('[loadFavorites] AUTH_EXPIRED error detected')
-        // ALWAYS request permissions on 401 (forceRequest: true)
+        // Check if permissions are missing - only show modal if they are
         const permissionsGranted = await requestPermissionsIfNeeded(true)
         if (permissionsGranted) {
           // Retry loading after permissions granted
@@ -463,7 +456,7 @@ function SidebarContent() {
       const error = err as { isAuthError?: boolean; message?: string }
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
         console.log('[loadEditorResources] AUTH_EXPIRED error detected')
-        // ALWAYS request permissions on 401 (forceRequest: true)
+        // Check if permissions are missing - only show modal if they are
         const permissionsGranted = await requestPermissionsIfNeeded(true)
         if (permissionsGranted) {
           // Retry loading after permissions granted
@@ -538,17 +531,15 @@ function SidebarContent() {
         console.log('[loadExperiments] AUTH_EXPIRED error detected')
         setIsAuthExpired(true)
 
-        // ALWAYS request permissions on 401 (forceRequest: true) because contains() is unreliable
+        // Check if permissions are missing - only show modal if they are
         const permissionsGranted = await requestPermissionsIfNeeded(true)
 
         if (permissionsGranted) {
           // Retry loading after permissions granted
           console.log('[loadExperiments] Retrying after permissions granted...')
           setTimeout(() => loadExperiments(true, page, size, customFilters), 500)
-        } else if (config?.authMethod === 'jwt') {
-          // User denied permissions
-          setError('Cookie permissions required for JWT authentication. Please reload and grant permissions.')
         } else {
+          // If permissions check didn't show modal, user is likely logged out
           setError('Your session has expired. Please log in again.')
         }
       } else {
