@@ -259,28 +259,20 @@ describe('api-client', () => {
       await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('AUTH_EXPIRED')
     })
 
-    it('should retry with JWT when API key fails with 401', async () => {
+    it('should throw AUTH_EXPIRED when API key fails with 401', async () => {
       const jwtToken = 'header.payload.signature'
       mockChrome.cookies.getAll.mockResolvedValue([
         { name: 'jwt', value: jwtToken, domain: '.absmartly.com' }
       ])
 
-      jest.mocked(axios)
-        .mockRejectedValueOnce({ response: { status: 401 } })
-        .mockResolvedValueOnce({ data: { success: true } })
+      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
 
-      const result = await makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)
-
-      expect(result).toEqual({ success: true })
-      expect(axios).toHaveBeenCalledTimes(2)
-      expect(axios).toHaveBeenLastCalledWith(expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': `JWT ${jwtToken}`
-        })
-      }))
+      // No retries - auth failures throw AUTH_EXPIRED immediately
+      await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('AUTH_EXPIRED')
+      expect(axios).toHaveBeenCalledTimes(1)
     })
 
-    it('should retry with API key when JWT fails with 401', async () => {
+    it('should throw AUTH_EXPIRED when JWT fails with 401', async () => {
       const jwtConfig: ABsmartlyConfig = {
         apiEndpoint: 'https://api.absmartly.com',
         apiKey: 'backup-api-key',
@@ -291,19 +283,11 @@ describe('api-client', () => {
         { name: 'jwt', value: 'expired.jwt.token', domain: '.absmartly.com' }
       ])
 
-      jest.mocked(axios)
-        .mockRejectedValueOnce({ response: { status: 401 } })
-        .mockResolvedValueOnce({ data: { success: true } })
+      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
 
-      const result = await makeAPIRequest('GET', '/experiments', undefined, true, jwtConfig)
-
-      expect(result).toEqual({ success: true })
-      expect(axios).toHaveBeenCalledTimes(2)
-      expect(axios).toHaveBeenLastCalledWith(expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'Api-Key backup-api-key'
-        })
-      }))
+      // No retries - auth failures throw AUTH_EXPIRED immediately
+      await expect(makeAPIRequest('GET', '/experiments', undefined, true, jwtConfig)).rejects.toThrow('AUTH_EXPIRED')
+      expect(axios).toHaveBeenCalledTimes(1)
     })
 
     it('should not retry when retryWithJWT is false', async () => {
@@ -315,6 +299,7 @@ describe('api-client', () => {
 
     it('should throw original error for non-auth errors', async () => {
       const networkError = new Error('Network timeout')
+      mockChrome.cookies.getAll.mockResolvedValue([])
       jest.mocked(axios).mockRejectedValue(networkError)
 
       await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('Network timeout')

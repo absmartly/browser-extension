@@ -211,10 +211,7 @@ describe('AvatarProxy', () => {
 
       expect(response).toBe(mockCachedResponse)
       expect(mockFetch).not.toHaveBeenCalled()
-      expect(console.log).toHaveBeenCalledWith(
-        '[AvatarProxy] Returning cached avatar:',
-        'https://cdn.example.com/avatar.png'
-      )
+      // Console logging was removed but caching functionality still works
     })
 
     it('should fetch avatar with JWT authentication', async () => {
@@ -395,10 +392,7 @@ describe('AvatarProxy', () => {
           status: 200
         })
       )
-      expect(console.log).toHaveBeenCalledWith(
-        '[AvatarProxy] Cached avatar:',
-        'https://cdn.example.com/avatar.png'
-      )
+      // Console logging was removed but caching functionality still works
     })
 
     it('should set appropriate cache headers', async () => {
@@ -449,10 +443,7 @@ describe('AvatarProxy', () => {
 
       handleFetchEvent(mockEvent)
 
-      expect(console.log).toHaveBeenCalledWith(
-        '[AvatarProxy] Intercepting avatar request:',
-        mockEvent.request.url
-      )
+      // Console logging was removed but interception functionality still works
       expect(mockEvent.respondWith).toHaveBeenCalledWith(expect.any(Promise))
     })
 
