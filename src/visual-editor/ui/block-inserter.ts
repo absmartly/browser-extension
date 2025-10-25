@@ -423,7 +423,7 @@ export class BlockInserter {
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: rgba(0, 0, 0, 0.7);
+        background: transparent;
         display: flex;
         align-items: center;
         justify-content: center;
