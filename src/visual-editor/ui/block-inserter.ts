@@ -20,6 +20,7 @@ export class BlockInserter {
   private dialogHost: HTMLElement | null = null
   private editorView: EditorView | null = null
   private previewContainer: HTMLElement | null = null
+  private previewElement: HTMLElement | null = null
   private resolveCallback: ((value: InsertBlockOptions | null) => void) | null = null
 
   async show(element: Element): Promise<InsertBlockOptions | null> {
@@ -65,7 +66,7 @@ export class BlockInserter {
 
     const title = document.createElement('h3')
     title.className = 'inserter-title'
-    title.textContent = 'Insert HTML Block'
+    title.textContent = 'Insert HTML Block (Live Preview)'
 
     const subtitle = document.createElement('div')
     subtitle.className = 'inserter-subtitle'
@@ -74,11 +75,39 @@ export class BlockInserter {
     header.appendChild(title)
     header.appendChild(subtitle)
 
+    // Make header draggable
+    let isDragging = false
+    let currentX = 0
+    let currentY = 0
+    let initialX = 0
+    let initialY = 0
+
+    header.style.cursor = 'move'
+
+    header.addEventListener('mousedown', (e) => {
+      isDragging = true
+      initialX = e.clientX - currentX
+      initialY = e.clientY - currentY
+    })
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        e.preventDefault()
+        currentX = e.clientX - initialX
+        currentY = e.clientY - initialY
+        container.style.transform = `translate(${currentX}px, ${currentY}px)`
+      }
+    })
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false
+    })
+
     const content = document.createElement('div')
     content.className = 'inserter-content'
 
-    const leftPanel = document.createElement('div')
-    leftPanel.className = 'inserter-panel inserter-panel-left'
+    const editorPanel = document.createElement('div')
+    editorPanel.className = 'inserter-panel inserter-panel-editor'
 
     const editorLabel = document.createElement('div')
     editorLabel.className = 'inserter-label'
@@ -88,31 +117,16 @@ export class BlockInserter {
     editorContainer.id = 'block-inserter-codemirror'
     editorContainer.className = 'inserter-editor'
 
-    leftPanel.appendChild(editorLabel)
-    leftPanel.appendChild(editorContainer)
-
-    const rightPanel = document.createElement('div')
-    rightPanel.className = 'inserter-panel inserter-panel-right'
-
-    const previewLabel = document.createElement('div')
-    previewLabel.className = 'inserter-label'
-    previewLabel.innerHTML = '<span class="icon">👁️</span> Live Preview'
-
-    this.previewContainer = document.createElement('div')
-    this.previewContainer.className = 'inserter-preview'
-    this.previewContainer.innerHTML = '<div class="preview-placeholder">Type HTML to see preview...</div>'
-
     const errorContainer = document.createElement('div')
     errorContainer.id = 'inserter-error'
     errorContainer.className = 'inserter-error'
     errorContainer.style.display = 'none'
 
-    rightPanel.appendChild(previewLabel)
-    rightPanel.appendChild(this.previewContainer)
-    rightPanel.appendChild(errorContainer)
+    editorPanel.appendChild(editorLabel)
+    editorPanel.appendChild(editorContainer)
+    editorPanel.appendChild(errorContainer)
 
-    content.appendChild(leftPanel)
-    content.appendChild(rightPanel)
+    content.appendChild(editorPanel)
 
     const positionGroup = document.createElement('div')
     positionGroup.className = 'inserter-position-group'
@@ -140,6 +154,10 @@ export class BlockInserter {
       positionOptions.querySelectorAll('.position-btn').forEach(b => b.classList.remove('position-btn-selected'))
       btn.classList.add('position-btn-selected')
       selectedPosition = btn.dataset.position as 'before' | 'after'
+      // Update preview position when position changes
+      if (this.editorView && this.previewElement) {
+        this.updateLivePreview(this.editorView.state.doc.toString(), element, selectedPosition)
+      }
     }
 
     beforeBtn.addEventListener('click', () => updatePosition(beforeBtn))
@@ -176,6 +194,16 @@ export class BlockInserter {
 
     const defaultHtml = '<div class="new-block">\n  <!-- Your content here -->\n  <p>New content</p>\n</div>'
 
+    // Create preview element on the page
+    this.previewElement = document.createElement('div')
+    this.previewElement.id = 'absmartly-block-inserter-preview'
+    this.previewElement.style.cssText = `
+      outline: 2px dashed #10b981;
+      outline-offset: 4px;
+      background: rgba(16, 185, 129, 0.1);
+      min-height: 20px;
+    `
+
     setTimeout(() => {
       const startState = EditorState.create({
         doc: defaultHtml,
@@ -187,7 +215,7 @@ export class BlockInserter {
           keymap.of(defaultKeymap),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
-              this.updatePreview(update.state.doc.toString())
+              this.updateLivePreview(update.state.doc.toString(), element, selectedPosition)
             }
           })
         ]
@@ -198,7 +226,8 @@ export class BlockInserter {
         parent: editorContainer
       })
 
-      this.updatePreview(defaultHtml)
+      // Insert initial preview element
+      this.updateLivePreview(defaultHtml, element, selectedPosition)
       this.editorView.focus()
     }, 10)
 
@@ -258,27 +287,39 @@ export class BlockInserter {
     document.addEventListener('keydown', escHandler)
   }
 
-  private updatePreview(html: string): void {
-    if (!this.previewContainer) return
+  private updateLivePreview(html: string, element: Element, position: 'before' | 'after'): void {
+    if (!this.previewElement) return
 
     this.hideError()
 
+    // Remove preview element if already inserted
+    if (this.previewElement.parentElement) {
+      this.previewElement.remove()
+    }
+
     if (!html.trim()) {
-      this.previewContainer.innerHTML = '<div class="preview-placeholder">Type HTML to see preview...</div>'
-      return
+      this.previewElement.innerHTML = '<div style="padding: 8px; color: #666; font-style: italic;">Type HTML to see preview...</div>'
+    } else {
+      const validationResult = this.validateHTML(html)
+      if (!validationResult.valid) {
+        this.showError(validationResult.error || 'Invalid HTML')
+        this.previewElement.innerHTML = '<div style="padding: 8px; color: #c33; background: #fee; border-radius: 4px;">Invalid HTML - see error below</div>'
+      } else {
+        try {
+          const sanitized = DOMPurify.sanitize(html)
+          this.previewElement.innerHTML = sanitized
+        } catch (error) {
+          this.showError(error instanceof Error ? error.message : 'Unknown error')
+          this.previewElement.innerHTML = '<div style="padding: 8px; color: #c33;">Preview error</div>'
+        }
+      }
     }
 
-    const validationResult = this.validateHTML(html)
-    if (!validationResult.valid) {
-      this.previewContainer.innerHTML = `<div class="preview-error"><strong>⚠️ Preview Error</strong><p>${validationResult.error}</p></div>`
-      return
-    }
-
-    try {
-      const sanitized = DOMPurify.sanitize(html)
-      this.previewContainer.innerHTML = `<div class="preview-content">${sanitized}</div>`
-    } catch (error) {
-      this.previewContainer.innerHTML = `<div class="preview-error"><strong>⚠️ Preview Error</strong><p>${error instanceof Error ? error.message : 'Unknown error'}</p></div>`
+    // Insert preview element at the correct position
+    if (position === 'before') {
+      element.parentElement?.insertBefore(this.previewElement, element)
+    } else {
+      element.parentElement?.insertBefore(this.previewElement, element.nextSibling)
     }
   }
 
@@ -352,6 +393,12 @@ export class BlockInserter {
       this.dialogHost = null
     }
 
+    // Remove preview element from the page
+    if (this.previewElement && this.previewElement.parentElement) {
+      this.previewElement.remove()
+    }
+    this.previewElement = null
+
     this.previewContainer = null
     // Don't call resolveCallback here - it should already be null
     // The caller is responsible for calling it before cleanup
@@ -394,10 +441,9 @@ export class BlockInserter {
         background: #1e1e1e;
         border-radius: 12px;
         box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-        width: 90%;
-        max-width: 1200px;
-        height: 80vh;
-        max-height: 800px;
+        width: 700px;
+        max-width: 90%;
+        height: 600px;
         display: flex;
         flex-direction: column;
         pointer-events: auto;
@@ -438,9 +484,8 @@ export class BlockInserter {
 
       .inserter-content {
         flex: 1;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0;
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
         min-height: 0;
       }
@@ -451,13 +496,9 @@ export class BlockInserter {
         overflow: hidden;
       }
 
-      .inserter-panel-left {
-        border-right: 1px solid #3e3e42;
+      .inserter-panel-editor {
+        flex: 1;
         background: #1e1e1e;
-      }
-
-      .inserter-panel-right {
-        background: #252526;
       }
 
       .inserter-label {
@@ -489,50 +530,6 @@ export class BlockInserter {
 
       .inserter-editor .cm-scroller {
         overflow: auto;
-      }
-
-      .inserter-preview {
-        flex: 1;
-        padding: 16px;
-        overflow: auto;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      }
-
-      .preview-placeholder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: #666;
-        font-size: 14px;
-        font-style: italic;
-      }
-
-      .preview-content {
-        background: white;
-        border-radius: 8px;
-        padding: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        min-height: 100px;
-      }
-
-      .preview-error {
-        background: #fee;
-        border: 1px solid #fcc;
-        border-radius: 8px;
-        padding: 16px;
-        color: #c33;
-      }
-
-      .preview-error strong {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 14px;
-      }
-
-      .preview-error p {
-        font-size: 13px;
-        margin: 0;
       }
 
       .inserter-error {
