@@ -348,6 +348,9 @@ export class ElementActions {
         const config = this.stateManager.getConfig()
         htmlElement.dataset.absmartlyExperiment = config.experimentName || '__preview__'
 
+        // Generate a selector for the inserted element so we can remove it on undo
+        const insertedSelector = this.getSelector(htmlElement)
+
         const change: any = {
           selector: referenceSelector,
           type: 'insert',
@@ -356,7 +359,8 @@ export class ElementActions {
           enabled: true
         }
 
-        this.undoRedoManager.addChange(change, null)
+        // Store the inserted element's selector for undo
+        this.undoRedoManager.addChange(change, { insertedSelector })
 
         this.notifications.show(
           `HTML block inserted ${options.position} selected element`,

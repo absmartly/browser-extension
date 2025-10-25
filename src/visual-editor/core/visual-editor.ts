@@ -529,21 +529,22 @@ export class VisualEditor {
       } else if (change.type === 'style' && oldValue) {
         Object.assign(htmlElement.style, oldValue)
       } else if (change.type === 'remove') {
-        // Undo remove: restore the element
-        if (oldValue && oldValue.html && oldValue.parent) {
-          const parent = document.querySelector(oldValue.parent)
-          if (parent) {
-            const tempContainer = document.createElement('div')
-            tempContainer.innerHTML = oldValue.html
-            const restoredElement = tempContainer.firstElementChild
-            if (restoredElement) {
-              if (oldValue.nextSibling) {
-                const nextSibling = parent.querySelector(`:scope > *:nth-child(${oldValue.nextSibling})`)
-                parent.insertBefore(restoredElement, nextSibling)
-              } else {
-                parent.appendChild(restoredElement)
-              }
+        // Undo remove: show the element again (it was hidden with display: none)
+        // The element was not actually removed, just hidden
+        if (element && htmlElement.style.display === 'none') {
+          // Restore the original display value from stored data
+          const storedData = htmlElement.dataset.absmartlyOriginal
+          if (storedData) {
+            try {
+              const originalData = JSON.parse(storedData)
+              const originalDisplay = originalData.styles?.display || ''
+              htmlElement.style.display = originalDisplay
+            } catch (e) {
+              // If parsing fails, just show the element
+              htmlElement.style.display = ''
             }
+          } else {
+            htmlElement.style.display = ''
           }
         }
       } else if (change.type === 'insert') {
@@ -606,8 +607,10 @@ export class VisualEditor {
       } else if (change.type === 'style' && change.value) {
         Object.assign(htmlElement.style, change.value)
       } else if (change.type === 'remove') {
-        // Redo remove: remove the element again
-        element?.remove()
+        // Redo remove: hide the element again (set display: none)
+        if (element && htmlElement) {
+          htmlElement.style.display = 'none'
+        }
       } else if (change.type === 'insert') {
         // Redo insert: insert the element again
         const insertChange = change as any
