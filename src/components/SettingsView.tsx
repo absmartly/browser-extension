@@ -98,7 +98,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       
       // Set the final values
       setApiKey(loadedApiKey)
-      setApiEndpoint(loadedApiEndpoint)
+      // Pre-fill with https:// if empty
+      setApiEndpoint(loadedApiEndpoint || 'https://')
       setApplicationName(loadedApplicationName)
       setDomChangesFieldName(loadedDomChangesFieldName)
       setAuthMethod(loadedAuthMethod)
@@ -331,11 +332,78 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     }
   }
 
-  const validateForm = () => {
+  const normalizeEndpoint = (endpoint: string): string => {
+    const trimmed = endpoint.trim()
+
+    // Return as-is if already has protocol
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed
+    }
+
+    // Add https:// prefix
+    return `https://${trimmed}`
+  }
+
+  const validateEndpointReachable = async (endpoint: string): Promise<boolean> => {
+    try {
+      // Try to reach the endpoint with a simple HEAD or GET request
+      const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+      const response = await axios.get(`${baseUrl}/health`, {
+        timeout: 5000,
+        validateStatus: () => true // Accept any status code
+      })
+
+      // If we get any response (even 404), the endpoint is reachable
+      return true
+    } catch (error: any) {
+      // Check if it's a network error vs CORS/timeout
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        return false
+      }
+      // CORS errors mean the endpoint exists but blocks us (which is OK)
+      if (error.message?.includes('Network Error')) {
+        // Try a different approach - just check if the domain resolves
+        try {
+          await axios.head(endpoint.replace(/\/+$/, '').replace(/\/v1$/, ''), {
+            timeout: 3000,
+            validateStatus: () => true
+          })
+          return true
+        } catch {
+          return false
+        }
+      }
+      return true // Other errors might just be CORS, assume reachable
+    }
+  }
+
+  const validateForm = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {}
 
-    if (!apiEndpoint.trim()) {
+    if (!apiEndpoint.trim() || apiEndpoint.trim() === 'https://') {
       newErrors.apiEndpoint = 'API Endpoint is required'
+      setErrors(newErrors)
+      return false
+    }
+
+    // Normalize the endpoint
+    const normalizedEndpoint = normalizeEndpoint(apiEndpoint)
+
+    // Validate URL format
+    try {
+      new URL(normalizedEndpoint)
+    } catch {
+      newErrors.apiEndpoint = 'Invalid URL format'
+      setErrors(newErrors)
+      return false
+    }
+
+    // Check if endpoint is reachable
+    const isReachable = await validateEndpointReachable(normalizedEndpoint)
+    if (!isReachable) {
+      newErrors.apiEndpoint = 'Unable to reach the endpoint. Please check the URL and your internet connection.'
+      setErrors(newErrors)
+      return false
     }
 
     if (authMethod === 'apikey' && !apiKey.trim()) {
@@ -347,11 +415,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   }
 
   const handleSave = async () => {
-    if (!validateForm()) return
+    // Validate form (this is now async)
+    const isValid = await validateForm()
+    if (!isValid) return
+
+    // Normalize the endpoint before saving
+    const normalizedEndpoint = normalizeEndpoint(apiEndpoint)
 
     const config: ABsmartlyConfig = {
       apiKey: apiKey.trim() || undefined,
-      apiEndpoint,
+      apiEndpoint: normalizedEndpoint,
       sdkEndpoint: sdkEndpoint.trim() || undefined,
       applicationName: applicationName.trim() || undefined,
       domChangesFieldName: domChangesFieldName.trim() || '__dom_changes',
@@ -365,12 +438,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
     try {
       await setConfig(config)
-      
-      // Store endpoint in localStorage for avatar URLs  
-      if (apiEndpoint) {
-        localStorage.setItem('absmartly-endpoint', apiEndpoint)
+
+      // Store endpoint in localStorage for avatar URLs
+      if (normalizedEndpoint) {
+        localStorage.setItem('absmartly-endpoint', normalizedEndpoint)
       }
-      
+
       // Navigate away - auth check will happen when user returns to settings via loadConfig
       onSave(config)
     } catch (error) {
