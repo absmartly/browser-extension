@@ -48,6 +48,7 @@ export class HtmlEditor {
       backdrop.className = 'editor-backdrop'
 
       const container = document.createElement('div')
+      container.id = 'html-editor-dialog'
       container.className = 'editor-container'
 
       const header = document.createElement('div')
