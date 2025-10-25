@@ -1092,9 +1092,9 @@ test.describe('Visual Editor Complete Workflow', () => {
     // Verify each specific change we made is present with correct details
     console.log('\n  Verifying individual changes:')
 
-    // 1. Edit Text on #test-paragraph - should contain "Undo test 3" (final text after undo/redo test)
-    const hasEditText = allText.includes('#test-paragraph') && allText.includes('Undo test 3')
-    console.log(`  ${hasEditText ? '✓' : '✗'} Edit Text: #test-paragraph → "Undo test 3"`)
+    // 1. Edit Text on #test-paragraph - should contain "Text undo test" (final text after undo/redo test)
+    const hasEditText = allText.includes('#test-paragraph') && allText.includes('Text undo test')
+    console.log(`  ${hasEditText ? '✓' : '✗'} Edit Text: #test-paragraph → "Text undo test"`)
     expect(hasEditText).toBeTruthy()
 
     // 2. Hide #button-1 - should contain style with display:none
@@ -1156,8 +1156,8 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       console.log('  Post-VE state:', postVEState)
 
-      // Verify changes are still applied (text should be "Undo test 3" after undo/redo test)
-      expect(postVEState.paragraphText).toBe('Undo test 3')
+      // Verify changes are still applied (text should be "Bold HTML test" after HTML undo/redo test)
+      expect(postVEState.paragraphText).toBe('Bold HTML test')
       expect(postVEState.button1Display).toBe('none')
       expect(postVEState.button2Display).toBe('none')
       expect(postVEState.testContainerHTML).toContain('HTML Edited!')
