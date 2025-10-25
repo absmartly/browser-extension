@@ -245,6 +245,19 @@ function SidebarContent() {
     }
   }, [config?.authMethod])
 
+  // Auto-refresh experiments when user returns after logging in
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && (isAuthExpired || error) && config && view === 'list') {
+        debugLog('Document became visible with error state, attempting to refresh...')
+        loadExperiments(true, 1, pageSize)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [isAuthExpired, error, config, view, pageSize])
+
   // Track if we've initialized experiments for this session
   const [hasInitialized, setHasInitialized] = useState(false)
   const [filtersInitialized, setFiltersInitialized] = useState(false)
