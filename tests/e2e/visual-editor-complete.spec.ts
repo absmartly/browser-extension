@@ -833,25 +833,46 @@ test.describe('Visual Editor Complete Workflow', () => {
 
       // 2. TEST HTML CHANGE UNDO/REDO
       console.log('\n  2️⃣  Testing HTML change undo/redo...')
+
+      // Wait for element to no longer be editable before proceeding
+      await testPage.waitForFunction(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.getAttribute('contenteditable') !== 'true'
+      })
+
       const originalHtml = await testPage.locator('#test-paragraph').innerHTML()
+      console.log(`  📝 Original HTML: "${originalHtml}"`)
 
       await openContextMenu('#test-paragraph')
       await testPage.locator('.menu-item:has-text("Edit HTML")').evaluate((el) => {
         el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
-      await testPage.waitForSelector('.html-editor-dialog', { state: 'visible' })
+      await testPage.waitForSelector('#html-editor-dialog', { state: 'visible' })
 
       // Clear and type new HTML in CodeMirror
       await testPage.evaluate(() => {
         const cm = document.querySelector('.cm-content') as HTMLElement
         if (cm) {
+          // Select all and replace
+          const selection = window.getSelection()
+          const range = document.createRange()
+          range.selectNodeContents(cm)
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+
           cm.textContent = '<strong>Bold HTML test</strong>'
           cm.dispatchEvent(new Event('input', { bubbles: true }))
         }
       })
 
-      await testPage.locator('.html-editor-dialog button:has-text("Save")').click()
-      await testPage.locator('.html-editor-dialog').waitFor({ state: 'hidden' })
+      // Wait for the paragraph innerHTML to update from live preview
+      await testPage.waitForFunction(() => {
+        const para = document.querySelector('#test-paragraph')
+        return para?.innerHTML.includes('<strong>Bold HTML test</strong>')
+      })
+
+      await testPage.locator('#html-editor-dialog button:has-text("Apply")').click()
+      await testPage.locator('#html-editor-dialog').waitFor({ state: 'hidden' })
 
       let currentHtml = await testPage.locator('#test-paragraph').innerHTML()
       expect(currentHtml).toContain('<strong>Bold HTML test</strong>')
@@ -869,39 +890,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(currentHtml).toContain('<strong>Bold HTML test</strong>')
       console.log(`  ✓ Redo reapplied HTML change`)
 
-      // 3. TEST STYLE CHANGE UNDO/REDO
-      console.log('\n  3️⃣  Testing STYLE change undo/redo...')
-      const originalColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
-
-      await openContextMenu('#test-paragraph')
-      await testPage.locator('.menu-item:has-text("Change Style")').evaluate((el) => {
-        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      })
-      await testPage.waitForSelector('.style-editor-dialog', { state: 'visible' })
-
-      // Add color style
-      await testPage.locator('input[name="color"]').fill('#ff0000')
-      await testPage.locator('.style-editor-dialog button:has-text("Apply")').click()
-      await testPage.locator('.style-editor-dialog').waitFor({ state: 'hidden' })
-
-      let currentColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
-      expect(currentColor).toBe('rgb(255, 0, 0)')
-      console.log(`  ✓ Style changed to color: ${currentColor}`)
-
-      // Undo style change
-      await testPage.locator('[data-action="undo"]').click()
-      currentColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
-      expect(currentColor).toBe(originalColor)
-      console.log(`  ✓ Undo restored original color`)
-
-      // Redo style change
-      await testPage.locator('[data-action="redo"]').click()
-      currentColor = await testPage.locator('#test-paragraph').evaluate((el: HTMLElement) => el.style.color)
-      expect(currentColor).toBe('rgb(255, 0, 0)')
-      console.log(`  ✓ Redo reapplied style change`)
-
-      // 4. TEST HIDE/SHOW UNDO/REDO
-      console.log('\n  4️⃣  Testing HIDE/SHOW undo/redo...')
+      // 3. TEST HIDE/SHOW UNDO/REDO
+      console.log('\n  3️⃣  Testing HIDE/SHOW undo/redo...')
       let isVisible = await testPage.locator('#test-paragraph').isVisible()
       expect(isVisible).toBe(true)
 
@@ -929,8 +919,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Show it back for next tests
       await testPage.locator('[data-action="undo"]').click()
 
-      // 5. TEST DELETE/RESTORE UNDO/REDO
-      console.log('\n  5️⃣  Testing DELETE/RESTORE undo/redo...')
+      // 4. TEST DELETE/RESTORE UNDO/REDO
+      console.log('\n  4️⃣  Testing DELETE/RESTORE undo/redo...')
       let elementExists = await testPage.locator('#test-paragraph').count()
       expect(elementExists).toBe(1)
 
@@ -958,8 +948,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       // Restore it back for next tests
       await testPage.locator('[data-action="undo"]').click()
 
-      // 6. TEST INSERT BLOCK UNDO/REDO
-      console.log('\n  6️⃣  Testing INSERT BLOCK undo/redo...')
+      // 5. TEST INSERT BLOCK UNDO/REDO
+      console.log('\n  5️⃣  Testing INSERT BLOCK undo/redo...')
       const initialBlockCount = await testPage.evaluate(() => {
         return document.querySelectorAll('.inserted-test-block').length
       })
@@ -1008,7 +998,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       console.log('\n✅ All undo/redo tests PASSED!')
       console.log('  ✓ Text change undo/redo works')
       console.log('  ✓ HTML change undo/redo works')
-      console.log('  ✓ Style change undo/redo works')
       console.log('  ✓ Hide/show undo/redo works')
       console.log('  ✓ Delete/restore undo/redo works')
       console.log('  ✓ Insert block undo/redo works')

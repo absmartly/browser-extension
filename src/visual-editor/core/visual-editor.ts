@@ -521,12 +521,62 @@ export class VisualEditor {
     const elements = document.querySelectorAll(change.selector)
     elements.forEach(element => {
       const htmlElement = element as HTMLElement
+
       if (change.type === 'text' && oldValue !== null) {
         htmlElement.textContent = oldValue
       } else if (change.type === 'html' && oldValue !== null) {
         htmlElement.innerHTML = oldValue
       } else if (change.type === 'style' && oldValue) {
         Object.assign(htmlElement.style, oldValue)
+      } else if (change.type === 'remove') {
+        // Undo remove: restore the element
+        if (oldValue && oldValue.html && oldValue.parent) {
+          const parent = document.querySelector(oldValue.parent)
+          if (parent) {
+            const tempContainer = document.createElement('div')
+            tempContainer.innerHTML = oldValue.html
+            const restoredElement = tempContainer.firstElementChild
+            if (restoredElement) {
+              if (oldValue.nextSibling) {
+                const nextSibling = parent.querySelector(`:scope > *:nth-child(${oldValue.nextSibling})`)
+                parent.insertBefore(restoredElement, nextSibling)
+              } else {
+                parent.appendChild(restoredElement)
+              }
+            }
+          }
+        }
+      } else if (change.type === 'insert') {
+        // Undo insert: remove the inserted element
+        if (oldValue && oldValue.insertedSelector) {
+          const insertedElements = document.querySelectorAll(oldValue.insertedSelector)
+          insertedElements.forEach(el => el.remove())
+        }
+      } else if (change.type === 'move') {
+        // Undo move: restore to original position
+        if (oldValue && oldValue.parent && element) {
+          const parent = document.querySelector(oldValue.parent)
+          if (parent) {
+            if (oldValue.nextSibling) {
+              const nextSibling = parent.querySelector(`:scope > *:nth-child(${oldValue.nextSibling})`)
+              parent.insertBefore(element, nextSibling)
+            } else {
+              parent.appendChild(element)
+            }
+          }
+        }
+      } else if (change.type === 'class' && oldValue) {
+        // Restore original classes
+        htmlElement.className = oldValue
+      } else if (change.type === 'attribute' && oldValue) {
+        // Restore original attributes
+        Object.keys(oldValue).forEach(attr => {
+          if (oldValue[attr] === null) {
+            htmlElement.removeAttribute(attr)
+          } else {
+            htmlElement.setAttribute(attr, oldValue[attr])
+          }
+        })
       }
     })
 
@@ -548,12 +598,66 @@ export class VisualEditor {
     const elements = document.querySelectorAll(change.selector)
     elements.forEach(element => {
       const htmlElement = element as HTMLElement
+
       if (change.type === 'text' && change.value !== undefined) {
         htmlElement.textContent = change.value
       } else if (change.type === 'html' && change.value !== undefined) {
         htmlElement.innerHTML = change.value
       } else if (change.type === 'style' && change.value) {
         Object.assign(htmlElement.style, change.value)
+      } else if (change.type === 'remove') {
+        // Redo remove: remove the element again
+        element?.remove()
+      } else if (change.type === 'insert') {
+        // Redo insert: insert the element again
+        const insertChange = change as any
+        if (insertChange.html && insertChange.position) {
+          const tempContainer = document.createElement('div')
+          tempContainer.innerHTML = insertChange.html
+          const newElement = tempContainer.firstElementChild
+          if (newElement && element) {
+            if (insertChange.position === 'before') {
+              element.parentElement?.insertBefore(newElement, element)
+            } else if (insertChange.position === 'after') {
+              element.parentElement?.insertBefore(newElement, element.nextSibling)
+            } else if (insertChange.position === 'firstChild') {
+              element.insertBefore(newElement, element.firstChild)
+            } else if (insertChange.position === 'lastChild') {
+              element.appendChild(newElement)
+            }
+          }
+        }
+      } else if (change.type === 'move') {
+        // Redo move: move to new position
+        const moveChange = change as any
+        if (moveChange.targetSelector && moveChange.position && element) {
+          const target = document.querySelector(moveChange.targetSelector)
+          if (target) {
+            if (moveChange.position === 'before') {
+              target.parentElement?.insertBefore(element, target)
+            } else if (moveChange.position === 'after') {
+              target.parentElement?.insertBefore(element, target.nextSibling)
+            } else if (moveChange.position === 'firstChild') {
+              target.insertBefore(element, target.firstChild)
+            } else if (moveChange.position === 'lastChild') {
+              target.appendChild(element)
+            }
+          }
+        }
+      } else if (change.type === 'class') {
+        // Redo class change
+        const classChange = change as any
+        if (classChange.add) {
+          classChange.add.forEach((cls: string) => htmlElement.classList.add(cls))
+        }
+        if (classChange.remove) {
+          classChange.remove.forEach((cls: string) => htmlElement.classList.remove(cls))
+        }
+      } else if (change.type === 'attribute' && change.value) {
+        // Redo attribute change
+        Object.keys(change.value).forEach(attr => {
+          htmlElement.setAttribute(attr, (change.value as any)[attr])
+        })
       }
     })
 
