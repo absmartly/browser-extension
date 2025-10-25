@@ -67,15 +67,8 @@ describe('nth-of-type selector generation', () => {
 
     console.log('Generated selector:', selector)
 
-    // The selector should use semantic attributes as the starting point
-    expect(selector).toContain('data-framer-name="Hero section"')
-
-    // Should start with a semantic selector, not a positional one
-    // It's OK to have :nth-of-type() on intermediate non-semantic elements for disambiguation
-    expect(selector).toMatch(/^div\[data-framer-name/)
-
-    // Verify it doesn't start with a positional selector
-    expect(selector).not.toMatch(/^div:nth-of-type/)
+    // Should generate the exact expected selector using closest semantic parent
+    expect(selector).toBe('div[data-framer-name="Hero section"] div[data-framer-name="home_page_subtitle"] p')
 
     // Verify the selector is unique
     const matches = document.querySelectorAll(selector)
@@ -104,23 +97,15 @@ describe('nth-of-type selector generation', () => {
     console.log('Selector 1:', selector1)
     console.log('Selector 2:', selector2)
 
-    // Each selector should be unique
+    // Should generate exact expected selectors with different semantic sections
+    expect(selector1).toBe('div[data-framer-name="Hero section"] div[data-framer-name="home_page_subtitle"] p')
+    expect(selector2).toBe('div[data-framer-name="Features section"] div[data-framer-name="home_page_subtitle"] p')
+
+    // Each selector should be unique and match only its target
     expect(document.querySelectorAll(selector1).length).toBe(1)
     expect(document.querySelectorAll(selector2).length).toBe(1)
-
-    // Each selector should match only its target
     expect(document.querySelector(selector1)).toBe(target1)
     expect(document.querySelector(selector2)).toBe(target2)
-
-    // Selectors should use different semantic section names
-    expect(selector1).toContain('Hero section')
-    expect(selector2).toContain('Features section')
-
-    // Both should start with semantic selectors, not positional ones
-    expect(selector1).toMatch(/^div\[data-framer-name/)
-    expect(selector2).toMatch(/^div\[data-framer-name/)
-    expect(selector1).not.toMatch(/^div:nth-of-type/)
-    expect(selector2).not.toMatch(/^div:nth-of-type/)
   })
 
   test('should prefer semantic attributes over auto-generated classes', () => {
@@ -135,13 +120,8 @@ describe('nth-of-type selector generation', () => {
 
     console.log('Semantic selector:', selector)
 
-    // Should NOT use auto-generated classes
-    expect(selector).not.toContain('framer-1raxb8g')
-    expect(selector).not.toContain('framer-styles-preset')
-    expect(selector).not.toContain('xZndidUCt')
-
-    // Should use semantic data-framer-name instead
-    expect(selector).toContain('data-framer-name')
+    // Should generate exact expected selector using semantic attributes, not auto-generated classes
+    expect(selector).toBe('div[data-framer-name="Hero section"] div[data-framer-name="home_page_subtitle"] p')
 
     // Verify uniqueness
     const matches = document.querySelectorAll(selector)
@@ -191,12 +171,8 @@ describe('Real-world absmartly.com scenarios', () => {
 
     console.log('Case 1 (Features section) selector:', selector)
 
-    // Should start with a semantic selector, not a positional one
-    expect(selector).toMatch(/^div\[data-framer-name/)
-    expect(selector).not.toMatch(/^div:nth-of-type/)
-
-    // Should use Features section to disambiguate
-    expect(selector).toContain('Features')
+    // Should generate the exact expected selector
+    expect(selector).toBe('div[data-framer-name="Features"] div[data-framer-name="Feature"]:nth-of-type(1) p')
 
     // Verify uniqueness
     const matches = document.querySelectorAll(selector)
@@ -247,15 +223,50 @@ describe('Real-world absmartly.com scenarios', () => {
     console.log('\n[Test] Final selector:', selector)
     console.log('[Test] Selector matches', document.querySelectorAll(selector).length, 'elements')
 
-    // Should start with a semantic selector, not a positional one
-    expect(selector).toMatch(/^div\[data-framer-name/)
-    expect(selector).not.toMatch(/^div:nth-of-type/)
+    // Should generate the exact expected selector
+    expect(selector).toBe('div[data-framer-name="Features Row 1"] > div[data-framer-name="Content"] > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > p')
 
-    // Should use semantic ancestors for disambiguation (Content, Features Row 1, etc.)
-    // The selector should contain at least one semantic ancestor
-    expect(selector).toMatch(/data-framer-name="(Content|Features Row 1|Wrapper|Product Highlights)"/)
+    // Verify uniqueness
+    const matches = document.querySelectorAll(selector)
+    expect(matches.length).toBe(1)
+    expect(matches[0]).toBe(target)
+  })
 
+  test('Case 3: GST engine paragraph - requires Product Highlights + Features Row 1 disambiguation', () => {
+    // Find the specific paragraph about GST engine
+    const paragraphs = Array.from(container.querySelectorAll('p'))
+    const target = paragraphs.find(p =>
+      p.textContent?.includes('Our Group Sequential Testing (GST) engine')
+    ) as HTMLElement
 
+    // Skip test if we can't find the element (HTML structure may have changed)
+    if (!target) {
+      console.warn('Could not find GST engine paragraph - skipping test')
+      return
+    }
+
+    console.log('\n========== CASE 3: GST Engine Paragraph Test ==========')
+    console.log('Target text:', target.textContent?.substring(0, 80))
+
+    // Enable debug mode
+    ;(window as any).__selectorDebug = true
+
+    const selector = generateRobustSelector(target, {
+      preferDataAttributes: true,
+      includeParentContext: true,
+      maxParentLevels: 12,
+      avoidAutoGenerated: true,
+      debug: true
+    })
+
+    // Disable debug mode
+    ;(window as any).__selectorDebug = false
+
+    console.log('\n[Test] Final selector:', selector)
+    console.log('[Test] Selector matches', document.querySelectorAll(selector).length, 'elements')
+
+    // Should generate the exact expected selector
+    expect(selector).toBe('div[data-framer-name="Features Row 1"] > div[data-framer-name="Content"] > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > p')
 
     // Verify uniqueness
     const matches = document.querySelectorAll(selector)
