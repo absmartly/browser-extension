@@ -10,12 +10,25 @@ export class EventHandlers {
   private stateManager: StateManager
   private isEditing = false
   private hoverTooltip: HTMLElement | null = null
+  private hoverEnabled = true
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
   }
 
+  setHoverEnabled(enabled: boolean): void {
+    this.hoverEnabled = enabled
+    // Remove tooltip if disabling
+    if (!enabled && this.hoverTooltip) {
+      this.hoverTooltip.remove()
+      this.hoverTooltip = null
+    }
+  }
+
   handleMouseOver = (e: MouseEvent): void => {
+    // Ignore if hover is disabled
+    if (!this.hoverEnabled) return
+
     // Ignore preview header elements
     if ((e.target as Element).closest('#absmartly-preview-header')) {
       return
