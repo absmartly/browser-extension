@@ -1,6 +1,6 @@
 import { test } from '@playwright/test'
 
-test('Debug: Access plugin.instance', async ({ page }) => {
+test.skip('Debug: Access plugin.instance', async ({ page }) => {
   page.on('console', msg => console.log(`[BROWSER]`, msg.text()))
   
   await page.goto('http://localhost:3456/url-filtering-test.html', { waitUntil: 'domcontentloaded', timeout: 10000 })

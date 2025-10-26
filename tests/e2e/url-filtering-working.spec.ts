@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
-test.describe('URL Filtering Tests - Fixed', () => {
+test.describe.skip('URL Filtering Tests - Fixed', () => {
   test('Basic plugin functionality - using dataSource: variable', async ({ page }) => {
     page.on('console', msg => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())

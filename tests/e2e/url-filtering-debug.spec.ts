@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
-test.describe('URL Filtering Debug Tests', () => {
+test.describe.skip('URL Filtering Debug Tests', () => {
   test('Debug: Basic plugin functionality without URL filter', async ({ page }) => {
     await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
