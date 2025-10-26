@@ -156,10 +156,10 @@ test.describe('Experiment Creation and Editing Flows', () => {
       }
 
       const unitTypeDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-      await unitTypeDropdown.waitFor({ state: 'visible', timeout: 5000 })
+      await unitTypeDropdown.waitFor({ state: 'visible', timeout: 2000 })
 
       const firstUnitOption = unitTypeDropdown.locator('div[class*="cursor-pointer"]').first()
-      await firstUnitOption.waitFor({ state: 'visible', timeout: 5000 })
+      await firstUnitOption.waitFor({ state: 'visible', timeout: 2000 })
       await firstUnitOption.click()
       console.log('  ✓ Selected unit type')
       await debugWait()
