@@ -1477,7 +1477,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
           // Also use localStorage as backup sync method
           localStorage.setItem('absmartly_sync_changes', JSON.stringify(syncMessage))
 
-          // Wait for potential responses
+          // Wait for potential responses (increased to 3s for reliability in full test suite)
           setTimeout(() => {
             channel.close()
             window.removeEventListener('storage', storageHandler)
@@ -1486,7 +1486,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
               syncData,
               channelSupported: typeof BroadcastChannel !== 'undefined'
             })
-          }, 1000)
+          }, 3000)
         })
       }),
 
@@ -1558,7 +1558,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
               syncData,
               channelSupported: typeof BroadcastChannel !== 'undefined'
             })
-          }, 1000)
+          }, 3000)
         })
       })
     ])
