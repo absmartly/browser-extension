@@ -49,7 +49,7 @@ test.describe('URL Filtering Tests - Fixed', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-plugins.dev.js'
     })
 
     // Initialize plugin with dataSource: 'variable'
@@ -138,7 +138,7 @@ test.describe('URL Filtering Tests - Fixed', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-plugins.dev.js'
     })
 
     // Initialize plugin
@@ -227,7 +227,7 @@ test.describe('URL Filtering Tests - Fixed', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-plugins.dev.js'
     })
 
     // Initialize plugin
