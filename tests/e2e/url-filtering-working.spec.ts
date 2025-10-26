@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
-test.describe.skip('URL Filtering Tests - Fixed', () => {
+test.describe('URL Filtering Tests - Fixed', () => {
   test('Basic plugin functionality - using dataSource: variable', async ({ page }) => {
     page.on('console', msg => {
       console.log(`[BROWSER ${msg.type()}]`, msg.text())
@@ -49,7 +49,7 @@ test.describe.skip('URL Filtering Tests - Fixed', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-bridge.bundle.js'
     })
 
     // Initialize plugin with dataSource: 'variable'
@@ -138,7 +138,7 @@ test.describe.skip('URL Filtering Tests - Fixed', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-bridge.bundle.js'
     })
 
     // Initialize plugin
@@ -227,7 +227,7 @@ test.describe.skip('URL Filtering Tests - Fixed', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-bridge.bundle.js'
     })
 
     // Initialize plugin
