@@ -56,7 +56,7 @@ test('Debug: Check exposure tracker state', async ({ page }) => {
 
   // Load plugin
   await page.addScriptTag({
-    path: 'public/absmartly-sdk-plugins.dev.js'
+    path: 'public/absmartly-dom-changes-core.min.js'
   })
 
   // Initialize plugin

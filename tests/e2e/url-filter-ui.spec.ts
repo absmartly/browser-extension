@@ -58,7 +58,7 @@ test('URL filter UI and JSON verification', async ({ page, context }) => {
   })
 
   // Load the DOM changes plugin
-  await page.addScriptTag({ path: 'public/absmartly-sdk-plugins.dev.js' })
+  await page.addScriptTag({ path: 'public/absmartly-dom-changes-core.min.js' })
 
   // Initialize the plugin
   await page.evaluate(() => {

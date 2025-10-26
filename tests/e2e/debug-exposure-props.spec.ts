@@ -35,7 +35,7 @@ test('Debug: Show all plugin properties', async ({ page }) => {
     }
   })
 
-  await page.addScriptTag({ path: 'public/absmartly-sdk-plugins.dev.js' })
+  await page.addScriptTag({ path: 'public/absmartly-dom-changes-core.min.js' })
 
   await page.evaluate(() => {
     const context = new (window as any).absmartly.Context();

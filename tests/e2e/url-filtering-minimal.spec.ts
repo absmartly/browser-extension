@@ -81,7 +81,7 @@ test('Minimal test: Check SDK mock is working', async ({ page }) => {
   // Load plugin
   console.log('[TEST] Loading plugin')
   await page.addScriptTag({
-    path: 'public/absmartly-sdk-plugins.dev.js'
+    path: 'public/absmartly-dom-changes-core.min.js'
   })
 
   // Check plugin loaded
