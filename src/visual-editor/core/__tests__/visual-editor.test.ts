@@ -210,7 +210,8 @@ describe('VisualEditor', () => {
         expect.any(Object), // UndoRedoManager instance
         expect.any(Object), // Notifications instance
         {
-          onChangesUpdate: expect.any(Function)
+          onChangesUpdate: expect.any(Function),
+          setHoverEnabled: expect.any(Function)
         }
       )
     })

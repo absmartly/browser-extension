@@ -687,7 +687,9 @@ describe('ElementActions', () => {
           position: 'after',
           enabled: true
         }),
-        null
+        expect.objectContaining({
+          insertedSelector: expect.any(String)
+        })
       )
       expect(mockNotifications.show).toHaveBeenCalledWith(
         'HTML block inserted after selected element',
@@ -761,7 +763,9 @@ describe('ElementActions', () => {
           position: 'before',
           enabled: true
         }),
-        null
+        expect.objectContaining({
+          insertedSelector: expect.any(String)
+        })
       )
     })
   })
