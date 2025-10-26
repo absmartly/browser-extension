@@ -21,7 +21,7 @@ test('Debug: Access plugin.instance', async ({ page }) => {
       }
     }
   })
-  await page.addScriptTag({ path: 'public/absmartly-dom-changes-core.min.js' })
+  await page.addScriptTag({ path: 'public/absmartly-sdk-plugins.dev.js' })
   await page.evaluate(() => {
     const context = new (window as any).absmartly.Context();
     (window as any).__testContext = context

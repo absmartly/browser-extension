@@ -52,7 +52,7 @@ test.describe('URL Filtering Debug Tests', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-plugins.dev.js'
     })
 
     // Initialize plugin
@@ -166,9 +166,9 @@ test.describe('URL Filtering Debug Tests', () => {
     })
 
     // Load plugin
-    console.log('[TEST] Loading plugin from public/absmartly-dom-changes-core.min.js')
+    console.log('[TEST] Loading plugin from public/absmartly-sdk-plugins.dev.js')
     await page.addScriptTag({
-      path: 'public/absmartly-dom-changes-core.min.js'
+      path: 'public/absmartly-sdk-plugins.dev.js'
     })
 
     // Initialize plugin with debug output
