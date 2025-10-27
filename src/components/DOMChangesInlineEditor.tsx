@@ -13,7 +13,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Checkbox } from './ui/Checkbox'
 import { MultiSelectTags } from './ui/MultiSelectTags'
-import type { DOMChange, DOMChangeType, DOMChangeStyleRules, DOMChangeStyle } from '~src/types/dom-changes'
+import type { DOMChange, DOMChangeType, DOMChangeStyleRules } from '~src/types/dom-changes'
 import { suggestCleanedSelector } from '~src/utils/selector-cleaner'
 import { generateSelectorSuggestions } from '~src/utils/selector-suggestions'
 import { StyleRulesEditor } from './StyleRulesEditor'
@@ -820,11 +820,11 @@ export function DOMChangesInlineEditor({
       styleProperties: change.type === 'style'
         ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({
             key,
-            value
+            value: value.replace(/ !important$/i, '') // Remove !important from value as it's handled by checkbox
           }))
         : [{ key: '', value: '' }],
       styleImportant: change.type === 'style'
-        ? (change as DOMChangeStyle).important || false
+        ? Object.values(change.value as Record<string, string>).some(v => v.includes('!important'))
         : false,
       styleRulesStates: change.type === 'styleRules' ? (change as DOMChangeStyleRules).states : undefined,
       styleRulesImportant: change.type === 'styleRules' ? (change as DOMChangeStyleRules).important : undefined,
@@ -890,14 +890,17 @@ export function DOMChangesInlineEditor({
         const styleValue: Record<string, string> = {}
         change.styleProperties?.forEach(({ key, value }) => {
           if (key && value) {
-            styleValue[key] = value
+            // Add !important flag if checkbox is checked
+            const finalValue = change.styleImportant && !value.includes('!important')
+              ? `${value} !important`
+              : value
+            styleValue[key] = finalValue
           }
         })
         domChange = {
           selector: change.selector,
           type: 'style',
           value: styleValue,
-          important: change.styleImportant,
           enabled: true,
           mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
