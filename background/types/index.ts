@@ -35,4 +35,4 @@ export interface ConfigValidationResult {
   error?: string
 }
 
-export { ABsmartlyConfig, ExtensionMessage }
+export type { ABsmartlyConfig, ExtensionMessage }

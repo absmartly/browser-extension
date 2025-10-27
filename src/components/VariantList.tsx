@@ -23,26 +23,32 @@ export interface Variant {
 
 // Helper to get DOM changes from config
 function getDOMChangesFromConfig(config: VariantConfig | undefined, domFieldName: string = '__dom_changes'): DOMChangesData {
-  if (!config) return { changes: [] }
+  if (!config) return []
   const domData = config[domFieldName]
-  if (!domData) return { changes: [] }
+  if (!domData) return []
   // Handle both legacy array and new config format
-  if (Array.isArray(domData)) return { changes: domData }
-  return domData
+  if (Array.isArray(domData)) return domData
+  return domData as DOMChangesConfig
 }
 
 // Helper to update config with DOM changes
 function setDOMChangesInConfig(config: VariantConfig, domChanges: DOMChangesData, domFieldName: string = '__dom_changes'): VariantConfig {
   const newConfig = { ...config }
-  // Only include DOM changes if not empty
-  if (Array.isArray(domChanges.changes) && domChanges.changes.length > 0) {
-    newConfig[domFieldName] = domChanges
-  } else if (!Array.isArray(domChanges.changes)) {
-    // If it's already an object with changes, include it
-    newConfig[domFieldName] = domChanges
+
+  if (Array.isArray(domChanges)) {
+    // Handle array format
+    if (domChanges.length > 0) {
+      newConfig[domFieldName] = domChanges
+    } else {
+      delete newConfig[domFieldName]
+    }
   } else {
-    // Remove if empty
-    delete newConfig[domFieldName]
+    // Handle config format
+    if (domChanges.changes && domChanges.changes.length > 0) {
+      newConfig[domFieldName] = domChanges
+    } else {
+      delete newConfig[domFieldName]
+    }
   }
   return newConfig
 }
