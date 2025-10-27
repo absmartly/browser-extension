@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Input } from './ui/Input';
+import { Button } from './ui/Button';
 
 export interface DOMChangeOptionsProps {
   important?: boolean;
@@ -10,6 +11,8 @@ export interface DOMChangeOptionsProps {
   onWaitForElementChange?: (value: boolean) => void;
   onPersistStyleChange?: (value: boolean) => void;
   onObserverRootChange?: (value: string) => void;
+  onStartPicker?: (field: string) => void;
+  pickingForField?: string | null;
   disabled?: boolean;
   idPrefix?: string;
   showImportant?: boolean;
@@ -27,6 +30,8 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
   onWaitForElementChange,
   onPersistStyleChange,
   onObserverRootChange,
+  onStartPicker,
+  pickingForField,
   disabled = false,
   idPrefix = 'dom-options',
   showImportant = true,
@@ -34,6 +39,7 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
   showPersistStyle = true,
   showObserverRoot = true,
 }) => {
+  const [localPickingForField, setLocalPickingForField] = useState<string | null>(pickingForField || null)
   return (
     <div className="space-y-2">
       {showImportant && onImportantChange && (
@@ -92,13 +98,37 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Observer Root (optional)
           </label>
-          <Input
-            value={observerRoot}
-            onChange={(e) => onObserverRootChange(e.target.value)}
-            placeholder="body, .container, #app"
-            disabled={disabled}
-            className="text-xs"
-          />
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <input
+                value={observerRoot}
+                onChange={(e) => onObserverRootChange(e.target.value)}
+                placeholder="body, .container, #app"
+                disabled={disabled}
+                className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${localPickingForField === 'observerRoot' ? 'border-blue-500' : 'border-gray-300'}`}
+              />
+            </div>
+            {onStartPicker && (
+              <Button
+                type="button"
+                onClick={() => {
+                  setLocalPickingForField('observerRoot')
+                  onStartPicker('observerRoot')
+                }}
+                size="sm"
+                variant="secondary"
+                title="Pick element"
+                className={localPickingForField === 'observerRoot' ? 'bg-blue-100' : ''}
+              >
+                🎯
+              </Button>
+            )}
+          </div>
+          {localPickingForField === 'observerRoot' && (
+            <p className="text-xs text-blue-600 mt-1 animate-pulse">
+              Click an element on the page...
+            </p>
+          )}
         </div>
       )}
     </div>
