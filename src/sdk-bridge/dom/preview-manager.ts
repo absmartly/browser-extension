@@ -91,7 +91,17 @@ export class PreviewManager {
           const styles = change.styles || change.value
           if (typeof styles === 'object') {
             Object.entries(styles).forEach(([prop, value]) => {
-              htmlElement.style[prop as any] = value as string
+              const cssValue = value as string
+              // Check if the value includes !important and extract it
+              const hasImportant = cssValue.includes('!important')
+              const cleanValue = cssValue.replace(/\s*!important\s*$/i, '').trim()
+              const priority = hasImportant ? 'important' : ''
+
+              htmlElement.style.setProperty(
+                prop.replace(/([A-Z])/g, '-$1').toLowerCase(),
+                cleanValue,
+                priority
+              )
             })
           } else if (typeof styles === 'string') {
             element.setAttribute('style', styles)
