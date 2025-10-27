@@ -23,7 +23,7 @@ Currently, we have **SIX different CodeMirror-based editor implementations** wit
 
 ## Proposed Solution
 
-Create a **single unified `UnifiedCodeEditor` class** that can be configured via parameters to handle all use cases.
+Create a **single unified `CodeEditor` class** that can be configured via parameters to handle all use cases.
 
 ### New File Structure
 ```
@@ -36,12 +36,15 @@ src/visual-editor/ui/
 
 ### Configuration Interface
 ```typescript
-interface UnifiedCodeEditorConfig {
+interface CodeEditorConfig {
   // Content
   title: string
   subtitle?: string
   initialContent: string
   language: 'javascript' | 'json' | 'html'
+
+  // ID (optional, defaults to 'code-editor-{language}')
+  editorId?: string  // e.g., 'code-editor-host', 'json-editor-host'
 
   // UI Customization
   saveButtonText?: string  // Default: "Save"
@@ -79,11 +82,24 @@ interface UnifiedCodeEditorConfig {
 }
 ```
 
+### ID Naming Convention
+All editor elements use consistent ID pattern:
+- `#{editorId}-title` - Title element
+- `#{editorId}-button-save` - Save button
+- `#{editorId}-button-cancel` - Cancel button
+- `#{editorId}-button-close` - Close button (read-only editors)
+- `#{editorId}-button-format` - Format button
+- `#{editorId}-status` - Status indicator
+- `#{editorId}-position-selector` - Position selector widget
+- `#{editorId}-button-copy` - Copy button (Event Viewer)
+- `#{editorId}-toolbar` - Toolbar section
+- `#{editorId}-metadata` - Metadata section (Event Viewer)
+
 ## Migration Map
 
-### 1. JavaScript Editor → UnifiedCodeEditor
+### 1. JavaScript Editor → CodeEditor
 ```typescript
-new UnifiedCodeEditor({
+new CodeEditor({
   title: 'Edit JavaScript Code',
   initialContent: code,
   language: 'javascript',
@@ -93,9 +109,9 @@ new UnifiedCodeEditor({
 })
 ```
 
-### 2. JSON Editor → UnifiedCodeEditor
+### 2. JSON Editor → CodeEditor
 ```typescript
-new UnifiedCodeEditor({
+new CodeEditor({
   title: title,
   initialContent: json,
   language: 'json',
@@ -114,9 +130,9 @@ new UnifiedCodeEditor({
 })
 ```
 
-### 3. HTML Editor → UnifiedCodeEditor
+### 3. HTML Editor → CodeEditor
 ```typescript
-new UnifiedCodeEditor({
+new CodeEditor({
   title: 'Edit HTML (Live Preview)',
   subtitle: `<${element.tagName.toLowerCase()}>`,
   initialContent: html,
@@ -130,9 +146,9 @@ new UnifiedCodeEditor({
 })
 ```
 
-### 4. Block Inserter → UnifiedCodeEditor
+### 4. Block Inserter → CodeEditor
 ```typescript
-new UnifiedCodeEditor({
+new CodeEditor({
   title: 'Insert HTML Block (Live Preview)',
   subtitle: `Insert relative to <${element.tagName.toLowerCase()}>`,
   initialContent: '',
@@ -154,9 +170,9 @@ new UnifiedCodeEditor({
 })
 ```
 
-### 5. Event Viewer → UnifiedCodeEditor
+### 5. Event Viewer → CodeEditor
 ```typescript
-new UnifiedCodeEditor({
+new CodeEditor({
   title: 'Event Details',
   initialContent: jsonData,
   language: 'json',
@@ -169,9 +185,9 @@ new UnifiedCodeEditor({
 })
 ```
 
-### 6. Code Editor (content.ts) → UnifiedCodeEditor
+### 6. Code Editor (content.ts) → CodeEditor
 ```typescript
-new UnifiedCodeEditor({
+new CodeEditor({
   title: `</> ${data.sectionTitle}`,
   initialContent: data.value,
   language: 'html',
@@ -185,7 +201,7 @@ new UnifiedCodeEditor({
 ### Phase 1: Create Unified Editor Foundation
 1. Create `unified-code-editor-types.ts` with all type definitions
 2. Create `unified-code-editor.ts` with:
-   - Constructor accepting `UnifiedCodeEditorConfig`
+   - Constructor accepting `CodeEditorConfig`
    - Core rendering logic (backdrop, container, header)
    - CodeMirror initialization with language switching
    - Unified CSS generation with configurable class prefix
@@ -202,17 +218,17 @@ new UnifiedCodeEditor({
 8. Add Shadow DOM support (conditional)
 
 ### Phase 3: Migrate Existing Editors
-9. Update JavaScript Editor call sites → UnifiedCodeEditor
+9. Update JavaScript Editor call sites → CodeEditor
    - `content.ts` openJavaScriptEditor function
-10. Update JSON Editor call sites → UnifiedCodeEditor
+10. Update JSON Editor call sites → CodeEditor
     - `content.ts` openJSONEditor function
-11. Update HTML Editor call sites → UnifiedCodeEditor
+11. Update HTML Editor call sites → CodeEditor
     - Visual editor context menu "Edit HTML"
-12. Update Block Inserter call sites → UnifiedCodeEditor
+12. Update Block Inserter call sites → CodeEditor
     - Visual editor context menu "Insert new block"
-13. Update Event Viewer call sites → UnifiedCodeEditor
+13. Update Event Viewer call sites → CodeEditor
     - Events debug page event viewing
-14. Update content.ts inline editor → UnifiedCodeEditor
+14. Update content.ts inline editor → CodeEditor
     - SDK plugin code injection editor
 
 ### Phase 4: Update Tests
@@ -220,35 +236,39 @@ new UnifiedCodeEditor({
 
 **tests/e2e/visual-editor-complete.spec.ts** (CRITICAL)
    - Tests HTML editor and Block inserter
-   - Lines 336, 342, 393, 417, 427, 585, 853: `.cm-editor` selectors
-   - Line 1600: `.json-editor-title` → `.unified-editor-title`
+   - Lines 336, 342, 393, 417, 427, 585, 853: `.cm-editor` selectors (CodeMirror class - keep as-is)
+   - Line 1600: `.json-editor-title` → `#code-editor-title`
    - Test HTML editor modal appearance and functionality
    - Test Block inserter modal and position selector
+   - Use ID-based selectors: `#code-editor-button-save`, `#code-editor-button-cancel`, `#code-editor-position-selector`
 
 **tests/e2e/events-debug-page.spec.ts** (HIGH)
    - Tests Event Viewer
-   - Lines 243, 247, 464, 468: `#absmartly-event-viewer-host` selector
+   - Lines 243, 247, 464, 468: `#absmartly-event-viewer-host` → `#code-editor-host`
    - Event viewer modal appearance tests
+   - Use ID-based selectors: `#code-editor-title`, `#code-editor-button-close`
 
 **tests/e2e/sdk-events.spec.ts** (HIGH)
    - Tests Event Viewer UI elements
    - Lines 68, 76, 78, 85, 91, 95, 98, 111, 122, 124, 137, 139
    - Selectors to update:
-     - `.event-viewer-button-close` → `.unified-editor-button-close`
-     - `.event-viewer-title` → `.unified-editor-title`
-     - `.event-viewer-value` → `.unified-editor-metadata-value`
-     - `.event-viewer-button-copy` → `.unified-editor-button-copy`
+     - `.event-viewer-button-close` → `#code-editor-button-close`
+     - `.event-viewer-title` → `#code-editor-title`
+     - `.event-viewer-value` → `#code-editor-metadata-value`
+     - `.event-viewer-button-copy` → `#code-editor-button-copy`
 
 **tests/e2e/experiment-code-injection.spec.ts** (HIGH)
    - Tests inline Code Editor from content.ts
-   - Lines 175, 227, 251: `#absmartly-code-editor-fullscreen` selector
-   - Update to unified editor ID or keep if config allows
+   - Lines 175, 227, 251: `#absmartly-code-editor-fullscreen` → `#code-editor-host`
+   - Use ID-based selectors for consistency
 
 **tests/e2e/visual-editor-context-menu.spec.ts** (MEDIUM)
    - May test context menu options that open editors
+   - Update to use unified editor IDs
 
 **tests/e2e/variable-sync.spec.ts** (LOW)
    - References CODE_EDITOR but may not directly test UI
+   - Review for any ID selector updates needed
 
 ### Phase 5: Clean Up
 16. Delete old editor files:
@@ -270,16 +290,23 @@ new UnifiedCodeEditor({
 
 ## Test Selector Migration Strategy
 
-**Recommended: Use data attributes for stability**
+**Recommended: Use real IDs for better performance and shorter selectors**
 ```typescript
-// In UnifiedCodeEditor
-<div class="unified-editor-title" data-testid="editor-title">
+// In CodeEditor
+<div id="code-editor-title" class="code-editor-title">
+<button id="code-editor-button-save" class="code-editor-button code-editor-button-save">
 
 // In tests
-await page.waitForSelector('[data-testid="editor-title"]')
+await page.waitForSelector('#code-editor-title')
+await page.click('#code-editor-button-save')
 ```
 
-This decouples tests from CSS class names and makes tests more resilient.
+Benefits of using real IDs:
+- Better performance (ID lookups are faster than class selectors)
+- Shorter, cleaner selectors
+- More semantic and meaningful
+- Easier to read and maintain in tests
+- Direct element reference without ambiguity
 
 ## Benefits
 
