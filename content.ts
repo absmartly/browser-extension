@@ -321,7 +321,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const variantName = payload.variantName
     const experimentId = payload.experimentId
 
-    console.log('[Content Script] ABSMARTLY_PREVIEW full payload:', { action, experimentName, variantName, changesCount: changes?.length, messageType: message.type })
     debugLog('[ABSmartly Content Script] Received preview message:', action)
 
     // If visual editor is active or starting, ignore preview update messages
