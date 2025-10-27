@@ -184,7 +184,7 @@ export async function generateDOMChanges(
     const userMessage = `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}\n\nGenerate the appropriate DOM changes as a JSON array.`
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [
