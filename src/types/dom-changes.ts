@@ -14,6 +14,7 @@ export interface DOMChangeStyle {
   selector: string;
   type: 'style';
   value: Record<string, string>;
+  important?: boolean;
   enabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
