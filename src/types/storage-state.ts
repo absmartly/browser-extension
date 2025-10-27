@@ -2,12 +2,15 @@
  * Type definitions for session storage state objects
  */
 
+import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
+import type { DOMChange } from '~src/types/dom-changes'
+
 export interface DOMChangesInlineState {
   variantName: string
-  editingChange: unknown
-  pickingForField: string
+  editingChange: EditingDOMChange | null
+  pickingForField: string | null
   dragDropMode?: boolean
-  changes?: unknown[]
+  changes?: DOMChange[]
 }
 
 export interface ElementPickerResult {
@@ -25,7 +28,7 @@ export interface DragDropResult {
 
 export interface VisualEditorChanges {
   variantName: string
-  changes: unknown[]
+  changes: DOMChange[]
 }
 
 export interface SidebarState {
