@@ -9,6 +9,8 @@ jest.mock('~src/utils/debug', () => ({
   debugWarn: jest.fn()
 }))
 
+const mockFn = jest.fn as any
+
 describe('AI DOM Generator', () => {
   const mockApiKey = 'test-api-key-123'
   const mockHtml = '<html><body><p id="test">Test content</p></body></html>'
@@ -38,7 +40,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -50,7 +52,7 @@ describe('AI DOM Generator', () => {
       expect(result).toEqual(mockChanges)
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'claude-sonnet-4-5-20250929',
           max_tokens: 4096,
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -81,7 +83,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -93,15 +95,50 @@ describe('AI DOM Generator', () => {
       expect(result).toEqual(mockChanges)
     })
 
-    it('should throw error when API key is missing', async () => {
+    it('should throw error when neither API key nor OAuth token is provided', async () => {
       await expect(generateDOMChanges(mockHtml, mockPrompt, '')).rejects.toThrow(
-        'Anthropic API key is required'
+        'Either API key or OAuth token is required'
       )
     })
 
-    it('should throw error when API key is null', async () => {
-      await expect(generateDOMChanges(mockHtml, mockPrompt, null as any)).rejects.toThrow(
-        'Anthropic API key is required'
+    it('should use OAuth token when provided with useOAuth option', async () => {
+      const mockOAuthToken = 'oauth-token-xyz'
+      const mockChanges = [
+        {
+          selector: '#test',
+          type: 'text',
+          value: 'Hello',
+          enabled: true
+        }
+      ]
+
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(mockChanges)
+          }
+        ]
+      }
+
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
+
+      const result = await generateDOMChanges(mockHtml, mockPrompt, '', {
+        useOAuth: true,
+        oauthToken: mockOAuthToken
+      })
+
+      expect(result).toEqual(mockChanges)
+      expect(jest.mocked(Anthropic)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: mockOAuthToken,
+          dangerouslyAllowBrowser: true
+        })
       )
     })
 
@@ -115,7 +152,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -137,7 +174,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -159,7 +196,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -200,7 +237,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -216,7 +253,7 @@ describe('AI DOM Generator', () => {
     it('should handle API errors from Claude', async () => {
       const mockError = new Error('API Error: Rate limit exceeded')
 
-      const mockCreate = jest.fn().mockRejectedValue(mockError)
+      const mockCreate = mockFn().mockRejectedValue(mockError)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -239,7 +276,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -266,7 +303,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate
@@ -290,7 +327,7 @@ describe('AI DOM Generator', () => {
         ]
       }
 
-      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      const mockCreate = mockFn().mockResolvedValue(mockMessage)
       jest.mocked(Anthropic).mockImplementation(() => ({
         messages: {
           create: mockCreate

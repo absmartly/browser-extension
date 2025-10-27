@@ -175,6 +175,48 @@ export async function revokeOAuthToken(
   }
 }
 
+export async function exchangeClaudeOAuthCode(
+  code: string,
+  clientId: string,
+  clientSecret: string,
+  redirectUri: string
+): Promise<OAuthToken> {
+  try {
+    debugLog('Exchanging Claude OAuth code for access token...')
+
+    const response = await axios({
+      method: 'POST',
+      url: 'https://api.anthropic.com/oauth/token',
+      data: {
+        grant_type: 'authorization_code',
+        code: code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const { access_token, refresh_token, expires_in, token_type } = response.data
+
+    const token: OAuthToken = {
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      expiresIn: expires_in,
+      expiresAt: Date.now() + expires_in * 1000,
+      tokenType: token_type || 'Bearer'
+    }
+
+    debugLog('Successfully exchanged Claude OAuth code for access token')
+    return token
+  } catch (error) {
+    debugError('Failed to exchange Claude OAuth code:', error)
+    throw error
+  }
+}
+
 function generateRandomState(length: number = 32): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let state = ''

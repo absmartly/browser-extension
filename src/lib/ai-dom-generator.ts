@@ -165,21 +165,34 @@ Analyze the provided HTML and user request, then generate the appropriate DOM ch
 export async function generateDOMChanges(
   html: string,
   prompt: string,
-  apiKey: string
+  apiKey: string,
+  options?: {
+    useOAuth?: boolean
+    oauthToken?: string
+  }
 ): Promise<DOMChange[]> {
   try {
     debugLog('🤖 Generating DOM changes with AI...')
     debugLog('📝 Prompt:', prompt)
     debugLog('📄 HTML length:', html.length)
 
-    if (!apiKey) {
-      throw new Error('Anthropic API key is required')
+    let authConfig: any = { dangerouslyAllowBrowser: true }
+
+    // Determine which authentication method to use
+    if (options?.useOAuth && options?.oauthToken) {
+      debugLog('🔐 Using OAuth token for authentication')
+      authConfig.apiKey = options.oauthToken
+      authConfig.defaultHeaders = {
+        'Authorization': `Bearer ${options.oauthToken}`
+      }
+    } else if (apiKey) {
+      debugLog('🔑 Using API key for authentication')
+      authConfig.apiKey = apiKey
+    } else {
+      throw new Error('Either API key or OAuth token is required')
     }
 
-    const anthropic = new Anthropic({
-      apiKey,
-      dangerouslyAllowBrowser: true
-    })
+    const anthropic = new Anthropic(authConfig)
 
     const userMessage = `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}\n\nGenerate the appropriate DOM changes as a JSON array.`
 
