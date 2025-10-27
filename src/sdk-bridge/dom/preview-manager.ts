@@ -91,15 +91,10 @@ export class PreviewManager {
           const styles = change.styles || change.value
           if (typeof styles === 'object') {
             Object.entries(styles).forEach(([prop, value]) => {
-              const cssValue = value as string
-              // Check if the value includes !important and extract it
-              const hasImportant = cssValue.includes('!important')
-              const cleanValue = cssValue.replace(/\s*!important\s*$/i, '').trim()
-              const priority = hasImportant ? 'important' : ''
-
+              const priority = (change as any).important ? 'important' : ''
               htmlElement.style.setProperty(
                 prop.replace(/([A-Z])/g, '-$1').toLowerCase(),
-                cleanValue,
+                value as string,
                 priority
               )
             })
