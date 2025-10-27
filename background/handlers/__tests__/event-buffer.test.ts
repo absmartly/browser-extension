@@ -1,9 +1,9 @@
 import {
   bufferSDKEvent,
   getBufferedEvents,
-  clearBufferedEvents,
-  SDKEvent
+  clearBufferedEvents
 } from "../event-buffer"
+import type { SDKEvent } from "../event-buffer"
 
 const mockSessionStorage = {
   get: jest.fn(),
