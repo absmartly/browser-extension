@@ -4,7 +4,7 @@ import type { PlasmoCSConfig } from "plasmo"
 // - DEV mode: Auto-injects on all URLs for easier development and testing
 // - PRODUCTION mode: Uses invalid URL pattern to prevent auto-loading
 //   Content script is injected programmatically when user clicks extension icon
-import { VisualEditor, JSONEditor } from '~src/visual-editor'
+import { VisualEditor, JSONEditor, JavaScriptEditor } from '~src/visual-editor'
 import { EventViewer } from '~src/visual-editor/ui/event-viewer'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
@@ -412,6 +412,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'CLOSE_JSON_EDITOR') {
     closeJSONEditor()
+    sendResponse({ success: true })
+    return true
+  }
+
+  // JavaScript Editor messages
+  if (message.type === 'OPEN_JAVASCRIPT_EDITOR') {
+    openJavaScriptEditor(message.data)
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (message.type === 'CLOSE_JAVASCRIPT_EDITOR') {
+    closeJavaScriptEditor()
     sendResponse({ success: true })
     return true
   }
@@ -1190,6 +1203,54 @@ function closeJSONEditor() {
   if (jsonEditorInstance) {
     // The editor cleans up when promise resolves/rejects
     jsonEditorInstance = null
+  }
+}
+
+// JavaScript editor functionality
+let jsEditorInstance: JavaScriptEditor | null = null
+
+async function openJavaScriptEditor(data: {
+  value: string
+}) {
+  // Close any existing editor
+  closeJavaScriptEditor()
+
+  // Temporarily disable VE if it's active (to prevent event conflicts)
+  const wasVEActive = isVisualEditorActive
+  if (wasVEActive && currentEditor) {
+    debugLog('[JavaScript Editor] Temporarily disabling VE while JS editor is open')
+    currentEditor.disable()
+  }
+
+  jsEditorInstance = new JavaScriptEditor()
+
+  const title = 'Edit JavaScript Code'
+  const result = await jsEditorInstance.show(title, data.value)
+
+  // Re-enable VE if it was active before
+  if (wasVEActive && currentEditor) {
+    debugLog('[JavaScript Editor] Re-enabling VE after JS editor closed')
+    currentEditor.enable()
+  }
+
+  if (result !== null) {
+    // User saved changes
+    chrome.runtime.sendMessage({
+      type: 'JAVASCRIPT_EDITOR_SAVE',
+      value: result
+    })
+  } else {
+    // User cancelled
+    chrome.runtime.sendMessage({
+      type: 'JAVASCRIPT_EDITOR_CLOSE'
+    })
+  }
+}
+
+function closeJavaScriptEditor() {
+  if (jsEditorInstance) {
+    // The editor cleans up when promise resolves/rejects
+    jsEditorInstance = null
   }
 }
 

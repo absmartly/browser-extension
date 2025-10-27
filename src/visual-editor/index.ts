@@ -24,6 +24,7 @@ export { Toolbar } from './ui/toolbar'
 export { Notifications } from './ui/notifications'
 export { Styles } from './ui/styles'
 export { JSONEditor } from './ui/json-editor'
+export { JavaScriptEditor } from './ui/javascript-editor'
 export { default as HtmlEditor } from './ui/html-editor'
 export { default as BlockInserter } from './ui/block-inserter'
 

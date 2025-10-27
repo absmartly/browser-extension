@@ -10,6 +10,7 @@ import type { DOMChange } from '../types/dom-changes'
 import { ElementStateManager, type ElementState } from './element-state'
 import { sanitizeHTML } from '../utils/html-sanitizer'
 import { Logger } from '../utils/logger'
+import { CodeExecutor } from '../experiment/code-executor'
 
 interface PreviewState {
   experimentName: string
@@ -113,6 +114,20 @@ export class PreviewManager {
           // In preview mode, mimic delete by hiding (display: none)
           htmlElement.style.display = 'none'
           Logger.log('Mimicking delete by hiding element')
+          break
+
+        case 'javascript':
+          if (change.value && typeof change.value === 'string') {
+            const success = CodeExecutor.execute(change.value, {
+              element: htmlElement,
+              experimentName
+            })
+            if (!success) {
+              Logger.warn('Failed to execute JavaScript for:', change.selector)
+            }
+          } else {
+            Logger.warn('Invalid javascript change, missing or invalid value')
+          }
           break
       }
 
