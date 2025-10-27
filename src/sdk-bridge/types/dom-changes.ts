@@ -4,7 +4,7 @@
  * Types for DOM manipulation and changes
  */
 
-export type DOMChangeType = 'text' | 'html' | 'style' | 'styles' | 'class' | 'attribute' | 'delete'
+export type DOMChangeType = 'text' | 'html' | 'style' | 'styles' | 'class' | 'attribute' | 'delete' | 'javascript'
 
 export interface DOMChange {
   selector: string

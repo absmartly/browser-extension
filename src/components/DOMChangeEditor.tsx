@@ -8,7 +8,8 @@ import { MultiSelectTags } from './ui/MultiSelectTags'
 import { StyleRulesEditor } from './StyleRulesEditor'
 import { AttributeEditor } from './AttributeEditor'
 import { DOMChangeOptions } from './DOMChangeOptions'
-import { CheckIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { CheckIcon, XMarkIcon, TrashIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline'
+import { JavaScriptEditor } from '~src/visual-editor/ui/javascript-editor'
 
 export interface EditingDOMChange {
   index: number | null
@@ -415,6 +416,19 @@ export const DOMChangeEditor = ({
     setLocalChange(initialChange)
   }, [initialChange])
 
+  // Listen for JavaScript editor save message
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === 'JAVASCRIPT_EDITOR_SAVE') {
+        setLocalChange({ ...localChange, jsValue: message.value })
+      }
+    }
+    chrome.runtime.onMessage.addListener(handleMessage)
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [localChange])
+
   const isEditMode = localChange.index !== null
 
   return (
@@ -682,17 +696,61 @@ export const DOMChangeEditor = ({
       )}
 
       {localChange.type === 'javascript' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            JavaScript Code
-          </label>
-          <textarea
-            value={localChange.jsValue || ''}
-            onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
-            placeholder="// JavaScript code to execute\nconsole.log('Hello');"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-            rows={5}
-          />
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                JavaScript Code
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  // Send message to content script to open editor in page context
+                  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    if (tabs[0]?.id) {
+                      chrome.tabs.sendMessage(tabs[0].id, {
+                        type: 'OPEN_JAVASCRIPT_EDITOR',
+                        data: {
+                          value: localChange.jsValue || ''
+                        }
+                      })
+                    }
+                  })
+                }}
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                title="Open fullscreen editor"
+              >
+                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                Fullscreen
+              </button>
+            </div>
+            <textarea
+              value={localChange.jsValue || ''}
+              onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
+              placeholder="// JavaScript code to execute
+// Available context:
+// - element: The selected element
+// - document: Page document
+// - window: Page window
+// - console: For logging
+// - experimentName: Experiment identifier
+
+console.log('Hello from experiment:', experimentName);"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+              rows={6}
+            />
+          </div>
+
+          {/* Wait for element checkbox and options */}
+          <div className="pt-2 border-t border-gray-200">
+            <DOMChangeOptions
+              waitForElement={localChange.waitForElement || false}
+              observerRoot={localChange.observerRoot || ''}
+              onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+              onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+              idPrefix={`js-${isEditMode ? 'edit' : 'new'}`}
+            />
+          </div>
         </div>
       )}
 
@@ -750,7 +808,7 @@ export const DOMChangeEditor = ({
       )}
 
       {/* Wait for element checkbox for applicable types */}
-      {localChange.type !== 'style' && localChange.type !== 'styleRules' && (
+      {localChange.type !== 'style' && localChange.type !== 'styleRules' && localChange.type !== 'javascript' && (
         <div className="space-y-2 pt-2 border-t border-gray-200">
           <div className="flex items-start">
             <input
