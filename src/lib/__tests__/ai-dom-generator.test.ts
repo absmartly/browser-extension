@@ -1,243 +1,305 @@
 import { generateDOMChanges } from '../ai-dom-generator'
+import Anthropic from '@anthropic-ai/sdk'
+import { jest } from '@jest/globals'
 
-// Sample HTML for testing
-const TEST_HTML = `
-<!DOCTYPE html>
-<html>
-<head><title>Test Page</title></head>
-<body>
-  <div id="test-container">
-    <h1 id="main-heading">Original Heading</h1>
-    <p id="test-paragraph">Original text content</p>
-    <button id="button-1">Button 1</button>
-    <button id="button-2">Button 2</button>
-    <ul>
-      <li id="item-1">Item 1</li>
-      <li id="item-2">Item 2</li>
-      <li id="item-3">Item 3</li>
-    </ul>
-  </div>
-</body>
-</html>
-`
+jest.mock('@anthropic-ai/sdk')
+jest.mock('~src/utils/debug', () => ({
+  debugLog: jest.fn(),
+  debugError: jest.fn(),
+  debugWarn: jest.fn()
+}))
 
 describe('AI DOM Generator', () => {
-  const API_KEY = process.env.ANTHROPIC_API_KEY || ''
+  const mockApiKey = 'test-api-key-123'
+  const mockHtml = '<html><body><p id="test">Test content</p></body></html>'
+  const mockPrompt = 'Change the text to "Hello"'
 
-  if (!API_KEY) {
-    console.warn('⚠️  ANTHROPIC_API_KEY not found in environment variables')
-    console.warn('   Tests will be skipped. Set ANTHROPIC_API_KEY to run these tests.')
-  }
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
 
-  (API_KEY ? it : it.skip)('should generate text change', async () => {
-    console.log('\n🤖 Testing: Text change generation')
+  describe('generateDOMChanges', () => {
+    it('should generate DOM changes from Claude API response', async () => {
+      const mockChanges = [
+        {
+          selector: '#test',
+          type: 'text',
+          value: 'Hello',
+          enabled: true
+        }
+      ]
 
-    const prompt = 'Change the text in the paragraph with id "test-paragraph" to say "Modified text!"'
-    console.log(`  Prompt: ${prompt}`)
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(mockChanges)
+          }
+        ]
+      }
 
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    // Verify we got at least one change
-    expect(changes.length).toBeGreaterThan(0)
+      const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
 
-    // Find the text change
-    const textChange = changes.find(c =>
-      c.selector?.includes('test-paragraph') &&
-      (c.type === 'text' || c.type === 'html')
-    ) as any
+      expect(result).toEqual(mockChanges)
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 4096,
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              content: expect.stringContaining(mockPrompt)
+            })
+          ])
+        })
+      )
+    })
 
-    expect(textChange).toBeDefined()
-    expect(textChange?.value || textChange?.html).toContain('Modified text')
+    it('should handle markdown code block formatting in response', async () => {
+      const mockChanges = [
+        {
+          selector: '.button',
+          type: 'style',
+          value: { color: 'red' },
+          enabled: true
+        }
+      ]
 
-    console.log('  ✅ Text change generated correctly')
-  }, 60000);
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: '```json\n' + JSON.stringify(mockChanges) + '\n```'
+          }
+        ]
+      }
 
-  (API_KEY ? it : it.skip)( 'should generate style change (hide element)', async () => {
-    console.log('\n🤖 Testing: Style change (hide) generation')
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    const prompt = 'Add a CSS style change to the button with id "button-1" to set the display property to "none" (do not remove the element, only change its style)'
-    console.log(`  Prompt: ${prompt}`)
+      const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
 
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
+      expect(result).toEqual(mockChanges)
+    })
 
-    expect(changes.length).toBeGreaterThan(0)
+    it('should throw error when API key is missing', async () => {
+      await expect(generateDOMChanges(mockHtml, mockPrompt, '')).rejects.toThrow(
+        'Anthropic API key is required'
+      )
+    })
 
-    // Find the style change
-    const styleChange = changes.find(c =>
-      c.selector?.includes('button-1') &&
-      c.type === 'style'
-    ) as any
+    it('should throw error when API key is null', async () => {
+      await expect(generateDOMChanges(mockHtml, mockPrompt, null as any)).rejects.toThrow(
+        'Anthropic API key is required'
+      )
+    })
 
-    if (!styleChange) {
-      console.log('  ⚠️  Style change not found. All changes:', JSON.stringify(changes, null, 2))
-    }
+    it('should handle non-text response type', async () => {
+      const mockMessage = {
+        content: [
+          {
+            type: 'image',
+            text: 'some image'
+          }
+        ]
+      }
 
-    expect(styleChange).toBeDefined()
-    expect(styleChange?.value).toBeDefined()
-    expect(styleChange?.value?.display).toBe('none')
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    console.log('  ✅ Style change generated correctly')
-  }, 60000);
+      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow(
+        'Unexpected response type from Claude'
+      )
+    })
 
-  (API_KEY ? it : it.skip)( 'should generate remove change', async () => {
-    console.log('\n🤖 Testing: Remove element generation')
+    it('should throw error when response is not an array', async () => {
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ selector: '#test', type: 'text' })
+          }
+        ]
+      }
 
-    const prompt = 'Remove the button with id "button-2" from the page completely'
-    console.log(`  Prompt: ${prompt}`)
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
+      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow(
+        'AI response is not an array'
+      )
+    })
 
-    expect(changes.length).toBeGreaterThan(0)
+    it('should handle JSON parsing errors', async () => {
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: 'Invalid JSON {'
+          }
+        ]
+      }
 
-    // Find the remove change
-    const removeChange = changes.find(c =>
-      c.selector?.includes('button-2') &&
-      c.type === 'remove'
-    )
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    expect(removeChange).toBeDefined()
+      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow()
+    })
 
-    console.log('  ✅ Remove change generated correctly')
-  }, 60000);
+    it('should generate multiple DOM changes', async () => {
+      const mockChanges = [
+        {
+          selector: '#title',
+          type: 'text',
+          value: 'New Title',
+          enabled: true
+        },
+        {
+          selector: '.button',
+          type: 'style',
+          value: { backgroundColor: '#ff0000' },
+          enabled: true
+        },
+        {
+          selector: '.hidden',
+          type: 'class',
+          add: ['hidden'],
+          enabled: true
+        }
+      ]
 
-  (API_KEY ? it : it.skip)( 'should generate move change', async () => {
-    console.log('\n🤖 Testing: Move element generation')
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(mockChanges)
+          }
+        ]
+      }
 
-    const prompt = 'Move the list item with id "item-2" to appear before the item with id "item-1"'
-    console.log(`  Prompt: ${prompt}`)
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
+      const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
 
-    expect(changes.length).toBeGreaterThan(0)
+      expect(result).toHaveLength(3)
+      expect(result).toEqual(mockChanges)
+    })
 
-    // Find the move change
-    const moveChange = changes.find(c =>
-      c.selector?.includes('item-2') &&
-      c.type === 'move'
-    ) as any
+    it('should handle API errors from Claude', async () => {
+      const mockError = new Error('API Error: Rate limit exceeded')
 
-    expect(moveChange).toBeDefined()
-    expect(moveChange?.targetSelector).toBeDefined()
-    expect(moveChange?.targetSelector).toContain('item-1')
+      const mockCreate = jest.fn().mockRejectedValue(mockError)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    console.log('  ✅ Move change generated correctly')
-  }, 60000);
+      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow(
+        'API Error: Rate limit exceeded'
+      )
+    })
 
-  (API_KEY ? it : it.skip)( 'should generate HTML replace change', async () => {
-    console.log('\n🤖 Testing: HTML replacement generation')
+    it('should initialize Anthropic client with dangerouslyAllowBrowser flag', async () => {
+      const mockChanges = []
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(mockChanges)
+          }
+        ]
+      }
 
-    const prompt = 'Replace the HTML content inside the div with id "test-container" with this: <h2>HTML Edited!</h2><p>New paragraph content</p>'
-    console.log(`  Prompt: ${prompt}`)
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
+      await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
 
-    expect(changes.length).toBeGreaterThan(0)
+      expect(jest.mocked(Anthropic)).toHaveBeenCalledWith({
+        apiKey: mockApiKey,
+        dangerouslyAllowBrowser: true
+      })
+    })
 
-    // Find the HTML change
-    const htmlChange = changes.find(c =>
-      c.selector?.includes('test-container') &&
-      c.type === 'html'
-    ) as any
+    it('should handle empty HTML gracefully', async () => {
+      const mockChanges = []
 
-    if (!htmlChange) {
-      console.log('  ⚠️  HTML change not found. All changes:', JSON.stringify(changes, null, 2))
-    }
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(mockChanges)
+          }
+        ]
+      }
 
-    expect(htmlChange).toBeDefined()
-    expect(htmlChange?.value).toContain('HTML Edited!')
-    expect(htmlChange?.value).toContain('New paragraph content')
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    console.log('  ✅ HTML change generated correctly')
-  }, 60000);
+      const result = await generateDOMChanges('', mockPrompt, mockApiKey)
 
-  (API_KEY ? it : it.skip)( 'should generate multiple changes in one request', async () => {
-    console.log('\n🤖 Testing: Multiple changes in one request')
+      expect(result).toEqual([])
+    })
 
-    const prompt = `Make these changes:
-    1. Change the heading text to "New Heading"
-    2. Hide button-1
-    3. Remove button-2`
-    console.log(`  Prompt: ${prompt}`)
+    it('should handle empty prompt gracefully', async () => {
+      const mockChanges = []
 
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
+      const mockMessage = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(mockChanges)
+          }
+        ]
+      }
 
-    // Should generate multiple changes
-    expect(changes.length).toBeGreaterThanOrEqual(3)
+      const mockCreate = jest.fn().mockResolvedValue(mockMessage)
+      jest.mocked(Anthropic).mockImplementation(() => ({
+        messages: {
+          create: mockCreate
+        }
+      } as any))
 
-    // Verify we have different types of changes
-    const hasTextChange = changes.some(c => c.type === 'text' || c.type === 'html')
-    const hasStyleChange = changes.some(c => c.type === 'style')
-    const hasRemoveChange = changes.some(c => c.type === 'remove')
+      const result = await generateDOMChanges(mockHtml, '', mockApiKey)
 
-    expect(hasTextChange).toBe(true)
-    expect(hasStyleChange).toBe(true)
-    expect(hasRemoveChange).toBe(true)
-
-    console.log('  ✅ Multiple changes generated correctly')
-  }, 60000);
-
-  it('should handle invalid API key gracefully', async () => {
-    console.log('\n🤖 Testing: Invalid API key handling')
-
-    const prompt = 'Change the heading text'
-    const invalidKey = 'invalid-key-12345'
-
-    await expect(async () => {
-      await generateDOMChanges(TEST_HTML, prompt, invalidKey)
-    }).rejects.toThrow()
-
-    console.log('  ✅ Invalid API key handled with error')
-  }, 30000);
-
-  (API_KEY ? it : it.skip)( 'should handle minimal HTML gracefully', async () => {
-    console.log('\n🤖 Testing: Minimal HTML handling')
-
-    const prompt = 'Add a paragraph with text "Hello World"'
-    const minimalHTML = '<html><body></body></html>'
-
-    const changes = await generateDOMChanges(minimalHTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
-
-    // Should return valid array of changes
-    expect(Array.isArray(changes)).toBe(true)
-    expect(changes.length).toBeGreaterThanOrEqual(0)
-
-    console.log('  ✅ Minimal HTML handled gracefully')
-  }, 60000);
-
-  (API_KEY ? it : it.skip)( 'should handle complex natural language prompts', async () => {
-    console.log('\n🤖 Testing: Complex natural language prompts')
-
-    const prompt = 'Hide the button with id "button-1" by setting its display style to none'
-    console.log(`  Prompt: ${prompt}`)
-
-    const changes = await generateDOMChanges(TEST_HTML, prompt, API_KEY)
-    console.log(`  Generated ${changes.length} change(s)`)
-    console.log(`  Changes:`, JSON.stringify(changes, null, 2))
-
-    expect(changes.length).toBeGreaterThan(0)
-
-    // Should generate either a style or remove change (both are valid interpretations)
-    const hasStyleOrRemove = changes.some(c =>
-      c.selector?.includes('button-1') &&
-      (c.type === 'style' || c.type === 'remove')
-    )
-
-    expect(hasStyleOrRemove).toBe(true)
-
-    console.log('  ✅ Complex prompt handled correctly')
-  }, 60000);
+      expect(result).toEqual([])
+    })
+  })
 })
