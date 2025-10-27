@@ -199,6 +199,8 @@ export function DOMChangesInlineEditor({
             } else {
               setEditingChange({ ...result.editingChange, targetSelector: pickerResult.selector })
             }
+          } else if (pickerResult.fieldId === 'observerRoot' && result.editingChange) {
+            setEditingChange({ ...result.editingChange, observerRoot: pickerResult.selector })
           }
           
           // Clear the picker result
@@ -304,6 +306,8 @@ export function DOMChangesInlineEditor({
           setEditingChange({ ...editingChange, selector: message.selector })
         } else if (pickingForField === 'targetSelector' && editingChange) {
           setEditingChange({ ...editingChange, targetSelector: message.selector })
+        } else if (pickingForField === 'observerRoot' && editingChange) {
+          setEditingChange({ ...editingChange, observerRoot: message.selector })
         }
         
         setPickingForField(null)
