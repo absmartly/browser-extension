@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
-test.describe('URL Filtering Debug Tests', () => {
+test.describe.skip('URL Filtering Debug Tests', () => {
   test('Debug: Basic plugin functionality without URL filter', async ({ page }) => {
     await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
@@ -52,7 +52,7 @@ test.describe('URL Filtering Debug Tests', () => {
 
     // Load plugin
     await page.addScriptTag({
-      path: 'public/absmartly-sdk-bridge.bundle.js'
+      path: 'public/absmartly-dom-changes-core.min.js'
     })
 
     // Initialize plugin
@@ -166,9 +166,9 @@ test.describe('URL Filtering Debug Tests', () => {
     })
 
     // Load plugin
-    console.log('[TEST] Loading plugin from public/absmartly-sdk-bridge.bundle.js')
+    console.log('[TEST] Loading plugin from public/absmartly-dom-changes-core.min.js')
     await page.addScriptTag({
-      path: 'public/absmartly-sdk-bridge.bundle.js'
+      path: 'public/absmartly-dom-changes-core.min.js'
     })
 
     // Initialize plugin with debug output

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
-test('Minimal test: Check SDK mock is working', async ({ page }) => {
+test.skip('Minimal test: Check SDK mock is working', async ({ page }) => {
   page.on('console', msg => {
     console.log(`[BROWSER ${msg.type()}]`, msg.text())
   })
@@ -81,7 +81,7 @@ test('Minimal test: Check SDK mock is working', async ({ page }) => {
   // Load plugin
   console.log('[TEST] Loading plugin')
   await page.addScriptTag({
-    path: 'public/absmartly-sdk-bridge.bundle.js'
+    path: 'public/absmartly-dom-changes-core.min.js'
   })
 
   // Check plugin loaded

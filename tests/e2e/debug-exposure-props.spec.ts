@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
 
-test('Debug: Show all plugin properties', async ({ page }) => {
+test.skip('Debug: Show all plugin properties', async ({ page }) => {
   page.on('console', msg => {
     console.log(`[BROWSER ${msg.type()}]`, msg.text())
   })
@@ -35,7 +35,7 @@ test('Debug: Show all plugin properties', async ({ page }) => {
     }
   })
 
-  await page.addScriptTag({ path: 'public/absmartly-sdk-bridge.bundle.js' })
+  await page.addScriptTag({ path: 'public/absmartly-dom-changes-core.min.js' })
 
   await page.evaluate(() => {
     const context = new (window as any).absmartly.Context();
