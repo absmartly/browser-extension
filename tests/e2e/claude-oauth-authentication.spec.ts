@@ -64,7 +64,10 @@ test.describe('Claude OAuth Authentication Flow', () => {
 
   test('should allow switching between OAuth and API Key methods', async ({ context, extensionUrl }) => {
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html'), { waitUntil: 'domcontentloaded', timeout: 10000 })
+
+    // Wait for the page to fully load before interacting
+    await page.waitForLoadState('networkidle')
 
     // Navigate to settings
     await page.click('text=Settings')
@@ -98,7 +101,10 @@ test.describe('Claude OAuth Authentication Flow', () => {
 
   test('should validate API key input when API Key method is selected', async ({ context, extensionUrl }) => {
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html'), { waitUntil: 'domcontentloaded', timeout: 10000 })
+
+    // Wait for the page to fully load before interacting
+    await page.waitForLoadState('networkidle')
 
     // Navigate to settings
     await page.click('text=Settings')
@@ -116,7 +122,10 @@ test.describe('Claude OAuth Authentication Flow', () => {
 
   test('should persist Claude auth method preference', async ({ context, extensionUrl, seedStorage }) => {
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html'))
+    await page.goto(extensionUrl('tabs/sidebar.html'), { waitUntil: 'domcontentloaded', timeout: 10000 })
+
+    // Wait for the page to fully load before interacting
+    await page.waitForLoadState('networkidle')
 
     // Navigate to settings
     await page.click('text=Settings')
