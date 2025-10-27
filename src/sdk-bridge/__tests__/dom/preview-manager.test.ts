@@ -186,6 +186,104 @@ describe('PreviewManager', () => {
       expect(testElement.style.display).toBe('none')
     })
 
+    it('should execute javascript code', () => {
+      const change: DOMChange = {
+        selector: '#test-element',
+        type: 'javascript',
+        value: "element.textContent = 'Modified by JS'"
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(true)
+      expect(testElement.textContent).toBe('Modified by JS')
+    })
+
+    it('should have access to element in javascript execution', () => {
+      const change: DOMChange = {
+        selector: '#test-element',
+        type: 'javascript',
+        value: "element.setAttribute('data-js-executed', 'true')"
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(true)
+      expect(testElement.getAttribute('data-js-executed')).toBe('true')
+    })
+
+    it('should have access to document in javascript execution', () => {
+      const change: DOMChange = {
+        selector: '#test-element',
+        type: 'javascript',
+        value: `
+          const newDiv = document.createElement('div');
+          newDiv.id = 'js-created-element';
+          document.body.appendChild(newDiv);
+        `
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(true)
+      expect(document.getElementById('js-created-element')).toBeDefined()
+    })
+
+    it('should pass experimentName to javascript execution', () => {
+      const change: DOMChange = {
+        selector: '#test-element',
+        type: 'javascript',
+        value: `
+          if (experimentName === 'my-test-exp') {
+            element.setAttribute('data-correct-exp', 'true');
+          }
+        `
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'my-test-exp')
+
+      expect(result).toBe(true)
+      expect(testElement.getAttribute('data-correct-exp')).toBe('true')
+    })
+
+    it('should return false for javascript with missing value', () => {
+      const change: any = {
+        selector: '#test-element',
+        type: 'javascript'
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(false)
+      expect(Logger.warn).toHaveBeenCalledWith('Invalid javascript change, missing or invalid value')
+    })
+
+    it('should return false for javascript with non-string value', () => {
+      const change: any = {
+        selector: '#test-element',
+        type: 'javascript',
+        value: 12345
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(false)
+      expect(Logger.warn).toHaveBeenCalledWith('Invalid javascript change, missing or invalid value')
+    })
+
+    it('should handle javascript execution errors gracefully', () => {
+      const change: DOMChange = {
+        selector: '#test-element',
+        type: 'javascript',
+        value: 'throw new Error("intentional error")'
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(true)
+      expect(Logger.warn).toHaveBeenCalledWith('Failed to execute JavaScript for:', '#test-element')
+    })
+
     it('should store original state before applying change', () => {
       testElement.style.color = 'blue'
       testElement.classList.add('original-class')
