@@ -564,6 +564,8 @@ export const DOMChangeEditor = ({
               onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
               onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistStyle: value })}
               onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+              onStartPicker={onStartPicker}
+              pickingForField={pickingForField}
               idPrefix={`style-${isEditMode ? 'edit' : 'new'}`}
             />
           </div>
@@ -748,6 +750,8 @@ console.log('Hello from experiment:', experimentName);"
               observerRoot={localChange.observerRoot || ''}
               onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
               onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+              onStartPicker={onStartPicker}
+              pickingForField={pickingForField}
               idPrefix={`js-${isEditMode ? 'edit' : 'new'}`}
             />
           </div>
