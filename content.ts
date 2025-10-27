@@ -321,6 +321,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const variantName = payload.variantName
     const experimentId = payload.experimentId
 
+    console.log('[Content Script] ABSMARTLY_PREVIEW message received:', { action, experimentName, variantName, changesCount: changes?.length })
     debugLog('[ABSmartly Content Script] Received preview message:', action)
 
     // If visual editor is active or starting, ignore preview update messages
@@ -596,14 +597,18 @@ window.addEventListener('message', (event) => {
 
 // Function to create preview header
 function createPreviewHeader(experimentName: string, variantName: string) {
+  console.log('[Content Script] createPreviewHeader called:', { experimentName, variantName, isVisualEditorActive, isVisualEditorStarting })
+
   // Remove any existing preview header
   removePreviewHeader()
 
   // Don't create header if visual editor is active or starting
   // The visual editor has its own toolbar with exit button
   if (isVisualEditorActive || isVisualEditorStarting) {
+    console.log('[Content Script] Skipping preview header creation: VE is active/starting')
     return
   }
+  console.log('[Content Script] Creating preview header...')
   
   // Create preview header container - floating bar style
   const headerContainer = document.createElement('div')
@@ -753,6 +758,7 @@ function createPreviewHeader(experimentName: string, variantName: string) {
   headerContainer.appendChild(content)
   headerContainer.appendChild(closeButton)
   document.body.appendChild(headerContainer)
+  console.log('[Content Script] Preview header created and appended to body')
 }
 
 // Function to remove preview header
