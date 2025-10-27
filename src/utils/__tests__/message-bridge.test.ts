@@ -1,4 +1,4 @@
-import { createMessageBridge, MessageBridgeOptions } from '../message-bridge'
+import { sendMessage, sendMessageNoResponse } from '../message-bridge'
 import { jest } from '@jest/globals'
 
 jest.mock('~src/utils/debug', () => ({
@@ -18,6 +18,7 @@ describe('Message Bridge Communication', () => {
     mockChrome = {
       runtime: {
         sendMessage: jest.fn(),
+        lastError: null,
         onMessage: {
           addListener: jest.fn()
         }
@@ -27,7 +28,10 @@ describe('Message Bridge Communication', () => {
     global.chrome = mockChrome as any
     global.window = {
       postMessage: jest.fn(),
-      addEventListener: jest.fn()
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      parent: {},
+      parent: { postMessage: jest.fn() }
     } as any
   })
 
@@ -35,58 +39,100 @@ describe('Message Bridge Communication', () => {
     global.window = originalWindow
   })
 
-  describe('createMessageBridge', () => {
-    it('should initialize bridge in production mode with chrome.runtime', async () => {
-      const bridge = createMessageBridge({ testMode: false })
+  describe('sendMessage - Production Mode', () => {
+    it('should send message via chrome.runtime in production', async () => {
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true, data: 'test' })
 
-      expect(bridge).toBeDefined()
-      expect(bridge.send).toBeDefined()
-    })
-
-    it('should initialize bridge in test mode with window.postMessage', async () => {
-      const bridge = createMessageBridge({ testMode: true })
-
-      expect(bridge).toBeDefined()
-      expect(bridge.send).toBeDefined()
-    })
-
-    it('should send message in production mode', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
-
-      const bridge = createMessageBridge({ testMode: false })
-      const result = await bridge.send('TEST_MESSAGE', { data: 'test' })
+      const result = await sendMessage({ type: 'TEST_MESSAGE', payload: { test: true } })
 
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'TEST_MESSAGE',
-          payload: { data: 'test' }
+          payload: { test: true }
         })
       )
-      expect(result).toEqual({ success: true })
+      expect(result).toEqual({ success: true, data: 'test' })
     })
 
-    it('should send message in test mode via postMessage', async () => {
-      const bridge = createMessageBridge({ testMode: true })
-
-      global.window.postMessage = jest.fn((message, origin) => {
-        if (message.type === 'TEST_MESSAGE' && message.from === 'sidebar') {
-          setTimeout(() => {
-            global.window.dispatchEvent(
-              new MessageEvent('message', {
-                data: { id: message.id, response: { success: true }, from: 'content' }
-              })
-            )
-          }, 0)
-        }
+    it('should handle chrome.runtime errors', async () => {
+      mockChrome.runtime.lastError = { message: 'Chrome error' }
+      mockChrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+        callback({ success: false })
       })
 
-      const result = await bridge.send('TEST_MESSAGE', { data: 'test' })
+      await expect(sendMessage({ type: 'TEST_MESSAGE' })).rejects.toThrow()
+    })
 
-      expect(global.window.postMessage).toHaveBeenCalled()
+    it('should support callback-based responses', async () => {
+      const callback = jest.fn()
+      mockChrome.runtime.sendMessage.mockImplementation((msg, chromeCallback) => {
+        chromeCallback({ success: true, data: 'callback response' })
+      })
+
+      await sendMessage({ type: 'TEST_MESSAGE' }, callback)
+
+      expect(callback).toHaveBeenCalledWith({ success: true, data: 'callback response' })
     })
   })
 
-  describe('Message Bridge - AI Generation', () => {
+  describe('sendMessage - Test Mode', () => {
+    beforeEach(() => {
+      global.window.parent = global.window
+    })
+
+    it('should send message via postMessage in test mode', async () => {
+      const callback = jest.fn()
+      global.window.postMessage = jest.fn((message, origin) => {
+        setTimeout(() => {
+          global.window.dispatchEvent(
+            new MessageEvent('message', {
+              data: {
+                source: 'absmartly-extension',
+                responseId: message.responseId,
+                response: { success: true }
+              }
+            })
+          )
+        }, 0)
+      })
+
+      const result = await sendMessage({ type: 'TEST_MESSAGE' }, callback)
+
+      expect(global.window.postMessage).toHaveBeenCalled()
+    })
+
+    it('should handle postMessage timeout', async () => {
+      global.window.postMessage = jest.fn()
+
+      const promise = sendMessage({ type: 'TEST_MESSAGE' })
+
+      await expect(promise).rejects.toThrow()
+    }, 35000)
+
+    it('should clean up event listeners on response', async () => {
+      const removeEventListenerSpy = jest.spyOn(global.window, 'removeEventListener')
+
+      global.window.postMessage = jest.fn((message, origin) => {
+        setTimeout(() => {
+          global.window.dispatchEvent(
+            new MessageEvent('message', {
+              data: {
+                source: 'absmartly-extension',
+                responseId: message.responseId,
+                response: { success: true }
+              }
+            })
+          )
+        }, 0)
+      })
+
+      await sendMessage({ type: 'TEST_MESSAGE' })
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function))
+    })
+  })
+
+  describe('AI Generation Messages', () => {
     it('should handle AI_GENERATE_DOM_CHANGES message', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue({
         success: true,
@@ -95,8 +141,8 @@ describe('Message Bridge Communication', () => {
         ]
       })
 
-      const bridge = createMessageBridge({ testMode: false })
-      const result = await bridge.send('AI_GENERATE_DOM_CHANGES', {
+      const result = await sendMessage({
+        type: 'AI_GENERATE_DOM_CHANGES',
         html: '<p>Test</p>',
         prompt: 'Change text',
         apiKey: 'test-key'
@@ -114,8 +160,7 @@ describe('Message Bridge Communication', () => {
         html: mockHtml
       })
 
-      const bridge = createMessageBridge({ testMode: false })
-      const result = await bridge.send('CAPTURE_HTML')
+      const result = await sendMessage({ type: 'CAPTURE_HTML' })
 
       expect(result.success).toBe(true)
       expect(result.html).toBe(mockHtml)
@@ -126,10 +171,9 @@ describe('Message Bridge Communication', () => {
         new Error('API key is required')
       )
 
-      const bridge = createMessageBridge({ testMode: false })
-
       await expect(
-        bridge.send('AI_GENERATE_DOM_CHANGES', {
+        sendMessage({
+          type: 'AI_GENERATE_DOM_CHANGES',
           html: '<p>Test</p>',
           prompt: 'Test',
           apiKey: ''
@@ -138,232 +182,139 @@ describe('Message Bridge Communication', () => {
     })
   })
 
-  describe('Message Bridge - Timeouts', () => {
-    it('should timeout long-running AI generation requests', async () => {
-      mockChrome.runtime.sendMessage.mockImplementation(
-        () => new Promise(() => {})
-      )
+  describe('sendMessageNoResponse - Fire and Forget', () => {
+    it('should send fire-and-forget message without waiting for response', () => {
+      mockChrome.runtime.sendMessage.mockResolvedValue(undefined)
 
-      const bridge = createMessageBridge({ testMode: false, timeout: 1000 })
-      const startTime = Date.now()
-
-      await expect(
-        bridge.send('AI_GENERATE_DOM_CHANGES', {
-          html: '<p>Test</p>',
-          prompt: 'Test',
-          apiKey: 'key'
-        })
-      ).rejects.toThrow()
-
-      const elapsed = Date.now() - startTime
-      expect(elapsed).toBeGreaterThanOrEqual(1000)
-    })
-
-    it('should use custom timeout values', async () => {
-      mockChrome.runtime.sendMessage.mockImplementation(
-        () => new Promise(() => {})
-      )
-
-      const customTimeout = 500
-      const bridge = createMessageBridge({
-        testMode: false,
-        timeout: customTimeout
-      })
-
-      const startTime = Date.now()
-
-      await expect(bridge.send('TEST_MESSAGE', {})).rejects.toThrow()
-
-      const elapsed = Date.now() - startTime
-      expect(elapsed).toBeGreaterThanOrEqual(customTimeout)
-    })
-
-    it('should not timeout successful messages', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
-
-      const bridge = createMessageBridge({ testMode: false, timeout: 1000 })
-      const startTime = Date.now()
-
-      const result = await bridge.send('TEST_MESSAGE', {})
-
-      const elapsed = Date.now() - startTime
-      expect(elapsed).toBeLessThan(100)
-      expect(result.success).toBe(true)
-    })
-  })
-
-  describe('Message Bridge - Response Handling', () => {
-    it('should handle response callbacks correctly', async () => {
-      const mockCallback = jest.fn()
-
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
-
-      const bridge = createMessageBridge({ testMode: false })
-      const result = await bridge.send(
-        'TEST_MESSAGE',
-        { data: 'test' },
-        mockCallback
-      )
-
-      expect(result).toBeDefined()
-    })
-
-    it('should support fire-and-forget messaging (no callback)', async () => {
-      mockChrome.runtime.sendMessage.mockImplementation(() => {
-        return Promise.resolve()
-      })
-
-      const bridge = createMessageBridge({ testMode: false })
-      await bridge.send('NOTIFICATION', { type: 'info', message: 'Test' })
+      sendMessageNoResponse({ type: 'NOTIFICATION', message: 'test' })
 
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalled()
     })
 
-    it('should track multiple concurrent messages', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ id: 123 })
+    it('should handle errors silently in fire-and-forget', () => {
+      mockChrome.runtime.sendMessage.mockRejectedValue(new Error('Send failed'))
 
-      const bridge = createMessageBridge({ testMode: false })
+      sendMessageNoResponse({ type: 'NOTIFICATION' })
 
-      const promise1 = bridge.send('MSG_1', { seq: 1 })
-      const promise2 = bridge.send('MSG_2', { seq: 2 })
-      const promise3 = bridge.send('MSG_3', { seq: 3 })
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalled()
+    })
 
-      const results = await Promise.all([promise1, promise2, promise3])
+    it('should use postMessage in test mode', () => {
+      global.window.parent = global.window
+      const sidebarIframe = document.createElement('iframe')
+      sidebarIframe.id = 'absmartly-sidebar-iframe'
+      sidebarIframe.contentWindow = {
+        postMessage: jest.fn()
+      } as any
 
-      expect(results).toHaveLength(3)
-      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledTimes(3)
+      document.body.appendChild(sidebarIframe)
+
+      sendMessageNoResponse({ type: 'NOTIFICATION' })
+
+      expect(sidebarIframe.contentWindow.postMessage).toHaveBeenCalled()
+
+      document.body.removeChild(sidebarIframe)
     })
   })
 
-  describe('Message Bridge - Test Mode', () => {
-    it('should route messages through iframe in test mode', async () => {
-      const bridge = createMessageBridge({ testMode: true })
-
-      global.window.postMessage = jest.fn()
-
-      await bridge.send('TEST_MESSAGE', { data: 'test' })
-
-      expect(global.window.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'TEST_MESSAGE'
-        }),
-        '*'
-      )
-    })
-
-    it('should handle postMessage errors gracefully', async () => {
-      const bridge = createMessageBridge({ testMode: true })
-
-      global.window.postMessage = jest.fn(() => {
-        throw new Error('postMessage failed')
-      })
-
-      await expect(bridge.send('TEST_MESSAGE', {})).rejects.toThrow()
-    })
-
-    it('should differentiate message sources in test mode', async () => {
-      const bridge = createMessageBridge({ testMode: true, from: 'content' })
-
-      global.window.postMessage = jest.fn()
-
-      await bridge.send('TEST_MESSAGE', {})
-
-      expect(global.window.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          from: 'content'
-        }),
-        '*'
-      )
-    })
-  })
-
-  describe('Message Bridge - Error Handling', () => {
-    it('should handle chrome.runtime errors', async () => {
-      const error = new Error('Chrome API error')
-      mockChrome.runtime.sendMessage.mockRejectedValue(error)
-
-      const bridge = createMessageBridge({ testMode: false })
-
-      await expect(bridge.send('TEST_MESSAGE', {})).rejects.toThrow('Chrome API error')
-    })
-
-    it('should provide meaningful error messages for missing messages', async () => {
-      mockChrome.runtime.sendMessage.mockRejectedValue(
-        new Error('No listener found')
-      )
-
-      const bridge = createMessageBridge({ testMode: false })
-
-      await expect(bridge.send('UNKNOWN_MESSAGE', {})).rejects.toThrow()
-    })
-
+  describe('Message Error Handling', () => {
     it('should handle malformed responses gracefully', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue(null)
 
-      const bridge = createMessageBridge({ testMode: false })
-      const result = await bridge.send('TEST_MESSAGE', {})
+      const result = await sendMessage({ type: 'TEST_MESSAGE' })
 
       expect(result).toBeNull()
     })
-  })
 
-  describe('Message Bridge - Listener Setup', () => {
-    it('should register message listeners in production mode', async () => {
-      createMessageBridge({ testMode: false })
+    it('should throw error with Chrome runtime lastError', async () => {
+      mockChrome.runtime.lastError = { message: 'Specified item not found' }
 
-      expect(mockChrome.runtime.onMessage.addListener).toHaveBeenCalled()
-    })
-
-    it('should handle incoming messages in test mode', async () => {
-      const bridge = createMessageBridge({ testMode: true })
-      const messageHandler = jest.fn()
-
-      global.window.addEventListener = jest.fn((event, handler) => {
-        if (event === 'message') {
-          global.window.messageHandler = handler
-        }
+      mockChrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+        callback(undefined)
       })
 
-      await bridge.send('TEST_MESSAGE', {})
+      await expect(sendMessage({ type: 'TEST' })).rejects.toThrow()
+    })
 
-      expect(global.window.addEventListener).toHaveBeenCalledWith(
-        'message',
-        expect.any(Function)
-      )
+    it('should handle exceptions in chrome.runtime.sendMessage', async () => {
+      mockChrome.runtime.sendMessage.mockImplementation(() => {
+        throw new Error('sendMessage threw exception')
+      })
+
+      await expect(sendMessage({ type: 'TEST' })).rejects.toThrow('sendMessage threw exception')
     })
   })
 
-  describe('Message Bridge - Performance', () => {
-    it('should handle rapid consecutive messages', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
+  describe('Response ID Tracking', () => {
+    it('should generate unique response IDs for multiple messages', async () => {
+      const responseIds = new Set()
 
-      const bridge = createMessageBridge({ testMode: false })
+      mockChrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+        responseIds.add(msg.responseId)
+        callback({ success: true })
+      })
 
-      const messages = Array.from({ length: 100 }, (_, i) => ({
-        type: `MSG_${i}`,
-        payload: { seq: i }
-      }))
+      await sendMessage({ type: 'MSG1' })
+      await sendMessage({ type: 'MSG2' })
+      await sendMessage({ type: 'MSG3' })
 
-      const promises = messages.map(msg =>
-        bridge.send(msg.type, msg.payload)
+      expect(responseIds.size).toBe(3)
+    })
+  })
+
+  describe('Callback Handling', () => {
+    it('should call callback before resolving promise', async () => {
+      const callback = jest.fn()
+      const callOrder: string[] = []
+
+      mockChrome.runtime.sendMessage.mockImplementation((msg, chromeCallback) => {
+        callOrder.push('chrome-callback')
+        chromeCallback({ success: true, data: 'response' })
+      })
+
+      const promise = sendMessage(
+        { type: 'TEST' },
+        (response) => {
+          callOrder.push('user-callback')
+        }
       )
 
-      const results = await Promise.all(promises)
+      await promise
 
-      expect(results).toHaveLength(100)
-      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledTimes(100)
+      callOrder.push('promise-resolved')
+
+      expect(callOrder[0]).toBe('chrome-callback')
+      expect(callOrder[1]).toBe('user-callback')
     })
 
-    it('should clean up completed message handlers', async () => {
+    it('should handle missing callback gracefully', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
 
-      const bridge = createMessageBridge({ testMode: false })
+      const result = await sendMessage({ type: 'TEST' })
 
-      await bridge.send('TEST_1', {})
-      await bridge.send('TEST_2', {})
-      await bridge.send('TEST_3', {})
+      expect(result).toEqual({ success: true })
+    })
+  })
 
-      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledTimes(3)
+  describe('Message Type Detection', () => {
+    it('should detect test mode correctly', async () => {
+      global.window.parent = global.window
+
+      mockChrome.runtime = undefined
+
+      const promise = sendMessage({ type: 'TEST' })
+
+      await expect(promise).rejects.toThrow()
+    })
+
+    it('should use chrome.runtime when available', async () => {
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
+
+      global.window.parent = {}
+
+      const result = await sendMessage({ type: 'TEST' })
+
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalled()
     })
   })
 })
