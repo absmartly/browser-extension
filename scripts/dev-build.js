@@ -56,6 +56,16 @@ function copyWithHash() {
     });
   }
 
+  // Copy SDK bridge bundle to dev build
+  const sdkBridgeSource = path.join(publicDir, 'absmartly-sdk-bridge.bundle.js');
+  const sdkBridgeDest = path.join(devBuildDir, 'absmartly-sdk-bridge.bundle.js');
+  if (fs.existsSync(sdkBridgeSource)) {
+    fs.copyFileSync(sdkBridgeSource, sdkBridgeDest);
+    console.log('[Dev Build] Copied absmartly-sdk-bridge.bundle.js');
+  } else {
+    console.warn('[Dev Build] Warning: absmartly-sdk-bridge.bundle.js not found in public directory');
+  }
+
   // Update manifest to include visual editor in web_accessible_resources
   const manifestPath = path.join(devBuildDir, 'manifest.json');
   if (fs.existsSync(manifestPath)) {

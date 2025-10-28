@@ -29,71 +29,6 @@ w.__absmartlyContentScriptLoaded = true
 console.log('[ABsmartly] Content script marker set:', w.__absmartlyContentScriptLoaded)
 debugLog('[Visual Editor Content Script] Content script loaded')
 
-// Polyfill chrome.runtime.sendMessage for test mode
-// This handles messages that expect a response (like REQUEST_INJECTION_CODE)
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
-  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-
-  if (sidebarIframe && sidebarIframe.contentWindow) {
-    // We're in test mode - polyfill sendMessage
-    const responseCallbacks = new Map<string, (response: any) => void>()
-
-    // Listen for responses from sidebar
-    window.addEventListener('message', (event) => {
-      // SECURITY: Only accept messages from sidebar iframe or same window
-      if (event.source !== window && event.source !== sidebarIframe?.contentWindow) {
-        return
-      }
-
-      if (event.data?.source === 'absmartly-extension' && event.data?.responseId) {
-        const callback = responseCallbacks.get(event.data.responseId)
-        if (callback) {
-          callback(event.data.response)
-          responseCallbacks.delete(event.data.responseId)
-        }
-      }
-    })
-
-    chrome.runtime.sendMessage = function(message: any, callback?: (response: any) => void) {
-      // Determine the correct source based on message type
-      const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
-                      message.type === 'VISUAL_EDITOR_STOPPED' ||
-                      message.type === 'ELEMENT_SELECTED' ||
-                      message.type === 'PREVIEW_STATE_CHANGED')
-        ? 'absmartly-visual-editor'
-        : 'absmartly-content-script'
-
-      if (callback) {
-        // Generate unique ID for this request
-        const responseId = `${message.type}_${Date.now()}_${Math.random()}`
-        responseCallbacks.set(responseId, callback)
-
-        // Send request to sidebar with response ID
-        sidebarIframe.contentWindow!.postMessage({
-          source: source,
-          responseId: responseId,
-          ...message
-        }, '*')
-
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          if (responseCallbacks.has(responseId)) {
-            responseCallbacks.delete(responseId)
-            debugWarn(`No response received for ${message.type} after 5s`)
-          }
-        }, 5000)
-      } else {
-        // No callback, just send the message
-        sidebarIframe.contentWindow!.postMessage({
-          source: source,
-          ...message
-        }, '*')
-      }
-    } as any
-  }
-}
-
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
@@ -321,12 +256,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const variantName = payload.variantName
     const experimentId = payload.experimentId
 
-    debugLog('[ABSmartly Content Script] Received preview message:', action)
+    console.log('[ABSmartly Content Script] Received preview message:', action)
+    console.log(`[ABSmartly Content Script] VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
 
     // If visual editor is active or starting, ignore preview update messages
     // The visual editor manages its own changes and we don't want conflicts
     if ((isVisualEditorActive || isVisualEditorStarting) && action === 'update') {
-      debugLog('[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update')
+      console.log('[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update')
       sendResponse({ success: true, message: 'Visual editor active, preview update ignored' })
       return true
     }
@@ -336,6 +272,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       await ensureSDKPluginInjected()
 
       if (action === 'apply') {
+        console.log(`[ABSmartly Content Script] Handling preview apply. VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
         // Create preview header (it will check visual editor state internally)
         createPreviewHeader(experimentName, variantName)
 
@@ -569,6 +506,7 @@ window.addEventListener('message', (event) => {
       currentEditor = null
       isVisualEditorActive = false
       isVisualEditorStarting = false
+      debugLog(`[Content Script] VE exited. Flags now: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
 
       // Send message to extension that visual editor was stopped
       chrome.runtime.sendMessage({
@@ -602,9 +540,12 @@ function createPreviewHeader(experimentName: string, variantName: string) {
   // Don't create header if visual editor is active or starting
   // The visual editor has its own toolbar with exit button
   if (isVisualEditorActive || isVisualEditorStarting) {
+    console.log(`[Content Script] Skipping preview header creation: isVisualEditorActive=${isVisualEditorActive}, isVisualEditorStarting=${isVisualEditorStarting}`)
     return
   }
-  
+
+  console.log(`[Content Script] Creating preview header for ${experimentName} / ${variantName}`)
+
   // Create preview header container - floating bar style
   const headerContainer = document.createElement('div')
   headerContainer.id = 'absmartly-preview-header'
