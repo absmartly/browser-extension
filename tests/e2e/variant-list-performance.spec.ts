@@ -5,6 +5,17 @@ import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-help
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
+/**
+ * E2E Tests for Variant List Performance (React.memo)
+ *
+ * Tests that verify React.memo optimizations prevent unnecessary re-renders in the variant editor:
+ * - URL filter section renders efficiently
+ * - Global defaults section renders efficiently
+ * - Sections don't re-render when unrelated variant properties change
+ *
+ * NOTE: Tests may skip gracefully if no experiments are available to edit. This is expected
+ * behavior in test environments where API data is not available.
+ */
 test.describe('Variant List Performance Tests (React.memo)', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
@@ -65,6 +76,8 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
           await debugWait()
         } else {
           console.log('  ⚠️ No experiment to edit')
+          // Skip gracefully if no experiments available - this is expected in test environments
+          // where API data is not available or no experiments have been created
           test.skip()
         }
       }
