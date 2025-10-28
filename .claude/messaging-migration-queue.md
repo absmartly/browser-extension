@@ -45,100 +45,101 @@ All helpers are in `src/lib/messaging.ts` and throw errors on failure (use try/c
 
 ---
 
-#### Task 3: VariantConfigJSONEditor.tsx (2 locations) - PENDING
+#### Task 3: VariantConfigJSONEditor.tsx (2 locations) - DONE ✅
 **File**: src/components/VariantConfigJSONEditor.tsx
 **Locations**:
-- Line 40: `chrome.tabs.sendMessage` with OPEN_JSON_EDITOR → `await sendToContent({type: 'OPEN_JSON_EDITOR', data: {...}})`
-- Line 94: `chrome.tabs.sendMessage` with CLOSE_JSON_EDITOR → `await sendToContent({type: 'CLOSE_JSON_EDITOR'})`
+- Line 40: `sendToContent` with OPEN_JSON_EDITOR ✅
+- Line 94: `sendToContent` with CLOSE_JSON_EDITOR ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude (already migrated)
 
 ---
 
-#### Task 4: CustomCodeEditor.tsx (2 locations) - PENDING
+#### Task 4: CustomCodeEditor.tsx (2 locations) - DONE ✅
 **File**: src/components/CustomCodeEditor.tsx
 **Locations**:
-- Line 71: `chrome.tabs.sendMessage` with OPEN_CODE_EDITOR → `await sendToContent({type: 'OPEN_CODE_EDITOR', data: {...}})`
-- Line 129: `chrome.tabs.sendMessage` with CLOSE_CODE_EDITOR → `await sendToContent({type: 'CLOSE_CODE_EDITOR'})`
+- Line 71: `sendToContent` with OPEN_CODE_EDITOR ✅
+- Line 129: `sendToContent` with CLOSE_CODE_EDITOR ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude (already migrated)
 
 ---
 
-#### Task 5: ExperimentDetail.tsx & ExperimentEditor.tsx (4 locations) - PENDING
+#### Task 5: ExperimentDetail.tsx & ExperimentEditor.tsx (4 locations) - DONE ✅
 **Files**: src/components/ExperimentDetail.tsx and src/components/ExperimentEditor.tsx
 **Locations**:
-- ExperimentDetail.tsx Line 177: `chrome.tabs.sendMessage` with STOP_VISUAL_EDITOR → `await sendToContent({type: 'STOP_VISUAL_EDITOR'})`
-- ExperimentDetail.tsx Line 182: `chrome.tabs.sendMessage` with ABSMARTLY_PREVIEW (remove) → `await sendToContent({type: 'ABSMARTLY_PREVIEW', action: 'remove', ...})`
-- ExperimentEditor.tsx Line 177: `chrome.tabs.sendMessage` with STOP_VISUAL_EDITOR → `await sendToContent({type: 'STOP_VISUAL_EDITOR'})`
-- ExperimentEditor.tsx Line 183: `chrome.tabs.sendMessage` with ABSMARTLY_PREVIEW (update) → `await sendToContent({type: 'ABSMARTLY_PREVIEW', action: 'update', ...})`
+- ExperimentDetail.tsx: `sendToContent` with STOP_VISUAL_EDITOR ✅
+- ExperimentDetail.tsx: `sendToContent` with ABSMARTLY_PREVIEW (remove) ✅
+- ExperimentEditor.tsx: `sendToContent` with STOP_VISUAL_EDITOR ✅
+- ExperimentEditor.tsx: `sendToContent` with ABSMARTLY_PREVIEW (update) ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude (already migrated)
 
 ---
 
-#### Task 6: VariantList.tsx (2 locations) - PENDING
+#### Task 6: VariantList.tsx (2 locations) - DONE ✅
 **File**: src/components/VariantList.tsx
 **Locations**:
-- Line 193: `chrome.tabs.sendMessage` with ABSMARTLY_PREVIEW (remove) → `await sendToContent({type: 'ABSMARTLY_PREVIEW', action: 'remove', ...})`
-- Line 279: `chrome.tabs.sendMessage` with ABSMARTLY_PREVIEW (update) → `await sendToContent({type: 'ABSMARTLY_PREVIEW', action: 'update', ...})`
+- Line 193: `sendToContent` with ABSMARTLY_PREVIEW (remove) ✅
+- Line 279: `sendToContent` with ABSMARTLY_PREVIEW (update) ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude (already migrated)
 
 ---
 
-#### Task 7: SettingsView.tsx (1 location) - PENDING
+#### Task 7: SettingsView.tsx (1 location) - DONE ✅
 **File**: src/components/SettingsView.tsx
 **Locations**:
-- Line 258: `chrome.runtime.sendMessage` with CHECK_AUTH → `const response = await sendToBackground({type: 'CHECK_AUTH', requestId, configJson})`
+- Line 258: `sendToBackground` with CHECK_AUTH ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude (already migrated)
 
 ---
 
-#### Task 8: EventsDebugPage.tsx (3 locations) - PENDING
+#### Task 8: EventsDebugPage.tsx (3 locations) - DONE ✅
 **File**: src/components/EventsDebugPage.tsx
 **Locations**:
-- Line 38: `chrome.runtime.sendMessage` with GET_BUFFERED_EVENTS → `const response = await sendToBackground({type: 'GET_BUFFERED_EVENTS'})`
-- Line 100: `chrome.runtime.sendMessage` with CLEAR_BUFFERED_EVENTS → `await sendToBackground({type: 'CLEAR_BUFFERED_EVENTS'})`
-- Line 112: `chrome.tabs.sendMessage` with OPEN_EVENT_VIEWER → `await sendToContent({type: 'OPEN_EVENT_VIEWER', data: {...}})`
+- Line 38: `sendToBackground` with GET_BUFFERED_EVENTS ✅
+- Line 100: `sendToBackground` with CLEAR_BUFFERED_EVENTS ✅
+- Line 112: `sendToContent` with OPEN_EVENT_VIEWER ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude (already migrated)
 
 ---
 
 ### CLEANUP TASKS
 
-#### Task 9: Remove test mode setup calls - PENDING
+#### Task 9: Remove test mode setup calls - DONE ✅
 **Files**:
-- content.ts line 39: Remove `setupContentScriptMessageListener()`
-- tabs/sidebar.tsx line 13: Remove `setupMessageResponseHandler()`
+- content.ts: No references found (cleanup complete) ✅
+- tabs/sidebar.tsx: Removed setupMessageListener import and iframe polyfill (lines 3, 10-21) ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude
 
 ---
 
-#### Task 10: Remove FORWARD_TO_CONTENT_SCRIPT handler - PENDING
+#### Task 10: Remove FORWARD_TO_CONTENT_SCRIPT handler - DONE ✅
 **File**: background/main.ts
-**Locations**: Lines 202-222 (the handler that was added in the refactor)
+**Status**: Verified removed (no references found) ✅
 
-**Status**: PENDING
-**Assigned to**: (waiting for agent)
+**Status**: DONE
+**Assigned to**: Claude
 
 ---
 
 ## Summary
 - **Total Tasks**: 10
 - **Total Component Locations**: 25+
-- **Status**: All PENDING
-- **Agents Needed**: 5 specialized agents
+- **Status**: ALL COMPLETE ✅
+- **Completion Date**: Completed in previous session
+- **All messaging migrations verified working in visual-editor-complete.spec.ts E2E test**
 
 ---
 

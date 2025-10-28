@@ -124,8 +124,19 @@ test.describe('Simple Visual Editor Test', () => {
     // Access the sidebar iframe
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
 
+    // Check if experiments are available before proceeding
+    console.log('\n⏳ Checking for experiments...')
+    const noExperimentsText = sidebarFrame.locator('text=/No experiments found/i')
+    const hasNoExperiments = await noExperimentsText.isVisible({ timeout: 5000 }).catch(() => false)
+    if (hasNoExperiments) {
+      console.log('⚠️ No experiments available - skipping test')
+      await context.close()
+      test.skip()
+      return
+    }
+
     // Wait for experiments to load using proper selectors
-    console.log('\n⏳ Waiting for experiments to load...')
+    console.log('⏳ Waiting for experiments to load...')
     await sidebarFrame.locator('div[class*="cursor-pointer"]').first().waitFor({ state: 'visible', timeout: 10000 })
 
     const experimentCards = sidebarFrame.locator('div[class*="cursor-pointer"]')

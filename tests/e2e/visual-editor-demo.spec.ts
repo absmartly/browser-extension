@@ -76,6 +76,17 @@ test.describe('Visual Editor Demo', () => {
     await page.waitForSelector('#absmartly-sidebar-root')
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
 
+    // Check if experiments are available before proceeding
+    console.log('⏳ Checking for experiments...')
+    const noExperimentsText = sidebarFrame.locator('text=/No experiments found/i')
+    const hasNoExperiments = await noExperimentsText.isVisible({ timeout: 5000 }).catch(() => false)
+    if (hasNoExperiments) {
+      console.log('⚠️ No experiments available - skipping test')
+      await context.close()
+      test.skip()
+      return
+    }
+
     // Wait for experiments
     console.log('⏳ Loading experiments...')
     await sidebarFrame.locator('div[class*="cursor-pointer"]').first().waitFor({ state: 'visible', timeout: 10000 })
