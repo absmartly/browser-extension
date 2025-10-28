@@ -89,12 +89,15 @@ test.describe('API Integration Tests', () => {
   test('sidebar shows experiments after API call', async ({
     context, seedStorage, extensionUrl, getStorage
   }) => {
-    // Seed with real credentials
+    // Seed with real credentials including the config object
     await seedStorage({
       'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
+      'absmartly-config': {
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+        authMethod: 'apikey'
+      }
     })
 
     // Verify storage was set
@@ -105,9 +108,13 @@ test.describe('API Integration Tests', () => {
     const page = await context.newPage()
     await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
 
-    // Wait for potential loading
-    // TODO: Replace timeout with specific element wait
+    // Wait for the page to finish loading and for the config to be loaded
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
+
+    // Wait for either experiments to load or empty state to appear (no loading spinner)
+    await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
+      console.log('Loading spinner not found or did not disappear - continuing anyway')
+    })
 
     // Check for experiments or empty state
     const experimentCount = await page.locator('.experiment-item').count()
@@ -123,20 +130,27 @@ test.describe('API Integration Tests', () => {
   test('can navigate to experiment details', async ({
     context, seedStorage, extensionUrl
   }) => {
-    // Seed credentials
+    // Seed credentials including the config object
     await seedStorage({
       'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
+      'absmartly-config': {
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+        authMethod: 'apikey'
+      }
     })
 
     const page = await context.newPage()
     await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
 
     // Wait for experiments to load
-    // TODO: Replace timeout with specific element wait
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
+
+    // Wait for loading spinner to disappear
+    await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
+      console.log('Loading spinner not found or did not disappear - continuing anyway')
+    })
 
     const experimentCount = await page.locator('.experiment-item').count()
 

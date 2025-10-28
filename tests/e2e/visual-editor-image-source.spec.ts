@@ -63,10 +63,18 @@ test.describe('Visual Editor - Change Image Source', () => {
     // Check if the menu exists in shadow DOM
     const menuExists = await page.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
-      if (!menuHost) return false
+      if (!menuHost) return {
+        hasChangeImageSource: false,
+        hasMoveUp: false,
+        hasMoveDown: false
+      }
 
       const shadowRoot = (menuHost as any).shadowRoot
-      if (!shadowRoot) return false
+      if (!shadowRoot) return {
+        hasChangeImageSource: false,
+        hasMoveUp: false,
+        hasMoveDown: false
+      }
 
       const menuItems = shadowRoot.querySelectorAll('.menu-item')
       const labels = Array.from(menuItems).map((item: any) =>
@@ -201,11 +209,13 @@ test.describe('Visual Editor - Change Image Source', () => {
       const shadowRoot = (menuHost as any)?.shadowRoot
       const menuItems = shadowRoot?.querySelectorAll('.menu-item')
 
-      for (const item of menuItems) {
-        const label = item.querySelector('.menu-label')?.textContent
-        if (label === 'Change image source') {
-          (item as HTMLElement).click()
-          break
+      if (menuItems) {
+        for (const item of menuItems) {
+          const label = item.querySelector('.menu-label')?.textContent
+          if (label === 'Change image source') {
+            (item as HTMLElement).click()
+            break
+          }
         }
       }
     })
