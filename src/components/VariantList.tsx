@@ -131,7 +131,9 @@ export function VariantList({
     const loadSavedChanges = async () => {
       // If parent already provided initialVariants, check storage for changes
       if (initialVariants.length > 0) {
-        const storageKey = `experiment-${experimentId}-variants`
+        const storageKey = experimentId === 0
+          ? 'experiment-new-variants'
+          : `experiment-${experimentId}-variants`
         try {
           const savedVariants = await storage.get(storageKey)
           if (savedVariants && Array.isArray(savedVariants)) {
@@ -151,7 +153,9 @@ export function VariantList({
       }
 
       // Legacy path: no initial variants provided, try loading from storage
-      const storageKey = `experiment-${experimentId}-variants`
+      const storageKey = experimentId === 0
+        ? 'experiment-new-variants'
+        : `experiment-${experimentId}-variants`
       try {
         const savedVariants = await storage.get(storageKey)
         if (savedVariants && Array.isArray(savedVariants)) {
@@ -220,7 +224,9 @@ export function VariantList({
   }, [])
 
   const saveToStorage = (updatedVariants: Variant[]) => {
-    const storageKey = `experiment-${experimentId}-variants`
+    const storageKey = experimentId === 0
+      ? 'experiment-new-variants'
+      : `experiment-${experimentId}-variants`
     storage.set(storageKey, updatedVariants).catch(error => {
       debugError('Failed to save variants to storage:', error)
     })

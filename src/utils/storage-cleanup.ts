@@ -14,7 +14,10 @@ export async function clearExperimentSessionStorage() {
 }
 
 export async function clearExperimentLocalStorage(experimentId: number) {
-  await localStorage.remove(`experiment-${experimentId}-variants`)
+  const storageKey = experimentId === 0
+    ? 'experiment-new-variants'
+    : `experiment-${experimentId}-variants`
+  await localStorage.remove(storageKey)
 }
 
 export async function clearAllExperimentStorage(experimentId: number) {
