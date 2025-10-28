@@ -72,12 +72,12 @@ test.describe('Visual Editor Complete Workflow', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
-    // Set up console listener using helper
-    allConsoleMessages = setupConsoleLogging(
-      testPage,
-      (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]') || msg.text.includes('[DOMChanges]') ||
-               msg.text.includes('[BlockInserter]') || msg.text.includes('[ElementActions]') || msg.text.includes('[EditorCoordinator]')
-    )
+    // Set up console listener using helper - capture ALL messages
+    const allMessages: Array<{type: string, text: string}> = []
+    testPage.on('console', (msg) => {
+      allMessages.push({ type: msg.type(), text: msg.text() })
+    })
+    allConsoleMessages = allMessages
 
     await testPage.goto(`${TEST_PAGE_URL}?use_shadow_dom_for_visual_editor_context_menu=0`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await testPage.setViewportSize({ width: 1920, height: 1080 })
@@ -224,15 +224,42 @@ test.describe('Visual Editor Complete Workflow', () => {
     await testPage.bringToFront()
     console.log('  ✓ Brought test page to front')
 
-    // Try dispatchEvent instead of click() to ensure handler is triggered
-    await visualEditorButton.evaluate((button) => {
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    })
-    console.log('  ✓ Dispatched click event to Visual Editor button')
+    // Take screenshot before clicking to see button state
+    await sidebar.locator('body').screenshot({ path: 'test-results/before-ve-click.png' })
+    console.log('  📸 Screenshot before VE click taken')
 
-    // Wait longer for messages to arrive and VE to start
-    console.log('  ⏳ Waited 3s after VE button click')
-    
+    // Scroll the button into view if needed
+    await visualEditorButton.scrollIntoViewIfNeeded()
+    console.log('  ✓ Scrolled button into view')
+
+    // Take another screenshot after scrolling
+    await sidebar.locator('body').screenshot({ path: 'test-results/after-scroll-ve-button.png' })
+    console.log('  📸 Screenshot after scroll taken')
+
+    // Click the VE button using Playwright's .click() which uses the proper browser click mechanism
+    console.log('  📌 Clicking VE button using Playwright click()...')
+    await visualEditorButton.click()
+    console.log('  ✓ Clicked Visual Editor button')
+
+    // Wait a bit for the handler to execute and message to be sent
+    await testPage.waitForFunction(() => true, { timeout: 2000 })
+    console.log('  ⏳ Waited for handler to execute')
+
+    // Extract sidebar console logs
+    const sidebarLogs = await sidebar.locator('body').evaluate(() => {
+      const logs: string[] = []
+      // Check if any logs are captured in window
+      if ((window as any).__consoleLogs) {
+        logs.push(...(window as any).__consoleLogs)
+      }
+      return logs
+    }).catch(() => [])
+
+    if (sidebarLogs.length > 0) {
+      console.log('  📋 Sidebar console logs captured:')
+      sidebarLogs.forEach(log => console.log('    ' + log))
+    }
+
     // Check if page is still alive
     const pageAlive = await testPage.evaluate(() => true).catch(() => false)
     if (!pageAlive) {
@@ -243,7 +270,7 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     // Log console message summary
     console.log(`  📋 Captured ${allConsoleMessages.length} console messages`)
-    const contentScriptMessages = allConsoleMessages.filter(m => m.text.includes('[ABsmartly]') || m.text.includes('[Background]'))
+    const contentScriptMessages = allConsoleMessages.filter(m => m.text.includes('[ABsmartly]') || m.text.includes('[Background]') || m.text.includes('[DOMChanges]'))
     console.log(`  📋 Content script/background messages: ${contentScriptMessages.length}`)
     if (contentScriptMessages.length > 0) {
       console.log('  Messages:\n    ' + contentScriptMessages.map(m => `[${m.type}] ${m.text}`).join('\n    '))

@@ -6,6 +6,7 @@ import {
   ArrowPathIcon
 } from "@heroicons/react/24/outline"
 import { Header } from "./Header"
+import { sendToContent, sendToBackground } from "~src/lib/messaging"
 
 interface SDKEvent {
   id: string
@@ -30,20 +31,25 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   }, [isPaused])
 
   useEffect(() => {
-    console.log('[EventsDebugPage] 🔵 Component mounted, fetching buffered events...')
+    console.log('[EventsDebugPage] Component mounted, fetching buffered events...')
 
     // Fetch buffered events on mount
-    // Note: SDK plugin is now automatically injected when content script loads,
-    // so we don't need to manually trigger injection here
-    chrome.runtime.sendMessage({ type: 'GET_BUFFERED_EVENTS' }, (response) => {
-      console.log('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
-      if (response?.success && response.events) {
-        console.log('[EventsDebugPage] ✅ Loaded', response.events.length, 'buffered events')
-        setEvents(response.events)
-      } else {
-        console.log('[EventsDebugPage] No buffered events found')
+    const fetchBufferedEvents = async () => {
+      try {
+        const response = await sendToBackground({ type: 'GET_BUFFERED_EVENTS' })
+        console.log('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
+        if (response?.success && response.events) {
+          console.log('[EventsDebugPage] Loaded', response.events.length, 'buffered events')
+          setEvents(response.events)
+        } else {
+          console.log('[EventsDebugPage] No buffered events found')
+        }
+      } catch (error) {
+        console.error('[EventsDebugPage] Error fetching buffered events:', error)
       }
-    })
+    }
+
+    fetchBufferedEvents()
 
     // Listen for real-time SDK events broadcast from background script
     const handleRuntimeMessage = (
@@ -51,10 +57,10 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       sender?: chrome.runtime.MessageSender,
       sendResponse?: (response?: any) => void
     ) => {
-      console.log('[EventsDebugPage] 🔵 Received runtime message:', message.type, message)
+      console.log('[EventsDebugPage] Received runtime message:', message.type, message)
       if (message.type === 'SDK_EVENT_BROADCAST') {
         if (!isPausedRef.current) {
-          console.log('[EventsDebugPage] ✅ SDK_EVENT_BROADCAST received, adding event:', message.payload)
+          console.log('[EventsDebugPage] SDK_EVENT_BROADCAST received, adding event:', message.payload)
           const sdkEvent: SDKEvent = {
             id: `${Date.now()}-${Math.random()}`,
             eventName: message.payload.eventName,
@@ -67,7 +73,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
             return [...prev, sdkEvent]
           })
         } else {
-          console.log('[EventsDebugPage] ⚠️ SDK_EVENT_BROADCAST received but capture is paused')
+          console.log('[EventsDebugPage] SDK_EVENT_BROADCAST received but capture is paused')
         }
       }
     }
@@ -75,17 +81,17 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
     // Listen for messages forwarded via window.postMessage (from sidebar.tsx in iframe mode)
     const handleWindowMessage = (event: MessageEvent) => {
       if (event.data?.source === 'absmartly-extension-incoming') {
-        console.log('[EventsDebugPage] 🔵 Received window message:', event.data.type, event.data)
+        console.log('[EventsDebugPage] Received window message:', event.data.type, event.data)
         handleRuntimeMessage(event.data)
       }
     }
 
-    console.log('[EventsDebugPage] ✅ Registered message listeners')
+    console.log('[EventsDebugPage] Registered message listeners')
     chrome.runtime.onMessage.addListener(handleRuntimeMessage)
     window.addEventListener('message', handleWindowMessage)
 
     return () => {
-      console.log('[EventsDebugPage] ❌ Removing message listeners')
+      console.log('[EventsDebugPage] Removing message listeners')
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
       window.removeEventListener('message', handleWindowMessage)
     }
@@ -95,9 +101,13 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
     setShowClearConfirm(true)
   }
 
-  const confirmClearEvents = () => {
+  const confirmClearEvents = async () => {
     setEvents([])
-    chrome.runtime.sendMessage({ type: 'CLEAR_BUFFERED_EVENTS' })
+    try {
+      await sendToBackground({ type: 'CLEAR_BUFFERED_EVENTS' })
+    } catch (error) {
+      console.error('[EventsDebugPage] Error clearing buffered events:', error)
+    }
     setShowClearConfirm(false)
   }
 
@@ -105,20 +115,20 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
     setShowClearConfirm(false)
   }
 
-  const handleEventClick = (event: SDKEvent) => {
+  const handleEventClick = async (event: SDKEvent) => {
     // Send message to content script to open event viewer (outside sidebar)
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'OPEN_EVENT_VIEWER',
-          data: {
-            eventName: event.eventName,
-            timestamp: new Date(event.timestamp).toLocaleString(),
-            value: event.data ? JSON.stringify(event.data, null, 2) : 'null'
-          }
-        })
-      }
-    })
+    try {
+      await sendToContent({
+        type: 'OPEN_EVENT_VIEWER',
+        data: {
+          eventName: event.eventName,
+          timestamp: new Date(event.timestamp).toLocaleString(),
+          value: event.data ? JSON.stringify(event.data, null, 2) : 'null'
+        }
+      })
+    } catch (error) {
+      console.error('[EventsDebugPage] Error opening event viewer:', error)
+    }
   }
 
   const getEventColor = (eventName: string) => {

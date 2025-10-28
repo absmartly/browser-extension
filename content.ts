@@ -14,7 +14,6 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { setupContentScriptMessageListener } from '~src/lib/messaging'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -34,9 +33,6 @@ let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
 let isVisualEditorActive = false
 let isVisualEditorStarting = false
-
-// Setup message listener polyfill for test mode (iframe context)
-setupContentScriptMessageListener()
 
 // Initialize overrides on page load
 // This ensures storage is synced to cookie for SSR compatibility
@@ -131,10 +127,12 @@ async function startVisualEditor(config: {
 }
 
 // Listen for messages from the background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+console.log('[ABsmartly] 📌 REGISTERING chrome.runtime.onMessage listener at line 134')
+const messageListenerRegistered = chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[ABsmartly] 📬 MESSAGE LISTENER ENTRY POINT - received message type:', message?.type)
   console.log('[ABsmartly] Message listener called! Message type:', message?.type)
   debugLog('[Visual Editor Content Script] Received message:', message.type)
-  
+
   // Handle SDK plugin injection request
   if (message.type === 'INJECT_SDK_PLUGIN') {
     console.log('[Content Script] 📌 Received INJECT_SDK_PLUGIN message')
@@ -146,15 +144,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true // Keep message channel open for async response
   }
-  
+
   // Handle element picker message
   if (message.type === 'START_ELEMENT_PICKER') {
     debugLog('[Visual Editor Content Script] Starting element picker')
-    
+
     if (!elementPicker) {
       elementPicker = new ElementPicker()
     }
-    
+
     elementPicker.start((selector: string) => {
       chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
@@ -162,24 +160,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       elementPicker = null
     })
-    
+
     sendResponse({ success: true })
     return true
   }
-  
+
   // Handle cancel element picker message
   if (message.type === 'CANCEL_ELEMENT_PICKER') {
     debugLog('[Visual Editor Content Script] Canceling element picker')
-    
+
     if (elementPicker) {
       elementPicker.stop()
       elementPicker = null
     }
-    
+
     sendResponse({ success: true })
     return true
   }
-  
+
   if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
     const isActive = isVisualEditorActive || isVisualEditorStarting
     debugLog('[Visual Editor Content Script] CHECK_VISUAL_EDITOR_ACTIVE:', {
@@ -199,7 +197,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'START_VISUAL_EDITOR') {
-    console.log('[ABsmartly] Received START_VISUAL_EDITOR message:', JSON.stringify(message))
+    console.log('[ABsmartly] ✅ MESSAGE RECEIVED: START_VISUAL_EDITOR')
+    console.log('[ABsmartly] Message payload:', JSON.stringify(message))
+    debugLog('[Visual Editor Content Script] START_VISUAL_EDITOR received:', {
+      variantName: message.variantName,
+      experimentName: message.experimentName,
+      changesCount: message.changes?.length || 0
+    })
+
     // Use shared start function
     startVisualEditor({
       variantName: message.variantName,
@@ -207,16 +212,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       changes: message.changes,
       useShadowDOM: message.useShadowDOM
     }).then(result => {
-      console.log('[ABsmartly] startVisualEditor completed with result:', JSON.stringify(result))
+      console.log('[ABsmartly] ✅ startVisualEditor completed with result:', JSON.stringify(result))
+      debugLog('[Visual Editor Content Script] Visual editor start completed:', result)
       sendResponse(result)
     }).catch(error => {
-      console.error('[ABsmartly] startVisualEditor failed:', error)
+      console.error('[ABsmartly] ❌ startVisualEditor failed:', error)
+      debugError('[Visual Editor Content Script] Error in startVisualEditor:', error)
       sendResponse({ success: false, error: error.message })
     })
 
     return true // Keep message channel open for async response
   }
-  
+
   if (message.type === 'STOP_VISUAL_EDITOR') {
     debugLog('[Visual Editor Content Script] Stopping visual editor')
 
@@ -234,7 +241,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true
   }
-  
+
   if (message.type === 'GET_VISUAL_EDITOR_STATUS') {
     sendResponse({
       active: isVisualEditorActive,
@@ -242,7 +249,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true
   }
-  
+
   // Visual editor preview messages aren't sent through chrome.tabs.sendMessage
   // They're sent via chrome.runtime.sendMessage and need to be handled differently
 
@@ -326,20 +333,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true
   }
-  
+
   // Code editor messages
   if (message.type === 'OPEN_CODE_EDITOR') {
     openCodeEditor(message.data)
     sendResponse({ success: true })
     return true
   }
-  
+
   if (message.type === 'CLOSE_CODE_EDITOR') {
     closeCodeEditor()
     sendResponse({ success: true })
     return true
   }
-  
+
   // JSON editor messages
   if (message.type === 'OPEN_JSON_EDITOR') {
     openJSONEditor(message.data)
@@ -828,11 +835,11 @@ window.addEventListener('message', async (event) => {
       })
     }
   }
-  
+
   // Handle messages from the SDK plugin (absmartly-sdk)
   else if (event.data && event.data.source === 'absmartly-sdk') {
     debugLog('[Content Script] Received message from SDK plugin:', event.data)
-    
+
     // We can handle other plugin messages here if needed
     // but we don't need to handle REQUEST_INJECTION_CODE anymore
     // since we inject the code directly during plugin initialization
