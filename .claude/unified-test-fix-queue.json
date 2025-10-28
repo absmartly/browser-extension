@@ -82,7 +82,7 @@
       "id": "unit-fix-5",
       "type": "unit-test-fix",
       "priority": "P2",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Fix or document CodeExecutor eval prevention",
       "files": [
         "src/sdk-bridge/experiment/code-executor.ts",
