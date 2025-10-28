@@ -1481,7 +1481,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       })
 
       if (!toolbarVisibleAfterEnable) {
-        console.log('  ⚠️  Preview toolbar did NOT appear after clicking toggle')
+        console.log('  ❌ Preview toolbar did NOT appear after clicking toggle')
         const toolbarCheckState = await testPage.evaluate(() => {
           const toolbar = document.getElementById('absmartly-preview-header')
           const banner = document.getElementById('absmartly-visual-editor-banner-host')
@@ -1502,10 +1502,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(enabledStates.experimentMarkersCount).toBeGreaterThan(0)
       console.log('  ✓ Preview mode toggle applied DOM changes successfully')
 
-      // Note: Toolbar visibility is a separate UI issue, tested but not required for this assertion
-      if (!toolbarVisibleAfterEnable) {
-        console.log('  ⚠️  Known issue: Preview toolbar does not appear when toggling via sidebar (but DOM changes are applied)')
-      }
+      // Verify that toolbar appeared (this is a UI requirement)
+      expect(toolbarVisibleAfterEnable).toBe(true, 'Preview toolbar should appear when preview toggle is enabled')
 
       // Second click: DISABLE preview
       console.log('\n  ▶ Click 2: DISABLING preview mode via sidebar toggle...')
@@ -1559,7 +1557,7 @@ test.describe('Visual Editor Complete Workflow', () => {
       if (!toolbarVisibleAfterDisable) {
         console.log('  ✅ Preview toolbar disappeared')
       } else {
-        console.log('  ⚠️  Preview toolbar is still visible')
+        console.log('  ❌ Preview toolbar is still visible')
       }
 
       // Verify that changes were reverted (this is the key functionality)
@@ -1567,9 +1565,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       expect(disabledStates.experimentMarkersCount).toBe(0)
       console.log('  ✓ Preview mode toggle reverted DOM changes successfully')
 
-      if (toolbarVisibleAfterDisable) {
-        console.log('  ⚠️  Known issue: Preview toolbar does not disappear when toggling via sidebar (but DOM changes are reverted)')
-      }
+      // Verify that toolbar disappeared (this is a UI requirement)
+      expect(toolbarVisibleAfterDisable).toBe(false, 'Preview toolbar should disappear when preview toggle is disabled')
 
       console.log('\n✅ Preview toggle functionality test COMPLETED!')
       console.log('  • Click 1: Enable preview - toolbar appeared ✓')
