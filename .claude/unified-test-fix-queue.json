@@ -66,7 +66,7 @@
       "id": "unit-fix-4",
       "type": "unit-test-fix",
       "priority": "P1",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Fix EventsDebugPage click handler",
       "files": [
         "src/components/__tests__/EventsDebugPage.test.tsx"
