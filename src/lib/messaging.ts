@@ -77,6 +77,28 @@ async function sendMessageTestMode(message: ExtensionMessage): Promise<any> {
 
 const pendingResponses = new Map<string, (response: any) => void>()
 
+// Store registered message listeners - only used in content script for test mode
+const registeredListeners: Array<(message: any, sender: any, sendResponse: (response: any) => void) => boolean | void> = []
+
+// Only intercept in content script context (when setupContentScriptMessageListener will be called)
+// This prevents breaking the sidebar message handling
+let listenersIntercepted = false
+
+function ensureListenersIntercepted() {
+  if (listenersIntercepted || typeof chrome === 'undefined') return
+  listenersIntercepted = true
+
+  try {
+    const originalAddListener = chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage)
+    chrome.runtime.onMessage.addListener = function(listener: any, filter?: any) {
+      registeredListeners.push(listener)
+      return originalAddListener(listener, filter)
+    }
+  } catch (e) {
+    debugError('[Messaging] Error intercepting chrome.runtime.onMessage:', e)
+  }
+}
+
 export function setupMessageResponseHandler() {
   if (!isTestMode()) return
 
@@ -94,6 +116,9 @@ export function setupMessageResponseHandler() {
 // For content script - convert incoming postMessage to chrome.runtime.onMessage calls
 export function setupContentScriptMessageListener() {
   debugLog('[Messaging] Setting up content script test mode listener')
+
+  // Ensure listeners are intercepted when we first set up the listener
+  ensureListenersIntercepted()
 
   window.addEventListener('message', (event) => {
     // EARLY EXIT: Only process messages from our extension (before any logging)
@@ -113,13 +138,10 @@ export function setupContentScriptMessageListener() {
     if (event.data?.type) {
       const message = event.data as ExtensionMessage
       debugLog('[Messaging] Content script received message from sidebar:', message.type)
+      debugLog('[Messaging] Number of registered listeners:', registeredListeners.length)
 
       // Call all registered chrome.runtime.onMessage listeners
-      const listeners = chrome.runtime.onMessage.hasListeners()
-        ? (chrome.runtime.onMessage as any)._listeners || []
-        : []
-
-      for (const listener of listeners) {
+      for (const listener of registeredListeners) {
         const sendResponse = (response: any) => {
           if (event.data.requestId && sidebarIframe.contentWindow) {
             sidebarIframe.contentWindow.postMessage({
@@ -131,6 +153,7 @@ export function setupContentScriptMessageListener() {
         }
 
         try {
+          debugLog('[Messaging] Calling listener for message type:', message.type)
           const result = listener(message, {}, sendResponse)
           if (result === true) {
             // Listener will call sendResponse asynchronously
