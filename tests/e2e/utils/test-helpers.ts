@@ -214,3 +214,49 @@ export async function setupTestPage(
   return { sidebar, allMessages }
 }
 
+/**
+ * Generic logging function with elapsed time and log level filtering
+ * @param message - Message to log
+ * @param level - Log level: 'debug', 'info', or 'error' (default: 'info')
+ */
+let testStartTime = Date.now()
+
+export function initializeTestLogging(): void {
+  testStartTime = Date.now()
+}
+
+export function log(message: string, level: 'debug' | 'info' | 'error' = 'info'): void {
+  const LOG_LEVELS = { debug: 0, info: 1, error: 2 }
+  const CURRENT_LOG_LEVEL = process.env.DEBUG === '1' || process.env.PWDEBUG === '1' ? LOG_LEVELS.debug : LOG_LEVELS.info
+
+  if (LOG_LEVELS[level] >= CURRENT_LOG_LEVEL) {
+    const elapsed = ((Date.now() - testStartTime) / 1000).toFixed(3)
+    console.log(`[+${elapsed}s] ${message}`)
+  }
+}
+
+/**
+ * Right-click helper for triggering context menus
+ * @param page - Playwright page or frame
+ * @param selector - CSS selector for element to right-click
+ */
+export async function rightClickElement(
+  target: Page | FrameLocator,
+  selector: string
+): Promise<void> {
+  let locator: Locator
+  if ('locator' in target && typeof (target as any).locator === 'function') {
+    locator = (target as any).locator(selector)
+  } else {
+    throw new Error('Invalid target passed to rightClickElement helper')
+  }
+
+  await locator.waitFor({ state: 'visible', timeout: 5000 })
+  await locator.click({ button: 'right' })
+  // Wait for context menu to appear
+  await (target instanceof Page
+    ? target.locator('#absmartly-menu-container')
+    : (target as FrameLocator).locator('#absmartly-menu-container')
+  ).waitFor({ state: 'attached', timeout: 2000 }).catch(() => {})
+}
+
