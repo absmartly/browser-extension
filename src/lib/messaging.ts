@@ -1,6 +1,19 @@
 import { debugLog, debugError } from '../utils/debug'
 
 /**
+ * Extension message format with routing information
+ */
+export interface ExtensionMessage {
+  type: string
+  from?: 'sidebar' | 'content' | 'background'
+  to?: 'sidebar' | 'content' | 'background'
+  payload?: any
+  requestId?: string
+  expectsResponse?: boolean
+  [key: string]: any
+}
+
+/**
  * Send message from sidebar to content script in the active tab
  * @param message Message object to send
  * @returns Promise resolving to the response from content script
