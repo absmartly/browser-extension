@@ -40,9 +40,7 @@ describe('EventsDebugPage', () => {
         }
       },
       tabs: {
-        query: jest.fn((query, callback) => {
-          callback([{ id: 1 }])
-        }),
+        query: jest.fn(() => Promise.resolve([{ id: 1 }])),
         sendMessage: mockTabsSendMessage
       }
     } as any
@@ -334,7 +332,7 @@ describe('EventsDebugPage', () => {
       })
 
       // Click event
-      const eventItem = screen.getByText('exposure').closest('div')
+      const eventItem = screen.getByText('exposure').closest('[data-testid="event-item"]')
       if (eventItem) {
         fireEvent.click(eventItem)
       }
@@ -365,7 +363,7 @@ describe('EventsDebugPage', () => {
       })
 
       // Click event
-      const eventItem = screen.getByText('ready').closest('div')
+      const eventItem = screen.getByText('ready').closest('[data-testid="event-item"]')
       if (eventItem) {
         fireEvent.click(eventItem)
       }
