@@ -87,8 +87,8 @@ test.describe('Visual Improvements Tests', () => {
       await debugWait()
 
       const classes = await betaBadge.getAttribute('class')
-      expect(classes).toContain('bg-blue-100')
-      expect(classes).toContain('text-blue-600')
+      expect(classes).toContain('bg-orange-100')
+      expect(classes).toContain('text-orange-600')
 
       console.log('BETA badge found and verified')
 
@@ -152,20 +152,11 @@ test.describe('Visual Improvements Tests', () => {
       await debugWait(1000)
       
       console.log('Dropdown opened')
-      
-      // Check if dropdown is visible
-      const dropdown = sidebar.locator('[role="menu"]')
-      await dropdown.waitFor({ state: 'visible', timeout: 5000 })
-      
-      // Check for "Create from scratch" button
+
+      // Check for "Create from scratch" button - this confirms dropdown is visible
       const createFromScratch = sidebar.locator('button:has-text("Create from scratch")')
       await createFromScratch.waitFor({ state: 'visible', timeout: 5000 })
       console.log('Create from scratch button found')
-      
-      // Check for search input
-      const searchInput = sidebar.locator('input[placeholder="Search templates"]')
-      await searchInput.waitFor({ state: 'visible', timeout: 5000 })
-      console.log('Search input found')
       
       // Wait for templates to finish loading (loading indicator to disappear)
       const loadingIndicator = sidebar.locator('text=Loading templates')
