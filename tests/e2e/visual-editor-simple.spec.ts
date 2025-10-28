@@ -133,17 +133,6 @@ test.describe('Simple Visual Editor Test', () => {
       fullPage: true
     })
 
-    // Check if experiments are available before proceeding
-    console.log('\n⏳ Checking for experiments...')
-    const noExperimentsText = sidebarFrame.locator('text=/No experiments found/i')
-    const hasNoExperiments = await noExperimentsText.isVisible({ timeout: 5000 }).catch(() => false)
-    if (hasNoExperiments) {
-      console.log('⚠️ No experiments available - skipping test')
-      await context.close()
-      test.skip()
-      return
-    }
-
     // Wait for experiments to load using proper selectors
     console.log('⏳ Waiting for experiments to load...')
     await sidebarFrame.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 10000 })

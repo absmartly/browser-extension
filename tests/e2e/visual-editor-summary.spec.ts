@@ -77,16 +77,6 @@ test.describe('Visual Editor Summary', () => {
       console.log('   Loading spinner not found or did not disappear - continuing anyway')
     })
 
-    // Check if experiments are available before proceeding
-    const noExperimentsText = sidebarFrame.locator('text=/No experiments found/i')
-    const hasNoExperiments = await noExperimentsText.isVisible({ timeout: 5000 }).catch(() => false)
-    if (hasNoExperiments) {
-      console.log('⚠️ No experiments available - skipping test')
-      await context.close()
-      test.skip()
-      return
-    }
-
     // Verify experiments loaded successfully
     console.log('✅ Step 2: Verifying experiments loaded from API')
     const experimentItem = sidebarFrame.locator('.experiment-item').first()
