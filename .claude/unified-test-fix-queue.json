@@ -49,7 +49,7 @@
       "id": "unit-fix-3",
       "type": "unit-test-fix",
       "priority": "P0",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Add PreviewManager javascript validation",
       "files": [
         "src/visual-editor/preview/preview-manager.ts"
@@ -58,7 +58,9 @@
       "action": "Add validation in applyPreviewChange(): if action === 'javascript', check value exists and is string, return false if not",
       "test_command": "npm run test:unit -- preview-manager.test.ts",
       "expected_outcome": "2 tests pass: 'should return false for javascript with missing value' and 'should return false for javascript with non-string value'",
-      "estimated_minutes": 20
+      "estimated_minutes": 20,
+      "started_at": "2025-10-28T20:55:00Z",
+      "agent": "Agent 6"
     },
     {
       "id": "unit-fix-4",
