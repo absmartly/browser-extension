@@ -54,7 +54,6 @@ export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Prom
 
   const toolbarVisibleAfterEnable = await page.evaluate(() => {
     const toolbar = document.getElementById('absmartly-preview-header')
-    console.log('  [Page] Preview toolbar check:', toolbar !== null)
     return toolbar !== null
   })
 

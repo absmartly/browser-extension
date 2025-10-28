@@ -47,7 +47,6 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     const editor = document.querySelector('.cm-content') as HTMLElement
     if (editor) {
       editor.focus()
-      console.log('[Test] Focused CodeMirror editor')
     }
   })
 
@@ -61,10 +60,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await page.evaluate(() => {
     const saveBtn = document.querySelector('.editor-button-save') as HTMLButtonElement
     if (saveBtn) {
-      console.log('[Test] Found save button, clicking...')
       saveBtn.click()
-    } else {
-      console.log('[Test] Save button not found!')
     }
   })
 
@@ -108,7 +104,6 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     const editor = document.querySelector('.cm-content') as HTMLElement
     if (editor) {
       editor.focus()
-      console.log('[Test] Focused CodeMirror editor for insert block')
     }
   })
   await debugWait()
@@ -133,7 +128,6 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     let testListenerFired = false
     btn.addEventListener('click', () => {
       testListenerFired = true
-      console.log('[Test] TEST LISTENER FIRED!')
     }, { once: true })
 
     btn.click()
