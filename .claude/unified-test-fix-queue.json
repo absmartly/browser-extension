@@ -124,7 +124,7 @@
       "id": "unit-verify",
       "type": "unit-test-verification",
       "priority": "P0",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Full unit test suite verification",
       "files": [
         "All unit test files"
@@ -189,7 +189,7 @@
       "id": "e2e-verify-1",
       "type": "e2e-test-verification",
       "priority": "P1",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Verify visual-editor-simple test",
       "files": [
         "tests/e2e/visual-editor-simple.spec.ts"
@@ -199,7 +199,9 @@
       "test_command": "npm run build:dev && npx playwright test tests/e2e/visual-editor-simple.spec.ts",
       "expected_outcome": "Test runs without skipping. Document pass/fail/skip counts.",
       "estimated_minutes": 10,
-      "note": "This fix may already be completed - check git log first"
+      "note": "This fix may already be completed - check git log first",
+      "started_at": "2025-10-28T21:08:00Z",
+      "agent": "Agent 6"
     },
     {
       "id": "e2e-verify-2",
