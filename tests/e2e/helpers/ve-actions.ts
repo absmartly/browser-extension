@@ -7,10 +7,7 @@ import { clickContextMenuItem } from '../utils/visual-editor-helpers'
  * Tests: Edit Text, Hide, Delete, Edit HTML, Insert Block, Change Image Source
  */
 export async function testAllVisualEditorActions(page: Page): Promise<void> {
-  log('\n🧪 STEP 4: Testing visual editor context menu actions')
-
   // Action 1: Edit Text on paragraph
-  log('  Testing: Edit Text on #test-paragraph')
   await click(page, '#test-paragraph')
   await clickContextMenuItem(page, 'Edit Text')
   await page.keyboard.type('Modified text!')
@@ -18,25 +15,21 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await debugWait()
 
   // Action 2: Hide element
-  log('  Testing: Hide on #button-1')
   await click(page, '#button-1')
   await clickContextMenuItem(page, 'Hide')
   await debugWait()
 
   // Action 3: Delete element
-  log('  Testing: Delete on #button-2')
   await click(page, '#button-2')
   await clickContextMenuItem(page, 'Delete')
   await debugWait()
 
   // Action 4: Edit HTML with CodeMirror editor on parent container
-  log('  Testing: Edit HTML on #test-container')
   await page.click('#test-container', { force: true })
   await page.locator('.menu-container').waitFor({ state: 'visible' })
   await page.locator('.menu-item:has-text("Edit HTML")').click()
 
   await page.locator('.cm-editor').waitFor({ state: 'visible' })
-  log('  ✓ CodeMirror editor appeared')
   await debugWait()
 
   const hasCodeMirrorSyntaxHighlight = await page.evaluate(() => {
@@ -46,7 +39,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     const hasScroller = editor.querySelector('.cm-scroller')
     return !!(hasContent && hasScroller)
   })
-  log(`  ${hasCodeMirrorSyntaxHighlight ? '✓' : '✗'} CodeMirror syntax highlighting: ${hasCodeMirrorSyntaxHighlight}`)
+  log(`  ${hasCodeMirrorSyntaxHighlight ? '✓' : '✗'} CodeMirror syntax highlighting`)
   expect(hasCodeMirrorSyntaxHighlight).toBeTruthy()
   await debugWait()
 
@@ -60,14 +53,11 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
 
   await page.keyboard.press('Meta+A')
   await page.keyboard.type('<h2>HTML Edited!</h2><p>New paragraph content</p>')
-  log('  ✓ Updated HTML via CodeMirror')
   await debugWait()
 
-  log('  Looking for Save button...')
   await page.locator('.editor-button-save').waitFor({ state: 'visible' })
   await debugWait()
 
-  log('  Clicking Save button with JavaScript click...')
   await page.evaluate(() => {
     const saveBtn = document.querySelector('.editor-button-save') as HTMLButtonElement
     if (saveBtn) {
@@ -77,71 +67,39 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
       console.log('[Test] Save button not found!')
     }
   })
-  log('  Clicked Save button')
 
   try {
     await page.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
-    log('  Editor closed')
   } catch (err) {
-    log('  ⚠️  Editor did not close within 5 seconds, continuing anyway...')
+    // Editor did not close, continuing
   }
 
-  log('  ✓ Edit HTML with CodeMirror works')
   await debugWait()
 
   // Action 5: Insert new block
-  log('  Testing: Insert new block after h2')
   await page.click('h2', { force: true })
   await page.locator('.menu-container').waitFor({ state: 'visible' })
-  log('  ✓ Clicked h2 element and menu opened')
   await debugWait()
 
   await clickContextMenuItem(page, 'Insert new block')
-  log('  ✓ Clicked "Insert new block" menu item')
 
   await page.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
-  log('  ✓ Insert block modal appeared with CodeMirror editor')
 
   await page.screenshot({ path: 'test-insert-block-modal.png', fullPage: true })
-  log('  📸 Screenshot: test-insert-block-modal.png')
-
-  const modalInfo = await page.evaluate(() => {
-    const dialog = document.querySelector('#absmartly-block-inserter-host')
-    const cmEditor = document.querySelector('.cm-editor')
-    const insertBtn = document.querySelector('.inserter-button-insert')
-    const previewContainer = document.querySelector('.inserter-preview-container')
-    const positionRadios = document.querySelectorAll('input[type="radio"][name="position"]')
-    return {
-      dialogExists: !!dialog,
-      dialogHTML: dialog ? dialog.outerHTML.substring(0, 500) : 'not found',
-      cmEditorExists: !!cmEditor,
-      insertBtnExists: !!insertBtn,
-      insertBtnHTML: insertBtn ? insertBtn.outerHTML : 'not found',
-      previewExists: !!previewContainer,
-      positionRadiosCount: positionRadios.length
-    }
-  })
-  log('  🔍 Modal structure:', JSON.stringify(modalInfo, null, 2))
-  await debugWait()
 
   const hasPreviewContainer = await page.evaluate(() => {
     const previewContainer = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
     return previewContainer !== null
   })
-  log(`  ${hasPreviewContainer ? '✓' : '⚠️'} Preview container exists: ${hasPreviewContainer}`)
   await debugWait()
 
   const hasRadioButton = await page.locator('input[type="radio"][value="after"]').count()
   if (hasRadioButton > 0) {
     await page.locator('input[type="radio"][value="after"]').check()
-    log('  ✓ Selected "After" position via radio button')
   } else {
     const hasDropdown = await page.locator('select[name="position"], #position-select').count()
     if (hasDropdown > 0) {
       await page.locator('select[name="position"], #position-select').selectOption('after')
-      log('  ✓ Selected "After" position via dropdown')
-    } else {
-      log('  ⚠️  Position selector not found, will use default')
     }
   }
   await debugWait()
@@ -161,38 +119,12 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
 
   const insertHTML = '<div class=\"inserted-block\">This is an inserted block!'
   await page.keyboard.type(insertHTML)
-  log(`  ✓ Typed HTML into CodeMirror: ${insertHTML}`)
   await debugWait()
 
-  if (hasPreviewContainer) {
-    const previewContent = await page.evaluate(() => {
-      const preview = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
-      return preview?.innerHTML || preview?.textContent
-    })
-    log(`  ${previewContent?.includes('inserted-block') ? '✓' : '⚠️'} Preview updated with content: ${previewContent?.substring(0, 50)}...`)
-  }
-  await debugWait()
-
-  log('  Looking for Insert button...')
   const insertBtn = page.locator('.inserter-button-insert')
   await insertBtn.waitFor({ state: 'visible', timeout: 5000 })
-  log('  ✓ Insert button found')
 
-  const buttonInfo = await page.evaluate(() => {
-    const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
-    return {
-      exists: !!btn,
-      disabled: btn?.disabled,
-      className: btn?.className,
-      listeners: btn ? Object.keys(btn).filter(k => k.startsWith('on') || k.includes('event')) : []
-    }
-  })
-  log('  🔍 Button info:', JSON.stringify(buttonInfo))
-  await debugWait()
-
-  log('  Clicking Insert button...')
   await page.screenshot({ path: 'test-before-insert-click.png', fullPage: true })
-  log('  📸 Screenshot before click: test-before-insert-click.png')
 
   const clickResult = await page.evaluate(() => {
     const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
@@ -219,33 +151,15 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
       buttonHTML: btn.outerHTML.substring(0, 100)
     }
   })
-  log('  ✓ Click result:', JSON.stringify(clickResult))
 
   await debugWait(500)
 
-  const postClickInfo = await page.evaluate(() => {
-    const dialog = document.querySelector('#absmartly-block-inserter-host')
-    const h2 = document.querySelector('h2')
-    const insertedBlock = document.querySelector('.inserted-block')
-
-    return {
-      dialogStillExists: !!dialog,
-      h2Exists: !!h2,
-      h2NextSibling: h2?.nextElementSibling?.className || 'none',
-      insertedBlockExists: !!insertedBlock,
-      insertedBlockHTML: insertedBlock ? insertedBlock.outerHTML : 'not found'
-    }
-  })
-  log('  🔍 Post-click state:', JSON.stringify(postClickInfo, null, 2))
-
   await page.screenshot({ path: 'test-after-insert-click.png', fullPage: true })
-  log('  📸 Screenshot after click: test-after-insert-click.png')
 
   try {
     await page.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
-    log('  ✓ Insert block modal closed')
   } catch (err) {
-    log('  ⚠️  Modal did not close within 5 seconds, continuing anyway...')
+    // Modal did not close, continuing
   }
   await debugWait()
 
@@ -255,7 +169,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     const nextElement = h2.nextElementSibling
     return nextElement?.classList.contains('inserted-block') || false
   })
-  log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists after h2: ${insertedBlockExists}`)
+  log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists`)
   expect(insertedBlockExists).toBeTruthy()
   await debugWait()
 
@@ -263,27 +177,11 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     const insertedBlock = document.querySelector('.inserted-block')
     return insertedBlock?.textContent?.trim()
   })
-  log(`  ${insertedContent === 'This is an inserted block!' ? '✓' : '✗'} Inserted content correct: "${insertedContent}"`)
+  log(`  ${insertedContent === 'This is an inserted block!' ? '✓' : '✗'} Inserted content correct`)
   expect(insertedContent).toBe('This is an inserted block!')
   await debugWait()
 
-  const changeCountAfterInsert = await page.evaluate(() => {
-    const banner = document.querySelector('#absmartly-visual-editor-banner-host')
-    if (banner?.shadowRoot) {
-      const counter = banner.shadowRoot.querySelector('.changes-counter')
-      return counter?.textContent?.trim() || '0'
-    }
-    const counter = document.querySelector('.changes-counter')
-    return counter?.textContent?.trim() || '0'
-  })
-  log(`  ✓ Changes counter after insert: ${changeCountAfterInsert}`)
-  await debugWait()
-
-  log('  ✅ Insert new block test completed successfully')
-  await debugWait()
-
   // Action 6: Change image source
-  log('  Testing: Change image source on img element')
 
   await page.evaluate(() => {
     const img = document.createElement('img')
@@ -299,22 +197,17 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     document.body.insertBefore(img, document.body.firstChild)
   })
   await page.locator('#test-image').waitFor({ state: 'visible', timeout: 2000 })
-  log('  ✓ Added test image to page')
 
   await page.locator('#test-image').scrollIntoViewIfNeeded()
   await page.locator('#test-image').click({ force: true })
   await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-  log('  ✓ Context menu opened for image')
 
   const changeImageOption = page.locator('.menu-item:has-text("Change image source")')
   await changeImageOption.waitFor({ state: 'visible', timeout: 2000 })
-  log('  ✓ "Change image source" option is visible')
 
   await changeImageOption.click()
-  log('  ✓ Clicked "Change image source"')
 
   await page.locator('#absmartly-image-dialog-host').waitFor({ state: 'visible', timeout: 5000 })
-  log('  ✓ Image source dialog opened')
 
   const menuStillVisible = await page.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
   expect(menuStillVisible).toBe(false)
@@ -331,7 +224,6 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
       }
     }
   }, newImageUrl)
-  log(`  ✓ Entered new image URL: ${newImageUrl}`)
 
   await page.evaluate(() => {
     const dialogHost = document.querySelector('#absmartly-image-dialog-host')
@@ -342,31 +234,29 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
       }
     }
   })
-  log('  ✓ Clicked Apply button')
 
   await page.locator('#absmartly-image-dialog-host').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
 
   const dialogStillVisible = await page.locator('#absmartly-image-dialog-host').isVisible({ timeout: 500 }).catch(() => false)
   expect(dialogStillVisible).toBe(false)
-  log('  ✓ Image source dialog closed after clicking Apply')
+  log('  ✓ Image source dialog closed')
 
   const menuReopened = await page.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
   expect(menuReopened).toBe(false)
-  log('  ✅ Context menu did NOT reopen (bug is fixed!)')
+  log('  ✓ Context menu did NOT reopen')
 
   const updatedSrc = await page.evaluate(() => {
     const img = document.querySelector('#test-image') as HTMLImageElement
     return img?.src
   })
   expect(updatedSrc).toBe(newImageUrl)
-  log(`  ✓ Image source updated to: ${updatedSrc}`)
+  log('  ✓ Image source updated')
 
   await debugWait()
 
-  log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Edit HTML, Insert Block, Change Image Source)')
+  log('✅ Visual editor actions tested')
 
   // Verify the actual DOM changes were applied
-  log('\n✓ Verifying DOM changes were actually applied...')
   const appliedChanges = await page.evaluate(() => {
     const paragraph = document.querySelector('#test-paragraph')
     const button1 = document.querySelector('#button-1')
@@ -381,21 +271,19 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     }
   })
 
-  log('  Applied changes:', appliedChanges)
-
   expect(appliedChanges.paragraphText).toBe('Modified text!')
-  log('  ✓ Text change applied: paragraph text is "Modified text!"')
+  log('  ✓ Text change applied')
 
   expect(appliedChanges.button1Display).toBe('none')
-  log('  ✓ Hide change applied: button-1 is display:none')
+  log('  ✓ Hide change applied')
 
   expect(appliedChanges.button2Display).toBe('none')
-  log('  ✓ Delete change applied: button-2 is hidden (display:none)')
+  log('  ✓ Delete change applied')
 
   expect(appliedChanges.testContainerHTML).toMatch(/<h2[^>]*>HTML Edited!<\/h2>/)
   expect(appliedChanges.testContainerHTML).toContain('<p>New paragraph content</p>')
-  log('  ✓ HTML change applied: test-container has new HTML')
+  log('  ✓ HTML change applied')
 
-  log('✅ All DOM changes verified and applied correctly')
+  log('✅ All DOM changes verified')
   await debugWait()
 }
