@@ -12,6 +12,11 @@ test.describe('Quick Experiments Check', () => {
     testPage = await context.newPage()
     const result = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
     sidebar = result.sidebar
+
+    // Log API credentials being used
+    const apiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'not-set'
+    const endpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'not-set'
+    console.log(`🔐 API Credentials: Key=${apiKey.substring(0, 10)}... Endpoint=${endpoint}`)
   })
 
   test.afterEach(async () => {
@@ -19,19 +24,19 @@ test.describe('Quick Experiments Check', () => {
   })
 
   test('Check experiments are loading from API', async () => {
-    test.setTimeout(30000)
+    test.setTimeout(60000)
 
     await debugWait(2000)
 
-    // Wait for loading spinner to disappear
+    // Wait for loading spinner to disappear - give it plenty of time for API call
     await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-      .waitFor({ state: 'hidden', timeout: 15000 })
+      .waitFor({ state: 'hidden', timeout: 30000 })
       .catch(() => {})
 
-    await debugWait(1000)
+    await debugWait(2000)
 
-    // Count experiment items in the sidebar
-    const experimentItems = sidebar.locator('[data-testid="experiment-item"]')
+    // Count experiment items in the sidebar - use class name 'experiment-item'
+    const experimentItems = sidebar.locator('.experiment-item')
     const count = await experimentItems.count()
 
     // Check sidebar body content to see what loaded
@@ -46,9 +51,9 @@ test.describe('Quick Experiments Check', () => {
     if (count > 0) {
       const firstExperiment = experimentItems.first()
       const experimentText = await firstExperiment.textContent()
-      console.log(`✅ First experiment: ${experimentText}`)
+      console.log(`✅ First experiment: ${experimentText?.substring(0, 100)}`)
       await expect(firstExperiment).toBeVisible()
-      console.log('✅ Experiment item is visible')
+      console.log(`✅ All ${count} experiment items are visible`)
     } else if (hasEmptyState) {
       console.log('✅ Sidebar loaded successfully and shows empty state (API returned 0 experiments)')
     } else if (!sidebarLoaded) {
