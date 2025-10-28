@@ -11,7 +11,6 @@ import { debugWait, click, log } from '../utils/test-helpers'
  * @param page - The test page where preview changes are applied
  */
 export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Promise<void> {
-  log('\n👁️ Testing preview mode toggle')
 
   const initialPreviewState = await page.evaluate(() => {
     const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
