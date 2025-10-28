@@ -227,16 +227,8 @@ test.describe('Experiment Data Persistence', () => {
       // First try to find experiment list items
       const allRows = sidebar.locator('div[role="button"], [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i })
 
-      // Check if experiments are available (graceful skip if none found)
-      const hasExperiments = await allRows.first().isVisible({ timeout: 2000 }).catch(() => false)
-      if (!hasExperiments) {
-        console.log('⚠️  No experiments found in list after creation - test environment may not persist API data')
-        test.skip()
-        return
-      }
-
       await allRows.first().waitFor({ state: 'visible', timeout: 2000 })
-      
+
       let experimentRow = null
       const rowCount = await allRows.count()
       console.log(`  Found ${rowCount} experiment(s)`)

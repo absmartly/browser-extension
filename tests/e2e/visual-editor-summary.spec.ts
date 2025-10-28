@@ -80,14 +80,7 @@ test.describe('Visual Editor Summary', () => {
     // Verify experiments loaded successfully
     console.log('✅ Step 2: Verifying experiments loaded from API')
     const experimentItem = sidebarFrame.locator('.experiment-item').first()
-    const experimentVisible = await experimentItem.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)
-
-    if (!experimentVisible) {
-      console.log('⚠️ No experiments available after loading - skipping test')
-      await context.close()
-      test.skip()
-      return
-    }
+    await experimentItem.waitFor({ state: 'visible', timeout: 10000 })
 
     const experimentCount = await sidebarFrame.locator('.experiment-item').count()
     console.log(`   Found ${experimentCount} experiments`)
