@@ -4,6 +4,7 @@ import { all as knownCSSProperties } from 'known-css-properties'
 import { DOMChangeOptions } from './DOMChangeOptions'
 import { highlightCSSSelector, highlightHTML } from '~src/utils/syntax-highlighter'
 import { sendToContent, sendToBackground } from '~src/lib/messaging'
+import { clearVisualEditorSessionStorage } from '~src/utils/storage-cleanup'
 
 // Module-level flag to prevent concurrent VE launches from multiple variant instances
 let isLaunchingVisualEditor = false
@@ -453,6 +454,9 @@ export function DOMChangesInlineEditor({
 
         // Mark VE as stopped for this variant after processing changes
         onVEStop()
+        clearVisualEditorSessionStorage().catch(error => {
+          debugError('Failed to clear Visual Editor session storage:', error)
+        })
         })() // Execute async function immediately
         return true // Indicate we will respond asynchronously
       } else if (message.type === 'VISUAL_EDITOR_STOPPED') {
@@ -461,6 +465,9 @@ export function DOMChangesInlineEditor({
 
         // Mark VE as stopped for this variant - re-enable all VE buttons
         onVEStop()
+        clearVisualEditorSessionStorage().catch(error => {
+          debugError('Failed to clear Visual Editor session storage:', error)
+        })
         return true
       }
     }

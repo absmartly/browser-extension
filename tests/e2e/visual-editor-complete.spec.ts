@@ -93,7 +93,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test.afterEach(async () => {
-    if (testPage) await testPage.close()
+    if (testPage && !process.env.SLOW) await testPage.close()
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
@@ -203,122 +203,93 @@ test.describe('Visual Editor Complete Workflow', () => {
           }
         })
       }
-    const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
-    
-    // Wait for button to be visible and then become enabled (form validation to complete)
-    await visualEditorButton.waitFor({ state: 'visible', timeout: 5000 })
-    await expect(visualEditorButton).toBeEnabled({ timeout: 10000 })
-    log('  ✓ Visual Editor button is enabled (form validation complete)')
+      const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
+      
+      // Wait for button to be visible and then become enabled (form validation to complete)
+      await visualEditorButton.waitFor({ state: 'visible', timeout: 5000 })
+      await expect(visualEditorButton).toBeEnabled({ timeout: 10000 })
+      log('  ✓ Visual Editor button is enabled (form validation complete)')
 
-    // Extra wait to ensure React event handlers are attached in headless mode
-    log('  ✓ Waited for React handlers to attach')
+      // Track console errors (console listener is already set up in beforeEach)
+      const consoleErrors: string[] = []
+      const beforeClickMessageCount = allConsoleMessages.length
 
-    // Track console errors (console listener is already set up in beforeEach)
-    const consoleErrors: string[] = []
-    const beforeClickMessageCount = allConsoleMessages.length
+      // Filter for errors from all messages
+      consoleErrors.push(...allConsoleMessages.filter(m => m.type === 'error').map(m => m.text))
 
-    // Filter for errors from all messages
-    consoleErrors.push(...allConsoleMessages.filter(m => m.type === 'error').map(m => m.text))
+      // Ensure test page is focused/active before clicking VE button
+      await testPage.bringToFront()
 
-    // Ensure test page is focused/active before clicking VE button
-    await testPage.bringToFront()
-    log('  ✓ Brought test page to front')
+      // Scroll the button into view if needed
+      await visualEditorButton.scrollIntoViewIfNeeded()
 
-    // Take screenshot before clicking to see button state
-    await sidebar.locator('body').screenshot({ path: 'test-results/before-ve-click.png' })
-    log('  📸 Screenshot before VE click taken')
+      await visualEditorButton.click()
+      log('  ✓ Clicked Visual Editor button')
 
-    // Scroll the button into view if needed
-    await visualEditorButton.scrollIntoViewIfNeeded()
-    log('  ✓ Scrolled button into view')
+      // Wait a bit for the handler to execute and message to be sent
+      // await testPage.waitForFunction(() => true, { timeout: 2000 })
 
-    // Take another screenshot after scrolling
-    await sidebar.locator('body').screenshot({ path: 'test-results/after-scroll-ve-button.png' })
-    log('  📸 Screenshot after scroll taken')
+      if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
+        // Extract sidebar console logs
+        const sidebarLogs = await sidebar.locator('body').evaluate(() => {
+          const logs: string[] = []
+          // Check if any logs are captured in window
+          if ((window as any).__consoleLogs) {
+            logs.push(...(window as any).__consoleLogs)
+          }
+          return logs
+        }).catch(() => [])
 
-    // Click the VE button using Playwright's .click() which uses the proper browser click mechanism
-    log('  📌 Clicking VE button using Playwright click()...')
-    await visualEditorButton.click()
-    log('  ✓ Clicked Visual Editor button')
+        if (sidebarLogs.length > 0) {
+          log('  📋 Sidebar console logs captured:')
+          sidebarLogs.forEach(log => console.log('    ' + log))
+        }
 
-    // Wait a bit for the handler to execute and message to be sent
-    await testPage.waitForFunction(() => true, { timeout: 2000 })
-    log('  ⏳ Waited for handler to execute')
+        log(`  📋 Captured ${allConsoleMessages.length} console messages`)
+        const contentScriptMessages = allConsoleMessages.filter(m => m.text.includes('[ABsmartly]') || m.text.includes('[Background]') || m.text.includes('[DOMChanges]'))
+        log(`  📋 Content script/background messages: ${contentScriptMessages.length}`)
+        if (contentScriptMessages.length > 0) {
+          log('  Messages:\n    ' + contentScriptMessages.map(m => `[${m.type}] ${m.text}`).join('\n    '))
+        } else {
+          log('  ⚠️  No content script messages detected - content script may not be loading!')
+        }
 
-    // Extract sidebar console logs
-    const sidebarLogs = await sidebar.locator('body').evaluate(() => {
-      const logs: string[] = []
-      // Check if any logs are captured in window
-      if ((window as any).__consoleLogs) {
-        logs.push(...(window as any).__consoleLogs)
+        // Check for errors
+        const errorMessages = allConsoleMessages.filter(m => m.type === 'error')
+        if (errorMessages.length > 0) {
+          log(`  ❌ Found ${errorMessages.length} error messages:`)
+          errorMessages.forEach(m => log(`    - ${m.text}`))
+        }
+
+        log(`  📋 Total messages captured so far: ${allConsoleMessages.length}`)
+
+        // Check if banner host exists in DOM
+        const bannerHostExists = await testPage.locator('#absmartly-visual-editor-banner-host').count()
+        log(`  Banner host element exists in DOM: ${bannerHostExists > 0 ? 'YES' : 'NO'}`)
+
+        if (bannerHostExists > 0) {
+          const isVisible = await testPage.locator('#absmartly-visual-editor-banner-host').isVisible()
+          log(`  Banner host is visible: ${isVisible}`)
+          const display = await testPage.locator('#absmartly-visual-editor-banner-host').evaluate((el: any) => window.getComputedStyle(el).display)
+          log(`  Banner host display style: ${display}`)
+        }
+
+        // Check if visual editor is actually running
+        const veRunning = await testPage.evaluate(() => {
+          return (window as any).__absmartlyVisualEditorRunning || false
+        })
+        log(`  Visual Editor running flag: ${veRunning}`)
       }
-      return logs
-    }).catch(() => [])
 
-    if (sidebarLogs.length > 0) {
-      log('  📋 Sidebar console logs captured:')
-      sidebarLogs.forEach(log => log('    ' + log))
-    }
 
-    // Check if page is still alive
-    const pageAlive = await testPage.evaluate(() => true).catch(() => false)
-    if (!pageAlive) {
-      log('  ❌ Page crashed after clicking VE button')
-      log('  Console errors before crash:', consoleErrors)
-      throw new Error('Page crashed when launching Visual Editor')
-    }
-
-    // Log console message summary
-    log(`  📋 Captured ${allConsoleMessages.length} console messages`)
-    const contentScriptMessages = allConsoleMessages.filter(m => m.text.includes('[ABsmartly]') || m.text.includes('[Background]') || m.text.includes('[DOMChanges]'))
-    log(`  📋 Content script/background messages: ${contentScriptMessages.length}`)
-    if (contentScriptMessages.length > 0) {
-      log('  Messages:\n    ' + contentScriptMessages.map(m => `[${m.type}] ${m.text}`).join('\n    '))
-    } else {
-      log('  ⚠️  No content script messages detected - content script may not be loading!')
-    }
-
-    // Check for errors
-    const errorMessages = allConsoleMessages.filter(m => m.type === 'error')
-    if (errorMessages.length > 0) {
-      log(`  ❌ Found ${errorMessages.length} error messages:`)
-      errorMessages.forEach(m => log(`    - ${m.text}`))
-    }
-
-    // Wait longer for VE banner and log more messages
-    log('  ⏳ Waiting for VE banner to appear...')
-    log(`  📋 Total messages captured so far: ${allConsoleMessages.length}`)
-
-    // Take screenshot BEFORE waiting for banner to see state
-    await testPage.screenshot({ path: 'test-results/before-ve-banner-wait.png', fullPage: true })
-    log('  📸 Screenshot: before-ve-banner-wait.png (taken before waiting for banner)')
-
-    // Check if banner host exists in DOM
-    const bannerHostExists = await testPage.locator('#absmartly-visual-editor-banner-host').count()
-    log(`  Banner host element exists in DOM: ${bannerHostExists > 0 ? 'YES' : 'NO'}`)
-
-    if (bannerHostExists > 0) {
-      const isVisible = await testPage.locator('#absmartly-visual-editor-banner-host').isVisible()
-      log(`  Banner host is visible: ${isVisible}`)
-      const display = await testPage.locator('#absmartly-visual-editor-banner-host').evaluate((el: any) => window.getComputedStyle(el).display)
-      log(`  Banner host display style: ${display}`)
-    }
-
-    // Check if visual editor is actually running
-    const veRunning = await testPage.evaluate(() => {
-      return (window as any).__absmartlyVisualEditorRunning || false
-    })
-    log(`  Visual Editor running flag: ${veRunning}`)
-
-    // Wait for VE banner to appear (more reliable than checking window variable)
-    try {
-      await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
-      log('✅ Visual editor active')
-    } catch (e) {
-      log(`  ❌ Timeout waiting for banner. Taking diagnostic screenshot...`)
-      await testPage.screenshot({ path: 'test-results/ve-banner-timeout.png', fullPage: true })
-      throw e
-    }
+      try {
+        await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
+        log('✅ Visual editor active')
+      } catch (e) {
+        log(`  ❌ Timeout waiting for banner. Taking diagnostic screenshot...`)
+        await testPage.screenshot({ path: 'test-results/ve-banner-timeout.png', fullPage: true })
+        throw e
+      }
 
       // Take screenshot to see sidebar state after VE activates
       await testPage.screenshot({ path: 'test-results/sidebar-after-ve-launch.png', fullPage: true })
@@ -353,433 +324,433 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Test visual editor actions', async () => {
       log('\n🧪 STEP 4: Testing visual editor context menu actions')
 
-    // Action 1: Edit Text on paragraph
-    log('  Testing: Edit Text on #test-paragraph')
+      // Action 1: Edit Text on paragraph
+      log('  Testing: Edit Text on #test-paragraph')
 
-    await testPage.click('#test-paragraph', { force: true })
-    await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-    await testPage.locator('.menu-item:has-text("Edit Text")').click({ timeout: 5000 })
-    await testPage.keyboard.type('Modified text!')
-    await testPage.keyboard.press('Enter')
-    log('  ✓ Edit Text works')
-    await debugWait()
+      await testPage.click('#test-paragraph', { force: true })
+      await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
+      await testPage.locator('.menu-item:has-text("Edit Text")').click({ timeout: 5000 })
+      await testPage.keyboard.type('Modified text!')
+      await testPage.keyboard.press('Enter')
+      log('  ✓ Edit Text works')
+      await debugWait()
 
-    // Action 2: Hide element
-    log('  Testing: Hide on #button-1')
-    await testPage.click('#button-1', { force: true })
-    await testPage.locator('.menu-container').waitFor({ state: 'visible' })
-    await testPage.locator('.menu-item:has-text("Hide")').click()
-    log('  ✓ Hide works')
-    await debugWait()
+      // Action 2: Hide element
+      log('  Testing: Hide on #button-1')
+      await testPage.click('#button-1', { force: true })
+      await testPage.locator('.menu-container').waitFor({ state: 'visible' })
+      await testPage.locator('.menu-item:has-text("Hide")').click()
+      log('  ✓ Hide works')
+      await debugWait()
 
-    // Action 3: Delete element
-    log('  Testing: Delete on #button-2')
-    await testPage.click('#button-2', { force: true })
-    await testPage.locator('.menu-container').waitFor({ state: 'visible' })
-    await testPage.locator('.menu-item:has-text("Delete")').click()
-    log('  ✓ Delete works')
-    await debugWait()
+      // Action 3: Delete element
+      log('  Testing: Delete on #button-2')
+      await testPage.click('#button-2', { force: true })
+      await testPage.locator('.menu-container').waitFor({ state: 'visible' })
+      await testPage.locator('.menu-item:has-text("Delete")').click()
+      log('  ✓ Delete works')
+      await debugWait()
 
-    // Action 4: Edit HTML with CodeMirror editor on parent container
-    log('  Testing: Edit HTML on #test-container')
-    await testPage.click('#test-container', { force: true })
-    await testPage.locator('.menu-container').waitFor({ state: 'visible' })
-    await testPage.locator('.menu-item:has-text("Edit HTML")').click()
+      // Action 4: Edit HTML with CodeMirror editor on parent container
+      log('  Testing: Edit HTML on #test-container')
+      await testPage.click('#test-container', { force: true })
+      await testPage.locator('.menu-container').waitFor({ state: 'visible' })
+      await testPage.locator('.menu-item:has-text("Edit HTML")').click()
 
-    // Wait for CodeMirror editor to appear
-    await testPage.locator('.cm-editor').waitFor({ state: 'visible' })
-    log('  ✓ CodeMirror editor appeared')
-    await debugWait()
+      // Wait for CodeMirror editor to appear
+      await testPage.locator('.cm-editor').waitFor({ state: 'visible' })
+      log('  ✓ CodeMirror editor appeared')
+      await debugWait()
 
-    // Verify CodeMirror syntax highlighting is present
-    const hasCodeMirrorSyntaxHighlight = await testPage.evaluate(() => {
-      const editor = document.querySelector('.cm-editor')
-      if (!editor) return false
+      // Verify CodeMirror syntax highlighting is present
+      const hasCodeMirrorSyntaxHighlight = await testPage.evaluate(() => {
+        const editor = document.querySelector('.cm-editor')
+        if (!editor) return false
 
-      // Check for CodeMirror-specific classes that indicate syntax highlighting
-      const hasContent = editor.querySelector('.cm-content')
-      const hasScroller = editor.querySelector('.cm-scroller')
+        // Check for CodeMirror-specific classes that indicate syntax highlighting
+        const hasContent = editor.querySelector('.cm-content')
+        const hasScroller = editor.querySelector('.cm-scroller')
 
-      return !!(hasContent && hasScroller)
-    })
-    log(`  ${hasCodeMirrorSyntaxHighlight ? '✓' : '✗'} CodeMirror syntax highlighting: ${hasCodeMirrorSyntaxHighlight}`)
-    expect(hasCodeMirrorSyntaxHighlight).toBeTruthy()
-    await debugWait()
-
-    // Set new HTML content by focusing editor and typing
-    await testPage.evaluate(() => {
-      // Focus the CodeMirror editor
-      const editor = document.querySelector('.cm-content') as HTMLElement
-      if (editor) {
-        editor.focus()
-        console.log('[Test] Focused CodeMirror editor')
-      }
-    })
-
-    // Select all and replace with new content (use Meta/Command for macOS)
-    await testPage.keyboard.press('Meta+A')
-    await testPage.keyboard.type('<h2>HTML Edited!</h2><p>New paragraph content</p>')
-    log('  ✓ Updated HTML via CodeMirror')
-    await debugWait()
-
-    // Click the Save button (no shadow DOM in test mode)
-    log('  Looking for Save button...')
-
-    // Wait for button to be visible and clickable
-    await testPage.locator('.editor-button-save').waitFor({ state: 'visible' })
-    await debugWait()
-
-    log('  Clicking Save button with JavaScript click...')
-    // Use JavaScript click to ensure event handler fires
-    await testPage.evaluate(() => {
-      const saveBtn = document.querySelector('.editor-button-save') as HTMLButtonElement
-      if (saveBtn) {
-        console.log('[Test] Found save button, clicking...')
-        saveBtn.click()
-      } else {
-        console.log('[Test] Save button not found!')
-      }
-    })
-    log('  Clicked Save button')
-
-    // Wait for editor to close (with 5 second timeout)
-    try {
-      await testPage.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
-      log('  Editor closed')
-    } catch (err) {
-      log('  ⚠️  Editor did not close within 5 seconds, continuing anyway...')
-    }
-
-    log('  ✓ Edit HTML with CodeMirror works')
-    await debugWait()
-
-    // Action 5: Insert new block
-    log('  Testing: Insert new block after h2')
-    log('Starting "Insert new block" test')
-
-    // Click on h2 element (created by previous HTML edit) to open context menu
-    await testPage.click('h2', { force: true })
-    await testPage.locator('.menu-container').waitFor({ state: 'visible' })
-    log('  ✓ Clicked h2 element and menu opened')
-    await debugWait()
-
-    // Click "Insert new block" menu item
-    await clickContextMenuItem(testPage, 'Insert new block')
-    log('  ✓ Clicked "Insert new block" menu item')
-
-    // Wait for modal to appear with CodeMirror editor
-    await testPage.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
-    log('  ✓ Insert block modal appeared with CodeMirror editor')
-
-    // Take screenshot of the modal
-    await testPage.screenshot({ path: 'test-insert-block-modal.png', fullPage: true })
-    log('  📸 Screenshot: test-insert-block-modal.png')
-
-    // Debug: Check what elements are actually in the DOM
-    const modalInfo = await testPage.evaluate(() => {
-      const dialog = document.querySelector('#absmartly-block-inserter-host')
-      const cmEditor = document.querySelector('.cm-editor')
-      const insertBtn = document.querySelector('.inserter-button-insert')
-      const previewContainer = document.querySelector('.inserter-preview-container')
-      const positionRadios = document.querySelectorAll('input[type="radio"][name="position"]')
-
-      return {
-        dialogExists: !!dialog,
-        dialogHTML: dialog ? dialog.outerHTML.substring(0, 500) : 'not found',
-        cmEditorExists: !!cmEditor,
-        insertBtnExists: !!insertBtn,
-        insertBtnHTML: insertBtn ? insertBtn.outerHTML : 'not found',
-        previewExists: !!previewContainer,
-        positionRadiosCount: positionRadios.length
-      }
-    })
-    log('  🔍 Modal structure:', JSON.stringify(modalInfo, null, 2))
-
-    await debugWait()
-
-    // Verify preview container exists
-    const hasPreviewContainer = await testPage.evaluate(() => {
-      // Look for preview container in modal (adjust selector based on actual implementation)
-      const previewContainer = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
-      return previewContainer !== null
-    })
-    log(`  ${hasPreviewContainer ? '✓' : '⚠️'} Preview container exists: ${hasPreviewContainer}`)
-    await debugWait()
-
-    // Select position: "After" (check for radio button or dropdown)
-    // First try radio button approach
-    const hasRadioButton = await testPage.locator('input[type="radio"][value="after"]').count()
-    if (hasRadioButton > 0) {
-      await testPage.locator('input[type="radio"][value="after"]').check()
-      log('  ✓ Selected "After" position via radio button')
-    } else {
-      // Try dropdown/select approach
-      const hasDropdown = await testPage.locator('select[name="position"], #position-select').count()
-      if (hasDropdown > 0) {
-        await testPage.locator('select[name="position"], #position-select').selectOption('after')
-        log('  ✓ Selected "After" position via dropdown')
-      } else {
-        log('  ⚠️  Position selector not found, will use default')
-      }
-    }
-    await debugWait()
-
-    // Focus CodeMirror editor, clear default content, and type HTML
-    await testPage.evaluate(() => {
-      const editor = document.querySelector('.cm-content') as HTMLElement
-      if (editor) {
-        editor.focus()
-        console.log('[Test] Focused CodeMirror editor for insert block')
-      }
-    })
-    await debugWait()
-
-    // Select all and delete to clear the default content
-    await testPage.keyboard.press('Meta+A')  // Cmd+A on Mac
-    await testPage.keyboard.press('Backspace')
-    await debugWait()
-
-    // Type the HTML content to insert
-    const insertHTML = '<div class=\"inserted-block\">This is an inserted block!'
-    await testPage.keyboard.type(insertHTML)
-    log(`  ✓ Typed HTML into CodeMirror: ${insertHTML}`)
-    await debugWait()
-
-    // Verify preview updates in real-time (if preview container exists)
-    if (hasPreviewContainer) {
-      const previewContent = await testPage.evaluate(() => {
-        const preview = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
-        return preview?.innerHTML || preview?.textContent
+        return !!(hasContent && hasScroller)
       })
-      log(`  ${previewContent?.includes('inserted-block') ? '✓' : '⚠️'} Preview updated with content: ${previewContent?.substring(0, 50)}...`)
-    }
-    await debugWait()
+      log(`  ${hasCodeMirrorSyntaxHighlight ? '✓' : '✗'} CodeMirror syntax highlighting: ${hasCodeMirrorSyntaxHighlight}`)
+      expect(hasCodeMirrorSyntaxHighlight).toBeTruthy()
+      await debugWait()
 
-    // Click the Insert button
-    log('  Looking for Insert button...')
-    const insertBtn = testPage.locator('.inserter-button-insert')
-    await insertBtn.waitFor({ state: 'visible', timeout: 5000 })
-    log('  ✓ Insert button found')
-    
-    // Verify button is actually clickable
-    const buttonInfo = await testPage.evaluate(() => {
-      const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
-      return {
-        exists: !!btn,
-        disabled: btn?.disabled,
-        className: btn?.className,
-        listeners: btn ? Object.keys(btn).filter(k => k.startsWith('on') || k.includes('event')) : []
-      }
-    })
-    log('  🔍 Button info:', JSON.stringify(buttonInfo))
-    await debugWait()
-
-    log('  Clicking Insert button...')
-
-    // Take screenshot before clicking
-    await testPage.screenshot({ path: 'test-before-insert-click.png', fullPage: true })
-    log('  📸 Screenshot before click: test-before-insert-click.png')
-
-    // Try multiple click methods
-    const clickResult = await testPage.evaluate(() => {
-      const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
-      if (!btn) return { error: 'Button not found' }
-      
-      // Add a test listener
-      let testListenerFired = false
-      btn.addEventListener('click', () => {
-        testListenerFired = true
-        console.log('[Test] TEST LISTENER FIRED!')
-      }, { once: true })
-      
-      // Try click()
-      btn.click()
-      
-      // Also try dispatchEvent
-      const clickEvent = new MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        view: window
+      // Set new HTML content by focusing editor and typing
+      await testPage.evaluate(() => {
+        // Focus the CodeMirror editor
+        const editor = document.querySelector('.cm-content') as HTMLElement
+        if (editor) {
+          editor.focus()
+          console.log('[Test] Focused CodeMirror editor')
+        }
       })
-      btn.dispatchEvent(clickEvent)
+
+      // Select all and replace with new content (use Meta/Command for macOS)
+      await testPage.keyboard.press('Meta+A')
+      await testPage.keyboard.type('<h2>HTML Edited!</h2><p>New paragraph content</p>')
+      log('  ✓ Updated HTML via CodeMirror')
+      await debugWait()
+
+      // Click the Save button (no shadow DOM in test mode)
+      log('  Looking for Save button...')
+
+      // Wait for button to be visible and clickable
+      await testPage.locator('.editor-button-save').waitFor({ state: 'visible' })
+      await debugWait()
+
+      log('  Clicking Save button with JavaScript click...')
+      // Use JavaScript click to ensure event handler fires
+      await testPage.evaluate(() => {
+        const saveBtn = document.querySelector('.editor-button-save') as HTMLButtonElement
+        if (saveBtn) {
+          console.log('[Test] Found save button, clicking...')
+          saveBtn.click()
+        } else {
+          console.log('[Test] Save button not found!')
+        }
+      })
+      log('  Clicked Save button')
+
+      // Wait for editor to close (with 5 second timeout)
+      try {
+        await testPage.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
+        log('  Editor closed')
+      } catch (err) {
+        log('  ⚠️  Editor did not close within 5 seconds, continuing anyway...')
+      }
+
+      log('  ✓ Edit HTML with CodeMirror works')
+      await debugWait()
+
+      // Action 5: Insert new block
+      log('  Testing: Insert new block after h2')
+      log('Starting "Insert new block" test')
+
+      // Click on h2 element (created by previous HTML edit) to open context menu
+      await testPage.click('h2', { force: true })
+      await testPage.locator('.menu-container').waitFor({ state: 'visible' })
+      log('  ✓ Clicked h2 element and menu opened')
+      await debugWait()
+
+      // Click "Insert new block" menu item
+      await clickContextMenuItem(testPage, 'Insert new block')
+      log('  ✓ Clicked "Insert new block" menu item')
+
+      // Wait for modal to appear with CodeMirror editor
+      await testPage.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
+      log('  ✓ Insert block modal appeared with CodeMirror editor')
+
+      // Take screenshot of the modal
+      await testPage.screenshot({ path: 'test-insert-block-modal.png', fullPage: true })
+      log('  📸 Screenshot: test-insert-block-modal.png')
+
+      // Debug: Check what elements are actually in the DOM
+      const modalInfo = await testPage.evaluate(() => {
+        const dialog = document.querySelector('#absmartly-block-inserter-host')
+        const cmEditor = document.querySelector('.cm-editor')
+        const insertBtn = document.querySelector('.inserter-button-insert')
+        const previewContainer = document.querySelector('.inserter-preview-container')
+        const positionRadios = document.querySelectorAll('input[type="radio"][name="position"]')
+
+        return {
+          dialogExists: !!dialog,
+          dialogHTML: dialog ? dialog.outerHTML.substring(0, 500) : 'not found',
+          cmEditorExists: !!cmEditor,
+          insertBtnExists: !!insertBtn,
+          insertBtnHTML: insertBtn ? insertBtn.outerHTML : 'not found',
+          previewExists: !!previewContainer,
+          positionRadiosCount: positionRadios.length
+        }
+      })
+      log('  🔍 Modal structure:', JSON.stringify(modalInfo, null, 2))
+
+      await debugWait()
+
+      // Verify preview container exists
+      const hasPreviewContainer = await testPage.evaluate(() => {
+        // Look for preview container in modal (adjust selector based on actual implementation)
+        const previewContainer = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
+        return previewContainer !== null
+      })
+      log(`  ${hasPreviewContainer ? '✓' : '⚠️'} Preview container exists: ${hasPreviewContainer}`)
+      await debugWait()
+
+      // Select position: "After" (check for radio button or dropdown)
+      // First try radio button approach
+      const hasRadioButton = await testPage.locator('input[type="radio"][value="after"]').count()
+      if (hasRadioButton > 0) {
+        await testPage.locator('input[type="radio"][value="after"]').check()
+        log('  ✓ Selected "After" position via radio button')
+      } else {
+        // Try dropdown/select approach
+        const hasDropdown = await testPage.locator('select[name="position"], #position-select').count()
+        if (hasDropdown > 0) {
+          await testPage.locator('select[name="position"], #position-select').selectOption('after')
+          log('  ✓ Selected "After" position via dropdown')
+        } else {
+          log('  ⚠️  Position selector not found, will use default')
+        }
+      }
+      await debugWait()
+
+      // Focus CodeMirror editor, clear default content, and type HTML
+      await testPage.evaluate(() => {
+        const editor = document.querySelector('.cm-content') as HTMLElement
+        if (editor) {
+          editor.focus()
+          console.log('[Test] Focused CodeMirror editor for insert block')
+        }
+      })
+      await debugWait()
+
+      // Select all and delete to clear the default content
+      await testPage.keyboard.press('Meta+A')  // Cmd+A on Mac
+      await testPage.keyboard.press('Backspace')
+      await debugWait()
+
+      // Type the HTML content to insert
+      const insertHTML = '<div class=\"inserted-block\">This is an inserted block!'
+      await testPage.keyboard.type(insertHTML)
+      log(`  ✓ Typed HTML into CodeMirror: ${insertHTML}`)
+      await debugWait()
+
+      // Verify preview updates in real-time (if preview container exists)
+      if (hasPreviewContainer) {
+        const previewContent = await testPage.evaluate(() => {
+          const preview = document.querySelector('[data-testid="insert-block-preview"], .insert-block-preview, #insert-block-preview')
+          return preview?.innerHTML || preview?.textContent
+        })
+        log(`  ${previewContent?.includes('inserted-block') ? '✓' : '⚠️'} Preview updated with content: ${previewContent?.substring(0, 50)}...`)
+      }
+      await debugWait()
+
+      // Click the Insert button
+      log('  Looking for Insert button...')
+      const insertBtn = testPage.locator('.inserter-button-insert')
+      await insertBtn.waitFor({ state: 'visible', timeout: 5000 })
+      log('  ✓ Insert button found')
       
-      return { 
-        clicked: true, 
-        testListenerFired,
-        buttonHTML: btn.outerHTML.substring(0, 100)
+      // Verify button is actually clickable
+      const buttonInfo = await testPage.evaluate(() => {
+        const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
+        return {
+          exists: !!btn,
+          disabled: btn?.disabled,
+          className: btn?.className,
+          listeners: btn ? Object.keys(btn).filter(k => k.startsWith('on') || k.includes('event')) : []
+        }
+      })
+      log('  🔍 Button info:', JSON.stringify(buttonInfo))
+      await debugWait()
+
+      log('  Clicking Insert button...')
+
+      // Take screenshot before clicking
+      await testPage.screenshot({ path: 'test-before-insert-click.png', fullPage: true })
+      log('  📸 Screenshot before click: test-before-insert-click.png')
+
+      // Try multiple click methods
+      const clickResult = await testPage.evaluate(() => {
+        const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
+        if (!btn) return { error: 'Button not found' }
+        
+        // Add a test listener
+        let testListenerFired = false
+        btn.addEventListener('click', () => {
+          testListenerFired = true
+          console.log('[Test] TEST LISTENER FIRED!')
+        }, { once: true })
+        
+        // Try click()
+        btn.click()
+        
+        // Also try dispatchEvent
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        })
+        btn.dispatchEvent(clickEvent)
+        
+        return { 
+          clicked: true, 
+          testListenerFired,
+          buttonHTML: btn.outerHTML.substring(0, 100)
+        }
+      })
+      log('  ✓ Click result:', JSON.stringify(clickResult))
+
+      // Wait a moment and check console errors
+      await debugWait(500)
+
+      // Check for any errors or state after click
+      const postClickInfo = await testPage.evaluate(() => {
+        const dialog = document.querySelector('#absmartly-block-inserter-host')
+        const h2 = document.querySelector('h2')
+        const insertedBlock = document.querySelector('.inserted-block')
+
+        return {
+          dialogStillExists: !!dialog,
+          h2Exists: !!h2,
+          h2NextSibling: h2?.nextElementSibling?.className || 'none',
+          insertedBlockExists: !!insertedBlock,
+          insertedBlockHTML: insertedBlock ? insertedBlock.outerHTML : 'not found'
+        }
+      })
+      log('  🔍 Post-click state:', JSON.stringify(postClickInfo, null, 2))
+
+      // Take screenshot after clicking
+      await testPage.screenshot({ path: 'test-after-insert-click.png', fullPage: true })
+      log('  📸 Screenshot after click: test-after-insert-click.png')
+
+      // Wait for modal to close
+      try {
+        await testPage.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
+        log('  ✓ Insert block modal closed')
+      } catch (err) {
+        log('  ⚠️  Modal did not close within 5 seconds, continuing anyway...')
       }
-    })
-    log('  ✓ Click result:', JSON.stringify(clickResult))
+      await debugWait()
 
-    // Wait a moment and check console errors
-    await debugWait(500)
+      // Verify the new element exists in the DOM at the correct position (after h2)
+      const insertedBlockExists = await testPage.evaluate(() => {
+        const h2 = document.querySelector('h2')
+        if (!h2) return false
 
-    // Check for any errors or state after click
-    const postClickInfo = await testPage.evaluate(() => {
-      const dialog = document.querySelector('#absmartly-block-inserter-host')
-      const h2 = document.querySelector('h2')
-      const insertedBlock = document.querySelector('.inserted-block')
+        // Check if next sibling is the inserted block
+        const nextElement = h2.nextElementSibling
+        return nextElement?.classList.contains('inserted-block') || false
+      })
+      log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists after h2: ${insertedBlockExists}`)
+      expect(insertedBlockExists).toBeTruthy()
+      await debugWait()
 
-      return {
-        dialogStillExists: !!dialog,
-        h2Exists: !!h2,
-        h2NextSibling: h2?.nextElementSibling?.className || 'none',
-        insertedBlockExists: !!insertedBlock,
-        insertedBlockHTML: insertedBlock ? insertedBlock.outerHTML : 'not found'
-      }
-    })
-    log('  🔍 Post-click state:', JSON.stringify(postClickInfo, null, 2))
+      // Verify the content is correct
+      const insertedContent = await testPage.evaluate(() => {
+        const insertedBlock = document.querySelector('.inserted-block')
+        return insertedBlock?.textContent?.trim()
+      })
+      log(`  ${insertedContent === 'This is an inserted block!' ? '✓' : '✗'} Inserted content correct: "${insertedContent}"`)
+      expect(insertedContent).toBe('This is an inserted block!')
+      await debugWait()
 
-    // Take screenshot after clicking
-    await testPage.screenshot({ path: 'test-after-insert-click.png', fullPage: true })
-    log('  📸 Screenshot after click: test-after-insert-click.png')
-
-    // Wait for modal to close
-    try {
-      await testPage.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
-      log('  ✓ Insert block modal closed')
-    } catch (err) {
-      log('  ⚠️  Modal did not close within 5 seconds, continuing anyway...')
-    }
-    await debugWait()
-
-    // Verify the new element exists in the DOM at the correct position (after h2)
-    const insertedBlockExists = await testPage.evaluate(() => {
-      const h2 = document.querySelector('h2')
-      if (!h2) return false
-
-      // Check if next sibling is the inserted block
-      const nextElement = h2.nextElementSibling
-      return nextElement?.classList.contains('inserted-block') || false
-    })
-    log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists after h2: ${insertedBlockExists}`)
-    expect(insertedBlockExists).toBeTruthy()
-    await debugWait()
-
-    // Verify the content is correct
-    const insertedContent = await testPage.evaluate(() => {
-      const insertedBlock = document.querySelector('.inserted-block')
-      return insertedBlock?.textContent?.trim()
-    })
-    log(`  ${insertedContent === 'This is an inserted block!' ? '✓' : '✗'} Inserted content correct: "${insertedContent}"`)
-    expect(insertedContent).toBe('This is an inserted block!')
-    await debugWait()
-
-    // Verify changes counter increased
-    const changeCountAfterInsert = await testPage.evaluate(() => {
-      const banner = document.querySelector('#absmartly-visual-editor-banner-host')
-      if (banner?.shadowRoot) {
-        const counter = banner.shadowRoot.querySelector('.changes-counter')
+      // Verify changes counter increased
+      const changeCountAfterInsert = await testPage.evaluate(() => {
+        const banner = document.querySelector('#absmartly-visual-editor-banner-host')
+        if (banner?.shadowRoot) {
+          const counter = banner.shadowRoot.querySelector('.changes-counter')
+          return counter?.textContent?.trim() || '0'
+        }
+        // Fallback to non-shadow DOM version
+        const counter = document.querySelector('.changes-counter')
         return counter?.textContent?.trim() || '0'
-      }
-      // Fallback to non-shadow DOM version
-      const counter = document.querySelector('.changes-counter')
-      return counter?.textContent?.trim() || '0'
-    })
-    log(`  ✓ Changes counter after insert: ${changeCountAfterInsert}`)
-    await debugWait()
+      })
+      log(`  ✓ Changes counter after insert: ${changeCountAfterInsert}`)
+      await debugWait()
 
-    log('  ✅ Insert new block test completed successfully')
-    log('Completed "Insert new block" test')
-    await debugWait()
+      log('  ✅ Insert new block test completed successfully')
+      log('Completed "Insert new block" test')
+      await debugWait()
 
-    // Action 6: Change image source
+      // Action 6: Change image source
 
-    log('  Testing: Change image source on img element')
+      log('  Testing: Change image source on img element')
 
-    // First, add an image to the test page at the top
-    // Use a data URL to avoid external dependencies and loading issues
-    await testPage.evaluate(() => {
-      const img = document.createElement('img')
-      img.id = 'test-image'
-      // Simple 10x10 red square as data URL
-      img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC'
-      img.alt = 'Test image'
-      img.style.width = '150px'
-      img.style.height = '150px'
-      img.style.margin = '20px'
-      img.style.display = 'block'
-      img.style.position = 'relative'
-      img.style.zIndex = '1'
-      // Insert at the beginning of body to ensure it's visible
-      document.body.insertBefore(img, document.body.firstChild)
-    })
-    // Wait for image to be loaded
-    await testPage.locator('#test-image').waitFor({ state: 'visible', timeout: 2000 })
-    log('  ✓ Added test image to page')
+      // First, add an image to the test page at the top
+      // Use a data URL to avoid external dependencies and loading issues
+      await testPage.evaluate(() => {
+        const img = document.createElement('img')
+        img.id = 'test-image'
+        // Simple 10x10 red square as data URL
+        img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC'
+        img.alt = 'Test image'
+        img.style.width = '150px'
+        img.style.height = '150px'
+        img.style.margin = '20px'
+        img.style.display = 'block'
+        img.style.position = 'relative'
+        img.style.zIndex = '1'
+        // Insert at the beginning of body to ensure it's visible
+        document.body.insertBefore(img, document.body.firstChild)
+      })
+      // Wait for image to be loaded
+      await testPage.locator('#test-image').waitFor({ state: 'visible', timeout: 2000 })
+      log('  ✓ Added test image to page')
 
-    // Scroll to the image and click to open context menu
-    await testPage.locator('#test-image').scrollIntoViewIfNeeded()
-    await testPage.locator('#test-image').click({ force: true })
-    await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-    log('  ✓ Context menu opened for image')
+      // Scroll to the image and click to open context menu
+      await testPage.locator('#test-image').scrollIntoViewIfNeeded()
+      await testPage.locator('#test-image').click({ force: true })
+      await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
+      log('  ✓ Context menu opened for image')
 
-    // Verify "Change image source" option is present
-    const changeImageOption = testPage.locator('.menu-item:has-text("Change image source")')
-    await changeImageOption.waitFor({ state: 'visible', timeout: 2000 })
-    log('  ✓ "Change image source" option is visible')
+      // Verify "Change image source" option is present
+      const changeImageOption = testPage.locator('.menu-item:has-text("Change image source")')
+      await changeImageOption.waitFor({ state: 'visible', timeout: 2000 })
+      log('  ✓ "Change image source" option is visible')
 
-    // Click "Change image source"
-    await changeImageOption.click()
-    log('  ✓ Clicked "Change image source"')
+      // Click "Change image source"
+      await changeImageOption.click()
+      log('  ✓ Clicked "Change image source"')
 
-    // Wait for the image source dialog to appear
-    await testPage.locator('#absmartly-image-dialog-host').waitFor({ state: 'visible', timeout: 5000 })
-    log('  ✓ Image source dialog opened')
+      // Wait for the image source dialog to appear
+      await testPage.locator('#absmartly-image-dialog-host').waitFor({ state: 'visible', timeout: 5000 })
+      log('  ✓ Image source dialog opened')
 
-    // Verify context menu is closed
-    const menuStillVisible = await testPage.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
-    expect(menuStillVisible).toBe(false)
-    log('  ✓ Context menu closed after opening image dialog')
+      // Verify context menu is closed
+      const menuStillVisible = await testPage.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
+      expect(menuStillVisible).toBe(false)
+      log('  ✓ Context menu closed after opening image dialog')
 
-    // Enter a new image URL in the shadow DOM input
-    const newImageUrl = 'https://via.placeholder.com/200'
-    await testPage.evaluate((url) => {
-      const dialogHost = document.querySelector('#absmartly-image-dialog-host')
-      if (dialogHost?.shadowRoot) {
-        const input = dialogHost.shadowRoot.querySelector('input.dialog-input') as HTMLInputElement
-        if (input) {
-          input.value = url
-          input.dispatchEvent(new Event('input', { bubbles: true }))
+      // Enter a new image URL in the shadow DOM input
+      const newImageUrl = 'https://via.placeholder.com/200'
+      await testPage.evaluate((url) => {
+        const dialogHost = document.querySelector('#absmartly-image-dialog-host')
+        if (dialogHost?.shadowRoot) {
+          const input = dialogHost.shadowRoot.querySelector('input.dialog-input') as HTMLInputElement
+          if (input) {
+            input.value = url
+            input.dispatchEvent(new Event('input', { bubbles: true }))
+          }
         }
-      }
-    }, newImageUrl)
-    log(`  ✓ Entered new image URL: ${newImageUrl}`)
+      }, newImageUrl)
+      log(`  ✓ Entered new image URL: ${newImageUrl}`)
 
-    // Click the Apply button
-    await testPage.evaluate(() => {
-      const dialogHost = document.querySelector('#absmartly-image-dialog-host')
-      if (dialogHost?.shadowRoot) {
-        const applyButton = dialogHost.shadowRoot.querySelector('.dialog-button-apply') as HTMLButtonElement
-        if (applyButton) {
-          applyButton.click()
+      // Click the Apply button
+      await testPage.evaluate(() => {
+        const dialogHost = document.querySelector('#absmartly-image-dialog-host')
+        if (dialogHost?.shadowRoot) {
+          const applyButton = dialogHost.shadowRoot.querySelector('.dialog-button-apply') as HTMLButtonElement
+          if (applyButton) {
+            applyButton.click()
+          }
         }
-      }
-    })
-    log('  ✓ Clicked Apply button')
+      })
+      log('  ✓ Clicked Apply button')
 
-    // Wait for modal to close
-    await testPage.locator('#absmartly-image-dialog-host').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+      // Wait for modal to close
+      await testPage.locator('#absmartly-image-dialog-host').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
 
-    // Verify the modal closed
-    const dialogStillVisible = await testPage.locator('#absmartly-image-dialog-host').isVisible({ timeout: 500 }).catch(() => false)
-    expect(dialogStillVisible).toBe(false)
-    log('  ✓ Image source dialog closed after clicking Apply')
+      // Verify the modal closed
+      const dialogStillVisible = await testPage.locator('#absmartly-image-dialog-host').isVisible({ timeout: 500 }).catch(() => false)
+      expect(dialogStillVisible).toBe(false)
+      log('  ✓ Image source dialog closed after clicking Apply')
 
-    // CRITICAL TEST: Verify context menu did NOT reopen
-    const menuReopened = await testPage.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
-    expect(menuReopened).toBe(false)
-    log('  ✅ Context menu did NOT reopen (bug is fixed!)')
+      // CRITICAL TEST: Verify context menu did NOT reopen
+      const menuReopened = await testPage.locator('.menu-container').isVisible({ timeout: 1000 }).catch(() => false)
+      expect(menuReopened).toBe(false)
+      log('  ✅ Context menu did NOT reopen (bug is fixed!)')
 
-    // Verify the image source was changed
-    const updatedSrc = await testPage.evaluate(() => {
-      const img = document.querySelector('#test-image') as HTMLImageElement
-      return img?.src
-    })
-    expect(updatedSrc).toBe(newImageUrl)
-    log(`  ✓ Image source updated to: ${updatedSrc}`)
+      // Verify the image source was changed
+      const updatedSrc = await testPage.evaluate(() => {
+        const img = document.querySelector('#test-image') as HTMLImageElement
+        return img?.src
+      })
+      expect(updatedSrc).toBe(newImageUrl)
+      log(`  ✓ Image source updated to: ${updatedSrc}`)
 
-    await debugWait()
+      await debugWait()
 
       log('✅ Visual editor actions tested (Edit Text, Hide, Delete, Edit HTML, Change Image Source)')
 
