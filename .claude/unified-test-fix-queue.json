@@ -264,7 +264,9 @@
       "action": "Build extension: npm run build:dev, run full suite: npx playwright test tests/e2e/ --reporter=list 2>&1 | tee .claude/e2e-test-results-after-fix.txt",
       "test_command": "npm run build:dev && npx playwright test tests/e2e/ --reporter=list",
       "expected_outcome": "Capture full results: total/passed/failed/skipped. Compare with pre-fix numbers. Document NEW failures (bugs that were hidden).",
-      "estimated_minutes": 40
+      "estimated_minutes": 40,
+      "started_at": "2025-10-28T21:22:00Z",
+      "agent": "Agent 6"
     }
   ],
   "summary": {
