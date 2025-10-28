@@ -252,7 +252,7 @@
       "id": "e2e-verify-full",
       "type": "e2e-test-verification",
       "priority": "P0",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Full E2E test suite verification",
       "files": [
         "tests/e2e/ (all tests)"
