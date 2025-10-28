@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-
+import { sendToContent } from '~src/lib/messaging'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
@@ -170,22 +170,22 @@ export function ExperimentDetail({
 
   const handleBack = () => {
     // Cleanup function to stop VE and Preview
-    const cleanup = () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          // Stop Visual Editor
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'STOP_VISUAL_EDITOR'
-          })
+    const cleanup = async () => {
+      try {
+        // Stop Visual Editor
+        await sendToContent({
+          type: 'STOP_VISUAL_EDITOR'
+        })
 
-          // Remove Preview
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experiment.name
-          })
-        }
-      })
+        // Remove Preview
+        await sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove',
+          experimentName: experiment.name
+        })
+      } catch (error) {
+        debugError('Error during cleanup:', error)
+      }
     }
 
     if (hasUnsavedChanges) {
