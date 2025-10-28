@@ -12,7 +12,6 @@ export async function createExperiment(
   sidebar: FrameLocator,
   options: { fillOwners?: boolean; fillTeams?: boolean; fillTags?: boolean } = {}
 ): Promise<string> {
-  log('\n📋 Creating new experiment', 'info')
 
   await click(sidebar, 'button[title="Create New Experiment"]', 5000)
   await debugWait()
@@ -66,7 +65,6 @@ export async function createExperiment(
  * Activate the visual editor by clicking the Visual Editor button
  */
 export async function activateVisualEditor(sidebar: FrameLocator, testPage: Page): Promise<void> {
-  log('\n🎨 Activating Visual Editor', 'info')
 
   const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
 
@@ -155,7 +153,6 @@ async function fillMetadataFields(
  * This verifies that the VE can be stopped and relaunched successfully
  */
 export async function testSecondVEInstance(sidebar: FrameLocator, page: Page): Promise<void> {
-  log('\n🔄 Testing second VE launch')
 
   if (page.isClosed()) {
     throw new Error('Test page was closed unexpectedly')
@@ -256,7 +253,6 @@ export async function testSecondVEInstance(sidebar: FrameLocator, page: Page): P
  * This prepares the experiment form for submission
  */
 export async function fillMetadataForSave(sidebar: FrameLocator, page: Page): Promise<void> {
-  log('\n💾 Preparing experiment for save', 'info')
   await debugWait()
 
   const exitPreviewBtn = page.locator('button:has-text("Exit Preview")')

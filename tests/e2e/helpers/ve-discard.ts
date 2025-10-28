@@ -26,7 +26,6 @@ export async function testDiscardChanges(
   page: Page,
   allConsoleMessages: Array<{ type: string; text: string }>
 ): Promise<void> {
-  log('\n🗑️  Testing discard changes functionality')
 
   const freshSidebar = page.frameLocator('#absmartly-sidebar-iframe')
 

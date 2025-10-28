@@ -8,7 +8,6 @@ import { log } from '../utils/test-helpers'
  * @param page - The Playwright page object representing the test page
  */
 export async function testUndoRedoForAllActions(page: Page): Promise<void> {
-  log('\n🔄 Testing comprehensive undo/redo for all change types...')
 
   // Helper to deselect all elements
   const deselectAll = async () => {
