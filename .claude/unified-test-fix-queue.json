@@ -86,7 +86,7 @@
       "id": "unit-fix-5",
       "type": "unit-test-fix",
       "priority": "P2",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Fix or document CodeExecutor eval prevention",
       "files": [
         "src/sdk-bridge/experiment/code-executor.ts",
@@ -96,7 +96,8 @@
       "action": "Research if eval prevention is possible in Function constructor context. Either implement prevention OR document as architectural limitation and skip test with clear comment",
       "test_command": "npm run test:unit -- code-executor.test.ts",
       "expected_outcome": "Either test passes (eval prevented) OR test skipped with documentation explaining why prevention isn't feasible",
-      "estimated_minutes": 30
+      "estimated_minutes": 30,
+      "completion_notes": "Test skipped with comprehensive documentation explaining architectural limitation. Cannot prevent eval() in Function constructor context - this is a fundamental JavaScript limitation. The validate() method warns about eval patterns, and code only executes in preview mode. Tests pass: 1 skipped, 20 passed, 21 total."
     },
     {
       "id": "unit-fix-6",
@@ -134,7 +135,7 @@
       "id": "e2e-skip-fix-1",
       "type": "e2e-test-fix",
       "priority": "P0",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Remove erroneous skip from visual-editor-unified",
       "files": [
         "tests/e2e/visual-editor-unified.spec.ts"
@@ -144,7 +145,9 @@
       "test_command": "npx playwright test tests/e2e/visual-editor-unified.spec.ts",
       "expected_outcome": "Test runs without skipping on missing experiments (may fail, which is correct)",
       "estimated_minutes": 15,
-      "note": "This task may already be completed - check git log first"
+      "note": "This task may already be completed - check git log first",
+      "started_at": "2025-10-28T20:52:19.091Z",
+      "agent": "Agent 2"
     },
     {
       "id": "e2e-skip-scan",
