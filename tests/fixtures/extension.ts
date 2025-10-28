@@ -19,7 +19,6 @@ function ensureSeedFileExists() {
   if (!fs.existsSync(seedDest) ||
       fs.statSync(seedSource).mtime > fs.statSync(seedDest).mtime) {
     fs.copyFileSync(seedSource, seedDest)
-    console.log('Copied seed.html to build directory')
   }
 }
 
@@ -75,7 +74,6 @@ export const test = base.extend<ExtFixtures>({
 
     // Extract extension ID from service worker URL
     const extensionId = new URL(sw.url()).host
-    console.log('Extension ID:', extensionId)
 
     await use(extensionId)
   },
