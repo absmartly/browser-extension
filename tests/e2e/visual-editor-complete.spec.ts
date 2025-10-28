@@ -1840,14 +1840,14 @@ test.describe('Visual Editor Complete Workflow', () => {
         }
         
         if (exitButton) {
-          log('  Found Exit button, dispatching click event...')
+          console.log('  Found Exit button, dispatching click event...')
           const clickEvent = new MouseEvent('click', {
             bubbles: true,
             cancelable: true,
             view: window
           })
           exitButton.dispatchEvent(clickEvent)
-          log('  ✓ Dispatched click event to Exit button')
+          console.log('  ✓ Dispatched click event to Exit button')
         } else {
           console.error('  ✗ Exit button not found in banner')
         }
