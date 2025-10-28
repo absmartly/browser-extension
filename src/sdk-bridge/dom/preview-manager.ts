@@ -41,6 +41,14 @@ export class PreviewManager {
       return false
     }
 
+    // Validate javascript action before processing
+    if (change.type === 'javascript') {
+      if (!change.value || typeof change.value !== 'string') {
+        Logger.warn('Invalid javascript change, missing or invalid value')
+        return false
+      }
+    }
+
     const elements = document.querySelectorAll(change.selector)
 
     if (elements.length === 0) {
@@ -127,16 +135,13 @@ export class PreviewManager {
           break
 
         case 'javascript':
-          if (change.value && typeof change.value === 'string') {
-            const success = CodeExecutor.execute(change.value, {
-              element: htmlElement,
-              experimentName
-            })
-            if (!success) {
-              Logger.warn('Failed to execute JavaScript for:', change.selector)
-            }
-          } else {
-            Logger.warn('Invalid javascript change, missing or invalid value')
+          // Validation already done before loop, value is guaranteed to be a string here
+          const success = CodeExecutor.execute(change.value as string, {
+            element: htmlElement,
+            experimentName
+          })
+          if (!success) {
+            Logger.warn('Failed to execute JavaScript for:', change.selector)
           }
           break
       }
