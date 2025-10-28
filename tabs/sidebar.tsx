@@ -1,10 +1,11 @@
 import React, { useState, useEffect, lazy, Suspense } from "react"
 import { Storage } from "@plasmohq/storage"
+import { debugLog, debugError } from "~src/utils/debug"
 import "~style.css"
 
 const storage = new Storage()
 
-console.log('🔵 ABSmartly Extension: Sidebar script loaded')
+debugLog('🔵 ABSmartly Extension: Sidebar script loaded')
 
 // Listen for messages from background script (works in both iframe and standalone modes)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -22,7 +23,7 @@ if (false && window.parent !== window) {
   // Disabled old code
   window.addEventListener('message', (event) => {
     if (event.data?.source === 'absmartly-content-script' || event.data?.source === 'absmartly-visual-editor') {
-      console.log('[tabs/sidebar.tsx] OLD POLYFILL - Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
+      debugLog('[tabs/sidebar.tsx] OLD POLYFILL - Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
 
       // Mock the background script's response for REQUEST_INJECTION_CODE
       if (event.data.type === 'REQUEST_INJECTION_CODE') {
@@ -37,10 +38,10 @@ if (false && window.parent !== window) {
           response: response
         }, '*')
 
-        console.log('[tabs/sidebar.tsx] Sent mock response for REQUEST_INJECTION_CODE')
+        debugLog('[tabs/sidebar.tsx] Sent mock response for REQUEST_INJECTION_CODE')
       } else {
         // Forward all other messages to background script using real chrome.runtime
-        console.log('[tabs/sidebar.tsx] Forwarding message to background script:', event.data.type)
+        debugLog('[tabs/sidebar.tsx] Forwarding message to background script:', event.data.type)
 
         // Extract the original message (without polyfill metadata)
         const { source, responseId, ...originalMessage } = event.data
@@ -55,12 +56,12 @@ if (false && window.parent !== window) {
                 responseId: responseId,
                 response: response
               }, '*')
-              console.log('[tabs/sidebar.tsx] Forwarded response from background:', response)
+              debugLog('[tabs/sidebar.tsx] Forwarded response from background:', response)
             } else {
-              console.log('[tabs/sidebar.tsx] Message forwarded successfully (no response expected)')
+              debugLog('[tabs/sidebar.tsx] Message forwarded successfully (no response expected)')
             }
           }).catch(error => {
-            console.error('[tabs/sidebar.tsx] Error forwarding message to background:', error)
+            debugError('[tabs/sidebar.tsx] Error forwarding message to background:', error)
             // Only send error response if there was a responseId
             if (responseId) {
               window.postMessage({
@@ -71,20 +72,20 @@ if (false && window.parent !== window) {
             }
           })
         } else {
-          console.error('[tabs/sidebar.tsx] Cannot forward message - chrome.runtime not available')
+          debugError('[tabs/sidebar.tsx] Cannot forward message - chrome.runtime not available')
         }
       }
     }
   })
 
-  console.log('[tabs/sidebar.tsx] Message forwarding listener registered')
+  debugLog('[tabs/sidebar.tsx] Message forwarding listener registered')
 }
 
 // Always listen for messages FROM background script (works in both iframe and standalone modes)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Log DEBUG messages directly
   if (message.type === 'DEBUG') {
-    console.log(message.message)
+    debugLog(message.message)
   }
 
   // Forward to iframe content as a regular message event
