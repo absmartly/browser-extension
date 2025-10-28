@@ -262,9 +262,36 @@ test.describe('Visual Editor Complete Workflow', () => {
     console.log('  ⏳ Waiting for VE banner to appear...')
     console.log(`  📋 Total messages captured so far: ${allConsoleMessages.length}`)
 
+    // Take screenshot BEFORE waiting for banner to see state
+    await testPage.screenshot({ path: 'test-results/before-ve-banner-wait.png', fullPage: true })
+    console.log('  📸 Screenshot: before-ve-banner-wait.png (taken before waiting for banner)')
+
+    // Check if banner host exists in DOM
+    const bannerHostExists = await testPage.locator('#absmartly-visual-editor-banner-host').count()
+    console.log(`  Banner host element exists in DOM: ${bannerHostExists > 0 ? 'YES' : 'NO'}`)
+
+    if (bannerHostExists > 0) {
+      const isVisible = await testPage.locator('#absmartly-visual-editor-banner-host').isVisible()
+      console.log(`  Banner host is visible: ${isVisible}`)
+      const display = await testPage.locator('#absmartly-visual-editor-banner-host').evaluate((el: any) => window.getComputedStyle(el).display)
+      console.log(`  Banner host display style: ${display}`)
+    }
+
+    // Check if visual editor is actually running
+    const veRunning = await testPage.evaluate(() => {
+      return (window as any).__absmartlyVisualEditorRunning || false
+    })
+    console.log(`  Visual Editor running flag: ${veRunning}`)
+
     // Wait for VE banner to appear (more reliable than checking window variable)
-    await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
-    console.log('✅ Visual editor active')
+    try {
+      await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
+      console.log('✅ Visual editor active')
+    } catch (e) {
+      console.log(`  ❌ Timeout waiting for banner. Taking diagnostic screenshot...`)
+      await testPage.screenshot({ path: 'test-results/ve-banner-timeout.png', fullPage: true })
+      throw e
+    }
 
       // Take screenshot to see sidebar state after VE activates
       await testPage.screenshot({ path: 'test-results/sidebar-after-ve-launch.png', fullPage: true })

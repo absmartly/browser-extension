@@ -2,12 +2,20 @@ import { type Page, type FrameLocator, type Locator } from '@playwright/test'
 
 /**
  * Injects the extension sidebar into a test page
+ * The sidebar iframe gets proper extension context because it's loaded via chrome.runtime.getURL()
  * @param page - Playwright page object
  * @param extensionUrl - Function to get extension URLs
  * @returns The sidebar frame locator
  */
 export async function injectSidebar(page: Page, extensionUrl: (path: string) => string): Promise<FrameLocator> {
-  await page.evaluate((extUrl) => {
+  const sidebarUrl = extensionUrl('tabs/sidebar.html')
+
+  await page.evaluate((url) => {
+    const existingSidebar = document.getElementById('absmartly-sidebar-root') as HTMLElement
+    if (existingSidebar) {
+      return
+    }
+
     const originalPadding = document.body.style.paddingRight || '0px'
     document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
     document.body.style.transition = 'padding-right 0.3s ease-in-out'
@@ -25,19 +33,26 @@ export async function injectSidebar(page: Page, extensionUrl: (path: string) => 
       border-left: 1px solid #e5e7eb;
       box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
       z-index: 2147483647;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
       font-size: 14px;
+      line-height: 1.5;
       color: #111827;
+      transform: translateX(0);
+      transition: transform 0.3s ease-in-out;
     `
 
     const iframe = document.createElement('iframe')
     iframe.id = 'absmartly-sidebar-iframe'
-    iframe.style.cssText = `width: 100%; height: 100%; border: none;`
-    iframe.src = extUrl
+    iframe.style.cssText = `
+      width: 100%;
+      height: 100%;
+      border: none;
+    `
+    iframe.src = url
 
     container.appendChild(iframe)
     document.body.appendChild(container)
-  }, extensionUrl('tabs/sidebar.html'))
+  }, sidebarUrl)
 
   const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
   await sidebar.locator('body').waitFor({ timeout: 10000 })

@@ -79,7 +79,8 @@
       "cookies"
     ],
     "host_permissions": [
-      "https://*.absmartly.com/*"
+      "https://*.absmartly.com/*",
+      "http://localhost/*"
     ],
     "web_accessible_resources": [
       {
