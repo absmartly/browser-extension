@@ -22,24 +22,6 @@ async function waitForVisualEditorBanner(page: Page, timeoutMs: number = 15000):
   await expect(bannerLocator).toBeVisible({ timeout: timeoutMs })
 }
 
-// Test-specific helper: Perform visual editor context menu action
-async function performVisualEditorAction(
-  page: Page,
-  targetSelector: string,
-  actionText: string
-): Promise<void> {
-  log(`  Testing: ${actionText} on ${targetSelector}`)
-
-  await click(page, targetSelector)
-  await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-  log(`  ✓ Menu appeared`)
-
-  await page.locator(`.menu-item:has-text("${actionText}")`).click({ timeout: 5000 })
-  log(`  ✓ ${actionText} works`)
-
-  await page.locator('.menu-container').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
-}
-
 // Helper to wait for visual editor to be active
 async function waitForVisualEditorActive(page: Page, timeout = 10000) {
   await page.waitForFunction(
@@ -326,17 +308,23 @@ test.describe('Visual Editor Complete Workflow', () => {
       log('\n🧪 STEP 4: Testing visual editor context menu actions')
 
       // Action 1: Edit Text on paragraph
-      await performVisualEditorAction(testPage, '#test-paragraph', 'Edit Text')
+      log('  Testing: Edit Text on #test-paragraph')
+      await click(testPage, '#test-paragraph')
+      await clickContextMenuItem(testPage, 'Edit Text')
       await testPage.keyboard.type('Modified text!')
       await testPage.keyboard.press('Enter')
       await debugWait()
 
       // Action 2: Hide element
-      await performVisualEditorAction(testPage, '#button-1', 'Hide')
+      log('  Testing: Hide on #button-1')
+      await click(testPage, '#button-1')
+      await clickContextMenuItem(testPage, 'Hide')
       await debugWait()
 
       // Action 3: Delete element
-      await performVisualEditorAction(testPage, '#button-2', 'Delete')
+      log('  Testing: Delete on #button-2')
+      await click(testPage, '#button-2')
+      await clickContextMenuItem(testPage, 'Delete')
       await debugWait()
 
       // Action 4: Edit HTML with CodeMirror editor on parent container
