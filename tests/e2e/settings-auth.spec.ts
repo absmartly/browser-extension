@@ -140,8 +140,13 @@ test.describe('Settings Authentication Tests', () => {
       console.log('  Debug: auth-user-info visible?', hasUserInfoBeforeSave)
       console.log('  Debug: auth-not-authenticated visible?', isNotAuthVisible)
 
-      // Skip test if auth check doesn't work before saving settings
-      // This is environment-dependent and may require saved credentials
+      // SKIP REASON: ENVIRONMENTAL (LEGITIMATE)
+      // This test verifies authentication state detection, which depends on:
+      // 1. Valid API credentials being stored in chrome.storage
+      // 2. API endpoint being reachable and responding correctly
+      // 3. Auth check completing before the test assertion
+      // Skip is triggered when: Auth check fails or returns no user data
+      // This is expected in test environments without pre-configured credentials
       if (!hasUserInfoBeforeSave) {
         console.log('  ⚠️ Auth check did not return user data before saving settings')
         console.log('  This may be expected behavior - skipping test')
