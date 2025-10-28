@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from "react"
 import { Storage } from "@plasmohq/storage"
-import { setupMessageResponseHandler, setupMessageListener } from "~src/lib/messaging"
+import { setupMessageListener } from "~src/lib/messaging"
 import "~style.css"
 
 const storage = new Storage()
@@ -10,7 +10,6 @@ console.log('🔵 ABSmartly Extension: Sidebar script loaded')
 // Setup test mode polyfill if running in iframe
 if (window.parent !== window) {
   console.log('[tabs/sidebar.tsx] Running in iframe (test mode), setting up message polyfill')
-  setupMessageResponseHandler()
 
   // Setup listener for incoming messages from background
   setupMessageListener((message, sendResponse) => {
@@ -131,22 +130,22 @@ const ExtensionUI = lazy(() => import("~src/components/ExtensionUI"))
 const LoadingContent = () => {
   return (
     <div style={{ padding: '20px' }}>
-      <h2 style={{ 
-        fontSize: '18px', 
+      <h2 style={{
+        fontSize: '18px',
         fontWeight: '600',
         marginBottom: '16px',
         color: '#111827'
       }}>
         ABSmartly Extension
       </h2>
-      
+
       <div style={{
         padding: '16px',
         backgroundColor: '#f9fafb',
         borderRadius: '8px',
         marginBottom: '16px'
       }}>
-        <p style={{ 
+        <p style={{
           fontSize: '14px',
           color: '#6b7280',
           marginBottom: '12px'

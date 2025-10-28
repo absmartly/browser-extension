@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
-import { sendMessage } from '~src/lib/messaging'
+import { sendToContent } from '~src/lib/messaging'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon } from '@heroicons/react/24/outline'
@@ -187,16 +187,18 @@ export function VariantList({
   // Cleanup storage and preview on unmount
   useEffect(() => {
     return () => {
-      // Clear preview
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experimentName
-          })
-        }
-      })
+      // Clear preview on unmount
+      try {
+        sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove',
+          experimentName: experimentName
+        }).catch(error => {
+          debugLog('[VariantList] No active tab for cleanup (normal on unmount):', error?.message)
+        })
+      } catch (error) {
+        debugLog('[VariantList] Exception during cleanup:', error?.message)
+      }
     }
   }, [experimentName])
 
@@ -274,17 +276,19 @@ export function VariantList({
     // Re-apply preview if active for this variant (but not for reorders)
     if (previewEnabled && activePreviewVariant === index && !options?.isReorder) {
       const enabledChanges = changes.filter(c => c.enabled !== false)
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'update',
-            changes: enabledChanges,
-            experimentName: experimentName,
-            variantName: newVariants[index].name
-          })
-        }
-      })
+      try {
+        sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'update',
+          changes: enabledChanges,
+          experimentName: experimentName,
+          variantName: newVariants[index].name
+        }).catch(error => {
+          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (update):', error)
+        })
+      } catch (error) {
+        debugError('[VariantList] Exception sending ABSMARTLY_PREVIEW (update):', error)
+      }
     }
   }
 
@@ -404,30 +408,22 @@ export function VariantList({
         changesCount: changes.filter(c => c.enabled !== false).length
       })
 
-      sendMessage({
+      sendToContent({
         type: 'ABSMARTLY_PREVIEW',
-        from: 'sidebar',
-        to: 'content',
-        payload: {
-          action: 'apply',
-          changes: changes.filter(c => c.enabled !== false),
-          experimentName: experimentName,
-          variantName: variantName
-        }
+        action: 'apply',
+        changes: changes.filter(c => c.enabled !== false),
+        experimentName: experimentName,
+        variantName: variantName
       }).catch(error => {
         debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (apply):', error)
       })
     } else {
       debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (remove):', { experimentName })
 
-      sendMessage({
+      sendToContent({
         type: 'ABSMARTLY_PREVIEW',
-        from: 'sidebar',
-        to: 'content',
-        payload: {
-          action: 'remove',
-          experimentName: experimentName
-        }
+        action: 'remove',
+        experimentName: experimentName
       }).catch(error => {
         debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (remove):', error)
       })

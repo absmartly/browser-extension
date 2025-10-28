@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-
+import { sendToContent } from '~src/lib/messaging'
 import { Button } from './ui/Button'
 import type { CustomCodeSection } from '~src/types/absmartly'
 
@@ -66,9 +66,9 @@ export function CustomCodeEditor({
     } else {
       // Production mode: use chrome.tabs API
       debugLog('CustomCodeEditor: Using chrome.tabs API mode')
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
+      const openEditor = async () => {
+        try {
+          await sendToContent({
             type: 'OPEN_CODE_EDITOR',
             data: {
               section,
@@ -78,8 +78,11 @@ export function CustomCodeEditor({
               readOnly
             }
           })
+        } catch (error) {
+          console.error('Error opening code editor:', error)
         }
-      })
+      }
+      openEditor()
     }
 
     // Listen for messages from the background script or parent window
@@ -124,13 +127,16 @@ export function CustomCodeEditor({
       } else {
         chrome.runtime.onMessage.removeListener(handleMessage)
         // Tell content script to close the editor
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, {
+        const closeEditor = async () => {
+          try {
+            await sendToContent({
               type: 'CLOSE_CODE_EDITOR'
             })
+          } catch (error) {
+            console.error('Error closing code editor:', error)
           }
-        })
+        }
+        closeEditor()
       }
     }
   }, [isOpen, section, value]) // Only re-run when these change
