@@ -681,14 +681,12 @@ export class VisualEditor {
     console.log('[VisualEditor] Disabling visual editor')
     this._isActive = false
     this.eventHandlers.setHoverEnabled(false)
-    this.uiComponents.hideToolbar()
   }
 
   public enable(): void {
     console.log('[VisualEditor] Enabling visual editor')
     this._isActive = true
     this.eventHandlers.setHoverEnabled(true)
-    this.uiComponents.showToolbar()
   }
 
   public get isActive(): boolean {

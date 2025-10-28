@@ -268,7 +268,7 @@ describe('VisualEditor', () => {
     })
 
     it('should return already active when editor is already active via isActive flag', () => {
-      editor['isActive'] = true
+      editor['_isActive'] = true
 
       const result = editor.start()
 
@@ -787,7 +787,7 @@ describe('VisualEditor', () => {
     })
 
     it('should return early when already active', () => {
-      editor['isActive'] = true
+      editor['_isActive'] = true
 
       const result = editor.start()
 
