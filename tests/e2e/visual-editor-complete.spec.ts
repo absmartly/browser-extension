@@ -1876,10 +1876,6 @@ test.describe('Visual Editor Complete Workflow', () => {
       log('  • Context menu works in second instance')
     })
 
-    await testPage.evaluate(() => {
-      log('\n🔄 STEP 11: Testing discard changes functionality')
-    })
-
     // Test that discarding changes properly cleans up the page
     await test.step('Test discarding changes cleans up page correctly', async () => {
       log('\n🗑️  STEP 11: Testing discard changes functionality...')
