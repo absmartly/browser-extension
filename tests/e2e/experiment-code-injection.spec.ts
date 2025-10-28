@@ -358,6 +358,8 @@ test.describe('Experiment Code Injection UI', () => {
         console.log('  ✅ Experiment saved and verified!')
       })
     } else {
+      // SKIP REASON: Database write step is only enabled when SAVE_EXPERIMENT=1 is set
+      // to prevent unintentional writes to production database during routine testing
       await test.step.skip('Save experiment and verify __inject_html structure', async () => {})
     }
   })
