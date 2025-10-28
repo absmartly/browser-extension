@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension'
-import { type Page } from '@playwright/test'
-import { injectSidebar, debugWait, setupConsoleLogging, click } from './utils/test-helpers'
+import { type Page, type FrameLocator } from '@playwright/test'
+import { injectSidebar, debugWait, setupConsoleLogging, click, setupTestPage } from './utils/test-helpers'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -14,6 +14,30 @@ const testStartTime = Date.now()
 function log(message: string) {
   const elapsed = ((Date.now() - testStartTime) / 1000).toFixed(3)
   console.log(`[+${elapsed}s] ${message}`)
+}
+
+// Test-specific helper: Wait for visual editor banner and assert it's visible
+async function waitForVisualEditorBanner(page: Page, timeoutMs: number = 15000): Promise<void> {
+  const bannerLocator = page.locator('#absmartly-visual-editor-banner-host')
+  await expect(bannerLocator).toBeVisible({ timeout: timeoutMs })
+}
+
+// Test-specific helper: Perform visual editor context menu action
+async function performVisualEditorAction(
+  page: Page,
+  targetSelector: string,
+  actionText: string
+): Promise<void> {
+  log(`  Testing: ${actionText} on ${targetSelector}`)
+
+  await click(page, targetSelector)
+  await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
+  log(`  ✓ Menu appeared`)
+
+  await page.locator(`.menu-item:has-text("${actionText}")`).click({ timeout: 5000 })
+  log(`  ✓ ${actionText} works`)
+
+  await page.locator('.menu-container').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
 }
 
 // Helper to wait for visual editor to be active
@@ -69,24 +93,11 @@ test.describe('Visual Editor Complete Workflow', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, extensionUrl }) => {
     testPage = await context.newPage()
 
-    // Set up console listener using helper - capture ALL messages
-    const allMessages: Array<{type: string, text: string}> = []
-    testPage.on('console', (msg) => {
-      allMessages.push({ type: msg.type(), text: msg.text() })
-    })
+    const { sidebar: _, allMessages } = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
     allConsoleMessages = allMessages
-
-    await testPage.goto(`${TEST_PAGE_URL}?use_shadow_dom_for_visual_editor_context_menu=0`, { waitUntil: 'domcontentloaded', timeout: 10000 })
-    await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForSelector('body', { timeout: 5000 })
-
-    // Enable test mode to disable shadow DOM for easier testing
-    await testPage.evaluate(() => {
-      (window as any).__absmartlyTestMode = true
-    })
 
     log('✅ Test page loaded (test mode enabled)')
     log(`  📋 Console messages so far: ${allConsoleMessages.length}`)
@@ -125,20 +136,16 @@ test.describe('Visual Editor Complete Workflow', () => {
       log('\n📋 STEP 2: Creating new experiment')
 
     // Click the plus icon button with title="Create New Experiment"
-    // Use dispatchEvent to ensure React handler is triggered in headless mode
-    await sidebar.locator('button[title="Create New Experiment"]').evaluate((button) => {
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    })
-    log('  Dispatched click event to Create New Experiment button')
+    // Use click helper to ensure React handler is triggered in headless mode
+    await click(sidebar, 'button[title="Create New Experiment"]')
+    log('  ✓ Clicked Create New Experiment button')
     await debugWait()
 
     // Select "From Scratch" option from the dropdown menu
     log('  Selecting "From Scratch" option...')
     const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
     await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
-    await fromScratchButton.evaluate((button) => {
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    })
+    await click(sidebar, 'button:has-text("From Scratch"), button:has-text("from scratch")')
     log('  ✓ Selected "From Scratch" option')
     await debugWait()
 
@@ -282,14 +289,8 @@ test.describe('Visual Editor Complete Workflow', () => {
       }
 
 
-      try {
-        await testPage.locator('#absmartly-visual-editor-banner-host').waitFor({ state: 'visible', timeout: 15000 })
-        log('✅ Visual editor active')
-      } catch (e) {
-        log(`  ❌ Timeout waiting for banner. Taking diagnostic screenshot...`)
-        await testPage.screenshot({ path: 'test-results/ve-banner-timeout.png', fullPage: true })
-        throw e
-      }
+      await waitForVisualEditorBanner(testPage, 15000)
+      log('✅ Visual editor active')
 
       // Take screenshot to see sidebar state after VE activates
       await testPage.screenshot({ path: 'test-results/sidebar-after-ve-launch.png', fullPage: true })
@@ -325,30 +326,17 @@ test.describe('Visual Editor Complete Workflow', () => {
       log('\n🧪 STEP 4: Testing visual editor context menu actions')
 
       // Action 1: Edit Text on paragraph
-      log('  Testing: Edit Text on #test-paragraph')
-
-      await testPage.click('#test-paragraph', { force: true })
-      await testPage.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
-      await testPage.locator('.menu-item:has-text("Edit Text")').click({ timeout: 5000 })
+      await performVisualEditorAction(testPage, '#test-paragraph', 'Edit Text')
       await testPage.keyboard.type('Modified text!')
       await testPage.keyboard.press('Enter')
-      log('  ✓ Edit Text works')
       await debugWait()
 
       // Action 2: Hide element
-      log('  Testing: Hide on #button-1')
-      await testPage.click('#button-1', { force: true })
-      await testPage.locator('.menu-container').waitFor({ state: 'visible' })
-      await testPage.locator('.menu-item:has-text("Hide")').click()
-      log('  ✓ Hide works')
+      await performVisualEditorAction(testPage, '#button-1', 'Hide')
       await debugWait()
 
       // Action 3: Delete element
-      log('  Testing: Delete on #button-2')
-      await testPage.click('#button-2', { force: true })
-      await testPage.locator('.menu-container').waitFor({ state: 'visible' })
-      await testPage.locator('.menu-item:has-text("Delete")').click()
-      log('  ✓ Delete works')
+      await performVisualEditorAction(testPage, '#button-2', 'Delete')
       await debugWait()
 
       // Action 4: Edit HTML with CodeMirror editor on parent container

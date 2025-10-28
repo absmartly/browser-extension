@@ -1,4 +1,4 @@
-import { type Page, type FrameLocator, type Locator } from '@playwright/test'
+import { type Page, type FrameLocator, type Locator, expect } from '@playwright/test'
 
 /**
  * Injects the extension sidebar into a test page
@@ -177,3 +177,40 @@ export async function click(
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 }
+
+/**
+ * Sets up test page with sidebar injection, viewport, and console logging
+ * Centralizes beforeEach setup logic
+ * @param page - Playwright page object
+ * @param extensionUrl - Function to get extension URLs
+ * @param testPageUrl - URL to navigate to (defaults to /visual-editor-test.html)
+ * @returns Object containing sidebar and console messages
+ */
+export async function setupTestPage(
+  page: Page,
+  extensionUrl: (path: string) => string,
+  testPageUrl: string = '/visual-editor-test.html'
+): Promise<{ sidebar: FrameLocator; allMessages: Array<{ type: string; text: string }> }> {
+  const allMessages: Array<{ type: string; text: string }> = []
+
+  page.on('console', (msg) => {
+    allMessages.push({ type: msg.type(), text: msg.text() })
+  })
+
+  await page.goto(`${testPageUrl}?use_shadow_dom_for_visual_editor_context_menu=0`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 10000
+  })
+
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.waitForSelector('body', { timeout: 5000 })
+
+  await page.evaluate(() => {
+    (window as any).__absmartlyTestMode = true
+  })
+
+  const sidebar = await injectSidebar(page, extensionUrl)
+
+  return { sidebar, allMessages }
+}
+
