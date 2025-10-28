@@ -341,7 +341,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         return (
           <div
             key={experiment.id}
-            className="px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100"
+            className="experiment-item px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100"
           >
             <div
               onClick={() => onExperimentClick(experiment)}
