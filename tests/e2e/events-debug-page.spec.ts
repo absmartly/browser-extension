@@ -5,6 +5,23 @@ import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-help
 import http from 'http'
 import fs from 'fs'
 
+/**
+ * E2E Tests for Events Debug Page
+ *
+ * Tests the Events Debug Page functionality including:
+ * - Capturing and displaying SDK events in real-time
+ * - Event detail modal display
+ * - Pause/resume event capture
+ * - Clear events functionality
+ * - Color-coded event types
+ * - Timestamp formatting
+ * - Handling events without data
+ * - Filtering non-SDK events
+ *
+ * All tests in this file are ACTIVE (no skipped tests). Tests use synthetic
+ * SDK events triggered via window.postMessage() and do not depend on external API availability.
+ */
+
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test.html')
 
 // Simple HTTP server to serve test page (needed because content scripts don't work reliably with file:// URLs)
