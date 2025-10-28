@@ -71,7 +71,7 @@
       "id": "unit-fix-4",
       "type": "unit-test-fix",
       "priority": "P1",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Fix EventsDebugPage click handler",
       "files": [
         "src/components/__tests__/EventsDebugPage.test.tsx"
@@ -102,7 +102,7 @@
       "id": "unit-fix-6",
       "type": "unit-test-fix",
       "priority": "P2",
-      "status": "pending",
+      "status": "in_progress",
       "title": "Fix Manifest HTTPS security check",
       "files": [
         "Find manifest validation test file (likely in tests/ or src/)"
@@ -111,7 +111,9 @@
       "action": "Find manifest test, add exception for localhost: if (permission !== 'http://localhost/*') { expect(permission).toMatch(/^https:\\/\\//) }",
       "test_command": "npm run test:unit -- manifest.test.ts (or appropriate file)",
       "expected_outcome": "Manifest HTTPS test passes with localhost exception",
-      "estimated_minutes": 15
+      "estimated_minutes": 15,
+      "started_at": "2025-10-28T21:02:00Z",
+      "agent": "Agent 6"
     },
     {
       "id": "unit-verify",
