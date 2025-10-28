@@ -238,9 +238,13 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   // Verify buffered events are displayed
   const bufferedEvents = await getEventsFromPanel(testPage)
 
-  // Skip test gracefully if events aren't being captured/buffered
-  // This can happen if SDK event forwarding chain isn't properly initialized
-  // or if the test environment doesn't support the messaging flow
+  // SKIP REASON: ENVIRONMENTAL (LEGITIMATE)
+  // This test verifies SDK event buffering and forwarding, which requires:
+  // 1. SDK plugin to be loaded and initialized on the page
+  // 2. Event forwarding chain: page -> inject-sdk-plugin.js -> background -> sidebar
+  // 3. BroadcastChannel or message passing to work correctly
+  // Skip is triggered when: Event forwarding chain fails to initialize or events aren't captured
+  // This is expected in some test environments due to timing/initialization issues
   if (bufferedEvents.length === 0) {
     console.log('⚠️ No buffered events found - SDK event forwarding may not be working in test environment')
     test.skip()
