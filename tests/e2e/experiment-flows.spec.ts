@@ -344,6 +344,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       // Wait for experiments to load using helper
       const hasExperiments = await waitForExperiments(sidebar)
 
+      // Skip this step if no experiments exist in the account
+      // This is not a test failure - just means the test environment doesn't have data
       if (!hasExperiments) {
         console.log('  ℹ️  No experiments available to open')
         test.skip()
