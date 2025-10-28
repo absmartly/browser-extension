@@ -175,7 +175,7 @@
       "id": "e2e-skip-doc",
       "type": "e2e-test-documentation",
       "priority": "P0",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Document all remaining skip() calls",
       "files": [
         "All test files with skip() calls"
@@ -184,7 +184,9 @@
       "action": "Find all test.skip() calls, classify as LEGITIMATE (environmental) or SUSPICIOUS (data-based), add comments explaining why",
       "test_command": "grep -r 'test.skip' tests/e2e/ and review each",
       "expected_outcome": "All remaining skips have clear documented reasons",
-      "estimated_minutes": 25
+      "estimated_minutes": 25,
+      "completed_notes": "Documented all remaining test.skip() calls with structured comments: 3 LEGITIMATE (sdk-events, visual-editor-persistence, settings-auth), all erroneous data-dependent skips already removed",
+      "commit": "6217b8c5"
     },
     {
       "id": "e2e-verify-1",
