@@ -74,11 +74,6 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
           )
           console.log('  ✓ Clicked existing experiment')
           await debugWait()
-        } else {
-          console.log('  ⚠️ No experiment to edit')
-          // Skip gracefully if no experiments available - this is expected in test environments
-          // where API data is not available or no experiments have been created
-          test.skip()
         }
       }
     })

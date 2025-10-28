@@ -79,13 +79,7 @@ test.describe('Visual Editor Demo', () => {
     // Wait for experiments to load
     console.log('⏳ Loading experiments...')
     const experimentItem = sidebarFrame.locator('.experiment-item').first()
-    const experimentVisible = await experimentItem.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)
-    if (!experimentVisible) {
-      console.log('⚠️ No experiments loaded - skipping test')
-      await context.close()
-      test.skip()
-      return
-    }
+    await experimentItem.waitFor({ state: 'visible', timeout: 10000 })
 
     // Open first experiment
     console.log('📂 Opening experiment...')

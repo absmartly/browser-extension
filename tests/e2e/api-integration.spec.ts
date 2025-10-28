@@ -123,17 +123,6 @@ test.describe('API Integration Tests', () => {
     console.log('Found experiments:', experimentCount)
     console.log('Has empty state:', hasEmptyState)
 
-    // Skip gracefully if no experiments and no empty state indicator
-    if (experimentCount === 0) {
-      const hasEmptyState = await page.locator('text=/no experiments/i')
-        .isVisible().catch(() => false)
-      if (!hasEmptyState) {
-        console.log('⚠️ No experiments and no empty state indicator - skipping')
-        test.skip()
-        return
-      }
-    }
-
     // Should either have experiments or show empty state (not error)
     expect(experimentCount > 0 || hasEmptyState).toBeTruthy()
   })

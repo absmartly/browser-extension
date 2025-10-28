@@ -159,7 +159,7 @@
       "id": "e2e-skip-scan",
       "type": "e2e-test-fix",
       "priority": "P0",
-      "status": "in_progress",
+      "status": "completed",
       "title": "Scan and remove all erroneous no-experiments skips",
       "files": [
         "tests/e2e/*.spec.ts"
@@ -168,7 +168,8 @@
       "action": "Search: grep -r 'test.skip()' tests/e2e/ --include='*.spec.ts', check each for 'No experiments found' check, remove erroneous blocks",
       "test_command": "For each file fixed, run: npx playwright test tests/e2e/[filename]",
       "expected_outcome": "All blanket 'no experiments' skips removed. Report list of files fixed.",
-      "estimated_minutes": 30
+      "estimated_minutes": 30,
+      "completion_notes": "Removed erroneous 'no experiments' skips from 6 files: visual-editor-summary, visual-editor-demo, variant-list-performance, experiment-data-persistence, experiment-flows, api-integration. Kept 3 legitimate ENVIRONMENTAL skips (sdk-events, visual-editor-persistence, settings-auth). All erroneous DATA-DEPENDENT and AMBIGUOUS skips removed - tests will now fail properly instead of skipping."
     },
     {
       "id": "e2e-skip-doc",
