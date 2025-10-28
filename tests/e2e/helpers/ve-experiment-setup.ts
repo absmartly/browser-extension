@@ -221,14 +221,12 @@ export async function testSecondVEInstance(sidebar: FrameLocator, page: Page): P
     }
 
     if (exitButton) {
-      console.log('Found Exit button, dispatching click event...')
       const clickEvent = new MouseEvent('click', {
         bubbles: true,
         cancelable: true,
         view: window
       })
       exitButton.dispatchEvent(clickEvent)
-      console.log('Dispatched click event to Exit button')
     } else {
       console.error('Exit button not found in banner')
     }

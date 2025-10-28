@@ -17,12 +17,15 @@ import { test, expect } from '../fixtures/extension'
 
 test.describe('Bug Fixes E2E Tests', () => {
   test.beforeEach(async ({ seedStorage }) => {
-    // Seed with API credentials for all tests
+    // Seed with API credentials for all tests - including config object
     await seedStorage({
       'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
+      'absmartly-config': {
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+        authMethod: 'apikey'
+      }
     })
   })
 
@@ -30,6 +33,9 @@ test.describe('Bug Fixes E2E Tests', () => {
     test('should stop VE when navigating back from experiment detail', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+
+      // Wait for loading spinner to disappear
+      await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
       // Wait for experiments to load
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 10000 })
@@ -52,8 +58,6 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Verify we're back at experiment list
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 3000 })
-
-      console.log('✅ Navigated back successfully, VE should be stopped')
     })
 
     test('should stop Preview mode when navigating away', async ({ context, extensionUrl, seedStorage }) => {
@@ -67,6 +71,10 @@ test.describe('Bug Fixes E2E Tests', () => {
       })
 
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+
+      // Wait for loading spinner to disappear
+      await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
+
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 10000 })
 
       // Open a test page to check for preview header
@@ -75,7 +83,6 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Check if preview header exists (it might not in a blank page, but we're testing the mechanism)
       const hasPreviewHeader = await testPage.locator('#absmartly-preview-header').count()
-      console.log('Preview header count:', hasPreviewHeader)
 
       // Navigate back to sidebar (navigate away from current view)
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
@@ -88,8 +95,6 @@ test.describe('Bug Fixes E2E Tests', () => {
         await experimentItems.nth(1).click()
         await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
       }
-
-      console.log('✅ Navigated away, preview mode cleanup should be triggered')
     })
   })
 
@@ -97,6 +102,9 @@ test.describe('Bug Fixes E2E Tests', () => {
     test('should show clear all button when overrides exist', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+
+      // Wait for loading spinner to disappear
+      await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
       // Wait for experiments to load
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 10000 })
@@ -117,10 +125,7 @@ test.describe('Bug Fixes E2E Tests', () => {
         // Look for "Clear All" button within the banner area
         const clearAllButton = page.locator('button:has-text("Clear All")')
         await expect(clearAllButton).toBeVisible()
-
-        console.log('✅ Clear All button is visible with overrides')
       } else {
-        console.log('ℹ️ Reload banner not shown (experiment may not be in SDK context)')
         // This is a valid test outcome - not all experiments show the reload banner
         expect(true).toBe(true)
       }
@@ -129,6 +134,9 @@ test.describe('Bug Fixes E2E Tests', () => {
     test('should clear all overrides when clicked', async ({ context, extensionUrl, getStorage }) => {
       const page = await context.newPage()
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+
+      // Wait for loading spinner to disappear
+      await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
       // Wait for experiments to load
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 10000 })
@@ -165,9 +173,7 @@ test.describe('Bug Fixes E2E Tests', () => {
         const overrides = storage['absmartly-overrides']
 
         expect(overrides === '{}' || overrides === null || overrides === undefined).toBeTruthy()
-        console.log('✅ All overrides cleared successfully')
       } else {
-        console.log('ℹ️ Reload banner not shown (experiments may not be in SDK context)')
         // This is a valid test outcome - not all experiments show the reload banner
         expect(true).toBe(true)
       }
@@ -178,6 +184,10 @@ test.describe('Bug Fixes E2E Tests', () => {
     test('should close SearchableSelect dropdown when clicking outside', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+
+      // Wait for loading spinner to disappear
+      await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
+
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 10000 })
 
       // Click Create Experiment
@@ -207,7 +217,6 @@ test.describe('Bug Fixes E2E Tests', () => {
 
           // Verify dropdown is closed
           await expect(dropdown).not.toBeVisible()
-          console.log('✅ Dropdown closed when clicking outside')
         }
       }
     })
@@ -217,6 +226,9 @@ test.describe('Bug Fixes E2E Tests', () => {
     test('should show selected unit type for existing experiment', async ({ context, extensionUrl }) => {
       const page = await context.newPage()
       await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+
+      // Wait for loading spinner to disappear
+      await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
       // Wait for experiments to load
       await page.waitForSelector('[data-testid="experiment-item"]', { timeout: 10000 })
@@ -236,11 +248,9 @@ test.describe('Bug Fixes E2E Tests', () => {
 
         // Check the text content (should not be "Select...")
         const selectedValue = await unitDropdown.textContent()
-        console.log('Unit type value:', selectedValue)
 
         // If experiment has units, value should not be placeholder
         const hasValue = selectedValue && selectedValue.trim() !== 'Select...' && selectedValue.trim().length > 0
-        console.log('✅ Unit type is displayed:', hasValue ? selectedValue : 'No units defined')
       }
     })
   })
@@ -303,7 +313,6 @@ test.describe('Bug Fixes E2E Tests', () => {
               // Check if value persisted
               const savedValue = await urlInput.inputValue()
               expect(savedValue).toBe('/test-url-filter/*')
-              console.log('✅ URL filter persisted:', savedValue)
             }
           }
         }
@@ -344,11 +353,8 @@ test.describe('Bug Fixes E2E Tests', () => {
           const initials = dropdown.locator('div[class*="rounded-full"]')
           const initialsCount = await initials.count()
 
-          console.log('Avatars:', imageCount, 'Initials:', initialsCount)
-
           // Should have either images or initials for each option
           expect(imageCount + initialsCount).toBeGreaterThan(0)
-          console.log('✅ Avatars/initials are displayed in dropdown')
         }
       }
     })
@@ -386,7 +392,6 @@ test.describe('Bug Fixes E2E Tests', () => {
 
             // Check if JSON editor opened (Monaco editor)
             const hasMonaco = await page.locator('.monaco-editor').count()
-            console.log('✅ JSON editor can be opened in VE mode, Monaco editor present:', hasMonaco > 0)
           }
         }
       }
@@ -417,11 +422,9 @@ test.describe('Bug Fixes E2E Tests', () => {
 
           // Look for yellow border/background styling
           const className = await parent.getAttribute('class')
-          console.log('Control variant classes:', className)
 
           // Should have yellow styling
           const hasYellowStyling = className?.includes('yellow') || false
-          console.log('✅ Control variant styling:', hasYellowStyling ? 'Has yellow highlight' : 'No yellow highlight')
         }
       }
     })
@@ -456,8 +459,6 @@ test.describe('Bug Fixes E2E Tests', () => {
           await expandButton.click()
           // Wait briefly for UI update
           await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-          console.log('✅ Control variant warning dialog shown:', dialogShown)
         }
       }
     })
@@ -509,7 +510,6 @@ test.describe('Bug Fixes E2E Tests', () => {
       expect(result.totalButtons).toBe(3)
       expect(result.uniqueMatchesCount).toBe(1)
       expect(result.matchesTarget).toBe(true)
-      console.log('✅ Selector disambiguation works correctly')
     })
   })
 })
