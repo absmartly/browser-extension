@@ -1424,170 +1424,174 @@ test.describe('Visual Editor Complete Workflow', () => {
       log('  • Changes are not saved to sidebar when discarded')
     })
 
-    // Save experiment to database (optional - skipped by default)
+    // Setup and fill metadata fields for saving (always runs, not gated by SAVE_EXPERIMENT)
+    log('\n💾 Preparing experiment for save: filling metadata fields...')
+    await debugWait()
+
+    // After the discard test:
+    // - VE toolbar is removed (VE is stopped)
+    // - Preview mode is still active (this is intentional - user might want to keep previewing)
+    // - The sidebar is still on the Create New Experiment form
+
+    // We need to exit preview mode before we can save
+    log('  🔄 Exiting preview mode...')
+    const exitPreviewBtn = testPage.locator('button:has-text("Exit Preview")')
+    const isPreviewActive = await exitPreviewBtn.isVisible().catch(() => false)
+
+    if (isPreviewActive) {
+      log('  ⚠️  Preview mode is active (expected after VE exit)')
+      await exitPreviewBtn.click()
+      log('  ✓ Clicked Exit Preview')
+      await debugWait()
+      await exitPreviewBtn.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
+      log('  ✓ Preview mode disabled')
+      await debugWait()
+    } else {
+      log('  ✓ Preview mode already disabled')
+    }
+
+    // Fill the new metadata fields (owners, teams, tags)
+    log('  📝 Filling owners, teams, and tags fields...')
+    await debugWait()
+
+    // Scroll to the metadata section
+    await sidebar.locator('label:has-text("Applications"), label:has-text("Owners")').first().scrollIntoViewIfNeeded()
+    await debugWait()
+
+    // Fill Owners field - click the field to open dropdown
+    log('  Attempting to select owners...')
+    const ownersContainer = sidebar.locator('label:has-text("Owners")').locator('..')
+    const ownersClickArea = ownersContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
+
+    // Verify field is enabled
+    const ownersDisabled = await ownersClickArea.evaluate(el => {
+      return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
+    })
+
+    if (ownersDisabled) {
+      throw new Error('Owners field is disabled - cannot select')
+    }
+
+    await ownersClickArea.click({ timeout: 5000 })
+    log('  ✓ Clicked owners field')
+    await debugWait()
+    await debugWait()
+
+    // Wait for dropdown to appear and get first option
+    const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+    await ownersDropdown.waitFor({ state: 'visible', timeout: 3000 })
+    log('  ✓ Owners dropdown appeared')
+
+    // Wait for owners/teams to be loaded in the dropdown
+    const firstOwnerOption = ownersDropdown.locator('div[class*="cursor-pointer"]').first()
+    await firstOwnerOption.waitFor({ state: 'visible', timeout: 5000 })
+    log('  ✓ Owners/teams loaded in dropdown')
+
+    const optionExists = await firstOwnerOption.isVisible({ timeout: 2000 })
+
+    if (!optionExists) {
+      throw new Error('No owners/teams available in dropdown')
+    }
+
+    const selectedOptionText = await firstOwnerOption.textContent()
+
+    // Use dispatchEvent to ensure React handler is triggered
+    await firstOwnerOption.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    log(`  ✓ Clicked owner/team option: ${selectedOptionText?.trim()}`)
+    await debugWait()
+
+    // Wait for the placeholder to disappear OR a badge to appear
+    await Promise.race([
+      ownersContainer.locator('text="Select owners and teams"').waitFor({ state: 'hidden', timeout: 5000 }),
+      ownersContainer.locator('div[class*="badge"], div[class*="chip"], div[class*="tag"]').first().waitFor({ state: 'visible', timeout: 5000 })
+    ]).catch(() => {
+      log('  ⚠️  Neither placeholder disappeared nor badge appeared')
+    })
+
+    // Close dropdown by clicking outside (multi-select dropdown stays open)
+    await sidebar.locator('label:has-text("Traffic")').click()
+    log('  ✓ Clicked outside to close dropdown')
+    await debugWait()
+
+    // Wait for dropdown to close
+    await ownersDropdown.waitFor({ state: 'hidden', timeout: 3000 })
+    log('  ✓ Owner dropdown closed')
+    await debugWait()
+
+    // Fill Tags field - click the field to open dropdown
+    log('  Attempting to select tags...')
+    const tagsContainer = sidebar.locator('label:has-text("Tags")').locator('..')
+    const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
+
+    // Verify field is enabled
+    const tagsDisabled = await tagsClickArea.evaluate(el => {
+      return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
+    })
+
+    if (tagsDisabled) {
+      throw new Error('Tags field is disabled - cannot select')
+    }
+
+    await tagsClickArea.click({ timeout: 5000 })
+    log('  ✓ Clicked tags field')
+    await debugWait()
+
+    // Wait for dropdown to appear and get first option
+    const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
+    await tagsDropdown.waitFor({ state: 'visible', timeout: 3000 })
+    log('  ✓ Tags dropdown appeared')
+    await debugWait()
+
+    // Click first available option in the dropdown
+    const firstTagOption = tagsDropdown.locator('div[class*="cursor-pointer"]').first()
+    await firstTagOption.waitFor({ state: 'visible', timeout: 5000 })
+    log('  ✓ Tags loaded in dropdown')
+
+    const tagOptionExists = await firstTagOption.isVisible({ timeout: 2000 })
+
+    if (!tagOptionExists) {
+      throw new Error('No tags available in dropdown')
+    }
+
+    const selectedTagText = await firstTagOption.textContent()
+
+    // Use dispatchEvent to ensure React handler is triggered
+    await firstTagOption.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    log(`  ✓ Clicked tag option: ${selectedTagText?.trim()}`)
+    await debugWait()
+
+    // Wait for the placeholder to disappear OR a badge to appear
+    await Promise.race([
+      tagsContainer.locator('text="Type tags"').waitFor({ state: 'hidden', timeout: 5000 }),
+      tagsContainer.locator('div[class*="badge"], div[class*="chip"], div[class*="tag"]').first().waitFor({ state: 'visible', timeout: 5000 })
+    ]).catch(() => {
+      log('  ⚠️  Neither placeholder disappeared nor badge appeared')
+    })
+
+    // Close dropdown by clicking outside (multi-select dropdown stays open)
+    await sidebar.locator('label:has-text("Traffic")').click()
+    log('  ✓ Clicked outside to close dropdown')
+    await debugWait()
+
+    // Wait for dropdown to close
+    await tagsDropdown.waitFor({ state: 'hidden', timeout: 3000 })
+    log('  ✓ Tag dropdown closed')
+    await debugWait()
+
+    log('  ✓ Filled metadata fields')
+    await debugWait()
+
+    // SAVE_EXPERIMENT guard: only wrap the actual save button click
     // WARNING: This writes to the production database! Only use when needed.
     // Pass SAVE_EXPERIMENT=1 environment variable to enable
     if (SAVE_EXPERIMENT) {
       await test.step('Save experiment to database', async () => {
         log('\n💾 Saving experiment to database...')
         log('⚠️  WARNING: This will write to the production database!')
-
-        // After the discard test:
-        // - VE toolbar is removed (VE is stopped)
-        // - Preview mode is still active (this is intentional - user might want to keep previewing)
-        // - The sidebar is still on the Create New Experiment form
-
-        // We need to exit preview mode before we can save
-        log('  🔄 Exiting preview mode...')
-        const exitPreviewBtn = testPage.locator('button:has-text("Exit Preview")')
-        const isPreviewActive = await exitPreviewBtn.isVisible().catch(() => false)
-
-        if (isPreviewActive) {
-          log('  ⚠️  Preview mode is active (expected after VE exit)')
-          await exitPreviewBtn.click()
-          log('  ✓ Clicked Exit Preview')
-          await debugWait()
-          await exitPreviewBtn.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
-          log('  ✓ Preview mode disabled')
-          await debugWait()
-        } else {
-          log('  ✓ Preview mode already disabled')
-        }
-
-        // Fill the new metadata fields (owners, teams, tags)
-        log('  📝 Filling owners, teams, and tags fields...')
-        await debugWait()
-
-        // Scroll to the metadata section
-        await sidebar.locator('label:has-text("Applications"), label:has-text("Owners")').first().scrollIntoViewIfNeeded()
-        await debugWait()
-
-        // Fill Owners field - click the field to open dropdown
-        log('  Attempting to select owners...')
-        const ownersContainer = sidebar.locator('label:has-text("Owners")').locator('..')
-        const ownersClickArea = ownersContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
-
-        // Verify field is enabled
-        const ownersDisabled = await ownersClickArea.evaluate(el => {
-          return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
-        })
-
-        if (ownersDisabled) {
-          throw new Error('Owners field is disabled - cannot select')
-        }
-
-        await ownersClickArea.click({ timeout: 5000 })
-        log('  ✓ Clicked owners field')
-        await debugWait()
-        await debugWait()
-
-        // Wait for dropdown to appear and get first option
-        const ownersDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-        await ownersDropdown.waitFor({ state: 'visible', timeout: 3000 })
-        log('  ✓ Owners dropdown appeared')
-
-        // Wait for owners/teams to be loaded in the dropdown
-        const firstOwnerOption = ownersDropdown.locator('div[class*="cursor-pointer"]').first()
-        await firstOwnerOption.waitFor({ state: 'visible', timeout: 5000 })
-        log('  ✓ Owners/teams loaded in dropdown')
-
-        const optionExists = await firstOwnerOption.isVisible({ timeout: 2000 })
-
-        if (!optionExists) {
-          throw new Error('No owners/teams available in dropdown')
-        }
-
-        const selectedOptionText = await firstOwnerOption.textContent()
-
-        // Use dispatchEvent to ensure React handler is triggered
-        await firstOwnerOption.evaluate((el) => {
-          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
-        log(`  ✓ Clicked owner/team option: ${selectedOptionText?.trim()}`)
-        await debugWait()
-
-        // Wait for the placeholder to disappear OR a badge to appear
-        await Promise.race([
-          ownersContainer.locator('text="Select owners and teams"').waitFor({ state: 'hidden', timeout: 5000 }),
-          ownersContainer.locator('div[class*="badge"], div[class*="chip"], div[class*="tag"]').first().waitFor({ state: 'visible', timeout: 5000 })
-        ]).catch(() => {
-          log('  ⚠️  Neither placeholder disappeared nor badge appeared')
-        })
-
-        // Close dropdown by clicking outside (multi-select dropdown stays open)
-        await sidebar.locator('label:has-text("Traffic")').click()
-        log('  ✓ Clicked outside to close dropdown')
-        await debugWait()
-
-        // Wait for dropdown to close
-        await ownersDropdown.waitFor({ state: 'hidden', timeout: 3000 })
-        log('  ✓ Owner dropdown closed')
-        await debugWait()
-
-        // Fill Tags field - click the field to open dropdown
-        log('  Attempting to select tags...')
-        const tagsContainer = sidebar.locator('label:has-text("Tags")').locator('..')
-        const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
-
-        // Verify field is enabled
-        const tagsDisabled = await tagsClickArea.evaluate(el => {
-          return el.className.includes('cursor-not-allowed') || el.className.includes('disabled')
-        })
-
-        if (tagsDisabled) {
-          throw new Error('Tags field is disabled - cannot select')
-        }
-
-        await tagsClickArea.click({ timeout: 5000 })
-        log('  ✓ Clicked tags field')
-        await debugWait()
-
-        // Wait for dropdown to appear and get first option
-        const tagsDropdown = sidebar.locator('div[class*="absolute"][class*="z-50"]').first()
-        await tagsDropdown.waitFor({ state: 'visible', timeout: 3000 })
-        log('  ✓ Tags dropdown appeared')
-        await debugWait()
-        
-        // Click first available option in the dropdown
-        const firstTagOption = tagsDropdown.locator('div[class*="cursor-pointer"]').first()
-        await firstTagOption.waitFor({ state: 'visible', timeout: 5000 })
-        log('  ✓ Tags loaded in dropdown')
-        
-        const tagOptionExists = await firstTagOption.isVisible({ timeout: 2000 })
-        
-        if (!tagOptionExists) {
-          throw new Error('No tags available in dropdown')
-        }
-        
-        const selectedTagText = await firstTagOption.textContent()
-
-        // Use dispatchEvent to ensure React handler is triggered
-        await firstTagOption.evaluate((el) => {
-          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
-        log(`  ✓ Clicked tag option: ${selectedTagText?.trim()}`)
-        await debugWait()
-
-        // Wait for the placeholder to disappear OR a badge to appear
-        await Promise.race([
-          tagsContainer.locator('text="Type tags"').waitFor({ state: 'hidden', timeout: 5000 }),
-          tagsContainer.locator('div[class*="badge"], div[class*="chip"], div[class*="tag"]').first().waitFor({ state: 'visible', timeout: 5000 })
-        ]).catch(() => {
-          log('  ⚠️  Neither placeholder disappeared nor badge appeared')
-        })
-
-        // Close dropdown by clicking outside (multi-select dropdown stays open)
-        await sidebar.locator('label:has-text("Traffic")').click()
-        log('  ✓ Clicked outside to close dropdown')
-        await debugWait()
-
-        // Wait for dropdown to close
-        await tagsDropdown.waitFor({ state: 'hidden', timeout: 3000 })
-        log('  ✓ Tag dropdown closed')
-        await debugWait()
-
-        log('  ✓ Filled metadata fields')
-        await debugWait()
 
         // Take screenshot before clicking save (should show top of form with any existing errors)
         await testPage.screenshot({ path: 'test-results/before-save-top.png', fullPage: true })
