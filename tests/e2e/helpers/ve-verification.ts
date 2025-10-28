@@ -305,14 +305,13 @@ export async function clickSaveButton(page: Page): Promise<void> {
   log('Clicking save button...')
 
   // Find and click the save button in the VE toolbar
-  const saveButton = page.locator('button:has-text("Save")')
+  const saveButton = page.locator('[data-action="save"]')
   await saveButton.waitFor({ state: 'visible' })
   await saveButton.click()
 
   // Wait a moment for the save operation to complete
   await page.waitForFunction(() => {
-    // Check if there's a success indicator or if the button is no longer in "saving" state
-    const button = document.querySelector('button:has-text("Save")')
+    const button = document.querySelector('[data-action="save"]') as HTMLButtonElement
     return button && !button.hasAttribute('disabled')
   })
 
