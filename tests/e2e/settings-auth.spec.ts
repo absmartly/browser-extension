@@ -125,7 +125,7 @@ test.describe('Settings Authentication Tests', () => {
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
       const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
 
-      // Wait for either authenticated or not-authenticated state (5s timeout is enough)
+      // Wait for either authenticated or not-authenticated state
       const hasResponse = await Promise.race([
         authUserInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
         notAuthSection.waitFor({ state: 'visible', timeout: 5000 }).then(() => false)
@@ -180,6 +180,7 @@ test.describe('Settings Authentication Tests', () => {
     await test.step('Verify Refresh button updates auth status', async () => {
       // Make sure we're on the settings page (with explicit timeout)
       const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible({ timeout: 2000 }).catch(() => false)
+
       if (!onSettingsPage) {
         const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
         await settingsButton.evaluate((btn: HTMLElement) =>
@@ -199,13 +200,12 @@ test.describe('Settings Authentication Tests', () => {
       const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
 
       // Wait for auth sections to update after refresh
-      // Allow 8s timeout - if auth doesn't respond, we accept that
+      // Note: Second refresh might not update UI visibly, so 2s timeout is acceptable
       await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 8000 }),
-        notAuthSection.waitFor({ state: 'visible', timeout: 8000 })
+        authUserInfo.waitFor({ state: 'visible', timeout: 2000 }),
+        notAuthSection.waitFor({ state: 'visible', timeout: 2000 })
       ]).catch(() => {
-        // If neither appears, the authentication endpoint might not be responding
-        // This is acceptable - the important thing is that the button click was processed
+        // Acceptable: button click was processed even if UI didn't update
       })
     })
   })
