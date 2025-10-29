@@ -39,6 +39,9 @@ try {
   // Read the bundled output
   let bundledCode = fs.readFileSync(outputFile, 'utf8')
 
+  // Check if production build
+  const isProduction = process.env.NODE_ENV === 'production'
+
   // Wrap the bundled code to make functions available globally
   const wrappedCode = `
 /**
@@ -59,7 +62,7 @@ if (typeof ABSmartlySDKBridge !== 'undefined') {
   // Mark as injected
   window.__absmartlyExtensionInjected = true
 
-  console.log('[ABsmartly] SDK Bridge loaded successfully - version 1.1.0')
+  ${!isProduction ? "console.log('[ABsmartly] SDK Bridge loaded successfully - version 1.1.0')" : "// Console removed in production"}
 } else {
   console.error('[ABsmartly] Failed to load SDK Bridge - ABSmartlySDKBridge not found')
 }

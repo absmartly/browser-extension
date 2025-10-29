@@ -263,7 +263,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       console.log('  ℹ️  __inject_html and __dom_changes are special fields, not regular variables')
 
       // Open Config editor to check full variant configuration
-      const configButton = sidebar.locator('button:has-text("Config")').first()
+      const configButton = sidebar.locator('button:has-text("Json")').first()
       await configButton.scrollIntoViewIfNeeded()
       await configButton.click()
       console.log('  Opened Variant Config editor')
@@ -381,7 +381,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       // The value input might not update properly in tests, but the actual config should be correct
 
       // Check Full variant config via Config editor
-      const configButton = sidebar.locator('button:has-text("Config")').first()
+      const configButton = sidebar.locator('button:has-text("Json")').first()
       await configButton.scrollIntoViewIfNeeded()
       await configButton.click()
       console.log('  Opened Variant Config editor')
@@ -468,7 +468,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       expect(hasHello && hasFoo).toBeTruthy()
 
       // Check full variant config via Config editor
-      const configButton = sidebar.locator('button:has-text("Config")').first()
+      const configButton = sidebar.locator('button:has-text("Json")').first()
       await configButton.scrollIntoViewIfNeeded()
       await configButton.click()
       // Wait briefly for UI update

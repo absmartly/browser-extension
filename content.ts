@@ -858,6 +858,28 @@ document.addEventListener('absmartly-test', (event: any) => {
 let codeEditorContainer: HTMLDivElement | null = null
 let codeEditorView: EditorView | null = null
 
+/**
+ * Helper function to send messages back to the sidebar
+ * Detects if we're in iframe mode (test environment) or production mode
+ * and uses the appropriate messaging method
+ */
+function sendMessageToSidebar(message: { type: string; value?: string }) {
+  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
+  if (sidebarIframe && sidebarIframe.contentWindow) {
+    // Iframe mode (test environment): use postMessage
+    console.log('[Content Script] Sending message to sidebar via postMessage:', message.type)
+    sidebarIframe.contentWindow.postMessage({
+      source: 'absmartly-content-script',
+      ...message
+    }, '*')
+  } else {
+    // Production mode: use chrome.runtime
+    console.log('[Content Script] Sending message via chrome.runtime:', message.type)
+    chrome.runtime.sendMessage(message)
+  }
+}
+
 function openCodeEditor(data: {
   section: string
   value: string
@@ -938,7 +960,7 @@ function openCodeEditor(data: {
   closeBtn.onmouseover = () => closeBtn.style.backgroundColor = '#f3f4f6'
   closeBtn.onmouseout = () => closeBtn.style.backgroundColor = 'transparent'
   closeBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
+    sendMessageToSidebar({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1018,7 +1040,7 @@ function openCodeEditor(data: {
   cancelBtn.onmouseover = () => cancelBtn.style.backgroundColor = '#f9fafb'
   cancelBtn.onmouseout = () => cancelBtn.style.backgroundColor = 'white'
   cancelBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
+    sendMessageToSidebar({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1044,7 +1066,7 @@ function openCodeEditor(data: {
     saveBtn.onmouseout = () => saveBtn.style.backgroundColor = '#3b82f6'
     saveBtn.onclick = () => {
       const value = codeEditorView?.state.doc.toString() || ''
-      chrome.runtime.sendMessage({
+      sendMessageToSidebar({
         type: 'CODE_EDITOR_SAVE',
         value
       })
