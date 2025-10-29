@@ -8,7 +8,7 @@
     "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
     "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'npm run build:sdk-bridge'",
     "dev": "npm run build:sdk-bridge && NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",
-    "build": "NODE_ENV=production npm run build:sdk-bridge && NODE_ENV=production node scripts/strip-console-pre-build.js && NODE_ENV=production plasmo build --src-path=. && NODE_ENV=production node scripts/post-build.js",
+    "build": "NODE_ENV=production npm run build:sdk-bridge && NODE_ENV=production plasmo build --src-path=. && NODE_ENV=production node scripts/post-build.js",
     "build:dev": "npm run build:sdk-bridge && NODE_ENV=development plasmo dev --no-hot-reload --src-path=.",
     "package": "plasmo package --src-path=.",
     "test": "npm run test:unit && npm run test:e2e",
@@ -71,6 +71,17 @@
     "tailwindcss": "^3.4.0",
     "ts-jest": "^29.4.1",
     "typescript": "5.3.3"
+  },
+  "terser": {
+    "compress": {
+      "drop_console": true,
+      "pure_funcs": [
+        "console.log",
+        "console.debug",
+        "console.info",
+        "console.trace"
+      ]
+    }
   },
   "manifest": {
     "permissions": [
