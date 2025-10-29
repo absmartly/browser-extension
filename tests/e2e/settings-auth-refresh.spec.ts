@@ -1,6 +1,26 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import { injectSidebar } from './utils/test-helpers'
+import fs from 'fs'
+import path from 'path'
+
+// Load environment variables from .env.dev.local if not already set
+if (!process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY) {
+  const envPath = path.join(__dirname, '../../.env.dev.local')
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf-8')
+    envContent.split('\n').forEach(line => {
+      if (line.trim().startsWith('#') || !line.trim()) return
+      const [key, value] = line.split('=')
+      if (key && value) {
+        const trimmedKey = key.trim()
+        if (!process.env[trimmedKey]) {
+          process.env[trimmedKey] = value.trim()
+        }
+      }
+    })
+  }
+}
 
 test.describe('Settings Auth Refresh Button', () => {
   let testPage: Page
@@ -49,12 +69,6 @@ test.describe('Settings Auth Refresh Button', () => {
     })
 
     await test.step('Configure authentication with API key', async () => {
-      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
-      if (!testApiKey) {
-        test.skip()
-        return
-      }
-
       const apiKeyRadio = sidebar.locator('#auth-method-apikey')
       await apiKeyRadio.evaluate((radio: HTMLInputElement) => {
         radio.checked = true
@@ -65,6 +79,7 @@ test.describe('Settings Auth Refresh Button', () => {
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
 
       const apiKeyInput = sidebar.locator('#api-key-input')
+      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || ''
       await apiKeyInput.fill(testApiKey)
     })
 
