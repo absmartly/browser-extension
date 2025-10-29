@@ -8,14 +8,12 @@ test.describe('Settings Auth Refresh Button', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
-    // Suppress console messages unless DEBUG is enabled
-    const DEBUG = process.env.DEBUG === '1' || process.env.PWDEBUG === '1'
-    testPage.on('console', msg => {
-      // Only print if DEBUG is enabled
-      if (DEBUG) {
+    // Only capture console messages if DEBUG is enabled
+    if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
+      testPage.on('console', msg => {
         console.log(`[CONSOLE] ${msg.type()}: ${msg.text()}`)
-      }
-    })
+      })
+    }
 
     // Load test page from same domain as API to avoid CORS issues
     await testPage.goto('https://demo-2.absmartly.com/')
