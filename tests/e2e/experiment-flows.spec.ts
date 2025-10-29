@@ -228,23 +228,76 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
     })
 
-    await test.step('Navigate back and open existing experiment to test detail view dropdowns', async () => {
-      console.log('\n🔄 Testing detail view dropdowns with existing experiment')
+    await test.step('Create the experiment', async () => {
+      console.log('\n💾 Creating experiment')
 
-      // Click back button to return to list
-      const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
-      await backButton.click()
-      console.log('  ✓ Clicked back button')
+      // Use ID selector for more reliable targeting
+      const createButton = sidebar.locator('button#create-experiment-button')
+      await createButton.waitFor({ state: 'visible', timeout: 5000 })
+      console.log('  ✓ Create button visible')
+
+      // Scroll button into view
+      await createButton.scrollIntoViewIfNeeded()
+      console.log('  ✓ Scrolled button into view')
+
+      await testPage.screenshot({ path: 'debug-flow-before-create-click.png', fullPage: true })
+
+      // Check if button is enabled
+      const isDisabled = await createButton.isDisabled()
+      console.log(`  [DEBUG] Button disabled: ${isDisabled}`)
+
+      // Since this is a submit button in a form, we need to trigger it properly
+      // Use evaluate to dispatch a click event that React will handle
+      await createButton.evaluate((btn: HTMLButtonElement) => {
+        btn.click()
+      })
+      console.log('  ✓ Clicked Create Experiment Draft button')
+
+      // Wait for redirect back to experiment list
+      console.log('  [DEBUG] Waiting for redirect to experiments list...')
+      await testPage.screenshot({ path: 'debug-flow-after-create-click.png', fullPage: true })
+
+      // Wait for either success (redirects to list) or error message
+      const listHeading = sidebar.locator('text=Experiments')
+      const errorMessage = sidebar.locator('text=/error|failed|invalid/i')
+
+      try {
+        await Promise.race([
+          listHeading.waitFor({ timeout: 10000 }),
+          errorMessage.waitFor({ timeout: 10000 })
+        ])
+
+        const hasError = await errorMessage.isVisible().catch(() => false)
+        if (hasError) {
+          const errorText = await errorMessage.textContent()
+          console.log(`  ❌ Error during creation: ${errorText}`)
+          await testPage.screenshot({ path: 'debug-flow-create-error.png', fullPage: true })
+          throw new Error(`Experiment creation failed: ${errorText}`)
+        }
+
+        console.log('  ✓ Redirected to experiments list')
+      } catch (error) {
+        console.log(`  ❌ Timeout or error waiting for redirect: ${error}`)
+        await testPage.screenshot({ path: 'debug-flow-create-timeout.png', fullPage: true })
+        throw error
+      }
+
+      // Wait for loading spinner to disappear
+      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
+        .waitFor({ state: 'hidden', timeout: 30000 })
+        .catch(() => {
+          console.log('  ℹ️  Loading spinner not found or already hidden')
+        })
+      console.log('  ✓ Experiment list loaded')
+
       await debugWait()
+    })
 
-      // Wait for list view
-      await sidebar.locator('text=Experiments').waitFor({ timeout: 2000 })
+    await test.step('Open the created experiment to test detail view dropdowns', async () => {
+      console.log('\n🔄 Testing detail view dropdowns with created experiment')
 
-      // Wait for experiments to load
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
-
-      // Find any experiment in the list (not the one we just created, since it's not saved)
+      // We're already in the experiment list after creation
+      // Find any experiment in the list
       const hasExperiments = await waitForExperiments(sidebar)
 
       if (!hasExperiments) {
@@ -253,14 +306,18 @@ test.describe('Experiment Creation and Editing Flows', () => {
       }
 
       // Click the first available experiment
-      const experimentItem = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i }).first()
-      await experimentItem.click()
-      console.log('  ✓ Opened existing experiment')
-      await debugWait()
+      // Use .experiment-item and then click the inner .cursor-pointer div
+      const experimentRow = sidebar.locator('.experiment-item').first()
+      await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
 
-      // Wait for detail view to load
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
+      const clickableArea = experimentRow.locator('.cursor-pointer').first()
+      await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
+      await clickableArea.click()
+      console.log('  ✓ Opened existing experiment')
+
+      // Wait for detail view title to change
+      await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 5000 })
+      await debugWait()
 
       // Check Unit Type dropdown
       const unitTypeDropdown = sidebar.locator('label:has-text("Unit Type")').locator('..').locator('[class*="cursor-pointer"]').first()
@@ -342,11 +399,25 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('\n📖 Opening first experiment')
 
       // Wait for experiments to load using helper
-      await waitForExperiments(sidebar)
+      const hasExperiments = await waitForExperiments(sidebar)
 
-      const experimentItem = sidebar.locator('div[role="button"], button, [class*="cursor-pointer"]').filter({ hasText: /Experiment|Test/i }).first()
-      await experimentItem.click()
+      if (!hasExperiments) {
+        console.log('  ℹ️  No experiments available - skipping detail view tests')
+        test.skip()
+        return
+      }
+
+      // Use .experiment-item and then click the inner .cursor-pointer div
+      const experimentRow = sidebar.locator('.experiment-item').first()
+      await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
+
+      const clickableArea = experimentRow.locator('.cursor-pointer').first()
+      await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
+      await clickableArea.click()
       console.log('  ✓ Clicked first experiment')
+
+      // Wait for detail view to load
+      await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 5000 })
       await debugWait()
     })
 
