@@ -124,8 +124,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             apiKey: loadedApiKey,
             authMethod: loadedAuthMethod
           })
-        } else {
-          console.log('[SettingsView] Permissions not granted, skipping auto auth check')
         }
       }
     } catch (error) {
@@ -146,11 +144,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         origins: ['https://*.absmartly.com/*']
       })
 
-      console.log('[SettingsView] Permissions:', { hasCookies, hasHost })
-
       return { hasCookies, hasHost }
     } catch (error) {
-      console.error('[SettingsView] Error checking permissions:', error)
+      debugError('[SettingsView] Error checking permissions:', error)
       return { hasCookies: false, hasHost: false }
     }
   }
@@ -160,7 +156,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     const { hasCookies, hasHost } = await checkPermissions()
 
     if (hasCookies && hasHost) {
-      console.log('[SettingsView] All permissions already granted')
       setCookiePermissionGranted(true)
       return true
     }
@@ -176,22 +171,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       request.origins = ['https://*.absmartly.com/*']
     }
 
-    console.log('[SettingsView] Requesting missing permissions:', request)
-
     try {
       const granted = await chrome.permissions.request(request)
-
-      if (granted) {
-        console.log('[SettingsView] User granted missing permissions')
-        setCookiePermissionGranted(true)
-      } else {
-        console.log('[SettingsView] User denied missing permissions')
-        setCookiePermissionGranted(false)
-      }
-
+      setCookiePermissionGranted(granted)
       return granted
     } catch (error) {
-      console.error('[SettingsView] Error requesting missing permissions:', error)
+      debugError('[SettingsView] Error requesting missing permissions:', error)
       setCookiePermissionGranted(false)
       return false
     }
@@ -209,7 +194,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   }
 
   const checkAuthStatus = async (endpoint: string, configOverride?: { apiKey: string; authMethod: 'jwt' | 'apikey' }) => {
-    console.log('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
+    debugLog('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
 
     // Always request permissions (both host access and cookies for JWT)
     const hasPermission = await requestCookiePermission()
@@ -232,20 +217,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         apiKey: apiKey
       }
 
-      const requestId = `auth_${Date.now()}`
-      console.log('[SettingsView] Sending CHECK_AUTH message to background, requestId:', requestId)
-
       const response: any = await sendToBackground({
         type: 'CHECK_AUTH',
-        requestId: requestId,
+        requestId: `auth_${Date.now()}`,
         configJson: JSON.stringify(configToSend)
       })
 
-      console.log('[SettingsView] Received CHECK_AUTH response:', response)
+      debugLog('[SettingsView] Received CHECK_AUTH response:', response)
 
       if (response.success) {
-        console.log('[SettingsView] Auth check successful, user:', response.data?.user)
-
         const apiUser = response.data?.user
         if (apiUser) {
           // Construct name from first_name and last_name like CreateExperimentDropdown does
@@ -264,7 +244,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           setUser(null)
         }
       } else {
-        console.error('[SettingsView] Auth check failed:', response.error)
+        debugError('[SettingsView] Auth check failed:', response.error)
         setUser(null)
 
         // Show specific error for permission issues
@@ -275,13 +255,11 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         }
       }
     } catch (error: any) {
-      console.error('[SettingsView] Auth check failed:', error)
+      debugError('[SettingsView] Auth check failed:', error)
       setUser(null)
 
       // Show specific error for timeout
       if (error.message?.includes('timed out')) {
-        console.log('[SettingsView] Auth timed out, checking permission status...')
-
         // Check which permissions are missing
         const { hasCookies, hasHost } = await checkPermissions()
 
@@ -291,21 +269,18 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           if (!hasCookies) missingPerms.push('cookies')
           if (!hasHost) missingPerms.push('host access')
 
-          console.log('[SettingsView] Missing permissions:', missingPerms.join(', '))
           setShowCookieConsentModal(true)
           setErrors({
             general: `Authentication timed out. Missing permissions: ${missingPerms.join(', ')}. Please grant permission to access ABsmartly.`
           })
         } else {
           // All permissions granted, but auth still timed out (different issue)
-          console.log('[SettingsView] All permissions granted, but auth still timed out')
           setErrors({
             general: 'Authentication check timed out. Please check your connection and try again.'
           })
         }
       }
     } finally {
-      console.log('[SettingsView] checkAuthStatus finally block - setting checkingAuth to false')
       setCheckingAuth(false)
     }
   }
@@ -507,6 +482,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       />
 
       <Input
+        id="absmartly-endpoint"
         label="ABsmartly Endpoint"
         type="url"
         value={apiEndpoint}
