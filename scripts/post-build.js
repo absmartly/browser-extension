@@ -139,3 +139,4 @@ if (fs.existsSync(visualEditorSource)) {
     }
   }
 }
+
