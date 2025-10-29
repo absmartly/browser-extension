@@ -1,12 +1,39 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import { injectSidebar } from './utils/test-helpers'
+import fs from 'fs'
+import path from 'path'
+
+// Load environment variables from .env.dev.local if not already set
+if (!process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY) {
+  const envPath = path.join(__dirname, '../../.env.dev.local')
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf-8')
+    envContent.split('\n').forEach(line => {
+      if (line.trim().startsWith('#') || !line.trim()) return
+      const [key, value] = line.split('=')
+      if (key && value) {
+        const trimmedKey = key.trim()
+        if (!process.env[trimmedKey]) {
+          process.env[trimmedKey] = value.trim()
+        }
+      }
+    })
+  }
+}
 
 test.describe('Settings Authentication Tests', () => {
   let testPage: Page
 
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
+
+    // Enable console logging when DEBUG is set
+    if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
+      testPage.on('console', msg => {
+        console.log(`[CONSOLE] ${msg.type()}: ${msg.text()}`)
+      })
+    }
 
     // Load test page from same domain as API to avoid CORS issues
     await testPage.goto('https://demo-2.absmartly.com/')
