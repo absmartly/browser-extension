@@ -57,6 +57,12 @@ test.describe('Settings Auth Refresh Button', () => {
     })
 
     await test.step('Configure authentication with API key', async () => {
+      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+      if (!testApiKey) {
+        test.skip()
+        return
+      }
+
       const apiKeyRadio = sidebar.locator('#auth-method-apikey')
       await apiKeyRadio.evaluate((radio: HTMLInputElement) => {
         radio.checked = true
@@ -67,7 +73,6 @@ test.describe('Settings Auth Refresh Button', () => {
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
 
       const apiKeyInput = sidebar.locator('#api-key-input')
-      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-api-key'
       await apiKeyInput.fill(testApiKey)
     })
 
