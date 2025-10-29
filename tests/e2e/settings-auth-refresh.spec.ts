@@ -116,8 +116,8 @@ test.describe('Settings Auth Refresh Button', () => {
 
       // Wait for either user info or explicit "not authenticated" state
       const hasResponse = await Promise.race([
-        userInfo.waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-        notAuthAfter.waitFor({ state: 'visible', timeout: 10000 }).then(() => true)
+        userInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+        notAuthAfter.waitFor({ state: 'visible', timeout: 5000 }).then(() => true)
       ]).catch(() => false)
 
       expect(hasResponse).toBeTruthy()
@@ -135,8 +135,8 @@ test.describe('Settings Auth Refresh Button', () => {
 
       // Should respond again - either showing user or not authenticated
       const hasSecondResponse = await Promise.race([
-        userInfo.waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-        notAuthSection.waitFor({ state: 'visible', timeout: 10000 }).then(() => true)
+        userInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+        notAuthSection.waitFor({ state: 'visible', timeout: 5000 }).then(() => true)
       ]).catch(() => false)
 
       expect(hasSecondResponse).toBeTruthy()

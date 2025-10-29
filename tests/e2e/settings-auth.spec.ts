@@ -125,10 +125,10 @@ test.describe('Settings Authentication Tests', () => {
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
       const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
 
-      // Wait for either authenticated or not-authenticated state
+      // Wait for either authenticated or not-authenticated state (5s timeout is enough)
       const hasResponse = await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-        notAuthSection.waitFor({ state: 'visible', timeout: 10000 }).then(() => false)
+        authUserInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+        notAuthSection.waitFor({ state: 'visible', timeout: 5000 }).then(() => false)
       ]).catch(() => null)
 
       if (hasResponse === null) {
@@ -146,8 +146,8 @@ test.describe('Settings Authentication Tests', () => {
       )
 
       await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 10000 }),
-        notAuthSection.waitFor({ state: 'visible', timeout: 10000 })
+        authUserInfo.waitFor({ state: 'visible', timeout: 5000 }),
+        notAuthSection.waitFor({ state: 'visible', timeout: 5000 })
       ])
     })
 
@@ -169,8 +169,8 @@ test.describe('Settings Authentication Tests', () => {
 
       // Wait for either authenticated or not-authenticated state
       const hasAuth = await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-        notAuthSection.waitFor({ state: 'visible', timeout: 10000 }).then(() => false)
+        authUserInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+        notAuthSection.waitFor({ state: 'visible', timeout: 5000 }).then(() => false)
       ]).catch(() => null)
 
       // Test should have authenticated user data
@@ -198,12 +198,11 @@ test.describe('Settings Authentication Tests', () => {
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
       const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
 
-      // Wait for either authenticated or not-authenticated state
-      // The auth section should respond to the refresh click
-      // Wait for auth sections to update - allow longer timeout on second refresh
+      // Wait for auth sections to update after refresh
+      // Allow 8s timeout - if auth doesn't respond, we accept that
       await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 15000 }),
-        notAuthSection.waitFor({ state: 'visible', timeout: 15000 })
+        authUserInfo.waitFor({ state: 'visible', timeout: 8000 }),
+        notAuthSection.waitFor({ state: 'visible', timeout: 8000 })
       ]).catch(() => {
         // If neither appears, the authentication endpoint might not be responding
         // This is acceptable - the important thing is that the button click was processed
