@@ -8,13 +8,6 @@ test.describe('Settings Auth Refresh Button', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
-    // Only capture console messages if DEBUG is enabled
-    if (process.env.DEBUG === '1' || process.env.PWDEBUG === '1') {
-      testPage.on('console', msg => {
-        console.log(`[CONSOLE] ${msg.type()}: ${msg.text()}`)
-      })
-    }
-
     // Load test page from same domain as API to avoid CORS issues
     await testPage.goto('https://demo-2.absmartly.com/')
     await testPage.setViewportSize({ width: 1920, height: 1080 })
