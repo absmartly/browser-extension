@@ -283,7 +283,6 @@ export function initializeBackgroundScript() {
       })
       sendResponse({ success: true })
     } else if (message.type === 'CHECK_AUTH') {
-      console.log('[Background CHECK_AUTH] Received with requestId:', message.requestId)
       debugLog('[Background CHECK_AUTH] Received with requestId:', message.requestId)
 
       // Parse config from JSON if present (allows passing current form values)
@@ -291,10 +290,8 @@ export function initializeBackgroundScript() {
       if (message.configJson) {
         try {
           configToUse = JSON.parse(message.configJson)
-          console.log('[Background CHECK_AUTH] Using config from message:', configToUse)
           debugLog('[Background CHECK_AUTH] Using config from message:', configToUse)
         } catch (e) {
-          console.error('[Background CHECK_AUTH] Failed to parse configJson:', e)
           debugError('[Background CHECK_AUTH] Failed to parse configJson:', e)
         }
       }
@@ -305,9 +302,7 @@ export function initializeBackgroundScript() {
         : getConfig(storage, secureStorage)
 
       configPromise.then(async config => {
-        console.log('[Background CHECK_AUTH] Got config, about to check auth')
         if (!config) {
-          console.log('[Background CHECK_AUTH] No config, sending error')
           const errorResult = {
             success: false,
             error: 'No configuration available'
@@ -317,15 +312,12 @@ export function initializeBackgroundScript() {
         }
 
         try {
-          console.log('[Background CHECK_AUTH] Calling checkAuthentication...')
           const authResult = await checkAuthentication(config)
-          console.log('[Background CHECK_AUTH] Auth result:', authResult)
           debugLog('[Background CHECK_AUTH] Auth result:', authResult)
 
           // Send result directly in response
           sendResponse(authResult)
         } catch (error) {
-          console.error('[Background CHECK_AUTH] Error:', error)
           debugError('[Background CHECK_AUTH] Error:', error)
 
           // Send error result
