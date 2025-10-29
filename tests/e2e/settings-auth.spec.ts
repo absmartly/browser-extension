@@ -8,11 +8,12 @@ test.describe('Settings Authentication Tests', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
-    // Suppress console messages to reduce noise
+    // Suppress console messages unless DEBUG is enabled
+    const DEBUG = process.env.DEBUG === '1' || process.env.PWDEBUG === '1'
     testPage.on('console', msg => {
-      // Only log errors
-      if (msg.type() === 'error') {
-        // Silently ignore - don't print anything
+      // Only print if DEBUG is enabled
+      if (DEBUG) {
+        console.log(`[CONSOLE] ${msg.type()}: ${msg.text()}`)
       }
     })
 
