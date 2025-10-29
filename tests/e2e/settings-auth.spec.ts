@@ -8,6 +8,14 @@ test.describe('Settings Authentication Tests', () => {
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
 
+    // Suppress console messages to reduce noise
+    testPage.on('console', msg => {
+      // Only log errors
+      if (msg.type() === 'error') {
+        // Silently ignore - don't print anything
+      }
+    })
+
     // Load test page from same domain as API to avoid CORS issues
     await testPage.goto('https://demo-2.absmartly.com/')
     await testPage.setViewportSize({ width: 1920, height: 1080 })
