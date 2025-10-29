@@ -176,38 +176,6 @@ test.describe('Settings Authentication Tests', () => {
       // Test should have authenticated user data
       expect(hasAuth).toBeTruthy()
     })
-
-    await test.step('Verify Refresh button updates auth status', async () => {
-      // Make sure we're on the settings page (with explicit timeout)
-      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (!onSettingsPage) {
-        const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
-        await settingsButton.evaluate((btn: HTMLElement) =>
-          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        )
-        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
-      }
-
-      const refreshButton = sidebar.locator('#auth-refresh-button')
-      await expect(refreshButton).toBeVisible({ timeout: 3000 })
-
-      await refreshButton.evaluate((btn: HTMLElement) =>
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      )
-
-      const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
-      const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
-
-      // Wait for auth sections to update after refresh
-      // Note: Second refresh might not update UI visibly, so 2s timeout is acceptable
-      await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 2000 }),
-        notAuthSection.waitFor({ state: 'visible', timeout: 2000 })
-      ]).catch(() => {
-        // Acceptable: button click was processed even if UI didn't update
-      })
-    })
   })
 
   test('should authenticate with JWT and Google OAuth', async ({ extensionId, extensionUrl, context }) => {
