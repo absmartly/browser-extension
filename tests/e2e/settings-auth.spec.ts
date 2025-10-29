@@ -58,12 +58,32 @@ test.describe('Settings Authentication Tests', () => {
         radio.dispatchEvent(new Event('change', { bubbles: true }))
       })
 
+      // Wait for permission modal if it appears
+      const permissionModal = sidebar.locator('text=grant permission').first()
+      const hasPermissionModal = await Promise.race([
+        permissionModal.waitFor({ state: 'visible', timeout: 2000 }).then(() => true),
+        Promise.resolve(false)
+      ]).catch(() => false)
+
+      if (hasPermissionModal) {
+        const grantButton = sidebar.locator('button:has-text("Grant")').first()
+        await grantButton.evaluate((btn: HTMLElement) => {
+          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        })
+        // Wait for modal to close
+        await permissionModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+      }
+
       const endpointInput = sidebar.locator('#absmartly-endpoint')
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
 
       const apiKeyInput = sidebar.locator('#api-key-input')
       const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-api-key'
       await apiKeyInput.fill(testApiKey)
+
+      // Ensure inputs have valid values before testing
+      await expect(endpointInput).toHaveValue('https://demo-2.absmartly.com/v1')
+      await expect(apiKeyInput).toHaveValue(testApiKey)
 
       const refreshButton = sidebar.locator('#auth-refresh-button')
       await refreshButton.evaluate((btn: HTMLElement) => {
