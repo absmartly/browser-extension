@@ -7,7 +7,7 @@
  */
 
 export class Logger {
-  private static DEBUG = true
+  private static DEBUG = false
 
   /**
    * Log an info message
