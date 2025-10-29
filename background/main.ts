@@ -308,16 +308,11 @@ export function initializeBackgroundScript() {
         console.log('[Background CHECK_AUTH] Got config, about to check auth')
         if (!config) {
           console.log('[Background CHECK_AUTH] No config, sending error')
-          // Send result as new message with requestId
-          chrome.runtime.sendMessage({
-            type: 'CHECK_AUTH_RESULT',
-            requestId: message.requestId,
-            result: {
-              authenticated: false,
-              error: 'No configuration available'
-            }
-          })
-          sendResponse({ success: true })
+          const errorResult = {
+            success: false,
+            error: 'No configuration available'
+          }
+          sendResponse(errorResult)
           return
         }
 
@@ -327,29 +322,18 @@ export function initializeBackgroundScript() {
           console.log('[Background CHECK_AUTH] Auth result:', authResult)
           debugLog('[Background CHECK_AUTH] Auth result:', authResult)
 
-          // Send result as new message with requestId
-          chrome.runtime.sendMessage({
-            type: 'CHECK_AUTH_RESULT',
-            requestId: message.requestId,
-            result: authResult
-          })
-
-          sendResponse({ success: true })
+          // Send result directly in response
+          sendResponse(authResult)
         } catch (error) {
           console.error('[Background CHECK_AUTH] Error:', error)
           debugError('[Background CHECK_AUTH] Error:', error)
 
-          // Send error result as new message with requestId
-          chrome.runtime.sendMessage({
-            type: 'CHECK_AUTH_RESULT',
-            requestId: message.requestId,
-            result: {
-              authenticated: false,
-              error: error instanceof Error ? error.message : String(error)
-            }
-          })
-
-          sendResponse({ success: true })
+          // Send error result
+          const errorResult = {
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          }
+          sendResponse(errorResult)
         }
       })
 
