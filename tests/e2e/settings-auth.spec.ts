@@ -86,7 +86,12 @@ test.describe('Settings Authentication Tests', () => {
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
 
       const apiKeyInput = sidebar.locator('#api-key-input')
-      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-api-key'
+      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+      if (!testApiKey) {
+        console.log('API Key not found in environment - skipping test')
+        test.skip()
+        return
+      }
       await apiKeyInput.fill(testApiKey)
 
       // Ensure inputs have valid values before testing
