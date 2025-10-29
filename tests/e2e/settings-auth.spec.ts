@@ -75,7 +75,7 @@ test.describe('Settings Authentication Tests', () => {
       }
 
       // Verify Settings page loaded
-      await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible()
+      await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
     })
 
     await test.step('Configure API Key authentication and test BEFORE saving', async () => {
@@ -152,17 +152,17 @@ test.describe('Settings Authentication Tests', () => {
     })
 
     await test.step('Verify authenticated user data displays', async () => {
-      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible().catch(() => false)
+      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible({ timeout: 2000 }).catch(() => false)
       if (!onSettingsPage) {
         const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
         await settingsButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
-        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible()
+        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
       }
 
       const authStatusSection = sidebar.locator('text=Authentication Status')
-      await expect(authStatusSection).toBeVisible()
+      await expect(authStatusSection).toBeVisible({ timeout: 3000 })
 
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
       const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
@@ -178,18 +178,18 @@ test.describe('Settings Authentication Tests', () => {
     })
 
     await test.step('Verify Refresh button updates auth status', async () => {
-      // Make sure we're on the settings page
-      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible().catch(() => false)
+      // Make sure we're on the settings page (with explicit timeout)
+      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible({ timeout: 2000 }).catch(() => false)
       if (!onSettingsPage) {
         const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
         await settingsButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
-        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible()
+        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
       }
 
       const refreshButton = sidebar.locator('#auth-refresh-button')
-      await expect(refreshButton).toBeVisible()
+      await expect(refreshButton).toBeVisible({ timeout: 3000 })
 
       await refreshButton.evaluate((btn: HTMLElement) =>
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -232,7 +232,7 @@ test.describe('Settings Authentication Tests', () => {
         )
       }
 
-      await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible()
+      await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
     })
 
     await test.step('Configure JWT authentication', async () => {
@@ -251,7 +251,7 @@ test.describe('Settings Authentication Tests', () => {
 
     await test.step('Authenticate with Google OAuth', async () => {
       const authButton = sidebar.locator('#authenticate-button')
-      const needsAuth = await authButton.isVisible().catch(() => false)
+      const needsAuth = await authButton.isVisible({ timeout: 2000 }).catch(() => false)
 
       if (needsAuth) {
         const pagePromise = context.waitForEvent('page')
@@ -272,17 +272,17 @@ test.describe('Settings Authentication Tests', () => {
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       )
 
-      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible().catch(() => false)
+      const onSettingsPage = await sidebar.locator('text=ABsmartly Endpoint').isVisible({ timeout: 2000 }).catch(() => false)
       if (!onSettingsPage) {
         const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
         await settingsButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
-        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible()
+        await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
       }
 
       const authStatusSection = sidebar.locator('text=Authentication Status')
-      await expect(authStatusSection).toBeVisible()
+      await expect(authStatusSection).toBeVisible({ timeout: 3000 })
     })
 
     await test.step('Switch between auth methods', async () => {
