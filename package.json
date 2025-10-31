@@ -1,7 +1,7 @@
 {
   "name": "absmartly-launchpad",
   "displayName": "ABsmartly LaunchPad",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
   "author": "Jonas Alves",
   "scripts": {
