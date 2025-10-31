@@ -423,6 +423,20 @@ export class UIComponents {
     if (banner) banner.remove()
     this.bannerShadowRoot = null
   }
+
+  hideToolbar(): void {
+    const banner = document.getElementById('absmartly-visual-editor-banner-host')
+    if (banner) {
+      banner.style.display = 'none'
+    }
+  }
+
+  showToolbar(): void {
+    const banner = document.getElementById('absmartly-visual-editor-banner-host')
+    if (banner) {
+      banner.style.display = ''
+    }
+  }
 }
 
 export default UIComponents

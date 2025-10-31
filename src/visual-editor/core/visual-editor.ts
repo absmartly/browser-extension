@@ -29,7 +29,7 @@ export interface VisualEditorOptions {
 
 export class VisualEditor {
   private readonly VERSION = '3.0-UNIFIED'
-  private isActive = false
+  private _isActive = false
   private hasUnsavedChanges = false  // Track if there are unsaved changes since last save
   private lastSavedChangesCount = 0  // Track the number of changes at last save
 
@@ -156,8 +156,8 @@ export class VisualEditor {
     console.log('[ABSmartly] Starting unified visual editor - Version:', this.VERSION)
     console.log('[ABSmartly] Build timestamp:', new Date().toISOString())
 
-    // Check if already active (single source of truth: this.isActive)
-    if (this.isActive) {
+    // Check if already active (single source of truth: this._isActive)
+    if (this._isActive) {
       console.log('[ABSmartly] Already active, returning')
       return { success: true, already: true }
     }
@@ -165,7 +165,7 @@ export class VisualEditor {
     console.log('[ABSmartly] Starting visual editor')
 
     // Mark as active
-    this.isActive = true
+    this._isActive = true
 
     // Keep preview header visible when visual editor starts
     // Users should see both the preview header and visual editor UI
@@ -193,7 +193,7 @@ export class VisualEditor {
   }
 
   stop(): void {
-    if (!this.isActive) return
+    if (!this._isActive) return
 
     // Check for unsaved changes
     if (this.hasUnsavedChanges) {
@@ -210,7 +210,7 @@ export class VisualEditor {
     console.log('[ABSmartly] Stopping unified visual editor')
     console.trace('[ABSmartly] Stop called from:')
 
-    this.isActive = false
+    this._isActive = false
 
     // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []
@@ -675,6 +675,22 @@ export class VisualEditor {
       canUndo: this.undoRedoManager.canUndo(),
       canRedo: this.undoRedoManager.canRedo()
     })
+  }
+
+  public disable(): void {
+    console.log('[VisualEditor] Disabling visual editor')
+    this._isActive = false
+    this.eventHandlers.setHoverEnabled(false)
+  }
+
+  public enable(): void {
+    console.log('[VisualEditor] Enabling visual editor')
+    this._isActive = true
+    this.eventHandlers.setHoverEnabled(true)
+  }
+
+  public get isActive(): boolean {
+    return this._isActive
   }
 }
 

@@ -64,6 +64,52 @@ await page.waitForTimeout(1000)
 
 **Never run all tests** - always run the specific test file as shown above.
 
+### Element IDs for E2E Testing
+
+**ALWAYS add `id` attributes to important interactive elements** for reliable E2E test selectors. This includes:
+- Form inputs (text, email, password, etc.)
+- Buttons (especially action buttons like Save, Submit, Refresh)
+- Sections that need to be tested (like authentication status)
+- Modal dialogs and their control elements
+- Dropdowns and select elements
+- Links that are tested
+
+**Why IDs are critical:**
+- ✅ IDs are stable, explicit, and intent-revealing
+- ✅ Tests using `#id` selectors are fast and reliable
+- ❌ CSS selectors like `.class` or `input[type="text"]` are fragile and break with styling changes
+- ❌ Text-based selectors break when content changes
+- ❌ Multiple elements matching a selector causes test flakiness
+
+**Example:**
+```tsx
+// ✅ GOOD - Has id for testing
+<Input
+  id="absmartly-endpoint"
+  label="ABsmartly Endpoint"
+  type="url"
+  value={apiEndpoint}
+  onChange={(e) => setApiEndpoint(e.target.value)}
+/>
+
+// ❌ BAD - No id, hard to test reliably
+<Input
+  label="ABsmartly Endpoint"
+  type="url"
+  value={apiEndpoint}
+  onChange={(e) => setApiEndpoint(e.target.value)}
+/>
+```
+
+**Test selector usage:**
+```typescript
+// ✅ GOOD - Uses ID
+const endpointInput = sidebar.locator('#absmartly-endpoint')
+
+// ❌ BAD - Fragile selector
+const endpointInput = sidebar.locator('input[placeholder="https://api.absmartly.com"]')
+```
+
 ## Architecture & Structure
 
 ### Key Directories

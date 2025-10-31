@@ -1,230 +1,166 @@
-import { test, chromium, expect } from '@playwright/test'
-import path from 'path'
-import fs from 'fs'
+import { test, expect } from '../fixtures/extension'
+import { type Page, type FrameLocator } from '@playwright/test'
+import { debugWait, log, initializeTestLogging, setupTestPage } from './utils/test-helpers'
+import { createExperiment, activateVisualEditor } from './helpers/ve-experiment-setup'
+
+const TEST_PAGE_URL = '/visual-editor-test.html'
 
 test.describe('Focused Visual Editor Test', () => {
-  test('Test key visual editor operations and save', async ({}) => {
-    test.setTimeout(90000) // 1.5 minutes
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+  let testPage: Page
+  let sidebar: FrameLocator
 
-    if (!fs.existsSync(extensionPath)) {
-      throw new Error('Extension not built! Run "npm run build" first')
-    }
+  test.beforeEach(async ({ context, extensionUrl }) => {
+    initializeTestLogging()
+    testPage = await context.newPage()
 
-    console.log('\n🚀 Starting Focused Visual Editor Test')
+    const result = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
+    sidebar = result.sidebar
 
-    // Launch browser with extension
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        '--enable-file-cookies',
-      ],
-      viewport: { width: 1920, height: 1080 },
-      slowMo: 50
-    })
+    log('✅ Test page loaded (test mode enabled)', 'info')
+  })
 
-    // Get extension ID
-    let [sw] = context.serviceWorkers()
-    if (!sw) {
-      sw = await context.waitForEvent('serviceworker')
-    }
-    const extensionId = new URL(sw.url()).host
+  test.afterEach(async () => {
+    if (testPage && !process.env.SLOW) await testPage.close()
+  })
 
-    // Set storage
-    const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: 'domcontentloaded', timeout: 10000 })
+  test('Test key visual editor operations and save', async () => {
+    test.setTimeout(90000)
 
-    await setupPage.evaluate(async () => {
-      return new Promise((resolve) => {
-        chrome.storage.local.clear(() => {
-          const config = {
-            apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-            apiEndpoint: 'https://demo-2.absmartly.com/v1',
-            authMethod: 'apikey'
-          }
+    log('\n🚀 Starting Focused Visual Editor Test')
 
-          chrome.storage.local.set({
-            'absmartly-config': config,
-            'plasmo:absmartly-config': config
-          }, () => resolve(true))
-        })
-      })
-    })
+    log('⏳ Waiting for experiments to load...')
+    await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
+      .waitFor({ state: 'hidden', timeout: 30000 })
+      .catch(() => {})
+    log('✅ Experiments loaded')
 
-    await setupPage.close()
+    log('\n📝 Creating new experiment')
+    const experimentName = await createExperiment(sidebar)
+    log(`✅ Experiment created: ${experimentName}`)
 
-    // Open test page
-    console.log('📄 Opening test page...')
-    const page = await context.newPage()
-    const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
-    await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    log('\n🚀 Launching Visual Editor')
+    await activateVisualEditor(sidebar, testPage)
+    log('✅ Visual Editor active')
 
-    // Inject sidebar
-    await page.evaluate((extId) => {
-      if (document.getElementById('absmartly-sidebar-root')) return
-
-      document.body.style.paddingRight = '384px'
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      container.style.cssText = `
-        position: fixed; top: 0; right: 0; width: 384px; height: 100%;
-        background: white; border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1); z-index: 2147483647;
-      `
-
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
-      iframe.src = `chrome-extension://${extId}/tabs/sidebar.html`
-
-      container.appendChild(iframe)
-      document.body.appendChild(container)
-    }, extensionId)
-
-    await page.waitForSelector('#absmartly-sidebar-root')
-    const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
-
-    // Wait for experiments and click first one
-    console.log('⏳ Loading experiments...')
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().waitFor({ state: 'visible', timeout: 10000 })
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().click()
-    await sidebarFrame.locator('button:has-text("Visual Editor")').first().waitFor({ state: 'visible', timeout: 5000 })
-
-    // Launch Visual Editor
-    console.log('🚀 Launching Visual Editor...')
-    await sidebarFrame.locator('button:has-text("Visual Editor")').first().click()
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
-
-    // Verify Visual Editor is active
-    const hasVisualEditor = await page.locator('text=/Visual Editor/').count() > 0
+    const hasVisualEditor = await testPage.locator('#absmartly-visual-editor-banner-host').isVisible({ timeout: 5000 })
     expect(hasVisualEditor).toBe(true)
-    console.log('✅ Visual Editor active')
 
-    // Test 3 key operations that create different types of DOM changes
-    console.log('\n🧪 Testing visual editor operations...')
+    log('\n🧪 Testing visual editor operations...')
 
-    // 1. Edit Text
-    console.log('1️⃣ Edit Text...')
-    const title = page.locator('#hero-title').first()
+    log('1️⃣ Edit Text...')
+    const title = testPage.locator('#main-title').first()
     await title.scrollIntoViewIfNeeded()
     await title.click()
-    // Wait briefly for UI update
-    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
+    await debugWait()
 
-    // Try to find and click Edit Element in context menu
-    const editOption = page.locator('text="Edit Element"').first()
+    const editOption = testPage.locator('text="Edit Element"').first()
     if (await editOption.isVisible({ timeout: 1500 }).catch(() => false)) {
       await editOption.click()
-      // Wait briefly for UI update
-      await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-      await page.keyboard.type('MODIFIED TITLE')
-      await page.keyboard.press('Enter')
-      console.log('✅ Text edited')
-      // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
+      await debugWait()
+      await testPage.keyboard.type('MODIFIED TITLE')
+      await testPage.keyboard.press('Enter')
+      log('✅ Text edited')
+      await debugWait()
     } else {
-      console.log('⚠️ Edit Element option not found')
+      log('⚠️ Edit Element option not found')
     }
 
-    // 2. Hide Element
-    console.log('2️⃣ Hide Element...')
-    const card = page.locator('#card-2').first()
+    // Close any open menu by clicking on a safe area
+    const backdrop = testPage.locator('.menu-backdrop').first()
+    if (await backdrop.isVisible({ timeout: 500 }).catch(() => false)) {
+      await testPage.mouse.click(10, 10)  // Click top-left corner to close menu
+      await backdrop.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+      await debugWait()
+    }
+
+    log('2️⃣ Hide Element...')
+    const card = testPage.locator('#button-2').first()
     await card.scrollIntoViewIfNeeded()
     await card.click()
-    // Wait briefly for UI update
-    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
+    await debugWait()
 
-    const hideOption = page.locator('text="Hide"').first()
+    const hideOption = testPage.locator('text="Hide"').first()
     if (await hideOption.isVisible({ timeout: 1500 }).catch(() => false)) {
       await hideOption.click()
-      console.log('✅ Element hidden')
-      // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
+      log('✅ Element hidden')
+      await debugWait()
     } else {
-      console.log('⚠️ Hide option not found')
+      log('⚠️ Hide option not found')
     }
 
-    // 3. Inline Edit
-    console.log('3️⃣ Inline Edit...')
-    const button = page.locator('#btn-primary').first()
+    log('3️⃣ Inline Edit...')
+    const button = testPage.locator('#button-1').first()
     await button.scrollIntoViewIfNeeded()
     await button.click()
-    // Wait briefly for UI update
-    await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
+    await debugWait()
 
-    const inlineOption = page.locator('text="Inline Edit"').first()
+    const inlineOption = testPage.locator('text="Inline Edit"').first()
     if (await inlineOption.isVisible({ timeout: 1500 }).catch(() => false)) {
       await inlineOption.click()
-      // Wait briefly for UI update
-      await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-      await page.keyboard.press('Control+A')
-      await page.keyboard.type('NEW BUTTON TEXT')
-      await page.keyboard.press('Enter')
-      console.log('✅ Inline edit done')
-      // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
+      await debugWait()
+      await testPage.keyboard.press('Control+A')
+      await testPage.keyboard.type('NEW BUTTON TEXT')
+      await testPage.keyboard.press('Enter')
+      log('✅ Inline edit done')
+      await debugWait()
     } else {
-      console.log('⚠️ Inline Edit option not found')
+      log('⚠️ Inline Edit option not found')
     }
 
-    // Check changes counter
-    console.log('\n📊 Checking changes...')
-    const changesCounter = page.locator('text=/\\d+ changes/').first()
+    log('\n📊 Checking changes...')
+    const changesCounter = testPage.locator('text=/\\d+ changes/').first()
     const changesText = await changesCounter.textContent().catch(() => null)
     if (changesText) {
-      console.log(`Changes made: ${changesText}`)
+      log(`Changes made: ${changesText}`)
     }
 
-    // Save changes
-    console.log('\n💾 Saving changes...')
-    const saveBtn = page.locator('button').filter({ hasText: 'Save' }).first()
+    log('\n💾 Saving changes...')
+
+    // Close any open menu before clicking save
+    const backdropBeforeSave = testPage.locator('.menu-backdrop').first()
+    if (await backdropBeforeSave.isVisible({ timeout: 500 }).catch(() => false)) {
+      await testPage.mouse.click(10, 10)
+      await backdropBeforeSave.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+      await debugWait()
+    }
+
+    const saveBtn = testPage.locator('button').filter({ hasText: 'Save' }).first()
     if (await saveBtn.isVisible()) {
       await saveBtn.click()
-      console.log('✅ Save button clicked')
-      // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
+      log('✅ Save button clicked')
+      await debugWait(3000)
 
-      // Verify DOM changes in sidebar
-      console.log('\n🔍 Checking DOM changes in sidebar...')
+      log('\n🔍 Checking DOM changes in sidebar...')
 
-      // Look for DOM Changes text
-      const domChanges = sidebarFrame.locator('text=/DOM Changes/i').first()
+      const domChanges = sidebar.locator('text=/DOM Changes/i').first()
       const hasChanges = await domChanges.isVisible({ timeout: 2000 }).catch(() => false)
 
       if (hasChanges) {
-        console.log('✅ DOM Changes section found in sidebar')
+        log('✅ DOM Changes section found in sidebar')
 
-        // Check if changes count is displayed
-        const changesCount = await sidebarFrame.locator('text=/\\d+\\s+DOM change/i').count()
+        const changesCount = await sidebar.locator('text=/\\d+\\s+DOM change/i').count()
         if (changesCount > 0) {
-          const text = await sidebarFrame.locator('text=/\\d+\\s+DOM change/i').first().textContent()
-          console.log(`✅ ${text} saved to experiment`)
+          const text = await sidebar.locator('text=/\\d+\\s+DOM change/i').first().textContent()
+          log(`✅ ${text} saved to experiment`)
         }
 
-        // Try to view the JSON
-        const jsonTab = sidebarFrame.locator('button').filter({ hasText: 'JSON' }).first()
+        const jsonTab = sidebar.locator('button').filter({ hasText: 'JSON' }).first()
         if (await jsonTab.isVisible({ timeout: 1000 }).catch(() => false)) {
           await jsonTab.click()
-          // Wait briefly for UI update
-          await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-          console.log('✅ Viewing DOM changes in JSON editor')
+          await debugWait()
+          log('✅ Viewing DOM changes in JSON editor')
         }
       } else {
-        console.log('⚠️ DOM Changes section not visible in sidebar')
+        log('⚠️ DOM Changes section not visible in sidebar')
       }
     }
 
-    // Take final screenshot
-    await page.screenshot({
+    await testPage.screenshot({
       path: 'test-results/visual-editor-focused-final.png',
       fullPage: true
     })
-    console.log('\n📸 Screenshot saved')
+    log('\n📸 Screenshot saved')
 
-    await context.close()
-    console.log('\n✨ Test complete!')
+    log('\n✨ Test complete!')
   })
 })

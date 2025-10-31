@@ -16,6 +16,9 @@ const TEST_PAGE_URL = 'http://localhost:3456/url-filtering-test.html'
  *
  * NOTE: These tests DO NOT use the SDK plugin. They use the extension's
  * built-in DOM changes application functionality via dom-changes-applier.ts
+ *
+ * All tests in this file are ACTIVE (no skipped tests). Tests are self-contained
+ * and use mocked SDK data, so they do not depend on external API availability.
  */
 
 test.describe('URL Filtering with DOM Changes', () => {
