@@ -5,6 +5,9 @@
 .mcp.json.bk
 .mcp.json
 
+# serena cache
+.serena
+
 # claude tasks
 .claude/tasks/
 
