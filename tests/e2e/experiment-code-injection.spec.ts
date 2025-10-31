@@ -6,10 +6,9 @@
 
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
-import path from 'path'
-import { injectSidebar, debugWait, click } from './utils/test-helpers'
+import { setupTestPage, debugWait, click } from './utils/test-helpers'
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev', 'local-test-page.html')
+const TEST_PAGE_URL = '/local-test-page.html'
 
 // Save experiment mode - set to true to actually save the experiment to the database
 // WARNING: This writes to the production database! Only use when needed.
@@ -21,7 +20,7 @@ test.describe('Experiment Code Injection UI', () => {
   let sidebar: FrameLocator
   let experimentName: string
 
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, extensionUrl }) => {
     testPage = await context.newPage()
 
     // Listen to all console messages for debugging
@@ -32,23 +31,25 @@ test.describe('Experiment Code Injection UI', () => {
       }
     })
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
-    await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForSelector('body', { timeout: 5000 })
+    const result = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
+    sidebar = result.sidebar
   })
 
   test.afterEach(async () => {
-    if (testPage) await testPage.close()
+    if (testPage && !process.env.SLOW) await testPage.close()
   })
 
-  test('code injection UI exists and code editor can be opened', async ({ extensionUrl }) => {
+  test('code injection UI exists and code editor can be opened', async () => {
     test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
 
-    await test.step('Inject sidebar', async () => {
-      console.log('\n📂 STEP 1: Injecting sidebar')
-      sidebar = await injectSidebar(testPage, extensionUrl)
-      await sidebar.locator('body').waitFor({ timeout: 10000 })
-      console.log('✅ Sidebar injected')
+    await test.step('Wait for sidebar to load', async () => {
+      console.log('\n📂 STEP 1: Wait for sidebar experiments to load')
+
+      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
+        .waitFor({ state: 'hidden', timeout: 30000 })
+        .catch(() => {})
+
+      console.log('✅ Sidebar loaded')
     })
 
     await test.step('Click Create new experiment', async () => {
@@ -358,6 +359,8 @@ test.describe('Experiment Code Injection UI', () => {
         console.log('  ✅ Experiment saved and verified!')
       })
     } else {
+      // SKIP REASON: Database write step is only enabled when SAVE_EXPERIMENT=1 is set
+      // to prevent unintentional writes to production database during routine testing
       await test.step.skip('Save experiment and verify __inject_html structure', async () => {})
     }
   })

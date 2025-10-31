@@ -14,11 +14,12 @@ import { ErrorBoundary } from "~src/components/ErrorBoundary"
 import { Toast } from "~src/components/Toast"
 import { CookieConsentModal } from "~src/components/CookieConsentModal"
 import { useABsmartly } from "~src/hooks/useABsmartly"
-import type { Experiment, ABsmartlyConfig } from "~src/types/absmartly"
+import type { Experiment, ABsmartlyConfig, Application, ExperimentTag, ExperimentUser, ExperimentTeam } from "~src/types/absmartly"
 import type { SidebarState, ExperimentFilters } from "~src/types/storage-state"
 import { CogIcon, PlusIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline"
 import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
+import { clearAllExperimentStorage } from "~src/utils/storage-cleanup"
 import { Logo } from "~src/components/Logo"
 import "~style.css"
 
@@ -598,10 +599,13 @@ function SidebarContent() {
   }
   
   const handleExperimentClick = async (experiment: Experiment) => {
+    // Clear storage when opening detail view to prevent stale data
+    await clearAllExperimentStorage(experiment.id)
+
     // Don't set the partial experiment first to avoid re-renders
     setView('detail')
     setExperimentDetailLoading(true)
-    
+
     // Always fetch full experiment details since we now cache minimal data only
     // The cached data doesn't include variant configs to save space
     try {
@@ -666,13 +670,15 @@ function SidebarContent() {
     setView('list')
   }
 
-  const handleCreateExperiment = () => {
+  const handleCreateExperiment = async () => {
+    await clearAllExperimentStorage(0)
     setSelectedExperiment(null)
     setView('create')
   }
 
   const handleCreateFromTemplate = async (templateId: number) => {
     try {
+      await clearAllExperimentStorage(0)
       const template = await getExperiment(templateId)
       // Load template with cleared name/display_name, matching ABsmartly frontend behavior
       setSelectedExperiment({
@@ -688,7 +694,8 @@ function SidebarContent() {
     }
   }
 
-  const handleEditExperiment = (experiment: Experiment) => {
+  const handleEditExperiment = async (experiment: Experiment) => {
+    await clearAllExperimentStorage(experiment.id)
     setSelectedExperiment(experiment)
     setView('edit')
   }

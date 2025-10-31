@@ -2,6 +2,15 @@ import { test, expect, chromium } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 
+/**
+ * E2E Tests for Move Operation Original Position Preservation
+ *
+ * Tests that verify the visual editor correctly preserves original element positions
+ * when move operations are performed and selectors are changed.
+ *
+ * All tests in this file are ACTIVE (no skipped tests). Tests use synthetic DOM
+ * manipulation and do not depend on external API availability.
+ */
 test.describe('Move Operation Original Position Preservation', () => {
   test('should preserve original position when changing selector after move', async () => {
     test.setTimeout(60000)

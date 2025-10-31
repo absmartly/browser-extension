@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
-import { sendMessage } from '~src/lib/messaging'
+import { sendToContent } from '~src/lib/messaging'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { PlusIcon, TrashIcon, CodeBracketIcon, XMarkIcon } from '@heroicons/react/24/outline'
@@ -23,26 +23,32 @@ export interface Variant {
 
 // Helper to get DOM changes from config
 function getDOMChangesFromConfig(config: VariantConfig | undefined, domFieldName: string = '__dom_changes'): DOMChangesData {
-  if (!config) return { changes: [] }
+  if (!config) return []
   const domData = config[domFieldName]
-  if (!domData) return { changes: [] }
+  if (!domData) return []
   // Handle both legacy array and new config format
-  if (Array.isArray(domData)) return { changes: domData }
-  return domData
+  if (Array.isArray(domData)) return domData
+  return domData as DOMChangesConfig
 }
 
 // Helper to update config with DOM changes
 function setDOMChangesInConfig(config: VariantConfig, domChanges: DOMChangesData, domFieldName: string = '__dom_changes'): VariantConfig {
   const newConfig = { ...config }
-  // Only include DOM changes if not empty
-  if (Array.isArray(domChanges.changes) && domChanges.changes.length > 0) {
-    newConfig[domFieldName] = domChanges
-  } else if (!Array.isArray(domChanges.changes)) {
-    // If it's already an object with changes, include it
-    newConfig[domFieldName] = domChanges
+
+  if (Array.isArray(domChanges)) {
+    // Handle array format
+    if (domChanges.length > 0) {
+      newConfig[domFieldName] = domChanges
+    } else {
+      delete newConfig[domFieldName]
+    }
   } else {
-    // Remove if empty
-    delete newConfig[domFieldName]
+    // Handle config format
+    if (domChanges.changes && domChanges.changes.length > 0) {
+      newConfig[domFieldName] = domChanges
+    } else {
+      delete newConfig[domFieldName]
+    }
   }
   return newConfig
 }
@@ -125,7 +131,9 @@ export function VariantList({
     const loadSavedChanges = async () => {
       // If parent already provided initialVariants, check storage for changes
       if (initialVariants.length > 0) {
-        const storageKey = `experiment-${experimentId}-variants`
+        const storageKey = experimentId === 0
+          ? 'experiment-new-variants'
+          : `experiment-${experimentId}-variants`
         try {
           const savedVariants = await storage.get(storageKey)
           if (savedVariants && Array.isArray(savedVariants)) {
@@ -145,7 +153,9 @@ export function VariantList({
       }
 
       // Legacy path: no initial variants provided, try loading from storage
-      const storageKey = `experiment-${experimentId}-variants`
+      const storageKey = experimentId === 0
+        ? 'experiment-new-variants'
+        : `experiment-${experimentId}-variants`
       try {
         const savedVariants = await storage.get(storageKey)
         if (savedVariants && Array.isArray(savedVariants)) {
@@ -181,16 +191,18 @@ export function VariantList({
   // Cleanup storage and preview on unmount
   useEffect(() => {
     return () => {
-      // Clear preview
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experimentName
-          })
-        }
-      })
+      // Clear preview on unmount
+      try {
+        sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove',
+          experimentName: experimentName
+        }).catch(error => {
+          debugLog('[VariantList] No active tab for cleanup (normal on unmount):', error?.message)
+        })
+      } catch (error) {
+        debugLog('[VariantList] Exception during cleanup:', error?.message)
+      }
     }
   }, [experimentName])
 
@@ -212,7 +224,9 @@ export function VariantList({
   }, [])
 
   const saveToStorage = (updatedVariants: Variant[]) => {
-    const storageKey = `experiment-${experimentId}-variants`
+    const storageKey = experimentId === 0
+      ? 'experiment-new-variants'
+      : `experiment-${experimentId}-variants`
     storage.set(storageKey, updatedVariants).catch(error => {
       debugError('Failed to save variants to storage:', error)
     })
@@ -268,17 +282,19 @@ export function VariantList({
     // Re-apply preview if active for this variant (but not for reorders)
     if (previewEnabled && activePreviewVariant === index && !options?.isReorder) {
       const enabledChanges = changes.filter(c => c.enabled !== false)
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'update',
-            changes: enabledChanges,
-            experimentName: experimentName,
-            variantName: newVariants[index].name
-          })
-        }
-      })
+      try {
+        sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'update',
+          changes: enabledChanges,
+          experimentName: experimentName,
+          variantName: newVariants[index].name
+        }).catch(error => {
+          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (update):', error)
+        })
+      } catch (error) {
+        debugError('[VariantList] Exception sending ABSMARTLY_PREVIEW (update):', error)
+      }
     }
   }
 
@@ -398,30 +414,22 @@ export function VariantList({
         changesCount: changes.filter(c => c.enabled !== false).length
       })
 
-      sendMessage({
+      sendToContent({
         type: 'ABSMARTLY_PREVIEW',
-        from: 'sidebar',
-        to: 'content',
-        payload: {
-          action: 'apply',
-          changes: changes.filter(c => c.enabled !== false),
-          experimentName: experimentName,
-          variantName: variantName
-        }
+        action: 'apply',
+        changes: changes.filter(c => c.enabled !== false),
+        experimentName: experimentName,
+        variantName: variantName
       }).catch(error => {
         debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (apply):', error)
       })
     } else {
       debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (remove):', { experimentName })
 
-      sendMessage({
+      sendToContent({
         type: 'ABSMARTLY_PREVIEW',
-        from: 'sidebar',
-        to: 'content',
-        payload: {
-          action: 'remove',
-          experimentName: experimentName
-        }
+        action: 'remove',
+        experimentName: experimentName
       }).catch(error => {
         debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (remove):', error)
       })

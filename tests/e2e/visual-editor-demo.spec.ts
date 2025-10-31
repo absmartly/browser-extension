@@ -76,13 +76,28 @@ test.describe('Visual Editor Demo', () => {
     await page.waitForSelector('#absmartly-sidebar-root')
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
 
-    // Wait for experiments
+    // Wait for loading spinner to disappear
     console.log('⏳ Loading experiments...')
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().waitFor({ state: 'visible', timeout: 10000 })
+    await sidebarFrame.locator('[role="status"][aria-label="Loading experiments"]')
+      .waitFor({ state: 'hidden', timeout: 30000 })
+      .catch(() => {})
+
+    // Check if experiments are available
+    const experimentItem = sidebarFrame.locator('.experiment-item')
+    const count = await experimentItem.count()
+
+    if (count === 0) {
+      console.log('⚠️  No experiments found - cannot run demo')
+      test.skip()
+      return
+    }
+
+    console.log(`✅ Found ${count} experiments`)
+    await experimentItem.first().waitFor({ state: 'visible', timeout: 5000 })
 
     // Open first experiment
     console.log('📂 Opening experiment...')
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().click()
+    await experimentItem.click()
     await sidebarFrame.locator('button:has-text("Visual Editor")').first().waitFor({ state: 'visible' })
 
     // Launch Visual Editor

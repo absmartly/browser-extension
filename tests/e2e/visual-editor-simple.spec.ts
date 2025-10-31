@@ -124,11 +124,20 @@ test.describe('Simple Visual Editor Test', () => {
     // Access the sidebar iframe
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
 
-    // Wait for experiments to load using proper selectors
-    console.log('\n⏳ Waiting for experiments to load...')
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().waitFor({ state: 'visible', timeout: 10000 })
+    // Give sidebar time to initialize and load
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
 
-    const experimentCards = sidebarFrame.locator('div[class*="cursor-pointer"]')
+    // Take screenshot to debug what's showing in sidebar
+    await page.screenshot({
+      path: 'test-results/sidebar-initial.png',
+      fullPage: true
+    })
+
+    // Wait for experiments to load using proper selectors
+    console.log('⏳ Waiting for experiments to load...')
+    await sidebarFrame.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 10000 })
+
+    const experimentCards = sidebarFrame.locator('.experiment-item')
     const experimentCount = await experimentCards.count()
     console.log(`✅ ${experimentCount} experiments loaded`)
 

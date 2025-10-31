@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/extension'
+import { type Page } from '@playwright/test'
 
 const createTestPage = () => `
 <!DOCTYPE html>
@@ -34,39 +35,38 @@ const createTestPage = () => `
 `
 
 test.describe('Visual Editor - Change Image Source', () => {
-  test.beforeEach(async ({ clearStorage, seedStorage }) => {
-    await clearStorage()
+  let testPage: Page
 
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-key',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
-    })
+  test.beforeEach(async ({ context }) => {
+    testPage = await context.newPage()
+    await testPage.goto('data:text/html,' + encodeURIComponent(createTestPage()))
+    await testPage.waitForLoadState('domcontentloaded')
   })
 
-  test('should show "Change image source" for img elements', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
+  test.afterEach(async () => {
+    if (testPage && !process.env.SLOW) await testPage.close()
+  })
 
-    // Wait for page to load
-    await page.waitForLoadState('domcontentloaded')
-
-    // Right-click on the img element
-    const img = await page.locator('#product-image')
+  test('should show "Change image source" for img elements', async () => {
+    const img = await testPage.locator('#product-image')
     await img.click({ button: 'right' })
 
-    // Wait for context menu
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Check if the menu exists in shadow DOM
-    const menuExists = await page.evaluate(() => {
+    const menuExists = await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
-      if (!menuHost) return false
+      if (!menuHost) return {
+        hasChangeImageSource: false,
+        hasMoveUp: false,
+        hasMoveDown: false
+      }
 
       const shadowRoot = (menuHost as any).shadowRoot
-      if (!shadowRoot) return false
+      if (!shadowRoot) return {
+        hasChangeImageSource: false,
+        hasMoveUp: false,
+        hasMoveDown: false
+      }
 
       const menuItems = shadowRoot.querySelectorAll('.menu-item')
       const labels = Array.from(menuItems).map((item: any) =>
@@ -85,20 +85,13 @@ test.describe('Visual Editor - Change Image Source', () => {
     expect(menuExists.hasMoveDown).toBe(false)
   })
 
-  test('should show "Change image source" for background-image elements', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
-
-    await page.waitForLoadState('domcontentloaded')
-
-    // Right-click on the element with background-image
-    const heroBanner = await page.locator('#hero-banner')
+  test('should show "Change image source" for background-image elements', async () => {
+    const heroBanner = await testPage.locator('#hero-banner')
     await heroBanner.click({ button: 'right' })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    const menuExists = await page.evaluate(() => {
+    const menuExists = await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
       if (!menuHost) return false
 
@@ -116,20 +109,13 @@ test.describe('Visual Editor - Change Image Source', () => {
     expect(menuExists).toBe(true)
   })
 
-  test('should NOT show "Change image source" for regular elements', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
-
-    await page.waitForLoadState('domcontentloaded')
-
-    // Right-click on regular div
-    const regularDiv = await page.locator('#regular-div')
+  test('should NOT show "Change image source" for regular elements', async () => {
+    const regularDiv = await testPage.locator('#regular-div')
     await regularDiv.click({ button: 'right' })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    const menuExists = await page.evaluate(() => {
+    const menuExists = await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
       if (!menuHost) return false
 
@@ -147,19 +133,13 @@ test.describe('Visual Editor - Change Image Source', () => {
     expect(menuExists).toBe(false)
   })
 
-  test('should NOT show "Move up" or "Move down" in context menu', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
-
-    await page.waitForLoadState('domcontentloaded')
-
-    const regularDiv = await page.locator('#regular-div')
+  test('should NOT show "Move up" or "Move down" in context menu', async () => {
+    const regularDiv = await testPage.locator('#regular-div')
     await regularDiv.click({ button: 'right' })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    const result = await page.evaluate(() => {
+    const result = await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
       if (!menuHost) return { hasMoveUp: false, hasMoveDown: false }
 
@@ -181,42 +161,32 @@ test.describe('Visual Editor - Change Image Source', () => {
     expect(result.hasMoveDown).toBe(false)
   })
 
-  test('should change img src when new URL is provided', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
+  test('should change img src when new URL is provided', async () => {
+    const originalSrc = await testPage.locator('#product-image').getAttribute('src')
 
-    await page.waitForLoadState('domcontentloaded')
+    await testPage.locator('#product-image').click({ button: 'right' })
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Get original src
-    const originalSrc = await page.locator('#product-image').getAttribute('src')
-
-    // Right-click on img
-    await page.locator('#product-image').click({ button: 'right' })
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
-
-    // Click "Change image source" in context menu
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
       const shadowRoot = (menuHost as any)?.shadowRoot
       const menuItems = shadowRoot?.querySelectorAll('.menu-item')
 
-      for (const item of menuItems) {
-        const label = item.querySelector('.menu-label')?.textContent
-        if (label === 'Change image source') {
-          (item as HTMLElement).click()
-          break
+      if (menuItems) {
+        for (const item of menuItems) {
+          const label = item.querySelector('.menu-label')?.textContent
+          if (label === 'Change image source') {
+            (item as HTMLElement).click()
+            break
+          }
         }
       }
     })
 
-    // Wait for dialog to appear
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Enter new URL in dialog
     const newUrl = 'https://via.placeholder.com/200x150/95E1D3/FFFFFF?text=New+Image'
-    await page.evaluate((url) => {
+    await testPage.evaluate((url) => {
       const dialogHost = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (dialogHost as any)?.shadowRoot
       const input = shadowRoot?.querySelector('input')
@@ -226,8 +196,7 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     }, newUrl)
 
-    // Click Apply button
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       const dialogHost = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (dialogHost as any)?.shadowRoot
       const applyButton = shadowRoot?.querySelector('.dialog-button-apply')
@@ -236,35 +205,23 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    // Wait for change to apply
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Verify src changed
-    const newSrc = await page.locator('#product-image').getAttribute('src')
+    const newSrc = await testPage.locator('#product-image').getAttribute('src')
     expect(newSrc).toBe(newUrl)
     expect(newSrc).not.toBe(originalSrc)
   })
 
-  test('should change background-image when new URL is provided', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
-
-    await page.waitForLoadState('domcontentloaded')
-
-    // Get original background-image
-    const originalBg = await page.evaluate(() => {
+  test('should change background-image when new URL is provided', async () => {
+    const originalBg = await testPage.evaluate(() => {
       const el = document.getElementById('hero-banner') as HTMLElement
       return el?.style.backgroundImage || ''
     })
 
-    // Right-click on hero banner
-    await page.locator('#hero-banner').click({ button: 'right' })
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.locator('#hero-banner').click({ button: 'right' })
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Click "Change image source"
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
       const shadowRoot = (menuHost as any)?.shadowRoot
       const menuItems = shadowRoot?.querySelectorAll('.menu-item')
@@ -278,12 +235,10 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Enter new URL
     const newUrl = 'https://via.placeholder.com/300x200/F38181/FFFFFF?text=New+BG'
-    await page.evaluate((url) => {
+    await testPage.evaluate((url) => {
       const dialogHost = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (dialogHost as any)?.shadowRoot
       const input = shadowRoot?.querySelector('input')
@@ -293,8 +248,7 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     }, newUrl)
 
-    // Click Apply
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       const dialogHost = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (dialogHost as any)?.shadowRoot
       const applyButton = shadowRoot?.querySelector('.dialog-button-apply')
@@ -303,11 +257,9 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Verify background-image changed
-    const newBg = await page.evaluate(() => {
+    const newBg = await testPage.evaluate(() => {
       const el = document.getElementById('hero-banner') as HTMLElement
       return el?.style.backgroundImage || ''
     })
@@ -316,20 +268,13 @@ test.describe('Visual Editor - Change Image Source', () => {
     expect(newBg).not.toBe(originalBg)
   })
 
-  test('should not change when dialog is cancelled', async ({ context }) => {
-    const page = await context.newPage()
-    await page.goto('data:text/html,' + encodeURIComponent(createTestPage()))
+  test('should not change when dialog is cancelled', async () => {
+    const originalSrc = await testPage.locator('#product-image').getAttribute('src')
 
-    await page.waitForLoadState('domcontentloaded')
+    await testPage.locator('#product-image').click({ button: 'right' })
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    const originalSrc = await page.locator('#product-image').getAttribute('src')
-
-    // Right-click and open dialog
-    await page.locator('#product-image').click({ button: 'right' })
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
-
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       const menuHost = document.getElementById('absmartly-menu-host')
       const shadowRoot = (menuHost as any)?.shadowRoot
       const menuItems = shadowRoot?.querySelectorAll('.menu-item')
@@ -343,11 +288,9 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Click Cancel button
-    await page.evaluate(() => {
+    await testPage.evaluate(() => {
       const dialogHost = document.getElementById('absmartly-image-dialog-host')
       const shadowRoot = (dialogHost as any)?.shadowRoot
       const cancelButton = shadowRoot?.querySelector('.dialog-button-cancel')
@@ -356,11 +299,9 @@ test.describe('Visual Editor - Change Image Source', () => {
       }
     })
 
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+    await testPage.waitForLoadState('domcontentloaded').catch(() => {})
 
-    // Verify src unchanged
-    const finalSrc = await page.locator('#product-image').getAttribute('src')
+    const finalSrc = await testPage.locator('#product-image').getAttribute('src')
     expect(finalSrc).toBe(originalSrc)
   })
 })

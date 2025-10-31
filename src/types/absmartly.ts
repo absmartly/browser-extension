@@ -139,3 +139,5 @@ export interface ExperimentInjectionCode {
   bodyEnd?: string    // Injected at bottom of <body>
   urlFilter?: import('~src/types/dom-changes').URLFilter  // URL filtering (same type as DOM changes)
 }
+
+export type { URLFilter, DOMChangesData } from './dom-changes'

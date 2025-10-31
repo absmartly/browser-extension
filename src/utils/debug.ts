@@ -1,56 +1,37 @@
 /**
  * Debug logging utility that only logs when DEBUG flag is enabled
- * Can be controlled via environment variable or localStorage
+ * Optimized for tree-shaking in production builds
  */
 
-// Check if debug mode is enabled
-const isDebugEnabled = (): boolean => {
-  // In production builds, debug is always disabled
-  if (process.env.NODE_ENV === 'production') {
-    return false
-  }
-
-  // In development, check localStorage
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    const debugFlag = localStorage.getItem('ABSMARTLY_DEBUG')
-    // Default to true in development if not explicitly set to false
-    return debugFlag !== 'false'
-  }
-
-  // Default to true in development
-  return true
-}
+// Use a constant that will be replaced at build time
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 /**
  * Debug log - only outputs when debug mode is enabled
+ * In production builds, this becomes an empty function
  */
-export const debugLog = (...args: any[]) => {
-  if (isDebugEnabled()) {
-    console.log(...args)
-  }
-}
+export const debugLog = IS_PRODUCTION
+  ? function() {}
+  : function() { console.log.apply(console, arguments) }
 
 /**
  * Debug warn - only outputs when debug mode is enabled
+ * In production builds, this becomes an empty function
  */
-export const debugWarn = (...args: any[]) => {
-  if (isDebugEnabled()) {
-    console.warn(...args)
-  }
-}
+export const debugWarn = IS_PRODUCTION
+  ? function() {}
+  : function() { console.warn.apply(console, arguments) }
 
 /**
- * Debug error - only outputs when debug mode is enabled
+ * Debug error - always preserved for production error tracking
  */
-export const debugError = (...args: any[]) => {
-  if (isDebugEnabled()) {
-    console.error(...args)
-  }
+export const debugError = function() {
+  console.error.apply(console, arguments)
 }
 
 /**
  * Always log - bypasses debug flag (use for important messages)
  */
-export const alwaysLog = (...args: any[]) => {
-  console.log(...args)
+export const alwaysLog = function() {
+  console.log.apply(console, arguments)
 }

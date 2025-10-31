@@ -14,7 +14,6 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { setupContentScriptMessageListener } from '~src/lib/messaging'
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -29,79 +28,11 @@ w.__absmartlyContentScriptLoaded = true
 console.log('[ABsmartly] Content script marker set:', w.__absmartlyContentScriptLoaded)
 debugLog('[Visual Editor Content Script] Content script loaded')
 
-// Polyfill chrome.runtime.sendMessage for test mode
-// This handles messages that expect a response (like REQUEST_INJECTION_CODE)
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
-  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-
-  if (sidebarIframe && sidebarIframe.contentWindow) {
-    // We're in test mode - polyfill sendMessage
-    const responseCallbacks = new Map<string, (response: any) => void>()
-
-    // Listen for responses from sidebar
-    window.addEventListener('message', (event) => {
-      // SECURITY: Only accept messages from sidebar iframe or same window
-      if (event.source !== window && event.source !== sidebarIframe?.contentWindow) {
-        return
-      }
-
-      if (event.data?.source === 'absmartly-extension' && event.data?.responseId) {
-        const callback = responseCallbacks.get(event.data.responseId)
-        if (callback) {
-          callback(event.data.response)
-          responseCallbacks.delete(event.data.responseId)
-        }
-      }
-    })
-
-    chrome.runtime.sendMessage = function(message: any, callback?: (response: any) => void) {
-      // Determine the correct source based on message type
-      const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
-                      message.type === 'VISUAL_EDITOR_STOPPED' ||
-                      message.type === 'ELEMENT_SELECTED' ||
-                      message.type === 'PREVIEW_STATE_CHANGED')
-        ? 'absmartly-visual-editor'
-        : 'absmartly-content-script'
-
-      if (callback) {
-        // Generate unique ID for this request
-        const responseId = `${message.type}_${Date.now()}_${Math.random()}`
-        responseCallbacks.set(responseId, callback)
-
-        // Send request to sidebar with response ID
-        sidebarIframe.contentWindow!.postMessage({
-          source: source,
-          responseId: responseId,
-          ...message
-        }, '*')
-
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          if (responseCallbacks.has(responseId)) {
-            responseCallbacks.delete(responseId)
-            debugWarn(`No response received for ${message.type} after 5s`)
-          }
-        }, 5000)
-      } else {
-        // No callback, just send the message
-        sidebarIframe.contentWindow!.postMessage({
-          source: source,
-          ...message
-        }, '*')
-      }
-    } as any
-  }
-}
-
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
 let isVisualEditorActive = false
 let isVisualEditorStarting = false
-
-// Setup message listener polyfill for test mode (iframe context)
-setupContentScriptMessageListener()
 
 // Initialize overrides on page load
 // This ensures storage is synced to cookie for SSR compatibility
@@ -196,10 +127,12 @@ async function startVisualEditor(config: {
 }
 
 // Listen for messages from the background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+console.log('[ABsmartly] 📌 REGISTERING chrome.runtime.onMessage listener at line 134')
+const messageListenerRegistered = chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[ABsmartly] 📬 MESSAGE LISTENER ENTRY POINT - received message type:', message?.type)
   console.log('[ABsmartly] Message listener called! Message type:', message?.type)
   debugLog('[Visual Editor Content Script] Received message:', message.type)
-  
+
   // Handle SDK plugin injection request
   if (message.type === 'INJECT_SDK_PLUGIN') {
     console.log('[Content Script] 📌 Received INJECT_SDK_PLUGIN message')
@@ -211,15 +144,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true // Keep message channel open for async response
   }
-  
+
   // Handle element picker message
   if (message.type === 'START_ELEMENT_PICKER') {
     debugLog('[Visual Editor Content Script] Starting element picker')
-    
+
     if (!elementPicker) {
       elementPicker = new ElementPicker()
     }
-    
+
     elementPicker.start((selector: string) => {
       chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
@@ -227,24 +160,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       elementPicker = null
     })
-    
+
     sendResponse({ success: true })
     return true
   }
-  
+
   // Handle cancel element picker message
   if (message.type === 'CANCEL_ELEMENT_PICKER') {
     debugLog('[Visual Editor Content Script] Canceling element picker')
-    
+
     if (elementPicker) {
       elementPicker.stop()
       elementPicker = null
     }
-    
+
     sendResponse({ success: true })
     return true
   }
-  
+
   if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
     const isActive = isVisualEditorActive || isVisualEditorStarting
     debugLog('[Visual Editor Content Script] CHECK_VISUAL_EDITOR_ACTIVE:', {
@@ -264,7 +197,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'START_VISUAL_EDITOR') {
-    console.log('[ABsmartly] Received START_VISUAL_EDITOR message:', JSON.stringify(message))
+    console.log('[ABsmartly] ✅ MESSAGE RECEIVED: START_VISUAL_EDITOR')
+    console.log('[ABsmartly] Message payload:', JSON.stringify(message))
+    debugLog('[Visual Editor Content Script] START_VISUAL_EDITOR received:', {
+      variantName: message.variantName,
+      experimentName: message.experimentName,
+      changesCount: message.changes?.length || 0
+    })
+
     // Use shared start function
     startVisualEditor({
       variantName: message.variantName,
@@ -272,16 +212,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       changes: message.changes,
       useShadowDOM: message.useShadowDOM
     }).then(result => {
-      console.log('[ABsmartly] startVisualEditor completed with result:', JSON.stringify(result))
+      console.log('[ABsmartly] ✅ startVisualEditor completed with result:', JSON.stringify(result))
+      debugLog('[Visual Editor Content Script] Visual editor start completed:', result)
       sendResponse(result)
     }).catch(error => {
-      console.error('[ABsmartly] startVisualEditor failed:', error)
+      console.error('[ABsmartly] ❌ startVisualEditor failed:', error)
+      debugError('[Visual Editor Content Script] Error in startVisualEditor:', error)
       sendResponse({ success: false, error: error.message })
     })
 
     return true // Keep message channel open for async response
   }
-  
+
   if (message.type === 'STOP_VISUAL_EDITOR') {
     debugLog('[Visual Editor Content Script] Stopping visual editor')
 
@@ -299,7 +241,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true
   }
-  
+
   if (message.type === 'GET_VISUAL_EDITOR_STATUS') {
     sendResponse({
       active: isVisualEditorActive,
@@ -307,7 +249,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true
   }
-  
+
   // Visual editor preview messages aren't sent through chrome.tabs.sendMessage
   // They're sent via chrome.runtime.sendMessage and need to be handled differently
 
@@ -321,12 +263,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const variantName = payload.variantName
     const experimentId = payload.experimentId
 
-    debugLog('[ABSmartly Content Script] Received preview message:', action)
+    console.log('[ABSmartly Content Script] Received preview message:', action)
+    console.log(`[ABSmartly Content Script] VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
 
     // If visual editor is active or starting, ignore preview update messages
     // The visual editor manages its own changes and we don't want conflicts
     if ((isVisualEditorActive || isVisualEditorStarting) && action === 'update') {
-      debugLog('[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update')
+      console.log('[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update')
       sendResponse({ success: true, message: 'Visual editor active, preview update ignored' })
       return true
     }
@@ -336,6 +279,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       await ensureSDKPluginInjected()
 
       if (action === 'apply') {
+        console.log(`[ABSmartly Content Script] Handling preview apply. VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
         // Create preview header (it will check visual editor state internally)
         createPreviewHeader(experimentName, variantName)
 
@@ -389,20 +333,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true
   }
-  
+
   // Code editor messages
   if (message.type === 'OPEN_CODE_EDITOR') {
     openCodeEditor(message.data)
     sendResponse({ success: true })
     return true
   }
-  
+
   if (message.type === 'CLOSE_CODE_EDITOR') {
     closeCodeEditor()
     sendResponse({ success: true })
     return true
   }
-  
+
   // JSON editor messages
   if (message.type === 'OPEN_JSON_EDITOR') {
     openJSONEditor(message.data)
@@ -569,6 +513,7 @@ window.addEventListener('message', (event) => {
       currentEditor = null
       isVisualEditorActive = false
       isVisualEditorStarting = false
+      debugLog(`[Content Script] VE exited. Flags now: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
 
       // Send message to extension that visual editor was stopped
       chrome.runtime.sendMessage({
@@ -602,9 +547,12 @@ function createPreviewHeader(experimentName: string, variantName: string) {
   // Don't create header if visual editor is active or starting
   // The visual editor has its own toolbar with exit button
   if (isVisualEditorActive || isVisualEditorStarting) {
+    console.log(`[Content Script] Skipping preview header creation: isVisualEditorActive=${isVisualEditorActive}, isVisualEditorStarting=${isVisualEditorStarting}`)
     return
   }
-  
+
+  console.log(`[Content Script] Creating preview header for ${experimentName} / ${variantName}`)
+
   // Create preview header container - floating bar style
   const headerContainer = document.createElement('div')
   headerContainer.id = 'absmartly-preview-header'
@@ -887,11 +835,11 @@ window.addEventListener('message', async (event) => {
       })
     }
   }
-  
+
   // Handle messages from the SDK plugin (absmartly-sdk)
   else if (event.data && event.data.source === 'absmartly-sdk') {
     debugLog('[Content Script] Received message from SDK plugin:', event.data)
-    
+
     // We can handle other plugin messages here if needed
     // but we don't need to handle REQUEST_INJECTION_CODE anymore
     // since we inject the code directly during plugin initialization
@@ -909,6 +857,28 @@ document.addEventListener('absmartly-test', (event: any) => {
 // Code editor functionality
 let codeEditorContainer: HTMLDivElement | null = null
 let codeEditorView: EditorView | null = null
+
+/**
+ * Helper function to send messages back to the sidebar
+ * Detects if we're in iframe mode (test environment) or production mode
+ * and uses the appropriate messaging method
+ */
+function sendMessageToSidebar(message: { type: string; value?: string }) {
+  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+
+  if (sidebarIframe && sidebarIframe.contentWindow) {
+    // Iframe mode (test environment): use postMessage
+    console.log('[Content Script] Sending message to sidebar via postMessage:', message.type)
+    sidebarIframe.contentWindow.postMessage({
+      source: 'absmartly-content-script',
+      ...message
+    }, '*')
+  } else {
+    // Production mode: use chrome.runtime
+    console.log('[Content Script] Sending message via chrome.runtime:', message.type)
+    chrome.runtime.sendMessage(message)
+  }
+}
 
 function openCodeEditor(data: {
   section: string
@@ -990,7 +960,7 @@ function openCodeEditor(data: {
   closeBtn.onmouseover = () => closeBtn.style.backgroundColor = '#f3f4f6'
   closeBtn.onmouseout = () => closeBtn.style.backgroundColor = 'transparent'
   closeBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
+    sendMessageToSidebar({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1070,7 +1040,7 @@ function openCodeEditor(data: {
   cancelBtn.onmouseover = () => cancelBtn.style.backgroundColor = '#f9fafb'
   cancelBtn.onmouseout = () => cancelBtn.style.backgroundColor = 'white'
   cancelBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
+    sendMessageToSidebar({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1096,7 +1066,7 @@ function openCodeEditor(data: {
     saveBtn.onmouseout = () => saveBtn.style.backgroundColor = '#3b82f6'
     saveBtn.onclick = () => {
       const value = codeEditorView?.state.doc.toString() || ''
-      chrome.runtime.sendMessage({
+      sendMessageToSidebar({
         type: 'CODE_EDITOR_SAVE',
         value
       })

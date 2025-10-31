@@ -1,13 +1,21 @@
-import { type Page, type FrameLocator, type Locator } from '@playwright/test'
+import { type Page, type FrameLocator, type Locator, expect } from '@playwright/test'
 
 /**
  * Injects the extension sidebar into a test page
+ * The sidebar iframe gets proper extension context because it's loaded via chrome.runtime.getURL()
  * @param page - Playwright page object
  * @param extensionUrl - Function to get extension URLs
  * @returns The sidebar frame locator
  */
 export async function injectSidebar(page: Page, extensionUrl: (path: string) => string): Promise<FrameLocator> {
-  await page.evaluate((extUrl) => {
+  const sidebarUrl = extensionUrl('tabs/sidebar.html')
+
+  await page.evaluate((url) => {
+    const existingSidebar = document.getElementById('absmartly-sidebar-root') as HTMLElement
+    if (existingSidebar) {
+      return
+    }
+
     const originalPadding = document.body.style.paddingRight || '0px'
     document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
     document.body.style.transition = 'padding-right 0.3s ease-in-out'
@@ -25,19 +33,26 @@ export async function injectSidebar(page: Page, extensionUrl: (path: string) => 
       border-left: 1px solid #e5e7eb;
       box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
       z-index: 2147483647;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
       font-size: 14px;
+      line-height: 1.5;
       color: #111827;
+      transform: translateX(0);
+      transition: transform 0.3s ease-in-out;
     `
 
     const iframe = document.createElement('iframe')
     iframe.id = 'absmartly-sidebar-iframe'
-    iframe.style.cssText = `width: 100%; height: 100%; border: none;`
-    iframe.src = extUrl
+    iframe.style.cssText = `
+      width: 100%;
+      height: 100%;
+      border: none;
+    `
+    iframe.src = url
 
     container.appendChild(iframe)
     document.body.appendChild(container)
-  }, extensionUrl('tabs/sidebar.html'))
+  }, sidebarUrl)
 
   const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
   await sidebar.locator('body').waitFor({ timeout: 10000 })
@@ -162,3 +177,86 @@ export async function click(
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 }
+
+/**
+ * Sets up test page with sidebar injection, viewport, and console logging
+ * Centralizes beforeEach setup logic
+ * @param page - Playwright page object
+ * @param extensionUrl - Function to get extension URLs
+ * @param testPageUrl - URL to navigate to (defaults to /visual-editor-test.html)
+ * @returns Object containing sidebar and console messages
+ */
+export async function setupTestPage(
+  page: Page,
+  extensionUrl: (path: string) => string,
+  testPageUrl: string = '/visual-editor-test.html'
+): Promise<{ sidebar: FrameLocator; allMessages: Array<{ type: string; text: string }> }> {
+  const allMessages: Array<{ type: string; text: string }> = []
+
+  page.on('console', (msg) => {
+    allMessages.push({ type: msg.type(), text: msg.text() })
+  })
+
+  await page.goto(`${testPageUrl}?use_shadow_dom_for_visual_editor_context_menu=0`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 10000
+  })
+
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.waitForSelector('body', { timeout: 5000 })
+
+  await page.evaluate(() => {
+    (window as any).__absmartlyTestMode = true
+  })
+
+  const sidebar = await injectSidebar(page, extensionUrl)
+
+  return { sidebar, allMessages }
+}
+
+/**
+ * Generic logging function with elapsed time and log level filtering
+ * @param message - Message to log
+ * @param level - Log level: 'debug', 'info', or 'error' (default: 'info')
+ */
+let testStartTime = Date.now()
+
+export function initializeTestLogging(): void {
+  testStartTime = Date.now()
+}
+
+export function log(message: string, level: 'debug' | 'info' | 'error' = 'info'): void {
+  const LOG_LEVELS = { debug: 0, info: 1, error: 2 }
+  const CURRENT_LOG_LEVEL = process.env.DEBUG === '1' || process.env.PWDEBUG === '1' ? LOG_LEVELS.debug : LOG_LEVELS.info
+
+  if (LOG_LEVELS[level] >= CURRENT_LOG_LEVEL) {
+    const elapsed = ((Date.now() - testStartTime) / 1000).toFixed(3)
+    console.log(`[+${elapsed}s] ${message}`)
+  }
+}
+
+/**
+ * Right-click helper for triggering context menus
+ * @param page - Playwright page or frame
+ * @param selector - CSS selector for element to right-click
+ */
+export async function rightClickElement(
+  target: Page | FrameLocator,
+  selector: string
+): Promise<void> {
+  let locator: Locator
+  if ('locator' in target && typeof (target as any).locator === 'function') {
+    locator = (target as any).locator(selector)
+  } else {
+    throw new Error('Invalid target passed to rightClickElement helper')
+  }
+
+  await locator.waitFor({ state: 'visible', timeout: 5000 })
+  await locator.click({ button: 'right' })
+  // Wait for context menu to appear
+  await (target instanceof Page
+    ? target.locator('#absmartly-menu-container')
+    : (target as FrameLocator).locator('#absmartly-menu-container')
+  ).waitFor({ state: 'attached', timeout: 2000 }).catch(() => {})
+}
+

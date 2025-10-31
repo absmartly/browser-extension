@@ -12,6 +12,7 @@ import { useExperimentVariants } from '~src/hooks/useExperimentVariants'
 import { useExperimentSave } from '~src/hooks/useExperimentSave'
 import { ExperimentCodeInjection } from './ExperimentCodeInjection'
 import type { ExperimentInjectionCode, URLFilter, DOMChangesData } from '~src/types/absmartly'
+import { sendToContent } from '~src/lib/messaging'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -169,26 +170,26 @@ export function ExperimentEditor({
     await saveExperiment(formData, currentVariants, undefined, onSave)
   }
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     // Cleanup function to stop VE and Preview
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        // Stop Visual Editor
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'STOP_VISUAL_EDITOR'
+    try {
+      // Stop Visual Editor
+      await sendToContent({
+        type: 'STOP_VISUAL_EDITOR'
+      })
+
+      // Remove Preview (use experiment name if available)
+      if (experiment?.name || formData.name) {
+        await sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove',
+          experimentName: experiment?.name || formData.name
         })
-        
-        // Remove Preview (use experiment name if available)
-        if (experiment?.name || formData.name) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experiment?.name || formData.name
-          })
-        }
       }
-    })
-    
+    } catch (error) {
+      console.error('Error cleaning up visual editor and preview:', error)
+    }
+
     onCancel()
   }
 
@@ -230,7 +231,7 @@ export function ExperimentEditor({
                 />
               </div>
             </div>
-            
+
             {/* Lock icon with bracket */}
             <div className="relative" style={{ width: '24px', paddingTop: '28px', marginLeft: '-24px' }}>
               {/* Bracket lines */}
@@ -267,7 +268,7 @@ export function ExperimentEditor({
                   />
                 </svg>
               )}
-              
+
               {/* Lock button positioned on the vertical line */}
               <button
                 type="button"

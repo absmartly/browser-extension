@@ -16,6 +16,7 @@ import { SDKConfigSection } from './settings/SDKConfigSection'
 import { QueryStringOverridesSection } from './settings/QueryStringOverridesSection'
 import { SDKInjectionSection } from './settings/SDKInjectionSection'
 import { Storage } from "@plasmohq/storage"
+import { sendToBackground } from '~src/lib/messaging'
 
 interface SettingsViewProps {
   onSave: (config: ABsmartlyConfig) => void
@@ -62,7 +63,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const loadConfig = async () => {
     try {
       const config = await getConfig()
-      
+
       // Load from config first
       let loadedApiKey = config?.apiKey || ''
       let loadedApiEndpoint = config?.apiEndpoint || ''
@@ -75,15 +76,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedPersistQueryToCookie = config?.persistQueryToCookie ?? true
       let loadedInjectSDK = config?.injectSDK ?? false
       let loadedSdkUrl = config?.sdkUrl || ''
-      
-      
+
+
       // In development, auto-load from environment variables if fields are empty
       // Plasmo replaces process.env.PLASMO_PUBLIC_* at build time
       const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
       const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
       const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
-      
-      
+
+
       // Only use env vars if the loaded values are empty
       if (!loadedApiKey && envApiKey) {
         loadedApiKey = envApiKey
@@ -94,8 +95,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       if (!loadedApplicationName && envApplicationName) {
         loadedApplicationName = envApplicationName
       }
-      
-      
+
+
       // Set the final values
       setApiKey(loadedApiKey)
       // Pre-fill with https:// if empty
@@ -109,7 +110,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setPersistQueryToCookie(loadedPersistQueryToCookie)
       setInjectSDK(loadedInjectSDK)
       setSdkUrl(loadedSdkUrl)
-      
+
       // Check authentication status if endpoint is set
       if (loadedApiEndpoint) {
         // Store endpoint in localStorage for avatar URLs
@@ -123,8 +124,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             apiKey: loadedApiKey,
             authMethod: loadedAuthMethod
           })
-        } else {
-          console.log('[SettingsView] Permissions not granted, skipping auto auth check')
         }
       }
     } catch (error) {
@@ -145,11 +144,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         origins: ['https://*.absmartly.com/*']
       })
 
-      console.log('[SettingsView] Permissions:', { hasCookies, hasHost })
-
       return { hasCookies, hasHost }
     } catch (error) {
-      console.error('[SettingsView] Error checking permissions:', error)
+      debugError('[SettingsView] Error checking permissions:', error)
       return { hasCookies: false, hasHost: false }
     }
   }
@@ -159,7 +156,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     const { hasCookies, hasHost } = await checkPermissions()
 
     if (hasCookies && hasHost) {
-      console.log('[SettingsView] All permissions already granted')
       setCookiePermissionGranted(true)
       return true
     }
@@ -175,22 +171,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       request.origins = ['https://*.absmartly.com/*']
     }
 
-    console.log('[SettingsView] Requesting missing permissions:', request)
-
     try {
       const granted = await chrome.permissions.request(request)
-
-      if (granted) {
-        console.log('[SettingsView] ✅ User granted missing permissions')
-        setCookiePermissionGranted(true)
-      } else {
-        console.log('[SettingsView] ❌ User denied missing permissions')
-        setCookiePermissionGranted(false)
-      }
-
+      setCookiePermissionGranted(granted)
       return granted
     } catch (error) {
-      console.error('[SettingsView] Error requesting missing permissions:', error)
+      debugError('[SettingsView] Error requesting missing permissions:', error)
       setCookiePermissionGranted(false)
       return false
     }
@@ -208,7 +194,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   }
 
   const checkAuthStatus = async (endpoint: string, configOverride?: { apiKey: string; authMethod: 'jwt' | 'apikey' }) => {
-    console.log('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
+    debugLog('[SettingsView] checkAuthStatus called with endpoint:', endpoint)
 
     // Always request permissions (both host access and cookies for JWT)
     const hasPermission = await requestCookiePermission()
@@ -231,43 +217,15 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         apiKey: apiKey
       }
 
-      const requestId = `auth_${Date.now()}`
-      console.log('[SettingsView] Sending CHECK_AUTH message to background, requestId:', requestId)
-
-      // Set up listener for the response BEFORE sending the message
-      // Use single chrome.runtime.onMessage listener (polyfill handles iframe context)
-      const responsePromise = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          chrome.runtime.onMessage.removeListener(listener)
-          reject(new Error('Auth check timed out (3s)'))
-        }, 3000)
-
-        // Single unified listener for chrome.runtime.onMessage
-        const listener = (message: any) => {
-          if (message.type === 'CHECK_AUTH_RESULT' && message.requestId === requestId) {
-            clearTimeout(timeout)
-            chrome.runtime.onMessage.removeListener(listener)
-            resolve(message.result)
-          }
-        }
-
-        chrome.runtime.onMessage.addListener(listener)
-      })
-
-      // Send the CHECK_AUTH message
-      chrome.runtime.sendMessage({
+      const response: any = await sendToBackground({
         type: 'CHECK_AUTH',
-        requestId: requestId,
+        requestId: `auth_${Date.now()}`,
         configJson: JSON.stringify(configToSend)
       })
 
-      // Wait for response
-      const response: any = await responsePromise
-      console.log('[SettingsView] Received CHECK_AUTH response:', response)
-      
-      if (response.success) {
-        console.log('[SettingsView] Auth check successful, user:', response.data?.user)
+      debugLog('[SettingsView] Received CHECK_AUTH response:', response)
 
+      if (response.success) {
         const apiUser = response.data?.user
         if (apiUser) {
           // Construct name from first_name and last_name like CreateExperimentDropdown does
@@ -286,7 +244,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           setUser(null)
         }
       } else {
-        console.error('[SettingsView] Auth check failed:', response.error)
+        debugError('[SettingsView] Auth check failed:', response.error)
         setUser(null)
 
         // Show specific error for permission issues
@@ -297,13 +255,11 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         }
       }
     } catch (error: any) {
-      console.error('[SettingsView] Auth check failed:', error)
+      debugError('[SettingsView] Auth check failed:', error)
       setUser(null)
 
       // Show specific error for timeout
       if (error.message?.includes('timed out')) {
-        console.log('[SettingsView] Auth timed out, checking permission status...')
-
         // Check which permissions are missing
         const { hasCookies, hasHost } = await checkPermissions()
 
@@ -313,21 +269,18 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           if (!hasCookies) missingPerms.push('cookies')
           if (!hasHost) missingPerms.push('host access')
 
-          console.log('[SettingsView] Missing permissions:', missingPerms.join(', '))
           setShowCookieConsentModal(true)
           setErrors({
             general: `Authentication timed out. Missing permissions: ${missingPerms.join(', ')}. Please grant permission to access ABsmartly.`
           })
         } else {
           // All permissions granted, but auth still timed out (different issue)
-          console.log('[SettingsView] All permissions granted, but auth still timed out')
           setErrors({
             general: 'Authentication check timed out. Please check your connection and try again.'
           })
         }
       }
     } finally {
-      console.log('[SettingsView] checkAuthStatus finally block - setting checkingAuth to false')
       setCheckingAuth(false)
     }
   }
@@ -509,7 +462,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         onBack={onCancel}
         config={apiEndpoint ? { apiEndpoint } : undefined}
       />
-      
+
       {errors.general && (
         <div role="alert" className="bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
           {errors.general}
@@ -527,8 +480,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         onCheckAuth={checkAuthStatus}
         onAuthenticate={handleAuthenticate}
       />
-      
+
       <Input
+        id="absmartly-endpoint"
         label="ABsmartly Endpoint"
         type="url"
         value={apiEndpoint}
@@ -536,7 +490,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         placeholder="https://api.absmartly.com"
         error={errors.apiEndpoint}
       />
-      
+
       {/* Authentication Method Toggle */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700">Authentication Method</label>
@@ -565,12 +519,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           </label>
         </div>
         <p className="text-xs text-gray-500">
-          {authMethod === 'jwt' 
+          {authMethod === 'jwt'
             ? 'Uses JWT token from browser cookies. You must be logged into ABsmartly.'
             : 'Uses the API key configured below for authentication.'}
         </p>
       </div>
-      
+
       <div>
         <Input
           id="api-key-input"
@@ -588,7 +542,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             : 'API key will be used for all authentication requests.'}
         </p>
       </div>
-      
+
       <Input
         label="Application Name (Optional)"
         type="text"
@@ -597,13 +551,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         placeholder="e.g., my-app, website, mobile-app"
         error={errors.applicationName}
       />
-      
+
       {/* DOM Changes Storage Settings */}
       <DOMChangesStorageSection
         domChangesFieldName={domChangesFieldName}
         onDomChangesFieldNameChange={setDomChangesFieldName}
       />
-      
+
       {/* SDK Configuration */}
       <SDKConfigSection
         sdkWindowProperty={sdkWindowProperty}

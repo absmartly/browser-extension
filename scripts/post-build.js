@@ -139,3 +139,27 @@ if (fs.existsSync(visualEditorSource)) {
     }
   }
 }
+
+// Copy SDK bridge bundle to build directories
+const sdkBridgeSource = path.join(__dirname, '..', 'public', 'absmartly-sdk-bridge.bundle.js');
+const sdkBridgeSourceMap = sdkBridgeSource + '.map';
+
+if (fs.existsSync(sdkBridgeSource)) {
+  [buildDir, devBuildDir].forEach(dir => {
+    if (fs.existsSync(dir)) {
+      const targetFile = path.join(dir, 'absmartly-sdk-bridge.bundle.js');
+      fs.copyFileSync(sdkBridgeSource, targetFile);
+      console.log(`Copied SDK bridge bundle to ${dir}`);
+
+      // Also copy source map if it exists
+      if (fs.existsSync(sdkBridgeSourceMap)) {
+        const targetSourceMap = targetFile + '.map';
+        fs.copyFileSync(sdkBridgeSourceMap, targetSourceMap);
+      }
+    }
+  });
+}
+
+// Console stripping removed - post-build minification was corrupting already-minified files
+// The SWC patch and optimized debug utilities provide sufficient console reduction
+

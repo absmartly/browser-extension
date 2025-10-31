@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-
+import { sendToContent } from '~src/lib/messaging'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
@@ -18,6 +18,7 @@ import { getExperimentStateLabel, getExperimentStateBadgeVariant } from '~src/ut
 import { ExperimentCodeInjection } from './ExperimentCodeInjection'
 import type { ExperimentInjectionCode } from '~src/types/absmartly'
 import type { URLFilter, DOMChangesData } from '~src/types/dom-changes'
+import { clearAllExperimentStorage } from '~src/utils/storage-cleanup'
 
 const storage = new Storage({ area: "local" })
 
@@ -110,13 +111,13 @@ export function ExperimentDetail({
 
     await save(formData, currentVariants, onUpdate)
 
-    // Clear storage after successful save - changes are now in the API
-    const storageKey = `experiment-${experiment.id}-variants`
-    storage.remove(storageKey).then(() => {
-      debugLog('🧹 Cleared variant data from storage after save for experiment', experiment.id)
-    }).catch(error => {
+    // Clear all storage after successful save - changes are now in the API
+    try {
+      await clearAllExperimentStorage(experiment.id)
+      debugLog('🧹 Cleared all DOM changes storage (session + local) after save for experiment', experiment.id)
+    } catch (error) {
       debugError('Failed to clear storage after save:', error)
-    })
+    }
 
     // Reset unsaved changes flag after successful save
     setHasUnsavedChanges(false)
@@ -170,35 +171,34 @@ export function ExperimentDetail({
 
   const handleBack = () => {
     // Cleanup function to stop VE and Preview
-    const cleanup = () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          // Stop Visual Editor
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'STOP_VISUAL_EDITOR'
-          })
+    const cleanup = async () => {
+      try {
+        // Stop Visual Editor
+        await sendToContent({
+          type: 'STOP_VISUAL_EDITOR'
+        })
 
-          // Remove Preview
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experiment.name
-          })
-        }
-      })
+        // Remove Preview
+        await sendToContent({
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove',
+          experimentName: experiment.name
+        })
+      } catch (error) {
+        debugError('Error during cleanup:', error)
+      }
     }
 
     if (hasUnsavedChanges) {
       if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
-        const storageKey = `experiment-${experiment.id}-variants`
         debugLog('🧹 User chose to discard changes for experiment', experiment.id)
-        // Clear storage only when discarding
-        storage.remove(storageKey).then(() => {
-          debugLog('🧹 Cleared variant data from storage for experiment', experiment.id)
+        // Clear all storage when discarding
+        clearAllExperimentStorage(experiment.id).then(() => {
+          debugLog('🧹 Cleared all DOM changes storage (session + local) when discarding for experiment', experiment.id)
           cleanup()
           onBack()
         }).catch(error => {
-          debugError('Failed to clear storage:', error)
+          debugError('Failed to clear storage when discarding:', error)
           cleanup()
           onBack()
         })
