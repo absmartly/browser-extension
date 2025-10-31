@@ -71,20 +71,28 @@ test.describe('Visual Editor Summary', () => {
     await page.waitForSelector('#absmartly-sidebar-root')
     const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
 
-    // Load experiments
-    console.log('✅ Step 1: Loading experiments from API')
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().waitFor({ state: 'visible', timeout: 10000 })
-    const experimentCount = await sidebarFrame.locator('div[class*="cursor-pointer"]').count()
+    // Wait for loading to complete
+    console.log('✅ Step 1: Waiting for experiments to load...')
+    await sidebarFrame.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
+      console.log('   Loading spinner not found or did not disappear - continuing anyway')
+    })
+
+    // Verify experiments loaded successfully
+    console.log('✅ Step 2: Verifying experiments loaded from API')
+    const experimentItem = sidebarFrame.locator('.experiment-item').first()
+    await experimentItem.waitFor({ state: 'visible', timeout: 10000 })
+
+    const experimentCount = await sidebarFrame.locator('.experiment-item').count()
     console.log(`   Found ${experimentCount} experiments`)
 
     // Open experiment
-    console.log('\n✅ Step 2: Opening experiment detail')
-    await sidebarFrame.locator('div[class*="cursor-pointer"]').first().click()
+    console.log('\n✅ Step 3: Opening experiment detail')
+    await experimentItem.click()
     await sidebarFrame.locator('button:has-text("Visual Editor")').first().waitFor({ state: 'visible' })
     console.log('   Experiment detail loaded')
 
     // Launch Visual Editor
-    console.log('\n✅ Step 3: Launching Visual Editor')
+    console.log('\n✅ Step 4: Launching Visual Editor')
     await sidebarFrame.locator('button:has-text("Visual Editor")').first().click()
     // TODO: Replace timeout with specific element wait
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
@@ -93,7 +101,7 @@ test.describe('Visual Editor Summary', () => {
     console.log('   Visual Editor header visible')
 
     // Test context menu
-    console.log('\n✅ Step 4: Testing context menu')
+    console.log('\n✅ Step 5: Testing context menu')
     const heading = page.locator('#hero-title').first()
     await heading.scrollIntoViewIfNeeded()
     await heading.click()
@@ -108,7 +116,7 @@ test.describe('Visual Editor Summary', () => {
     console.log('   Context menu triggered (see screenshot)')
 
     // Verify visual editor features
-    console.log('\n✅ Step 5: Visual Editor Features Available:')
+    console.log('\n✅ Step 6: Visual Editor Features Available:')
     console.log('   • Edit Element - Modify text content')
     console.log('   • Edit HTML - Change raw HTML')
     console.log('   • Inline Edit - Quick text changes')

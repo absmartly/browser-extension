@@ -10,6 +10,7 @@ import { AttributeEditor } from './AttributeEditor'
 import { DOMChangeOptions } from './DOMChangeOptions'
 import { CheckIcon, XMarkIcon, TrashIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline'
 import { JavaScriptEditor } from '~src/visual-editor/ui/javascript-editor'
+import { sendToContent } from '~src/lib/messaging'
 
 export interface EditingDOMChange {
   index: number | null
@@ -706,18 +707,18 @@ export const DOMChangeEditor = ({
               </label>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   // Send message to content script to open editor in page context
-                  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                    if (tabs[0]?.id) {
-                      chrome.tabs.sendMessage(tabs[0].id, {
-                        type: 'OPEN_JAVASCRIPT_EDITOR',
-                        data: {
-                          value: localChange.jsValue || ''
-                        }
-                      })
-                    }
-                  })
+                  try {
+                    await sendToContent({
+                      type: 'OPEN_JAVASCRIPT_EDITOR',
+                      data: {
+                        value: localChange.jsValue || ''
+                      }
+                    })
+                  } catch (error) {
+                    console.error('Error opening JavaScript editor:', error)
+                  }
                 }}
                 className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
                 title="Open fullscreen editor"

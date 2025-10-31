@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import type { Variant } from './VariantList'
+import { sendToContent } from '~src/lib/messaging'
 
 interface VariantConfigJSONEditorProps {
   isOpen: boolean
@@ -35,17 +36,20 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
     const fullConfig = variant.config
 
     // Send message to content script to open the JSON editor
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
+    const openEditor = async () => {
+      try {
+        await sendToContent({
           type: 'OPEN_JSON_EDITOR',
           data: {
             variantName: variant.name,
             value: JSON.stringify(fullConfig, null, 2)
           }
         })
+      } catch (error) {
+        console.error('Error opening JSON editor:', error)
       }
-    })
+    }
+    openEditor()
 
     const handleMessage = (message: any) => {
       if (message.type === 'JSON_EDITOR_SAVE') {
@@ -89,13 +93,16 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
+      const closeEditor = async () => {
+        try {
+          await sendToContent({
             type: 'CLOSE_JSON_EDITOR'
           })
+        } catch (error) {
+          console.error('Error closing JSON editor:', error)
         }
-      })
+      }
+      closeEditor()
     }
   }, [isOpen, variant])
 

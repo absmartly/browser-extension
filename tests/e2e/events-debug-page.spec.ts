@@ -1,9 +1,26 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
-import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
+import { injectSidebar } from './utils/test-helpers'
 import http from 'http'
 import fs from 'fs'
+
+/**
+ * E2E Tests for Events Debug Page
+ *
+ * Tests the Events Debug Page functionality including:
+ * - Capturing and displaying SDK events in real-time
+ * - Event detail modal display
+ * - Pause/resume event capture
+ * - Clear events functionality
+ * - Color-coded event types
+ * - Timestamp formatting
+ * - Handling events without data
+ * - Filtering non-SDK events
+ *
+ * All tests in this file are ACTIVE (no skipped tests). Tests use synthetic
+ * SDK events triggered via window.postMessage() and do not depend on external API availability.
+ */
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test.html')
 
@@ -23,7 +40,6 @@ test.beforeAll(async () => {
     testServer!.listen(0, '127.0.0.1', () => {
       const address = testServer!.address() as any
       testServerUrl = `http://127.0.0.1:${address.port}`
-      console.log(`Test server started at ${testServerUrl}`)
       resolve()
     })
   })
@@ -32,17 +48,11 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (testServer) {
     await new Promise<void>((resolve) => testServer!.close(() => resolve()))
-    console.log('Test server stopped')
   }
 })
 
 test.describe('Events Debug Page', () => {
-  test('sidebar loads with config (main UI)', async ({ context, extensionId, extensionUrl, seedStorage, getStorage }) => {
-    console.log('\n🚀 Starting sidebar test with config')
-    console.log('Extension ID:', extensionId)
-
-    // Seed config first
-    console.log('Seeding config...')
+  test('sidebar loads with config (main UI)', async ({ context, extensionUrl, seedStorage }) => {
     const config = {
       apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
       apiEndpoint: 'https://demo-2.absmartly.com/v1',
@@ -56,48 +66,24 @@ test.describe('Events Debug Page', () => {
       'absmartly-config': config,
       'plasmo:absmartly-config': config
     })
-    console.log('✅ Config seeded')
-
-    // Wait for config to propagate to extension
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    // Verify storage
-    const storage = await getStorage()
-    console.log('Storage keys:', Object.keys(storage))
-    console.log('Has config:', 'absmartly-config' in storage)
 
     const page = await context.newPage()
     await page.goto(testServerUrl!)
-    console.log('✅ Test page loaded')
 
-    // Inject sidebar
     const sidebar = await injectSidebar(page, extensionUrl)
-    console.log('✅ Sidebar injected')
-
-    // Wait for iframe to load
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
-    console.log('✅ Sidebar iframe loaded')
 
     // Wait for sidebar to load config from storage - wait for Events Debug button to appear
-    console.log('Waiting for sidebar to load config...')
     await sidebar.locator('button[aria-label="Events Debug"]').waitFor({ timeout: 10000 })
-    console.log('Wait complete')
 
     // Check if sidebar content shows main UI
     const sidebarHTML = await sidebar.locator('body').innerHTML()
-    console.log('Sidebar HTML length:', sidebarHTML.length)
 
     const hasWelcomeText = sidebarHTML.includes('Welcome to ABsmartly') || sidebarHTML.includes('Configure Settings')
     const hasExperimentsText = sidebarHTML.includes('Experiments')
     const hasEventsButton = sidebarHTML.includes('Events Debug')
-    console.log('Has welcome screen:', hasWelcomeText)
-    console.log('Has experiments UI:', hasExperimentsText)
-    console.log('Has Events Debug button:', hasEventsButton)
 
     expect(hasWelcomeText).toBe(false)
     expect(hasExperimentsText || hasEventsButton).toBe(true)
-
-    console.log('✅ Test passed - main UI shown with config!')
 
     await page.close()
   })
@@ -106,9 +92,8 @@ test.describe('Events Debug Page', () => {
   test.describe('Event Capture and Display', () => {
     let testPage: Page
     let sidebar: any
-    let consoleMessages: Array<{ type: string; text: string }> = []
 
-    test.beforeEach(async ({ context, extensionUrl, extensionId, seedStorage }) => {
+    test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
       // Seed config FIRST, before creating page
       await seedStorage({
         'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
@@ -118,9 +103,6 @@ test.describe('Events Debug Page', () => {
       })
 
       testPage = await context.newPage()
-
-      // Set up console logging to capture all messages
-      consoleMessages = setupConsoleLogging(testPage)
 
       // Use HTTP server instead of file:// URL so content scripts work properly
       await testPage.goto(testServerUrl!)
@@ -140,7 +122,6 @@ test.describe('Events Debug Page', () => {
       // Clear any buffered events to start each test fresh
       const eventCountText = await eventCount.textContent()
       if (eventCountText && !eventCountText.includes('0 events captured')) {
-        console.log('Clearing', eventCountText, 'before test...')
         const clearButton = sidebar.locator('button[title="Clear all events"]')
         await clearButton.waitFor({ state: 'visible', timeout: 2000 })
         await clearButton.evaluate((button) => {
@@ -154,24 +135,16 @@ test.describe('Events Debug Page', () => {
         })
         // Wait for events to be cleared
         await sidebar.locator('#events-debug-event-count:has-text("0 events captured")').waitFor({ state: 'visible', timeout: 5000 })
-        console.log('Events cleared successfully')
       }
     })
 
     test.afterEach(async () => {
-      // Print ALL console messages for debugging
-      console.log(`\n📋 Total console messages captured: ${consoleMessages.length}`)
-      console.log('📋 ALL messages:')
-      consoleMessages.forEach(msg => console.log(`  [${msg.type}] ${msg.text}`))
-
       if (testPage) await testPage.close()
     })
 
     test('captures and displays SDK events in real-time', async () => {
       await test.step('Trigger SDK ready event', async () => {
-        console.log('Sending SDK_EVENT via window.postMessage...')
         await testPage.evaluate(() => {
-          console.log('[TEST] About to send window.postMessage with SDK_EVENT')
           window.postMessage({
             source: 'absmartly-page',
             type: 'SDK_EVENT',
@@ -181,7 +154,6 @@ test.describe('Events Debug Page', () => {
               timestamp: new Date().toISOString()
             }
           }, '*')
-          console.log('[TEST] window.postMessage sent')
         })
       })
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-
+import { sendToContent } from '~src/lib/messaging'
 import { Button } from './ui/Button'
 import type { CustomCodeSection } from '~src/types/absmartly'
 
@@ -10,7 +10,7 @@ interface CustomCodeEditorProps {
   section: CustomCodeSection
   value: string
   onChange: (value: string) => void
-  onSave: () => void
+  onSave: (value: string) => void
   readOnly?: boolean
 }
 
@@ -42,96 +42,56 @@ export function CustomCodeEditor({
     }
 
     debugLog('CustomCodeEditor: Opening code editor for section:', section, 'with value length:', value?.length || 0)
-    console.log('[CustomCodeEditor] Effect running - isOpen:', isOpen, 'section:', section, 'value:', value?.substring(0, 50))
 
-    // Detect if we're in an iframe (test mode)
-    const isInIframe = window.self !== window.top
-
-    if (isInIframe) {
-      // Test/iframe mode: use postMessage to communicate with parent page
-      debugLog('CustomCodeEditor: Using iframe postMessage mode')
-      console.log('[CustomCodeEditor] Sending OPEN_CODE_EDITOR to parent window')
-      window.parent.postMessage({
-        source: 'absmartly-sidebar',
-        type: 'OPEN_CODE_EDITOR',
-        data: {
-          section,
-          value,
-          sectionTitle: getSectionTitle(section),
-          placeholder: getPlaceholder(section),
-          readOnly
-        }
-      }, '*')
-      console.log('[CustomCodeEditor] Message sent')
-    } else {
-      // Production mode: use chrome.tabs API
-      debugLog('CustomCodeEditor: Using chrome.tabs API mode')
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'OPEN_CODE_EDITOR',
-            data: {
-              section,
-              value,
-              sectionTitle: getSectionTitle(section),
-              placeholder: getPlaceholder(section),
-              readOnly
-            }
-          })
-        }
-      })
+    const openEditor = async () => {
+      try {
+        await sendToContent({
+          type: 'OPEN_CODE_EDITOR',
+          data: {
+            section,
+            value,
+            sectionTitle: getSectionTitle(section),
+            placeholder: getPlaceholder(section),
+            readOnly
+          }
+        })
+      } catch (error) {
+        console.error('Error opening code editor:', error)
+      }
     }
+    openEditor()
 
-    // Listen for messages from the background script or parent window
+    // Listen for messages from the background script
     const handleMessage = (message: any) => {
       debugLog('CustomCodeEditor received message:', message)
 
       if (message.type === 'CODE_EDITOR_SAVE') {
         debugLog('Saving value:', message.value)
-        // Update the value first
+        // Update the tempValue via onChange for immediate UI feedback
         onChangeRef.current(message.value)
-        // Use setTimeout to ensure React processes the state update before calling onSave
-        setTimeout(() => {
-          onSaveRef.current()
-        }, 0)
+        // Pass the value directly to onSave to avoid stale state issues
+        onSaveRef.current(message.value)
       } else if (message.type === 'CODE_EDITOR_CLOSE') {
         debugLog('Closing editor')
         onCloseRef.current()
       }
     }
 
-    const handleWindowMessage = (event: MessageEvent) => {
-      // Only handle messages from the parent window (in iframe mode)
-      if (event.data?.source === 'absmartly-content-script') {
-        handleMessage(event.data)
-      }
-    }
-
-    if (isInIframe) {
-      window.addEventListener('message', handleWindowMessage)
-    } else {
-      chrome.runtime.onMessage.addListener(handleMessage)
-    }
+    chrome.runtime.onMessage.addListener(handleMessage)
 
     return () => {
-      if (isInIframe) {
-        window.removeEventListener('message', handleWindowMessage)
-        // Tell content script to close the editor
-        window.parent.postMessage({
-          source: 'absmartly-sidebar',
-          type: 'CLOSE_CODE_EDITOR'
-        }, '*')
-      } else {
-        chrome.runtime.onMessage.removeListener(handleMessage)
-        // Tell content script to close the editor
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-              type: 'CLOSE_CODE_EDITOR'
-            })
-          }
-        })
+      chrome.runtime.onMessage.removeListener(handleMessage)
+      // Tell content script to close the editor
+      const closeEditor = async () => {
+        try {
+          await sendToContent({
+            type: 'CLOSE_CODE_EDITOR'
+          })
+        } catch (error) {
+          console.error('Error closing code editor:', error)
+        }
       }
+      closeEditor()
     }
   }, [isOpen, section, value]) // Only re-run when these change
 

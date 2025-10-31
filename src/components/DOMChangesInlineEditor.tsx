@@ -3,6 +3,8 @@ import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { all as knownCSSProperties } from 'known-css-properties'
 import { DOMChangeOptions } from './DOMChangeOptions'
 import { highlightCSSSelector, highlightHTML } from '~src/utils/syntax-highlighter'
+import { sendToContent, sendToBackground } from '~src/lib/messaging'
+import { clearVisualEditorSessionStorage } from '~src/utils/storage-cleanup'
 
 // Module-level flag to prevent concurrent VE launches from multiple variant instances
 let isLaunchingVisualEditor = false
@@ -125,33 +127,16 @@ export function DOMChangesInlineEditor({
     })
     debugLog('Saved state to storage')
 
-    // Start element picker
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (tabs[0]?.id) {
-        const tabId = tabs[0].id
-        const tabUrl = tabs[0].url || 'unknown'
-
-        // Check if this is a restricted page
-        if (tabUrl.startsWith('chrome://') ||
-            tabUrl.startsWith('chrome-extension://') ||
-            tabUrl.startsWith('edge://') ||
-            tabUrl.includes('chrome.google.com/webstore')) {
-          debugError('Content scripts cannot run on this page. Please try on a regular website.')
-          alert('Element picker cannot run on this page.\n\nPlease navigate to a regular website and try again.')
-          setPickingForField(null)
-          return
-        }
-
-        // Send element picker message
-        chrome.tabs.sendMessage(tabId, {
-          type: 'START_ELEMENT_PICKER'
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            debugError('Error starting element picker:', chrome.runtime.lastError)
-          }
-        })
-      }
-    })
+    try {
+      // Send element picker message
+      await sendToContent({
+        type: 'START_ELEMENT_PICKER'
+      })
+    } catch (error) {
+      debugError('Error starting element picker:', error)
+      alert('Element picker cannot run on this page.\n\nPlease navigate to a regular website and try again.')
+      setPickingForField(null)
+    }
   }
 
   // Restore state when component mounts
@@ -469,6 +454,9 @@ export function DOMChangesInlineEditor({
 
         // Mark VE as stopped for this variant after processing changes
         onVEStop()
+        clearVisualEditorSessionStorage().catch(error => {
+          debugError('Failed to clear Visual Editor session storage:', error)
+        })
         })() // Execute async function immediately
         return true // Indicate we will respond asynchronously
       } else if (message.type === 'VISUAL_EDITOR_STOPPED') {
@@ -477,6 +465,9 @@ export function DOMChangesInlineEditor({
 
         // Mark VE as stopped for this variant - re-enable all VE buttons
         onVEStop()
+        clearVisualEditorSessionStorage().catch(error => {
+          debugError('Failed to clear Visual Editor session storage:', error)
+        })
         return true
       }
     }
@@ -521,13 +512,25 @@ export function DOMChangesInlineEditor({
   }, [variantName, onChange]) // Removed 'changes' - handler doesn't need it since messages contain changes
 
   const handleLaunchVisualEditor = async () => {
-    // TEMPORARY DEBUG: This alert should show up in test
-    if (typeof window !== 'undefined') {
-      console.log('[DOMChanges] HANDLER CALLED - about to query tabs')
+    try {
+      console.log('[DOMChanges] 🎯 HANDLER CALLED: handleLaunchVisualEditor')
+      console.log('[DOMChanges] 🎯 variantName:', variantName)
+      console.log('[DOMChanges] 🎯 variantIndex:', variantIndex)
+      console.log('[DOMChangesInlineEditor] 🎨 Launch requested for variant:', variantName)
+      console.log('[DOMChangesInlineEditor] 🎨 activeVEVariant state:', activeVEVariant)
+      console.log('[DOMChangesInlineEditor] 🎨 isLaunchingVisualEditor flag:', isLaunchingVisualEditor)
+
+      return await handleLaunchVisualEditorInner()
+    } catch (error) {
+      console.error('[DOMChanges] ❌ FATAL ERROR in handleLaunchVisualEditor:', error)
+      console.error('[DOMChanges] Error message:', error?.message)
+      console.error('[DOMChanges] Error stack:', error?.stack)
+      isLaunchingVisualEditor = false
     }
-    console.log('[DOMChangesInlineEditor] 🎨 Launch requested for variant:', variantName)
-    console.log('[DOMChangesInlineEditor] 🎨 activeVEVariant state:', activeVEVariant)
-    console.log('[DOMChangesInlineEditor] 🎨 isLaunchingVisualEditor flag:', isLaunchingVisualEditor)
+  }
+
+  const handleLaunchVisualEditorInner = async () => {
+    console.log('[DOMChanges] 🎯 Starting handleLaunchVisualEditorInner')
 
     // Check if VE is already active for ANY variant (including this one)
     if (activeVEVariant) {
@@ -563,21 +566,8 @@ export function DOMChangesInlineEditor({
     }
 
     console.log('[DOMChanges] Using tab ID:', tabs[0]?.id)
-    if (tabs[0]?.id) {
-      try {
-        const isVEActive = await chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'CHECK_VISUAL_EDITOR_ACTIVE'
-        })
-        if (isVEActive) {
-          debugLog('⏭️ Visual Editor already active in page, skipping launch')
-          isLaunchingVisualEditor = false
-          alert(`Visual Editor is already running. Please close it first before launching for "${variantName}".`)
-          return
-        }
-      } catch (e) {
-        // Ignore errors from CHECK message
-      }
-    }
+    // Note: We skip the CHECK message because it fails when content script isn't ready yet
+    // The START_VISUAL_EDITOR message will handle the check server-side
 
     try {
       console.log('[DOMChangesInlineEditor] 🎨 Launching Visual Editor for variant:', variantName)
@@ -593,10 +583,16 @@ export function DOMChangesInlineEditor({
 
       // Set a flag to prevent preview header from showing FIRST
       if (tabs[0]?.id) {
-        await chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'SET_VISUAL_EDITOR_STARTING',
-          starting: true
-        })
+        try {
+          await sendToContent({
+            type: 'SET_VISUAL_EDITOR_STARTING',
+            starting: true
+          })
+          console.log('[DOMChangesInlineEditor] ✅ SET_VISUAL_EDITOR_STARTING sent successfully')
+        } catch (e) {
+          console.error('[DOMChangesInlineEditor] ⚠️ SET_VISUAL_EDITOR_STARTING failed (content script may not be ready yet):', e?.message)
+          // Continue anyway - the content script will handle this gracefully
+        }
       }
 
     // If preview is not enabled, enable it
@@ -622,40 +618,50 @@ export function DOMChangesInlineEditor({
     debugLog('Experiment name:', experimentName)
     debugLog('Changes:', changes)
 
-    // Test if we can send any message at all
-    chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
-      debugLog('PING response:', response)
-    })
-
-    // Send directly to content script (no relay through background)
-    console.log('[DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id:', tabs[0]?.id)
+    // Send directly to content script
+    console.log('[DOMChanges] 🚀 READY TO SEND START_VISUAL_EDITOR')
+    console.log('[DOMChanges] tabs[0]?.id:', tabs[0]?.id)
+    console.log('[DOMChanges] tabs array length:', tabs.length)
     if (tabs[0]?.id) {
-      const tabId = tabs[0].id
-      console.log('[DOMChanges] Sending START_VISUAL_EDITOR to tab:', tabId)
+      console.log('[DOMChanges] ✅ SENDING START_VISUAL_EDITOR')
+      console.log('[DOMChanges] Variant:', variantName)
+      console.log('[DOMChanges] Experiment:', experimentName)
+      console.log('[DOMChanges] Changes count:', changes.length)
 
-      // Let content script detect test mode itself (it checks URL params and window flags)
-      // Don't pass useShadowDOM - let content script decide based on URL param
-      chrome.tabs.sendMessage(tabId, {
-        type: 'START_VISUAL_EDITOR',
-        variantName,
-        experimentName,
-        changes
-      }, (response) => {
-        debugLog('📨 Response received from content script:', response)
-        if (chrome.runtime.lastError) {
-          debugError('❌ Chrome runtime error:', chrome.runtime.lastError)
-        } else if (response?.error) {
+      try {
+        // Send START_VISUAL_EDITOR directly to content script
+        console.log('[DOMChanges] 📤 Sending START_VISUAL_EDITOR to content script')
+        console.log('[DOMChanges] Variant:', variantName)
+
+        const response = await sendToContent({
+          type: 'START_VISUAL_EDITOR',
+          variantName,
+          experimentName,
+          changes
+        })
+
+        console.log('[DOMChanges] 🔔 RESPONSE from content script:', JSON.stringify(response))
+
+        if (response?.error) {
+          console.error('[DOMChanges] ❌ Error from content script:', response.error)
           debugError('❌ Error from content script:', response.error)
           alert('Failed to start visual editor: ' + response.error)
-        } else {
+        } else if (response?.success) {
+          console.log('[DOMChanges] ✅ Visual editor started successfully')
           debugLog('✅ Visual editor started successfully:', response)
+        } else {
+          console.log('[DOMChanges] 📨 Response:', JSON.stringify(response))
         }
-        // Reset flag after message is sent
         isLaunchingVisualEditor = false
-      })
+      } catch (e) {
+        console.error('[DOMChanges] ❌ Exception while sending to content:', e?.message)
+        debugError('❌ Exception sending to content:', e?.message)
+        isLaunchingVisualEditor = false
+      }
     } else {
-      console.error('[DOMChanges] ❌ No active tab found after tabs query')
+      console.error('[DOMChanges] ❌ NO ACTIVE TAB FOUND after tabs query')
       console.error('[DOMChanges] tabs array:', tabs)
+      console.error('[DOMChanges] tabs.length:', tabs.length)
       debugError('❌ No active tab found')
       isLaunchingVisualEditor = false
     }
@@ -694,39 +700,20 @@ export function DOMChangesInlineEditor({
     await storage.set('domChangesInlineState', stateToSave)
     
     // Start drag-drop picker
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (tabs[0]?.id) {
-        const tabId = tabs[0].id
-        const tabUrl = tabs[0].url || 'unknown'
-        
-        // Check if this is a restricted page
-        if (tabUrl.startsWith('chrome://') || 
-            tabUrl.startsWith('chrome-extension://') || 
-            tabUrl.startsWith('edge://') ||
-            tabUrl.includes('chrome.google.com/webstore')) {
-          debugError('Content scripts cannot run on this page.')
-          return
-        }
-        
-        // Send message to start drag-drop picker
-        chrome.tabs.sendMessage(tabId, {
-          type: 'START_DRAG_DROP_PICKER'
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            debugError('Error starting drag-drop picker:', chrome.runtime.lastError)
-          } else {
-            debugLog('Drag-drop picker started successfully:', response)
-          }
-        })
-        // Visual editor started in sidebar
-      }
-    })
+    try {
+      const response = await sendToContent({
+        type: 'START_DRAG_DROP_PICKER'
+      })
+      debugLog('Drag-drop picker started successfully:', response)
+    } catch (error) {
+      debugError('Error starting drag-drop picker:', error)
+    }
   }
 
   const handleStartElementPicker = async (fieldId: string) => {
     debugLog('Starting element picker for field:', fieldId)
     setPickingForField(fieldId)
-    
+
     // Save current state before picker starts
     const storage = new Storage({ area: "session" })
     await storage.set('domChangesInlineState', {
@@ -735,39 +722,18 @@ export function DOMChangesInlineEditor({
       pickingForField: fieldId
     })
     debugLog('Saved state to storage')
-    
+
     // Sidebar state will be handled by the parent component's effect
     // We just need to ensure our state is saved before closing
-    
+
     // Start element picker
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (tabs[0]?.id) {
-        const tabId = tabs[0].id
-        const tabUrl = tabs[0].url || 'unknown'
-
-        // Check if this is a restricted page
-        if (tabUrl.startsWith('chrome://') ||
-            tabUrl.startsWith('chrome-extension://') ||
-            tabUrl.startsWith('edge://') ||
-            tabUrl.includes('chrome.google.com/webstore')) {
-          debugError('Content scripts cannot run on this page. Please try on a regular website.')
-          return
-        }
-
-        // Send element picker message
-        chrome.tabs.sendMessage(tabId, {
-          type: 'START_ELEMENT_PICKER'
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            debugError('Error starting element picker:', chrome.runtime.lastError)
-          }
-        })
-
-        // The sidebar should remain open to receive the element selection
-      } else {
-        debugError('No active tab found!')
-      }
-    })
+    try {
+      await sendToContent({
+        type: 'START_ELEMENT_PICKER'
+      })
+    } catch (error) {
+      debugError('Error starting element picker:', error)
+    }
   }
 
   const handleToggleChange = (index: number) => {

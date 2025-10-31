@@ -130,8 +130,11 @@ describe('Manifest Permissions', () => {
 
     it('should use HTTPS for all host permissions', () => {
       // All host permissions should use HTTPS for security
+      // Exception: localhost is allowed for local development
       manifest.host_permissions.forEach((permission: string) => {
-        expect(permission).toMatch(/^https:\/\//)
+        if (permission !== 'http://localhost/*') {
+          expect(permission).toMatch(/^https:\/\//)
+        }
       })
     })
 

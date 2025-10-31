@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { XMarkIcon, PlusIcon } from '@heroicons/react/24/outline'
-import { Button } from './ui/button'
-import { Input } from './ui/input'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
 import type { DOMChangesConfig } from '../types/dom-changes'
 
 interface URLFilterSectionProps {

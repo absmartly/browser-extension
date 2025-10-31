@@ -283,7 +283,6 @@ export function initializeBackgroundScript() {
       })
       sendResponse({ success: true })
     } else if (message.type === 'CHECK_AUTH') {
-      console.log('[Background CHECK_AUTH] Received with requestId:', message.requestId)
       debugLog('[Background CHECK_AUTH] Received with requestId:', message.requestId)
 
       // Parse config from JSON if present (allows passing current form values)
@@ -291,10 +290,8 @@ export function initializeBackgroundScript() {
       if (message.configJson) {
         try {
           configToUse = JSON.parse(message.configJson)
-          console.log('[Background CHECK_AUTH] Using config from message:', configToUse)
           debugLog('[Background CHECK_AUTH] Using config from message:', configToUse)
         } catch (e) {
-          console.error('[Background CHECK_AUTH] Failed to parse configJson:', e)
           debugError('[Background CHECK_AUTH] Failed to parse configJson:', e)
         }
       }
@@ -305,51 +302,30 @@ export function initializeBackgroundScript() {
         : getConfig(storage, secureStorage)
 
       configPromise.then(async config => {
-        console.log('[Background CHECK_AUTH] Got config, about to check auth')
         if (!config) {
-          console.log('[Background CHECK_AUTH] No config, sending error')
-          // Send result as new message with requestId
-          chrome.runtime.sendMessage({
-            type: 'CHECK_AUTH_RESULT',
-            requestId: message.requestId,
-            result: {
-              authenticated: false,
-              error: 'No configuration available'
-            }
-          })
-          sendResponse({ success: true })
+          const errorResult = {
+            success: false,
+            error: 'No configuration available'
+          }
+          sendResponse(errorResult)
           return
         }
 
         try {
-          console.log('[Background CHECK_AUTH] Calling checkAuthentication...')
           const authResult = await checkAuthentication(config)
-          console.log('[Background CHECK_AUTH] Auth result:', authResult)
           debugLog('[Background CHECK_AUTH] Auth result:', authResult)
 
-          // Send result as new message with requestId
-          chrome.runtime.sendMessage({
-            type: 'CHECK_AUTH_RESULT',
-            requestId: message.requestId,
-            result: authResult
-          })
-
-          sendResponse({ success: true })
+          // Send result directly in response
+          sendResponse(authResult)
         } catch (error) {
-          console.error('[Background CHECK_AUTH] Error:', error)
           debugError('[Background CHECK_AUTH] Error:', error)
 
-          // Send error result as new message with requestId
-          chrome.runtime.sendMessage({
-            type: 'CHECK_AUTH_RESULT',
-            requestId: message.requestId,
-            result: {
-              authenticated: false,
-              error: error instanceof Error ? error.message : String(error)
-            }
-          })
-
-          sendResponse({ success: true })
+          // Send error result
+          const errorResult = {
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          }
+          sendResponse(errorResult)
         }
       })
 
