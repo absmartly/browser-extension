@@ -72,8 +72,12 @@ export class BackgroundAPIClient {
   
   async createExperiment(data: any): Promise<Experiment> {
     try {
-      return await this.makeRequest('POST', '/experiments', data)
+      console.log('[createExperiment] Request data:', JSON.stringify(data, null, 2))
+      const response = await this.makeRequest('POST', '/experiments', data)
+      console.log('[createExperiment] Full response:', JSON.stringify(response, null, 2))
+      return response
     } catch (error) {
+      console.error('[createExperiment] Error:', error)
       debugError('Failed to create experiment:', error)
       throw error
     }
