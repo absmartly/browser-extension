@@ -289,12 +289,19 @@ export class Orchestrator {
    */
   private handlePreviewChanges(payload: any): void {
     Logger.log('[ABsmartly Page] Handling PREVIEW_CHANGES message')
-    const { changes, experimentName, variantName } = payload || {}
+    const { changes, experimentName, variantName, updateMode } = payload || {}
     const expName = experimentName || '__preview__'
 
     Logger.log('[ABsmartly Page] Preview changes received for experiment:', expName)
     Logger.log('[ABsmartly Page] Variant name:', variantName)
+    Logger.log('[ABsmartly Page] Update mode:', updateMode)
     Logger.log('[ABsmartly Page] Changes to apply:', changes)
+
+    // If updateMode is 'replace', remove all existing changes first
+    if (updateMode === 'replace') {
+      Logger.log('[ABsmartly Page] Replace mode: removing existing changes first')
+      this.previewManager.removePreviewChanges(expName)
+    }
 
     if (!changes || changes.length === 0) {
       Logger.warn('[ABsmartly Page] No changes to apply')
