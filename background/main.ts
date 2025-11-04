@@ -248,6 +248,7 @@ export function initializeBackgroundScript() {
       makeAPIRequest(message.method, message.path, message.data)
         .then(data => {
           debugLog('[Background] API request successful')
+          console.log('[Background] Full API response:', JSON.stringify(data, null, 2))
           sendResponse({ success: true, data })
         })
         .catch(error => {

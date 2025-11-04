@@ -227,7 +227,23 @@ export async function makeAPIRequest(
       withCredentials: false
     })
 
-    return response.data
+    const responseData = response.data
+
+    // Check if response indicates an error even with 200 status
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.ok === false) {
+        const errorMessage = Array.isArray(responseData.errors) && responseData.errors.length > 0
+          ? responseData.errors.join(', ')
+          : responseData.error || 'API request failed'
+        
+        const error = new Error(errorMessage)
+        ;(error as any).response = response
+        ;(error as any).responseData = responseData
+        throw error
+      }
+    }
+
+    return responseData
   } catch (error) {
     const axiosError = error as AxiosError
     debugError('Request failed:', axiosError.response?.status, axiosError.response?.data)
