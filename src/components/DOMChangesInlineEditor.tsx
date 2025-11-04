@@ -748,6 +748,22 @@ export function DOMChangesInlineEditor({
       allChanges: newChanges
     })
     onChange(newChanges)
+
+    // If preview is enabled, re-apply changes to reflect the toggle
+    if (previewEnabled && experimentName && variantName) {
+      const enabledChanges = newChanges.filter(c => c.enabled !== false)
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'update',
+            changes: enabledChanges,
+            experimentName: experimentName,
+            variantName: variantName
+          })
+        }
+      })
+    }
   }
 
   const handleDeleteChange = (index: number) => {
