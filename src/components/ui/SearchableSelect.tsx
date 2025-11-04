@@ -112,10 +112,15 @@ export function SearchableSelect(props: SearchableSelectProps) {
       setIsOpen(false)
       setSearchTerm('')
     } else {
-      if (props.selectedIds.includes(optionId)) {
+      const isRemoving = props.selectedIds.includes(optionId)
+      if (isRemoving) {
         props.onChange(props.selectedIds.filter(id => id !== optionId))
+        // Keep dropdown open when removing items so user can add more
       } else {
         props.onChange([...props.selectedIds, optionId])
+        // Close dropdown after adding an item
+        setIsOpen(false)
+        setSearchTerm('')
       }
     }
   }

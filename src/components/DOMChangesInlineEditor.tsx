@@ -353,8 +353,8 @@ export function DOMChangesInlineEditor({
         if (message.changes && Array.isArray(message.changes)) {
           debugLog('📝 Merging visual editor changes with existing changes')
 
-          // Get current changes from parent
-          const currentChanges = changes || []
+          // Get current changes from ref (always up-to-date)
+          const currentChanges = changesRef.current || []
 
           // Create a map to track unique changes by selector and type
           const changesMap = new Map()
@@ -509,7 +509,7 @@ export function DOMChangesInlineEditor({
       window.removeEventListener('message', handleWindowMessage)
       chrome.storage.session.onChanged.removeListener(handleStorageChange)
     }
-  }, [variantName, onChange]) // Removed 'changes' - handler doesn't need it since messages contain changes
+  }, [variantName]) // Only depend on variantName - handler uses changesRef.current and stable onChange via callback
 
   const handleLaunchVisualEditor = async () => {
     try {
