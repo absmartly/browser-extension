@@ -708,13 +708,15 @@ function SidebarContent() {
         await createExperiment(experiment)
       }
       setView('list')
-      loadExperiments(true, 1, pageSize) // Refresh and go to first page
+      loadExperiments(true, 1, pageSize)
+      setToast({ message: 'Experiment saved successfully!', type: 'success' })
     } catch (err: any) {
       if (err.isAuthError || err.message === 'AUTH_EXPIRED') {
         setIsAuthExpired(true)
         setError('Your session has expired. Please log in again.')
       } else {
-        setError('Failed to save experiment')
+        const errorMessage = err.message || 'Failed to save experiment'
+        setToast({ message: errorMessage, type: 'error' })
       }
       debugError('Failed to save experiment:', err)
     }

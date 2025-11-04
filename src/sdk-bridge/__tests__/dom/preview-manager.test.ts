@@ -160,18 +160,67 @@ describe('PreviewManager', () => {
       expect(testElement.classList.contains('new-class')).toBe(true)
     })
 
-    it('should apply attribute change', () => {
+    it('should apply attribute changes with object format', () => {
       const change: DOMChange = {
         selector: '#test-element',
         type: 'attribute',
-        attribute: 'data-value',
-        value: '123'
+        value: {
+          'data-value': '123',
+          'data-test': 'foo',
+          'aria-label': 'Test Element'
+        }
       }
 
       const result = previewManager.applyPreviewChange(change, 'exp-1')
 
       expect(result).toBe(true)
       expect(testElement.getAttribute('data-value')).toBe('123')
+      expect(testElement.getAttribute('data-test')).toBe('foo')
+      expect(testElement.getAttribute('aria-label')).toBe('Test Element')
+    })
+
+    it('should remove attributes when value is null', () => {
+      testElement.setAttribute('data-remove-me', 'value')
+      testElement.setAttribute('data-keep-me', 'value')
+
+      const change: DOMChange = {
+        selector: '#test-element',
+        type: 'attribute',
+        value: {
+          'data-remove-me': null,
+          'data-keep-me': 'updated'
+        }
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(true)
+      expect(testElement.hasAttribute('data-remove-me')).toBe(false)
+      expect(testElement.getAttribute('data-keep-me')).toBe('updated')
+    })
+
+    it('should handle multiple attribute changes on same element', () => {
+      const linkElement = document.createElement('a')
+      linkElement.id = 'test-link'
+      linkElement.href = 'https://old.com'
+      document.body.appendChild(linkElement)
+
+      const change: DOMChange = {
+        selector: '#test-link',
+        type: 'attribute',
+        value: {
+          'href': 'https://new.com',
+          'target': '_blank',
+          'rel': 'noopener noreferrer'
+        }
+      }
+
+      const result = previewManager.applyPreviewChange(change, 'exp-1')
+
+      expect(result).toBe(true)
+      expect(linkElement.getAttribute('href')).toBe('https://new.com')
+      expect(linkElement.getAttribute('target')).toBe('_blank')
+      expect(linkElement.getAttribute('rel')).toBe('noopener noreferrer')
     })
 
     it('should apply delete change by hiding', () => {

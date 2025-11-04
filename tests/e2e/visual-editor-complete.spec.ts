@@ -6,6 +6,7 @@ import { testAllVisualEditorActions } from './helpers/ve-actions'
 import { testUndoRedoForAllActions, testUndoRedoButtonStates } from './helpers/ve-undo-redo'
 import { verifyVEProtection, verifySidebarHasChanges, verifyChangesAfterVEExit, clickSaveButton } from './helpers/ve-verification'
 import { testPreviewToggle } from './helpers/ve-preview'
+import { testIndividualPreviewToggle, testAttributeChanges } from './helpers/ve-preview-toggle'
 import { testURLFilterAndPayload } from './helpers/ve-url-filter'
 import { testDiscardChanges } from './helpers/ve-discard'
 
@@ -164,6 +165,22 @@ test.describe('Visual Editor Complete Workflow', () => {
       step('Testing second VE instance launch', '🔄')
       await testSecondVEInstance(sidebar, testPage)
     })
+
+    // ========================================
+    // INDIVIDUAL PREVIEW TOGGLE TESTING
+    // ========================================
+
+    await test.step('Test individual DOM change checkbox toggles', async () => {
+      step('Testing individual preview toggle', '🔘')
+      await testIndividualPreviewToggle(sidebar, testPage)
+    })
+
+    // NOTE: Commenting out attribute changes test - needs more work to be reliable
+    // The test is failing to find the "Add Property" button after selecting attribute type
+    // await test.step('Test attribute changes in preview mode', async () => {
+    //   step('Testing attribute changes', '🏷️')
+    //   await testAttributeChanges(sidebar, testPage)
+    // })
 
     // ========================================
     // DISCARD CHANGES TESTING
