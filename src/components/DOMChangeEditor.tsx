@@ -400,11 +400,13 @@ const CSSStyleEditor = ({
 // Unified DOM Change Editor Component
 export const DOMChangeEditor = ({
   editingChange: initialChange,
+  variantIndex,
   onSave,
   onCancel,
   onStartPicker
 }: {
   editingChange: EditingDOMChange,
+  variantIndex: number,
   onSave: (change: EditingDOMChange) => void,
   onCancel: () => void,
   onStartPicker: (field: string) => void
@@ -431,6 +433,10 @@ export const DOMChangeEditor = ({
   }, [localChange])
 
   const isEditMode = localChange.index !== null
+  // Create unique ID suffix using variant index and change index
+  // For new changes (index === null), use 'new' as the change index
+  const changeIdx = localChange.index !== null ? localChange.index : 'new'
+  const idSuffix = `${variantIndex}-${changeIdx}`
 
   return (
     <div className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
@@ -464,6 +470,7 @@ export const DOMChangeEditor = ({
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <input
+              id={`dom-change-selector-${idSuffix}`}
               value={localChange.selector}
               onChange={(e) => setLocalChange({ ...localChange, selector: e.target.value })}
               placeholder=".cta-button, #header, [data-test='submit']"
@@ -497,6 +504,7 @@ export const DOMChangeEditor = ({
           Change Type
         </label>
         <select
+          id={`dom-change-type-${idSuffix}`}
           value={localChange.type}
           onChange={(e) => {
             const newType = e.target.value as DOMChangeType

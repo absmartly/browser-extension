@@ -2,20 +2,23 @@ import React from 'react'
 import { CheckIcon } from '@heroicons/react/24/solid'
 
 interface CheckboxProps {
+  id?: string
   checked?: boolean
   onChange?: (checked: boolean) => void
   disabled?: boolean
   className?: string
 }
 
-export function Checkbox({ 
-  checked = false, 
-  onChange, 
+export function Checkbox({
+  id,
+  checked = false,
+  onChange,
   disabled = false,
   className = ''
 }: CheckboxProps) {
   return (
     <button
+      id={id}
       type="button"
       role="checkbox"
       aria-checked={checked}

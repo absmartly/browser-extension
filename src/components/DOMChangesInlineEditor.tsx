@@ -1328,6 +1328,7 @@ export function DOMChangesInlineEditor({
                   <div key={index}>
                     <DOMChangeEditor
                       editingChange={editingChange}
+                      variantIndex={variantIndex}
                       onSave={handleSaveChange}
                       onCancel={handleCancelEdit}
                       onStartPicker={(field) => {
@@ -1418,6 +1419,7 @@ export function DOMChangesInlineEditor({
                       <div className="flex flex-col items-center gap-1">
                         {/* Checkbox */}
                         <Checkbox
+                          id={`dom-change-checkbox-${index}`}
                           checked={change.enabled !== false}
                           onChange={() => handleToggleChange(index)}
                         />
@@ -1508,6 +1510,7 @@ export function DOMChangesInlineEditor({
       {editingChange && editingChange.index === null && (
         <DOMChangeEditor
           editingChange={editingChange}
+          variantIndex={variantIndex}
           onSave={handleSaveChange}
           onCancel={handleCancelEdit}
           onStartPicker={(field) => {
