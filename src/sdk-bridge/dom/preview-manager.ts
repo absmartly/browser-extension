@@ -123,8 +123,14 @@ export class PreviewManager {
           break
 
         case 'attribute':
-          if (change.attribute && change.value !== undefined) {
-            element.setAttribute(change.attribute, change.value)
+          if (change.value && typeof change.value === 'object') {
+            Object.entries(change.value).forEach(([attr, value]) => {
+              if (value === null || value === undefined) {
+                element.removeAttribute(attr)
+              } else {
+                element.setAttribute(attr, String(value))
+              }
+            })
           }
           break
 
