@@ -30,6 +30,7 @@ export interface Experiment {
   stopped_at?: string
   type?: 'group_sequential' | 'fixed_horizon'
   favorite?: boolean
+  custom_section_field_values?: ExperimentCustomSectionFieldValue[] | Record<string, any>
 }
 
 export interface Variant {
@@ -138,6 +139,36 @@ export interface ExperimentInjectionCode {
   bodyStart?: string  // Injected at top of <body>
   bodyEnd?: string    // Injected at bottom of <body>
   urlFilter?: import('~src/types/dom-changes').URLFilter  // URL filtering (same type as DOM changes)
+}
+
+export type CustomSectionFieldType = 'text' | 'string' | 'json' | 'boolean' | 'number'
+
+export interface ExperimentCustomSectionField {
+  id: number
+  section_id: number
+  title: string
+  help_text: string
+  placeholder: string
+  default_value: string
+  type: CustomSectionFieldType
+  required: boolean
+  archived: boolean
+  order_index: number
+  available_in_sdk?: boolean
+  sdk_field_name?: string | null
+  created_at?: string
+  updated_at?: string | null
+}
+
+export interface ExperimentCustomSectionFieldValue {
+  id?: number
+  experiment_id?: number
+  experiment_custom_section_field_id?: number
+  type: CustomSectionFieldType
+  value: string
+  updated_at?: string
+  updated_by_user_id?: number
+  default_value?: string
 }
 
 export type { URLFilter, DOMChangesData } from './dom-changes'
