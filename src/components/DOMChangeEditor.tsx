@@ -446,6 +446,7 @@ export const DOMChangeEditor = ({
         </h5>
         <div className="flex gap-2">
           <button
+            id={`dom-change-save-${idSuffix}`}
             onClick={() => onSave(localChange)}
             className="p-1 text-green-600 hover:text-green-800"
             title="Save"
@@ -453,6 +454,7 @@ export const DOMChangeEditor = ({
             <CheckIcon className="h-5 w-5" />
           </button>
           <button
+            id={`dom-change-cancel-${idSuffix}`}
             onClick={onCancel}
             className="p-1 text-gray-400 hover:text-gray-600"
             title="Cancel"
@@ -687,6 +689,7 @@ export const DOMChangeEditor = ({
           <AttributeEditor
             attributeProperties={localChange.attributeProperties || [{ key: '', value: '' }]}
             onChange={(attrs) => setLocalChange({ ...localChange, attributeProperties: attrs })}
+            idSuffix={idSuffix}
           />
         </div>
       )}

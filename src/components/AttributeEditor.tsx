@@ -15,11 +15,13 @@ const commonAttributes = [
 interface AttributeEditorProps {
   attributeProperties: Array<{ key: string; value: string }> | undefined
   onChange: (properties: Array<{ key: string; value: string }>) => void
+  idSuffix?: string
 }
 
 export const AttributeEditor = ({
   attributeProperties,
-  onChange
+  onChange,
+  idSuffix
 }: AttributeEditorProps) => {
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -210,6 +212,7 @@ export const AttributeEditor = ({
 
         {/* Add new property */}
         <div
+          id={idSuffix ? `add-attribute-${idSuffix}` : undefined}
           className="flex items-center hover:bg-gray-800 cursor-pointer px-3 py-1"
           onClick={handleAddProperty}
         >
