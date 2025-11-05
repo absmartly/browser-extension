@@ -104,7 +104,7 @@ export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page
   const selectorInput = sidebar.locator('#dom-change-selector-1-new')
   await selectorInput.waitFor({ state: 'visible', timeout: 10000 })
   log('Selector input is visible')
-  await selectorInput.fill('#test-heading')
+  await selectorInput.fill('#main-title')
   log('Filled selector input')
 
   // Change type to 'attribute'
@@ -114,50 +114,128 @@ export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page
 
   log('Selected attribute change type')
 
-  // Add attribute key-value pairs
-  const addPropertyButton = sidebar.locator('button:has-text("Add Property")').first()
+  // Find the first attribute input (should already exist)
+  const firstKeyInput = sidebar.locator('input[placeholder="attribute"]').first()
+  await firstKeyInput.waitFor({ state: 'visible', timeout: 5000 })
+  log('First attribute key input visible')
 
-  // Add first attribute
-  await click(sidebar, addPropertyButton)
+  // Fill the first attribute - use real attribute (title for tooltip)
+  await firstKeyInput.fill('title')
+  const firstValueInput = sidebar.locator('input[placeholder="value"]').first()
+  await firstValueInput.fill('Modified Section Title')
+  log('Filled first attribute: title=Modified Section Title')
 
-  const keyInput1 = sidebar.locator('input[placeholder*="key"]').last()
-  const valueInput1 = sidebar.locator('input[placeholder*="value"]').last()
-  await keyInput1.fill('data-test-attr')
-  await valueInput1.fill('test-value-123')
+  // Click "+ Add attribute..." to add another attribute
+  // Using the ID: add-attribute-{variantIdx}-{changeIdx}
+  // For new change in variant 1, the ID will be: add-attribute-1-new
+  const addAttributeButton = sidebar.locator('#add-attribute-1-new')
+  await addAttributeButton.waitFor({ state: 'visible' })
+  await click(sidebar, addAttributeButton)
+  log('Clicked + Add attribute...')
 
-  // Add second attribute
-  await click(sidebar, addPropertyButton)
-
-  const keyInput2 = sidebar.locator('input[placeholder*="key"]').last()
-  const valueInput2 = sidebar.locator('input[placeholder*="value"]').last()
-  await keyInput2.fill('aria-label')
-  await valueInput2.fill('Test Heading Label')
+  // Fill the second attribute (use .nth(1) to get the second one) - use real attribute (data-experiment)
+  const secondKeyInput = sidebar.locator('input[placeholder="attribute"]').nth(1)
+  await secondKeyInput.waitFor({ state: 'visible' })
+  await secondKeyInput.fill('data-experiment')
+  const secondValueInput = sidebar.locator('input[placeholder="value"]').nth(1)
+  await secondValueInput.fill('attribute-test')
+  log('Filled second attribute: data-experiment=attribute-test')
 
   log('Added attribute properties')
 
-  // Save the change
-  const saveButton = sidebar.locator('button:has-text("Save Change")').first()
-  await saveButton.waitFor({ state: 'visible' })
+  // Take a screenshot before saving
+  await testPage.screenshot({ path: 'test-results/before-save-attribute-change.png', fullPage: true })
+  log('Screenshot saved: before-save-attribute-change.png')
+
+  // Save the change by clicking the save button (green checkmark)
+  // Using the ID: dom-change-save-{variantIdx}-{changeIdx}
+  // For new change in variant 1, the ID will be: dom-change-save-1-new
+  const saveButton = sidebar.locator('#dom-change-save-1-new')
   await click(sidebar, saveButton)
 
   log('Saved attribute change')
 
-  // Enable preview mode
-  const previewToggle = sidebar.locator('text=Preview').first()
-  await previewToggle.waitFor({ state: 'visible' })
-  await click(sidebar, previewToggle)
+  // Take screenshot before enabling preview
+  await testPage.screenshot({ path: 'test-results/before-preview-attribute.png', fullPage: true })
+  log('Screenshot saved: before-preview-attribute.png')
 
-  log('Preview mode enabled')
+  // Check if preview is already enabled
+  const previewAlreadyEnabled = await testPage.evaluate(() => {
+    return document.getElementById('absmartly-preview-header') !== null
+  })
+  log(`Preview already enabled: ${previewAlreadyEnabled}`)
+
+  // Get the preview toggle locator (needed later for turning preview off)
+  const previewToggle = sidebar.locator('#preview-variant-1')
+
+  // Only enable preview if not already enabled
+  if (!previewAlreadyEnabled) {
+    log('Enabling preview mode')
+    await previewToggle.waitFor({ state: 'visible' })
+    await click(sidebar, previewToggle)
+  } else {
+    log('Preview already enabled, skipping toggle')
+  }
+
+  log('Preview mode enabled, waiting for preview toolbar...')
+
+  // Take screenshot right after clicking preview
+  await testPage.screenshot({ path: 'test-results/after-preview-click-attribute.png', fullPage: true })
+  log('Screenshot saved: after-preview-click-attribute.png')
+
+  // Check if page is still alive and capture any console errors
+  try {
+    const pageAlive = await testPage.evaluate(() => true).catch(() => false)
+    log(`Page alive after preview click: ${pageAlive}`)
+    
+    if (!pageAlive) {
+      log('ERROR: Page crashed immediately after preview click!')
+      throw new Error('Page crashed after enabling preview mode')
+    }
+
+    // Wait for preview toolbar with timeout
+    log('Waiting for preview toolbar to appear...')
+    await testPage.waitForSelector('#absmartly-preview-header', { 
+      state: 'visible', 
+      timeout: 5000 
+    }).catch(async (e) => {
+      log('ERROR: Preview toolbar did not appear')
+      await testPage.screenshot({ path: 'test-results/preview-toolbar-missing.png', fullPage: true })
+      log('Screenshot saved: preview-toolbar-missing.png')
+      throw e
+    })
+    log('Preview toolbar appeared')
+
+    // Wait for main title element
+    log('Waiting for main title element...')
+    const mainTitleExists = await testPage.evaluate(() => document.getElementById('main-title') !== null)
+    log(`Main title exists: ${mainTitleExists}`)
+
+    if (!mainTitleExists) {
+      log('ERROR: Main title element not found')
+      await testPage.screenshot({ path: 'test-results/main-title-missing.png', fullPage: true })
+      log('Screenshot saved: main-title-missing.png')
+      throw new Error('Main title element not found')
+    }
+    log('Main title element found on page')
+  } catch (error) {
+    log(`ERROR during preview verification: ${error.message}`)
+    await testPage.screenshot({ path: 'test-results/preview-error.png', fullPage: true })
+    log('Screenshot saved: preview-error.png')
+    throw error
+  }
 
   // Verify attributes are applied on the test page
-  const testHeading = testPage.locator('#test-heading')
-  await testHeading.waitFor({ state: 'visible' })
+  const mainTitle = testPage.locator('#main-title')
+  await mainTitle.waitFor({ state: 'visible', timeout: 5000 })
+  log('Main title is visible')
 
-  const dataAttr = await testHeading.getAttribute('data-test-attr')
-  const ariaLabel = await testHeading.getAttribute('aria-label')
+  const titleAttr = await mainTitle.getAttribute('title')
+  const dataAttr = await mainTitle.getAttribute('data-experiment')
+  log(`Attributes found: title=${titleAttr}, data-experiment=${dataAttr}`)
 
-  expect(dataAttr).toBe('test-value-123')
-  expect(ariaLabel).toBe('Test Heading Label')
+  expect(titleAttr).toBe('Modified Section Title')
+  expect(dataAttr).toBe('attribute-test')
 
   log('✓ Attributes correctly applied in preview')
 
@@ -178,11 +256,11 @@ export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page
   await click(sidebar, lastCheckbox)
 
   // Verify attributes are removed
-  const dataAttrAfterToggle = await testHeading.getAttribute('data-test-attr')
-  const ariaLabelAfterToggle = await testHeading.getAttribute('aria-label')
+  const titleAttrAfterToggle = await mainTitle.getAttribute('title')
+  const dataAttrAfterToggle = await mainTitle.getAttribute('data-experiment')
 
   // Attributes should be removed (or null if they weren't there before)
-  log(`Attributes after toggle: data-test-attr=${dataAttrAfterToggle}, aria-label=${ariaLabelAfterToggle}`)
+  log(`Attributes after toggle: title=${titleAttrAfterToggle}, data-experiment=${dataAttrAfterToggle}`)
 
   // Turn preview off
   await click(sidebar, previewToggle)
