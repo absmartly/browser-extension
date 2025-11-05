@@ -222,4 +222,14 @@ export class BackgroundAPIClient {
       throw error
     }
   }
+
+  async getCustomSectionFields(): Promise<any[]> {
+    try {
+      const data = await this.makeRequest('GET', '/experiment_custom_section_fields', { items: 100 })
+      return data.experiment_custom_section_fields || []
+    } catch (error) {
+      debugError('Failed to fetch custom section fields:', error)
+      throw error
+    }
+  }
 }
