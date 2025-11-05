@@ -1,7 +1,8 @@
-import { debugError } from '~src/utils/debug'
+import { debugError, debugLog } from '~src/utils/debug'
 import { getConfig } from '~src/utils/storage'
-import type { Experiment } from '~src/types/absmartly'
+import type { Experiment, ExperimentCustomSectionField } from '~src/types/absmartly'
 import type { VariantData } from './useExperimentVariants'
+import { BackgroundAPIClient } from '~src/lib/background-api-client'
 
 interface UseExperimentSaveOptions {
   experiment?: Experiment | null
@@ -56,6 +57,29 @@ async function createNewExperiment(
   domFieldName: string,
   onSave: (experiment: Partial<Experiment>) => Promise<void>
 ) {
+  // Fetch custom fields dynamically
+  const client = new BackgroundAPIClient()
+  let customFields: ExperimentCustomSectionField[] = []
+
+  try {
+    debugLog('[createNewExperiment] Fetching custom section fields...')
+    customFields = await client.getCustomSectionFields()
+    debugLog('[createNewExperiment] Fetched custom section fields:', customFields)
+  } catch (error) {
+    debugError('[createNewExperiment] Failed to fetch custom fields:', error)
+  }
+
+  // Build custom_section_field_values dynamically from fetched fields
+  const custom_section_field_values: Record<string, any> = {}
+
+  customFields.forEach(field => {
+    custom_section_field_values[String(field.id)] = {
+      value: field.default_value || "",
+      type: field.type,
+      id: field.id
+    }
+  })
+
   // Prepare variants - use full config as-is
   const preparedVariants = currentVariants.map((v, index) => ({
     variant: index,
@@ -94,16 +118,10 @@ async function createNewExperiment(
     template_permission: {},
     template_name: '',
     template_description: '',
-    custom_section_field_values: {
-      "1": { value: "", type: "text", id: 1 },
-      "2": { value: "", type: "text", id: 2 },
-      "3": { value: "", type: "text", id: 3 },
-      "4": { value: "", type: "text", id: 4 },
-      "5": { value: "", type: "text", id: 5 },
-      "111": { value: "", type: "string", id: 111 }
-    }
+    custom_section_field_values
   }
 
+  debugLog('[createNewExperiment] Experiment data with custom fields:', experimentData)
   await onSave(experimentData)
 }
 
