@@ -276,58 +276,63 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
 
     // Ensure SDK plugin is injected before handling preview
     ;(async () => {
-      await ensureSDKPluginInjected()
+      try {
+        await ensureSDKPluginInjected()
 
-      if (action === 'apply') {
-        console.log(`[ABSmartly Content Script] Handling preview apply. VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
-        // Create preview header (it will check visual editor state internally)
-        createPreviewHeader(experimentName, variantName)
+        if (action === 'apply') {
+          console.log(`[ABSmartly Content Script] Handling preview apply. VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`)
+          // Create preview header (it will check visual editor state internally)
+          createPreviewHeader(experimentName, variantName)
 
-        // Send message to SDK plugin to preview changes
-        window.postMessage({
-          source: 'absmartly-extension',
-          type: 'PREVIEW_CHANGES',
-          payload: {
-            changes: changes || [],
-            experimentName: experimentName,
-            variantName: variantName,
-            experimentId: experimentId
+          // Send message to SDK plugin to preview changes
+          window.postMessage({
+            source: 'absmartly-extension',
+            type: 'PREVIEW_CHANGES',
+            payload: {
+              changes: changes || [],
+              experimentName: experimentName,
+              variantName: variantName,
+              experimentId: experimentId
+            }
+          }, '*')
+
+          sendResponse({ success: true })
+        } else if (action === 'update') {
+          // Update changes WITHOUT recreating the header
+          // Just send the new changes to the SDK plugin with updateMode flag
+          window.postMessage({
+            source: 'absmartly-extension',
+            type: 'PREVIEW_CHANGES',
+            payload: {
+              changes: changes || [],
+              experimentName: experimentName,
+              variantName: variantName,
+              experimentId: experimentId,
+              updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
+            }
+          }, '*')
+
+          sendResponse({ success: true })
+        } else if (action === 'remove') {
+          // Only remove preview header if visual editor is NOT active
+          if (!isVisualEditorActive) {
+            removePreviewHeader()
           }
-        }, '*')
 
-        sendResponse({ success: true })
-      } else if (action === 'update') {
-        // Update changes WITHOUT recreating the header
-        // Just send the new changes to the SDK plugin with updateMode flag
-        window.postMessage({
-          source: 'absmartly-extension',
-          type: 'PREVIEW_CHANGES',
-          payload: {
-            changes: changes || [],
-            experimentName: experimentName,
-            variantName: variantName,
-            experimentId: experimentId,
-            updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
-          }
-        }, '*')
+          // Send message to SDK plugin to remove preview
+          window.postMessage({
+            source: 'absmartly-extension',
+            type: 'REMOVE_PREVIEW',
+            payload: {
+              experimentName: experimentName
+            }
+          }, '*')
 
-        sendResponse({ success: true })
-      } else if (action === 'remove') {
-        // Only remove preview header if visual editor is NOT active
-        if (!isVisualEditorActive) {
-          removePreviewHeader()
+          sendResponse({ success: true })
         }
-
-        // Send message to SDK plugin to remove preview
-        window.postMessage({
-          source: 'absmartly-extension',
-          type: 'REMOVE_PREVIEW',
-          payload: {
-            experimentName: experimentName
-          }
-        }, '*')
-
-        sendResponse({ success: true })
+      } catch (error) {
+        console.error('[ABSmartly Content Script] Error handling preview:', error)
+        sendResponse({ success: false, error: error.message })
       }
     })()
 
