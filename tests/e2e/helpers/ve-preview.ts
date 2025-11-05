@@ -27,6 +27,13 @@ export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Prom
   await page.screenshot({ path: 'test-results/preview-toggle-before-enable.png', fullPage: true })
 
   await click(sidebar, '#preview-variant-1', 5000)
+
+  // Wait for DOM changes to actually be applied
+  await page.waitForFunction(() => {
+    const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
+    return modifiedElements.length > 0
+  }, { timeout: 5000 })
+
   await debugWait(2000)
 
   await page.screenshot({ path: 'test-results/preview-toggle-after-enable.png', fullPage: true })
@@ -65,6 +72,13 @@ export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Prom
 
   // Second click: DISABLE preview
   await click(sidebar, '#preview-variant-1', 5000)
+
+  // Wait for DOM changes to be removed
+  await page.waitForFunction(() => {
+    const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
+    return modifiedElements.length === 0
+  }, { timeout: 5000 })
+
   await debugWait(2000)
 
   await page.screenshot({ path: 'test-results/preview-toggle-after-disable.png', fullPage: true })
