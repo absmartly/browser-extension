@@ -165,8 +165,14 @@
           break;
 
         case 'attribute':
-          if (change.attribute && change.value !== undefined) {
-            element.setAttribute(change.attribute, change.value);
+          if (change.value && typeof change.value === 'object') {
+            Object.entries(change.value).forEach(([attr, value]) => {
+              if (value === null || value === undefined) {
+                element.removeAttribute(attr);
+              } else {
+                element.setAttribute(attr, String(value));
+              }
+            });
           }
           break;
 
@@ -455,14 +461,20 @@
               break;
               
             case 'attribute':
-              if (change.attribute) {
+              if (change.value && typeof change.value === 'object') {
                 if (!originalData.attributes) {
                   originalData.attributes = {};
                 }
-                if (!originalData.attributes[change.attribute]) {
-                  originalData.attributes[change.attribute] = element.getAttribute(change.attribute);
-                }
-                element.setAttribute(change.attribute, change.value);
+                Object.entries(change.value).forEach(([attr, value]) => {
+                  if (!originalData.attributes[attr]) {
+                    originalData.attributes[attr] = element.getAttribute(attr);
+                  }
+                  if (value === null || value === undefined) {
+                    element.removeAttribute(attr);
+                  } else {
+                    element.setAttribute(attr, String(value));
+                  }
+                });
               }
               break;
               
