@@ -64,6 +64,60 @@ await page.waitForTimeout(1000)
 
 **Never run all tests** - always run the specific test file as shown above.
 
+### Debugging Test Failures
+
+**When debugging E2E test timeouts and failures, ALWAYS add debug logging and screenshots to understand what the test is waiting for. NEVER just report "Target page, context or browser has been closed" - that's a symptom, not the root cause.**
+
+**Debugging practices:**
+- ✅ Add screenshots before and after critical operations
+- ✅ Add try-catch blocks with detailed error logging
+- ✅ Check if page is alive with `page.evaluate(() => true).catch(() => false)`
+- ✅ Use specific error messages that describe what element or state was expected
+- ✅ Monitor console logs for JavaScript errors that might cause crashes
+- ❌ Don't just say "page closed" - investigate WHY it closed
+
+**Example of proper debugging:**
+```typescript
+// Take screenshot before operation
+await testPage.screenshot({ path: 'test-results/before-operation.png', fullPage: true })
+log('Screenshot saved: before-operation.png')
+
+// Perform operation
+await clickButton()
+
+// Take screenshot after operation
+await testPage.screenshot({ path: 'test-results/after-operation.png', fullPage: true })
+log('Screenshot saved: after-operation.png')
+
+// Check if page is still alive
+try {
+  const pageAlive = await testPage.evaluate(() => true).catch(() => false)
+  log(`Page alive after operation: ${pageAlive}`)
+  
+  if (!pageAlive) {
+    log('ERROR: Page crashed immediately after operation!')
+    throw new Error('Page crashed after operation')
+  }
+
+  // Wait for expected element with detailed error handling
+  await testPage.waitForSelector('#expected-element', { 
+    state: 'visible', 
+    timeout: 5000 
+  }).catch(async (e) => {
+    log('ERROR: Expected element did not appear')
+    await testPage.screenshot({ path: 'test-results/element-missing.png', fullPage: true })
+    log('Screenshot saved: element-missing.png')
+    throw e
+  })
+  log('Expected element appeared')
+} catch (error) {
+  log(`ERROR during operation: ${error.message}`)
+  await testPage.screenshot({ path: 'test-results/operation-error.png', fullPage: true })
+  log('Screenshot saved: operation-error.png')
+  throw error
+}
+```
+
 ### Element IDs for E2E Testing
 
 **ALWAYS add `id` attributes to important interactive elements** for reliable E2E test selectors. This includes:
