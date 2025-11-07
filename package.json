@@ -1,10 +1,11 @@
 {
   "name": "absmartly-launchpad",
   "displayName": "ABsmartly LaunchPad",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
   "author": "Jonas Alves",
   "scripts": {
+    "postinstall": "patch-package",
     "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
     "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'npm run build:sdk-bridge'",
     "dev": "npm run build:sdk-bridge && NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",

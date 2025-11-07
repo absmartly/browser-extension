@@ -289,7 +289,7 @@
             debugLog('[ABsmartly Page] Restored attributes from VE original');
           }
         } catch (e) {
-          console.warn('[ABsmartly Page] Failed to restore element from data-absmartly-original:', e);
+          debugWarn('[ABsmartly Page] Failed to restore element from data-absmartly-original:', e);
         }
 
         // Remove the original data attribute - we're back at original state now
