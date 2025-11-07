@@ -17,6 +17,9 @@ try {
     execSync('npm install --save-dev esbuild', { stdio: 'inherit' })
   }
 
+  // Check if production build
+  const isProduction = process.env.NODE_ENV === 'production'
+
   // Build the bundle
   const buildCommand = [
     'npx',
@@ -30,17 +33,15 @@ try {
     '--target=es2020',
     '--minify-syntax',
     '--keep-names',
-    '--sourcemap'
-  ].join(' ')
+    '--sourcemap',
+    isProduction ? '--drop:console' : ''
+  ].filter(Boolean).join(' ')
 
   console.log('[SDK Bridge Build] Running esbuild...')
   execSync(buildCommand, { stdio: 'inherit' })
 
   // Read the bundled output
   let bundledCode = fs.readFileSync(outputFile, 'utf8')
-
-  // Check if production build
-  const isProduction = process.env.NODE_ENV === 'production'
 
   // Wrap the bundled code to make functions available globally
   const wrappedCode = `
