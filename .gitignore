@@ -73,6 +73,7 @@ menu-*.png
 tests/e2e/menu-*.png
 tests/e2e/after-*.png
 tests/e2e/before-*.png
+test-*.png
 
 # Backup files
 *.bak
