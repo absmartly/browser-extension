@@ -251,18 +251,18 @@ const CSSStyleEditor = ({
   }
 
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-visible">
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
         element.style {'{'}
       </div>
 
       {/* Properties */}
-      <div className="py-1">
+      <div className="py-1 overflow-hidden">
         {(styleProperties || []).map((prop, index) => (
           <div
             key={index}
-            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative pr-10"
+            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative pr-10 min-w-0"
           >
             {/* Property name */}
             <input
@@ -329,7 +329,7 @@ const CSSStyleEditor = ({
                 }, 200)
               }}
               placeholder="value"
-              className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1"
+              className="bg-transparent outline-none text-orange-400 placeholder-gray-600 flex-1 overflow-hidden text-ellipsis"
             />
             <span className="text-gray-500">;</span>
 

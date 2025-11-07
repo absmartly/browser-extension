@@ -153,23 +153,23 @@ export const CSSStyleEditor = ({
   }
 
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-visible">
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
         {getSelectorDisplay()} {'{'}
       </div>
       
       {/* Properties */}
-      <div className="py-1">
+      <div className="py-1 overflow-hidden">
         {(styleProperties || []).map((prop, index) => (
           <div 
             key={index} 
-            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative pr-8"
+            className="flex items-center hover:bg-gray-800 group px-3 py-1 relative pr-8 min-w-0"
           >
             {/* Property inputs container */}
             <div className="flex items-center flex-1 mr-2 min-w-0">
               {/* Property name - with constrained width */}
-              <div className="flex-shrink-0 max-w-[40%] min-w-[80px]">
+              <div className="flex-shrink-0 max-w-[40%] min-w-[80px] overflow-hidden">
                 <input
                   ref={el => propertyRefs.current[index] = el}
                   type="text"
@@ -199,13 +199,13 @@ export const CSSStyleEditor = ({
                     }, 200)
                   }}
                   placeholder="property"
-                  className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 w-full overflow-hidden text-ellipsis"
+                  className="bg-transparent outline-none text-cyan-400 placeholder-gray-600 w-full"
                 />
               </div>
               <span className="text-gray-500 px-1 flex-shrink-0">:</span>
               
               {/* Property value - with overflow handling */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <input
                   type="text"
                   value={prop.value}
