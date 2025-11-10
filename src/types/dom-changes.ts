@@ -66,6 +66,7 @@ export interface DOMChangeAttribute {
   enabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
+  persistAttribute?: boolean;
   observerRoot?: string;
 }
 

@@ -39,6 +39,7 @@ export interface EditingDOMChange {
   waitForElement?: boolean
   observerRoot?: string
   persistStyle?: boolean
+  persistAttribute?: boolean
 }
 
 export const createEmptyChange = (): EditingDOMChange => ({
@@ -404,6 +405,22 @@ export const DOMChangeEditor = ({
             onChange={(attrs) => setLocalChange({ ...localChange, attributeProperties: attrs })}
             idSuffix={idSuffix}
           />
+
+          {/* Options for attributes */}
+          <div className="pt-2 border-t border-gray-200">
+            <DOMChangeOptions
+              waitForElement={localChange.waitForElement || false}
+              persistStyle={localChange.persistAttribute || false}
+              observerRoot={localChange.observerRoot || ''}
+              onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+              onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistAttribute: value })}
+              onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+              onStartPicker={onStartPicker}
+              pickingForField={pickingForField}
+              idPrefix={`attribute-${isEditMode ? 'edit' : 'new'}`}
+              showImportant={false}
+            />
+          </div>
         </div>
       )}
 
