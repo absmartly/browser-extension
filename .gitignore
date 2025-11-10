@@ -11,6 +11,9 @@
 # claude tasks
 .claude/tasks/
 
+# serena
+.serena
+
 public/*.{min,dev}.js
 react.production.min.js
 
