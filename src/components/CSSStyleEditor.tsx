@@ -153,14 +153,14 @@ export const CSSStyleEditor = ({
   }
 
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full overflow-hidden">
+    <div className="bg-gray-900 text-gray-100 rounded-md font-mono text-xs relative max-w-full">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-700 text-gray-400">
         {getSelectorDisplay()} {'{'}
       </div>
-      
+
       {/* Properties */}
-      <div className="py-1 overflow-hidden">
+      <div className="py-1">
         {(styleProperties || []).map((prop, index) => (
           <div 
             key={index} 
