@@ -1,0 +1,21 @@
+{
+  "name": "absmartly-extension-native-host",
+  "version": "1.0.0",
+  "description": "Chrome Native Messaging Host for ABsmartly Extension - Claude Code CLI Bridge",
+  "main": "host.js",
+  "scripts": {
+    "install-host": "node install.js",
+    "uninstall-host": "node install.js --uninstall"
+  },
+  "keywords": [
+    "chrome",
+    "native-messaging",
+    "claude",
+    "extension"
+  ],
+  "author": "ABsmartly",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
