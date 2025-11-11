@@ -1,9 +1,0 @@
-{
-  "name": "com.absmartly.claude_native_host",
-  "description": "Native messaging host for ABsmartly Extension to communicate with Claude Code CLI",
-  "path": "{{HOST_PATH}}",
-  "type": "stdio",
-  "allowed_origins": [
-    "chrome-extension://{{EXTENSION_ID}}/"
-  ]
-}

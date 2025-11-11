@@ -1,9 +1,0 @@
-{
-  "name": "com.absmartly.claude_native_host",
-  "description": "Native messaging host for ABsmartly Extension - Claude Code CLI Bridge",
-  "path": "HOST_PATH_PLACEHOLDER",
-  "type": "stdio",
-  "allowed_origins": [
-    "chrome-extension://EXTENSION_ID_PLACEHOLDER/"
-  ]
-}
