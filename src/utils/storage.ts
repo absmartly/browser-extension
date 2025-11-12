@@ -15,38 +15,14 @@ export const STORAGE_KEYS = {
 } as const
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
-  console.log('[Storage] getConfig() called')
-
   try {
-    console.log('[Storage] Using chrome.storage.local with 2s timeout...')
-
-    // Add timeout to storage.get() to prevent hanging
-    const storagePromise = chrome.storage.local.get(STORAGE_KEYS.CONFIG)
-    const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => {
-        console.error('[Storage] chrome.storage.local.get() timed out after 2s')
-        resolve(null)
-      }, 2000)
-    })
-
-    const result = await Promise.race([storagePromise, timeoutPromise])
-
-    if (!result) {
-      console.error('[Storage] Storage access timed out or failed')
-      return null
-    }
-
+    const result = await chrome.storage.local.get(STORAGE_KEYS.CONFIG)
     const config = result[STORAGE_KEYS.CONFIG] as ABsmartlyConfig | null
-    console.log('[Storage] Got config from chrome.storage.local:', !!config)
 
     if (config) {
-      // API key should be in the config already (from environment or settings)
-      // We can't safely access secure storage in sidebar context
       config.apiKey = config.apiKey || ''
-      console.log('[Storage] Using config.apiKey:', !!config.apiKey)
     }
 
-    console.log('[Storage] Returning config')
     return config
   } catch (error) {
     console.error('[Storage] Failed to get config:', error)

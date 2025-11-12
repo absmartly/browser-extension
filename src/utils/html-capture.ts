@@ -11,19 +11,30 @@ export async function capturePageHTML(): Promise<string> {
       throw new Error('chrome.tabs API not available')
     }
 
-    // Get the active tab in the current window
-    console.log('[HTML Capture] Querying active tab...')
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    console.log('[HTML Capture] Active tab:', activeTab?.id, 'URL:', activeTab?.url)
+    // Get all tabs and find the first non-extension page
+    // We can't use active:true because the sidebar might be active
+    console.log('[HTML Capture] Querying all tabs...')
+    const allTabs = await chrome.tabs.query({ currentWindow: true })
+    console.log('[HTML Capture] Total tabs in current window:', allTabs.length)
 
-    if (!activeTab?.id) {
-      console.error('[HTML Capture] No active tab found!')
-      throw new Error('No active tab found')
+    // Find first tab that's not an extension page
+    const contentTab = allTabs.find(t =>
+      t.url &&
+      !t.url.startsWith('chrome-extension://') &&
+      !t.url.startsWith('chrome://') &&
+      !t.url.startsWith('about:')
+    )
+
+    console.log('[HTML Capture] Found content tab:', contentTab?.id, 'URL:', contentTab?.url)
+
+    if (!contentTab?.id) {
+      console.error('[HTML Capture] No content tab found! All tabs:', allTabs.map(t => ({ id: t.id, url: t.url })))
+      throw new Error('No content tab found. Please open a webpage first.')
     }
 
-    console.log('[HTML Capture] Sending CAPTURE_HTML message to tab:', activeTab.id)
+    console.log('[HTML Capture] Sending CAPTURE_HTML message to tab:', contentTab.id)
 
-    const response = await chrome.tabs.sendMessage(activeTab.id, {
+    const response = await chrome.tabs.sendMessage(contentTab.id, {
       type: 'CAPTURE_HTML'
     })
 
