@@ -372,14 +372,13 @@ function SidebarContent() {
         if (state.selectedExperiment) {
           setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
         }
-        if (state.aiDomContext) {
-          setAiDomContext(state.aiDomContext)
-        }
 
-        // Handle AI page restoration
-        if (state.view === 'ai-dom-changes' && state.aiVariantName && state.aiDomContext) {
-          debugLog('Restoring AI page with variant:', state.aiVariantName)
-          setView('ai-dom-changes')
+        // Handle AI page restoration - set flag to auto-navigate once experiment detail loads
+        if (state.view === 'ai-dom-changes' && state.aiVariantName) {
+          debugLog('Will restore AI page with variant:', state.aiVariantName)
+          // Set auto-navigate flag - the experiment detail will call handleNavigateToAI with proper callback
+          setAutoNavigateToAI(state.aiVariantName)
+          setView('detail') // First go to detail view so experiment editor loads
         } else if (state.view && state.view !== 'ai-dom-changes') {
           setView(state.view as View)
         }
