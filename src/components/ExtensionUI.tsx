@@ -369,44 +369,22 @@ function SidebarContent() {
     storage.get<SidebarState>('sidebarState').then(state => {
       if (state) {
         debugLog('Restoring sidebar state:', state)
-
-        try {
-          // Restore selectedExperiment first
-          if (state.selectedExperiment) {
-            setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
-          }
-
-          // Handle AI page restoration - restore aiDomContext but with a dummy onGenerate that will be replaced
-          if (state.view === 'ai-dom-changes' && state.aiDomContext) {
-            debugLog('Restoring AI page with context:', state.aiDomContext)
-            // Restore aiDomContext with a dummy onGenerate function
-            // The component will use this initially, but we'll replace it via autoNavigateToAI
-            const dummyOnGenerate = async () => {
-              debugLog('[Dummy onGenerate] Called - this should be replaced')
-            }
-            setAIDomContext({
-              ...state.aiDomContext,
-              onGenerate: dummyOnGenerate
-            })
-            setView('ai-dom-changes')
-
-            // Set auto-navigate flag so the proper callback gets created when user returns to detail view
-            if (state.aiVariantName) {
-              setAutoNavigateToAI(state.aiVariantName)
-            }
-          } else if (state.view && state.view !== 'ai-dom-changes') {
-            // Normal restoration for non-AI pages
-            setView(state.view as View)
-          }
-          // Don't clear the state - keep it for next time
-        } catch (error) {
-          debugError('[ExtensionUI] Error restoring sidebar state:', error)
-          // On error, just reset to list view
-          setView('list')
+        if (state.selectedExperiment) {
+          setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
         }
+        if (state.aiDomContext) {
+          setAiDomContext(state.aiDomContext)
+        }
+
+        // Handle AI page restoration
+        if (state.view === 'ai-dom-changes' && state.aiVariantName && state.aiDomContext) {
+          debugLog('Restoring AI page with variant:', state.aiVariantName)
+          setView('ai-dom-changes')
+        } else if (state.view && state.view !== 'ai-dom-changes') {
+          setView(state.view as View)
+        }
+        // Don't clear the state - keep it for next time
       }
-    }).catch(error => {
-      debugError('[ExtensionUI] Error getting sidebar state:', error)
     })
 
     // Restore filters and check for configured application
