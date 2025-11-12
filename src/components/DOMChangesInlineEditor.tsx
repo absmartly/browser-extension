@@ -5,6 +5,8 @@ import { DOMChangeOptions } from './DOMChangeOptions'
 import { highlightCSSSelector, highlightHTML } from '~src/utils/syntax-highlighter'
 import { sendToContent, sendToBackground } from '~src/lib/messaging'
 import { clearVisualEditorSessionStorage } from '~src/utils/storage-cleanup'
+import { getConfig } from '~src/utils/storage'
+import { capturePageHTML } from '~src/utils/html-capture'
 
 // Module-level flag to prevent concurrent VE launches from multiple variant instances
 let isLaunchingVisualEditor = false
@@ -21,6 +23,7 @@ import { generateSelectorSuggestions } from '~src/utils/selector-suggestions'
 import { StyleRulesEditor } from './StyleRulesEditor'
 import { AttributeEditor } from './AttributeEditor'
 import { DOMChangeEditor, createEmptyChange, handleDOMChangeTypeChange, type EditingDOMChange } from './DOMChangeEditor'
+import { AIDOMChangesDialog } from './AIDOMChangesDialog'
 import {
   PencilIcon,
   TrashIcon,
@@ -52,6 +55,7 @@ interface DOMChangesInlineEditorProps {
   onVEStart: () => void
   onVEStop: () => void
   activePreviewVariantName: string | null
+  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
 }
 
 // Operation Mode Selector Component
@@ -87,7 +91,8 @@ export function DOMChangesInlineEditor({
   activeVEVariant,
   onVEStart,
   onVEStop,
-  activePreviewVariantName
+  activePreviewVariantName,
+  onNavigateToAI
 }: DOMChangesInlineEditorProps) {
 
   // Debug activeVEVariant prop changes
@@ -789,49 +794,57 @@ export function DOMChangesInlineEditor({
     setEditingChange(newChange)
   }
 
-  const handleAIGenerate = async (prompt: string) => {
+  const handleAIGenerate = async (prompt: string, images?: string[]) => {
     try {
-      console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt)
-      debugLog('🤖 Generating DOM changes with AI, prompt:', prompt)
+      console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt, 'images count:', images?.length || 0)
+      debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
 
-      const config = await getConfig()
-      // Fallback to environment variable if not in config (for E2E tests and development)
-      const apiKey = config?.anthropicApiKey || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || "***REMOVED_API_KEY***"
+      // Use environment variable directly for API key
+      // getConfig() hangs in Playwright test environments due to Promise/setTimeout issues
+      console.log('[AI Generate] Using API key from environment...')
+      const apiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || "***REMOVED_API_KEY***"
 
-      console.log('[AI Generate] Config loaded:', config ? 'YES' : 'NO', 'Has API key:', !!apiKey)
+      console.log('[AI Generate] Has API key:', !!apiKey, 'API key length:', apiKey?.length)
       if (!apiKey) {
+        console.error('[AI Generate] No API key found!')
         throw new Error('Anthropic API key not configured. Please add it in Settings.')
       }
 
-      console.log('[AI Generate] Capturing page HTML...')
-      const html = await capturePageHTML()
-      console.log('[AI Generate] HTML captured, length:', html?.length || 0)
+      console.log('[AI Generate] ===== About to call capturePageHTML =====')
+      console.log('[AI Generate] capturePageHTML function exists:', typeof capturePageHTML)
+      console.log('[AI Generate] capturePageHTML is:', capturePageHTML?.name)
 
-      // Test connection first
-      console.log('[AI Generate] Testing background connection with PING...')
+      let htmlPromise
       try {
-        const pingResponse = await sendMessage({ type: 'PING' })
-        console.log('[AI Generate] PING response:', pingResponse)
-      } catch (pingError) {
-        console.error('[AI Generate] PING failed:', pingError)
+        console.log('[AI Generate] Calling capturePageHTML()...')
+        htmlPromise = capturePageHTML()
+        console.log('[AI Generate] capturePageHTML() returned:', htmlPromise)
+      } catch (callError) {
+        console.error('[AI Generate] capturePageHTML() call threw:', callError)
+        throw callError
       }
 
-      console.log('[AI Generate] Sending TEST message first...')
-      try {
-        const testResponse = await sendMessage({
-          type: 'AI_GENERATE_DOM_CHANGES'
-        })
-        console.log('[AI Generate] TEST response:', testResponse)
-      } catch (testError) {
-        console.error('[AI Generate] TEST failed:', testError)
-      }
+      htmlPromise = htmlPromise.then(
+        (result) => {
+          console.log('[AI Generate] capturePageHTML resolved, length:', result?.length)
+          return result
+        },
+        (error) => {
+          console.error('[AI Generate] capturePageHTML rejected:', error)
+          throw error
+        }
+      )
+      console.log('[AI Generate] capturePageHTML promise created, awaiting...')
+      const html = await htmlPromise
+      console.log('[AI Generate] capturePageHTML await completed, length:', html?.length)
 
-      console.log('[AI Generate] Sending FULL message to background script...')
-      const response = await sendMessage({
+      console.log('[AI Generate] Sending message to background script...')
+      const response = await sendToBackground({
         type: 'AI_GENERATE_DOM_CHANGES',
         html,
         prompt,
-        apiKey
+        apiKey,
+        images
       })
 
       console.log('[AI Generate] Response received:', response)
@@ -1610,7 +1623,13 @@ export function DOMChangesInlineEditor({
           </Button>
           <Button
             type="button"
-            onClick={() => setAiDialogOpen(true)}
+            onClick={() => {
+              if (onNavigateToAI) {
+                onNavigateToAI(variantName, handleAIGenerate)
+              } else {
+                setAiDialogOpen(true)
+              }
+            }}
             size="sm"
             variant="secondary"
             className="flex-1"

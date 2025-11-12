@@ -34,6 +34,9 @@ export interface VisualEditorChanges {
 export interface SidebarState {
   view: string
   selectedExperiment: number | null
+  aiVariantName?: string
+  aiDomContext?: any
+  timestamp?: number
 }
 
 export interface ExperimentFilters {

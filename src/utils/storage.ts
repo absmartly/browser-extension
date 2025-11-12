@@ -15,19 +15,43 @@ export const STORAGE_KEYS = {
 } as const
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
-  const config = await storage.get(STORAGE_KEYS.CONFIG) as ABsmartlyConfig | null
-  // SECURITY: Get API key from secure storage
-  if (config) {
-    try {
-      const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
-      config.apiKey = secureApiKey || config.apiKey || ''
-    } catch (error) {
-      // If secure storage fails (e.g., JSON parse error for legacy data), fall back to config.apiKey
-      console.warn('[Storage] Failed to get API key from secure storage:', error)
-      config.apiKey = config.apiKey || ''
+  console.log('[Storage] getConfig() called')
+
+  try {
+    console.log('[Storage] Using chrome.storage.local with 2s timeout...')
+
+    // Add timeout to storage.get() to prevent hanging
+    const storagePromise = chrome.storage.local.get(STORAGE_KEYS.CONFIG)
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.error('[Storage] chrome.storage.local.get() timed out after 2s')
+        resolve(null)
+      }, 2000)
+    })
+
+    const result = await Promise.race([storagePromise, timeoutPromise])
+
+    if (!result) {
+      console.error('[Storage] Storage access timed out or failed')
+      return null
     }
+
+    const config = result[STORAGE_KEYS.CONFIG] as ABsmartlyConfig | null
+    console.log('[Storage] Got config from chrome.storage.local:', !!config)
+
+    if (config) {
+      // API key should be in the config already (from environment or settings)
+      // We can't safely access secure storage in sidebar context
+      config.apiKey = config.apiKey || ''
+      console.log('[Storage] Using config.apiKey:', !!config.apiKey)
+    }
+
+    console.log('[Storage] Returning config')
+    return config
+  } catch (error) {
+    console.error('[Storage] Failed to get config:', error)
+    return null
   }
-  return config
 }
 
 export async function setConfig(config: ABsmartlyConfig): Promise<void> {

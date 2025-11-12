@@ -34,6 +34,8 @@ interface ExperimentDetailProps {
   owners?: any[]
   teams?: any[]
   tags?: any[]
+  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
+  autoNavigateToAI?: string | null
 }
 
 // Removed - now using Variant from VariantList
@@ -49,7 +51,9 @@ export function ExperimentDetail({
   unitTypes = [],
   owners = [],
   teams = [],
-  tags = []
+  tags = [],
+  onNavigateToAI,
+  autoNavigateToAI
 }: ExperimentDetailProps) {
   debugLog('🔍 ExperimentDetail render start - experiment:', experiment)
   debugLog('🔍 ExperimentDetail render start - experiment.variants:', experiment?.variants)
@@ -337,6 +341,8 @@ export function ExperimentDetail({
             canEdit={true}
             canAddRemove={canAddVariants}
             domFieldName={domFieldName}
+            onNavigateToAI={onNavigateToAI}
+            autoNavigateToAI={autoNavigateToAI}
           />
         )}
 

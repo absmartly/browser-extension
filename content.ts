@@ -261,6 +261,21 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
     return true // Keep message channel open for async response
   }
 
+  // Handle HTML capture request
+  if (message.type === 'CAPTURE_HTML') {
+    console.log('[HTML Capture Content Script] Processing CAPTURE_HTML request')
+    try {
+      const html = document.documentElement.outerHTML
+      console.log('[HTML Capture Content Script] Captured HTML, length:', html.length)
+      sendResponse({ success: true, html })
+      console.log('[HTML Capture Content Script] Response sent')
+    } catch (error) {
+      console.error('[HTML Capture Content Script] Error capturing HTML:', error)
+      sendResponse({ success: false, error: (error as Error).message })
+    }
+    return true
+  }
+
   // Handle element picker message
   if (message.type === 'START_ELEMENT_PICKER') {
     debugLog('[Visual Editor Content Script] Starting element picker')

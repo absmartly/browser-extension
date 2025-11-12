@@ -8,6 +8,7 @@ import { ExperimentEditor } from "~src/components/ExperimentEditor"
 import { ExperimentFilter } from "~src/components/ExperimentFilter"
 import { SettingsView } from "~src/components/SettingsView"
 import EventsDebugPage from "~src/components/EventsDebugPage"
+import { AIDOMChangesPage } from "~src/components/AIDOMChangesPage"
 import { Pagination } from "~src/components/Pagination"
 import { Button } from "~src/components/ui/Button"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
@@ -23,7 +24,7 @@ import { clearAllExperimentStorage } from "~src/utils/storage-cleanup"
 import { Logo } from "~src/components/Logo"
 import "~style.css"
 
-type View = 'list' | 'detail' | 'settings' | 'create' | 'edit' | 'events'
+type View = 'list' | 'detail' | 'settings' | 'create' | 'edit' | 'events' | 'ai-dom-changes'
 
 // Helper function to build API parameters from filter state
 const buildFilterParams = (filterState: ExperimentFilters, page: number, size: number) => {
@@ -89,7 +90,29 @@ function SidebarContent() {
   const [isAuthExpired, setIsAuthExpired] = useState(false)
   const [needsPermissions, setNeedsPermissions] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
-  
+
+  // AI DOM Changes state
+  const [aiDomContext, setAiDomContext] = useState<{
+    variantName: string
+    onGenerate: (prompt: string, images?: string[]) => Promise<void>
+    previousView: View
+  } | null>(null)
+
+  // Flag to auto-navigate to AI page after experiment detail loads (used for state restoration)
+  const [autoNavigateToAI, setAutoNavigateToAI] = useState<string | null>(null)
+
+  const handleNavigateToAI = useCallback((variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => {
+    debugLog('[ExtensionUI] Navigating to AI DOM changes page for variant:', variantName)
+    setAiDomContext({
+      variantName,
+      onGenerate,
+      previousView: view
+    })
+    setView('ai-dom-changes')
+    // Clear auto-navigate flag after navigation
+    setAutoNavigateToAI(null)
+  }, [view])
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
@@ -346,8 +369,20 @@ function SidebarContent() {
     storage.get<SidebarState>('sidebarState').then(state => {
       if (state) {
         debugLog('Restoring sidebar state:', state)
-        if (state.view) setView(state.view as View)
-        if (state.selectedExperiment) setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
+        if (state.selectedExperiment) {
+          setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
+        }
+        if (state.aiDomContext) {
+          setAiDomContext(state.aiDomContext)
+        }
+
+        // Handle AI page restoration
+        if (state.view === 'ai-dom-changes' && state.aiVariantName && state.aiDomContext) {
+          debugLog('Restoring AI page with variant:', state.aiVariantName)
+          setView('ai-dom-changes')
+        } else if (state.view && state.view !== 'ai-dom-changes') {
+          setView(state.view as View)
+        }
         // Don't clear the state - keep it for next time
       }
     })
@@ -386,11 +421,13 @@ function SidebarContent() {
     const state = {
       view,
       selectedExperiment,
+      aiVariantName: aiDomContext?.variantName,
+      aiDomContext,
       timestamp: Date.now()
     }
     storage.set('sidebarState', state)
     debugLog('Saved sidebar state:', state)
-  }, [view, selectedExperiment])
+  }, [view, selectedExperiment, aiDomContext])
 
   // Reset to first page when switching to list view
   useEffect(() => {
@@ -1027,6 +1064,8 @@ function SidebarContent() {
             owners={owners}
             teams={teams}
             tags={tags}
+            onNavigateToAI={handleNavigateToAI}
+            autoNavigateToAI={autoNavigateToAI}
             onUpdate={async (id, updates) => {
             try {
               // Send the update
@@ -1086,10 +1125,19 @@ function SidebarContent() {
           metrics={metrics}
           tags={tags}
           owners={owners}
-            teams={teams}
+          teams={teams}
+          onNavigateToAI={handleNavigateToAI}
         />
       )}
-      
+
+      {view === 'ai-dom-changes' && aiDomContext && (
+        <AIDOMChangesPage
+          variantName={aiDomContext.variantName}
+          onBack={() => setView(aiDomContext.previousView)}
+          onGenerate={aiDomContext.onGenerate}
+        />
+      )}
+
       {/* Toast notification */}
       {toast && (
         <Toast

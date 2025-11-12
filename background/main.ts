@@ -14,6 +14,7 @@ import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/stor
 import type { ExtensionMessage } from '~src/lib/messaging'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication } from '~src/utils/auth'
+import { generateDOMChanges } from '~src/lib/ai-dom-generator'
 
 // Import core modules
 import { routeMessage, validateSender } from './core/message-router'
@@ -71,8 +72,20 @@ export function initializeBackgroundScript() {
 
   // Set up message listener
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[Background] Message received:', message.type, 'from sender:', {
+      id: sender.id,
+      url: sender.url,
+      tab: sender.tab?.id
+    })
+    console.log('[Background] Our extension ID:', chrome.runtime.id)
+
     // Validate sender - only accept messages from our own extension
     if (!validateSender(sender)) {
+      console.error('[Background] REJECTED message from unauthorized sender:', {
+        senderId: sender.id,
+        ourId: chrome.runtime.id,
+        match: sender.id === chrome.runtime.id
+      })
       debugWarn('[Background] Rejected message from unauthorized sender:', sender)
       return false
     }
@@ -130,6 +143,21 @@ export function initializeBackgroundScript() {
         })
         .catch(error => {
           debugError('[Background] Storage REMOVE error:', error)
+          sendResponse({ success: false, error: message })
+        })
+      return true
+    } else if (message.type === 'GET_CONFIG') {
+      console.log('[Background] GET_CONFIG message received from:', sender.tab?.id, sender.url)
+      getConfig(storage, secureStorage)
+        .then(config => {
+          console.log('[Background] GET_CONFIG config retrieved:', !!config)
+          debugLog('[Background] GET_CONFIG returning config')
+          sendResponse({ success: true, config })
+          console.log('[Background] GET_CONFIG response sent')
+        })
+        .catch(error => {
+          console.error('[Background] GET_CONFIG error:', error)
+          debugError('[Background] GET_CONFIG error:', error)
           sendResponse({ success: false, error: error.message })
         })
       return true
@@ -247,8 +275,6 @@ export function initializeBackgroundScript() {
 
       makeAPIRequest(message.method, message.path, message.data)
         .then(data => {
-          debugLog('[Background] API request successful')
-          console.log('[Background] Full API response:', JSON.stringify(data, null, 2))
           sendResponse({ success: true, data })
         })
         .catch(error => {
@@ -330,6 +356,36 @@ export function initializeBackgroundScript() {
         }
       })
 
+      return true
+    } else if (message.type === 'AI_GENERATE_DOM_CHANGES') {
+      debugLog('[Background] Handling AI_GENERATE_DOM_CHANGES')
+
+      const handleAIGeneration = async () => {
+        try {
+          console.log('[Background] AI_GENERATE_DOM_CHANGES - Starting generation...')
+          const config = await getConfig(storage, secureStorage)
+          const { html, prompt, apiKey } = message
+          console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length)
+
+          const changes = await generateDOMChanges(html, prompt, apiKey, {
+            aiProvider: config?.aiProvider
+          })
+
+          console.log('[Background] Generated changes:', JSON.stringify(changes, null, 2))
+          console.log('[Background] Changes count:', changes?.length)
+          sendResponse({ success: true, changes })
+          console.log('[Background] Response sent successfully')
+        } catch (error) {
+          console.error('[Background] AI generation error:', error)
+          debugError('[Background] AI generation error:', error)
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to generate DOM changes'
+          })
+        }
+      }
+
+      handleAIGeneration()
       return true
     } else if (message.type === 'PING') {
       debugLog('[Background] PONG! Message system is working')

@@ -72,13 +72,15 @@ export const injectSidebar = () => {
     debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
     const currentTransform = existing.style.transform
     const isVisible = currentTransform === 'translateX(0px)' || currentTransform === 'translateX(0%)' || !currentTransform
-    
+
     if (isVisible) {
       existing.style.transform = 'translateX(100%)'
       sidebarVisible = false
+      storage.set('sidebar-visible', false).catch(() => {})
     } else {
       existing.style.transform = 'translateX(0)'
       sidebarVisible = true
+      storage.set('sidebar-visible', true).catch(() => {})
     }
     return
   }
@@ -330,9 +332,10 @@ export const injectSidebar = () => {
     requestAnimationFrame(() => {
       sidebarContainer!.style.transform = 'translateX(0)'
       sidebarVisible = true
+      storage.set('sidebar-visible', true).catch(() => {})
     })
   })
-  
+
   debugLog('🔵 ABSmartly Extension: Sidebar injected with shadow DOM')
 }
 
@@ -341,6 +344,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'TOGGLE_SIDEBAR') {
     injectSidebar()
     sendResponse({ success: true })
+    return true
+  }
+
+  if (message.type === 'CAPTURE_HTML') {
+    try {
+      const html = document.documentElement.outerHTML
+      sendResponse({ success: true, html })
+    } catch (error) {
+      sendResponse({ success: false, error: error.message })
+    }
     return true
   }
 })
@@ -358,9 +371,19 @@ if ((module as any).hot) {
   })
 }
 
-// Don't auto-inject, wait for user action
-export default () => {
+// Auto-inject sidebar if it was previously visible
+export default async () => {
   debugLog('🔵 ABSmartly Extension: Sidebar content script loaded')
+
+  try {
+    const wasSidebarVisible = await storage.get('sidebar-visible')
+    if (wasSidebarVisible === true) {
+      debugLog('🔵 ABSmartly Extension: Auto-injecting sidebar (was previously visible)')
+      injectSidebar()
+    }
+  } catch (error) {
+    debugError('Failed to check sidebar visibility state:', error)
+  }
 }
 
 // Export injectSidebar for dynamic imports

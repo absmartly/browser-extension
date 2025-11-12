@@ -89,6 +89,10 @@ interface VariantListProps {
   canAddRemove?: boolean
   // DOM changes field name from config (required)
   domFieldName: string
+  // Callback to navigate to AI DOM changes page
+  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
+  // Auto-navigate to AI page for this variant name (used for state restoration)
+  autoNavigateToAI?: string | null
 }
 
 export function VariantList({
@@ -98,7 +102,9 @@ export function VariantList({
   onVariantsChange,
   canEdit = true,
   canAddRemove = true,
-  domFieldName
+  domFieldName,
+  onNavigateToAI,
+  autoNavigateToAI
 }: VariantListProps) {
   const [variants, setVariants] = useState<Variant[]>(initialVariants)
   const [previewEnabled, setPreviewEnabled] = useState(false)
@@ -125,6 +131,25 @@ export function VariantList({
   useEffect(() => {
     justUpdatedRef.current = false
   }, [experimentId])
+
+  // Auto-navigate to AI page if requested (for state restoration after reload)
+  useEffect(() => {
+    if (autoNavigateToAI && onNavigateToAI && variants.length > 0) {
+      // Find the variant with the matching name
+      const variant = variants.find(v => v.name === autoNavigateToAI)
+      if (variant) {
+        debugLog('[VariantList] Auto-navigating to AI page for variant:', autoNavigateToAI)
+        // Find the variant index
+        const variantIndex = variants.findIndex(v => v.name === autoNavigateToAI)
+        // Create the onGenerate handler for this variant
+        const handleGenerate = async (prompt: string, images?: string[]) => {
+          // This would be the actual generation logic, but for now just navigate
+          // The DOMChangesInlineEditor will handle the actual generation
+        }
+        onNavigateToAI(autoNavigateToAI, handleGenerate)
+      }
+    }
+  }, [autoNavigateToAI, onNavigateToAI, variants])
 
   // Load saved changes from storage on mount ONLY if not already provided by parent
   useEffect(() => {
@@ -668,6 +693,7 @@ export function VariantList({
                 onVEStart={() => setActiveVEVariant(variant.name)}
                 onVEStop={() => setActiveVEVariant(null)}
                 activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
+                onNavigateToAI={onNavigateToAI}
               />
             </div>
             )}

@@ -15,6 +15,7 @@ import { DOMChangesStorageSection } from './settings/DOMChangesStorageSection'
 import { SDKConfigSection } from './settings/SDKConfigSection'
 import { QueryStringOverridesSection } from './settings/QueryStringOverridesSection'
 import { SDKInjectionSection } from './settings/SDKInjectionSection'
+import { AIProviderSection } from './settings/AIProviderSection'
 import { Storage } from "@plasmohq/storage"
 import { sendToBackground } from '~src/lib/messaging'
 
@@ -36,6 +37,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [persistQueryToCookie, setPersistQueryToCookie] = useState(true) // Persist query to cookie
   const [injectSDK, setInjectSDK] = useState(false) // Whether to inject SDK if not detected
   const [sdkUrl, setSdkUrl] = useState('') // Custom SDK URL
+  const [aiProvider, setAiProvider] = useState<'claude-subscription' | 'anthropic-api' | 'openai-api'>('claude-subscription') // AI provider for DOM generation
+  const [claudeApiKey, setClaudeApiKey] = useState('') // Anthropic API key
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
@@ -76,6 +79,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedPersistQueryToCookie = config?.persistQueryToCookie ?? true
       let loadedInjectSDK = config?.injectSDK ?? false
       let loadedSdkUrl = config?.sdkUrl || ''
+      let loadedAiProvider = config?.aiProvider || 'claude-subscription'
+      let loadedClaudeApiKey = config?.claudeApiKey || ''
 
 
       // In development, auto-load from environment variables if fields are empty
@@ -110,6 +115,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setPersistQueryToCookie(loadedPersistQueryToCookie)
       setInjectSDK(loadedInjectSDK)
       setSdkUrl(loadedSdkUrl)
+      setAiProvider(loadedAiProvider)
+      setClaudeApiKey(loadedClaudeApiKey)
 
       // Auto-save config if values were loaded from environment variables
       // This ensures env vars are persisted to storage on first load
@@ -129,7 +136,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           queryPrefix: loadedQueryPrefix,
           persistQueryToCookie: loadedPersistQueryToCookie,
           injectSDK: loadedInjectSDK,
-          sdkUrl: loadedSdkUrl.trim() || undefined
+          sdkUrl: loadedSdkUrl.trim() || undefined,
+          aiProvider: loadedAiProvider,
+          claudeApiKey: loadedClaudeApiKey.trim() || undefined
         }
         await setConfig(autoConfig)
         console.log('[SettingsView] Auto-saved config from environment variables')
@@ -410,7 +419,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       queryPrefix: queryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
       persistQueryToCookie,
       injectSDK,
-      sdkUrl: sdkUrl.trim() || undefined
+      sdkUrl: sdkUrl.trim() || undefined,
+      aiProvider,
+      claudeApiKey: claudeApiKey.trim() || undefined
     }
 
     try {
@@ -604,6 +615,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         sdkUrl={sdkUrl}
         onInjectSDKChange={setInjectSDK}
         onSdkUrlChange={setSdkUrl}
+      />
+
+      {/* AI Provider Configuration */}
+      <AIProviderSection
+        aiProvider={aiProvider}
+        claudeApiKey={claudeApiKey}
+        onAiProviderChange={setAiProvider}
+        onClaudeApiKeyChange={setClaudeApiKey}
       />
 
       <div className="flex gap-2 pt-2">

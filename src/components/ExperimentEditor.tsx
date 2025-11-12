@@ -25,6 +25,7 @@ interface ExperimentEditorProps {
   tags?: any[]
   owners?: any[]
   teams?: any[]
+  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
 }
 
 export function ExperimentEditor({
@@ -37,7 +38,8 @@ export function ExperimentEditor({
   metrics = [],
   tags = [],
   owners = [],
-  teams = []
+  teams = [],
+  onNavigateToAI
 }: ExperimentEditorProps) {
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
   const [formData, setFormData] = useState({
@@ -325,6 +327,7 @@ export function ExperimentEditor({
           canEdit={true}
           canAddRemove={true}
           domFieldName={domFieldName}
+          onNavigateToAI={onNavigateToAI}
         />
 
         {/* Code Injection Section - Only for control variant */}
