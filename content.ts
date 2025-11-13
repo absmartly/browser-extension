@@ -243,10 +243,9 @@ async function startVisualEditor(config: {
 }
 
 // Listen for messages from the background script
-console.log('[ABsmartly] 📌 REGISTERING chrome.runtime.onMessage listener at line 134')
+console.log('[ABsmartly] Registering chrome.runtime.onMessage listener')
 const messageListenerRegistered = chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[ABsmartly] 📬 MESSAGE LISTENER ENTRY POINT - received message type:', message?.type)
-  console.log('[ABsmartly] Message listener called! Message type:', message?.type)
+  console.log('[ABsmartly] Message received:', message?.type)
   debugLog('[Visual Editor Content Script] Received message:', message.type)
 
   // Handle SDK plugin injection request
@@ -263,14 +262,13 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
 
   // Handle HTML capture request
   if (message.type === 'CAPTURE_HTML') {
-    console.log('[HTML Capture Content Script] Processing CAPTURE_HTML request')
+    console.log('[ABsmartly] Capture HTML request received')
     try {
       const html = document.documentElement.outerHTML
-      console.log('[HTML Capture Content Script] Captured HTML, length:', html.length)
+      console.log('[ABsmartly] HTML captured, length:', html.length)
       sendResponse({ success: true, html })
-      console.log('[HTML Capture Content Script] Response sent')
     } catch (error) {
-      console.error('[HTML Capture Content Script] Error capturing HTML:', error)
+      console.error('[ABsmartly] Capture error:', error)
       sendResponse({ success: false, error: (error as Error).message })
     }
     return true

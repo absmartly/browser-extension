@@ -82,12 +82,14 @@ export async function initializeConfig(
   const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
   const envApplicationId = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
   const envAuthMethod = process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
+  const envAIProvider = process.env.PLASMO_PUBLIC_ABSMARTLY_AI_PROVIDER as 'claude-subscription' | 'anthropic-api' | 'openai-api' | undefined
 
   debugLog('[Config] Environment variables:', {
     hasApiKey: !!envApiKey,
     apiEndpoint: envApiEndpoint,
     applicationId: envApplicationId,
-    authMethod: envAuthMethod
+    authMethod: envAuthMethod,
+    aiProvider: envAIProvider
   })
 
   let updated = false
@@ -112,30 +114,40 @@ export async function initializeConfig(
     apiEndpoint: storedConfig?.apiEndpoint || '',
     applicationId: storedConfig?.applicationId,
     authMethod: storedConfig?.authMethod || defaultAuthMethod,
-    domChangesFieldName: storedConfig?.domChangesFieldName
+    domChangesFieldName: storedConfig?.domChangesFieldName,
+    aiProvider: storedConfig?.aiProvider,
+    claudeApiKey: storedConfig?.claudeApiKey
   }
 
-  if (!newConfig.apiKey && envApiKey) {
+  // Only update fields that are empty AND have environment values
+  // Don't overwrite existing stored config values
+  if (!storedConfig?.apiKey && !secureApiKey && envApiKey) {
     newConfig.apiKey = envApiKey
     await secureStorage.set("absmartly-apikey", envApiKey)
     updated = true
     debugLog('[Config] Using API key from environment and storing securely')
   }
 
-  if (!newConfig.apiEndpoint && envApiEndpoint) {
+  if (!storedConfig?.apiEndpoint && envApiEndpoint) {
     newConfig.apiEndpoint = envApiEndpoint
     updated = true
     debugLog('[Config] Using API endpoint from environment')
   }
 
-  if (!newConfig.applicationId && envApplicationId) {
+  if (!storedConfig?.applicationId && envApplicationId) {
     newConfig.applicationId = parseInt(envApplicationId)
     updated = true
     debugLog('[Config] Using application ID from environment')
   }
 
   if (updated) {
-    const configToStore = { ...newConfig, apiKey: '' }
+    // Only write back if we actually updated something from environment
+    // Preserve any fields that were already in storedConfig (like aiProvider from tests)
+    const configToStore = {
+      ...storedConfig,  // Preserve existing fields first
+      ...newConfig,     // Then apply our updates
+      apiKey: ''        // Always remove apiKey from non-secure storage
+    }
     await storage.set("absmartly-config", configToStore)
     debugLog('[Config] Updated config with environment variables (API key stored securely)')
   } else {

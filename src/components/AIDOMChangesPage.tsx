@@ -1,26 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
-import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline'
+import { ChangeViewerModal } from './ChangeViewerModal'
+import { renderMarkdown } from '~src/utils/markdown'
+import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   images?: string[]
+  domChangesSnapshot?: DOMChange[]
+  timestamp: number
+  id: string
+  aiResponse?: string
 }
 
 interface AIDOMChangesPageProps {
   variantName: string
+  currentChanges: DOMChange[]
   onBack: () => void
-  onGenerate: (prompt: string, images?: string[]) => Promise<void>
+  onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>
+  onRestoreChanges: (changes: DOMChange[]) => void
 }
 
-export function AIDOMChangesPage({
+export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   variantName,
+  currentChanges,
   onBack,
-  onGenerate
+  onGenerate,
+  onRestoreChanges
 }: AIDOMChangesPageProps) {
-  console.log('[AIDOMChangesPage] Component mounted/rendered for variant:', variantName)
 
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,10 +39,59 @@ export function AIDOMChangesPage({
   const [attachedImages, setAttachedImages] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [viewerModal, setViewerModal] = useState<{ changes: DOMChange[], response: string, timestamp: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Check if onGenerate function is missing (e.g., after page reload)
+  const isFunctionMissing = !onGenerate || typeof onGenerate !== 'function'
+
+  if (isFunctionMissing) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              aria-label="Go back"
+            >
+              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+            </button>
+            <div className="flex items-center gap-2">
+              <SparklesIcon className="h-6 w-6 text-purple-600" />
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">AI DOM Generator</h1>
+                <p className="text-xs text-gray-500">Variant: {variantName}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-md">
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 mb-3">
+                The AI generator needs to be reinitialized after page reload.
+              </p>
+              <Button
+                onClick={onBack}
+                className="w-full"
+              >
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Return to Variant Editor
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-4">
+              Your chat history has been preserved and will be restored when you return to this page.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Load chat history for this variant on mount
   useEffect(() => {
@@ -143,18 +202,27 @@ export function AIDOMChangesPage({
     setLoading(true)
     setError(null)
 
+    const timestamp = Date.now()
     const userMessage: ChatMessage = {
       role: 'user',
       content: prompt,
-      images: attachedImages.length > 0 ? [...attachedImages] : undefined
+      images: attachedImages.length > 0 ? [...attachedImages] : undefined,
+      timestamp,
+      id: `user-${timestamp}`
     }
     setChatHistory(prev => [...prev, userMessage])
 
     try {
-      await onGenerate(prompt, attachedImages.length > 0 ? attachedImages : undefined)
+      const result = await onGenerate(prompt, attachedImages.length > 0 ? attachedImages : undefined)
+
+      const assistantTimestamp = Date.now()
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: 'DOM changes generated successfully! I\'ve analyzed your request and applied the changes to the variant.'
+        content: result.response,
+        aiResponse: result.response,
+        domChangesSnapshot: result.domChanges,
+        timestamp: assistantTimestamp,
+        id: `assistant-${assistantTimestamp}`
       }
       setChatHistory(prev => [...prev, assistantMessage])
       setPrompt('')
@@ -301,7 +369,7 @@ export function AIDOMChangesPage({
           <div className="space-y-4 mb-4">
             {chatHistory.map((message, index) => (
               <div
-                key={index}
+                key={message.id || index}
                 data-message-index={index}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
@@ -326,7 +394,40 @@ export function AIDOMChangesPage({
                     </div>
                   )}
                   {message.content && (
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    message.role === 'assistant' && message.aiResponse ? (
+                      <div
+                        className="text-sm prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(message.aiResponse) }}
+                      />
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    )
+                  )}
+                  {message.role === 'assistant' && message.domChangesSnapshot && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
+                      <button
+                        onClick={() => setViewerModal({
+                          changes: message.domChangesSnapshot!,
+                          response: message.aiResponse || '',
+                          timestamp: message.timestamp
+                        })}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                      >
+                        <EyeIcon className="h-4 w-4" />
+                        View Changes ({message.domChangesSnapshot.length})
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (message.domChangesSnapshot) {
+                            onRestoreChanges(message.domChangesSnapshot)
+                          }
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 transition-colors"
+                      >
+                        <ArrowUturnLeftIcon className="h-4 w-4" />
+                        Restore
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -417,20 +518,8 @@ export function AIDOMChangesPage({
 
         <Button
           id="ai-generate-button"
-          onClick={(e) => {
-            console.log('[AIDOMChangesPage] Button onClick event fired!', e)
-            handleGenerate()
-          }}
-          disabled={(() => {
-            const isDisabled = loading || (!prompt.trim() && attachedImages.length === 0)
-            console.log('[AIDOMChangesPage] Button disabled check:', {
-              loading,
-              promptLength: prompt.trim().length,
-              imagesCount: attachedImages.length,
-              isDisabled
-            })
-            return isDisabled
-          })()}
+          onClick={handleGenerate}
+          disabled={loading || (!prompt.trim() && attachedImages.length === 0)}
           className="w-full"
         >
           {loading ? (
@@ -446,6 +535,16 @@ export function AIDOMChangesPage({
           )}
         </Button>
       </div>
+
+      {viewerModal && (
+        <ChangeViewerModal
+          isOpen={true}
+          onClose={() => setViewerModal(null)}
+          changes={viewerModal.changes}
+          response={viewerModal.response}
+          timestamp={viewerModal.timestamp}
+        />
+      )}
     </div>
   )
-}
+})

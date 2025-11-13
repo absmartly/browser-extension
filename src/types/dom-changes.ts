@@ -292,6 +292,30 @@ export const STYLE_RULES_TEMPLATES: StyleRulesTemplate[] = [
   }
 ];
 
+// AI DOM Generation Types
+export type DOMChangeAction =
+  | 'append'
+  | 'replace_all'
+  | 'replace_specific'
+  | 'remove_specific'
+  | 'none';
+
+export interface AIDOMGenerationResult {
+  domChanges: DOMChange[];
+  response: string;
+  action: DOMChangeAction;
+  targetSelectors?: string[];
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  images?: string[];
+  domChangesSnapshot?: DOMChange[];
+  timestamp: number;
+  id: string;
+}
+
 export const DOM_CHANGE_TEMPLATES: DOMChangeTemplate[] = [
   {
     id: 'rounded-cta',

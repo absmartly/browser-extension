@@ -346,16 +346,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true })
     return true
   }
-
-  if (message.type === 'CAPTURE_HTML') {
-    try {
-      const html = document.documentElement.outerHTML
-      sendResponse({ success: true, html })
-    } catch (error) {
-      sendResponse({ success: false, error: error.message })
-    }
-    return true
-  }
 })
 
 // Export for HMR support

@@ -7,6 +7,7 @@ import { sendToContent, sendToBackground } from '~src/lib/messaging'
 import { clearVisualEditorSessionStorage } from '~src/utils/storage-cleanup'
 import { getConfig } from '~src/utils/storage'
 import { capturePageHTML } from '~src/utils/html-capture'
+import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
 
 // Module-level flag to prevent concurrent VE launches from multiple variant instances
 let isLaunchingVisualEditor = false
@@ -17,7 +18,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Checkbox } from './ui/Checkbox'
 import { MultiSelectTags } from './ui/MultiSelectTags'
-import type { DOMChange, DOMChangeType, DOMChangeStyleRules } from '~src/types/dom-changes'
+import type { DOMChange, DOMChangeType, DOMChangeStyleRules, AIDOMGenerationResult } from '~src/types/dom-changes'
 import { suggestCleanedSelector } from '~src/utils/selector-cleaner'
 import { generateSelectorSuggestions } from '~src/utils/selector-suggestions'
 import { StyleRulesEditor } from './StyleRulesEditor'
@@ -55,7 +56,12 @@ interface DOMChangesInlineEditorProps {
   onVEStart: () => void
   onVEStop: () => void
   activePreviewVariantName: string | null
-  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
+  onNavigateToAI?: (
+    variantName: string,
+    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    currentChanges: DOMChange[],
+    onRestoreChanges: (changes: DOMChange[]) => void
+  ) => void
 }
 
 // Operation Mode Selector Component
@@ -624,11 +630,6 @@ export function DOMChangesInlineEditor({
     debugLog('Experiment name:', experimentName)
     debugLog('Changes:', changes)
 
-    // Test if we can send any message at all
-    sendMessage({ type: 'PING' }, (response) => {
-      debugLog('PING response:', response)
-    })
-
     // Send directly to content script (no relay through background)
     console.log('[DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id:', tabs[0]?.id)
     if (tabs[0]?.id) {
@@ -794,7 +795,7 @@ export function DOMChangesInlineEditor({
     setEditingChange(newChange)
   }
 
-  const handleAIGenerate = async (prompt: string, images?: string[]) => {
+  const handleAIGenerate = async (prompt: string, images?: string[]): Promise<AIDOMGenerationResult> => {
     try {
       console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt, 'images count:', images?.length || 0)
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
@@ -844,7 +845,8 @@ export function DOMChangesInlineEditor({
         html,
         prompt,
         apiKey,
-        images
+        images,
+        currentChanges: changes
       })
 
       console.log('[AI Generate] Response received:', response)
@@ -854,18 +856,20 @@ export function DOMChangesInlineEditor({
         throw new Error(response.error || 'Failed to generate DOM changes')
       }
 
-      const generatedChanges = response.changes as DOMChange[]
-      console.log('[AI Generate] ✅ Generated', generatedChanges.length, 'DOM changes:', generatedChanges)
-      debugLog('✅ Generated', generatedChanges.length, 'DOM changes:', generatedChanges)
+      const result = response.result as AIDOMGenerationResult
+      console.log('[AI Generate] ✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
+      debugLog('✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
 
       console.log('[AI Generate] Current changes count:', changes.length)
-      const updatedChanges = [...changes, ...generatedChanges]
-      console.log('[AI Generate] Updated changes count:', updatedChanges.length)
+      const updatedChanges = applyDOMChangeAction(changes, result)
+      console.log('[AI Generate] Updated changes count after', result.action, ':', updatedChanges.length)
       console.log('[AI Generate] Calling onChange...')
       onChange(updatedChanges)
 
-      console.log('[AI Generate] ✅ AI-generated changes added successfully')
-      debugLog('✅ AI-generated changes added successfully')
+      console.log('[AI Generate] ✅ AI-generated changes applied successfully')
+      debugLog('✅ AI-generated changes applied successfully')
+
+      return result
     } catch (error) {
       console.error('[AI Generate] ❌ AI generation failed:', error)
       debugError('❌ AI generation failed:', error)
@@ -1625,7 +1629,7 @@ export function DOMChangesInlineEditor({
             type="button"
             onClick={() => {
               if (onNavigateToAI) {
-                onNavigateToAI(variantName, handleAIGenerate)
+                onNavigateToAI(variantName, handleAIGenerate, changes, onChange)
               } else {
                 setAiDialogOpen(true)
               }

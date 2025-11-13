@@ -11,27 +11,27 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production'
  * In production builds, this becomes an empty function
  */
 export const debugLog = IS_PRODUCTION
-  ? function() {}
-  : function() { console.log.apply(console, arguments) }
+  ? function(..._args: any[]) {}
+  : function(...args: any[]) { console.log(...args) }
 
 /**
  * Debug warn - only outputs when debug mode is enabled
  * In production builds, this becomes an empty function
  */
 export const debugWarn = IS_PRODUCTION
-  ? function() {}
-  : function() { console.warn.apply(console, arguments) }
+  ? function(..._args: any[]) {}
+  : function(...args: any[]) { console.warn(...args) }
 
 /**
  * Debug error - always preserved for production error tracking
  */
-export const debugError = function() {
-  console.error.apply(console, arguments)
+export const debugError = function(...args: any[]) {
+  console.error(...args)
 }
 
 /**
  * Always log - bypasses debug flag (use for important messages)
  */
-export const alwaysLog = function() {
-  console.log.apply(console, arguments)
+export const alwaysLog = function(...args: any[]) {
+  console.log(...args)
 }

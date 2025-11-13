@@ -360,20 +360,30 @@ export function initializeBackgroundScript() {
     } else if (message.type === 'AI_GENERATE_DOM_CHANGES') {
       debugLog('[Background] Handling AI_GENERATE_DOM_CHANGES')
 
-      const handleAIGeneration = async () => {
+      ;(async () => {
         try {
           console.log('[Background] AI_GENERATE_DOM_CHANGES - Starting generation...')
           const config = await getConfig(storage, secureStorage)
-          const { html, prompt, apiKey } = message
-          console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length)
+          const { html, prompt, currentChanges } = message
+          console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length, 'Current changes:', currentChanges?.length || 0)
+          console.error('🔍 [Background] Full config:', JSON.stringify(config, null, 2))
+          console.error('🔍 [Background] AI Provider from config:', config?.aiProvider)
+          console.log('[Background] AI Provider:', config?.aiProvider)
 
-          const changes = await generateDOMChanges(html, prompt, apiKey, {
+          const apiKeyToUse = config?.aiProvider === 'anthropic-api'
+            ? config?.anthropicApiKey
+            : config?.apiKey
+
+          console.log('[Background] Using API key from config:', apiKeyToUse ? 'present' : 'missing')
+
+          console.error('🚀 [Background] Calling generateDOMChanges with aiProvider:', config?.aiProvider)
+          const result = await generateDOMChanges(html, prompt, apiKeyToUse || '', currentChanges || [], {
             aiProvider: config?.aiProvider
           })
 
-          console.log('[Background] Generated changes:', JSON.stringify(changes, null, 2))
-          console.log('[Background] Changes count:', changes?.length)
-          sendResponse({ success: true, changes })
+          console.log('[Background] Generated result:', JSON.stringify(result, null, 2))
+          console.log('[Background] Result action:', result.action, 'DOM changes count:', result.domChanges?.length)
+          sendResponse({ success: true, result })
           console.log('[Background] Response sent successfully')
         } catch (error) {
           console.error('[Background] AI generation error:', error)
@@ -383,9 +393,7 @@ export function initializeBackgroundScript() {
             error: error instanceof Error ? error.message : 'Failed to generate DOM changes'
           })
         }
-      }
-
-      handleAIGeneration()
+      })()
       return true
     } else if (message.type === 'PING') {
       debugLog('[Background] PONG! Message system is working')

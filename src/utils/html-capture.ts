@@ -11,30 +11,28 @@ export async function capturePageHTML(): Promise<string> {
       throw new Error('chrome.tabs API not available')
     }
 
-    // Get all tabs and find the first non-extension page
-    // We can't use active:true because the sidebar might be active
-    console.log('[HTML Capture] Querying all tabs...')
-    const allTabs = await chrome.tabs.query({ currentWindow: true })
-    console.log('[HTML Capture] Total tabs in current window:', allTabs.length)
+    // Get the active tab (the one the user is looking at)
+    console.log('[HTML Capture] Querying active tab...')
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    console.log('[HTML Capture] Active tab:', activeTab?.id, 'URL:', activeTab?.url)
 
-    // Find first tab that's not an extension page
-    const contentTab = allTabs.find(t =>
-      t.url &&
-      !t.url.startsWith('chrome-extension://') &&
-      !t.url.startsWith('chrome://') &&
-      !t.url.startsWith('about:')
-    )
-
-    console.log('[HTML Capture] Found content tab:', contentTab?.id, 'URL:', contentTab?.url)
-
-    if (!contentTab?.id) {
-      console.error('[HTML Capture] No content tab found! All tabs:', allTabs.map(t => ({ id: t.id, url: t.url })))
-      throw new Error('No content tab found. Please open a webpage first.')
+    if (!activeTab?.id) {
+      console.error('[HTML Capture] No active tab found!')
+      throw new Error('No active tab found')
     }
 
-    console.log('[HTML Capture] Sending CAPTURE_HTML message to tab:', contentTab.id)
+    // Verify it's a real webpage, not an extension page
+    if (!activeTab.url ||
+        activeTab.url.startsWith('chrome-extension://') ||
+        activeTab.url.startsWith('chrome://') ||
+        activeTab.url.startsWith('about:')) {
+      console.error('[HTML Capture] Active tab is not a webpage:', activeTab.url)
+      throw new Error('Please open the extension on a webpage, not an extension page')
+    }
 
-    const response = await chrome.tabs.sendMessage(contentTab.id, {
+    console.log('[HTML Capture] Sending CAPTURE_HTML message to active tab:', activeTab.id)
+
+    const response = await chrome.tabs.sendMessage(activeTab.id, {
       type: 'CAPTURE_HTML'
     })
 

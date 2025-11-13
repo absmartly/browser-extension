@@ -461,6 +461,20 @@ export function VariantList({
     }
   }, [variants, experimentName, domFieldName])
 
+  const handleNavigateToAIWithPreview = useCallback((variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => {
+    debugLog('[VariantList] handleNavigateToAIWithPreview called for variant:', variantName)
+
+    const variantIndex = variants.findIndex(v => v.name === variantName)
+    if (variantIndex !== -1) {
+      debugLog('[VariantList] Auto-enabling preview for variant index:', variantIndex)
+      handlePreviewToggle(true, variantIndex)
+    }
+
+    if (onNavigateToAI) {
+      onNavigateToAI(variantName, onGenerate)
+    }
+  }, [variants, handlePreviewToggle, onNavigateToAI])
+
   // Pre-compute display variables for all variants to avoid repeated calculations in render
   const variantsDisplayVariables = useMemo(
     () => variants.map(variant => getVariablesForDisplay(variant.config, domFieldName)),
@@ -693,7 +707,7 @@ export function VariantList({
                 onVEStart={() => setActiveVEVariant(variant.name)}
                 onVEStop={() => setActiveVEVariant(null)}
                 activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
-                onNavigateToAI={onNavigateToAI}
+                onNavigateToAI={handleNavigateToAIWithPreview}
               />
             </div>
             )}

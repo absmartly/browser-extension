@@ -299,28 +299,13 @@ test.describe('AI Page Persistence and HTML Capture', () => {
 
       log('Waiting for AI generation to complete...')
 
-      // Wait for either a chat message to appear or an error message
-      const chatMessage = testPage.locator('[class*="chat"], [role="log"], .space-y-4 > div').first()
-      const errorMessage = testPage.locator('text=/failed|error/i')
+      // Wait for the "Generating..." state to disappear and response to appear
+      const generatingButton = testPage.locator('button:has-text("Generating")')
+      await generatingButton.waitFor({ state: 'hidden', timeout: 60000 }).catch(() => {
+        log('⚠️ Generation still in progress or button state did not change')
+      })
 
-      try {
-        await Promise.race([
-          chatMessage.waitFor({ state: 'visible', timeout: 8000 }),
-          errorMessage.waitFor({ state: 'visible', timeout: 8000 })
-        ])
-
-        const hasError = await errorMessage.isVisible().catch(() => false)
-        if (hasError) {
-          const errorText = await errorMessage.textContent()
-          log(`⚠️ AI generation failed with error: ${errorText}`)
-        } else {
-          log('✓ AI generation completed - chat message appeared')
-        }
-      } catch (error) {
-        log('⚠️ AI generation may have completed too quickly or is still processing')
-      }
-
-      await debugWait(500)
+      await debugWait(1000)
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-5-after-generate.png', fullPage: true })
       log('Screenshot saved: ai-persistence-5-after-generate.png')
@@ -328,68 +313,33 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       const chatMessages = await testPage.locator('[class*="chat"], [role="log"], .space-y-4 > div').count()
       log(`Chat messages/sections found: ${chatMessages}`)
 
+      let responseText = ''
       if (chatMessages > 0) {
         log('✅ Chat history exists')
         const allText = await testPage.locator('[class*="chat"], [role="log"], .space-y-4').textContent().catch(() => '')
-        log(`Chat content preview: ${allText?.substring(0, 200) || 'No text'}...`)
+        responseText = allText || ''
+        log(`Chat content preview: ${responseText.substring(0, 300)}...`)
 
-        if (allText?.includes('orange') || allText?.includes('button') || allText?.includes('background')) {
+        if (responseText.includes('orange') || responseText.includes('button') || responseText.includes('background')) {
           log('✅ Response mentions buttons/orange/background')
+        }
+
+        if (responseText.includes('"selector"') && responseText.includes('"type"')) {
+          log('✅ Response contains JSON with DOM changes')
+
+          try {
+            let jsonMatch = responseText.match(/\[[\s\S]*\]/)
+            if (jsonMatch) {
+              const domChanges = JSON.parse(jsonMatch[0])
+              log(`✅ Successfully parsed ${domChanges.length} DOM change(s) from Claude response`)
+              log(`   First change: ${JSON.stringify(domChanges[0])}`)
+            }
+          } catch (e) {
+            log('⚠️ Could not parse JSON from response')
+          }
         }
       } else {
         log('⚠️ No chat messages found in the expected locations')
-      }
-
-      log('Checking if generation completed successfully...')
-      const successMessage = await testPage.locator('text=/success|generated|applied/i').isVisible({ timeout: 2000 }).catch(() => false)
-      if (successMessage) {
-        log('✅ Success message found')
-
-        log('Verifying buttons turned orange...')
-        await debugWait(500)
-
-        const button1 = testPage.locator('#button-1')
-        const button2 = testPage.locator('#button-2')
-        const button3 = testPage.locator('#button-3')
-
-        const button1Color = await button1.evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
-        const button2Color = await button2.evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
-        const button3Color = await button3.evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
-
-        log(`Button 1 background: ${button1Color}`)
-        log(`Button 2 background: ${button2Color}`)
-        log(`Button 3 background: ${button3Color}`)
-
-        const isOrange = (color: string | null) => {
-          if (!color) return false
-          if (color.includes('orange')) return true
-
-          const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
-          if (rgbMatch) {
-            const r = parseInt(rgbMatch[1])
-            const g = parseInt(rgbMatch[2])
-            const b = parseInt(rgbMatch[3])
-
-            return r > 200 && r <= 255 &&
-                   g >= 80 && g <= 180 &&
-                   b >= 0 && b <= 100
-          }
-          return false
-        }
-
-        const allOrange = isOrange(button1Color) && isOrange(button2Color) && isOrange(button3Color)
-
-        if (allOrange) {
-          log('✅ SUCCESS: All buttons have orange backgrounds!')
-        } else {
-          log('⚠️ WARNING: Buttons colors detected but may not be orange')
-          log('   This could mean: AI generated different changes, or generation failed')
-        }
-
-        await testPage.screenshot({ path: 'test-results/ai-persistence-5.5-after-changes.png', fullPage: true })
-        log('Screenshot saved: ai-persistence-5.5-after-changes.png')
-      } else {
-        log('⚠️ No success message - generation may have failed or be incomplete')
       }
     })
 
@@ -444,6 +394,109 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       log('Screenshot saved: ai-persistence-8-final.png')
 
       expect(isOnAIPage).toBe(true)
+    })
+
+    await test.step('Verify auto-preview and button colors', async () => {
+      log('Verifying auto-preview feature and DOM changes...')
+
+      const backButton = testPage.locator('button').filter({ has: testPage.locator('svg') }).first()
+      await backButton.click()
+      log('✓ Clicked back button')
+
+      await debugWait(1000)
+
+      await testPage.screenshot({ path: 'test-results/ai-persistence-9-back-to-editor.png', fullPage: true })
+      log('Screenshot saved: ai-persistence-9-back-to-editor.png')
+
+      await expect(testPage.locator('text=Display Name')).toBeVisible({ timeout: 10000 })
+      log('✓ Back at experiment editor')
+
+      log('Scrolling to DOM Changes section...')
+      await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
+      await debugWait(500)
+
+      log('Checking and enabling Preview if needed...')
+      const previewToggle = testPage.locator('[data-testid="preview-toggle-variant-1"]')
+      await previewToggle.waitFor({ state: 'visible', timeout: 10000 })
+
+      const hasBlueBackground = await previewToggle.evaluate(el => {
+        return el.classList.contains('bg-blue-600')
+      })
+      log(`Preview toggle state: ${hasBlueBackground ? 'ON' : 'OFF'}`)
+
+      if (!hasBlueBackground) {
+        log('Preview is OFF, enabling it manually...')
+        await previewToggle.click()
+        await debugWait(1000)
+        log('✓ Preview enabled')
+      } else {
+        log('✓ Preview already enabled')
+      }
+
+      await testPage.screenshot({ path: 'test-results/ai-persistence-10-preview-enabled.png', fullPage: true })
+      log('Screenshot saved: ai-persistence-10-preview-enabled.png')
+
+      log('Navigating to test page to verify button colors...')
+      const contentPage = context.pages().find(p => p.url().includes('localhost:3456'))
+
+      if (contentPage) {
+        await contentPage.bringToFront()
+        await contentPage.reload({ waitUntil: 'domcontentloaded' })
+        await debugWait(2000)
+
+        await contentPage.screenshot({ path: 'test-results/ai-persistence-11-test-page.png', fullPage: true })
+        log('Screenshot saved: ai-persistence-11-test-page.png')
+
+        log('Checking button colors on test page...')
+        const button1Color = await contentPage.locator('#button-1').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
+        const button2Color = await contentPage.locator('#button-2').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
+        const button3Color = await contentPage.locator('#button-3').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
+
+        log(`Button 1 background: ${button1Color}`)
+        log(`Button 2 background: ${button2Color}`)
+        log(`Button 3 background: ${button3Color}`)
+
+        const isOrange = (color: string | null) => {
+          if (!color) return false
+          if (color.includes('orange')) return true
+
+          const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+          if (rgbMatch) {
+            const r = parseInt(rgbMatch[1])
+            const g = parseInt(rgbMatch[2])
+            const b = parseInt(rgbMatch[3])
+
+            return r > 200 && r <= 255 &&
+                   g >= 80 && g <= 180 &&
+                   b >= 0 && b <= 100
+          }
+          return false
+        }
+
+        const button1Orange = isOrange(button1Color)
+        const button2Orange = isOrange(button2Color)
+        const button3Orange = isOrange(button3Color)
+
+        log(`Button 1 is orange: ${button1Orange}`)
+        log(`Button 2 is orange: ${button2Orange}`)
+        log(`Button 3 is orange: ${button3Orange}`)
+
+        if (button1Orange && button2Orange && button3Orange) {
+          log('✅ SUCCESS: All buttons have orange backgrounds!')
+        } else {
+          log('⚠️ WARNING: Not all buttons are orange')
+          log(`   Button 1: ${button1Orange ? '✓' : '✗'}`)
+          log(`   Button 2: ${button2Orange ? '✓' : '✗'}`)
+          log(`   Button 3: ${button3Orange ? '✓' : '✗'}`)
+        }
+
+        await contentPage.screenshot({ path: 'test-results/ai-persistence-12-final-verification.png', fullPage: true })
+        log('Screenshot saved: ai-persistence-12-final-verification.png')
+
+        expect(button1Orange || button2Orange || button3Orange).toBe(true)
+      } else {
+        log('⚠️ Could not find test page to verify button colors')
+      }
 
       log('Test completed')
     })

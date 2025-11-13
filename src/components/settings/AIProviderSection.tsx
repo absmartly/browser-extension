@@ -22,6 +22,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NOT_CONFIGURED)
   const [testingConnection, setTestingConnection] = useState(false)
   const [bridgePort, setBridgePort] = useState<number | null>(null)
+  const [subscriptionType, setSubscriptionType] = useState<string | undefined>(undefined)
   const [customPort, setCustomPort] = useState('')
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       const connection = bridgeClient.getConnection()
       if (connection) {
         setBridgePort(connection.port)
+        setSubscriptionType(connection.subscriptionType)
         setConnectionState(ConnectionState.CONNECTED)
       }
     } catch (error) {
@@ -53,6 +55,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         const connection = bridgeClient.getConnection()
         if (connection) {
           setBridgePort(connection.port)
+          setSubscriptionType(connection.subscriptionType)
         }
         setConnectionState(ConnectionState.CONNECTED)
       } else {
@@ -105,7 +108,11 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                 <p className="text-sm font-medium">
                   {connectionState === ConnectionState.CONNECTED ? `Connected (port ${bridgePort})` : 'Not Connected'}
                 </p>
-                <p className="text-xs text-gray-600">{getConnectionStateMessage(connectionState)}</p>
+                <p className="text-xs text-gray-600">
+                  {connectionState === ConnectionState.CONNECTED && subscriptionType
+                    ? `${getConnectionStateMessage(connectionState)} • ${subscriptionType}`
+                    : getConnectionStateMessage(connectionState)}
+                </p>
               </div>
             </div>
             <Button

@@ -17,6 +17,7 @@ import { CookieConsentModal } from "~src/components/CookieConsentModal"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import type { Experiment, ABsmartlyConfig, Application, ExperimentTag, ExperimentUser, ExperimentTeam } from "~src/types/absmartly"
 import type { SidebarState, ExperimentFilters } from "~src/types/storage-state"
+import type { DOMChange, AIDOMGenerationResult } from "~src/types/dom-changes"
 import { CogIcon, PlusIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline"
 import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
@@ -94,24 +95,39 @@ function SidebarContent() {
   // AI DOM Changes state
   const [aiDomContext, setAiDomContext] = useState<{
     variantName: string
-    onGenerate: (prompt: string, images?: string[]) => Promise<void>
+    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>
+    currentChanges: DOMChange[]
+    onRestoreChanges: (changes: DOMChange[]) => void
     previousView: View
   } | null>(null)
 
   // Flag to auto-navigate to AI page after experiment detail loads (used for state restoration)
   const [autoNavigateToAI, setAutoNavigateToAI] = useState<string | null>(null)
 
-  const handleNavigateToAI = useCallback((variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => {
+  const handleNavigateToAI = useCallback((
+    variantName: string,
+    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    currentChanges: DOMChange[],
+    onRestoreChanges: (changes: DOMChange[]) => void
+  ) => {
     debugLog('[ExtensionUI] Navigating to AI DOM changes page for variant:', variantName)
     setAiDomContext({
       variantName,
       onGenerate,
+      currentChanges,
+      onRestoreChanges,
       previousView: view
     })
     setView('ai-dom-changes')
     // Clear auto-navigate flag after navigation
     setAutoNavigateToAI(null)
   }, [view])
+
+  const handleBackFromAI = useCallback(() => {
+    if (aiDomContext) {
+      setView(aiDomContext.previousView)
+    }
+  }, [aiDomContext])
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -1133,8 +1149,10 @@ function SidebarContent() {
       {view === 'ai-dom-changes' && aiDomContext && (
         <AIDOMChangesPage
           variantName={aiDomContext.variantName}
-          onBack={() => setView(aiDomContext.previousView)}
+          currentChanges={aiDomContext.currentChanges}
+          onBack={handleBackFromAI}
           onGenerate={aiDomContext.onGenerate}
+          onRestoreChanges={aiDomContext.onRestoreChanges}
         />
       )}
 

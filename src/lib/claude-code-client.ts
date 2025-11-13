@@ -163,7 +163,7 @@ export class ClaudeCodeBridgeClient {
     return await response.json()
   }
 
-  async sendMessage(conversationId: string, content: string, files: string[] = []): Promise<void> {
+  async sendMessage(conversationId: string, content: string, files: string[] = [], systemPrompt?: string): Promise<void> {
     if (!this.connection) {
       await this.connect()
     }
@@ -173,7 +173,8 @@ export class ClaudeCodeBridgeClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content,
-        files
+        files,
+        systemPrompt
       })
     })
 

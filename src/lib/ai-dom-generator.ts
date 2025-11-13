@@ -1,9 +1,71 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { DOMChange } from '~src/types/dom-changes'
+import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import { debugLog, debugError } from '~src/utils/debug'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
+import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
 
-const SYSTEM_PROMPT = `You are an AI assistant specialized in generating DOM changes for the ABsmartly A/B testing platform.
+const SYSTEM_PROMPT = AI_DOM_GENERATION_SYSTEM_PROMPT
+
+interface ValidationError {
+  isValid: false
+  errors: string[]
+}
+
+interface ValidationSuccess {
+  isValid: true
+  result: AIDOMGenerationResult
+}
+
+type ValidationResult = ValidationError | ValidationSuccess
+
+function validateAIDOMGenerationResult(responseText: string): ValidationResult {
+  const errors: string[] = []
+
+  let parsedResult: any
+  try {
+    parsedResult = JSON.parse(responseText)
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: ['Response is not valid JSON. Your response must be pure JSON starting with { and ending with }.']
+    }
+  }
+
+  if (!parsedResult.domChanges) {
+    errors.push('Missing required field: "domChanges" (must be an array of DOM change objects)')
+  } else if (!Array.isArray(parsedResult.domChanges)) {
+    errors.push('"domChanges" must be an array, got: ' + typeof parsedResult.domChanges)
+  }
+
+  if (!parsedResult.response) {
+    errors.push('Missing required field: "response" (must be a string with your conversational message)')
+  } else if (typeof parsedResult.response !== 'string') {
+    errors.push('"response" must be a string, got: ' + typeof parsedResult.response)
+  }
+
+  if (!parsedResult.action) {
+    errors.push('Missing required field: "action" (must be one of: append, replace_all, replace_specific, remove_specific, none)')
+  } else if (!['append', 'replace_all', 'replace_specific', 'remove_specific', 'none'].includes(parsedResult.action)) {
+    errors.push(`"action" must be one of: append, replace_all, replace_specific, remove_specific, none. Got: "${parsedResult.action}"`)
+  }
+
+  if ((parsedResult.action === 'replace_specific' || parsedResult.action === 'remove_specific') &&
+      (!parsedResult.targetSelectors || !Array.isArray(parsedResult.targetSelectors) || parsedResult.targetSelectors.length === 0)) {
+    errors.push(`Action "${parsedResult.action}" requires a non-empty "targetSelectors" array`)
+  }
+
+  if (errors.length > 0) {
+    return { isValid: false, errors }
+  }
+
+  return {
+    isValid: true,
+    result: parsedResult as AIDOMGenerationResult
+  }
+}
+
+// Legacy prompt kept for reference (replaced by comprehensive prompt above)
+const LEGACY_SYSTEM_PROMPT = `You are an AI assistant specialized in generating DOM changes for the ABsmartly A/B testing platform.
 
 Your task is to analyze HTML and generate valid DOM change objects based on user requests.
 
@@ -167,21 +229,27 @@ export async function generateDOMChanges(
   html: string,
   prompt: string,
   apiKey: string,
+  currentChanges: DOMChange[] = [],
   options?: {
     useOAuth?: boolean
     oauthToken?: string
     aiProvider?: 'claude-subscription' | 'anthropic-api' | 'openai-api'
   }
-): Promise<DOMChange[]> {
+): Promise<AIDOMGenerationResult> {
   try {
     debugLog('🤖 Generating DOM changes with AI...')
     debugLog('📝 Prompt:', prompt)
     debugLog('📄 HTML length:', html.length)
-    debugLog('🔧 AI Provider:', options?.aiProvider || 'anthropic-api')
 
-    if (options?.aiProvider === 'claude-subscription') {
-      debugLog('🔗 Using Claude Code Bridge for generation')
-      return await generateWithBridge(html, prompt)
+    // Try Claude Code Bridge first (uses Claude subscription, no API costs)
+    try {
+      debugLog('🔗 Attempting to use Claude Code Bridge...')
+      const result = await generateWithBridge(html, prompt, currentChanges)
+      debugLog('✅ Successfully generated with Claude Code Bridge')
+      return result
+    } catch (bridgeError) {
+      debugLog('⚠️ Claude Code Bridge not available, falling back to Anthropic API:', bridgeError)
+      console.log('[AI Generator] Bridge unavailable, using Anthropic API fallback')
     }
 
     let authConfig: any = { dangerouslyAllowBrowser: true }
@@ -201,7 +269,13 @@ export async function generateDOMChanges(
 
     const anthropic = new Anthropic(authConfig)
 
-    const userMessage = `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}\n\nGenerate the appropriate DOM changes as a JSON array.`
+    let userMessage = ''
+
+    if (currentChanges.length > 0) {
+      userMessage += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
+    }
+
+    userMessage += `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}`
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
@@ -221,27 +295,32 @@ export async function generateDOMChanges(
     }
 
     let responseText = content.text.trim()
-    debugLog('🤖 AI Response:', responseText)
+    debugLog('🤖 AI Response:', responseText.substring(0, 200))
 
     if (responseText.startsWith('```')) {
       responseText = responseText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    const changes: DOMChange[] = JSON.parse(responseText)
+    const validation = validateAIDOMGenerationResult(responseText)
 
-    if (!Array.isArray(changes)) {
-      throw new Error('AI response is not an array')
+    if (validation.isValid) {
+      debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+      return validation.result
     }
 
-    debugLog('✅ Generated', changes.length, 'DOM changes')
-    return changes
+    debugLog('ℹ️ Response is not structured JSON, normalizing as conversational message')
+    return {
+      domChanges: [],
+      response: responseText,
+      action: 'none'
+    }
   } catch (error) {
     debugError('❌ Failed to generate DOM changes:', error)
     throw error
   }
 }
 
-async function generateWithBridge(html: string, prompt: string): Promise<DOMChange[]> {
+async function generateWithBridge(html: string, prompt: string, currentChanges: DOMChange[] = []): Promise<AIDOMGenerationResult> {
   const bridgeClient = new ClaudeCodeBridgeClient()
 
   try {
@@ -254,32 +333,58 @@ async function generateWithBridge(html: string, prompt: string): Promise<DOMChan
       'allow'
     )
 
-    const userMessage = `${SYSTEM_PROMPT}\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}\n\nGenerate the appropriate DOM changes as a JSON array.`
+    let userMessage = ''
 
-    await bridgeClient.sendMessage(conversationId, userMessage)
+    if (currentChanges.length > 0) {
+      userMessage += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
+    }
+
+    userMessage += `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}`
 
     const responseText = await new Promise<string>((resolve, reject) => {
       let fullResponse = ''
+
+      debugLog('[Bridge] Starting stream for conversation:', conversationId)
       const eventSource = bridgeClient.streamResponses(
         conversationId,
         (event) => {
+          debugLog('[Bridge] Received event:', event.type, event.data?.substring(0, 100))
           if (event.type === 'text') {
             fullResponse += event.data
           } else if (event.type === 'done') {
+            debugLog('[Bridge] Stream done, full response length:', fullResponse.length)
             eventSource.close()
             resolve(fullResponse)
+          } else if (event.type === 'error') {
+            debugError('[Bridge] Claude error:', event.data)
+            eventSource.close()
+            reject(new Error(`Claude error: ${event.data || 'Unknown error'}`))
           }
         },
         (error) => {
+          debugError('[Bridge] Stream error:', error)
           eventSource.close()
           reject(error)
         }
       )
 
+      setTimeout(async () => {
+        debugLog('[Bridge] Sending message to conversation:', conversationId)
+        try {
+          await bridgeClient.sendMessage(conversationId, userMessage, [], SYSTEM_PROMPT)
+          debugLog('[Bridge] Message sent successfully')
+        } catch (error) {
+          debugError('[Bridge] Failed to send message:', error)
+          eventSource.close()
+          reject(error)
+        }
+      }, 100)
+
       setTimeout(() => {
+        debugError('[Bridge] Response timeout after 60s')
         eventSource.close()
-        reject(new Error('Bridge response timeout after 30s'))
-      }, 30000)
+        reject(new Error('Bridge response timeout after 60s'))
+      }, 60000)
     })
 
     let cleanedResponse = responseText.trim()
@@ -287,14 +392,20 @@ async function generateWithBridge(html: string, prompt: string): Promise<DOMChan
       cleanedResponse = cleanedResponse.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    const changes: DOMChange[] = JSON.parse(cleanedResponse)
+    debugLog('[Bridge] Validating response')
+    const validation = validateAIDOMGenerationResult(cleanedResponse)
 
-    if (!Array.isArray(changes)) {
-      throw new Error('Bridge response is not an array')
+    if (validation.isValid) {
+      debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes via bridge with action:', validation.result.action)
+      return validation.result
     }
 
-    debugLog('✅ Generated', changes.length, 'DOM changes via bridge')
-    return changes
+    debugLog('ℹ️ Response is not structured JSON, normalizing as conversational message')
+    return {
+      domChanges: [],
+      response: cleanedResponse,
+      action: 'none'
+    }
   } catch (error) {
     debugError('❌ Bridge generation failed:', error)
     throw new Error(`Claude Code Bridge error: ${error instanceof Error ? error.message : 'Unknown error'}`)
