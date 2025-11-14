@@ -1,3 +1,5 @@
+import type { DOMChange } from './dom-changes'
+
 export interface Experiment {
   id: number
   name: string
@@ -46,16 +48,6 @@ export interface Application {
   application_id?: number
   name: string
   application_version?: string
-}
-
-export interface DOMChange {
-  selector: string
-  action: 'text' | 'html' | 'style' | 'attribute' | 'class' | 'javascript'
-  value?: string
-  attribute?: string
-  css?: Record<string, string>
-  className?: string
-  script?: string
 }
 
 export interface ABsmartlyConfig {
@@ -180,4 +172,40 @@ export interface ConversationSession {
   conversationId?: string
 }
 
-export type { URLFilter, DOMChangesData } from './dom-changes'
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  images?: string[]
+  domChangesSnapshot?: DOMChange[]
+  timestamp: number
+  id: string
+  aiResponse?: string
+}
+
+export interface StoredConversation {
+  id: string
+  variantName: string
+  messages: ChatMessage[]
+  conversationSession: ConversationSession
+  createdAt: number
+  updatedAt: number
+  messageCount: number
+  firstUserMessage: string
+  isActive: boolean
+}
+
+export interface ConversationListItem {
+  id: string
+  createdAt: number
+  updatedAt: number
+  messageCount: number
+  firstUserMessage: string
+  isActive: boolean
+}
+
+export interface StoredConversationsData {
+  conversations: StoredConversation[]
+  version: number
+}
+
+export type { URLFilter, DOMChangesData, DOMChange } from './dom-changes'

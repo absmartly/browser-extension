@@ -811,33 +811,40 @@ export function DOMChangesInlineEditor({
         throw new Error('Anthropic API key not configured. Please add it in Settings.')
       }
 
-      console.log('[AI Generate] ===== About to call capturePageHTML =====')
-      console.log('[AI Generate] capturePageHTML function exists:', typeof capturePageHTML)
-      console.log('[AI Generate] capturePageHTML is:', capturePageHTML?.name)
+      let html: string | undefined
 
-      let htmlPromise
-      try {
-        console.log('[AI Generate] Calling capturePageHTML()...')
-        htmlPromise = capturePageHTML()
-        console.log('[AI Generate] capturePageHTML() returned:', htmlPromise)
-      } catch (callError) {
-        console.error('[AI Generate] capturePageHTML() call threw:', callError)
-        throw callError
-      }
+      if (conversationSession?.htmlSent) {
+        console.log('[AI Generate] Session already has HTML sent, skipping capture')
+        html = undefined
+      } else {
+        console.log('[AI Generate] ===== About to call capturePageHTML =====')
+        console.log('[AI Generate] capturePageHTML function exists:', typeof capturePageHTML)
+        console.log('[AI Generate] capturePageHTML is:', capturePageHTML?.name)
 
-      htmlPromise = htmlPromise.then(
-        (result) => {
-          console.log('[AI Generate] capturePageHTML resolved, length:', result?.length)
-          return result
-        },
-        (error) => {
-          console.error('[AI Generate] capturePageHTML rejected:', error)
-          throw error
+        let htmlPromise
+        try {
+          console.log('[AI Generate] Calling capturePageHTML()...')
+          htmlPromise = capturePageHTML()
+          console.log('[AI Generate] capturePageHTML() returned:', htmlPromise)
+        } catch (callError) {
+          console.error('[AI Generate] capturePageHTML() call threw:', callError)
+          throw callError
         }
-      )
-      console.log('[AI Generate] capturePageHTML promise created, awaiting...')
-      const html = await htmlPromise
-      console.log('[AI Generate] capturePageHTML await completed, length:', html?.length)
+
+        htmlPromise = htmlPromise.then(
+          (result) => {
+            console.log('[AI Generate] capturePageHTML resolved, length:', result?.length)
+            return result
+          },
+          (error) => {
+            console.error('[AI Generate] capturePageHTML rejected:', error)
+            throw error
+          }
+        )
+        console.log('[AI Generate] capturePageHTML promise created, awaiting...')
+        html = await htmlPromise
+        console.log('[AI Generate] capturePageHTML await completed, length:', html?.length)
+      }
 
       console.log('[AI Generate] Sending message to background script...')
       console.log('[AI Generate] Session:', conversationSession?.id || 'null')
@@ -851,14 +858,41 @@ export function DOMChangesInlineEditor({
         conversationSession: conversationSession || null
       })
 
-      console.log('[AI Generate] Response received:', response)
+      console.log('[AI Generate] Response received:', JSON.stringify(response, null, 2))
+      console.log('[AI Generate] Response keys:', Object.keys(response || {}))
+      console.log('[AI Generate] Response.success:', response?.success)
+      console.log('[AI Generate] Response.result:', response?.result ? 'present' : 'MISSING')
+      console.log('[AI Generate] Response.error:', response?.error)
+
+      if (!response) {
+        console.error('[AI Generate] ❌ No response received from background!')
+        throw new Error('No response received from background')
+      }
 
       if (!response.success) {
         console.error('[AI Generate] ❌ Response failed:', response.error)
         throw new Error(response.error || 'Failed to generate DOM changes')
       }
 
+      // Validate response.result exists
+      if (!response.result) {
+        console.error('[AI Generate] ❌ Response missing result property!', response)
+        throw new Error('Invalid response: missing result property')
+      }
+
       const result = response.result as AIDOMGenerationResult
+
+      // Validate result structure
+      if (!result.domChanges) {
+        console.error('[AI Generate] ❌ Result missing domChanges!', result)
+        throw new Error('Invalid result: missing domChanges property')
+      }
+
+      if (!Array.isArray(result.domChanges)) {
+        console.error('[AI Generate] ❌ Result.domChanges is not an array!', typeof result.domChanges, result.domChanges)
+        throw new Error(`Invalid result: domChanges must be an array, got ${typeof result.domChanges}`)
+      }
+
       console.log('[AI Generate] ✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
       debugLog('✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
 

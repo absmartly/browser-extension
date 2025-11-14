@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
-import { debugLog, debugError } from '~src/utils/debug'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
 
@@ -240,32 +239,38 @@ export async function generateDOMChanges(
   }
 ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
   try {
-    debugLog('🤖 Generating DOM changes with AI...')
-    debugLog('📝 Prompt:', prompt)
-    debugLog('📄 HTML length:', html.length)
-    debugLog('🖼️ Images:', images?.length || 0)
+    console.log('[AI Gen] 🤖 Generating DOM changes with AI...')
+    console.log('[AI Gen] 📝 Prompt:', prompt)
+    console.log('[AI Gen] 📄 HTML length:', html?.length || 'undefined')
+    console.log('[AI Gen] 🖼️ Images:', images?.length || 0)
+    console.log('[AI Gen] 💾 Has conversation session:', !!options?.conversationSession)
+    if (options?.conversationSession) {
+      console.log('[AI Gen] Session ID:', options.conversationSession.id)
+      console.log('[AI Gen] Session conversationId:', options.conversationSession.conversationId)
+      console.log('[AI Gen] Session htmlSent:', options.conversationSession.htmlSent)
+    }
 
     // Try Claude Code Bridge first (uses Claude subscription, no API costs)
     try {
-      debugLog('🔗 Attempting to use Claude Code Bridge...')
+      console.log('[AI Gen] 🔗 Attempting to use Claude Code Bridge...')
       const result = await generateWithBridge(html, prompt, currentChanges, images, options?.conversationSession)
-      debugLog('✅ Successfully generated with Claude Code Bridge')
+      console.log('[AI Gen] ✅ Successfully generated with Claude Code Bridge')
       return result
     } catch (bridgeError) {
-      debugLog('⚠️ Claude Code Bridge not available, falling back to Anthropic API:', bridgeError)
-      console.log('[AI Generator] Bridge unavailable, using Anthropic API fallback')
+      console.log('[AI Gen] ⚠️ Claude Code Bridge not available, falling back to Anthropic API:', bridgeError)
+      console.log('[AI Gen] Bridge error details:', bridgeError.message, bridgeError.stack)
     }
 
     let authConfig: any = { dangerouslyAllowBrowser: true }
 
     if (options?.useOAuth && options?.oauthToken) {
-      debugLog('🔐 Using OAuth token for authentication')
+      console.log('🔐 Using OAuth token for authentication')
       authConfig.apiKey = options.oauthToken
       authConfig.defaultHeaders = {
         'Authorization': `Bearer ${options.oauthToken}`
       }
     } else if (apiKey) {
-      debugLog('🔑 Using API key for authentication')
+      console.log('🔑 Using API key for authentication')
       authConfig.apiKey = apiKey
     } else {
       throw new Error('Either API key or OAuth token is required')
@@ -284,9 +289,12 @@ export async function generateDOMChanges(
 
     let systemPrompt = SYSTEM_PROMPT
     if (!session.htmlSent) {
+      if (!html) {
+        throw new Error('HTML is required for first message in conversation')
+      }
       systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
       session.htmlSent = true
-      debugLog('📄 Including HTML in system prompt (initializing conversation)')
+      console.log('📄 Including HTML in system prompt (initializing conversation)')
     }
 
     let userMessageText = ''
@@ -345,7 +353,7 @@ export async function generateDOMChanges(
     }
 
     let responseText = content.text.trim()
-    debugLog('🤖 AI Response:', responseText.substring(0, 200))
+    console.log('🤖 AI Response:', responseText.substring(0, 200))
 
     let textBefore = ''
     let textAfter = ''
@@ -355,70 +363,164 @@ export async function generateDOMChanges(
       jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
-    if (jsonMatch) {
-      textBefore = jsonMatch[1].trim()
-      jsonText = jsonMatch[2].trim()
-      textAfter = jsonMatch[3].trim()
+    // Find ALL JSON objects in the response (to handle duplicate JSON)
+    // Use balanced brace matching instead of regex to handle nested objects
+    const allJsonMatches: Array<{ json: string; start: number; end: number }> = []
+    let pos = 0
+    while (pos < jsonText.length) {
+      const startPos = jsonText.indexOf('{', pos)
+      if (startPos === -1) break
+
+      // Find matching closing brace by tracking depth
+      let depth = 1
+      let endPos = startPos + 1
+      while (endPos < jsonText.length && depth > 0) {
+        if (jsonText[endPos] === '{') depth++
+        if (jsonText[endPos] === '}') depth--
+        endPos++
+      }
+
+      if (depth === 0) {
+        const potentialJson = jsonText.substring(startPos, endPos)
+        // Quick validation - does it look like our response format?
+        if (potentialJson.includes('"domChanges"') && potentialJson.includes('"response"') && potentialJson.includes('"action"')) {
+          allJsonMatches.push({
+            json: potentialJson,
+            start: startPos,
+            end: endPos
+          })
+        }
+      }
+
+      pos = endPos > startPos ? endPos : startPos + 1
     }
 
-    const validation = validateAIDOMGenerationResult(jsonText)
+    // If we found multiple JSON objects, use the LAST one (most likely the actual response)
+    // and collect all text before it
+    let validation: ValidationResult
+    if (allJsonMatches.length > 1) {
+      console.log(`⚠️ Found ${allJsonMatches.length} JSON objects in response, using the LAST one`)
+      const lastMatch = allJsonMatches[allJsonMatches.length - 1]
+      jsonText = lastMatch.json
+      textBefore = jsonText.substring(0, lastMatch.start).trim()
+      textAfter = jsonText.substring(lastMatch.end).trim()
+
+      validation = validateAIDOMGenerationResult(jsonText)
+    } else if (allJsonMatches.length === 1) {
+      // Single JSON object found
+      const singleMatch = allJsonMatches[0]
+      jsonText = singleMatch.json
+      textBefore = jsonText.substring(0, singleMatch.start).trim()
+      textAfter = jsonText.substring(singleMatch.end).trim()
+
+      validation = validateAIDOMGenerationResult(jsonText)
+    } else {
+      // No JSON objects found, try original regex approach
+      const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
+      if (jsonMatch) {
+        textBefore = jsonMatch[1].trim()
+        jsonText = jsonMatch[2].trim()
+        textAfter = jsonMatch[3].trim()
+      }
+
+      validation = validateAIDOMGenerationResult(jsonText)
+    }
 
     if (validation.isValid) {
       if (textBefore || textAfter) {
         let modifiedResponse = validation.result.response
         if (textBefore) {
           modifiedResponse = textBefore + '\n\n' + modifiedResponse
-          debugLog('📝 Prepended text before JSON:', textBefore.substring(0, 100))
+          console.log('📝 Prepended text before JSON:', textBefore.substring(0, 100))
         }
         if (textAfter) {
           modifiedResponse = modifiedResponse + '\n\n' + textAfter
-          debugLog('📝 Appended text after JSON:', textAfter.substring(0, 100))
+          console.log('📝 Appended text after JSON:', textAfter.substring(0, 100))
         }
         validation.result.response = modifiedResponse
       }
-      debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+      console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+
+      // Validate before returning
+      if (!validation.result.domChanges || !Array.isArray(validation.result.domChanges)) {
+        console.error('⚠️ validation.result.domChanges is invalid:', validation.result.domChanges)
+        throw new Error('Validation result missing domChanges array')
+      }
 
       session.messages.push({ role: 'assistant', content: validation.result.response })
 
-      return {
+      const returnValue = {
         ...validation.result,
         session
       }
+
+      // Log return value structure
+      console.log('[AI Generator] Returning from Anthropic API:', {
+        domChanges: returnValue.domChanges?.length,
+        response: returnValue.response?.substring(0, 50),
+        action: returnValue.action,
+        session: returnValue.session?.id
+      })
+
+      return returnValue
     }
 
-    debugLog('ℹ️ Response is not structured JSON, normalizing as conversational message')
+    console.log('ℹ️ Response is not structured JSON, normalizing as conversational message')
 
     session.messages.push({ role: 'assistant', content: responseText })
 
-    return {
+    const returnValue = {
       domChanges: [],
       response: responseText,
       action: 'none',
       session
     }
+
+    // Log return value structure
+    console.log('[AI Generator] Returning conversational message:', {
+      domChanges: returnValue.domChanges.length,
+      response: returnValue.response.substring(0, 50),
+      action: returnValue.action,
+      session: returnValue.session?.id
+    })
+
+    return returnValue
   } catch (error) {
-    debugError('❌ Failed to generate DOM changes:', error)
+    console.error('❌ Failed to generate DOM changes:', error)
     throw error
   }
 }
 
 async function generateWithBridge(html: string, prompt: string, currentChanges: DOMChange[] = [], images?: string[], conversationSession?: ConversationSession): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
+  console.log('[Bridge] generateWithBridge() called')
   const bridgeClient = new ClaudeCodeBridgeClient()
 
   try {
+    console.log('[Bridge] About to call bridgeClient.connect()...')
     await bridgeClient.connect()
+    console.log('[Bridge] ✅ connect() completed successfully')
+    console.log('[Bridge] Connection:', bridgeClient.getConnection())
+
+    console.log('[Bridge] Input session:', JSON.stringify(conversationSession))
+    console.log('[Bridge] Input HTML:', html ? `${html.length} chars` : 'undefined')
 
     let session = conversationSession
     let conversationId: string
     let systemPromptToSend = SYSTEM_PROMPT
 
     if (!session || !session.conversationId) {
+      console.log('[Bridge] No session or no conversationId, creating new conversation')
+      console.log('[Bridge] session:', session)
+      console.log('[Bridge] session.conversationId:', session?.conversationId)
       const sessionId = crypto.randomUUID()
 
+      if (!html) {
+        throw new Error('HTML is required for creating new bridge conversation')
+      }
       systemPromptToSend += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
-      debugLog('[Bridge] Including HTML in system prompt (initializing conversation)')
+      console.log('[Bridge] Including HTML in system prompt (initializing conversation)')
 
+      console.log('[Bridge] About to create conversation with sessionId:', sessionId)
       const result = await bridgeClient.createConversation(
         sessionId,
         '/',
@@ -432,10 +534,10 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
         messages: [],
         conversationId
       }
-      debugLog('[Bridge] Created new conversation:', conversationId)
+      console.log('[Bridge] ✅ Created new conversation:', conversationId)
     } else {
       conversationId = session.conversationId
-      debugLog('[Bridge] Reusing existing conversation:', conversationId)
+      console.log('[Bridge] Reusing existing conversation:', conversationId)
     }
 
     let userMessage = ''
@@ -450,44 +552,44 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
     const responseText = await new Promise<string>((resolve, reject) => {
       let fullResponse = ''
 
-      debugLog('[Bridge] Starting stream for conversation:', conversationId)
+      console.log('[Bridge] Starting stream for conversation:', conversationId)
       const eventSource = bridgeClient.streamResponses(
         conversationId,
         (event) => {
-          debugLog('[Bridge] Received event:', event.type, event.data?.substring(0, 100))
+          console.log('[Bridge] Received event:', event.type, event.data?.substring(0, 100))
           if (event.type === 'text') {
             fullResponse += event.data
           } else if (event.type === 'done') {
-            debugLog('[Bridge] Stream done, full response length:', fullResponse.length)
+            console.log('[Bridge] Stream done, full response length:', fullResponse.length)
             eventSource.close()
             resolve(fullResponse)
           } else if (event.type === 'error') {
-            debugError('[Bridge] Claude error:', event.data)
+            console.error('[Bridge] Claude error:', event.data)
             eventSource.close()
             reject(new Error(`Claude error: ${event.data || 'Unknown error'}`))
           }
         },
         (error) => {
-          debugError('[Bridge] Stream error:', error)
+          console.error('[Bridge] Stream error:', error)
           eventSource.close()
           reject(error)
         }
       )
 
       setTimeout(async () => {
-        debugLog('[Bridge] Sending message to conversation:', conversationId)
+        console.log('[Bridge] Sending message to conversation:', conversationId)
         try {
           await bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend)
-          debugLog('[Bridge] Message sent successfully')
+          console.log('[Bridge] Message sent successfully')
         } catch (error) {
-          debugError('[Bridge] Failed to send message:', error)
+          console.error('[Bridge] Failed to send message:', error)
           eventSource.close()
           reject(error)
         }
       }, 100)
 
       setTimeout(() => {
-        debugError('[Bridge] Response timeout after 60s')
+        console.error('[Bridge] Response timeout after 60s')
         eventSource.close()
         reject(new Error('Bridge response timeout after 60s'))
       }, 60000)
@@ -502,51 +604,132 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
-    if (jsonMatch) {
-      textBefore = jsonMatch[1].trim()
-      jsonText = jsonMatch[2].trim()
-      textAfter = jsonMatch[3].trim()
+    // Find ALL JSON objects in the response (to handle duplicate JSON)
+    // Use balanced brace matching instead of regex to handle nested objects
+    const allJsonMatches: Array<{ json: string; start: number; end: number }> = []
+    let pos = 0
+    while (pos < jsonText.length) {
+      const startPos = jsonText.indexOf('{', pos)
+      if (startPos === -1) break
+
+      // Find matching closing brace by tracking depth
+      let depth = 1
+      let endPos = startPos + 1
+      while (endPos < jsonText.length && depth > 0) {
+        if (jsonText[endPos] === '{') depth++
+        if (jsonText[endPos] === '}') depth--
+        endPos++
+      }
+
+      if (depth === 0) {
+        const potentialJson = jsonText.substring(startPos, endPos)
+        // Quick validation - does it look like our response format?
+        if (potentialJson.includes('"domChanges"') && potentialJson.includes('"response"') && potentialJson.includes('"action"')) {
+          allJsonMatches.push({
+            json: potentialJson,
+            start: startPos,
+            end: endPos
+          })
+        }
+      }
+
+      pos = endPos > startPos ? endPos : startPos + 1
     }
 
-    debugLog('[Bridge] Validating response')
-    const validation = validateAIDOMGenerationResult(jsonText)
+    console.log('[Bridge] Validating response')
+    let validation: ValidationResult
+
+    // If we found multiple JSON objects, use the LAST one (most likely the actual response)
+    // and collect all text before it
+    if (allJsonMatches.length > 1) {
+      console.log(`[Bridge] ⚠️ Found ${allJsonMatches.length} JSON objects in response, using the LAST one`)
+      const lastMatch = allJsonMatches[allJsonMatches.length - 1]
+      jsonText = lastMatch.json
+      textBefore = cleanedResponse.substring(0, lastMatch.start).trim()
+      textAfter = cleanedResponse.substring(lastMatch.end).trim()
+
+      validation = validateAIDOMGenerationResult(jsonText)
+    } else if (allJsonMatches.length === 1) {
+      // Single JSON object found
+      const singleMatch = allJsonMatches[0]
+      jsonText = singleMatch.json
+      textBefore = cleanedResponse.substring(0, singleMatch.start).trim()
+      textAfter = cleanedResponse.substring(singleMatch.end).trim()
+
+      validation = validateAIDOMGenerationResult(jsonText)
+    } else {
+      // No JSON objects found, try original regex approach
+      const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
+      if (jsonMatch) {
+        textBefore = jsonMatch[1].trim()
+        jsonText = jsonMatch[2].trim()
+        textAfter = jsonMatch[3].trim()
+      }
+
+      validation = validateAIDOMGenerationResult(jsonText)
+    }
 
     if (validation.isValid) {
       if (textBefore || textAfter) {
         let modifiedResponse = validation.result.response
         if (textBefore) {
           modifiedResponse = textBefore + '\n\n' + modifiedResponse
-          debugLog('[Bridge] Prepended text before JSON:', textBefore.substring(0, 100))
+          console.log('[Bridge] Prepended text before JSON:', textBefore.substring(0, 100))
         }
         if (textAfter) {
           modifiedResponse = modifiedResponse + '\n\n' + textAfter
-          debugLog('[Bridge] Appended text after JSON:', textAfter.substring(0, 100))
+          console.log('[Bridge] Appended text after JSON:', textAfter.substring(0, 100))
         }
         validation.result.response = modifiedResponse
       }
-      debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes via bridge with action:', validation.result.action)
+      console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes via bridge with action:', validation.result.action)
+
+      // Validate before returning
+      if (!validation.result.domChanges || !Array.isArray(validation.result.domChanges)) {
+        console.error('⚠️ Bridge validation.result.domChanges is invalid:', validation.result.domChanges)
+        throw new Error('Bridge validation result missing domChanges array')
+      }
 
       session.messages.push({ role: 'assistant', content: validation.result.response })
 
-      return {
+      const returnValue = {
         ...validation.result,
         session
       }
+
+      // Log return value structure
+      console.log('[AI Generator] Returning from Bridge (validated):', {
+        domChanges: returnValue.domChanges?.length,
+        response: returnValue.response?.substring(0, 50),
+        action: returnValue.action,
+        session: returnValue.session?.id
+      })
+
+      return returnValue
     }
 
-    debugLog('ℹ️ Response is not structured JSON, normalizing as conversational message')
+    console.log('ℹ️ Response is not structured JSON, normalizing as conversational message')
 
     session.messages.push({ role: 'assistant', content: cleanedResponse })
 
-    return {
+    const returnValueConv = {
       domChanges: [],
       response: cleanedResponse,
       action: 'none',
       session
     }
+
+    // Log return value structure
+    console.log('[AI Generator] Returning from Bridge (conversational):', {
+      domChanges: returnValueConv.domChanges.length,
+      response: returnValueConv.response.substring(0, 50),
+      action: returnValueConv.action,
+      session: returnValueConv.session?.id
+    })
+
+    return returnValueConv
   } catch (error) {
-    debugError('❌ Bridge generation failed:', error)
+    console.error('❌ Bridge generation failed:', error)
     throw new Error(`Claude Code Bridge error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
     bridgeClient.disconnect()

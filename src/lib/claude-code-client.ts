@@ -38,35 +38,42 @@ export class ClaudeCodeBridgeClient {
   }
 
   async findBridgePort(): Promise<number> {
+    console.log('[Bridge] Finding bridge port...')
     const customPort = await this.storage.get<number>(STORAGE_KEY_BRIDGE_PORT)
+    console.log(`[Bridge] Storage returned custom port: ${customPort || 'null'}`)
 
     if (customPort) {
-      debugLog(`[Bridge] Trying saved custom port: ${customPort}`)
+      console.log(`[Bridge] Trying saved custom port: ${customPort}`)
       try {
         await this.tryConnect(customPort)
+        console.log(`[Bridge] Custom port ${customPort} connected successfully`)
         return customPort
       } catch (error) {
-        debugLog(`[Bridge] Custom port ${customPort} failed, trying defaults...`)
+        console.log(`[Bridge] Custom port ${customPort} failed:`, error.message)
+        console.log(`[Bridge] Trying default ports...`)
       }
     }
 
     for (const port of DEFAULT_PORTS) {
-      debugLog(`[Bridge] Trying port ${port}...`)
+      console.log(`[Bridge] Trying port ${port}...`)
       try {
         await this.tryConnect(port)
         await this.storage.set(STORAGE_KEY_BRIDGE_PORT, port)
-        debugLog(`[Bridge] Found bridge on port ${port}`)
+        console.log(`[Bridge] ✅ Found bridge on port ${port}`)
         return port
       } catch (error) {
+        console.log(`[Bridge] Port ${port} failed: ${error.message}`)
         continue
       }
     }
 
+    console.log(`[Bridge] ❌ Could not find Claude Code Bridge on any port`)
     throw new Error('Could not find Claude Code Bridge on any port (3000-3004)')
   }
 
   private async tryConnect(port: number): Promise<BridgeHealthResponse> {
     const url = `http://localhost:${port}/health`
+    console.log(`[Bridge] Fetching ${url}...`)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT)
 
@@ -77,12 +84,14 @@ export class ClaudeCodeBridgeClient {
       })
 
       clearTimeout(timeout)
+      console.log(`[Bridge] Fetch response status: ${response.status}`)
 
       if (!response.ok) {
         throw new Error(`Health check failed: ${response.status}`)
       }
 
       const data = await response.json() as BridgeHealthResponse
+      console.log(`[Bridge] Health check data:`, data)
 
       if (!data.ok) {
         throw new Error('Bridge health check returned not ok')
@@ -91,6 +100,7 @@ export class ClaudeCodeBridgeClient {
       return data
     } catch (error) {
       clearTimeout(timeout)
+      console.log(`[Bridge] Fetch failed: ${error.name} - ${error.message}`)
       if (error.name === 'AbortError') {
         throw new Error(`Connection timeout to port ${port}`)
       }
@@ -99,11 +109,13 @@ export class ClaudeCodeBridgeClient {
   }
 
   async connect(): Promise<BridgeConnection> {
+    console.log('[Bridge] connect() called')
     this.connectionState = ConnectionState.CONNECTING
 
     try {
       const port = await this.findBridgePort()
       const url = `http://localhost:${port}`
+      console.log(`[Bridge] Found port ${port}, full URL: ${url}`)
 
       const healthResponse = await this.tryConnect(port)
 
@@ -115,11 +127,11 @@ export class ClaudeCodeBridgeClient {
       }
 
       this.connectionState = ConnectionState.CONNECTED
-      debugLog(`[Bridge] Connected to ${url}`, this.connection)
+      console.log(`[Bridge] ✅ Connected to ${url}`, this.connection)
 
       return this.connection
     } catch (error) {
-      debugError('[Bridge] Connection failed:', error)
+      console.error('[Bridge] ❌ Connection failed:', error)
       this.connectionState = ConnectionState.SERVER_NOT_FOUND
       throw error
     }

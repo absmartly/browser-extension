@@ -367,8 +367,6 @@ export function initializeBackgroundScript() {
           const { html, prompt, currentChanges, images, conversationSession } = message
           console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length, 'Current changes:', currentChanges?.length || 0, 'Images:', images?.length || 0)
           console.log('[Background] Session:', conversationSession?.id || 'null')
-          console.error('🔍 [Background] Full config:', JSON.stringify(config, null, 2))
-          console.error('🔍 [Background] AI Provider from config:', config?.aiProvider)
           console.log('[Background] AI Provider:', config?.aiProvider)
 
           const apiKeyToUse = config?.aiProvider === 'anthropic-api'
@@ -390,21 +388,89 @@ export function initializeBackgroundScript() {
           const result = await generateDOMChanges(html, prompt, apiKeyToUse || '', currentChanges || [], images, options)
 
           console.log('[Background] Generated result:', JSON.stringify(result, null, 2))
-          console.log('[Background] Result action:', result.action, 'DOM changes count:', result.domChanges?.length)
+          console.log('[Background] Result keys:', Object.keys(result))
+          console.log('[Background] Result.domChanges:', result.domChanges)
+          console.log('[Background] Result.action:', result.action)
+          console.log('[Background] Result.response:', result.response?.substring(0, 100))
+
+          // Validate result structure
+          if (!result.domChanges) {
+            console.error('[Background] ⚠️ Result missing domChanges property!', result)
+            throw new Error('Invalid result: missing domChanges property')
+          }
+
+          if (!Array.isArray(result.domChanges)) {
+            console.error('[Background] ⚠️ Result.domChanges is not an array!', typeof result.domChanges)
+            throw new Error('Invalid result: domChanges must be an array')
+          }
+
+          // Normalize response format
+          const normalizedResult = {
+            domChanges: result.domChanges || [],
+            response: result.response || '',
+            action: result.action || 'none',
+            targetSelectors: result.targetSelectors
+          }
+
+          console.log('[Background] Normalized result:', normalizedResult)
 
           if (result.session) {
             console.log('[Background] Returning session:', result.session.id)
-            sendResponse({ success: true, result, session: result.session })
+            sendResponse({ success: true, result: normalizedResult, session: result.session })
           } else {
-            sendResponse({ success: true, result })
+            sendResponse({ success: true, result: normalizedResult })
           }
           console.log('[Background] Response sent successfully')
         } catch (error) {
           console.error('[Background] AI generation error:', error)
+          console.error('[Background] Error stack:', error instanceof Error ? error.stack : 'No stack')
           debugError('[Background] AI generation error:', error)
           sendResponse({
             success: false,
             error: error instanceof Error ? error.message : 'Failed to generate DOM changes'
+          })
+        }
+      })()
+      return true
+    } else if (message.type === 'AI_INITIALIZE_SESSION') {
+      debugLog('[Background] Handling AI_INITIALIZE_SESSION')
+
+      ;(async () => {
+        try {
+          console.log('[Background] AI_INITIALIZE_SESSION - Initializing session...')
+          const config = await getConfig(storage, secureStorage)
+          const { html, conversationSession } = message
+          console.log('[Background] HTML length:', html?.length, 'Session:', conversationSession?.id)
+
+          const apiKeyToUse = config?.aiProvider === 'anthropic-api'
+            ? config?.anthropicApiKey
+            : config?.apiKey
+
+          console.log('[Background] Using API key from config:', apiKeyToUse ? 'present' : 'missing')
+
+          const options: any = {
+            aiProvider: config?.aiProvider,
+            conversationSession: conversationSession
+          }
+
+          const initPrompt = "I'm ready to help you make DOM changes to the page. Please describe what you'd like to change."
+
+          console.log('[Background] Initializing conversation with HTML...')
+          const result = await generateDOMChanges(html, initPrompt, apiKeyToUse || '', [], undefined, options)
+
+          if (result.session) {
+            console.log('[Background] Session initialized:', result.session.id, 'htmlSent:', result.session.htmlSent)
+            sendResponse({ success: true, session: result.session })
+          } else {
+            throw new Error('Session not returned from initialization')
+          }
+          console.log('[Background] Initialization response sent successfully')
+        } catch (error) {
+          console.error('[Background] Session initialization error:', error)
+          debugError('[Background] Session initialization error:', error)
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to initialize session'
           })
         }
       })()

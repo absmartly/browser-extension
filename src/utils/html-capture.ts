@@ -30,6 +30,34 @@ export async function capturePageHTML(): Promise<string> {
       throw new Error('Please open the extension on a webpage, not an extension page')
     }
 
+    // Verify content script is loaded by sending a PING first
+    console.log('[HTML Capture] Checking if content script is loaded...')
+    let contentScriptLoaded = false
+    try {
+      await chrome.tabs.sendMessage(activeTab.id, { type: 'PING' })
+      contentScriptLoaded = true
+      console.log('[HTML Capture] Content script is already loaded')
+    } catch (error) {
+      console.log('[HTML Capture] Content script not loaded, will inject it')
+    }
+
+    // If content script isn't loaded, inject it
+    if (!contentScriptLoaded) {
+      console.log('[HTML Capture] Injecting content script...')
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ['content.js']
+        })
+        console.log('[HTML Capture] Content script injected, waiting for initialization...')
+        // Wait for content script to initialize
+        await new Promise(resolve => setTimeout(resolve, 100))
+      } catch (injectError) {
+        console.error('[HTML Capture] Failed to inject content script:', injectError)
+        throw new Error('Failed to inject content script. Please refresh the page and try again.')
+      }
+    }
+
     console.log('[HTML Capture] Sending CAPTURE_HTML message to active tab:', activeTab.id)
 
     const response = await chrome.tabs.sendMessage(activeTab.id, {

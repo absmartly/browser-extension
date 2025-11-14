@@ -305,6 +305,7 @@ export interface AIDOMGenerationResult {
   response: string;
   action: DOMChangeAction;
   targetSelectors?: string[];
+  session?: import('./absmartly').ConversationSession;
 }
 
 export interface ChatMessage {

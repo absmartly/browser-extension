@@ -1,21 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
-import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { ChangeViewerModal } from './ChangeViewerModal'
 import { renderMarkdown } from '~src/utils/markdown'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
-import type { ConversationSession } from '~src/types/absmartly'
-
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  images?: string[]
-  domChangesSnapshot?: DOMChange[]
-  timestamp: number
-  id: string
-  aiResponse?: string
-}
+import type { ConversationSession, ChatMessage, StoredConversation, ConversationListItem } from '~src/types/absmartly'
+import { getConversations, saveConversation, loadConversation, deleteConversation, getConversationList, setActiveConversation } from '~src/utils/ai-conversation-storage'
+import { needsMigration, migrateConversation } from '~src/utils/ai-conversation-migration'
+import { formatConversationTimestamp } from '~src/utils/time-format'
+import { capturePageHTML } from '~src/utils/html-capture'
+import { sendToBackground } from '~src/lib/messaging'
+import { compressImages } from '~src/utils/image-compression'
 
 interface AIDOMChangesPageProps {
   variantName: string
@@ -45,6 +41,11 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [viewerModal, setViewerModal] = useState<{ changes: DOMChange[], response: string, timestamp: number } | null>(null)
   const [latestDomChanges, setLatestDomChanges] = useState<DOMChange[]>(currentChanges)
   const [conversationSession, setConversationSession] = useState<ConversationSession | null>(null)
+  const [conversationList, setConversationList] = useState<ConversationListItem[]>([])
+  const [currentConversationId, setCurrentConversationId] = useState<string>('')
+  const [isInitializing, setIsInitializing] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -106,37 +107,88 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }, [onPreviewToggle])
 
-  // Initialize conversation session on mount
+  // Initialize conversation with migration and preemptive HTML capture
   useEffect(() => {
-    const newSession: ConversationSession = {
-      id: crypto.randomUUID(),
-      htmlSent: false,
-      messages: [],
-    }
-    setConversationSession(newSession)
-    console.log('[AIDOMChangesPage] Session initialized:', newSession.id)
-  }, [])
+    ;(async () => {
+      try {
+        setIsInitializing(true)
+        setIsLoadingHistory(true)
 
-  // Load chat history for this variant on mount
-  useEffect(() => {
-    const storage = new Storage({ area: "local" })
-    const storageKey = `ai-chat-${variantName}`
+        if (await needsMigration(variantName)) {
+          console.log('[AIDOMChangesPage] Migrating old conversation format')
+          await migrateConversation(variantName)
+        }
 
-    storage.get<ChatMessage[]>(storageKey).then(savedHistory => {
-      if (savedHistory && Array.isArray(savedHistory)) {
-        setChatHistory(savedHistory)
+        const list = await getConversationList(variantName)
+        console.log('[AIDOMChangesPage] Loaded conversation list on mount:', list.length, 'conversations')
+        setConversationList(list)
+        setIsLoadingHistory(false)
+
+        const activeConv = list.find(c => c.isActive)
+        if (activeConv) {
+          const loaded = await loadConversation(variantName, activeConv.id)
+          if (loaded) {
+            setChatHistory(loaded.messages)
+            setConversationSession(loaded.conversationSession)
+            setCurrentConversationId(loaded.id)
+            console.log('[AIDOMChangesPage] Loaded active conversation:', loaded.id)
+
+            if (!loaded.conversationSession.htmlSent) {
+              console.log('[AIDOMChangesPage] Session HTML not sent yet, initializing...')
+              await initializeSession(loaded.conversationSession, loaded.id)
+            } else {
+              setIsInitialized(true)
+            }
+            return
+          }
+        }
+
+        const newSession: ConversationSession = {
+          id: crypto.randomUUID(),
+          htmlSent: false,
+          messages: [],
+        }
+        const newConvId = crypto.randomUUID()
+        setConversationSession(newSession)
+        setCurrentConversationId(newConvId)
+        console.log('[AIDOMChangesPage] Created new conversation:', newConvId)
+
+        await initializeSession(newSession, newConvId)
+      } catch (error) {
+        console.error('[AIDOMChangesPage] Initialization error:', error)
+        setError(error instanceof Error ? error.message : 'Failed to initialize chat session')
+        setIsLoadingHistory(false)
+      } finally {
+        setIsInitializing(false)
       }
-    })
+    })()
   }, [variantName])
 
-  // Save chat history whenever it changes
-  useEffect(() => {
-    if (chatHistory.length > 0) {
-      const storage = new Storage({ area: "local" })
-      const storageKey = `ai-chat-${variantName}`
-      storage.set(storageKey, chatHistory)
+  const initializeSession = async (session: ConversationSession, conversationId: string) => {
+    try {
+      console.log('[AIDOMChangesPage] Initializing session with HTML capture...')
+      const html = await capturePageHTML()
+      console.log('[AIDOMChangesPage] HTML captured, length:', html.length)
+
+      const response = await sendToBackground({
+        type: 'AI_INITIALIZE_SESSION',
+        html,
+        conversationSession: session
+      })
+
+      if (response.success && response.session) {
+        const initializedSession = response.session as ConversationSession
+        setConversationSession(initializedSession)
+        console.log('[AIDOMChangesPage] Session initialized:', initializedSession.id, 'htmlSent:', initializedSession.htmlSent)
+        setIsInitialized(true)
+      } else {
+        throw new Error(response.error || 'Failed to initialize session')
+      }
+    } catch (error) {
+      console.error('[AIDOMChangesPage] Session initialization failed:', error)
+      setIsInitialized(true)
     }
-  }, [chatHistory, variantName])
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -227,18 +279,21 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     setLoading(true)
     setError(null)
 
+    const compressedImages = attachedImages.length > 0 ? await compressImages(attachedImages) : undefined
+    console.log('[AIDOMChangesPage] Compressed images:', compressedImages?.length || 0)
+
     const timestamp = Date.now()
     const userMessage: ChatMessage = {
       role: 'user',
       content: prompt,
-      images: attachedImages.length > 0 ? [...attachedImages] : undefined,
+      images: compressedImages,
       timestamp,
       id: `user-${timestamp}`
     }
     setChatHistory(prev => [...prev, userMessage])
 
     try {
-      const result = await onGenerate(prompt, attachedImages.length > 0 ? attachedImages : undefined, conversationSession)
+      const result = await onGenerate(prompt, compressedImages, conversationSession)
 
       if (result.session) {
         setConversationSession(result.session)
@@ -254,7 +309,40 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         timestamp: assistantTimestamp,
         id: `assistant-${assistantTimestamp}`
       }
-      setChatHistory(prev => [...prev, assistantMessage])
+      const newHistory = [...chatHistory, userMessage, assistantMessage]
+      setChatHistory(newHistory)
+
+      // Auto-save conversation after each message
+      const updatedConversation: StoredConversation = {
+        id: currentConversationId,
+        variantName,
+        messages: newHistory,
+        conversationSession: result.session || conversationSession!,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messageCount: newHistory.length,
+        firstUserMessage: newHistory.find(m => m.role === 'user')?.content.substring(0, 50) || 'New conversation',
+        isActive: true
+      }
+
+      try {
+        await saveConversation(updatedConversation)
+        await setActiveConversation(variantName, currentConversationId)
+
+        const list = await getConversationList(variantName)
+        setConversationList(list)
+      } catch (storageError) {
+        console.warn('[AIDOMChangesPage] Failed to save conversation:', storageError)
+        const warningMessage = storageError instanceof Error
+          ? storageError.message
+          : 'Failed to save conversation history. Your changes are still applied, but may not be saved.'
+
+        setTimeout(() => {
+          if (window.confirm(`${warningMessage}\n\nWould you like to start a new conversation?`)) {
+            handleNewChat()
+          }
+        }, 500)
+      }
 
       // Track the latest DOM changes
       if (result.domChanges && result.domChanges.length > 0) {
@@ -265,13 +353,15 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         }
       }
 
-      setPrompt('')
-      setAttachedImages([])
     } catch (err) {
+      console.error('[AIDOMChangesPage] Error in handleGenerate:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate DOM changes'
       setError(errorMessage)
       setChatHistory(prev => prev.slice(0, -1))
     } finally {
+      console.log('[AIDOMChangesPage] Clearing prompt and images, then setting loading to false')
+      setPrompt('')
+      setAttachedImages([])
       setLoading(false)
     }
   }
@@ -283,24 +373,50 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
+    // Save current conversation first
+    if (chatHistory.length > 0 && currentConversationId) {
+      const currentConv: StoredConversation = {
+        id: currentConversationId,
+        variantName,
+        messages: chatHistory,
+        conversationSession: conversationSession!,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messageCount: chatHistory.length,
+        firstUserMessage: chatHistory.find(m => m.role === 'user')?.content.substring(0, 50) || 'Conversation',
+        isActive: false
+      }
+
+      try {
+        await saveConversation(currentConv)
+      } catch (storageError) {
+        console.warn('[AIDOMChangesPage] Failed to save conversation before creating new chat:', storageError)
+      }
+    }
+
+    // Create new conversation
     const newSession: ConversationSession = {
       id: crypto.randomUUID(),
       htmlSent: false,
       messages: [],
     }
     setConversationSession(newSession)
-    console.log('[AIDOMChangesPage] New chat session:', newSession.id)
+
+    const newConvId = crypto.randomUUID()
+    setCurrentConversationId(newConvId)
+    await setActiveConversation(variantName, newConvId)
 
     setChatHistory([])
-    setPrompt('')
     setAttachedImages([])
     setError(null)
+    setLatestDomChanges(currentChanges)
 
-    // Clear persisted chat history
-    const storage = new Storage({ area: "local" })
-    const storageKey = `ai-chat-${variantName}`
-    storage.remove(storageKey)
+    // Refresh conversation list
+    const list = await getConversationList(variantName)
+    setConversationList(list)
+
+    console.log('[AIDOMChangesPage] New chat session:', newConvId)
   }
 
   return (
@@ -330,47 +446,122 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
               ref={historyButtonRef}
               onClick={() => setShowHistory(!showHistory)}
               className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-              title="Chat History"
-              disabled={chatHistory.length === 0}
+              title={isLoadingHistory ? 'Loading conversations...' : 'Conversation History'}
+              disabled={isLoadingHistory || conversationList.length === 0}
             >
-              <ClockIcon className={`h-5 w-5 ${chatHistory.length === 0 ? 'text-gray-300' : 'text-gray-600'}`} />
+              {isLoadingHistory ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600" />
+              ) : (
+                <ClockIcon className={`h-5 w-5 ${conversationList.length === 0 ? 'text-gray-300' : 'text-gray-600'}`} />
+              )}
             </button>
-            {showHistory && chatHistory.length > 0 && (
+            {showHistory && conversationList.length > 0 && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
                 <div className="p-3 border-b border-gray-200 bg-gray-50">
-                  <h3 className="text-sm font-semibold text-gray-900">Chat History</h3>
-                  <p className="text-xs text-gray-600">{chatHistory.length} messages</p>
+                  <h3 className="text-sm font-semibold text-gray-900">Conversation History</h3>
+                  <p className="text-xs text-gray-600">{conversationList.length} conversation{conversationList.length !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {chatHistory.map((message, index) => (
+                  {conversationList.map((conv) => (
                     <div
-                      key={index}
-                      className="p-3 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => {
-                        const element = document.querySelector(`[data-message-index="${index}"]`)
-                        element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                        setShowHistory(false)
-                      }}
+                      key={conv.id}
+                      className="p-3 hover:bg-gray-50 transition-colors group"
+                      id={`conversation-${conv.id}`}
                     >
-                      <div className="flex items-start gap-2">
-                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                          message.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                        }`}>
-                          {message.role === 'user' ? 'U' : 'A'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-500 mb-1">
-                            {message.role === 'user' ? 'You' : 'Assistant'}
-                          </p>
-                          <p className="text-sm text-gray-900 line-clamp-2">
-                            {message.content || '(Image only)'}
-                          </p>
-                          {message.images && message.images.length > 0 && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              📷 {message.images.length} image{message.images.length > 1 ? 's' : ''}
+                      <div className="flex items-start justify-between gap-2">
+                        <div
+                          className="flex-1 cursor-pointer min-w-0"
+                          onClick={async () => {
+                            if (chatHistory.length > 0 && currentConversationId !== conv.id) {
+                              const currentConv: StoredConversation = {
+                                id: currentConversationId,
+                                variantName,
+                                messages: chatHistory,
+                                conversationSession: conversationSession!,
+                                createdAt: Date.now(),
+                                updatedAt: Date.now(),
+                                messageCount: chatHistory.length,
+                                firstUserMessage: chatHistory.find(m => m.role === 'user')?.content.substring(0, 50) || 'Conversation',
+                                isActive: false
+                              }
+
+                              try {
+                                await saveConversation(currentConv)
+                              } catch (storageError) {
+                                console.warn('[AIDOMChangesPage] Failed to save conversation before switching:', storageError)
+                              }
+                            }
+
+                            const loaded = await loadConversation(variantName, conv.id)
+                            if (loaded) {
+                              setChatHistory(loaded.messages)
+                              setConversationSession(loaded.conversationSession)
+                              setCurrentConversationId(loaded.id)
+                              await setActiveConversation(variantName, loaded.id)
+
+                              const list = await getConversationList(variantName)
+                              setConversationList(list)
+
+                              setShowHistory(false)
+                              console.log('[AIDOMChangesPage] Loaded conversation:', loaded.id)
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-xs font-medium text-gray-900">
+                              {formatConversationTimestamp(conv.createdAt)}
                             </p>
-                          )}
+                            {conv.isActive && (
+                              <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 line-clamp-2 mb-1">
+                            {conv.firstUserMessage || 'No messages yet'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {conv.messageCount} message{conv.messageCount !== 1 ? 's' : ''} • Updated {formatConversationTimestamp(conv.updatedAt)}
+                          </p>
                         </div>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+
+                            if (!confirm('Delete this conversation? This cannot be undone.')) {
+                              return
+                            }
+
+                            await deleteConversation(variantName, conv.id)
+
+                            if (conv.isActive) {
+                              const newSession: ConversationSession = {
+                                id: crypto.randomUUID(),
+                                htmlSent: false,
+                                messages: [],
+                              }
+                              setConversationSession(newSession)
+
+                              const newConvId = crypto.randomUUID()
+                              setCurrentConversationId(newConvId)
+                              await setActiveConversation(variantName, newConvId)
+
+                              setChatHistory([])
+                              setAttachedImages([])
+                              setError(null)
+                            }
+
+                            const list = await getConversationList(variantName)
+                            setConversationList(list)
+
+                            console.log('[AIDOMChangesPage] Deleted conversation:', conv.id)
+                          }}
+                          className="flex-shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                          title="Delete conversation"
+                          id={`delete-conversation-${conv.id}`}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -391,27 +582,41 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       <div className="flex-1 overflow-auto p-4">
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <SparklesIcon className="h-16 w-16 text-purple-300 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              AI-Powered DOM Changes
-            </h3>
-            <p className="text-gray-600 max-w-md mb-4">
-              Describe what you want to change on the page, and the AI will analyze the HTML
-              and generate the appropriate DOM changes for you.
-            </p>
-            <p className="text-sm text-purple-600 font-medium mb-2">
-              💡 You can paste or drag images to help the AI understand your request!
-            </p>
-            <div className="mt-6 space-y-2 text-left w-full max-w-md">
-              <p className="text-sm text-gray-700 font-medium">Example prompts:</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Change the CTA button to red with white text</li>
-                <li>• Add rounded corners to all product images</li>
-                <li>• Hide the promotional banner</li>
-                <li>• Make the headline text larger and bold</li>
-                <li>• Replace the logo with this image (paste/drag image)</li>
-              </ul>
-            </div>
+            {isInitializing ? (
+              <>
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Analyzing page...
+                </h3>
+                <p className="text-gray-600 max-w-md">
+                  Capturing page HTML and initializing AI session
+                </p>
+              </>
+            ) : (
+              <>
+                <SparklesIcon className="h-16 w-16 text-purple-300 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  AI-Powered DOM Changes
+                </h3>
+                <p className="text-gray-600 max-w-md mb-4">
+                  Describe what you want to change on the page, and the AI will analyze the HTML
+                  and generate the appropriate DOM changes for you.
+                </p>
+                <p className="text-sm text-purple-600 font-medium mb-2">
+                  💡 You can paste or drag images to help the AI understand your request!
+                </p>
+                <div className="mt-6 space-y-2 text-left w-full max-w-md">
+                  <p className="text-sm text-gray-700 font-medium">Example prompts:</p>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Change the CTA button to red with white text</li>
+                    <li>• Add rounded corners to all product images</li>
+                    <li>• Hide the promotional banner</li>
+                    <li>• Make the headline text larger and bold</li>
+                    <li>• Replace the logo with this image (paste/drag image)</li>
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-4 mb-4">
@@ -431,13 +636,17 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                   {message.images && message.images.length > 0 && (
                     <div className="mb-2 space-y-2">
                       {message.images.map((img, imgIndex) => (
-                        <img
-                          key={imgIndex}
-                          src={img}
-                          alt={`Attached ${imgIndex + 1}`}
-                          className="max-w-full rounded border border-white/20"
-                          style={{ maxHeight: '200px' }}
-                        />
+                        <div key={imgIndex} className="relative inline-block">
+                          <img
+                            src={img}
+                            alt={`Attached ${imgIndex + 1}`}
+                            className="max-w-full rounded border border-white/20"
+                            style={{ maxHeight: '200px' }}
+                          />
+                          <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded backdrop-blur-sm">
+                            Thumbnail
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
