@@ -5,6 +5,7 @@ import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon,
 import { ChangeViewerModal } from './ChangeViewerModal'
 import { renderMarkdown } from '~src/utils/markdown'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
+import type { ConversationSession } from '~src/types/absmartly'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -20,8 +21,9 @@ interface AIDOMChangesPageProps {
   variantName: string
   currentChanges: DOMChange[]
   onBack: () => void
-  onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>
+  onGenerate: (prompt: string, images?: string[], conversationSession?: ConversationSession | null) => Promise<AIDOMGenerationResult>
   onRestoreChanges: (changes: DOMChange[]) => void
+  onPreviewToggle?: (enabled: boolean) => void
 }
 
 export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
@@ -29,7 +31,8 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   currentChanges,
   onBack,
   onGenerate,
-  onRestoreChanges
+  onRestoreChanges,
+  onPreviewToggle
 }: AIDOMChangesPageProps) {
 
   const [prompt, setPrompt] = useState('')
@@ -40,6 +43,8 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [isDragging, setIsDragging] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [viewerModal, setViewerModal] = useState<{ changes: DOMChange[], response: string, timestamp: number } | null>(null)
+  const [latestDomChanges, setLatestDomChanges] = useState<DOMChange[]>(currentChanges)
+  const [conversationSession, setConversationSession] = useState<ConversationSession | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -92,6 +97,25 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       </div>
     )
   }
+
+  // Enable preview mode when entering AI chat
+  useEffect(() => {
+    if (onPreviewToggle) {
+      console.log('[AIDOMChangesPage] Enabling preview mode on mount')
+      onPreviewToggle(true)
+    }
+  }, [onPreviewToggle])
+
+  // Initialize conversation session on mount
+  useEffect(() => {
+    const newSession: ConversationSession = {
+      id: crypto.randomUUID(),
+      htmlSent: false,
+      messages: [],
+    }
+    setConversationSession(newSession)
+    console.log('[AIDOMChangesPage] Session initialized:', newSession.id)
+  }, [])
 
   // Load chat history for this variant on mount
   useEffect(() => {
@@ -191,6 +215,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
   const handleGenerate = async () => {
     console.log('[AIDOMChangesPage] handleGenerate called, prompt:', prompt, 'images:', attachedImages.length)
+    console.log('[AIDOMChangesPage] Current session:', conversationSession?.id)
 
     if (!prompt.trim() && attachedImages.length === 0) {
       console.log('[AIDOMChangesPage] Empty prompt and no images')
@@ -213,7 +238,12 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     setChatHistory(prev => [...prev, userMessage])
 
     try {
-      const result = await onGenerate(prompt, attachedImages.length > 0 ? attachedImages : undefined)
+      const result = await onGenerate(prompt, attachedImages.length > 0 ? attachedImages : undefined, conversationSession)
+
+      if (result.session) {
+        setConversationSession(result.session)
+        console.log('[AIDOMChangesPage] Session updated:', result.session.id)
+      }
 
       const assistantTimestamp = Date.now()
       const assistantMessage: ChatMessage = {
@@ -225,6 +255,16 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         id: `assistant-${assistantTimestamp}`
       }
       setChatHistory(prev => [...prev, assistantMessage])
+
+      // Track the latest DOM changes
+      if (result.domChanges && result.domChanges.length > 0) {
+        setLatestDomChanges(result.domChanges)
+        // Save changes to variant immediately
+        if (onRestoreChanges) {
+          onRestoreChanges(result.domChanges)
+        }
+      }
+
       setPrompt('')
       setAttachedImages([])
     } catch (err) {
@@ -244,6 +284,14 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   }
 
   const handleNewChat = () => {
+    const newSession: ConversationSession = {
+      id: crypto.randomUUID(),
+      htmlSent: false,
+      messages: [],
+    }
+    setConversationSession(newSession)
+    console.log('[AIDOMChangesPage] New chat session:', newSession.id)
+
     setChatHistory([])
     setPrompt('')
     setAttachedImages([])
@@ -420,6 +468,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                         onClick={() => {
                           if (message.domChangesSnapshot) {
                             onRestoreChanges(message.domChangesSnapshot)
+                            setLatestDomChanges(message.domChangesSnapshot)
                           }
                         }}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 transition-colors"

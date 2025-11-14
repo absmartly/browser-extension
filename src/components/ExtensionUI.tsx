@@ -95,9 +95,10 @@ function SidebarContent() {
   // AI DOM Changes state
   const [aiDomContext, setAiDomContext] = useState<{
     variantName: string
-    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>
+    onGenerate: (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null) => Promise<AIDOMGenerationResult>
     currentChanges: DOMChange[]
     onRestoreChanges: (changes: DOMChange[]) => void
+    onPreviewToggle: (enabled: boolean) => void
     previousView: View
   } | null>(null)
 
@@ -106,9 +107,10 @@ function SidebarContent() {
 
   const handleNavigateToAI = useCallback((
     variantName: string,
-    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    onGenerate: (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
-    onRestoreChanges: (changes: DOMChange[]) => void
+    onRestoreChanges: (changes: DOMChange[]) => void,
+    onPreviewToggle: (enabled: boolean) => void
   ) => {
     debugLog('[ExtensionUI] Navigating to AI DOM changes page for variant:', variantName)
     setAiDomContext({
@@ -116,6 +118,7 @@ function SidebarContent() {
       onGenerate,
       currentChanges,
       onRestoreChanges,
+      onPreviewToggle,
       previousView: view
     })
     setView('ai-dom-changes')
@@ -1153,6 +1156,7 @@ function SidebarContent() {
           onBack={handleBackFromAI}
           onGenerate={aiDomContext.onGenerate}
           onRestoreChanges={aiDomContext.onRestoreChanges}
+          onPreviewToggle={aiDomContext.onPreviewToggle}
         />
       )}
 

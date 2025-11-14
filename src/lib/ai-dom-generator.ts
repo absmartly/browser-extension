@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
+import type { ConversationSession } from '~src/types/absmartly'
 import { debugLog, debugError } from '~src/utils/debug'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
@@ -230,21 +231,24 @@ export async function generateDOMChanges(
   prompt: string,
   apiKey: string,
   currentChanges: DOMChange[] = [],
+  images?: string[],
   options?: {
     useOAuth?: boolean
     oauthToken?: string
     aiProvider?: 'claude-subscription' | 'anthropic-api' | 'openai-api'
+    conversationSession?: ConversationSession
   }
-): Promise<AIDOMGenerationResult> {
+): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
   try {
     debugLog('🤖 Generating DOM changes with AI...')
     debugLog('📝 Prompt:', prompt)
     debugLog('📄 HTML length:', html.length)
+    debugLog('🖼️ Images:', images?.length || 0)
 
     // Try Claude Code Bridge first (uses Claude subscription, no API costs)
     try {
       debugLog('🔗 Attempting to use Claude Code Bridge...')
-      const result = await generateWithBridge(html, prompt, currentChanges)
+      const result = await generateWithBridge(html, prompt, currentChanges, images, options?.conversationSession)
       debugLog('✅ Successfully generated with Claude Code Bridge')
       return result
     } catch (bridgeError) {
@@ -269,24 +273,70 @@ export async function generateDOMChanges(
 
     const anthropic = new Anthropic(authConfig)
 
-    let userMessage = ''
-
-    if (currentChanges.length > 0) {
-      userMessage += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
+    let session = options?.conversationSession
+    if (!session) {
+      session = {
+        id: crypto.randomUUID(),
+        htmlSent: true,
+        messages: []
+      }
     }
 
-    userMessage += `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}`
+    let systemPrompt = SYSTEM_PROMPT
+    if (!session.htmlSent) {
+      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
+      session.htmlSent = true
+      debugLog('📄 Including HTML in system prompt (initializing conversation)')
+    }
+
+    let userMessageText = ''
+
+    if (currentChanges.length > 0) {
+      userMessageText += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
+    }
+
+    userMessageText += `User Request: ${prompt}`
+
+    const contentParts: Anthropic.MessageParam['content'] = [
+      {
+        type: 'text',
+        text: userMessageText
+      }
+    ]
+
+    if (images && images.length > 0) {
+      for (const img of images) {
+        const match = img.match(/^data:(image\/\w+);base64,(.+)$/)
+        if (match) {
+          const [, mediaType, base64Data] = match
+          if (Array.isArray(contentParts)) {
+            contentParts.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                data: base64Data
+              }
+            })
+          }
+        }
+      }
+    }
+
+    const newUserMessage: Anthropic.MessageParam = {
+      role: 'user',
+      content: contentParts
+    }
+    session.messages.push({ role: 'user', content: userMessageText })
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: userMessage
-        }
-      ]
+      system: systemPrompt,
+      messages: [...session.messages.slice(0, -1).map(m => ({
+        role: m.role,
+        content: m.content
+      })), newUserMessage] as Anthropic.MessageParam[]
     })
 
     const content = message.content[0]
@@ -297,22 +347,55 @@ export async function generateDOMChanges(
     let responseText = content.text.trim()
     debugLog('🤖 AI Response:', responseText.substring(0, 200))
 
+    let textBefore = ''
+    let textAfter = ''
+    let jsonText = responseText
+
     if (responseText.startsWith('```')) {
-      responseText = responseText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
+      jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    const validation = validateAIDOMGenerationResult(responseText)
+    const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
+    if (jsonMatch) {
+      textBefore = jsonMatch[1].trim()
+      jsonText = jsonMatch[2].trim()
+      textAfter = jsonMatch[3].trim()
+    }
+
+    const validation = validateAIDOMGenerationResult(jsonText)
 
     if (validation.isValid) {
+      if (textBefore || textAfter) {
+        let modifiedResponse = validation.result.response
+        if (textBefore) {
+          modifiedResponse = textBefore + '\n\n' + modifiedResponse
+          debugLog('📝 Prepended text before JSON:', textBefore.substring(0, 100))
+        }
+        if (textAfter) {
+          modifiedResponse = modifiedResponse + '\n\n' + textAfter
+          debugLog('📝 Appended text after JSON:', textAfter.substring(0, 100))
+        }
+        validation.result.response = modifiedResponse
+      }
       debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-      return validation.result
+
+      session.messages.push({ role: 'assistant', content: validation.result.response })
+
+      return {
+        ...validation.result,
+        session
+      }
     }
 
     debugLog('ℹ️ Response is not structured JSON, normalizing as conversational message')
+
+    session.messages.push({ role: 'assistant', content: responseText })
+
     return {
       domChanges: [],
       response: responseText,
-      action: 'none'
+      action: 'none',
+      session
     }
   } catch (error) {
     debugError('❌ Failed to generate DOM changes:', error)
@@ -320,18 +403,40 @@ export async function generateDOMChanges(
   }
 }
 
-async function generateWithBridge(html: string, prompt: string, currentChanges: DOMChange[] = []): Promise<AIDOMGenerationResult> {
+async function generateWithBridge(html: string, prompt: string, currentChanges: DOMChange[] = [], images?: string[], conversationSession?: ConversationSession): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
   const bridgeClient = new ClaudeCodeBridgeClient()
 
   try {
     await bridgeClient.connect()
 
-    const sessionId = `dom-gen-${Date.now()}`
-    const { conversationId } = await bridgeClient.createConversation(
-      sessionId,
-      '/',
-      'allow'
-    )
+    let session = conversationSession
+    let conversationId: string
+    let systemPromptToSend = SYSTEM_PROMPT
+
+    if (!session || !session.conversationId) {
+      const sessionId = crypto.randomUUID()
+
+      systemPromptToSend += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
+      debugLog('[Bridge] Including HTML in system prompt (initializing conversation)')
+
+      const result = await bridgeClient.createConversation(
+        sessionId,
+        '/',
+        'allow'
+      )
+      conversationId = result.conversationId
+
+      session = {
+        id: sessionId,
+        htmlSent: true,
+        messages: [],
+        conversationId
+      }
+      debugLog('[Bridge] Created new conversation:', conversationId)
+    } else {
+      conversationId = session.conversationId
+      debugLog('[Bridge] Reusing existing conversation:', conversationId)
+    }
 
     let userMessage = ''
 
@@ -339,7 +444,8 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       userMessage += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
     }
 
-    userMessage += `HTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\`\n\nUser Request: ${prompt}`
+    userMessage += `User Request: ${prompt}`
+    session.messages.push({ role: 'user', content: userMessage })
 
     const responseText = await new Promise<string>((resolve, reject) => {
       let fullResponse = ''
@@ -371,7 +477,7 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       setTimeout(async () => {
         debugLog('[Bridge] Sending message to conversation:', conversationId)
         try {
-          await bridgeClient.sendMessage(conversationId, userMessage, [], SYSTEM_PROMPT)
+          await bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend)
           debugLog('[Bridge] Message sent successfully')
         } catch (error) {
           debugError('[Bridge] Failed to send message:', error)
@@ -388,23 +494,56 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
     })
 
     let cleanedResponse = responseText.trim()
+    let textBefore = ''
+    let textAfter = ''
+    let jsonText = cleanedResponse
+
     if (cleanedResponse.startsWith('```')) {
-      cleanedResponse = cleanedResponse.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
+      jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
+    }
+
+    const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
+    if (jsonMatch) {
+      textBefore = jsonMatch[1].trim()
+      jsonText = jsonMatch[2].trim()
+      textAfter = jsonMatch[3].trim()
     }
 
     debugLog('[Bridge] Validating response')
-    const validation = validateAIDOMGenerationResult(cleanedResponse)
+    const validation = validateAIDOMGenerationResult(jsonText)
 
     if (validation.isValid) {
+      if (textBefore || textAfter) {
+        let modifiedResponse = validation.result.response
+        if (textBefore) {
+          modifiedResponse = textBefore + '\n\n' + modifiedResponse
+          debugLog('[Bridge] Prepended text before JSON:', textBefore.substring(0, 100))
+        }
+        if (textAfter) {
+          modifiedResponse = modifiedResponse + '\n\n' + textAfter
+          debugLog('[Bridge] Appended text after JSON:', textAfter.substring(0, 100))
+        }
+        validation.result.response = modifiedResponse
+      }
       debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes via bridge with action:', validation.result.action)
-      return validation.result
+
+      session.messages.push({ role: 'assistant', content: validation.result.response })
+
+      return {
+        ...validation.result,
+        session
+      }
     }
 
     debugLog('ℹ️ Response is not structured JSON, normalizing as conversational message')
+
+    session.messages.push({ role: 'assistant', content: cleanedResponse })
+
     return {
       domChanges: [],
       response: cleanedResponse,
-      action: 'none'
+      action: 'none',
+      session
     }
   } catch (error) {
     debugError('❌ Bridge generation failed:', error)

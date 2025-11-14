@@ -173,4 +173,11 @@ export interface ExperimentCustomSectionFieldValue {
   default_value?: string
 }
 
+export interface ConversationSession {
+  id: string
+  htmlSent: boolean
+  messages: Array<{role: 'user' | 'assistant', content: string}>
+  conversationId?: string
+}
+
 export type { URLFilter, DOMChangesData } from './dom-changes'

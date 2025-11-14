@@ -795,7 +795,7 @@ export function DOMChangesInlineEditor({
     setEditingChange(newChange)
   }
 
-  const handleAIGenerate = async (prompt: string, images?: string[]): Promise<AIDOMGenerationResult> => {
+  const handleAIGenerate = async (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null): Promise<AIDOMGenerationResult> => {
     try {
       console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt, 'images count:', images?.length || 0)
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
@@ -840,13 +840,15 @@ export function DOMChangesInlineEditor({
       console.log('[AI Generate] capturePageHTML await completed, length:', html?.length)
 
       console.log('[AI Generate] Sending message to background script...')
+      console.log('[AI Generate] Session:', conversationSession?.id || 'null')
       const response = await sendToBackground({
         type: 'AI_GENERATE_DOM_CHANGES',
         html,
         prompt,
         apiKey,
         images,
-        currentChanges: changes
+        currentChanges: changes,
+        conversationSession: conversationSession || null
       })
 
       console.log('[AI Generate] Response received:', response)
@@ -868,6 +870,11 @@ export function DOMChangesInlineEditor({
 
       console.log('[AI Generate] ✅ AI-generated changes applied successfully')
       debugLog('✅ AI-generated changes applied successfully')
+
+      if (response.session) {
+        console.log('[AI Generate] Session returned from background:', response.session.id)
+        return { ...result, session: response.session }
+      }
 
       return result
     } catch (error) {
@@ -1629,7 +1636,7 @@ export function DOMChangesInlineEditor({
             type="button"
             onClick={() => {
               if (onNavigateToAI) {
-                onNavigateToAI(variantName, handleAIGenerate, changes, onChange)
+                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle)
               } else {
                 setAiDialogOpen(true)
               }

@@ -1,11 +1,18 @@
 // Test setup file
 import '@testing-library/jest-dom'
 import { TextEncoder, TextDecoder } from 'util'
+import { config } from 'dotenv'
+import fetch from 'node-fetch'
+import EventSource from 'eventsource'
 
-// Add TextEncoder/TextDecoder for jsdom environment
+config({ path: '.env.development.local' })
+
+// Add TextEncoder/TextDecoder/fetch/EventSource for jsdom environment
 Object.assign(global, {
   TextEncoder,
   TextDecoder,
+  fetch,
+  EventSource,
 })
 
 // Mock chrome APIs for testing
