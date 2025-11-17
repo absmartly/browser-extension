@@ -297,6 +297,15 @@ export async function generateDOMChanges(
       console.log('📄 Including HTML in system prompt (initializing conversation)')
     }
 
+    // Print the complete system prompt to console
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log(systemPrompt)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log(`📊 System prompt length: ${systemPrompt.length} characters`)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+
     let userMessageText = ''
 
     if (currentChanges.length > 0) {
@@ -439,6 +448,20 @@ export async function generateDOMChanges(
         }
         validation.result.response = modifiedResponse
       }
+
+      // Strip out any JSON objects that appear in the response text
+      // (AI sometimes includes the JSON in its explanation)
+      let cleanedResponse = validation.result.response
+      const jsonPattern = /\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}/g
+      cleanedResponse = cleanedResponse.replace(jsonPattern, '').trim()
+
+      // Clean up any extra whitespace
+      cleanedResponse = cleanedResponse.replace(/\n{3,}/g, '\n\n').trim()
+
+      if (cleanedResponse !== validation.result.response) {
+        console.log('🧹 Stripped duplicate JSON from response text')
+        validation.result.response = cleanedResponse
+      }
       console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
 
       // Validate before returning
@@ -519,6 +542,15 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       }
       systemPromptToSend += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
       console.log('[Bridge] Including HTML in system prompt (initializing conversation)')
+
+      // Print the complete system prompt to console
+      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log('[Bridge] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
+      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log(systemPromptToSend)
+      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log(`[Bridge] 📊 System prompt length: ${systemPromptToSend.length} characters`)
+      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
       console.log('[Bridge] About to create conversation with sessionId:', sessionId)
       const result = await bridgeClient.createConversation(
