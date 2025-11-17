@@ -135,22 +135,10 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }, [])
 
-  // Track preview state
-  const [previewActive, setPreviewActive] = useState(false)
-
   // Keep ref updated with latest callback
   useEffect(() => {
     onPreviewToggleRef.current = onPreviewToggle
   }, [onPreviewToggle])
-
-  // Enable preview mode when entering AI chat (only runs once on mount)
-  useEffect(() => {
-    if (onPreviewToggleRef.current) {
-      console.log('[AIDOMChangesPage] Enabling preview mode on mount')
-      onPreviewToggleRef.current(true)
-      setPreviewActive(true)
-    }
-  }, [])
 
   // Initialize conversation - this should NEVER block the UI from showing
   useEffect(() => {
@@ -411,18 +399,16 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           onRestoreChanges(result.domChanges)
         }
 
-        // If preview is active, refresh it to apply the new changes
-        if (previewActive && onPreviewToggleRef.current) {
-          console.log('[AIDOMChangesPage] Refreshing preview with new DOM changes from AI')
-          // Toggle off then on to force re-application of changes
-          onPreviewToggleRef.current(false)
-          // Use longer timeout to ensure React state updates complete before re-enabling
+        // Turn on preview mode to apply the new changes
+        // This will read the latest changes from the variant and apply them
+        if (onPreviewToggleRef.current) {
+          console.log('[AIDOMChangesPage] Turning on preview to apply new DOM changes from AI')
+          // Give React time to update state, then turn on preview
           setTimeout(() => {
             if (onPreviewToggleRef.current) {
               onPreviewToggleRef.current(true)
-              setPreviewActive(true)
             }
-          }, 500)
+          }, 300)
         }
       }
 
@@ -758,16 +744,14 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                             onRestoreChanges(message.domChangesSnapshot)
                             setLatestDomChanges(message.domChangesSnapshot)
 
-                            // Refresh preview if active
-                            if (previewActive && onPreviewToggleRef.current) {
-                              console.log('[AIDOMChangesPage] Refreshing preview after restoring changes from history')
-                              onPreviewToggleRef.current(false)
+                            // Turn on preview to apply the restored changes
+                            if (onPreviewToggleRef.current) {
+                              console.log('[AIDOMChangesPage] Turning on preview after restoring changes from history')
                               setTimeout(() => {
                                 if (onPreviewToggleRef.current) {
                                   onPreviewToggleRef.current(true)
-                                  setPreviewActive(true)
                                 }
-                              }, 500)
+                              }, 300)
                             }
                           }
                         }}
