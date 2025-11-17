@@ -23,6 +23,9 @@ export class Toolbar {
     this.stateManager = stateManager
   }
 
+  private shadowHost: HTMLElement | null = null
+  private shadowRoot: ShadowRoot | null = null
+
   create(): void {
     console.log('[Toolbar] Creating toolbar')
     console.error('[Toolbar] Create called - this should appear in console')
@@ -37,9 +40,16 @@ export class Toolbar {
 
     if (this.toolbar) {
       console.log('[Toolbar] Toolbar already exists, removing old one')
-      this.toolbar.remove()
-      this.toolbar = null
+      this.remove()
     }
+
+    // Create Shadow DOM host for complete isolation from page styles
+    this.shadowHost = document.createElement('div')
+    this.shadowHost.id = 'absmartly-visual-editor-toolbar-host'
+    this.shadowHost.style.cssText = 'all: initial; position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;'
+
+    // Attach shadow root (closed mode for better encapsulation)
+    this.shadowRoot = this.shadowHost.attachShadow({ mode: 'closed' })
 
     this.toolbar = document.createElement('div')
     this.toolbar.className = 'absmartly-toolbar'
@@ -160,53 +170,36 @@ export class Toolbar {
     this.undoButton = this.toolbar.querySelector('[data-action="undo"]')
     this.redoButton = this.toolbar.querySelector('[data-action="redo"]')
 
-    // Add hover effects via CSS with unique ID to avoid duplicates
-    if (!document.getElementById('absmartly-toolbar-styles')) {
-      const style = document.createElement('style')
-      style.id = 'absmartly-toolbar-styles'
-      style.textContent = `
-        .absmartly-toolbar-button:hover {
-          background: #e5e7eb;
-        }
-        .absmartly-toolbar-button.primary:hover {
-          background: #2563eb;
-        }
-        .absmartly-toolbar-button.danger:hover {
-          background: #dc2626;
-        }
-      `
-      document.head.appendChild(style)
-    }
-
-    // Append toolbar directly to body
-    document.body.appendChild(this.toolbar)
-    console.log('[Toolbar] Toolbar added to DOM')
-
-    // Verify toolbar is actually in DOM and visible
-    const verifyToolbar = document.querySelector('.absmartly-toolbar') as HTMLElement
-    if (verifyToolbar) {
-      console.log('[Toolbar] Verified: Toolbar found in DOM')
-      const rect = verifyToolbar.getBoundingClientRect()
-      console.log('[Toolbar] Position:', rect)
-      console.log('[Toolbar] Computed styles:', {
-        display: window.getComputedStyle(verifyToolbar).display,
-        visibility: window.getComputedStyle(verifyToolbar).visibility,
-        opacity: window.getComputedStyle(verifyToolbar).opacity,
-        zIndex: window.getComputedStyle(verifyToolbar).zIndex
-      })
-
-      // Check if toolbar is actually visible
-      if (rect.width === 0 || rect.height === 0) {
-        console.error('[Toolbar] ERROR: Toolbar has zero dimensions!')
+    // Add hover effects via CSS inside shadow root
+    const style = document.createElement('style')
+    style.id = 'absmartly-toolbar-styles'
+    style.textContent = `
+      .absmartly-toolbar-button:hover {
+        background: #e5e7eb;
       }
-      if (window.getComputedStyle(verifyToolbar).display === 'none') {
-        console.error('[Toolbar] ERROR: Toolbar display is none!')
+      .absmartly-toolbar-button.primary:hover {
+        background: #2563eb;
       }
-      if (window.getComputedStyle(verifyToolbar).visibility === 'hidden') {
-        console.error('[Toolbar] ERROR: Toolbar visibility is hidden!')
+      .absmartly-toolbar-button.danger:hover {
+        background: #dc2626;
       }
+    `
+    this.shadowRoot!.appendChild(style)
+
+    // Append toolbar to shadow root (not to main DOM)
+    this.shadowRoot!.appendChild(this.toolbar)
+
+    // Append shadow host to document body
+    document.body.appendChild(this.shadowHost!)
+    console.log('[Toolbar] Toolbar added to Shadow DOM')
+
+    // Verify shadow host is in DOM
+    const verifyShadowHost = document.getElementById('absmartly-visual-editor-toolbar-host')
+    if (verifyShadowHost) {
+      console.log('[Toolbar] Verified: Shadow host found in DOM')
+      console.log('[Toolbar] Toolbar is now isolated in Shadow DOM, protected from page styles')
     } else {
-      console.error('[Toolbar] ERROR: Toolbar not found in DOM after appendChild!')
+      console.error('[Toolbar] ERROR: Shadow host not found in DOM after appendChild!')
     }
 
     // Add event listeners
@@ -218,19 +211,17 @@ export class Toolbar {
     console.log('[Toolbar] Remove called')
     console.trace('[Toolbar] Remove stack trace:')
 
-    if (this.toolbar) {
-      this.toolbar.remove()
+    if (this.shadowHost) {
+      this.shadowHost.remove()
+      this.shadowHost = null
+      this.shadowRoot = null
       this.toolbar = null
       this.changesCounter = null
       this.undoButton = null
       this.redoButton = null
     }
 
-    // Also remove styles
-    const style = document.getElementById('absmartly-toolbar-styles')
-    if (style) {
-      style.remove()
-    }
+    // Note: Styles are inside shadow root and removed automatically with shadowHost
   }
 
   updateChangesCount(count: number): void {

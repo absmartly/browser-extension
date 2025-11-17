@@ -552,6 +552,14 @@ function createPreviewHeader(experimentName: string, variantName: string) {
 
   console.log(`[Content Script] Creating preview header for ${experimentName} / ${variantName}`)
 
+  // Create Shadow DOM host for complete isolation from page styles
+  const shadowHost = document.createElement('div')
+  shadowHost.id = 'absmartly-preview-header-host'
+  shadowHost.style.cssText = 'all: initial; position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;'
+
+  // Attach shadow root (closed mode for better encapsulation)
+  const shadowRoot = shadowHost.attachShadow({ mode: 'closed' })
+
   // Create preview header container - floating bar style
   const headerContainer = document.createElement('div')
   headerContainer.id = 'absmartly-preview-header'
@@ -699,14 +707,19 @@ function createPreviewHeader(experimentName: string, variantName: string) {
 
   headerContainer.appendChild(content)
   headerContainer.appendChild(closeButton)
-  document.body.appendChild(headerContainer)
+
+  // Append header to shadow root (not to main DOM)
+  shadowRoot.appendChild(headerContainer)
+
+  // Append shadow host to document body
+  document.body.appendChild(shadowHost)
 }
 
 // Function to remove preview header
 function removePreviewHeader() {
-  const header = document.getElementById('absmartly-preview-header')
-  if (header) {
-    header.remove()
+  const shadowHost = document.getElementById('absmartly-preview-header-host')
+  if (shadowHost) {
+    shadowHost.remove()
   }
 }
 

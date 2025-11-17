@@ -60,7 +60,7 @@ export class PreviewManager {
 
     const allElements = document.querySelectorAll(change.selector)
 
-    // Filter out extension UI elements (sidebar, toolbars, etc.)
+    // Filter out extension UI shadow hosts (sidebar, toolbars wrapped in shadow DOM)
     const elements = Array.from(allElements).filter(el => !this.isExtensionElement(el))
 
     if (elements.length === 0) {
@@ -431,20 +431,22 @@ export class PreviewManager {
 
   /**
    * Check if an element is part of the extension UI
-   * Extension UI elements should never be modified by preview changes
+   * Extension UI elements (including shadow hosts) should never be modified by preview changes
    */
   private isExtensionElement(element: Element): boolean {
     const extensionIds = [
       'absmartly-sidebar-root',
       'absmartly-sidebar-iframe',
-      'absmartly-preview-header',
-      'absmartly-visual-editor-toolbar'
+      'absmartly-preview-header-host',        // Shadow host for preview toolbar
+      'absmartly-visual-editor-toolbar-host'  // Shadow host for VE toolbar
     ]
 
+    // Check if this element IS an extension container
     if (element.id && extensionIds.includes(element.id)) {
       return true
     }
 
+    // Check if this element is INSIDE an extension container
     for (const id of extensionIds) {
       const container = document.getElementById(id)
       if (container && container.contains(element)) {
