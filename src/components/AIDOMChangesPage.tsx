@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon, TrashIcon } from '@heroicons/react/24/outline'
@@ -22,6 +22,9 @@ interface AIDOMChangesPageProps {
   onPreviewToggle?: (enabled: boolean) => void
 }
 
+// DIAGNOSTIC: Helper to generate unique mount IDs
+const generateMountId = () => `mount-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
 export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   variantName,
   currentChanges,
@@ -30,6 +33,12 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   onRestoreChanges,
   onPreviewToggle
 }: AIDOMChangesPageProps) {
+  console.log('[AIDOMChangesPage] ========== COMPONENT RENDER START ==========')
+  console.log('[AIDOMChangesPage] Props:', { variantName, currentChangesCount: currentChanges?.length })
+
+  // DIAGNOSTIC: Track component instance lifecycle
+  const mountId = useRef(generateMountId())
+  const renderCount = useRef(0)
 
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
@@ -43,13 +52,13 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [conversationSession, setConversationSession] = useState<ConversationSession | null>(null)
   const [conversationList, setConversationList] = useState<ConversationListItem[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string>('')
-  const [isInitializing, setIsInitializing] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(true)
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
+  const onPreviewToggleRef = useRef(onPreviewToggle)
 
   // Check if onGenerate function is missing (e.g., after page reload)
   const isFunctionMissing = !onGenerate || typeof onGenerate !== 'function'
@@ -99,32 +108,70 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     )
   }
 
-  // Enable preview mode when entering AI chat
+  // DIAGNOSTIC: Track mount/unmount lifecycle
   useEffect(() => {
-    if (onPreviewToggle) {
-      console.log('[AIDOMChangesPage] Enabling preview mode on mount')
-      onPreviewToggle(true)
+    const id = mountId.current
+    console.log(JSON.stringify({
+      type: 'LIFECYCLE',
+      component: 'AIDOMChangesPage',
+      event: 'MOUNT',
+      mountId: id,
+      timestamp: Date.now(),
+      props: {
+        variantName,
+        currentChangesCount: currentChanges?.length
+      }
+    }))
+
+    return () => {
+      console.log(JSON.stringify({
+        type: 'LIFECYCLE',
+        component: 'AIDOMChangesPage',
+        event: 'UNMOUNT',
+        mountId: id,
+        timestamp: Date.now(),
+        totalRenders: renderCount.current
+      }))
     }
+  }, [])
+
+  // Keep ref updated with latest callback
+  useEffect(() => {
+    onPreviewToggleRef.current = onPreviewToggle
   }, [onPreviewToggle])
 
-  // Initialize conversation with migration and preemptive HTML capture
+  // Enable preview mode when entering AI chat (only runs once on mount)
   useEffect(() => {
+    if (onPreviewToggleRef.current) {
+      console.log('[AIDOMChangesPage] Enabling preview mode on mount')
+      onPreviewToggleRef.current(true)
+    }
+  }, [])
+
+  // Initialize conversation - this should NEVER block the UI from showing
+  useEffect(() => {
+    console.log('[AIDOMChangesPage] ========== INITIALIZATION START ==========')
+    console.log('[AIDOMChangesPage] variantName:', variantName)
+
     ;(async () => {
       try {
-        setIsInitializing(true)
         setIsLoadingHistory(true)
 
+        // Step 1: Check for migration (quick, shouldn't fail)
         if (await needsMigration(variantName)) {
           console.log('[AIDOMChangesPage] Migrating old conversation format')
           await migrateConversation(variantName)
         }
 
+        // Step 2: Load conversation list (quick, shouldn't fail)
         const list = await getConversationList(variantName)
-        console.log('[AIDOMChangesPage] Loaded conversation list on mount:', list.length, 'conversations')
+        console.log('[AIDOMChangesPage] Loaded conversation list:', list.length, 'conversations')
         setConversationList(list)
         setIsLoadingHistory(false)
 
+        // Step 3: Load active conversation or create new one
         const activeConv = list.find(c => c.isActive)
+
         if (activeConv) {
           const loaded = await loadConversation(variantName, activeConv.id)
           if (loaded) {
@@ -133,42 +180,50 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
             setCurrentConversationId(loaded.id)
             console.log('[AIDOMChangesPage] Loaded active conversation:', loaded.id)
 
+            // Try to initialize HTML if not sent yet - but don't block on failure
             if (!loaded.conversationSession.htmlSent) {
-              console.log('[AIDOMChangesPage] Session HTML not sent yet, initializing...')
-              await initializeSession(loaded.conversationSession, loaded.id)
-            } else {
-              setIsInitialized(true)
+              initializeSessionHTML(loaded.conversationSession, loaded.id)
+                .catch(err => {
+                  console.warn('[AIDOMChangesPage] HTML initialization failed (non-blocking):', err)
+                })
             }
             return
           }
         }
 
+        // Create new conversation
         const newSession: ConversationSession = {
           id: crypto.randomUUID(),
           htmlSent: false,
           messages: [],
         }
         const newConvId = crypto.randomUUID()
+
         setConversationSession(newSession)
         setCurrentConversationId(newConvId)
         console.log('[AIDOMChangesPage] Created new conversation:', newConvId)
 
-        await initializeSession(newSession, newConvId)
+        // Try to initialize HTML in background - don't block on failure
+        initializeSessionHTML(newSession, newConvId)
+          .catch(err => {
+            console.warn('[AIDOMChangesPage] HTML initialization failed (non-blocking):', err)
+          })
+
       } catch (error) {
-        console.error('[AIDOMChangesPage] Initialization error:', error)
-        setError(error instanceof Error ? error.message : 'Failed to initialize chat session')
+        console.error('[AIDOMChangesPage] ❌ INITIALIZATION ERROR:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load conversation history')
         setIsLoadingHistory(false)
-      } finally {
-        setIsInitializing(false)
       }
     })()
   }, [variantName])
 
-  const initializeSession = async (session: ConversationSession, conversationId: string) => {
+  // Initialize HTML context for the session - runs in background, doesn't block UI
+  const initializeSessionHTML = async (session: ConversationSession, conversationId: string) => {
+    console.log('[initializeSessionHTML] Starting background HTML capture...')
+
     try {
-      console.log('[AIDOMChangesPage] Initializing session with HTML capture...')
       const html = await capturePageHTML()
-      console.log('[AIDOMChangesPage] HTML captured, length:', html.length)
+      console.log('[initializeSessionHTML] HTML captured, length:', html.length)
 
       const response = await sendToBackground({
         type: 'AI_INITIALIZE_SESSION',
@@ -179,14 +234,14 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       if (response.success && response.session) {
         const initializedSession = response.session as ConversationSession
         setConversationSession(initializedSession)
-        console.log('[AIDOMChangesPage] Session initialized:', initializedSession.id, 'htmlSent:', initializedSession.htmlSent)
-        setIsInitialized(true)
+        console.log('[initializeSessionHTML] ✅ HTML context initialized successfully')
       } else {
         throw new Error(response.error || 'Failed to initialize session')
       }
     } catch (error) {
-      console.error('[AIDOMChangesPage] Session initialization failed:', error)
-      setIsInitialized(true)
+      console.error('[initializeSessionHTML] ❌ HTML capture failed:', error)
+      // Don't set error state - this is optional functionality
+      // User can still chat, just without preemptive HTML context
     }
   }
 
@@ -419,6 +474,26 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     console.log('[AIDOMChangesPage] New chat session:', newConvId)
   }
 
+  console.log('[AIDOMChangesPage] ========== RENDER START (isInitialized:', isInitialized, 'chatHistory:', chatHistory.length, ') ==========')
+
+  // DIAGNOSTIC: Track each render with structured logging
+  renderCount.current++
+  console.log(JSON.stringify({
+    type: 'LIFECYCLE',
+    component: 'AIDOMChangesPage',
+    event: 'RENDER',
+    mountId: mountId.current,
+    renderNumber: renderCount.current,
+    timestamp: Date.now(),
+    state: {
+      isInitialized,
+      chatHistoryLength: chatHistory.length,
+      conversationSessionId: conversationSession?.id,
+      loading,
+      error: error ? true : false
+    }
+  }))
+
   return (
     <div className="flex flex-col h-full bg-white">
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
@@ -582,41 +657,27 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       <div className="flex-1 overflow-auto p-4">
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            {isInitializing ? (
-              <>
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Analyzing page...
-                </h3>
-                <p className="text-gray-600 max-w-md">
-                  Capturing page HTML and initializing AI session
-                </p>
-              </>
-            ) : (
-              <>
-                <SparklesIcon className="h-16 w-16 text-purple-300 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  AI-Powered DOM Changes
-                </h3>
-                <p className="text-gray-600 max-w-md mb-4">
-                  Describe what you want to change on the page, and the AI will analyze the HTML
-                  and generate the appropriate DOM changes for you.
-                </p>
-                <p className="text-sm text-purple-600 font-medium mb-2">
-                  💡 You can paste or drag images to help the AI understand your request!
-                </p>
-                <div className="mt-6 space-y-2 text-left w-full max-w-md">
-                  <p className="text-sm text-gray-700 font-medium">Example prompts:</p>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Change the CTA button to red with white text</li>
-                    <li>• Add rounded corners to all product images</li>
-                    <li>• Hide the promotional banner</li>
-                    <li>• Make the headline text larger and bold</li>
-                    <li>• Replace the logo with this image (paste/drag image)</li>
-                  </ul>
-                </div>
-              </>
-            )}
+            <SparklesIcon className="h-16 w-16 text-purple-300 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              AI-Powered DOM Changes
+            </h3>
+            <p className="text-gray-600 max-w-md mb-4">
+              Describe what you want to change on the page, and the AI will analyze the HTML
+              and generate the appropriate DOM changes for you.
+            </p>
+            <p className="text-sm text-purple-600 font-medium mb-2">
+              💡 You can paste or drag images to help the AI understand your request!
+            </p>
+            <div className="mt-6 space-y-2 text-left w-full max-w-md">
+              <p className="text-sm text-gray-700 font-medium">Example prompts:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• Change the CTA button to red with white text</li>
+                <li>• Add rounded corners to all product images</li>
+                <li>• Hide the promotional banner</li>
+                <li>• Make the headline text larger and bold</li>
+                <li>• Replace the logo with this image (paste/drag image)</li>
+              </ul>
+            </div>
           </div>
         ) : (
           <div className="space-y-4 mb-4">

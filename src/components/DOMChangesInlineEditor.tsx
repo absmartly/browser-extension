@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { all as knownCSSProperties } from 'known-css-properties'
 import { DOMChangeOptions } from './DOMChangeOptions'
@@ -60,7 +60,8 @@ interface DOMChangesInlineEditorProps {
     variantName: string,
     onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
-    onRestoreChanges: (changes: DOMChange[]) => void
+    onRestoreChanges: (changes: DOMChange[]) => void,
+    onPreviewToggle: (enabled: boolean) => void
   ) => void
 }
 
@@ -795,7 +796,7 @@ export function DOMChangesInlineEditor({
     setEditingChange(newChange)
   }
 
-  const handleAIGenerate = async (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null): Promise<AIDOMGenerationResult> => {
+  const handleAIGenerate = useCallback(async (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null): Promise<AIDOMGenerationResult> => {
     try {
       console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt, 'images count:', images?.length || 0)
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
@@ -916,7 +917,25 @@ export function DOMChangesInlineEditor({
       debugError('❌ AI generation failed:', error)
       throw error
     }
-  }
+  }, [changes, onChange])
+
+  // DIAGNOSTIC: Track handleAIGenerate callback recreation
+  const aiGenerateCallbackIdRef = useRef(Date.now())
+  useEffect(() => {
+    const newId = Date.now()
+    console.log(JSON.stringify({
+      type: 'CALLBACK_CHANGE',
+      component: 'DOMChangesInlineEditor',
+      event: 'HANDLE_AI_GENERATE_RECREATED',
+      timestamp: newId,
+      previousId: aiGenerateCallbackIdRef.current,
+      dependencies: {
+        changesLength: changes?.length,
+        onChangeProvided: !!onChange
+      }
+    }))
+    aiGenerateCallbackIdRef.current = newId
+  }, [handleAIGenerate])
 
   const handleEditChange = (index: number) => {
     const change = changes[index]

@@ -3,7 +3,6 @@ import type { Page } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { TestServer } from './helpers/test-server'
-import { BackgroundRunner } from './helpers/background-runner'
 
 const EXTENSION_BUILD_PATH = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
 const TEST_PAGE_PATH = path.join(__dirname, 'fixtures', 'extension-test-page.html')
@@ -33,9 +32,7 @@ test.describe('Visual Editor Workflow Tests', () => {
     // Enable console logging
     page.on('console', msg => console.log('[Page]', msg.text()))
 
-    // Initialize background runner to handle API requests BEFORE loading the page
-    const backgroundRunner = new BackgroundRunner(page)
-    await backgroundRunner.initialize(EXTENSION_BUILD_PATH)
+    // BackgroundRunner no longer needed; tests rely on native chrome.runtime messaging
 
     // Copy the test page to the server directory so it's served from the same origin
     const fs = require('fs')
@@ -48,8 +45,7 @@ test.describe('Visual Editor Workflow Tests', () => {
     await page.waitForSelector('body', { timeout: 5000 })
     console.log('✅ Test page loaded')
 
-    // Re-initialize the background runner after page load to ensure it's available
-    await backgroundRunner.initialize(EXTENSION_BUILD_PATH)
+    // No background runner re-initialization needed
 
     // Click button to inject extension sidebar
     await page.click('#inject-extension-btn')
@@ -113,9 +109,7 @@ test.describe('Visual Editor Workflow Tests', () => {
   })
 
   test('Complete visual editor workflow', async ({ page }) => {
-    // Initialize background runner to handle API requests BEFORE loading the page
-    const backgroundRunner = new BackgroundRunner(page)
-    await backgroundRunner.initialize(EXTENSION_BUILD_PATH)
+    // BackgroundRunner no longer needed; tests rely on native chrome.runtime messaging
 
     // Copy the test page to the server directory so it's served from the same origin
     const fs = require('fs')
@@ -127,8 +121,7 @@ test.describe('Visual Editor Workflow Tests', () => {
     await page.goto(`http://localhost:${serverPort}/test-page.html?port=${serverPort}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForSelector('body', { timeout: 5000 })
 
-    // Re-initialize the background runner after page load
-    await backgroundRunner.initialize(EXTENSION_BUILD_PATH)
+    // No background runner re-initialization needed
 
     // Inject extension
     await page.click('#inject-extension-btn')

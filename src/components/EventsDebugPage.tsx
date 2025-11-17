@@ -78,22 +78,12 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       }
     }
 
-    // Listen for messages forwarded via window.postMessage (from sidebar.tsx in iframe mode)
-    const handleWindowMessage = (event: MessageEvent) => {
-      if (event.data?.source === 'absmartly-extension-incoming') {
-        console.log('[EventsDebugPage] Received window message:', event.data.type, event.data)
-        handleRuntimeMessage(event.data)
-      }
-    }
-
     console.log('[EventsDebugPage] Registered message listeners')
     chrome.runtime.onMessage.addListener(handleRuntimeMessage)
-    window.addEventListener('message', handleWindowMessage)
 
     return () => {
       console.log('[EventsDebugPage] Removing message listeners')
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
-      window.removeEventListener('message', handleWindowMessage)
     }
   }, [])
 

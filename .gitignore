@@ -69,6 +69,8 @@ visual-editor-*.png
 tests/e2e/*-mock.spec.ts
 tests/e2e/*-real.spec.ts
 tests/e2e/*-temp.spec.ts
+tests/
+.test-backups
 
 # Debug screenshots and test artifacts
 after-*.png
@@ -85,3 +87,6 @@ test-*.png
 *.orig
 *~
 *.png
+
+# Docs and PRPs
+PRPs

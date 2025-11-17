@@ -1,178 +1,79 @@
-import React, { useState, useEffect, lazy, Suspense } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Storage } from "@plasmohq/storage"
 import { debugLog, debugError } from "~src/utils/debug"
 import "~style.css"
 import { generateDOMChanges } from "~src/lib/ai-dom-generator"
+import ExtensionUI from "~src/components/ExtensionUI"
 
 const storage = new Storage()
 
 debugLog('🔵 ABSmartly Extension: Sidebar script loaded')
 
-// Listen for messages from background script (works in both iframe and standalone modes)
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Forward to React components via window.postMessage
-  window.postMessage({
-    source: 'absmartly-extension-incoming',
-    ...message
-  }, '*')
-
+// Listen for messages from background script and handle directly in React components
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'DEBUG') {
+    debugLog(message.message)
+  }
   return false
 })
 
-// Old polyfill code below - can be removed
-if (false && window.parent !== window) {
-  // Disabled old code
-  window.addEventListener('message', (event) => {
-    if (event.data?.source === 'absmartly-content-script' || event.data?.source === 'absmartly-visual-editor') {
-      debugLog('[tabs/sidebar.tsx] OLD POLYFILL - Received polyfilled message:', event.data.type, 'source:', event.data.source, 'responseId:', event.data.responseId)
+// TEMP: Instrument DOM to detect root removal/clearing inside iframe
+try {
+  const root = document.getElementById('__plasmo')
+  console.log('[Sidebar Instrumentation] __plasmo exists:', !!root)
 
-      // Mock the background script's response for REQUEST_INJECTION_CODE
-      if (event.data.type === 'REQUEST_INJECTION_CODE') {
-        const response = {
-          data: null, // No custom code in test
-          config: null // No config in test
+  const logChildren = (label: string) => {
+    const el = document.getElementById('__plasmo')
+    console.log(`[Sidebar Instrumentation] ${label} children:`, el ? el.children.length : 'root-missing')
+  }
+
+  logChildren('initial')
+
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === 'childList') {
+        const el = document.getElementById('__plasmo')
+        if (!el) {
+          console.warn('[Sidebar Instrumentation] __plasmo removed from DOM')
+        } else if (m.target === el || (m.target as HTMLElement).id === '__plasmo') {
+          console.warn('[Sidebar Instrumentation] __plasmo childList changed. count=', el.children.length)
         }
-
-        window.postMessage({
-          source: 'absmartly-extension',
-          responseId: event.data.responseId,
-          response: response
-        }, '*')
-
-        debugLog('[tabs/sidebar.tsx] Sent mock response for REQUEST_INJECTION_CODE')
-      } else {
-        // Forward all other messages to background script using real chrome.runtime
-        debugLog('[tabs/sidebar.tsx] Forwarding message to background script:', event.data.type)
-
-        // Extract the original message (without polyfill metadata)
-        const { source, responseId, ...originalMessage } = event.data
-
-        // Forward to background script using real chrome.runtime
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-          chrome.runtime.sendMessage(originalMessage).then(response => {
-            // Only send response back if there was a responseId (meaning caller expects a response)
-            if (responseId) {
-              window.postMessage({
-                source: 'absmartly-extension',
-                responseId: responseId,
-                response: response
-              }, '*')
-              debugLog('[tabs/sidebar.tsx] Forwarded response from background:', response)
-            } else {
-              debugLog('[tabs/sidebar.tsx] Message forwarded successfully (no response expected)')
-            }
-          }).catch(error => {
-            debugError('[tabs/sidebar.tsx] Error forwarding message to background:', error)
-            // Only send error response if there was a responseId
-            if (responseId) {
-              window.postMessage({
-                source: 'absmartly-extension',
-                responseId: responseId,
-                response: { success: false, error: error.message || 'Message forwarding failed' }
-              }, '*')
-            }
-          })
-        } else {
-          debugError('[tabs/sidebar.tsx] Cannot forward message - chrome.runtime not available')
-        }
+      }
+      if (m.type === 'attributes' && (m.target as HTMLElement).id === '__plasmo') {
+        console.warn('[Sidebar Instrumentation] __plasmo attributes changed:', m.attributeName)
       }
     }
   })
 
-  debugLog('[tabs/sidebar.tsx] Message forwarding listener registered')
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
+
+  window.addEventListener('pageshow', () => logChildren('pageshow'))
+  window.addEventListener('load', () => logChildren('load'))
+  window.addEventListener('error', (e) => {
+    console.error('[Sidebar Instrumentation] window error:', e)
+  })
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('[Sidebar Instrumentation] unhandledrejection:', e.reason)
+  })
+} catch (e) {
+  console.error('[Sidebar Instrumentation] init failed:', e)
 }
 
-// Always listen for messages FROM background script (works in both iframe and standalone modes)
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Log DEBUG messages directly
-  if (message.type === 'DEBUG') {
-    debugLog(message.message)
-  }
-
-  // Forward to iframe content as a regular message event
-  // In iframe mode (dev), forward via window.postMessage to both parent and own window
-  // In standalone mode (production), the window.postMessage will still work
-  // because EventsDebugPage listens for both chrome.runtime and window messages
-
-  // Post to own window (for EventsDebugPage in standalone mode)
-  window.postMessage({
-    source: 'absmartly-extension-incoming',
-    ...message
-  }, '*')
-
-  // In iframe mode, also post to parent window (for content script)
-  if (window.parent !== window) {
-    window.parent.postMessage({
-      source: 'absmartly-extension-incoming',
-      ...message
-    }, '*')
-  }
-
-  return false
-})
-
-// Lazy load the ExtensionUI to avoid bundling issues
-const ExtensionUI = lazy(() => import("~src/components/ExtensionUI"))
-
-// Fallback component while loading
-const LoadingContent = () => {
-  return (
-    <div style={{ padding: '20px' }}>
-      <h2 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        marginBottom: '16px',
-        color: '#111827'
-      }}>
-        ABSmartly Extension
-      </h2>
-
-      <div style={{
-        padding: '16px',
-        backgroundColor: '#f9fafb',
-        borderRadius: '8px',
-        marginBottom: '16px'
-      }}>
-        <p style={{
-          fontSize: '14px',
-          color: '#6b7280',
-          marginBottom: '12px'
-        }}>
-          Loading extension...
-        </p>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            border: '3px solid #f3f4f6',
-            borderTop: '3px solid #3b82f6',
-            borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            animation: 'spin 1s linear infinite'
-          }} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// SidebarContent wrapper that uses Suspense for lazy loading
+// SidebarContent wrapper - now directly renders ExtensionUI without lazy loading
 const SidebarContent = () => {
-  return (
-    <Suspense fallback={<LoadingContent />}>
-      <ExtensionUI />
-    </Suspense>
-  )
+  return <ExtensionUI />
 }
 
 const ABSmartlySidebar = () => {
+  const mountId = useRef(`sidebar-${Date.now()}`)
+
   // Style the __plasmo div to fill the iframe
   useEffect(() => {
+    console.log('[sidebar.tsx] 🟢 ABSmartlySidebar MOUNTED', mountId.current)
+
     const plasmoRoot = document.getElementById('__plasmo')
     if (plasmoRoot) {
+      console.log('[sidebar.tsx] Found __plasmo div, applying styles')
       Object.assign(plasmoRoot.style, {
         width: '100%',
         height: '100%',
@@ -183,8 +84,55 @@ const ABSmartlySidebar = () => {
         color: '#111827',
         overflow: 'auto',
       })
+
+      // Set up MutationObserver to track DOM changes
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.removedNodes.length > 0) {
+            console.warn('[sidebar.tsx] ⚠️ DOM NODES REMOVED FROM __plasmo:', {
+              removed: mutation.removedNodes.length,
+              removedNodes: Array.from(mutation.removedNodes).map(n => ({
+                nodeName: n.nodeName,
+                nodeType: n.nodeType,
+                textContent: n.textContent?.substring(0, 50)
+              })),
+              target: mutation.target,
+              mountId: mountId.current,
+              timestamp: new Date().toISOString()
+            })
+          }
+          if (mutation.addedNodes.length > 0) {
+            console.log('[sidebar.tsx] ➕ DOM NODES ADDED TO __plasmo:', {
+              added: mutation.addedNodes.length,
+              target: mutation.target,
+              mountId: mountId.current
+            })
+          }
+        }
+      })
+
+      observer.observe(plasmoRoot, {
+        childList: true,
+        subtree: true,
+        attributes: false
+      })
+
+      console.log('[sidebar.tsx] MutationObserver set up on __plasmo')
+
+      return () => {
+        console.log('[sidebar.tsx] Disconnecting MutationObserver')
+        observer.disconnect()
+      }
+    } else {
+      console.error('[sidebar.tsx] ❌ __plasmo div not found!')
+    }
+
+    return () => {
+      console.log('[sidebar.tsx] 🔴 ABSmartlySidebar UNMOUNTED', mountId.current)
     }
   }, [])
+
+  console.log('[sidebar.tsx] ABSmartlySidebar RENDER, mountId:', mountId.current)
 
   // Return only the body content (no header)
   return <SidebarContent />

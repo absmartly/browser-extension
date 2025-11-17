@@ -9,7 +9,6 @@ import { EventViewer } from '~src/visual-editor/ui/event-viewer'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { sendMessageNoResponse } from '~src/utils/message-bridge'
 import { initializeOverrides } from '~src/utils/overrides'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
@@ -29,120 +28,7 @@ w.__absmartlyContentScriptLoaded = true
 console.log('[ABsmartly] Content script marker set:', w.__absmartlyContentScriptLoaded)
 debugLog('[Visual Editor Content Script] Content script loaded')
 
-// Polyfill chrome.runtime.sendMessage for test mode
-// This handles messages that expect a response (like REQUEST_INJECTION_CODE)
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
-  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-
-  if (sidebarIframe && sidebarIframe.contentWindow) {
-    // We're in test mode - polyfill sendMessage
-    const responseCallbacks = new Map<string, (response: any) => void>()
-
-    // Listen for responses from sidebar
-    window.addEventListener('message', (event) => {
-      // SECURITY: Only accept messages from sidebar iframe or same window
-      if (event.source !== window && event.source !== sidebarIframe?.contentWindow) {
-        return
-      }
-
-      if (event.data?.source === 'absmartly-extension' && event.data?.responseId) {
-        const callback = responseCallbacks.get(event.data.responseId)
-        if (callback) {
-          callback(event.data.response)
-          responseCallbacks.delete(event.data.responseId)
-        }
-      }
-    })
-
-    chrome.runtime.sendMessage = function(message: any, callback?: (response: any) => void) {
-      // Determine the correct source based on message type
-      const source = (message.type === 'VISUAL_EDITOR_CHANGES' ||
-                      message.type === 'VISUAL_EDITOR_STOPPED' ||
-                      message.type === 'ELEMENT_SELECTED' ||
-                      message.type === 'PREVIEW_STATE_CHANGED')
-        ? 'absmartly-visual-editor'
-        : 'absmartly-content-script'
-
-      if (callback) {
-        // Generate unique ID for this request
-        const responseId = `${message.type}_${Date.now()}_${Math.random()}`
-        responseCallbacks.set(responseId, callback)
-
-        // Send request to sidebar with response ID
-        sidebarIframe.contentWindow!.postMessage({
-          source: source,
-          responseId: responseId,
-          ...message
-        }, '*')
-
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          if (responseCallbacks.has(responseId)) {
-            responseCallbacks.delete(responseId)
-            debugWarn(`No response received for ${message.type} after 5s`)
-          }
-        }, 5000)
-      } else {
-        // No callback, just send the message
-        sidebarIframe.contentWindow!.postMessage({
-          source: source,
-          ...message
-        }, '*')
-      }
-    } as any
-  }
-}
-
-// Message bridge relay for test mode
-// Forwards messages between sidebar iframe and background script
-window.addEventListener('message', async (event) => {
-  // Only handle messages from sidebar iframe that need to go to background
-  if (event.data?.source === 'absmartly-sidebar' && event.data?.responseId) {
-    const { responseId, type, ...messageData} = event.data
-
-    console.log('[Content Script Bridge] Relaying message from sidebar to background:', type)
-
-    try {
-      // Forward to background script
-      const response = await chrome.runtime.sendMessage({
-        type,
-        ...messageData
-      })
-
-      console.log('[Content Script Bridge] Got response from background for:', type)
-
-      // Send response back to sidebar iframe
-      const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-      if (sidebarIframe?.contentWindow) {
-        sidebarIframe.contentWindow.postMessage({
-          source: 'absmartly-extension',
-          responseId: responseId,
-          response: response
-        }, '*')
-
-        console.log('[Content Script Bridge] Sent response back to sidebar')
-      }
-    } catch (error) {
-      console.error('[Content Script Bridge] Error relaying message:', error)
-
-      // Send error response back to sidebar
-      const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-      if (sidebarIframe?.contentWindow) {
-        sidebarIframe.contentWindow.postMessage({
-          source: 'absmartly-extension',
-          responseId: responseId,
-          response: {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }
-        }, '*')
-      }
-    }
-  }
-})
-
-console.log('[Content Script] Message bridge relay installed')
+// Runtime messaging relies solely on chrome.runtime APIs in extension context
 
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
@@ -247,6 +133,13 @@ console.log('[ABsmartly] Registering chrome.runtime.onMessage listener')
 const messageListenerRegistered = chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[ABsmartly] Message received:', message?.type)
   debugLog('[Visual Editor Content Script] Received message:', message.type)
+
+  // Handle PING message (content script health check)
+  if (message.type === 'PING') {
+    console.log('[ABsmartly] PING received, sending PONG')
+    sendResponse({ success: true, pong: true })
+    return true
+  }
 
   // Handle SDK plugin injection request
   if (message.type === 'INJECT_SDK_PLUGIN') {
@@ -550,31 +443,6 @@ window.addEventListener('message', (event) => {
   // 2. The sidebar iframe (when in test mode)
   if (event.source !== window && (!sidebarIframe || event.source !== sidebarIframe.contentWindow)) {
     return
-  }
-
-  // Handle messages from sidebar iframe
-  if (event.data?.source === 'absmartly-sidebar') {
-    console.log('[Content Script] Received message from sidebar iframe:', event.data.type, event.data)
-    debugLog('[Content Script] Received message from sidebar iframe:', event.data.type)
-
-    if (event.data.type === 'OPEN_CODE_EDITOR') {
-      console.log('[Content Script] Opening code editor with data:', event.data.data)
-      openCodeEditor(event.data.data)
-      // Send confirmation back to sidebar
-      if (sidebarIframe && sidebarIframe.contentWindow) {
-        console.log('[Content Script] Sending confirmation back to sidebar')
-        sidebarIframe.contentWindow.postMessage({
-          source: 'absmartly-content-script',
-          type: 'CODE_EDITOR_OPENED'
-        }, '*')
-      }
-      return
-    }
-
-    if (event.data.type === 'CLOSE_CODE_EDITOR') {
-      closeCodeEditor()
-      return
-    }
   }
 
   // Handle test messages for programmatic sidebar control
@@ -997,23 +865,6 @@ let codeEditorView: EditorView | null = null
  * Detects if we're in iframe mode (test environment) or production mode
  * and uses the appropriate messaging method
  */
-function sendMessageToSidebar(message: { type: string; value?: string }) {
-  const sidebarIframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
-
-  if (sidebarIframe && sidebarIframe.contentWindow) {
-    // Iframe mode (test environment): use postMessage
-    console.log('[Content Script] Sending message to sidebar via postMessage:', message.type)
-    sidebarIframe.contentWindow.postMessage({
-      source: 'absmartly-content-script',
-      ...message
-    }, '*')
-  } else {
-    // Production mode: use chrome.runtime
-    console.log('[Content Script] Sending message via chrome.runtime:', message.type)
-    chrome.runtime.sendMessage(message)
-  }
-}
-
 function openCodeEditor(data: {
   section: string
   value: string
@@ -1094,7 +945,7 @@ function openCodeEditor(data: {
   closeBtn.onmouseover = () => closeBtn.style.backgroundColor = '#f3f4f6'
   closeBtn.onmouseout = () => closeBtn.style.backgroundColor = 'transparent'
   closeBtn.onclick = () => {
-    sendMessageToSidebar({ type: 'CODE_EDITOR_CLOSE' })
+    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1174,7 +1025,7 @@ function openCodeEditor(data: {
   cancelBtn.onmouseover = () => cancelBtn.style.backgroundColor = '#f9fafb'
   cancelBtn.onmouseout = () => cancelBtn.style.backgroundColor = 'white'
   cancelBtn.onclick = () => {
-    sendMessageToSidebar({ type: 'CODE_EDITOR_CLOSE' })
+    chrome.runtime.sendMessage({ type: 'CODE_EDITOR_CLOSE' })
     closeCodeEditor()
   }
 
@@ -1200,7 +1051,7 @@ function openCodeEditor(data: {
     saveBtn.onmouseout = () => saveBtn.style.backgroundColor = '#3b82f6'
     saveBtn.onclick = () => {
       const value = codeEditorView?.state.doc.toString() || ''
-      sendMessageToSidebar({
+      chrome.runtime.sendMessage({
         type: 'CODE_EDITOR_SAVE',
         value
       })

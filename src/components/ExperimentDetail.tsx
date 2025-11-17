@@ -34,7 +34,13 @@ interface ExperimentDetailProps {
   owners?: any[]
   teams?: any[]
   tags?: any[]
-  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
+  onNavigateToAI?: (
+    variantName: string,
+    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    currentChanges: DOMChange[],
+    onRestoreChanges: (changes: DOMChange[]) => void,
+    onPreviewToggle: (enabled: boolean) => void
+  ) => void
   autoNavigateToAI?: string | null
 }
 

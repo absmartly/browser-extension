@@ -69,20 +69,27 @@ export const injectSidebar = () => {
   // Check if sidebar already exists
   const existing = document.getElementById('absmartly-sidebar-root')
   if (existing) {
-    debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
-    const currentTransform = existing.style.transform
-    const isVisible = currentTransform === 'translateX(0px)' || currentTransform === 'translateX(0%)' || !currentTransform
-
-    if (isVisible) {
-      existing.style.transform = 'translateX(100%)'
-      sidebarVisible = false
-      storage.set('sidebar-visible', false).catch(() => {})
+    // Check if it has a shadow root - if not, it's a stale div, remove it
+    if (!existing.shadowRoot) {
+      debugLog('🔵 ABSmartly Extension: Found stale sidebar without shadow DOM, removing it')
+      existing.remove()
+      // Continue to create a fresh sidebar below
     } else {
-      existing.style.transform = 'translateX(0)'
-      sidebarVisible = true
-      storage.set('sidebar-visible', true).catch(() => {})
+      debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
+      const currentTransform = existing.style.transform
+      const isVisible = currentTransform === 'translateX(0px)' || currentTransform === 'translateX(0%)' || !currentTransform
+
+      if (isVisible) {
+        existing.style.transform = 'translateX(100%)'
+        sidebarVisible = false
+        storage.set('sidebar-visible', false).catch(() => {})
+      } else {
+        existing.style.transform = 'translateX(0)'
+        sidebarVisible = true
+        storage.set('sidebar-visible', true).catch(() => {})
+      }
+      return
     }
-    return
   }
 
   debugLog('🔵 ABSmartly Extension: Creating sidebar with shadow DOM')

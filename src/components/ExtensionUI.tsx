@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
 import { Storage } from "@plasmohq/storage"
@@ -74,13 +74,6 @@ const buildFilterParams = (filterState: ExperimentFilters, page: number, size: n
 }
 
 function SidebarContent() {
-  // Track component renders
-  const renderCount = React.useRef(0)
-  React.useEffect(() => {
-    renderCount.current += 1
-    debugLog(`=== SidebarContent render #${renderCount.current} ===`)
-  })
-
   const [view, setView] = useState<View>('list')
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [experiments, setExperiments] = useState<Experiment[]>([])
@@ -112,7 +105,6 @@ function SidebarContent() {
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void
   ) => {
-    debugLog('[ExtensionUI] Navigating to AI DOM changes page for variant:', variantName)
     setAiDomContext({
       variantName,
       onGenerate,
@@ -122,7 +114,6 @@ function SidebarContent() {
       previousView: view
     })
     setView('ai-dom-changes')
-    // Clear auto-navigate flag after navigation
     setAutoNavigateToAI(null)
   }, [view])
 
@@ -287,6 +278,31 @@ function SidebarContent() {
       })
     }
   }, [config?.authMethod])
+
+  // DIAGNOSTIC: Track view state changes
+  const prevViewRef = useRef<View>('list')
+  useEffect(() => {
+    console.log(JSON.stringify({
+      type: 'STATE_CHANGE',
+      component: 'ExtensionUI',
+      event: 'VIEW_CHANGED',
+      timestamp: Date.now(),
+      oldView: prevViewRef.current,
+      newView: view,
+      aiDomContextSet: !!aiDomContext
+    }))
+    prevViewRef.current = view
+  }, [view, aiDomContext])
+
+  // DIAGNOSTIC: Track handleNavigateToAI callback changes
+  useEffect(() => {
+    console.log(JSON.stringify({
+      type: 'CALLBACK_CHANGE',
+      component: 'ExtensionUI',
+      event: 'NAVIGATE_TO_AI_CALLBACK_CHANGED',
+      timestamp: Date.now()
+    }))
+  }, [handleNavigateToAI])
 
   // Auto-refresh experiments when user returns after logging in
   useEffect(() => {
@@ -1150,14 +1166,48 @@ function SidebarContent() {
       )}
 
       {view === 'ai-dom-changes' && aiDomContext && (
-        <AIDOMChangesPage
-          variantName={aiDomContext.variantName}
-          currentChanges={aiDomContext.currentChanges}
-          onBack={handleBackFromAI}
-          onGenerate={aiDomContext.onGenerate}
-          onRestoreChanges={aiDomContext.onRestoreChanges}
-          onPreviewToggle={aiDomContext.onPreviewToggle}
-        />
+        <ErrorBoundary
+          fallback={
+            <div className="flex flex-col items-center justify-center h-screen p-8 bg-red-50">
+              <div className="text-center max-w-md">
+                <h2 className="text-xl font-bold text-red-600 mb-4">
+                  AI Chat Failed to Load
+                </h2>
+                <p className="text-sm text-gray-600 mb-6">
+                  The AI chat page encountered an error. Your changes are safe.
+                </p>
+                <Button onClick={handleBackFromAI}>
+                  ← Return to Variant Editor
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <AIDOMChangesPage
+            variantName={aiDomContext.variantName}
+            currentChanges={aiDomContext.currentChanges}
+            onBack={handleBackFromAI}
+            onGenerate={aiDomContext.onGenerate}
+            onRestoreChanges={aiDomContext.onRestoreChanges}
+            onPreviewToggle={aiDomContext.onPreviewToggle}
+          />
+        </ErrorBoundary>
+      )}
+
+      {view === 'ai-dom-changes' && !aiDomContext && (
+        <div className="flex flex-col items-center justify-center h-screen p-8 bg-yellow-50">
+          <div className="text-center max-w-md">
+            <h2 className="text-xl font-bold text-yellow-600 mb-4">
+              Missing Context
+            </h2>
+            <p className="text-sm text-gray-600 mb-6">
+              AI chat context is missing. Please return and try again.
+            </p>
+            <Button onClick={handleBackFromAI}>
+              ← Go Back
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Toast notification */}

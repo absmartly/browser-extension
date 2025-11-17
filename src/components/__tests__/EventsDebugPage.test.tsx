@@ -62,22 +62,7 @@ describe('EventsDebugPage', () => {
     })
   }
 
-  // Helper to dispatch SDK events via window.postMessage (forwarded from sidebar)
-  const dispatchSDKEventViaWindow = (eventName: string, data: any = null, timestamp?: string) => {
-    act(() => {
-      window.dispatchEvent(new MessageEvent('message', {
-        data: {
-          source: 'absmartly-extension-incoming',
-          type: 'SDK_EVENT_BROADCAST',
-          payload: {
-            eventName,
-            data,
-            timestamp: timestamp || new Date().toISOString()
-          }
-        }
-      }))
-    })
-  }
+  // No window.postMessage helper anymore; events come via chrome.runtime only
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -121,16 +106,7 @@ describe('EventsDebugPage', () => {
       })
     })
 
-    it('captures SDK events from window.postMessage (sidebar forwarding)', async () => {
-      render(<EventsDebugPage onBack={() => {}} />)
-
-      dispatchSDKEventViaWindow('ready', { experiments: ['exp1', 'exp2'] })
-
-      await waitFor(() => {
-        expect(screen.getByText('ready')).toBeInTheDocument()
-        expect(screen.getByText('1 event captured')).toBeInTheDocument()
-      })
-    })
+    // Removed: window.postMessage forwarding path
 
     it('captures multiple events in chronological order (newest first)', async () => {
       render(<EventsDebugPage onBack={() => {}} />)
