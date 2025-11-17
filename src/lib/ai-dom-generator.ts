@@ -450,10 +450,16 @@ export async function generateDOMChanges(
       }
 
       // Strip out any JSON objects that appear in the response text
-      // (AI sometimes includes the JSON in its explanation)
+      // (AI sometimes includes the JSON in its explanation, with or without code fences)
       let cleanedResponse = validation.result.response
-      const jsonPattern = /\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}/g
-      cleanedResponse = cleanedResponse.replace(jsonPattern, '').trim()
+
+      // Pattern 1: JSON wrapped in markdown code fences (```json ... ``` or ``` ... ```)
+      const markdownJsonPattern = /```(?:json)?\s*\n?\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}\s*\n?```/g
+      cleanedResponse = cleanedResponse.replace(markdownJsonPattern, '').trim()
+
+      // Pattern 2: Raw JSON objects (in case they're not in code fences)
+      const rawJsonPattern = /(?<![`])\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}(?![`])/g
+      cleanedResponse = cleanedResponse.replace(rawJsonPattern, '').trim()
 
       // Clean up any extra whitespace
       cleanedResponse = cleanedResponse.replace(/\n{3,}/g, '\n\n').trim()
