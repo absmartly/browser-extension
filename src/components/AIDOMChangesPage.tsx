@@ -416,13 +416,13 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           console.log('[AIDOMChangesPage] Refreshing preview with new DOM changes from AI')
           // Toggle off then on to force re-application of changes
           onPreviewToggleRef.current(false)
-          // Use setTimeout to ensure the off state is processed before turning back on
+          // Use longer timeout to ensure React state updates complete before re-enabling
           setTimeout(() => {
             if (onPreviewToggleRef.current) {
               onPreviewToggleRef.current(true)
               setPreviewActive(true)
             }
-          }, 100)
+          }, 500)
         }
       }
 
@@ -767,7 +767,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                                   onPreviewToggleRef.current(true)
                                   setPreviewActive(true)
                                 }
-                              }, 100)
+                              }, 500)
                             }
                           }
                         }}

@@ -720,6 +720,27 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
         }
         validation.result.response = modifiedResponse
       }
+
+      // Strip out any JSON objects that appear in the response text
+      // (AI sometimes includes the JSON in its explanation, with or without code fences)
+      let cleanedResponse = validation.result.response
+
+      // Pattern 1: JSON wrapped in markdown code fences (```json ... ``` or ``` ... ```)
+      const markdownJsonPattern = /```(?:json)?\s*\n?\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}\s*\n?```/g
+      cleanedResponse = cleanedResponse.replace(markdownJsonPattern, '').trim()
+
+      // Pattern 2: Raw JSON objects (in case they're not in code fences)
+      const rawJsonPattern = /(?<![`])\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}(?![`])/g
+      cleanedResponse = cleanedResponse.replace(rawJsonPattern, '').trim()
+
+      // Clean up any extra whitespace
+      cleanedResponse = cleanedResponse.replace(/\n{3,}/g, '\n\n').trim()
+
+      if (cleanedResponse !== validation.result.response) {
+        console.log('[Bridge] 🧹 Stripped duplicate JSON from response text')
+        validation.result.response = cleanedResponse
+      }
+
       console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes via bridge with action:', validation.result.action)
 
       // Validate before returning
