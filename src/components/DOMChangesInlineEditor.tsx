@@ -408,13 +408,6 @@ export function DOMChangesInlineEditor({
         }
         })() // Execute async function immediately
         return true // Indicate we will respond asynchronously
-      } else if (message.type === 'PREVIEW_STATE_CHANGED') {
-        // Update preview toggle state when requested
-        debugLog('📡 Preview state changed:', message.enabled)
-        if (message.enabled === false) {
-          // Turn off the preview toggle regardless of current state
-          onPreviewToggle(false)
-        }
       } else if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE' && message.variantName === variantName) {
         (async () => {
         debugLog('✅ Visual Editor Complete - Received changes:', message)

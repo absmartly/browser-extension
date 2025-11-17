@@ -19,11 +19,20 @@ interface PreviewState {
   changeType: string
 }
 
+interface StyleRuleTracking {
+  experimentName: string
+  ruleKey: string
+  css: string
+}
+
 export class PreviewManager {
   private previewStateMap: Map<Element, PreviewState>
+  // Track style rules per experiment: experimentName -> Map<ruleKey, css>
+  private styleRulesByExperiment: Map<string, Map<string, string>>
 
   constructor() {
     this.previewStateMap = new Map()
+    this.styleRulesByExperiment = new Map()
   }
 
   /**
@@ -155,7 +164,124 @@ export class PreviewManager {
       Logger.log('Applied change to element:', element)
     })
 
+    // Handle styleRules separately (affects all matching elements via CSS rules)
+    if (change.type === 'styleRules') {
+      return this.applyStyleRules(change, experimentName)
+    }
+
     return true
+  }
+
+  /**
+   * Apply style rules (CSS rules that affect all matching elements)
+   * Matches SDK plugin behavior exactly
+   */
+  private applyStyleRules(change: DOMChange, experimentName: string): boolean {
+    try {
+      // Use same ruleKey format as SDK plugin: ${change.selector}::states
+      const ruleKey = `${change.selector}::states`
+
+      let css: string
+
+      // Support both raw CSS string in value and structured states (same as SDK plugin)
+      if (typeof change.value === 'string' && change.value.trim()) {
+        // Raw CSS provided in value
+        css = change.value
+      } else if (change.states) {
+        // Structured states provided - build CSS from states
+        css = this.buildStateRules(change.selector, change.states, change.important !== false)
+      } else {
+        // No CSS provided
+        Logger.warn('[PreviewManager] styleRules change missing both value and states:', change.selector)
+        return false
+      }
+
+      // Get or create rules map for this experiment
+      let rulesMap = this.styleRulesByExperiment.get(experimentName)
+      if (!rulesMap) {
+        rulesMap = new Map()
+        this.styleRulesByExperiment.set(experimentName, rulesMap)
+      }
+
+      // Set the rule (same as StyleSheetManager.setRule)
+      rulesMap.set(ruleKey, css)
+
+      // Render the stylesheet (same as StyleSheetManager.render)
+      this.renderStyleSheet(experimentName)
+
+      Logger.log('[PreviewManager] Applied style rule:', ruleKey)
+      Logger.log('[PreviewManager] CSS:', css)
+
+      return true
+    } catch (error) {
+      Logger.error('[PreviewManager] Error applying style rules:', error)
+      return false
+    }
+  }
+
+  /**
+   * Render stylesheet for an experiment (matches StyleSheetManager.render)
+   */
+  private renderStyleSheet(experimentName: string): void {
+    // Use same ID format as SDK plugin: absmartly-styles-${experimentName}
+    const styleId = `absmartly-styles-${experimentName}`
+    let styleElement = document.getElementById(styleId) as HTMLStyleElement
+
+    if (!styleElement) {
+      styleElement = document.createElement('style')
+      styleElement.id = styleId
+      // Use same attribute as SDK plugin
+      styleElement.setAttribute('data-absmartly-styles', 'true')
+      document.head.appendChild(styleElement)
+      Logger.log('[PreviewManager] Created stylesheet:', styleId)
+    }
+
+    // Get all rules for this experiment
+    const rulesMap = this.styleRulesByExperiment.get(experimentName)
+    if (rulesMap) {
+      // Join all rules with \n\n (same as StyleSheetManager.render)
+      const cssText = Array.from(rulesMap.values()).join('\n\n')
+      styleElement.textContent = cssText
+    } else {
+      styleElement.textContent = ''
+    }
+  }
+
+  /**
+   * Build CSS rules from structured states (hover, active, etc.)
+   */
+  private buildStateRules(selector: string, states: any, important = true): string {
+    const rules: string[] = []
+
+    if (states.normal) {
+      rules.push(this.buildCssRule(selector, states.normal, important))
+    }
+    if (states.hover) {
+      rules.push(this.buildCssRule(`${selector}:hover`, states.hover, important))
+    }
+    if (states.active) {
+      rules.push(this.buildCssRule(`${selector}:active`, states.active, important))
+    }
+    if (states.focus) {
+      rules.push(this.buildCssRule(`${selector}:focus`, states.focus, important))
+    }
+
+    return rules.join('\n\n')
+  }
+
+  /**
+   * Build a single CSS rule from properties
+   */
+  private buildCssRule(selector: string, properties: Record<string, any>, important = true): string {
+    const declarations = Object.entries(properties)
+      .map(([prop, value]) => {
+        const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase()
+        const bang = important ? ' !important' : ''
+        return `  ${cssProp}: ${value}${bang};`
+      })
+      .join('\n')
+
+    return `${selector} {\n${declarations}\n}`
   }
 
   /**
@@ -242,6 +368,26 @@ export class PreviewManager {
       element.removeAttribute('data-absmartly-modified')
       restoredCount++
     })
+
+    // Remove styleRules for this experiment (matches StyleSheetManager.destroy)
+    const rulesMap = this.styleRulesByExperiment.get(experimentName)
+    if (rulesMap) {
+      const hadRules = rulesMap.size > 0
+      this.styleRulesByExperiment.delete(experimentName)
+
+      if (hadRules) {
+        Logger.log(`[PreviewManager] Cleared ${rulesMap.size} style rules for experiment:`, experimentName)
+      }
+    }
+
+    // Remove the style element for this experiment (same ID format as SDK plugin)
+    const styleId = `absmartly-styles-${experimentName}`
+    const styleElement = document.getElementById(styleId)
+    if (styleElement) {
+      styleElement.remove()
+      Logger.log('[PreviewManager] Destroyed stylesheet:', styleId)
+      restoredCount++
+    }
 
     Logger.log(`Removed preview changes, cleaned ${restoredCount} elements`)
     return restoredCount > 0

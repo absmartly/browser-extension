@@ -14,18 +14,35 @@ import { Orchestrator } from './core/orchestrator'
 // Version
 export const SDK_BRIDGE_VERSION = '1.1.0'
 
-// Create orchestrator instance
-const orchestrator = new Orchestrator()
+// CRITICAL: Do not run SDK bridge inside the sidebar iframe!
+// The sidebar is the extension UI and should not process preview changes
+if (window.self !== window.top) {
+  // We're in an iframe - check if it's the sidebar
+  const isInSidebarIframe = window.frameElement?.id === 'absmartly-sidebar-iframe'
+  if (!isInSidebarIframe) {
+    // Not the sidebar - initialize normally
+    initializeBridge()
+  }
+  // If it is the sidebar iframe, exit early without initializing
+} else {
+  // We're in the main page - initialize normally
+  initializeBridge()
+}
 
-// Setup message listener for extension communication
-orchestrator.setupMessageListener()
+function initializeBridge() {
+  // Create orchestrator instance
+  const orchestrator = new Orchestrator()
 
-// Expose APIs for extension to call
-orchestrator.exposeVariantAssignments()
-orchestrator.exposeContextPath()
+  // Setup message listener for extension communication
+  orchestrator.setupMessageListener()
 
-// Start the initialization process
-orchestrator.start()
+  // Expose APIs for extension to call
+  orchestrator.exposeVariantAssignments()
+  orchestrator.exposeContextPath()
 
-// Log that we're loaded
-console.log('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)
+  // Start the initialization process
+  orchestrator.start()
+
+  // Log that we're loaded
+  console.log('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)
+}

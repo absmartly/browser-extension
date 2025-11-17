@@ -55,20 +55,30 @@ export class ElementStateManager {
     const htmlElement = element as HTMLElement
 
     try {
-      // Restore innerHTML first (this clears textContent)
-      if (originalState.innerHTML !== undefined) {
-        element.innerHTML = sanitizeHTML(originalState.innerHTML)
+      // CRITICAL: Never restore innerHTML for structural elements (body, html, head)
+      // This would wipe out dynamically added elements like the sidebar
+      const isStructuralElement = element.tagName === 'BODY' || element.tagName === 'HTML' || element.tagName === 'HEAD'
+
+      if (isStructuralElement) {
+        Logger.log('[ElementStateManager] Skipping innerHTML restoration for structural element:', element.tagName)
+      } else {
+        // Restore innerHTML first (this clears textContent)
+        if (originalState.innerHTML !== undefined) {
+          element.innerHTML = sanitizeHTML(originalState.innerHTML)
+        }
       }
 
       // Note: textContent is derived from innerHTML, so we don't restore it separately
       // The innerHTML restoration above will set the correct textContent
 
-      // Restore attributes
+      // Restore attributes (always safe to restore)
       if (originalState.attributes) {
         // First, remove all current attributes except data-* ones we want to clean
         const currentAttrs = Array.from(element.attributes)
         currentAttrs.forEach((attr) => {
-          if (!originalState.attributes.hasOwnProperty(attr.name)) {
+          // Skip removing core structural attributes
+          if (!originalState.attributes.hasOwnProperty(attr.name) &&
+              !['id', 'class', 'data-absmartly-experiment', 'data-absmartly-modified'].includes(attr.name)) {
             element.removeAttribute(attr.name)
           }
         })
@@ -79,7 +89,7 @@ export class ElementStateManager {
         })
       }
 
-      // Restore styles
+      // Restore styles (always safe to restore)
       if (originalState.styles && htmlElement.style) {
         // Clear all inline styles first
         element.removeAttribute('style')
@@ -90,7 +100,7 @@ export class ElementStateManager {
         })
       }
 
-      // Restore class list
+      // Restore class list (always safe to restore)
       if (originalState.classList) {
         element.className = originalState.classList.join(' ')
       }

@@ -296,7 +296,10 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
       return true
     }
 
-    // Ensure SDK plugin is injected before handling preview
+    // Respond immediately to prevent message channel timeout
+    sendResponse({ success: true })
+
+    // Ensure SDK plugin is injected and handle preview asynchronously
     ;(async () => {
       try {
         await ensureSDKPluginInjected()
@@ -317,8 +320,6 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
               experimentId: experimentId
             }
           }, '*')
-
-          sendResponse({ success: true })
         } else if (action === 'update') {
           // Update changes WITHOUT recreating the header
           // Just send the new changes to the SDK plugin with updateMode flag
@@ -333,8 +334,6 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
               updateMode: 'replace' // Tell plugin to replace all changes instead of incremental
             }
           }, '*')
-
-          sendResponse({ success: true })
         } else if (action === 'remove') {
           // Only remove preview header if visual editor is NOT active
           if (!isVisualEditorActive) {
@@ -349,16 +348,14 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
               experimentName: experimentName
             }
           }, '*')
-
-          sendResponse({ success: true })
         }
       } catch (error) {
         console.error('[ABSmartly Content Script] Error handling preview:', error)
-        sendResponse({ success: false, error: error.message })
       }
     })()
 
-    return true
+    // Return false since we already called sendResponse synchronously
+    return false
   }
 
   // Code editor messages
@@ -757,11 +754,14 @@ async function ensureSDKPluginInjected() {
     }
     // Give the script a moment to set up its message listener
     await new Promise(resolve => setTimeout(resolve, 50))
-  } else if (sdkBridgeInjected) {
-    console.log('[Content Script] ℹ️ SDK bridge already injected')
   } else if (sdkBridgeInjecting) {
-    console.log('[Content Script] ⏳ SDK bridge injection already in progress')
+    console.log('[Content Script] ⏳ SDK bridge injection already in progress, waiting...')
+    // Wait for injection to complete
+    while (sdkBridgeInjecting) {
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
   }
+  // Don't log "already injected" message - it's not useful and clutters console
 }
 
 // Listen for messages from the injected script and SDK plugin

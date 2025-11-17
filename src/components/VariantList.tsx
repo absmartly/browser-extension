@@ -236,23 +236,6 @@ export function VariantList({
     }
   }, [experimentName])
 
-  // Listen for preview state changes from background script
-  useEffect(() => {
-    const handleMessage = (message: unknown) => {
-      if (typeof message === 'object' && message !== null && 'type' in message && message.type === 'PREVIEW_STATE_CHANGED' && 'enabled' in message && message.enabled === false) {
-        // Turn off preview when Exit Preview button is clicked
-        setPreviewEnabled(false)
-        setActivePreviewVariant(null)
-      }
-    }
-
-    chrome.runtime.onMessage.addListener(handleMessage)
-
-    return () => {
-      chrome.runtime.onMessage.removeListener(handleMessage)
-    }
-  }, [])
-
   const saveToStorage = (updatedVariants: Variant[]) => {
     const storageKey = experimentId === 0
       ? 'experiment-new-variants'
@@ -428,43 +411,91 @@ export function VariantList({
     updateVariants(newVariants)
   }
 
-  const handlePreviewToggle = useCallback((enabled: boolean, variantIndex: number) => {
-    debugLog('[VariantList] handlePreviewToggle called:', { enabled, variantIndex })
-    setPreviewEnabled(enabled)
-    setActivePreviewVariant(enabled ? variantIndex : null)
+  const handlePreviewToggle = useCallback(async (enabled: boolean, variantIndex: number) => {
+    try {
+      debugLog('[VariantList] handlePreviewToggle called:', { enabled, variantIndex })
 
-    if (enabled && variants[variantIndex]) {
-      const domChangesData = getDOMChangesFromConfig(variants[variantIndex].config, domFieldName)
-      const changes = getChangesArray(domChangesData)
-      const variantName = variants[variantIndex].name
+      // Update state BEFORE sending message to avoid race conditions
+      setPreviewEnabled(enabled)
+      setActivePreviewVariant(enabled ? variantIndex : null)
+      debugLog('[VariantList] State updated:', { previewEnabled: enabled, activePreviewVariant: enabled ? variantIndex : null })
 
-      debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (apply):', {
-        experimentName,
-        variantName,
-        changesCount: changes.filter(c => c.enabled !== false).length
-      })
+      if (enabled && variants[variantIndex]) {
+        const domChangesData = getDOMChangesFromConfig(variants[variantIndex].config, domFieldName)
+        const changes = getChangesArray(domChangesData)
+        const variantName = variants[variantIndex].name
 
-      sendToContent({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'apply',
-        changes: changes.filter(c => c.enabled !== false),
-        experimentName: experimentName,
-        variantName: variantName
-      }).catch(error => {
-        debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (apply):', error)
-      })
-    } else {
-      debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (remove):', { experimentName })
+        const enabledChanges = changes.filter(c => c.enabled !== false)
+        debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (apply):', {
+          experimentName,
+          variantName,
+          changesCount: enabledChanges.length,
+          changes: enabledChanges
+        })
 
-      sendToContent({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'remove',
-        experimentName: experimentName
-      }).catch(error => {
-        debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (remove):', error)
-      })
+        try {
+          await sendToContent({
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'apply',
+            changes: enabledChanges,
+            experimentName: experimentName,
+            variantName: variantName
+          })
+          debugLog('[VariantList] Preview apply successful')
+        } catch (error) {
+          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (apply):', error)
+        }
+      } else {
+        debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (remove):', { experimentName })
+
+        try {
+          await sendToContent({
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'remove',
+            experimentName: experimentName
+          })
+          debugLog('[VariantList] Preview remove successful')
+        } catch (error) {
+          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (remove):', error)
+        }
+      }
+
+      debugLog('[VariantList] handlePreviewToggle completed successfully')
+    } catch (error) {
+      debugError('[VariantList] Unexpected error in handlePreviewToggle:', error)
     }
   }, [variants, experimentName, domFieldName])
+
+  // Listen for preview state changes from background script
+  // IMPORTANT: This must come AFTER handlePreviewToggle is defined
+  useEffect(() => {
+    const handleMessage = (message: unknown) => {
+      try {
+        if (typeof message === 'object' && message !== null && 'type' in message && message.type === 'PREVIEW_STATE_CHANGED' && 'enabled' in message && message.enabled === false) {
+          // Turn off preview when Exit Preview button is clicked
+          // IMPORTANT: Only call handlePreviewToggle if preview is actually enabled to prevent circular updates
+          debugLog('[VariantList] Received PREVIEW_STATE_CHANGED, current previewEnabled:', previewEnabled, 'activePreviewVariant:', activePreviewVariant)
+          if (previewEnabled && activePreviewVariant !== null) {
+            debugLog('[VariantList] Calling handlePreviewToggle to disable preview')
+            // Call handlePreviewToggle to properly clean up preview (sends remove message)
+            handlePreviewToggle(false, activePreviewVariant)
+          } else {
+            debugLog('[VariantList] Preview already disabled, ignoring PREVIEW_STATE_CHANGED')
+          }
+        }
+      } catch (error) {
+        debugError('[VariantList] Error handling message:', error)
+      }
+      // Always return false to allow other listeners to process the message
+      return false
+    }
+
+    chrome.runtime.onMessage.addListener(handleMessage)
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [previewEnabled, activePreviewVariant, handlePreviewToggle])
 
   const handleNavigateToAIWithPreview = useCallback((
     variantName: string,
@@ -501,6 +532,15 @@ export function VariantList({
     () => variants.map(variant => getVariablesForDisplay(variant.config, domFieldName)),
     [variants, domFieldName]
   )
+
+  // Log render to help debug blank screen issue
+  React.useEffect(() => {
+    debugLog('[VariantList] Rendering with state:', {
+      variantsCount: variants.length,
+      previewEnabled,
+      activePreviewVariant
+    })
+  })
 
   return (
     <div className="space-y-4">
