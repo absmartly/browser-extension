@@ -58,18 +58,33 @@ export class PreviewManager {
       }
     }
 
-    const elements = document.querySelectorAll(change.selector)
+    const allElements = document.querySelectorAll(change.selector)
+
+    // Filter out extension UI elements (sidebar, toolbars, etc.)
+    const elements = Array.from(allElements).filter(el => !this.isExtensionElement(el))
 
     if (elements.length === 0) {
-      Logger.warn('No elements found for selector:', change.selector)
+      if (allElements.length > 0) {
+        Logger.log(`Selector matched ${allElements.length} element(s) but all were extension UI (filtered out):`, change.selector)
+      } else {
+        Logger.warn('No elements found for selector:', change.selector)
+      }
       return false
     }
 
-    Logger.log(
-      `Applying preview change to ${elements.length} element(s):`,
-      change.selector,
-      change.type
-    )
+    if (allElements.length > elements.length) {
+      Logger.log(
+        `Applying preview change to ${elements.length} element(s) (${allElements.length - elements.length} extension UI elements filtered out):`,
+        change.selector,
+        change.type
+      )
+    } else {
+      Logger.log(
+        `Applying preview change to ${elements.length} element(s):`,
+        change.selector,
+        change.type
+      )
+    }
 
     elements.forEach((element) => {
       const htmlElement = element as HTMLElement
@@ -412,5 +427,31 @@ export class PreviewManager {
    */
   getPreviewCount(): number {
     return this.previewStateMap.size
+  }
+
+  /**
+   * Check if an element is part of the extension UI
+   * Extension UI elements should never be modified by preview changes
+   */
+  private isExtensionElement(element: Element): boolean {
+    const extensionIds = [
+      'absmartly-sidebar-root',
+      'absmartly-sidebar-iframe',
+      'absmartly-preview-header',
+      'absmartly-visual-editor-toolbar'
+    ]
+
+    if (element.id && extensionIds.includes(element.id)) {
+      return true
+    }
+
+    for (const id of extensionIds) {
+      const container = document.getElementById(id)
+      if (container && container.contains(element)) {
+        return true
+      }
+    }
+
+    return false
   }
 }
