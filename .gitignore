@@ -41,6 +41,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
 # local env files
 .env*.local
@@ -73,6 +74,7 @@ tests/e2e/*-temp.spec.ts
 after-*.png
 before-*.png
 menu-*.png
+debug-*.png
 tests/e2e/menu-*.png
 tests/e2e/after-*.png
 tests/e2e/before-*.png
