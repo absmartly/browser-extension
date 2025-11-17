@@ -135,6 +135,9 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }, [])
 
+  // Track preview state
+  const [previewActive, setPreviewActive] = useState(false)
+
   // Keep ref updated with latest callback
   useEffect(() => {
     onPreviewToggleRef.current = onPreviewToggle
@@ -145,6 +148,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     if (onPreviewToggleRef.current) {
       console.log('[AIDOMChangesPage] Enabling preview mode on mount')
       onPreviewToggleRef.current(true)
+      setPreviewActive(true)
     }
   }, [])
 
@@ -405,6 +409,20 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         // Save changes to variant immediately
         if (onRestoreChanges) {
           onRestoreChanges(result.domChanges)
+        }
+
+        // If preview is active, refresh it to apply the new changes
+        if (previewActive && onPreviewToggleRef.current) {
+          console.log('[AIDOMChangesPage] Refreshing preview with new DOM changes from AI')
+          // Toggle off then on to force re-application of changes
+          onPreviewToggleRef.current(false)
+          // Use setTimeout to ensure the off state is processed before turning back on
+          setTimeout(() => {
+            if (onPreviewToggleRef.current) {
+              onPreviewToggleRef.current(true)
+              setPreviewActive(true)
+            }
+          }, 100)
         }
       }
 
@@ -739,6 +757,18 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                           if (message.domChangesSnapshot) {
                             onRestoreChanges(message.domChangesSnapshot)
                             setLatestDomChanges(message.domChangesSnapshot)
+
+                            // Refresh preview if active
+                            if (previewActive && onPreviewToggleRef.current) {
+                              console.log('[AIDOMChangesPage] Refreshing preview after restoring changes from history')
+                              onPreviewToggleRef.current(false)
+                              setTimeout(() => {
+                                if (onPreviewToggleRef.current) {
+                                  onPreviewToggleRef.current(true)
+                                  setPreviewActive(true)
+                                }
+                              }, 100)
+                            }
                           }
                         }}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 transition-colors"
