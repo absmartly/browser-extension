@@ -471,7 +471,10 @@ export async function generateDOMChanges(
     }
 
     let responseText = content.text.trim()
-    console.log('🤖 AI Text Response:', responseText.substring(0, 200))
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('📝 FULL TEXT RESPONSE FROM ANTHROPIC:')
+    console.log(responseText)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     // Strip markdown code fences if present
     let jsonText = responseText
@@ -615,7 +618,12 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       const eventSource = bridgeClient.streamResponses(
         conversationId,
         (event) => {
-          console.log('[Bridge] Received event:', event.type, event.data ? (typeof event.data === 'string' ? event.data.substring(0, 100) : JSON.stringify(event.data).substring(0, 100)) : 'no data')
+          // Log ALL events with full data for debugging
+          console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          console.log(`[Bridge] 📦 RAW EVENT TYPE: ${event.type}`)
+          console.log('[Bridge] Full event data:', JSON.stringify(event, null, 2))
+          console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
           if (event.type === 'tool_use') {
             console.log('[Bridge] 🔧 Received tool_use response from Claude')
             receivedToolUse = true
@@ -690,7 +698,10 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
     console.warn('[Bridge] ⚠️ Tool calling not used - falling back to text parsing')
 
     let responseText = responseData.data.trim()
-    console.log('[Bridge] Text Response:', responseText.substring(0, 200))
+    console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('[Bridge] 📝 FULL TEXT RESPONSE:')
+    console.log(responseText)
+    console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     // Strip markdown code fences if present
     let jsonText = responseText
