@@ -458,118 +458,31 @@ export async function generateDOMChanges(
       }
     }
 
-    // Fallback to text parsing (for backwards compatibility)
+    // Fallback to text parsing (should rarely be hit with tool_choice forcing)
+    console.warn('⚠️ Tool calling not used - falling back to text parsing')
+
     if (content.type !== 'text') {
       throw new Error('Unexpected response type from Claude')
     }
 
     let responseText = content.text.trim()
-    console.log('🤖 AI Response:', responseText.substring(0, 200))
+    console.log('🤖 AI Text Response:', responseText.substring(0, 200))
 
-    let textBefore = ''
-    let textAfter = ''
+    // Strip markdown code fences if present
     let jsonText = responseText
-
-    if (responseText.startsWith('```')) {
+    if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    // Find ALL JSON objects in the response (to handle duplicate JSON)
-    // Use balanced brace matching instead of regex to handle nested objects
-    const allJsonMatches: Array<{ json: string; start: number; end: number }> = []
-    let pos = 0
-    while (pos < jsonText.length) {
-      const startPos = jsonText.indexOf('{', pos)
-      if (startPos === -1) break
-
-      // Find matching closing brace by tracking depth
-      let depth = 1
-      let endPos = startPos + 1
-      while (endPos < jsonText.length && depth > 0) {
-        if (jsonText[endPos] === '{') depth++
-        if (jsonText[endPos] === '}') depth--
-        endPos++
-      }
-
-      if (depth === 0) {
-        const potentialJson = jsonText.substring(startPos, endPos)
-        // Quick validation - does it look like our response format?
-        if (potentialJson.includes('"domChanges"') && potentialJson.includes('"response"') && potentialJson.includes('"action"')) {
-          allJsonMatches.push({
-            json: potentialJson,
-            start: startPos,
-            end: endPos
-          })
-        }
-      }
-
-      pos = endPos > startPos ? endPos : startPos + 1
+    // Extract JSON object from text
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      jsonText = jsonMatch[0]
     }
 
-    // If we found multiple JSON objects, use the LAST one (most likely the actual response)
-    // and collect all text before it
-    let validation: ValidationResult
-    if (allJsonMatches.length > 1) {
-      console.log(`⚠️ Found ${allJsonMatches.length} JSON objects in response, using the LAST one`)
-      const lastMatch = allJsonMatches[allJsonMatches.length - 1]
-      jsonText = lastMatch.json
-      textBefore = jsonText.substring(0, lastMatch.start).trim()
-      textAfter = jsonText.substring(lastMatch.end).trim()
-
-      validation = validateAIDOMGenerationResult(jsonText)
-    } else if (allJsonMatches.length === 1) {
-      // Single JSON object found
-      const singleMatch = allJsonMatches[0]
-      jsonText = singleMatch.json
-      textBefore = jsonText.substring(0, singleMatch.start).trim()
-      textAfter = jsonText.substring(singleMatch.end).trim()
-
-      validation = validateAIDOMGenerationResult(jsonText)
-    } else {
-      // No JSON objects found, try original regex approach
-      const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
-      if (jsonMatch) {
-        textBefore = jsonMatch[1].trim()
-        jsonText = jsonMatch[2].trim()
-        textAfter = jsonMatch[3].trim()
-      }
-
-      validation = validateAIDOMGenerationResult(jsonText)
-    }
+    const validation = validateAIDOMGenerationResult(jsonText)
 
     if (validation.isValid) {
-      if (textBefore || textAfter) {
-        let modifiedResponse = validation.result.response
-        if (textBefore) {
-          modifiedResponse = textBefore + '\n\n' + modifiedResponse
-          console.log('📝 Prepended text before JSON:', textBefore.substring(0, 100))
-        }
-        if (textAfter) {
-          modifiedResponse = modifiedResponse + '\n\n' + textAfter
-          console.log('📝 Appended text after JSON:', textAfter.substring(0, 100))
-        }
-        validation.result.response = modifiedResponse
-      }
-
-      // Strip out any JSON objects that appear in the response text
-      // (AI sometimes includes the JSON in its explanation, with or without code fences)
-      let cleanedResponse = validation.result.response
-
-      // Pattern 1: JSON wrapped in markdown code fences (```json ... ``` or ``` ... ```)
-      const markdownJsonPattern = /```(?:json)?\s*\n?\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}\s*\n?```/g
-      cleanedResponse = cleanedResponse.replace(markdownJsonPattern, '').trim()
-
-      // Pattern 2: Raw JSON objects (in case they're not in code fences)
-      const rawJsonPattern = /(?<![`])\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}(?![`])/g
-      cleanedResponse = cleanedResponse.replace(rawJsonPattern, '').trim()
-
-      // Clean up any extra whitespace
-      cleanedResponse = cleanedResponse.replace(/\n{3,}/g, '\n\n').trim()
-
-      if (cleanedResponse !== validation.result.response) {
-        console.log('🧹 Stripped duplicate JSON from response text')
-        validation.result.response = cleanedResponse
-      }
       console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
 
       // Validate before returning
@@ -762,116 +675,28 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       }
     }
 
-    // Fallback: Handle text response (for backwards compatibility)
-    let cleanedResponse = responseData.data.trim()
-    let textBefore = ''
-    let textAfter = ''
-    let jsonText = cleanedResponse
+    // Fallback: Handle text response (should rarely be hit with tool_choice forcing)
+    console.warn('[Bridge] ⚠️ Tool calling not used - falling back to text parsing')
 
-    if (cleanedResponse.startsWith('```')) {
+    let responseText = responseData.data.trim()
+    console.log('[Bridge] Text Response:', responseText.substring(0, 200))
+
+    // Strip markdown code fences if present
+    let jsonText = responseText
+    if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     }
 
-    // Find ALL JSON objects in the response (to handle duplicate JSON)
-    // Use balanced brace matching instead of regex to handle nested objects
-    const allJsonMatches: Array<{ json: string; start: number; end: number }> = []
-    let pos = 0
-    while (pos < jsonText.length) {
-      const startPos = jsonText.indexOf('{', pos)
-      if (startPos === -1) break
-
-      // Find matching closing brace by tracking depth
-      let depth = 1
-      let endPos = startPos + 1
-      while (endPos < jsonText.length && depth > 0) {
-        if (jsonText[endPos] === '{') depth++
-        if (jsonText[endPos] === '}') depth--
-        endPos++
-      }
-
-      if (depth === 0) {
-        const potentialJson = jsonText.substring(startPos, endPos)
-        // Quick validation - does it look like our response format?
-        if (potentialJson.includes('"domChanges"') && potentialJson.includes('"response"') && potentialJson.includes('"action"')) {
-          allJsonMatches.push({
-            json: potentialJson,
-            start: startPos,
-            end: endPos
-          })
-        }
-      }
-
-      pos = endPos > startPos ? endPos : startPos + 1
+    // Extract JSON object from text
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      jsonText = jsonMatch[0]
     }
 
-    console.log('[Bridge] Validating response')
-    let validation: ValidationResult
-
-    // If we found multiple JSON objects, use the LAST one (most likely the actual response)
-    // and collect all text before it
-    if (allJsonMatches.length > 1) {
-      console.log(`[Bridge] ⚠️ Found ${allJsonMatches.length} JSON objects in response, using the LAST one`)
-      const lastMatch = allJsonMatches[allJsonMatches.length - 1]
-      jsonText = lastMatch.json
-      textBefore = cleanedResponse.substring(0, lastMatch.start).trim()
-      textAfter = cleanedResponse.substring(lastMatch.end).trim()
-
-      validation = validateAIDOMGenerationResult(jsonText)
-    } else if (allJsonMatches.length === 1) {
-      // Single JSON object found
-      const singleMatch = allJsonMatches[0]
-      jsonText = singleMatch.json
-      textBefore = cleanedResponse.substring(0, singleMatch.start).trim()
-      textAfter = cleanedResponse.substring(singleMatch.end).trim()
-
-      validation = validateAIDOMGenerationResult(jsonText)
-    } else {
-      // No JSON objects found, try original regex approach
-      const jsonMatch = jsonText.match(/^(.*?)(\{[\s\S]*\})(.*?)$/s)
-      if (jsonMatch) {
-        textBefore = jsonMatch[1].trim()
-        jsonText = jsonMatch[2].trim()
-        textAfter = jsonMatch[3].trim()
-      }
-
-      validation = validateAIDOMGenerationResult(jsonText)
-    }
+    const validation = validateAIDOMGenerationResult(jsonText)
 
     if (validation.isValid) {
-      if (textBefore || textAfter) {
-        let modifiedResponse = validation.result.response
-        if (textBefore) {
-          modifiedResponse = textBefore + '\n\n' + modifiedResponse
-          console.log('[Bridge] Prepended text before JSON:', textBefore.substring(0, 100))
-        }
-        if (textAfter) {
-          modifiedResponse = modifiedResponse + '\n\n' + textAfter
-          console.log('[Bridge] Appended text after JSON:', textAfter.substring(0, 100))
-        }
-        validation.result.response = modifiedResponse
-      }
-
-      // Strip out any JSON objects that appear in the response text
-      // (AI sometimes includes the JSON in its explanation, with or without code fences)
-      let cleanedResponse = validation.result.response
-
-      // Pattern 1: JSON wrapped in markdown code fences (```json ... ``` or ``` ... ```)
-      const markdownJsonPattern = /```(?:json)?\s*\n?\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}\s*\n?```/g
-      cleanedResponse = cleanedResponse.replace(markdownJsonPattern, '').trim()
-
-      // Pattern 2: Raw JSON objects (in case they're not in code fences)
-      const rawJsonPattern = /(?<![`])\{[\s\S]*?"domChanges"[\s\S]*?"response"[\s\S]*?"action"[\s\S]*?\}(?![`])/g
-      cleanedResponse = cleanedResponse.replace(rawJsonPattern, '').trim()
-
-      // Clean up any extra whitespace
-      cleanedResponse = cleanedResponse.replace(/\n{3,}/g, '\n\n').trim()
-
-      if (cleanedResponse !== validation.result.response) {
-        console.log('[Bridge] 🧹 Stripped duplicate JSON from response text')
-        validation.result.response = cleanedResponse
-      }
-
-      console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes via bridge with action:', validation.result.action)
+      console.log('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
 
       // Validate before returning
       if (!validation.result.domChanges || !Array.isArray(validation.result.domChanges)) {
@@ -897,14 +722,14 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       return returnValue
     }
 
-    console.log('ℹ️ Response is not structured JSON, normalizing as conversational message')
+    console.log('[Bridge] ℹ️ Response is not structured JSON, normalizing as conversational message')
 
-    session.messages.push({ role: 'assistant', content: cleanedResponse })
+    session.messages.push({ role: 'assistant', content: responseText })
 
     const returnValueConv = {
       domChanges: [],
-      response: cleanedResponse,
-      action: 'none',
+      response: responseText,
+      action: 'none' as const,
       session
     }
 
