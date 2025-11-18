@@ -28,7 +28,10 @@ module.exports = {
     '!background/**/*.d.ts',
     '!background/**/index.ts',
   ],
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+  setupFilesAfterEnv: [
+    '<rootDir>/src/__tests__/setup.ts',
+    '<rootDir>/tests/setup/jest.setup.ts'
+  ],
   moduleNameMapper: {
     '^~src/(.*)$': '<rootDir>/src/$1',
   },
