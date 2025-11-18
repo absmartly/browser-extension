@@ -59,7 +59,12 @@ test.describe('AI Storage Quota Management', () => {
   test.afterEach(async () => {
     if (testPage) {
       await testPage.evaluate(async () => {
-        await chrome.storage.local.remove('ai-conversations-A')
+        const DB_NAME = 'absmartly-conversations'
+        await new Promise<void>((resolve) => {
+          const request = indexedDB.deleteDatabase(DB_NAME)
+          request.onsuccess = () => resolve()
+          request.onerror = () => resolve()
+        })
       }).catch(() => {})
       await testPage.close()
     }
@@ -155,12 +160,28 @@ test.describe('AI Storage Quota Management', () => {
       await debugWait(1000)
     })
 
-    await test.step('Verify images are sanitized in storage', async () => {
+    await test.step('Verify images are sanitized in IndexedDB', async () => {
       console.log('\n💾 STEP 3: Verifying image sanitization')
 
       const storage = await testPage.evaluate(async () => {
-        const result = await chrome.storage.local.get('ai-conversations-A')
-        return result['ai-conversations-A'] ? JSON.parse(result['ai-conversations-A']) : null
+        const DB_NAME = 'absmartly-conversations'
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+
+        const tx = db.transaction('conversations', 'readonly')
+        const store = tx.objectStore('conversations')
+        const index = store.index('by-variant')
+
+        const conversations = await new Promise<any[]>((resolve) => {
+          const request = index.getAll('A')
+          request.onsuccess = () => resolve(request.result || [])
+          request.onerror = () => resolve([])
+        })
+
+        return { conversations }
       })
 
       expect(storage).toBeTruthy()
@@ -178,6 +199,7 @@ test.describe('AI Storage Quota Management', () => {
       }
 
       const storageSizeLogs = allConsoleMessages.filter(msg =>
+        msg.text.includes('[IndexedDB] Saved conversation') ||
         msg.text.includes('[ConversationStorage] Saved conversation')
       )
 
@@ -196,10 +218,26 @@ test.describe('AI Storage Quota Management', () => {
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
-    await test.step('Pre-populate storage with large conversation', async () => {
-      console.log('\n💾 STEP 1: Creating large conversation in storage')
+    await test.step('Pre-populate IndexedDB with large conversation', async () => {
+      console.log('\n💾 STEP 1: Creating large conversation in IndexedDB')
 
       await testPage.evaluate(async () => {
+        const DB_NAME = 'absmartly-conversations'
+        const DB_VERSION = 1
+
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+          request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            if (!db.objectStoreNames.contains('conversations')) {
+              const store = db.createObjectStore('conversations', { keyPath: 'id' })
+              store.createIndex('by-variant', 'variantName', { unique: false })
+            }
+          }
+        })
+
         const largeMessage = 'A'.repeat(10000)
         const messages = []
 
@@ -234,22 +272,20 @@ test.describe('AI Storage Quota Management', () => {
           isActive: true
         }
 
-        const storageData = {
-          conversations: [conv],
-          version: 1
-        }
-
-        const serialized = JSON.stringify(storageData)
-        const sizeInBytes = new Blob([serialized]).size
-
+        const sizeInBytes = new Blob([JSON.stringify(conv)]).size
         console.log(`[TEST SETUP] Created conversation with size: ${sizeInBytes} bytes`)
 
-        await chrome.storage.local.set({
-          'ai-conversations-A': serialized
+        const tx = db.transaction('conversations', 'readwrite')
+        const store = tx.objectStore('conversations')
+        store.add(conv)
+
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve()
+          tx.onerror = () => reject(tx.error)
         })
       })
 
-      console.log('✅ Large conversation created in storage')
+      console.log('✅ Large conversation created in IndexedDB')
     })
 
     await test.step('Load AI page and monitor warnings', async () => {
@@ -301,10 +337,26 @@ test.describe('AI Storage Quota Management', () => {
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
 
-    await test.step('Create experiment with extremely large conversation', async () => {
+    await test.step('Create experiment with extremely large conversation in IndexedDB', async () => {
       console.log('\n💾 STEP 1: Creating conversation that exceeds quota')
 
       await testPage.evaluate(async () => {
+        const DB_NAME = 'absmartly-conversations'
+        const DB_VERSION = 1
+
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+          request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            if (!db.objectStoreNames.contains('conversations')) {
+              const store = db.createObjectStore('conversations', { keyPath: 'id' })
+              store.createIndex('by-variant', 'variantName', { unique: false })
+            }
+          }
+        })
+
         const hugeMessage = 'X'.repeat(12000)
         const messages = []
 
@@ -339,18 +391,16 @@ test.describe('AI Storage Quota Management', () => {
           isActive: true
         }
 
-        const storageData = {
-          conversations: [conv],
-          version: 1
-        }
-
-        const serialized = JSON.stringify(storageData)
-        const sizeInBytes = new Blob([serialized]).size
-
+        const sizeInBytes = new Blob([JSON.stringify(conv)]).size
         console.log(`[TEST SETUP] Created huge conversation with size: ${sizeInBytes} bytes (should exceed 100KB)`)
 
-        await chrome.storage.local.set({
-          'ai-conversations-A': serialized
+        const tx = db.transaction('conversations', 'readwrite')
+        const store = tx.objectStore('conversations')
+        store.add(conv)
+
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve()
+          tx.onerror = () => reject(tx.error)
         })
       })
 
@@ -462,12 +512,28 @@ test.describe('AI Storage Quota Management', () => {
       await debugWait(1000)
     })
 
-    await test.step('Verify session.messages is empty in storage', async () => {
+    await test.step('Verify session.messages is empty in IndexedDB', async () => {
       console.log('\n💾 STEP 2: Verifying session messages are cleared')
 
       const storage = await testPage.evaluate(async () => {
-        const result = await chrome.storage.local.get('ai-conversations-A')
-        return result['ai-conversations-A'] ? JSON.parse(result['ai-conversations-A']) : null
+        const DB_NAME = 'absmartly-conversations'
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+
+        const tx = db.transaction('conversations', 'readonly')
+        const store = tx.objectStore('conversations')
+        const index = store.index('by-variant')
+
+        const conversations = await new Promise<any[]>((resolve) => {
+          const request = index.getAll('A')
+          request.onsuccess = () => resolve(request.result || [])
+          request.onerror = () => resolve([])
+        })
+
+        return { conversations }
       })
 
       expect(storage).toBeTruthy()

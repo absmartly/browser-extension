@@ -25,14 +25,34 @@ test.describe('AI Conversation History', () => {
     await debugWait(500)
     log('✓ Content page loaded')
 
-    await test.step('Setup: Create conversations in storage before loading AI page', async () => {
-      log('Pre-populating storage with conversations...')
+    await test.step('Setup: Create conversations in IndexedDB before loading AI page', async () => {
+      log('Pre-populating IndexedDB with conversations...')
 
       const sidebarUrl = extensionUrl('tabs/sidebar.html')
       const setupPage = await context.newPage()
       await setupPage.goto(sidebarUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
       await setupPage.evaluate(async () => {
+        const DB_NAME = 'absmartly-conversations'
+        const DB_VERSION = 1
+
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+          request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            if (!db.objectStoreNames.contains('conversations')) {
+              const store = db.createObjectStore('conversations', { keyPath: 'id' })
+              store.createIndex('by-variant', 'variantName', { unique: false })
+              store.createIndex('by-variant-updated', ['variantName', 'updatedAt'], { unique: false })
+            }
+            if (!db.objectStoreNames.contains('metadata')) {
+              db.createObjectStore('metadata', { keyPath: 'key' })
+            }
+          }
+        })
+
         const conversations = []
         const baseTime = Date.now()
 
@@ -70,31 +90,24 @@ test.describe('AI Conversation History', () => {
           conversations.push(conversation)
         }
 
-        const storageData = {
-          conversations,
-          version: 1
+        const tx = db.transaction('conversations', 'readwrite')
+        const store = tx.objectStore('conversations')
+
+        for (const conv of conversations) {
+          store.add(conv)
         }
 
-        // Write to Chrome extension storage (not localStorage!)
-        await chrome.storage.local.set({
-          'ai-conversations-A': JSON.stringify(storageData)
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve()
+          tx.onerror = () => reject(tx.error)
         })
 
-        // Verify it was written correctly
-        const verify = await chrome.storage.local.get('ai-conversations-A')
-        console.log('[TEST SETUP] Storage verification:', verify['ai-conversations-A'] ? 'Data written successfully' : 'ERROR: No data!')
-        if (verify['ai-conversations-A']) {
-          const parsed = JSON.parse(verify['ai-conversations-A'])
-          console.log('[TEST SETUP] Conversation count:', parsed.conversations?.length || 0)
-        }
-
-        // Give Chrome extension storage time to propagate across contexts
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        console.log('[TEST SETUP] Added 3 conversations to IndexedDB')
       })
 
       await setupPage.close()
       await debugWait(500)
-      log('✓ Storage pre-populated with 3 conversations in Chrome extension storage')
+      log('✓ IndexedDB pre-populated with 3 conversations')
     })
 
     await test.step('Load sidebar and navigate to AI page', async () => {
@@ -154,19 +167,29 @@ test.describe('AI Conversation History', () => {
       await testPage.screenshot({ path: 'test-results/conv-history-1-ai-page.png', fullPage: true })
       log('Screenshot saved: conv-history-1-ai-page.png')
 
-      // Debug: Check storage from AI page context
+      // Debug: Check IndexedDB from AI page context
       const storageCheck = await testPage.evaluate(async () => {
-        const result = await chrome.storage.local.get('ai-conversations-A')
-        const data = result['ai-conversations-A']
-        if (data) {
-          const parsed = JSON.parse(data)
-          console.log('[AI PAGE] Found conversations in storage:', parsed.conversations?.length || 0)
-          return parsed.conversations?.length || 0
-        }
-        console.log('[AI PAGE] No conversations found in storage!')
-        return 0
+        const DB_NAME = 'absmartly-conversations'
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+
+        const tx = db.transaction('conversations', 'readonly')
+        const store = tx.objectStore('conversations')
+        const index = store.index('by-variant')
+
+        const conversations = await new Promise<any[]>((resolve) => {
+          const request = index.getAll('A')
+          request.onsuccess = () => resolve(request.result || [])
+          request.onerror = () => resolve([])
+        })
+
+        console.log('[AI PAGE] Found conversations in IndexedDB:', conversations.length)
+        return conversations.length
       })
-      log(`Storage check from AI page context: ${storageCheck} conversations`)
+      log(`IndexedDB check from AI page context: ${storageCheck} conversations`)
 
       const promptInput = testPage.locator('textarea[placeholder*="Example"]')
       await promptInput.waitFor({ state: 'visible', timeout: 5000 })
@@ -318,17 +341,30 @@ test.describe('AI Conversation History', () => {
     })
 
     await test.step('Verify conversation limit enforcement', async () => {
-      log('Verifying 10 conversation limit in storage...')
+      log('Verifying 10 conversation limit in IndexedDB...')
 
       const conversationCount = await testPage.evaluate(async () => {
-        const result = await chrome.storage.local.get('ai-conversations-A')
-        const data = result['ai-conversations-A']
-        if (!data) return 0
-        const parsed = JSON.parse(data)
-        return parsed.conversations?.length || 0
+        const DB_NAME = 'absmartly-conversations'
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+
+        const tx = db.transaction('conversations', 'readonly')
+        const store = tx.objectStore('conversations')
+        const index = store.index('by-variant')
+
+        const conversations = await new Promise<any[]>((resolve) => {
+          const request = index.getAll('A')
+          request.onsuccess = () => resolve(request.result || [])
+          request.onerror = () => resolve([])
+        })
+
+        return conversations.length
       })
 
-      log(`Current conversation count in storage: ${conversationCount}`)
+      log(`Current conversation count in IndexedDB: ${conversationCount}`)
       expect(conversationCount).toBeLessThanOrEqual(10)
       log('✅ Conversation count respects 10 item limit')
 
