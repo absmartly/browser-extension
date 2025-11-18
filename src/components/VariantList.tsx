@@ -95,7 +95,8 @@ interface VariantListProps {
     onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
-    onPreviewToggle: (enabled: boolean) => void
+    onPreviewToggle: (enabled: boolean) => void,
+    onPreviewRefresh: () => void
   ) => void
   // Auto-navigate to AI page for this variant name (used for state restoration)
   autoNavigateToAI?: string | null
@@ -294,7 +295,7 @@ export function VariantList({
 
     // Re-apply preview if active for this variant (but not for reorders)
     if (previewEnabled && activePreviewVariant === index && !options?.isReorder) {
-      const enabledChanges = changes.filter(c => c.enabled !== false)
+      const enabledChanges = changes.filter(c => !c.disabled)
       try {
         sendToContent({
           type: 'ABSMARTLY_PREVIEW',
@@ -425,7 +426,7 @@ export function VariantList({
         const changes = getChangesArray(domChangesData)
         const variantName = variants[variantIndex].name
 
-        const enabledChanges = changes.filter(c => c.enabled !== false)
+        const enabledChanges = changes.filter(c => !c.disabled)
         debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (apply):', {
           experimentName,
           variantName,
@@ -466,6 +467,42 @@ export function VariantList({
     }
   }, [variants, experimentName, domFieldName])
 
+  const handlePreviewRefresh = useCallback(async (variantIndex: number) => {
+    try {
+      debugLog('[VariantList] handlePreviewRefresh called:', { variantIndex, previewEnabled, activePreviewVariant })
+
+      if (previewEnabled && activePreviewVariant === variantIndex && variants[variantIndex]) {
+        const domChangesData = getDOMChangesFromConfig(variants[variantIndex].config, domFieldName)
+        const changes = getChangesArray(domChangesData)
+        const variantName = variants[variantIndex].name
+
+        const enabledChanges = changes.filter(c => !c.disabled)
+        debugLog('[VariantList] Refreshing preview with latest changes:', {
+          experimentName,
+          variantName,
+          changesCount: enabledChanges.length
+        })
+
+        try {
+          await sendToContent({
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'update',
+            changes: enabledChanges,
+            experimentName: experimentName,
+            variantName: variantName
+          })
+          debugLog('[VariantList] Preview refresh successful')
+        } catch (error) {
+          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (update):', error)
+        }
+      } else {
+        debugLog('[VariantList] Preview refresh skipped - preview not enabled for this variant')
+      }
+    } catch (error) {
+      debugError('[VariantList] Unexpected error in handlePreviewRefresh:', error)
+    }
+  }, [variants, experimentName, domFieldName, previewEnabled, activePreviewVariant])
+
   // Listen for preview state changes from background script
   // IMPORTANT: This must come AFTER handlePreviewToggle is defined
   useEffect(() => {
@@ -502,7 +539,8 @@ export function VariantList({
     onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
-    onPreviewToggle: (enabled: boolean) => void
+    onPreviewToggle: (enabled: boolean) => void,
+    _onPreviewRefresh: () => void
   ) => {
     console.log('[VariantList] handleNavigateToAIWithPreview called for variant:', variantName)
     debugLog('[VariantList] handleNavigateToAIWithPreview called with params:', {
@@ -514,18 +552,20 @@ export function VariantList({
     })
 
     const variantIndex = variants.findIndex(v => v.name === variantName)
-    if (variantIndex !== -1) {
-      debugLog('[VariantList] Auto-enabling preview for variant index:', variantIndex)
-      handlePreviewToggle(true, variantIndex)
+
+    const wrappedPreviewRefresh = () => {
+      if (variantIndex !== -1) {
+        handlePreviewRefresh(variantIndex)
+      }
     }
 
     if (onNavigateToAI) {
-      console.log('[VariantList] Calling parent onNavigateToAI with all 5 parameters')
-      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, onPreviewToggle)
+      console.log('[VariantList] Calling parent onNavigateToAI with all 6 parameters')
+      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, onPreviewToggle, wrappedPreviewRefresh)
     } else {
       console.warn('[VariantList] onNavigateToAI is not defined!')
     }
-  }, [variants, handlePreviewToggle, onNavigateToAI])
+  }, [variants, onNavigateToAI, handlePreviewRefresh])
 
   // Pre-compute display variables for all variants to avoid repeated calculations in render
   const variantsDisplayVariables = useMemo(
@@ -764,6 +804,7 @@ export function VariantList({
                   }
                   handlePreviewToggle(enabled, index)
                 }}
+                onPreviewRefresh={() => handlePreviewRefresh(index)}
                 activeVEVariant={activeVEVariant}
                 onVEStart={() => setActiveVEVariant(variant.name)}
                 onVEStop={() => setActiveVEVariant(null)}

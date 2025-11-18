@@ -46,6 +46,7 @@
     "known-css-properties": "^0.37.0",
     "marked": "^17.0.0",
     "monaco-editor": "^0.53.0",
+    "openai": "^6.9.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "zod": "^4.1.12"

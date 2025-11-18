@@ -1,10 +1,74 @@
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
 
 const SYSTEM_PROMPT = AI_DOM_GENERATION_SYSTEM_PROMPT
+
+// Tool definition for Anthropic Claude
+const DOM_CHANGES_TOOL: Anthropic.Tool = {
+  name: 'dom_changes_generator',
+  description: 'Generates DOM change objects for A/B tests following strict selector rules.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      domChanges: {
+        type: 'array',
+        description: 'Array of DOM change instruction objects.'
+      },
+      response: {
+        type: 'string',
+        description: 'Conversational explanation and reasoning.'
+      },
+      action: {
+        type: 'string',
+        enum: ['append', 'replace_all', 'replace_specific', 'remove_specific', 'none'],
+        description: 'How the DOM changes should be applied.'
+      },
+      targetSelectors: {
+        type: 'array',
+        description: 'Selectors to target for replace/remove actions.',
+        items: { type: 'string' }
+      }
+    },
+    required: ['domChanges', 'response', 'action']
+  }
+}
+
+// Tool definition for OpenAI (uses different schema format)
+const DOM_CHANGES_TOOL_OPENAI: OpenAI.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'dom_changes_generator',
+    description: 'Generates DOM change objects for A/B tests following strict selector rules.',
+    parameters: {
+      type: 'object',
+      properties: {
+        domChanges: {
+          type: 'array',
+          description: 'Array of DOM change instruction objects.'
+        },
+        response: {
+          type: 'string',
+          description: 'Conversational explanation and reasoning.'
+        },
+        action: {
+          type: 'string',
+          enum: ['append', 'replace_all', 'replace_specific', 'remove_specific', 'none'],
+          description: 'How the DOM changes should be applied.'
+        },
+        targetSelectors: {
+          type: 'array',
+          description: 'Selectors to target for replace/remove actions.',
+          items: { type: 'string' }
+        }
+      },
+      required: ['domChanges', 'response', 'action']
+    }
+  }
+}
 
 interface ValidationError {
   isValid: false
@@ -251,16 +315,27 @@ export async function generateDOMChanges(
     }
 
     // Try Claude Code Bridge first (uses Claude subscription, no API costs)
-    try {
-      console.log('[AI Gen] 🔗 Attempting to use Claude Code Bridge...')
-      const result = await generateWithBridge(html, prompt, currentChanges, images, options?.conversationSession)
-      console.log('[AI Gen] ✅ Successfully generated with Claude Code Bridge')
-      return result
-    } catch (bridgeError) {
-      console.log('[AI Gen] ⚠️ Claude Code Bridge not available, falling back to Anthropic API:', bridgeError)
-      console.log('[AI Gen] Bridge error details:', bridgeError.message, bridgeError.stack)
+    // Skip bridge if explicitly using OpenAI API
+    if (options?.aiProvider !== 'openai-api') {
+      try {
+        console.log('[AI Gen] 🔗 Attempting to use Claude Code Bridge...')
+        const result = await generateWithBridge(html, prompt, currentChanges, images, options?.conversationSession)
+        console.log('[AI Gen] ✅ Successfully generated with Claude Code Bridge')
+        return result
+      } catch (bridgeError) {
+        console.log('[AI Gen] ⚠️ Claude Code Bridge not available, falling back to API:', bridgeError)
+        console.log('[AI Gen] Bridge error details:', bridgeError.message, bridgeError.stack)
+      }
     }
 
+    // Use OpenAI API if specified
+    if (options?.aiProvider === 'openai-api') {
+      console.log('[AI Gen] 🤖 Using OpenAI API')
+      return await generateWithOpenAI(html, prompt, apiKey, currentChanges, images, options)
+    }
+
+    // Default to Anthropic API
+    console.log('[AI Gen] 🤖 Using Anthropic API')
     let authConfig: any = { dangerouslyAllowBrowser: true }
 
     if (options?.useOAuth && options?.oauthToken) {
@@ -353,10 +428,37 @@ export async function generateDOMChanges(
       messages: [...session.messages.slice(0, -1).map(m => ({
         role: m.role,
         content: m.content
-      })), newUserMessage] as Anthropic.MessageParam[]
+      })), newUserMessage] as Anthropic.MessageParam[],
+      tools: [DOM_CHANGES_TOOL],
+      tool_choice: { type: 'tool', name: 'dom_changes_generator' }
     })
 
     const content = message.content[0]
+
+    // Handle tool use response
+    if (content.type === 'tool_use') {
+      console.log('🔧 Received tool_use response from Claude')
+      const toolInput = content.input as any
+
+      // Validate the tool input
+      const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
+
+      if (validation.isValid) {
+        console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+
+        session.messages.push({ role: 'assistant', content: validation.result.response })
+
+        return {
+          ...validation.result,
+          session
+        }
+      } else {
+        console.error('❌ Tool use validation failed:', validation.errors)
+        throw new Error(`Tool use validation failed: ${validation.errors.join(', ')}`)
+      }
+    }
+
+    // Fallback to text parsing (for backwards compatibility)
     if (content.type !== 'text') {
       throw new Error('Unexpected response type from Claude')
     }
@@ -587,20 +689,28 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
     userMessage += `User Request: ${prompt}`
     session.messages.push({ role: 'user', content: userMessage })
 
-    const responseText = await new Promise<string>((resolve, reject) => {
+    const responseData = await new Promise<{ type: 'text' | 'tool_use', data: any }>((resolve, reject) => {
       let fullResponse = ''
+      let receivedToolUse = false
 
       console.log('[Bridge] Starting stream for conversation:', conversationId)
       const eventSource = bridgeClient.streamResponses(
         conversationId,
         (event) => {
-          console.log('[Bridge] Received event:', event.type, event.data?.substring(0, 100))
-          if (event.type === 'text') {
+          console.log('[Bridge] Received event:', event.type, event.data ? (typeof event.data === 'string' ? event.data.substring(0, 100) : JSON.stringify(event.data).substring(0, 100)) : 'no data')
+          if (event.type === 'tool_use') {
+            console.log('[Bridge] 🔧 Received tool_use response from Claude')
+            receivedToolUse = true
+            eventSource.close()
+            resolve({ type: 'tool_use', data: event.data })
+          } else if (event.type === 'text') {
             fullResponse += event.data
           } else if (event.type === 'done') {
             console.log('[Bridge] Stream done, full response length:', fullResponse.length)
             eventSource.close()
-            resolve(fullResponse)
+            if (!receivedToolUse) {
+              resolve({ type: 'text', data: fullResponse })
+            }
           } else if (event.type === 'error') {
             console.error('[Bridge] Claude error:', event.data)
             eventSource.close()
@@ -633,7 +743,27 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       }, 60000)
     })
 
-    let cleanedResponse = responseText.trim()
+    // Handle tool_use response (structured output)
+    if (responseData.type === 'tool_use') {
+      console.log('[Bridge] Processing tool_use response')
+      const validation = validateAIDOMGenerationResult(JSON.stringify(responseData.data))
+
+      if (validation.isValid) {
+        console.log('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+        session.messages.push({ role: 'assistant', content: validation.result.response })
+
+        return {
+          ...validation.result,
+          session
+        }
+      } else {
+        console.error('[Bridge] ❌ Tool use validation failed:', validation.errors)
+        throw new Error(`Tool use validation failed: ${validation.errors.join(', ')}`)
+      }
+    }
+
+    // Fallback: Handle text response (for backwards compatibility)
+    let cleanedResponse = responseData.data.trim()
     let textBefore = ''
     let textAfter = ''
     let jsonText = cleanedResponse
@@ -793,4 +923,112 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
   } finally {
     bridgeClient.disconnect()
   }
+}
+
+async function generateWithOpenAI(
+  html: string,
+  prompt: string,
+  apiKey: string,
+  currentChanges: DOMChange[] = [],
+  images?: string[],
+  options?: {
+    useOAuth?: boolean
+    oauthToken?: string
+    conversationSession?: ConversationSession
+  }
+): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
+  console.log('[OpenAI] generateWithOpenAI() called')
+
+  const openai = new OpenAI({
+    apiKey: apiKey,
+    dangerouslyAllowBrowser: true
+  })
+
+  let session = options?.conversationSession
+  if (!session) {
+    session = {
+      id: crypto.randomUUID(),
+      htmlSent: true,
+      messages: []
+    }
+  }
+
+  let systemPrompt = SYSTEM_PROMPT
+  if (!session.htmlSent) {
+    if (!html) {
+      throw new Error('HTML is required for first message in conversation')
+    }
+    systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
+    session.htmlSent = true
+    console.log('[OpenAI] Including HTML in system prompt (initializing conversation)')
+  }
+
+  console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('[OpenAI] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO OPENAI:')
+  console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log(systemPrompt)
+  console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log(`[OpenAI] 📊 System prompt length: ${systemPrompt.length} characters`)
+  console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+
+  let userMessageText = ''
+  if (currentChanges.length > 0) {
+    userMessageText += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
+  }
+  userMessageText += `User Request: ${prompt}`
+
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: 'system', content: systemPrompt },
+    ...session.messages.map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content
+    })),
+    { role: 'user', content: userMessageText }
+  ]
+
+  if (images && images.length > 0) {
+    console.log('[OpenAI] ⚠️ Note: Image support not yet implemented for OpenAI')
+  }
+
+  session.messages.push({ role: 'user', content: userMessageText })
+
+  console.log('[OpenAI] Calling OpenAI API with tool_choice forcing...')
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4-turbo',
+    messages: messages,
+    tools: [DOM_CHANGES_TOOL_OPENAI],
+    tool_choice: { type: 'function', function: { name: 'dom_changes_generator' } }
+  })
+
+  console.log('[OpenAI] Received response from OpenAI')
+  const message = completion.choices[0]?.message
+
+  if (!message) {
+    throw new Error('No message in OpenAI response')
+  }
+
+  if (message.tool_calls && message.tool_calls.length > 0) {
+    console.log('[OpenAI] 🔧 Received tool_calls response from OpenAI')
+    const toolCall = message.tool_calls[0]
+
+    if (toolCall.function.name === 'dom_changes_generator') {
+      const toolInput = JSON.parse(toolCall.function.arguments)
+      const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
+
+      if (validation.isValid) {
+        console.log('[OpenAI] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+        session.messages.push({ role: 'assistant', content: validation.result.response })
+
+        return {
+          ...validation.result,
+          session
+        }
+      } else {
+        console.error('[OpenAI] ❌ Tool call validation failed:', validation.errors)
+        throw new Error(`Tool call validation failed: ${validation.errors.join(', ')}`)
+      }
+    }
+  }
+
+  throw new Error('OpenAI did not return a tool call')
 }

@@ -92,6 +92,7 @@ function SidebarContent() {
     currentChanges: DOMChange[]
     onRestoreChanges: (changes: DOMChange[]) => void
     onPreviewToggle: (enabled: boolean) => void
+    onPreviewRefresh: () => void
     previousView: View
   } | null>(null)
 
@@ -103,7 +104,8 @@ function SidebarContent() {
     onGenerate: (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
-    onPreviewToggle: (enabled: boolean) => void
+    onPreviewToggle: (enabled: boolean) => void,
+    onPreviewRefresh: () => void
   ) => {
     setAiDomContext({
       variantName,
@@ -111,6 +113,7 @@ function SidebarContent() {
       currentChanges,
       onRestoreChanges,
       onPreviewToggle,
+      onPreviewRefresh,
       previousView: view
     })
     setView('ai-dom-changes')
@@ -1190,6 +1193,7 @@ function SidebarContent() {
             onGenerate={aiDomContext.onGenerate}
             onRestoreChanges={aiDomContext.onRestoreChanges}
             onPreviewToggle={aiDomContext.onPreviewToggle}
+            onPreviewRefresh={aiDomContext.onPreviewRefresh}
           />
         </ErrorBoundary>
       )}

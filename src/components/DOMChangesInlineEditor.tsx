@@ -52,6 +52,7 @@ interface DOMChangesInlineEditorProps {
   onChange: (changes: DOMChange[]) => void
   previewEnabled: boolean
   onPreviewToggle: (enabled: boolean) => void
+  onPreviewRefresh?: () => void
   activeVEVariant: string | null
   onVEStart: () => void
   onVEStop: () => void
@@ -61,7 +62,8 @@ interface DOMChangesInlineEditorProps {
     onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
-    onPreviewToggle: (enabled: boolean) => void
+    onPreviewToggle: (enabled: boolean) => void,
+    onPreviewRefresh: () => void
   ) => void
 }
 
@@ -95,6 +97,7 @@ export function DOMChangesInlineEditor({
   onChange,
   previewEnabled,
   onPreviewToggle,
+  onPreviewRefresh,
   activeVEVariant,
   onVEStart,
   onVEStop,
@@ -742,20 +745,20 @@ export function DOMChangesInlineEditor({
 
   const handleToggleChange = (index: number) => {
     const newChanges = [...changes]
-    const wasEnabled = newChanges[index].enabled !== false
-    newChanges[index] = { ...newChanges[index], enabled: !wasEnabled }
+    const wasDisabled = newChanges[index].disabled === true
+    newChanges[index] = { ...newChanges[index], disabled: !wasDisabled }
     debugLog('🔄 Toggle change:', {
       index,
       selector: newChanges[index].selector,
-      wasEnabled,
-      isNowEnabled: newChanges[index].enabled,
+      wasDisabled,
+      isNowDisabled: newChanges[index].disabled,
       allChanges: newChanges
     })
     onChange(newChanges)
 
     // If preview is enabled, re-apply changes to reflect the toggle
     if (previewEnabled && experimentName && variantName) {
-      const enabledChanges = newChanges.filter(c => c.enabled !== false)
+      const enabledChanges = newChanges.filter(c => !c.disabled)
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, {
@@ -1465,7 +1468,7 @@ export function DOMChangesInlineEditor({
           <>
             {changes.map((change, index) => {
               const Icon = getChangeIcon(change.type)
-              const isDisabled = change.enabled === false
+              const isDisabled = change.disabled === true
               
               // If we're editing this change, show the edit form instead
               if (editingChange && editingChange.index === index) {
@@ -1565,7 +1568,7 @@ export function DOMChangesInlineEditor({
                         {/* Checkbox */}
                         <Checkbox
                           id={`dom-change-checkbox-${index}`}
-                          checked={change.enabled !== false}
+                          checked={!change.disabled}
                           onChange={() => handleToggleChange(index)}
                         />
                         
@@ -1681,8 +1684,8 @@ export function DOMChangesInlineEditor({
           <Button
             type="button"
             onClick={() => {
-              if (onNavigateToAI) {
-                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle)
+              if (onNavigateToAI && onPreviewRefresh) {
+                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh)
               } else {
                 setAiDialogOpen(true)
               }

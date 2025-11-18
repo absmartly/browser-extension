@@ -20,6 +20,7 @@ interface AIDOMChangesPageProps {
   onGenerate: (prompt: string, images?: string[], conversationSession?: ConversationSession | null) => Promise<AIDOMGenerationResult>
   onRestoreChanges: (changes: DOMChange[]) => void
   onPreviewToggle?: (enabled: boolean) => void
+  onPreviewRefresh?: () => void
 }
 
 // DIAGNOSTIC: Helper to generate unique mount IDs
@@ -31,7 +32,8 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   onBack,
   onGenerate,
   onRestoreChanges,
-  onPreviewToggle
+  onPreviewToggle,
+  onPreviewRefresh
 }: AIDOMChangesPageProps) {
   console.log('[AIDOMChangesPage] ========== COMPONENT RENDER START ==========')
   console.log('[AIDOMChangesPage] Props:', { variantName, currentChangesCount: currentChanges?.length })
@@ -54,11 +56,13 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [currentConversationId, setCurrentConversationId] = useState<string>('')
   const [isInitialized, setIsInitialized] = useState(true)
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
+  const [previewEnabledOnce, setPreviewEnabledOnce] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const onPreviewToggleRef = useRef(onPreviewToggle)
+  const onPreviewRefreshRef = useRef(onPreviewRefresh)
 
   // Check if onGenerate function is missing (e.g., after page reload)
   const isFunctionMissing = !onGenerate || typeof onGenerate !== 'function'
@@ -135,10 +139,11 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }, [])
 
-  // Keep ref updated with latest callback
+  // Keep refs updated with latest callbacks
   useEffect(() => {
     onPreviewToggleRef.current = onPreviewToggle
-  }, [onPreviewToggle])
+    onPreviewRefreshRef.current = onPreviewRefresh
+  }, [onPreviewToggle, onPreviewRefresh])
 
   // Initialize conversation - this should NEVER block the UI from showing
   useEffect(() => {
@@ -399,17 +404,24 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           onRestoreChanges(result.domChanges)
         }
 
-        // Turn on preview mode to apply the new changes
-        // This will read the latest changes from the variant and apply them
-        if (onPreviewToggleRef.current) {
-          console.log('[AIDOMChangesPage] Turning on preview to apply new DOM changes from AI')
-          // Give React time to update state, then turn on preview
-          setTimeout(() => {
+        // Apply the new changes to the preview
+        // Give React time to update state first
+        setTimeout(() => {
+          if (!previewEnabledOnce) {
+            // First message with DOM changes - enable preview
+            console.log('[AIDOMChangesPage] First message with DOM changes - enabling preview')
             if (onPreviewToggleRef.current) {
               onPreviewToggleRef.current(true)
+              setPreviewEnabledOnce(true)
             }
-          }, 300)
-        }
+          } else {
+            // Preview already enabled - refresh to apply new changes
+            console.log('[AIDOMChangesPage] Refreshing preview to apply new DOM changes from AI')
+            if (onPreviewRefreshRef.current) {
+              onPreviewRefreshRef.current()
+            }
+          }
+        }, 300)
       }
 
     } catch (err) {
@@ -725,7 +737,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     )
                   )}
-                  {message.role === 'assistant' && message.domChangesSnapshot && (
+                  {message.role === 'assistant' && message.domChangesSnapshot && message.domChangesSnapshot.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
                       <button
                         onClick={() => setViewerModal({
@@ -744,15 +756,23 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                             onRestoreChanges(message.domChangesSnapshot)
                             setLatestDomChanges(message.domChangesSnapshot)
 
-                            // Turn on preview to apply the restored changes
-                            if (onPreviewToggleRef.current) {
-                              console.log('[AIDOMChangesPage] Turning on preview after restoring changes from history')
-                              setTimeout(() => {
+                            // Apply the restored changes
+                            setTimeout(() => {
+                              if (!previewEnabledOnce) {
+                                // First time enabling preview
+                                console.log('[AIDOMChangesPage] Enabling preview after restoring changes from history')
                                 if (onPreviewToggleRef.current) {
                                   onPreviewToggleRef.current(true)
+                                  setPreviewEnabledOnce(true)
                                 }
-                              }, 300)
-                            }
+                              } else {
+                                // Preview already enabled - refresh to apply restored changes
+                                console.log('[AIDOMChangesPage] Refreshing preview after restoring changes from history')
+                                if (onPreviewRefreshRef.current) {
+                                  onPreviewRefreshRef.current()
+                                }
+                              }
+                            }, 300)
                           }
                         }}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 transition-colors"

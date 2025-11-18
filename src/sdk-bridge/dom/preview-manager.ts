@@ -45,7 +45,7 @@ export class PreviewManager {
     }
 
     // Skip disabled changes
-    if (change.enabled === false) {
+    if (change.disabled) {
       Logger.log('Skipping disabled change:', change.selector)
       return false
     }

@@ -60,6 +60,9 @@ function routeToContent(
     } else {
       sendResponse({ error: 'No active tab found' })
     }
+  }).catch(error => {
+    debugError('[Router] Error querying tabs:', error)
+    sendResponse({ error: error.message })
   })
 }
 

@@ -15,7 +15,7 @@ export interface DOMChangeStyle {
   type: 'style';
   value: Record<string, string>;
   important?: boolean;
-  enabled?: boolean;
+  disabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
   persistStyle?: boolean;
@@ -32,7 +32,7 @@ export interface DOMChangeStyleRules {
     focus?: Record<string, string>;
   };
   important?: boolean;
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   persistStyle?: boolean;
   observerRoot?: string;
@@ -43,7 +43,7 @@ export interface DOMChangeText {
   type: 'text';
   value: string;
   originalText?: string; // Store original text for restoration when preview is removed
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }
@@ -53,7 +53,7 @@ export interface DOMChangeClass {
   type: 'class';
   add?: string[];
   remove?: string[];
-  enabled?: boolean;
+  disabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
   observerRoot?: string;
@@ -63,7 +63,7 @@ export interface DOMChangeAttribute {
   selector: string;
   type: 'attribute';
   value: Record<string, string>;
-  enabled?: boolean;
+  disabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
   persistAttribute?: boolean;
@@ -75,7 +75,7 @@ export interface DOMChangeHTML {
   type: 'html';
   value: string;
   originalHtml?: string; // Store original HTML for restoration when preview is removed
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }
@@ -84,7 +84,7 @@ export interface DOMChangeJavaScript {
   selector: string;
   type: 'javascript';
   value: string;
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }
@@ -94,7 +94,7 @@ export interface DOMChangeMove {
   type: 'move';
   targetSelector: string;
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }
@@ -102,7 +102,7 @@ export interface DOMChangeMove {
 export interface DOMChangeRemove {
   selector: string;
   type: 'remove';
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }
@@ -112,7 +112,7 @@ export interface DOMChangeInsert {
   type: 'insert';
   html: string; // HTML content to insert
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }
@@ -123,7 +123,7 @@ export interface DOMChangeCreate {
   element: string; // HTML content to create
   targetSelector: string;
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
-  enabled?: boolean;
+  disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
 }

@@ -100,16 +100,9 @@ export function initializeBackgroundScript() {
         `[Background Router] Received message: ${extensionMessage.type} from ${extensionMessage.from} to ${extensionMessage.to}`
       )
 
-      // Use the message router
-      routeMessage(extensionMessage)
-        .then(response => {
-          sendResponse(response)
-        })
-        .catch(error => {
-          debugError('[Background Router] Error routing message:', error)
-          sendResponse({ error: error.message })
-        })
-      return true // Will respond asynchronously
+      // Use the message router - pass all required parameters
+      const result = routeMessage(extensionMessage, sender, sendResponse)
+      return result.async // Return true only if async response is expected
     }
 
     // EXISTING MESSAGE HANDLERS (for backward compatibility)
