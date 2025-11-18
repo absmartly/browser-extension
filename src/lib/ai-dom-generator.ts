@@ -440,6 +440,11 @@ export async function generateDOMChanges(
       console.log('🔧 Received tool_use response from Claude')
       const toolInput = content.input as any
 
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log('📦 RAW STRUCTURED OUTPUT FROM ANTHROPIC (tool call arguments):')
+      console.log(JSON.stringify(toolInput, null, 2))
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
       // Validate the tool input
       const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
 
@@ -659,6 +664,12 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
     // Handle tool_use response (structured output)
     if (responseData.type === 'tool_use') {
       console.log('[Bridge] Processing tool_use response')
+
+      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log('[Bridge] 📦 RAW STRUCTURED OUTPUT FROM CLAUDE (tool call arguments):')
+      console.log(JSON.stringify(responseData.data, null, 2))
+      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
       const validation = validateAIDOMGenerationResult(JSON.stringify(responseData.data))
 
       if (validation.isValid) {
@@ -837,6 +848,11 @@ async function generateWithOpenAI(
     const toolCall = message.tool_calls[0]
 
     if (toolCall.function.name === 'dom_changes_generator') {
+      console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log('[OpenAI] 📦 RAW STRUCTURED OUTPUT FROM OPENAI (tool call arguments):')
+      console.log(toolCall.function.arguments)
+      console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
       const toolInput = JSON.parse(toolCall.function.arguments)
       const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
 
