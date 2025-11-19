@@ -63,7 +63,8 @@ interface DOMChangesInlineEditorProps {
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
-    onPreviewRefresh: () => void
+    onPreviewRefresh: () => void,
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => void
 }
 

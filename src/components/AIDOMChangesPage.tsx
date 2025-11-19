@@ -21,6 +21,7 @@ interface AIDOMChangesPageProps {
   onRestoreChanges: (changes: DOMChange[]) => void
   onPreviewToggle?: (enabled: boolean) => void
   onPreviewRefresh?: () => void
+  onPreviewWithChanges?: (enabled: boolean, changes: DOMChange[]) => void
 }
 
 // DIAGNOSTIC: Helper to generate unique mount IDs
@@ -33,7 +34,8 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   onGenerate,
   onRestoreChanges,
   onPreviewToggle,
-  onPreviewRefresh
+  onPreviewRefresh,
+  onPreviewWithChanges
 }: AIDOMChangesPageProps) {
   console.log('[AIDOMChangesPage] ========== COMPONENT RENDER START ==========')
   console.log('[AIDOMChangesPage] Props:', { variantName, currentChangesCount: currentChanges?.length })
@@ -399,29 +401,31 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       // Track the latest DOM changes
       if (result.domChanges && result.domChanges.length > 0) {
         setLatestDomChanges(result.domChanges)
-        // Save changes to variant immediately
-        if (onRestoreChanges) {
-          onRestoreChanges(result.domChanges)
-        }
 
-        // Apply the new changes to the preview
-        // Give React time to update state first
-        setTimeout(() => {
-          if (!previewEnabledOnce) {
-            // First message with DOM changes - enable preview
-            console.log('[AIDOMChangesPage] First message with DOM changes - enabling preview')
-            if (onPreviewToggleRef.current) {
-              onPreviewToggleRef.current(true)
-              setPreviewEnabledOnce(true)
-            }
-          } else {
-            // Preview already enabled - refresh to apply new changes
-            console.log('[AIDOMChangesPage] Refreshing preview to apply new DOM changes from AI')
+        if (!previewEnabledOnce) {
+          // First message with DOM changes - enable preview with these changes directly
+          console.log('[AIDOMChangesPage] First message with DOM changes - enabling preview directly')
+          if (onPreviewWithChanges) {
+            onPreviewWithChanges(true, result.domChanges)
+            setPreviewEnabledOnce(true)
+          }
+          // Save changes to variant after preview is enabled
+          if (onRestoreChanges) {
+            onRestoreChanges(result.domChanges)
+          }
+        } else {
+          // Preview already enabled - save changes first, then refresh
+          console.log('[AIDOMChangesPage] Preview already enabled - restoring and refreshing')
+          if (onRestoreChanges) {
+            onRestoreChanges(result.domChanges)
+          }
+          // Give variant time to update, then refresh
+          setTimeout(() => {
             if (onPreviewRefreshRef.current) {
               onPreviewRefreshRef.current()
             }
-          }
-        }, 300)
+          }, 100)
+        }
       }
 
     } catch (err) {
@@ -753,26 +757,31 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                       <button
                         onClick={() => {
                           if (message.domChangesSnapshot) {
-                            onRestoreChanges(message.domChangesSnapshot)
                             setLatestDomChanges(message.domChangesSnapshot)
 
-                            // Apply the restored changes
-                            setTimeout(() => {
-                              if (!previewEnabledOnce) {
-                                // First time enabling preview
-                                console.log('[AIDOMChangesPage] Enabling preview after restoring changes from history')
-                                if (onPreviewToggleRef.current) {
-                                  onPreviewToggleRef.current(true)
-                                  setPreviewEnabledOnce(true)
-                                }
-                              } else {
-                                // Preview already enabled - refresh to apply restored changes
-                                console.log('[AIDOMChangesPage] Refreshing preview after restoring changes from history')
+                            if (!previewEnabledOnce) {
+                              // First time enabling preview - use direct changes
+                              console.log('[AIDOMChangesPage] Enabling preview after restoring changes from history')
+                              if (onPreviewWithChanges) {
+                                onPreviewWithChanges(true, message.domChangesSnapshot)
+                                setPreviewEnabledOnce(true)
+                              }
+                              // Save to variant after preview enabled
+                              if (onRestoreChanges) {
+                                onRestoreChanges(message.domChangesSnapshot)
+                              }
+                            } else {
+                              // Preview already enabled - save then refresh
+                              console.log('[AIDOMChangesPage] Refreshing preview after restoring changes from history')
+                              if (onRestoreChanges) {
+                                onRestoreChanges(message.domChangesSnapshot)
+                              }
+                              setTimeout(() => {
                                 if (onPreviewRefreshRef.current) {
                                   onPreviewRefreshRef.current()
                                 }
-                              }
-                            }, 300)
+                              }, 100)
+                            }
                           }
                         }}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 transition-colors"

@@ -93,6 +93,7 @@ function SidebarContent() {
     onRestoreChanges: (changes: DOMChange[]) => void
     onPreviewToggle: (enabled: boolean) => void
     onPreviewRefresh: () => void
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
     previousView: View
   } | null>(null)
 
@@ -105,7 +106,8 @@ function SidebarContent() {
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
-    onPreviewRefresh: () => void
+    onPreviewRefresh: () => void,
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => {
     setAiDomContext({
       variantName,
@@ -114,6 +116,7 @@ function SidebarContent() {
       onRestoreChanges,
       onPreviewToggle,
       onPreviewRefresh,
+      onPreviewWithChanges,
       previousView: view
     })
     setView('ai-dom-changes')
@@ -1194,6 +1197,7 @@ function SidebarContent() {
             onRestoreChanges={aiDomContext.onRestoreChanges}
             onPreviewToggle={aiDomContext.onPreviewToggle}
             onPreviewRefresh={aiDomContext.onPreviewRefresh}
+            onPreviewWithChanges={aiDomContext.onPreviewWithChanges}
           />
         </ErrorBoundary>
       )}

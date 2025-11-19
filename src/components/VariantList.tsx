@@ -96,7 +96,8 @@ interface VariantListProps {
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
-    onPreviewRefresh: () => void
+    onPreviewRefresh: () => void,
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => void
   // Auto-navigate to AI page for this variant name (used for state restoration)
   autoNavigateToAI?: string | null
@@ -465,7 +466,46 @@ export function VariantList({
     } catch (error) {
       debugError('[VariantList] Unexpected error in handlePreviewToggle:', error)
     }
-  }, [variants, experimentName, domFieldName])
+  }, [variants, experimentName, domFieldName, activeVEVariant])
+
+  const handlePreviewWithChanges = useCallback(async (enabled: boolean, variantIndex: number, changes: DOMChange[]) => {
+    try {
+      debugLog('[VariantList] handlePreviewWithChanges called:', { enabled, variantIndex, changesCount: changes.length })
+
+      // Update state BEFORE sending message
+      setPreviewEnabled(enabled)
+      setActivePreviewVariant(enabled ? variantIndex : null)
+      debugLog('[VariantList] State updated:', { previewEnabled: enabled, activePreviewVariant: enabled ? variantIndex : null })
+
+      if (enabled && variants[variantIndex]) {
+        const variantName = variants[variantIndex].name
+        const enabledChanges = changes.filter(c => !c.disabled)
+
+        debugLog('[VariantList] Sending ABSMARTLY_PREVIEW (apply) with provided changes:', {
+          experimentName,
+          variantName,
+          changesCount: enabledChanges.length
+        })
+
+        try {
+          await sendToContent({
+            type: 'ABSMARTLY_PREVIEW',
+            action: 'apply',
+            changes: enabledChanges,
+            experimentName: experimentName,
+            variantName: variantName
+          })
+          debugLog('[VariantList] Preview apply successful')
+        } catch (error) {
+          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (apply):', error)
+        }
+      }
+
+      debugLog('[VariantList] handlePreviewWithChanges completed')
+    } catch (error) {
+      debugError('[VariantList] Unexpected error in handlePreviewWithChanges:', error)
+    }
+  }, [variants, experimentName])
 
   const handlePreviewRefresh = useCallback(async (variantIndex: number) => {
     try {
@@ -553,6 +593,12 @@ export function VariantList({
 
     const variantIndex = variants.findIndex(v => v.name === variantName)
 
+    const wrappedPreviewWithChanges = (enabled: boolean, changes: DOMChange[]) => {
+      if (variantIndex !== -1) {
+        handlePreviewWithChanges(enabled, variantIndex, changes)
+      }
+    }
+
     const wrappedPreviewRefresh = () => {
       if (variantIndex !== -1) {
         handlePreviewRefresh(variantIndex)
@@ -560,12 +606,12 @@ export function VariantList({
     }
 
     if (onNavigateToAI) {
-      console.log('[VariantList] Calling parent onNavigateToAI with all 6 parameters')
-      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, onPreviewToggle, wrappedPreviewRefresh)
+      console.log('[VariantList] Calling parent onNavigateToAI with all 7 parameters')
+      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, onPreviewToggle, wrappedPreviewRefresh, wrappedPreviewWithChanges)
     } else {
       console.warn('[VariantList] onNavigateToAI is not defined!')
     }
-  }, [variants, onNavigateToAI, handlePreviewRefresh])
+  }, [variants, onNavigateToAI, handlePreviewRefresh, handlePreviewWithChanges])
 
   // Pre-compute display variables for all variants to avoid repeated calculations in render
   const variantsDisplayVariables = useMemo(
