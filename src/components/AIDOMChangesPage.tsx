@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
+import { Header } from './Header'
 import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { ChangeViewerModal } from './ChangeViewerModal'
 import { renderMarkdown } from '~src/utils/markdown'
@@ -59,60 +60,13 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [isInitialized, setIsInitialized] = useState(true)
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [previewEnabledOnce, setPreviewEnabledOnce] = useState(false)
+  const [isPreviewEnabled, setIsPreviewEnabled] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const onPreviewToggleRef = useRef(onPreviewToggle)
   const onPreviewRefreshRef = useRef(onPreviewRefresh)
-
-  // Check if onGenerate function is missing (e.g., after page reload)
-  const isFunctionMissing = !onGenerate || typeof onGenerate !== 'function'
-
-  if (isFunctionMissing) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onBack}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
-              aria-label="Go back"
-            >
-              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-            </button>
-            <div className="flex items-center gap-2">
-              <SparklesIcon className="h-6 w-6 text-purple-600" />
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">AI DOM Generator</h1>
-                <p className="text-xs text-gray-500">Variant: {variantName}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center max-w-md">
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800 mb-3">
-                The AI generator needs to be reinitialized after page reload.
-              </p>
-              <Button
-                onClick={onBack}
-                className="w-full"
-              >
-                <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                Return to Variant Editor
-              </Button>
-            </div>
-            <p className="text-xs text-gray-500 mt-4">
-              Your chat history has been preserved and will be restored when you return to this page.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // DIAGNOSTIC: Track mount/unmount lifecycle
   useEffect(() => {
@@ -408,6 +362,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           if (onPreviewWithChanges) {
             onPreviewWithChanges(true, result.domChanges)
             setPreviewEnabledOnce(true)
+            setIsPreviewEnabled(true)
           }
           // Save changes to variant after preview is enabled
           if (onRestoreChanges) {
@@ -442,9 +397,20 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       handleGenerate()
+    }
+  }
+
+  const handlePreviewToggle = () => {
+    const newState = !isPreviewEnabled
+    setIsPreviewEnabled(newState)
+    if (onPreviewToggle) {
+      onPreviewToggle(newState)
+      if (newState) {
+        setPreviewEnabledOnce(true)
+      }
     }
   }
 
@@ -516,31 +482,25 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-            title="Back"
-          >
-            <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-          </button>
-          <div className="flex items-center gap-2">
-            <SparklesIcon className="h-6 w-6 text-purple-600" />
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                AI DOM Generator
-              </h2>
-              <p className="text-xs text-gray-600">Variant: {variantName}</p>
+      <div className="p-4">
+        <Header
+          title={
+            <div className="flex items-center gap-2">
+              <SparklesIcon className="h-6 w-6 text-purple-600" />
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Vibe Studio</h2>
+                <p className="text-xs text-gray-600">Variant: {variantName}</p>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+          }
+          onBack={onBack}
+          actions={
+            <div className="flex items-center gap-2">
           <div className="relative">
             <button
               ref={historyButtonRef}
               onClick={() => setShowHistory(!showHistory)}
-              className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
               title={isLoadingHistory ? 'Loading conversations...' : 'Conversation History'}
               disabled={isLoadingHistory || conversationList.length === 0}
             >
@@ -563,7 +523,16 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                       className="p-3 hover:bg-gray-50 transition-colors group"
                       id={`conversation-${conv.id}`}
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start justify-between gap-3">
+                        {conv.firstScreenshot && (
+                          <div className="flex-shrink-0">
+                            <img
+                              src={conv.firstScreenshot}
+                              alt="Conversation thumbnail"
+                              className="w-16 h-16 object-cover rounded border border-gray-200"
+                            />
+                          </div>
+                        )}
                         <div
                           className="flex-1 cursor-pointer min-w-0"
                           onClick={async () => {
@@ -666,12 +635,14 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           </div>
           <button
             onClick={handleNewChat}
-            className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-md transition-colors"
             title="New Chat"
           >
             <PlusIcon className="h-5 w-5 text-gray-600" />
           </button>
-        </div>
+            </div>
+          }
+        />
       </div>
 
       <div className="flex-1 overflow-auto p-4">
@@ -852,7 +823,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           />
           <div className="mt-1 flex items-center justify-between">
             <p className="text-xs text-gray-500">
-              Press {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to send • Paste or drag images
+              Press Enter to send • Shift+Enter for new line • Paste or drag images
             </p>
             <input
               ref={fileInputRef}
@@ -878,12 +849,13 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           </div>
         )}
 
-        <Button
-          id="ai-generate-button"
-          onClick={handleGenerate}
-          disabled={loading || (!prompt.trim() && attachedImages.length === 0)}
-          className="w-full"
-        >
+        <div className="flex gap-2 items-center">
+          <Button
+            id="ai-generate-button"
+            onClick={handleGenerate}
+            disabled={loading || (!prompt.trim() && attachedImages.length === 0)}
+            className="flex-1"
+          >
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -896,6 +868,19 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
             </>
           )}
         </Button>
+        <button
+          onClick={handlePreviewToggle}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+            isPreviewEnabled
+              ? 'bg-green-600 text-white hover:bg-green-700'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+          title={isPreviewEnabled ? 'Preview is ON' : 'Preview is OFF'}
+        >
+          <EyeIcon className="h-4 w-4" />
+          {isPreviewEnabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
       </div>
 
       {viewerModal && (

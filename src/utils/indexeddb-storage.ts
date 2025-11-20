@@ -137,13 +137,19 @@ export async function getConversationList(
       const cursor = (event.target as IDBRequest).result
       if (cursor) {
         const conv = cursor.value as StoredConversation
+
+        const firstScreenshot = conv.messages
+          .find(msg => msg.images && msg.images.length > 0)
+          ?.images?.[0]
+
         conversations.push({
           id: conv.id,
           createdAt: conv.createdAt,
           updatedAt: conv.updatedAt,
           messageCount: conv.messageCount,
           firstUserMessage: conv.firstUserMessage,
-          isActive: conv.isActive
+          isActive: conv.isActive,
+          firstScreenshot
         })
         cursor.continue()
       } else {

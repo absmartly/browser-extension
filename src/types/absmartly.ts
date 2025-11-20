@@ -201,6 +201,7 @@ export interface ConversationListItem {
   messageCount: number
   firstUserMessage: string
   isActive: boolean
+  firstScreenshot?: string
 }
 
 export interface StoredConversationsData {
