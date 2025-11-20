@@ -143,7 +143,8 @@ function toggleSidebarFunc(): void {
         const currentPadding = document.body.style.paddingRight || '0px'
         document.body.setAttribute('data-absmartly-original-padding-right', currentPadding)
         document.body.style.transition = 'padding-right 0.3s ease-in-out'
-        document.body.style.paddingRight = '384px'
+        const currentWidth = existingSidebar.style.width || '384px'
+        document.body.style.paddingRight = currentWidth
       }
     }
     return
@@ -157,7 +158,8 @@ function toggleSidebarFunc(): void {
   const originalTransition = document.body.style.transition
   document.body.style.transition = 'padding-right 0.3s ease-in-out'
 
-  document.body.style.paddingRight = '384px'
+  const savedWidth = localStorage.getItem('absmartly-sidebar-width') || '384px'
+  document.body.style.paddingRight = savedWidth
 
   const container = document.createElement('div')
   container.id = 'absmartly-sidebar-root'
@@ -165,7 +167,7 @@ function toggleSidebarFunc(): void {
     position: fixed;
     top: 0;
     right: 0;
-    width: 384px;
+    width: ${savedWidth};
     height: 100vh;
     background-color: white;
     border-left: 1px solid #e5e7eb;
@@ -188,6 +190,122 @@ function toggleSidebarFunc(): void {
   `
   iframe.src = chrome.runtime.getURL('tabs/sidebar.html')
 
+  const resizeHandle = document.createElement('div')
+  resizeHandle.id = 'absmartly-sidebar-resize-handle'
+  resizeHandle.style.cssText = `
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 10;
+  `
+
+  const handleGrip = document.createElement('div')
+  handleGrip.style.cssText = `
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    pointer-events: none;
+  `
+
+  for (let i = 0; i < 5; i++) {
+    const dot = document.createElement('div')
+    dot.className = 'resize-grip-dot'
+    dot.style.cssText = `
+      width: 4px;
+      height: 4px;
+      background: #94a3b8;
+      border-radius: 50%;
+      transition: background 0.2s;
+    `
+    handleGrip.appendChild(dot)
+  }
+
+  resizeHandle.appendChild(handleGrip)
+
+  let isResizing = false
+  let startX = 0
+  let startWidth = 0
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return
+
+    const deltaX = startX - e.clientX
+    const newWidth = Math.max(280, Math.min(800, startWidth + deltaX))
+
+    container.style.width = `${newWidth}px`
+    document.body.style.paddingRight = `${newWidth}px`
+
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleMouseUp = () => {
+    if (!isResizing) return
+
+    isResizing = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    container.style.transition = 'transform 0.3s ease-in-out'
+    document.body.style.transition = 'padding-right 0.3s ease-in-out'
+    iframe.style.pointerEvents = ''
+
+    const finalWidth = container.style.width
+    localStorage.setItem('absmartly-sidebar-width', finalWidth)
+    console.log('🔵 ABSmartly Extension: Saved sidebar width:', finalWidth)
+
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }
+
+  resizeHandle.addEventListener('mouseenter', () => {
+    if (!isResizing) {
+      resizeHandle.style.background = 'rgba(59, 130, 246, 0.2)'
+      const dots = handleGrip.querySelectorAll('.resize-grip-dot') as NodeListOf<HTMLElement>
+      dots.forEach(dot => dot.style.background = '#3b82f6')
+    }
+  })
+
+  resizeHandle.addEventListener('mouseleave', () => {
+    if (!isResizing) {
+      resizeHandle.style.background = 'transparent'
+      const dots = handleGrip.querySelectorAll('.resize-grip-dot') as NodeListOf<HTMLElement>
+      dots.forEach(dot => dot.style.background = '#94a3b8')
+    }
+  })
+
+  resizeHandle.addEventListener('mousedown', (e: MouseEvent) => {
+    isResizing = true
+    startX = e.clientX
+    startWidth = container.offsetWidth
+    document.body.style.cursor = 'ew-resize'
+    document.body.style.userSelect = 'none'
+    container.style.transition = 'none'
+    document.body.style.transition = 'none'
+    resizeHandle.style.background = 'rgba(59, 130, 246, 0.4)'
+    const dots = handleGrip.querySelectorAll('.resize-grip-dot') as NodeListOf<HTMLElement>
+    dots.forEach(dot => dot.style.background = '#2563eb')
+    iframe.style.pointerEvents = 'none'
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  })
+
+  container.appendChild(resizeHandle)
   container.appendChild(iframe)
   document.body.appendChild(container)
 
