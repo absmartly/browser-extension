@@ -57,14 +57,14 @@ interface DOMChangesInlineEditorProps {
   onVEStart: () => void
   onVEStop: () => void
   activePreviewVariantName: string | null
+  autoNavigateToAI?: string | null
   onNavigateToAI?: (
     variantName: string,
     onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
-    onPreviewRefresh: () => void,
-    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
+    onPreviewRefresh: () => void
   ) => void
 }
 
@@ -103,6 +103,7 @@ export function DOMChangesInlineEditor({
   onVEStart,
   onVEStop,
   activePreviewVariantName,
+  autoNavigateToAI,
   onNavigateToAI
 }: DOMChangesInlineEditorProps) {
 
@@ -934,6 +935,21 @@ export function DOMChangesInlineEditor({
     aiGenerateCallbackIdRef.current = newId
   }, [handleAIGenerate])
 
+  // Auto-navigate to AI page if this variant was active before refresh
+  const hasAutoNavigatedRef = useRef(false)
+  useEffect(() => {
+    if (
+      autoNavigateToAI === variantName &&
+      onNavigateToAI &&
+      onPreviewRefresh &&
+      !hasAutoNavigatedRef.current
+    ) {
+      hasAutoNavigatedRef.current = true
+      console.log(`[DOMChangesInlineEditor:${variantName}] Auto-navigating to AI page`)
+      onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh)
+    }
+  }, [autoNavigateToAI, variantName, onNavigateToAI, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh])
+
   const handleEditChange = (index: number) => {
     const change = changes[index]
     
@@ -1672,7 +1688,7 @@ export function DOMChangesInlineEditor({
       {/* Action buttons - always show unless editing */}
       {!editingChange && (
         <div className="flex gap-2">
-          <Button
+          <Button id="add-dom-change-button"
             type="button"
             onClick={handleAddChange}
             size="sm"
@@ -1682,7 +1698,7 @@ export function DOMChangesInlineEditor({
             <PlusIcon className="h-4 w-4 mr-1" />
             Add DOM Change
           </Button>
-          <Button
+          <Button id="generate-with-ai-button"
             type="button"
             onClick={() => {
               if (onNavigateToAI && onPreviewRefresh) {
@@ -1698,7 +1714,7 @@ export function DOMChangesInlineEditor({
             <SparklesIcon className="h-4 w-4 mr-1" />
             Generate with AI
           </Button>
-          <Button
+          <Button id="visual-editor-button"
             type="button"
             onClick={handleLaunchVisualEditor}
             size="sm"

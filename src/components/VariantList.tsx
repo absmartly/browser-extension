@@ -855,6 +855,7 @@ export function VariantList({
                 onVEStart={() => setActiveVEVariant(variant.name)}
                 onVEStop={() => setActiveVEVariant(null)}
                 activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
+                autoNavigateToAI={autoNavigateToAI}
                 onNavigateToAI={handleNavigateToAIWithPreview}
               />
             </div>
