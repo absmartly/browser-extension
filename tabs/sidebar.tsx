@@ -34,18 +34,13 @@ try {
       if (m.type === 'childList') {
         const el = document.getElementById('__plasmo')
         if (!el) {
-          console.warn('[Sidebar Instrumentation] __plasmo removed from DOM')
-        } else if (m.target === el || (m.target as HTMLElement).id === '__plasmo') {
-          console.warn('[Sidebar Instrumentation] __plasmo childList changed. count=', el.children.length)
+          console.error('[Sidebar Instrumentation] CRITICAL: __plasmo removed from DOM')
         }
-      }
-      if (m.type === 'attributes' && (m.target as HTMLElement).id === '__plasmo') {
-        console.warn('[Sidebar Instrumentation] __plasmo attributes changed:', m.attributeName)
       }
     }
   })
 
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
+  observer.observe(document.documentElement, { childList: true, subtree: false, attributes: false })
 
   window.addEventListener('pageshow', () => logChildren('pageshow'))
   window.addEventListener('load', () => logChildren('load'))
@@ -85,35 +80,24 @@ const ABSmartlySidebar = () => {
         overflow: 'auto',
       })
 
-      // Set up MutationObserver to track DOM changes
+      // Set up MutationObserver to track critical DOM changes only
       const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
-          if (mutation.removedNodes.length > 0) {
-            console.warn('[sidebar.tsx] ⚠️ DOM NODES REMOVED FROM __plasmo:', {
-              removed: mutation.removedNodes.length,
-              removedNodes: Array.from(mutation.removedNodes).map(n => ({
-                nodeName: n.nodeName,
-                nodeType: n.nodeType,
-                textContent: n.textContent?.substring(0, 50)
-              })),
-              target: mutation.target,
-              mountId: mountId.current,
-              timestamp: new Date().toISOString()
-            })
-          }
-          if (mutation.addedNodes.length > 0) {
-            console.log('[sidebar.tsx] ➕ DOM NODES ADDED TO __plasmo:', {
-              added: mutation.addedNodes.length,
-              target: mutation.target,
-              mountId: mountId.current
-            })
+          // Only log if the entire plasmoRoot was removed (critical issue)
+          if (mutation.removedNodes.length > 0 && mutation.target === document.body) {
+            const removedPlasmo = Array.from(mutation.removedNodes).some(n =>
+              (n as HTMLElement).id === '__plasmo'
+            )
+            if (removedPlasmo) {
+              console.error('[sidebar.tsx] ⚠️ CRITICAL: __plasmo root was removed from DOM')
+            }
           }
         }
       })
 
-      observer.observe(plasmoRoot, {
+      observer.observe(document.body, {
         childList: true,
-        subtree: true,
+        subtree: false,
         attributes: false
       })
 

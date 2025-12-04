@@ -13,6 +13,7 @@ import { formatConversationTimestamp } from '~src/utils/time-format'
 import { capturePageHTML } from '~src/utils/html-capture'
 import { sendToBackground } from '~src/lib/messaging'
 import { compressImages } from '~src/utils/image-compression'
+import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
 
 interface AIDOMChangesPageProps {
   variantName: string
@@ -37,9 +38,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   onPreviewRefresh,
   onPreviewWithChanges
 }: AIDOMChangesPageProps) {
-  console.log('[AIDOMChangesPage] ========== COMPONENT RENDER START ==========')
-  console.log('[AIDOMChangesPage] Props:', { variantName, currentChangesCount: currentChanges?.length })
-
   const mountId = useRef(generateMountId())
   const renderCount = useRef(0)
 
@@ -66,29 +64,11 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const onPreviewToggleRef = useRef(onPreviewToggle)
   const onPreviewRefreshRef = useRef(onPreviewRefresh)
 
+  // Component lifecycle tracking (mount/unmount)
   useEffect(() => {
-    const id = mountId.current
-    console.log(JSON.stringify({
-      type: 'LIFECYCLE',
-      component: 'AIDOMChangesPage',
-      event: 'MOUNT',
-      mountId: id,
-      timestamp: Date.now(),
-      props: {
-        variantName,
-        currentChangesCount: currentChanges?.length
-      }
-    }))
-
+    // Component mounted
     return () => {
-      console.log(JSON.stringify({
-        type: 'LIFECYCLE',
-        component: 'AIDOMChangesPage',
-        event: 'UNMOUNT',
-        mountId: id,
-        timestamp: Date.now(),
-        totalRenders: renderCount.current
-      }))
+      // Component unmounted
     }
   }, [])
 
@@ -339,28 +319,41 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       }
 
       if (result.domChanges && result.domChanges.length > 0) {
-        setLatestDomChanges(result.domChanges)
+        // Apply the action (append, replace_all, etc.) to get the final changes
+        const finalChanges = applyDOMChangeAction(currentChanges, result)
+        console.log('[AIDOMChangesPage] Applied action:', result.action, 'Final changes count:', finalChanges.length)
+
+        setLatestDomChanges(finalChanges)
 
         if (!previewEnabledOnce) {
           console.log('[AIDOMChangesPage] First message with DOM changes - enabling preview directly')
           if (onPreviewWithChanges) {
-            onPreviewWithChanges(true, result.domChanges)
+            onPreviewWithChanges(true, finalChanges)
             setPreviewEnabledOnce(true)
             setIsPreviewEnabled(true)
           }
           if (onRestoreChanges) {
-            onRestoreChanges(result.domChanges)
+            onRestoreChanges(finalChanges)
           }
         } else {
-          console.log('[AIDOMChangesPage] Preview already enabled - restoring and refreshing')
-          if (onRestoreChanges) {
-            onRestoreChanges(result.domChanges)
-          }
-          setTimeout(() => {
-            if (onPreviewRefreshRef.current) {
-              onPreviewRefreshRef.current()
+          console.log('[AIDOMChangesPage] Subsequent message - clearing old changes then applying new ones')
+
+          // For replace_all or replace_specific actions, clear old changes first
+          if (result.action === 'replace_all' || result.action === 'replace_specific') {
+            console.log('[AIDOMChangesPage] Clearing old changes before applying new ones')
+            if (onPreviewToggleRef.current) {
+              onPreviewToggleRef.current(false)
             }
-          }, 100)
+            // Small delay to ensure old changes are removed
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+
+          if (onRestoreChanges) {
+            onRestoreChanges(finalChanges)
+          }
+          if (onPreviewWithChanges) {
+            onPreviewWithChanges(true, finalChanges)
+          }
         }
       }
 
@@ -437,25 +430,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
     console.log('[AIDOMChangesPage] New chat session:', newConvId)
   }
-
-  console.log('[AIDOMChangesPage] ========== RENDER START (isInitialized:', isInitialized, 'chatHistory:', chatHistory.length, ') ==========')
-
-  renderCount.current++
-  console.log(JSON.stringify({
-    type: 'LIFECYCLE',
-    component: 'AIDOMChangesPage',
-    event: 'RENDER',
-    mountId: mountId.current,
-    renderNumber: renderCount.current,
-    timestamp: Date.now(),
-    state: {
-      isInitialized,
-      chatHistoryLength: chatHistory.length,
-      conversationSessionId: conversationSession?.id,
-      loading,
-      error: error ? true : false
-    }
-  }))
 
   return (
     <div className="flex flex-col h-full bg-white" data-ai-dom-changes-page="true">

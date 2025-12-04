@@ -367,7 +367,7 @@ export async function generateDOMChanges(
       if (!html) {
         throw new Error('HTML is required for first message in conversation')
       }
-      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
+      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
       session.htmlSent = true
       console.log('📄 Including HTML in system prompt (initializing conversation)')
     }
@@ -569,7 +569,7 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       if (!html) {
         throw new Error('HTML is required for creating new bridge conversation')
       }
-      systemPromptToSend += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
+      systemPromptToSend += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
       console.log('[Bridge] Including HTML in system prompt (initializing conversation)')
 
       // Print the complete system prompt to console
@@ -805,7 +805,7 @@ async function generateWithOpenAI(
     if (!html) {
       throw new Error('HTML is required for first message in conversation')
     }
-    systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html.slice(0, 50000)}\n\`\`\``
+    systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
     session.htmlSent = true
     console.log('[OpenAI] Including HTML in system prompt (initializing conversation)')
   }

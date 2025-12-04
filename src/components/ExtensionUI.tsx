@@ -368,13 +368,41 @@ function SidebarContent() {
   useEffect(() => {
     const storage = new Storage({ area: "local" })
 
-    storage.get<SidebarState>('sidebarState').then(state => {
+    storage.get<SidebarState>('sidebarState').then(async (state) => {
       if (state) {
         debugLog('Restoring sidebar state:', state)
-        if (state.selectedExperiment) {
-          setSelectedExperiment(state.selectedExperiment as unknown as Experiment)
+
+        let restoredExperiment: Experiment | null = null
+
+        if (state.selectedExperiment !== null && state.selectedExperiment !== undefined) {
+          if (state.selectedExperiment === 0) {
+            debugLog('Restoring new unsaved experiment')
+            const newExperiment: Partial<Experiment> = {
+              id: undefined as any,
+              name: '',
+              display_name: ''
+            }
+            setSelectedExperiment(newExperiment as Experiment)
+            restoredExperiment = newExperiment as Experiment
+          } else {
+            try {
+              debugLog('Fetching experiment by ID:', state.selectedExperiment)
+              setExperimentDetailLoading(true)
+              const fullExperiment = await getExperiment(state.selectedExperiment)
+              setSelectedExperiment(fullExperiment)
+              restoredExperiment = fullExperiment
+              debugLog('Successfully restored experiment:', fullExperiment.id)
+            } catch (error) {
+              debugError('Failed to restore experiment:', error)
+              setView('list')
+              return
+            } finally {
+              setExperimentDetailLoading(false)
+            }
+          }
         }
-        if (state.aiVariantName) {
+
+        if (state.aiVariantName && restoredExperiment) {
           setAutoNavigateToAI(state.aiVariantName)
           setView('detail')
         } else if (state.view && state.view !== 'ai-dom-changes') {
@@ -417,7 +445,7 @@ function SidebarContent() {
     const storage = new Storage({ area: "local" })
     const state = {
       view: view === 'ai-dom-changes' ? 'detail' : view,
-      selectedExperiment,
+      selectedExperiment: selectedExperiment ? (selectedExperiment.id ?? 0) : null,
       aiVariantName: view === 'ai-dom-changes' ? aiDomContext?.variantName : null,
       timestamp: Date.now()
     }
