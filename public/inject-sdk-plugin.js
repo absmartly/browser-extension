@@ -1823,7 +1823,7 @@
     if (!cachedContext) {
       detectABsmartlySDK();
     }
-    
+
     return {
       found: !!cachedContext,
       path: contextPropertyPath || null,
@@ -1832,6 +1832,9 @@
       hasTreatment: cachedContext && typeof cachedContext.treatment === 'function'
     };
   };
+
+  // Expose applyPreviewChange for testing purposes
+  window.applyPreviewChange = applyPreviewChange;
 
 
 

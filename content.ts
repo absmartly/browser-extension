@@ -1022,6 +1022,7 @@ function openCodeEditor(data: {
   `
 
   const cancelBtn = document.createElement('button')
+  cancelBtn.id = 'cancel-button'
   cancelBtn.style.cssText = `
     padding: 8px 16px !important;
     background: white !important;
@@ -1047,6 +1048,7 @@ function openCodeEditor(data: {
   // Only show Save button if not in read-only mode
   if (!data.readOnly) {
     const saveBtn = document.createElement('button')
+    saveBtn.id = 'save-button'
     saveBtn.style.cssText = `
       padding: 8px 16px !important;
       background: #3b82f6 !important;

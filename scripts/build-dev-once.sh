@@ -31,3 +31,14 @@ while IFS= read -r line; do
     break
   fi
 done < "$PIPE"
+
+# Copy SDK bridge bundle to build directory after Plasmo finishes
+if [ -f "public/absmartly-sdk-bridge.bundle.js" ]; then
+  if [ -d "build/chrome-mv3-dev" ]; then
+    cp public/absmartly-sdk-bridge.bundle.js build/chrome-mv3-dev/
+    echo "✅ Copied SDK bridge bundle to build/chrome-mv3-dev/"
+  fi
+  if [ -f "public/absmartly-sdk-bridge.bundle.js.map" ] && [ -d "build/chrome-mv3-dev" ]; then
+    cp public/absmartly-sdk-bridge.bundle.js.map build/chrome-mv3-dev/
+  fi
+fi
