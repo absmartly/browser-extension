@@ -6,6 +6,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ABsmartly Browser Extension - A Plasmo-based browser extension for visual A/B testing with the ABsmartly platform. The extension enables users to create and manage DOM-based experiments visually without writing code.
 
+## Testing Framework
+
+**CRITICAL**: This project uses **Jest** for unit tests, NOT Vitest!
+- **Unit Tests**: Jest with ts-jest (`npm run test:unit`)
+- **E2E Tests**: Playwright (`npm run test:e2e`)
+- **Config**: `jest.config.js` (already configured with proper path aliases)
+- **Never mention Vitest** - this is a Jest project
+
+**🚨 NEVER CHANGE PRODUCT BRANDING TO FIX TESTS! 🚨**
+- Product names, feature names, and UI text are intentional branding decisions
+- Example: "Vibe Studio" is the product name - don't change it to "AI DOM Generator"
+- **FIX TESTS TO MATCH PRODUCT**, not the other way around
+- Use IDs for targeting (e.g., `id="ai-dom-generator-heading"`) but keep original text
+
+**🚨 ALWAYS USE ID SELECTORS IN TESTS, NEVER TEXT SELECTORS! 🚨**
+- ✅ **ALWAYS**: Add `id` attributes to elements and use `#id` selectors
+- ❌ **NEVER**: Use `getByText()`, `has-text()`, or text-based selectors
+- **Why**: Text changes with branding/copy, IDs are stable for tests
+- **Pattern**: If element lacks ID, add one in source code first, then use it in test
+- **Example**:
+  ```typescript
+  // WRONG:
+  await page.getByText('Vibe Studio').click()
+
+  // RIGHT:
+  // 1. Add to component: <h2 id="vibe-studio-heading">Vibe Studio</h2>
+  // 2. Use in test: await page.locator('#vibe-studio-heading').click()
+  ```
+
 ## Common Development Commands
 
 ```bash
@@ -38,6 +67,14 @@ SAVE_EXPERIMENT=1 npx playwright test tests/e2e/visual-editor-complete.spec.ts
 ```
 
 **CRITICAL: NEVER use grep, tail, head, or any output filtering!** Always run the test command without any pipes or filters. We need to see the FULL output to debug issues properly.
+
+**🚨 CRITICAL: 10 SECOND TIMEOUT RULE 🚨**
+
+All tests MUST complete in less than 10 seconds. If a test times out:
+- ❌ **DO NOT increase the timeout** - timeouts > 10s mean the test is hanging forever
+- ✅ **Debug what it's waiting for** - element not appearing, wrong selector, component not rendering
+- ✅ **Fix the root cause** - make the element appear or fix the selector
+- The 10-second limit is to catch hangs early, not to be extended
 
 **🚨 ABSOLUTELY FORBIDDEN: NEVER EVER USE `waitForTimeout()` IN TESTS! 🚨**
 
