@@ -79,18 +79,29 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
   useEffect(() => {
     if (experiments.length > 0) {
       const experimentNames = experiments.map(exp => exp.name)
-      getCurrentVariantAssignments(experimentNames).then(data => {
+
+      const checkAssignments = async () => {
+        const data = await getCurrentVariantAssignments(experimentNames)
         setRealVariants(data.assignments)
         setExperimentsInContext(data.experimentsInContext)
         debugLog('SDK data:', data)
-        
-        // Check if any existing overrides differ from real variants
+
         const hasActiveOverrides = Object.entries(overrides).some(([expName, overrideValue]) => {
           const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
-          return data.assignments[expName] !== variant
+          const sdkVariant = data.assignments[expName]
+
+          debugLog(`Comparing override for ${expName}: override=${variant}, sdk=${sdkVariant}`)
+
+          return sdkVariant !== undefined && sdkVariant !== variant
         })
+
+        debugLog('Has active overrides after comparison:', hasActiveOverrides)
         setShowReloadBanner(hasActiveOverrides)
-      })
+      }
+
+      const timeoutId = setTimeout(checkAssignments, 500)
+
+      return () => clearTimeout(timeoutId)
     }
   }, [experiments, overrides])
 
