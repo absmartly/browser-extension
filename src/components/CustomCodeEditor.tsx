@@ -23,12 +23,10 @@ export function CustomCodeEditor({
   onSave,
   readOnly = false
 }: CustomCodeEditorProps) {
-  // Use refs to maintain stable references to callbacks
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
   const onCloseRef = useRef(onClose)
-  
-  // Update refs when props change
+
   useEffect(() => {
     onChangeRef.current = onChange
     onSaveRef.current = onSave
@@ -61,15 +59,12 @@ export function CustomCodeEditor({
     }
     openEditor()
 
-    // Listen for messages from the background script
     const handleMessage = (message: any) => {
       debugLog('CustomCodeEditor received message:', message)
 
       if (message.type === 'CODE_EDITOR_SAVE') {
         debugLog('Saving value:', message.value)
-        // Update the tempValue via onChange for immediate UI feedback
         onChangeRef.current(message.value)
-        // Pass the value directly to onSave to avoid stale state issues
         onSaveRef.current(message.value)
       } else if (message.type === 'CODE_EDITOR_CLOSE') {
         debugLog('Closing editor')
@@ -81,7 +76,6 @@ export function CustomCodeEditor({
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
-      // Tell content script to close the editor
       const closeEditor = async () => {
         try {
           await sendToContent({
@@ -93,7 +87,7 @@ export function CustomCodeEditor({
       }
       closeEditor()
     }
-  }, [isOpen, section, value]) // Only re-run when these change
+  }, [isOpen, section, value])
 
   const getSectionTitle = (section: CustomCodeSection) => {
     switch (section) {
@@ -127,6 +121,5 @@ export function CustomCodeEditor({
     }
   }
 
-  // Return null as the actual editor will be rendered in the content script
   return null
 }

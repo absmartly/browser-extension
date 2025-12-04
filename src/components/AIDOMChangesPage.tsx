@@ -25,7 +25,6 @@ interface AIDOMChangesPageProps {
   onPreviewWithChanges?: (enabled: boolean, changes: DOMChange[]) => void
 }
 
-// DIAGNOSTIC: Helper to generate unique mount IDs
 const generateMountId = () => `mount-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
 export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
@@ -41,7 +40,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   console.log('[AIDOMChangesPage] ========== COMPONENT RENDER START ==========')
   console.log('[AIDOMChangesPage] Props:', { variantName, currentChangesCount: currentChanges?.length })
 
-  // DIAGNOSTIC: Track component instance lifecycle
   const mountId = useRef(generateMountId())
   const renderCount = useRef(0)
 
@@ -68,7 +66,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const onPreviewToggleRef = useRef(onPreviewToggle)
   const onPreviewRefreshRef = useRef(onPreviewRefresh)
 
-  // DIAGNOSTIC: Track mount/unmount lifecycle
   useEffect(() => {
     const id = mountId.current
     console.log(JSON.stringify({
@@ -95,13 +92,11 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }, [])
 
-  // Keep refs updated with latest callbacks
   useEffect(() => {
     onPreviewToggleRef.current = onPreviewToggle
     onPreviewRefreshRef.current = onPreviewRefresh
   }, [onPreviewToggle, onPreviewRefresh])
 
-  // Initialize conversation - this should NEVER block the UI from showing
   useEffect(() => {
     console.log('[AIDOMChangesPage] ========== INITIALIZATION START ==========')
     console.log('[AIDOMChangesPage] variantName:', variantName)
@@ -110,19 +105,17 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       try {
         setIsLoadingHistory(true)
 
-        // Step 1: Check for migration (quick, shouldn't fail)
         if (await needsMigration(variantName)) {
           console.log('[AIDOMChangesPage] Migrating old conversation format')
           await migrateConversation(variantName)
         }
 
-        // Step 2: Load conversation list (quick, shouldn't fail)
         const list = await getConversationList(variantName)
-        console.log('[AIDOMChangesPage] Loaded conversation list:', list.length, 'conversations')
+        console.log('[AIDOMChangesPage] Loaded conversation list:', list.length, 'conversations for variant:', variantName)
+        console.log('[AIDOMChangesPage] Conversation list:', JSON.stringify(list))
         setConversationList(list)
         setIsLoadingHistory(false)
 
-        // Step 3: Load active conversation or create new one
         const activeConv = list.find(c => c.isActive)
 
         if (activeConv) {
@@ -133,7 +126,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
             setCurrentConversationId(loaded.id)
             console.log('[AIDOMChangesPage] Loaded active conversation:', loaded.id)
 
-            // Try to initialize HTML if not sent yet - but don't block on failure
             if (!loaded.conversationSession.htmlSent) {
               initializeSessionHTML(loaded.conversationSession, loaded.id)
                 .catch(err => {
@@ -144,7 +136,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           }
         }
 
-        // Create new conversation
         const newSession: ConversationSession = {
           id: crypto.randomUUID(),
           htmlSent: false,
@@ -156,7 +147,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         setCurrentConversationId(newConvId)
         console.log('[AIDOMChangesPage] Created new conversation:', newConvId)
 
-        // Try to initialize HTML in background - don't block on failure
         initializeSessionHTML(newSession, newConvId)
           .catch(err => {
             console.warn('[AIDOMChangesPage] HTML initialization failed (non-blocking):', err)
@@ -170,7 +160,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     })()
   }, [variantName])
 
-  // Initialize HTML context for the session - runs in background, doesn't block UI
   const initializeSessionHTML = async (session: ConversationSession, conversationId: string) => {
     console.log('[initializeSessionHTML] Starting background HTML capture...')
 
@@ -193,8 +182,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       }
     } catch (error) {
       console.error('[initializeSessionHTML] ❌ HTML capture failed:', error)
-      // Don't set error state - this is optional functionality
-      // User can still chat, just without preemptive HTML context
     }
   }
 
@@ -320,7 +307,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       const newHistory = [...chatHistory, userMessage, assistantMessage]
       setChatHistory(newHistory)
 
-      // Auto-save conversation after each message
       const updatedConversation: StoredConversation = {
         id: currentConversationId,
         variantName,
@@ -352,29 +338,24 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         }, 500)
       }
 
-      // Track the latest DOM changes
       if (result.domChanges && result.domChanges.length > 0) {
         setLatestDomChanges(result.domChanges)
 
         if (!previewEnabledOnce) {
-          // First message with DOM changes - enable preview with these changes directly
           console.log('[AIDOMChangesPage] First message with DOM changes - enabling preview directly')
           if (onPreviewWithChanges) {
             onPreviewWithChanges(true, result.domChanges)
             setPreviewEnabledOnce(true)
             setIsPreviewEnabled(true)
           }
-          // Save changes to variant after preview is enabled
           if (onRestoreChanges) {
             onRestoreChanges(result.domChanges)
           }
         } else {
-          // Preview already enabled - save changes first, then refresh
           console.log('[AIDOMChangesPage] Preview already enabled - restoring and refreshing')
           if (onRestoreChanges) {
             onRestoreChanges(result.domChanges)
           }
-          // Give variant time to update, then refresh
           setTimeout(() => {
             if (onPreviewRefreshRef.current) {
               onPreviewRefreshRef.current()
@@ -415,7 +396,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   }
 
   const handleNewChat = async () => {
-    // Save current conversation first
     if (chatHistory.length > 0 && currentConversationId) {
       const currentConv: StoredConversation = {
         id: currentConversationId,
@@ -436,7 +416,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       }
     }
 
-    // Create new conversation
     const newSession: ConversationSession = {
       id: crypto.randomUUID(),
       htmlSent: false,
@@ -453,7 +432,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     setError(null)
     setLatestDomChanges(currentChanges)
 
-    // Refresh conversation list
     const list = await getConversationList(variantName)
     setConversationList(list)
 
@@ -462,7 +440,6 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
   console.log('[AIDOMChangesPage] ========== RENDER START (isInitialized:', isInitialized, 'chatHistory:', chatHistory.length, ') ==========')
 
-  // DIAGNOSTIC: Track each render with structured logging
   renderCount.current++
   console.log(JSON.stringify({
     type: 'LIFECYCLE',
@@ -481,14 +458,14 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   }))
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white" data-ai-dom-changes-page="true">
       <div className="p-4">
         <Header
           title={
             <div className="flex items-center gap-2">
               <SparklesIcon className="h-6 w-6 text-purple-600" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Vibe Studio</h2>
+                <h2 id="ai-dom-generator-heading" className="text-lg font-semibold text-gray-900">Vibe Studio</h2>
                 <p className="text-xs text-gray-600">Variant: {variantName}</p>
               </div>
             </div>
@@ -731,18 +708,15 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                             setLatestDomChanges(message.domChangesSnapshot)
 
                             if (!previewEnabledOnce) {
-                              // First time enabling preview - use direct changes
                               console.log('[AIDOMChangesPage] Enabling preview after restoring changes from history')
                               if (onPreviewWithChanges) {
                                 onPreviewWithChanges(true, message.domChangesSnapshot)
                                 setPreviewEnabledOnce(true)
                               }
-                              // Save to variant after preview enabled
                               if (onRestoreChanges) {
                                 onRestoreChanges(message.domChangesSnapshot)
                               }
                             } else {
-                              // Preview already enabled - save then refresh
                               console.log('[AIDOMChangesPage] Refreshing preview after restoring changes from history')
                               if (onRestoreChanges) {
                                 onRestoreChanges(message.domChangesSnapshot)

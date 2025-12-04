@@ -95,7 +95,7 @@ const OwnersField = React.memo(function OwnersField({
 
   return (
     <MultiSelect
-      label="Owners"
+      label="Owners" id="owners-label"
       options={ownersOptions}
       selectedIds={ownersSelectedIds}
       onChange={handleOwnersChange}
@@ -169,7 +169,7 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label id="traffic-label" className="block text-sm font-medium text-gray-700 mb-1">
           Traffic Percentage
         </label>
         <Input
@@ -225,7 +225,7 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
       ) : null}
 
       <MultiSelect
-        label="Tags (optional)"
+        label="Tags (optional)" id="tags-label"
         options={tagOptions}
         selectedIds={data.tag_ids}
         onChange={handleTagChange}

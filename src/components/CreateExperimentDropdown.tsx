@@ -152,6 +152,7 @@ export function CreateExperimentDropdownPanel({
       </div>
 
       <button
+        id="from-scratch-button"
         onClick={onCreateFromScratch}
         className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm font-medium text-blue-600 border-b border-gray-200"
         role="menuitem"

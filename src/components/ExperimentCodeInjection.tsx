@@ -31,7 +31,6 @@ export function ExperimentCodeInjection({
   const [editingSection, setEditingSection] = useState<InjectionSection | null>(null)
   const [tempValue, setTempValue] = useState('')
 
-  // URL Filter state
   const [isUrlFilterExpanded, setIsUrlFilterExpanded] = useState(false)
   const [mode, setMode] = useState<'all' | 'simple' | 'advanced'>(() => {
     if (!code.urlFilter) return 'all'
@@ -88,13 +87,9 @@ export function ExperimentCodeInjection({
   const codeCount = sections.filter(s => hasCode(s.key)).length
 
   const handleSectionClick = (section: InjectionSection) => {
-    // Always allow opening the editor to view code, even in read-only mode
-    // If the same section is clicked again, temporarily close and reopen to trigger the effect
     if (editingSection === section) {
-      // Store current code value before closing
       const currentCode = code[section] || ''
       setEditingSection(null)
-      // Use setTimeout to ensure the state update is processed before reopening
       setTimeout(() => {
         setEditingSection(section)
         setTempValue(currentCode)
@@ -105,11 +100,11 @@ export function ExperimentCodeInjection({
     }
   }
 
-  const handleSaveSection = () => {
+  const handleSaveSection = (value: string) => {
     if (editingSection) {
       const updatedCode = {
         ...code,
-        [editingSection]: tempValue
+        [editingSection]: value
       }
       setCode(updatedCode)
       onChange(updatedCode)
@@ -143,7 +138,6 @@ export function ExperimentCodeInjection({
         }
       }
     } else {
-      // advanced mode
       const includeFiltered = simplePatterns.filter(p => p.trim())
       const excludeFiltered = excludePatterns.filter(p => p.trim())
 
@@ -169,7 +163,6 @@ export function ExperimentCodeInjection({
   const copyUrlFilterFromDomChanges = () => {
     if (!domChangesUrlFilter) return
 
-    // Update mode
     if (typeof domChangesUrlFilter === 'string' || Array.isArray(domChangesUrlFilter)) {
       setMode('simple')
       const patterns = typeof domChangesUrlFilter === 'string' ? [domChangesUrlFilter] : domChangesUrlFilter
@@ -186,7 +179,6 @@ export function ExperimentCodeInjection({
       setMatchType(domChangesUrlFilter.matchType || 'path')
     }
 
-    // Update the code with the filter
     const updatedCode = { ...code, urlFilter: domChangesUrlFilter }
     setCode(updatedCode)
     onChange(updatedCode)
@@ -194,7 +186,6 @@ export function ExperimentCodeInjection({
 
   return (
     <div className="bg-gray-50 rounded-lg border border-gray-200">
-      {/* Header with toggle */}
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -215,7 +206,6 @@ export function ExperimentCodeInjection({
         )}
       </button>
 
-      {/* Collapsible content */}
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-gray-200 pt-4">
           <p className="text-xs text-gray-500">
@@ -223,7 +213,6 @@ export function ExperimentCodeInjection({
             Wrap JavaScript in <code className="bg-gray-200 px-1 rounded">&lt;script&gt;</code> tags.
           </p>
 
-          {/* Copy URL filter button */}
           {domChangesUrlFilter && (
             <Button
               type="button"
@@ -236,7 +225,6 @@ export function ExperimentCodeInjection({
             </Button>
           )}
 
-          {/* URL Filter Section */}
           <div className="bg-blue-50 rounded-lg border border-blue-200">
             <button
               type="button"
@@ -249,7 +237,6 @@ export function ExperimentCodeInjection({
 
             {isUrlFilterExpanded && (
               <div className="px-4 pb-4 space-y-3 border-t border-blue-200 pt-3">
-                {/* Mode selector */}
                 <select
                   value={mode}
                   onChange={(e) => {
@@ -274,7 +261,6 @@ export function ExperimentCodeInjection({
                   <option value="advanced">Advanced (Include/Exclude + Regex)</option>
                 </select>
 
-                {/* Match Type selector */}
                 {mode !== 'all' && (
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1.5 block">
@@ -299,7 +285,6 @@ export function ExperimentCodeInjection({
                   </div>
                 )}
 
-                {/* Simple mode */}
                 {mode === 'simple' && (
                   <div className="space-y-2">
                     <div className="text-xs text-gray-600">
@@ -346,7 +331,6 @@ export function ExperimentCodeInjection({
                   </div>
                 )}
 
-                {/* Advanced mode */}
                 {mode === 'advanced' && (
                   <div className="space-y-3">
                     <label className="flex items-center gap-2">
@@ -363,7 +347,6 @@ export function ExperimentCodeInjection({
                       <span className="text-xs text-gray-700">Use regular expressions</span>
                     </label>
 
-                    {/* Include patterns */}
                     <div>
                       <label className="text-xs font-medium text-gray-600 mb-1.5 block">
                         Include (show on these URLs):
@@ -410,7 +393,6 @@ export function ExperimentCodeInjection({
                       </div>
                     </div>
 
-                    {/* Exclude patterns */}
                     <div>
                       <label className="text-xs font-medium text-gray-600 mb-1.5 block">
                         Exclude (hide on these URLs):
@@ -462,7 +444,6 @@ export function ExperimentCodeInjection({
             )}
           </div>
 
-          {/* Code sections */}
           <div className="space-y-2">
             {sections.map((section) => (
               <div
@@ -510,7 +491,6 @@ export function ExperimentCodeInjection({
         </div>
       )}
 
-      {/* Code Editor */}
       <CustomCodeEditor
         isOpen={editingSection !== null}
         onClose={handleCloseDialog}

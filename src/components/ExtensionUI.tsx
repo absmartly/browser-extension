@@ -378,7 +378,13 @@ function SidebarContent() {
           setAutoNavigateToAI(state.aiVariantName)
           setView('detail')
         } else if (state.view && state.view !== 'ai-dom-changes') {
-          setView(state.view as View)
+          // Don't restore 'detail' view if there's no selected experiment - redirect to list
+          if (state.view === 'detail' && !state.selectedExperiment) {
+            debugLog('Redirecting to list - detail view with no selected experiment')
+            setView('list')
+          } else {
+            setView(state.view as View)
+          }
         }
       }
     })
