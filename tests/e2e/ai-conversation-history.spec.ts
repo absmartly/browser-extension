@@ -73,7 +73,7 @@ test.describe('AI Conversation History', () => {
 
           const conversation = {
             id: conversationId,
-            variantName: 'A',
+            variantName: 'Variant 1',
             messages: [message, message2],
             conversationSession: {
               id: `session-${i}`,
@@ -151,7 +151,7 @@ test.describe('AI Conversation History', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
       await generateWithAIButton.scrollIntoViewIfNeeded()
       await debugWait(300)
@@ -161,7 +161,7 @@ test.describe('AI Conversation History', () => {
 
       await debugWait(1000)
 
-      await testPage.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await testPage.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       log('✓ AI page opened')
 
       await testPage.screenshot({ path: 'test-results/conv-history-1-ai-page.png', fullPage: true })
@@ -181,7 +181,7 @@ test.describe('AI Conversation History', () => {
         const index = store.index('by-variant')
 
         const conversations = await new Promise<any[]>((resolve) => {
-          const request = index.getAll('A')
+          const request = index.getAll('Variant 1')
           request.onsuccess = () => resolve(request.result || [])
           request.onerror = () => resolve([])
         })
@@ -199,16 +199,28 @@ test.describe('AI Conversation History', () => {
     await test.step('Verify history button is enabled (conversations exist)', async () => {
       log('Checking history button state (should be enabled with pre-populated data)...')
 
+      // Debug: Check what variant name the AI page is using
+      const variantDebug = await testPage.evaluate(() => {
+        const variantText = document.querySelector('p.text-xs.text-gray-600')?.textContent
+        return variantText
+      })
+      log(`AI page variant: ${variantDebug}`)
+
+      // Wait for the button to finish loading (title changes from "Loading conversations..." to "Conversation History")
       const historyButton = testPage.locator('button[title="Conversation History"]')
-      await historyButton.waitFor({ state: 'visible', timeout: 5000 })
-      log('✓ History button found')
+      await historyButton.waitFor({ state: 'visible', timeout: 15000 })
+      log('✓ History button found and loaded')
+
+      // Debug: Check if conversationList was loaded
+      const buttonTitle = await historyButton.getAttribute('title')
+      const iconClass = await historyButton.locator('svg').getAttribute('class')
+      log(`Button title: ${buttonTitle}`)
+      log(`Icon class: ${iconClass}`)
 
       const isDisabled = await historyButton.isDisabled()
       expect(isDisabled).toBe(false)
       log('✅ History button is correctly enabled (conversations exist)')
 
-      const iconClass = await historyButton.locator('svg').getAttribute('class')
-      log(`Icon class: ${iconClass}`)
       expect(iconClass).toContain('text-gray-600')
       log('✅ Icon has correct color (gray-600 when enabled)')
 
@@ -356,7 +368,7 @@ test.describe('AI Conversation History', () => {
         const index = store.index('by-variant')
 
         const conversations = await new Promise<any[]>((resolve) => {
-          const request = index.getAll('A')
+          const request = index.getAll('Variant 1')
           request.onsuccess = () => resolve(request.result || [])
           request.onerror = () => resolve([])
         })

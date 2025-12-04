@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
+import { createExperiment, activateVisualEditor } from './helpers/ve-experiment-setup'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -82,7 +83,7 @@ test.describe('Visual Improvements Tests', () => {
     await test.step('Check for BETA badge', async () => {
       console.log('Checking for BETA badge')
 
-      const betaBadge = sidebar.locator('span:has-text("BETA")')
+      const betaBadge = sidebar.locator('#beta-badge, span:has-text("BETA")')
       await betaBadge.waitFor({ state: 'visible', timeout: 5000 })
       await debugWait()
 
@@ -133,7 +134,7 @@ test.describe('Visual Improvements Tests', () => {
       await backButton.click()
       await debugWait()
 
-      await sidebar.locator('h1:has-text("Experiments")').waitFor({ state: 'visible', timeout: 5000 })
+      await sidebar.locator('#experiments-header, h1:has-text("Experiments")').waitFor({ state: 'visible', timeout: 5000 })
       console.log('Back button works - returned to experiments list')
       await debugWait()
     })
@@ -154,7 +155,7 @@ test.describe('Visual Improvements Tests', () => {
       console.log('Dropdown opened')
 
       // Check for "Create from scratch" button - this confirms dropdown is visible
-      const createFromScratch = sidebar.locator('button:has-text("Create from scratch")')
+      const createFromScratch = sidebar.locator('#from-scratch-button')
       await createFromScratch.waitFor({ state: 'visible', timeout: 5000 })
       console.log('Create from scratch button found')
       
@@ -166,7 +167,7 @@ test.describe('Visual Improvements Tests', () => {
       await debugWait(1000)
       
       // Check if templates loaded successfully
-      const templateButtons = sidebar.locator('button:has-text("Load")')
+      const templateButtons = sidebar.locator('#load-template-button, button:has-text("Load")')
       const templateCount = await templateButtons.count()
       console.log('Number of templates loaded:', templateCount)
       
@@ -198,20 +199,14 @@ test.describe('Visual Improvements Tests', () => {
 
     const sidebar = await injectSidebar(testPage, extensionUrl)
 
-    await test.step('Start Visual Editor', async () => {
-      console.log('Starting Visual Editor')
-
-      await sidebar.locator('button[title="Create New Experiment"]').click()
-      const experimentName = `VE Float Test ${Date.now()}`
-      await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
+    await test.step('Create experiment and start Visual Editor', async () => {
+      console.log('Creating experiment')
+      const experimentName = await createExperiment(sidebar)
       console.log(`Created experiment: ${experimentName}`)
-      await debugWait()
 
-      const visualEditorButton = sidebar.locator('button:has-text("Visual Editor")').first()
-      await visualEditorButton.click()
-      await testPage.locator('.absmartly-notification:has-text("Visual Editor Active")').waitFor({ state: 'visible', timeout: 10000 })
+      console.log('Activating Visual Editor')
+      await activateVisualEditor(sidebar, testPage)
       console.log('Visual editor active')
-      await debugWait()
     })
 
     await test.step('Verify floating bar styling', async () => {

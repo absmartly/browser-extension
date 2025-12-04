@@ -186,7 +186,7 @@ test.describe('AI DOM Granular Operations', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
       await generateWithAIButton.click()
       await debugWait(1000)
@@ -273,7 +273,7 @@ test.describe('AI DOM Granular Operations', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.click()
       await debugWait(1000)
 
@@ -343,7 +343,7 @@ test.describe('AI DOM Granular Operations', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.click()
       await debugWait(1000)
 
@@ -416,7 +416,7 @@ test.describe('AI DOM Granular Operations', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.click()
       await debugWait(1000)
 
@@ -489,7 +489,7 @@ test.describe('AI DOM Granular Operations', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.click()
       await debugWait(1000)
 
@@ -562,7 +562,7 @@ test.describe('AI DOM Granular Operations', () => {
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
       await generateWithAIButton.click()
       await debugWait(1000)
 

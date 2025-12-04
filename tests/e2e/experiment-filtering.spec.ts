@@ -49,7 +49,7 @@ test.describe('Experiment Filtering Tests', () => {
       console.log('\n🔍 STEP 2: Opening filters')
 
       // Look for filter toggle button
-      const filterButton = sidebar.locator('button:has-text("Filters"), button:has-text("Filter")')
+      const filterButton = sidebar.locator('#filters-button')
 
       if (await filterButton.count() > 0) {
         await filterButton.first().evaluate((btn: HTMLElement) =>
@@ -86,7 +86,7 @@ test.describe('Experiment Filtering Tests', () => {
       console.log('\n📊 STEP 4: Applying state filter')
 
       // Look for state filter dropdown or checkboxes
-      const stateSelect = sidebar.locator('select[name*="state"], select:has-text("State")')
+      const stateSelect = sidebar.locator('#state-filter-select, select[name*="state"]')
 
       if (await stateSelect.count() > 0) {
         await stateSelect.first().selectOption('running')
@@ -94,7 +94,7 @@ test.describe('Experiment Filtering Tests', () => {
         await debugWait()
       } else {
         // Try checkboxes
-        const runningCheckbox = sidebar.locator('input[type="checkbox"][value="running"], label:has-text("Running") input[type="checkbox"]')
+        const runningCheckbox = sidebar.locator('#running-filter-checkbox, input[type="checkbox"][value="running"]')
         if (await runningCheckbox.count() > 0) {
           await runningCheckbox.first().check()
           console.log('  ✓ Checked "running" state checkbox')
@@ -109,7 +109,7 @@ test.describe('Experiment Filtering Tests', () => {
       console.log('\n✅ STEP 5: Applying filters')
 
       // Look for apply/search button
-      const applyButton = sidebar.locator('button:has-text("Apply"), button:has-text("Search"), button[type="submit"]')
+      const applyButton = sidebar.locator('#apply-filters-button, button[type="submit"]')
 
       if (await applyButton.count() > 0) {
         await applyButton.first().evaluate((btn: HTMLElement) =>
@@ -129,7 +129,7 @@ test.describe('Experiment Filtering Tests', () => {
       await sidebar.locator('text=Loading').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 
       // Check if any experiments are displayed
-      const experimentItems = sidebar.locator('[data-testid*="experiment"], .experiment-item, div:has-text("Experiment")')
+      const experimentItems = sidebar.locator('[data-testid*="experiment"], .experiment-item')
       const count = await experimentItems.count()
 
       console.log(`  ℹ Found ${count} experiment items`)
@@ -172,7 +172,7 @@ test.describe('Experiment Filtering Tests', () => {
       console.log('\n🧹 Clearing filters')
 
       // Look for clear/reset button
-      const clearButton = sidebar.locator('button:has-text("Clear"), button:has-text("Reset")')
+      const clearButton = sidebar.locator('#clear-filters-button')
 
       if (await clearButton.count() > 0) {
         await clearButton.first().evaluate((btn: HTMLElement) =>

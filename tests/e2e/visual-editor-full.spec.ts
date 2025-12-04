@@ -64,7 +64,7 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
     await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Look for Visual Editor button
-      const visualEditorBtn = sidebarPage.locator('button:has-text("Visual Editor"), button:has-text("Launch Visual Editor")').first()
+      const visualEditorBtn = sidebarPage.locator('#visual-editor-button').first()
       if (await visualEditorBtn.isVisible()) {
         console.log('✅ Found Visual Editor button, clicking...')
         await visualEditorBtn.click()
@@ -251,13 +251,13 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
       }
 
       // Check Save button
-      const saveBtn = toolbar.locator('button:has-text("Save")').first()
+      const saveBtn = toolbar.locator('#save-button').first()
       if (await saveBtn.isVisible()) {
         console.log('   Save button is available')
       }
 
       // Check Cancel/Exit button
-      const exitBtn = toolbar.locator('button:has-text("Cancel"), button:has-text("Exit"), button[aria-label*="close"]').first()
+      const exitBtn = toolbar.locator('#cancel-button, #exit-button, button[aria-label*="close"]').first()
       if (await exitBtn.isVisible()) {
         console.log('   Exit button is available')
       }

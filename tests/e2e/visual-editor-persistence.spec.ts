@@ -2066,7 +2066,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
 
     // Verify multi-variant experiment handling
     expect(multiVariantResult.experimentsCount).toBe(3)
-    expect(multiVariantResult.totalVariants).toBe(8) // Total variants across all experiments
+    expect(multiVariantResult.totalVariants).toBe(9) // Total variants across all experiments (4+2+3)
     expect(multiVariantResult.assignedVariants).toBe(3)
     expect(multiVariantResult.applicationResults.length).toBeGreaterThan(0)
 

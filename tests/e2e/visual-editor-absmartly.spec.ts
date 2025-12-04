@@ -99,7 +99,7 @@ test.describe('Visual Editor Complete Test', () => {
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {}) // Give time for API calls
 
     // Check if we need to configure first
-    const needsConfig = await sidebarFrame.locator('button:has-text("Configure Settings")').isVisible().catch(() => false)
+    const needsConfig = await sidebarFrame.locator('#configure-settings-button').isVisible().catch(() => false)
 
     if (needsConfig) {
       console.log('⚙️ Extension needs configuration, skipping...')
@@ -133,14 +133,14 @@ test.describe('Visual Editor Complete Test', () => {
 
     // Step 5: Click Visual Editor button
     console.log('\n🎨 Launching Visual Editor...')
-    const visualEditorBtn = sidebarFrame.locator('button:has-text("Visual Editor"), button:has-text("Launch Visual Editor")').first()
+    const visualEditorBtn = sidebarFrame.locator('#visual-editor-button').first()
 
     const btnVisible = await visualEditorBtn.isVisible().catch(() => false)
     if (!btnVisible) {
       console.log('⚠️ Visual Editor button not found')
 
       // Try to find back button to ensure we're on details page
-      const hasBackBtn = await sidebarFrame.locator('button:has-text("Back")').isVisible().catch(() => false)
+      const hasBackBtn = await sidebarFrame.locator('#back-button').isVisible().catch(() => false)
       console.log('   On details page:', hasBackBtn)
 
       return
@@ -278,13 +278,13 @@ test.describe('Visual Editor Complete Test', () => {
     }
 
     // Check for Save button
-    const saveBtn = toolbar.locator('button:has-text("Save")').first()
+    const saveBtn = toolbar.locator('#save-button').first()
     if (await saveBtn.isVisible()) {
       console.log('   ✅ Save button available')
     }
 
     // Check for Exit button
-    const exitBtn = toolbar.locator('button:has-text("Cancel"), button:has-text("Exit"), button[title*="Close"]').first()
+    const exitBtn = toolbar.locator('#cancel-button, #exit-button, button[title*="Close"]').first()
     if (await exitBtn.isVisible()) {
       console.log('   ✅ Exit button available')
     }

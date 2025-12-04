@@ -120,7 +120,7 @@ test.describe('API Integration Tests', () => {
       await page.locator('.experiment-item').first().click()
 
       // Should navigate to experiment detail
-      const hasBackButton = await page.locator('button:has-text("Back")').isVisible().catch(() => false)
+      const hasBackButton = await page.locator('#back-button').isVisible().catch(() => false)
       const hasVisualEditorButton = await page.locator('text=/visual editor/i').isVisible().catch(() => false)
 
       // Should show experiment details

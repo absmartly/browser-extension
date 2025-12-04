@@ -57,7 +57,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n➕ STEP 2: Creating/editing experiment')
 
       // Try to find create button
-      const createButton = sidebar.locator('button:has-text("Create"), button:has-text("New Experiment")')
+      const createButton = sidebar.locator('#create-experiment-button')
 
       if (await createButton.count() > 0) {
         await createButton.first().evaluate((btn: HTMLElement) =>
@@ -67,7 +67,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
         await debugWait()
       } else {
         // Try to find and click an existing experiment
-        const experimentItem = sidebar.locator('[data-testid*="experiment"], div:has-text("experiment")').first()
+        const experimentItem = sidebar.locator('[data-testid*="experiment"]').first()
         if (await experimentItem.count() > 0) {
           await experimentItem.evaluate((el: HTMLElement) =>
             el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -82,7 +82,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n📦 STEP 3: Expanding variant')
 
       // Look for variant expand button (arrow icon)
-      const expandButton = sidebar.locator('button:has-text("▶"), button:has-text("▼")').first()
+      const expandButton = sidebar.locator('[aria-label*="expand"], [aria-label*="collapse"], button:has-text("▶")').first()
 
       if (await expandButton.count() > 0) {
         await expandButton.evaluate((btn: HTMLElement) =>
@@ -105,7 +105,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
         console.log('  ✓ URL filtering section found')
 
         // Expand if collapsed
-        const expandButton = urlFilterSection.locator('..').locator('button:has-text("+"), button:has-text("−")')
+        const expandButton = urlFilterSection.locator('..').locator('[aria-label*="toggle"], button:has-text("+")')
         if (await expandButton.count() > 0) {
           await expandButton.first().evaluate((btn: HTMLElement) =>
             btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -122,7 +122,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n⚙️ STEP 5: Interacting with URL filter')
 
       // Look for URL filter mode dropdown
-      const modeSelect = sidebar.locator('select:has-text("Apply on all pages"), select:has-text("Target specific URLs")')
+      const modeSelect = sidebar.locator('#url-filter-mode-select, select').first()
 
       if (await modeSelect.count() > 0) {
         // Change mode to simple
@@ -170,7 +170,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n📦 Navigating to variant')
 
       // Create or edit experiment
-      const createButton = sidebar.locator('button:has-text("Create"), button:has-text("New")')
+      const createButton = sidebar.locator('#create-experiment-button')
       if (await createButton.count() > 0) {
         await createButton.first().evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -179,7 +179,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       }
 
       // Expand variant
-      const expandButton = sidebar.locator('button:has-text("▶")').first()
+      const expandButton = sidebar.locator('[aria-label*="expand"], button:has-text("▶")').first()
       if (await expandButton.count() > 0) {
         await expandButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -197,7 +197,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
         console.log('  ✓ Global defaults section found')
 
         // Expand it
-        const expandButton = globalDefaultsSection.locator('..').locator('button:has-text("+"), button:has-text("−")')
+        const expandButton = globalDefaultsSection.locator('..').locator('[aria-label*="toggle"], button:has-text("+")')
         if (await expandButton.count() > 0) {
           await expandButton.first().evaluate((btn: HTMLElement) =>
             btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -258,7 +258,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       await debugWait()
 
       // Navigate to experiment editor
-      const createButton = sidebar.locator('button:has-text("Create")')
+      const createButton = sidebar.locator('#create-experiment-button')
       if (await createButton.count() > 0) {
         await createButton.first().evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))

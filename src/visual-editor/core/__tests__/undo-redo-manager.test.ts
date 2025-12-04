@@ -21,8 +21,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'new text',
-        enabled: true
+        value: 'new text'
       }
 
       manager.addChange(change, 'old text')
@@ -36,14 +35,12 @@ describe('UndoRedoManager', () => {
       const change1: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'text 1',
-        enabled: true
+        value: 'text 1'
       }
       const change2: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'text 2',
-        enabled: true
+        value: 'text 2'
       }
 
       manager.addChange(change1, 'original')
@@ -63,20 +60,17 @@ describe('UndoRedoManager', () => {
       const change1: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'text 1',
-        enabled: true
+        value: 'text 1'
       }
       const change2: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'text 2',
-        enabled: true
+        value: 'text 2'
       }
       const change3: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'text 3',
-        enabled: true
+        value: 'text 3'
       }
 
       manager.addChange(change1, 'original')
@@ -104,14 +98,12 @@ describe('UndoRedoManager', () => {
       const change1: DOMChange = {
         selector: '#test1',
         type: 'text',
-        value: 'text 1',
-        enabled: true
+        value: 'text 1'
       }
       const change2: DOMChange = {
         selector: '#test2',
         type: 'text',
-        value: 'text 2',
-        enabled: true
+        value: 'text 2'
       }
 
       manager.addChange(change1, 'old1')
@@ -124,14 +116,12 @@ describe('UndoRedoManager', () => {
       const change1: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'new text',
-        enabled: true
+        value: 'new text'
       }
       const change2: DOMChange = {
         selector: '#test',
         type: 'html',
-        value: '<div>new html</div>',
-        enabled: true
+        value: '<div>new html</div>'
       }
 
       manager.addChange(change1, 'old text')
@@ -146,8 +136,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'new text',
-        enabled: true
+        value: 'new text'
       }
 
       manager.addChange(change, 'old text')
@@ -162,9 +151,9 @@ describe('UndoRedoManager', () => {
 
     it('should undo multiple changes in correct order', () => {
       const changes = [
-        { selector: '#test1', type: 'text' as const, value: 'text 1', enabled: true },
-        { selector: '#test2', type: 'text' as const, value: 'text 2', enabled: true },
-        { selector: '#test3', type: 'text' as const, value: 'text 3', enabled: true }
+        { selector: '#test1', type: 'text' as const, value: 'text 1' },
+        { selector: '#test2', type: 'text' as const, value: 'text 2' },
+        { selector: '#test3', type: 'text' as const, value: 'text 3' }
       ]
 
       manager.addChange(changes[0], 'original1')
@@ -194,8 +183,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'new text',
-        enabled: true
+        value: 'new text'
       }
 
       manager.addChange(change, 'old text')
@@ -212,9 +200,9 @@ describe('UndoRedoManager', () => {
 
     it('should redo multiple changes in correct order', () => {
       const changes = [
-        { selector: '#test1', type: 'text' as const, value: 'text 1', enabled: true },
-        { selector: '#test2', type: 'text' as const, value: 'text 2', enabled: true },
-        { selector: '#test3', type: 'text' as const, value: 'text 3', enabled: true }
+        { selector: '#test1', type: 'text' as const, value: 'text 1' },
+        { selector: '#test2', type: 'text' as const, value: 'text 2' },
+        { selector: '#test3', type: 'text' as const, value: 'text 3' }
       ]
 
       manager.addChange(changes[0], 'original1')
@@ -249,15 +237,15 @@ describe('UndoRedoManager', () => {
     it('should squash multiple changes to same element', () => {
       // Add 3 changes to same element
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'text 1', enabled: true },
+        { selector: '#test', type: 'text', value: 'text 1' },
         'original'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'text 2', enabled: true },
+        { selector: '#test', type: 'text', value: 'text 2' },
         'text 1'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'text 3', enabled: true },
+        { selector: '#test', type: 'text', value: 'text 3' },
         'text 2'
       )
 
@@ -274,11 +262,11 @@ describe('UndoRedoManager', () => {
 
     it('should not squash changes to different selectors', () => {
       manager.addChange(
-        { selector: '#test1', type: 'text', value: 'text 1', enabled: true },
+        { selector: '#test1', type: 'text', value: 'text 1' },
         'old1'
       )
       manager.addChange(
-        { selector: '#test2', type: 'text', value: 'text 2', enabled: true },
+        { selector: '#test2', type: 'text', value: 'text 2' },
         'old2'
       )
 
@@ -288,11 +276,11 @@ describe('UndoRedoManager', () => {
 
     it('should not squash changes to different types', () => {
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'new text', enabled: true },
+        { selector: '#test', type: 'text', value: 'new text' },
         'old text'
       )
       manager.addChange(
-        { selector: '#test', type: 'html', value: '<div>new html</div>', enabled: true },
+        { selector: '#test', type: 'html', value: '<div>new html</div>' },
         'old html'
       )
 
@@ -303,23 +291,23 @@ describe('UndoRedoManager', () => {
     it('should squash mixed changes correctly', () => {
       // Changes to #test1 (will squash to 1)
       manager.addChange(
-        { selector: '#test1', type: 'text', value: 'A', enabled: true },
+        { selector: '#test1', type: 'text', value: 'A' },
         'original'
       )
       manager.addChange(
-        { selector: '#test1', type: 'text', value: 'B', enabled: true },
+        { selector: '#test1', type: 'text', value: 'B' },
         'A'
       )
 
       // Change to #test2 (different element)
       manager.addChange(
-        { selector: '#test2', type: 'text', value: 'X', enabled: true },
+        { selector: '#test2', type: 'text', value: 'X' },
         'oldX'
       )
 
       // Another change to #test1 (will merge with earlier #test1 changes)
       manager.addChange(
-        { selector: '#test1', type: 'text', value: 'C', enabled: true },
+        { selector: '#test1', type: 'text', value: 'C' },
         'B'
       )
 
@@ -343,11 +331,11 @@ describe('UndoRedoManager', () => {
 
     it('should squash style changes correctly', () => {
       manager.addChange(
-        { selector: '#test', type: 'style', value: { color: 'red' }, enabled: true },
+        { selector: '#test', type: 'style', value: { color: 'red' } },
         { color: 'black' }
       )
       manager.addChange(
-        { selector: '#test', type: 'style', value: { color: 'blue', fontSize: '16px' }, enabled: true },
+        { selector: '#test', type: 'style', value: { color: 'blue', fontSize: '16px' } },
         { color: 'red' }
       )
 
@@ -362,8 +350,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'original value',
-        enabled: true
+        value: 'original value'
       }
 
       manager.addChange(change, 'old value')
@@ -380,8 +367,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'style',
-        value: { color: 'red' },
-        enabled: true
+        value: { color: 'red' }
       }
       const oldValue = { color: 'blue' }
 
@@ -399,8 +385,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'new value',
-        enabled: true
+        value: 'new value'
       }
 
       manager.addChange(change, 'old value')
@@ -423,8 +408,7 @@ describe('UndoRedoManager', () => {
         const change: DOMChange = {
           selector: `#test${i}`,
           type: 'text',
-          value: `text ${i}`,
-          enabled: true
+          value: `text ${i}`
         }
         smallManager.addChange(change, `old ${i}`)
       }
@@ -450,7 +434,7 @@ describe('UndoRedoManager', () => {
       // Add many changes to same element (no squashing - each tracked individually)
       for (let i = 0; i < 5; i++) {
         smallManager.addChange(
-          { selector: '#test', type: 'text', value: `text ${i}`, enabled: true },
+          { selector: '#test', type: 'text', value: `text ${i}` },
           i === 0 ? 'original' : `text ${i - 1}`
         )
       }
@@ -474,8 +458,7 @@ describe('UndoRedoManager', () => {
       const change: DOMChange = {
         selector: '#test',
         type: 'text',
-        value: 'new text',
-        enabled: true
+        value: 'new text'
       }
 
       manager.addChange(change, 'old text')
@@ -496,9 +479,9 @@ describe('UndoRedoManager', () => {
   describe('Complex scenarios', () => {
     it('should handle alternating undo/redo operations with individual changes', () => {
       const changes = [
-        { selector: '#test', type: 'text' as const, value: 'A', enabled: true },
-        { selector: '#test', type: 'text' as const, value: 'B', enabled: true },
-        { selector: '#test', type: 'text' as const, value: 'C', enabled: true }
+        { selector: '#test', type: 'text' as const, value: 'A' },
+        { selector: '#test', type: 'text' as const, value: 'B' },
+        { selector: '#test', type: 'text' as const, value: 'C' }
       ]
 
       manager.addChange(changes[0], 'original')
@@ -535,19 +518,19 @@ describe('UndoRedoManager', () => {
       // Simulate the E2E test flow: three text changes to the same element
       // Change 1: "Modified text!" -> "Undo test 1"
       manager.addChange(
-        { selector: '#test-paragraph', type: 'text', value: 'Undo test 1', enabled: true },
+        { selector: '#test-paragraph', type: 'text', value: 'Undo test 1' },
         'Modified text!'
       )
 
       // Change 2: "Undo test 1" -> "Undo test 2"
       manager.addChange(
-        { selector: '#test-paragraph', type: 'text', value: 'Undo test 2', enabled: true },
+        { selector: '#test-paragraph', type: 'text', value: 'Undo test 2' },
         'Undo test 1'
       )
 
       // Change 3: "Undo test 2" -> "Undo test 3"
       manager.addChange(
-        { selector: '#test-paragraph', type: 'text', value: 'Undo test 3', enabled: true },
+        { selector: '#test-paragraph', type: 'text', value: 'Undo test 3' },
         'Undo test 2'
       )
 
@@ -612,15 +595,15 @@ describe('UndoRedoManager', () => {
 
       // Add 3 changes
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        { selector: '#test', type: 'text', value: 'A' },
         'original'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        { selector: '#test', type: 'text', value: 'B' },
         'A'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        { selector: '#test', type: 'text', value: 'C' },
         'B'
       )
 
@@ -664,15 +647,15 @@ describe('UndoRedoManager', () => {
 
       // Add 3 changes
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        { selector: '#test', type: 'text', value: 'A' },
         'original'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        { selector: '#test', type: 'text', value: 'B' },
         'A'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        { selector: '#test', type: 'text', value: 'C' },
         'B'
       )
 
@@ -685,7 +668,7 @@ describe('UndoRedoManager', () => {
 
       // Add new change - should truncate future history
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'D', enabled: true },
+        { selector: '#test', type: 'text', value: 'D' },
         'A'
       )
 
@@ -703,7 +686,7 @@ describe('UndoRedoManager', () => {
 
       // Add 1
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        { selector: '#test', type: 'text', value: 'A' },
         'original'
       )
       expect(manager.getUndoCount()).toBe(1)
@@ -711,7 +694,7 @@ describe('UndoRedoManager', () => {
 
       // Add 2
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        { selector: '#test', type: 'text', value: 'B' },
         'A'
       )
       expect(manager.getUndoCount()).toBe(2)
@@ -724,7 +707,7 @@ describe('UndoRedoManager', () => {
 
       // Add 3 (should clear redo stack)
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        { selector: '#test', type: 'text', value: 'C' },
         'A'
       )
       expect(manager.getUndoCount()).toBe(2)
@@ -748,15 +731,15 @@ describe('UndoRedoManager', () => {
 
       // Add 3 changes to same element
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        { selector: '#test', type: 'text', value: 'A' },
         'original'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'B', enabled: true },
+        { selector: '#test', type: 'text', value: 'B' },
         'A'
       )
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'C', enabled: true },
+        { selector: '#test', type: 'text', value: 'C' },
         'B'
       )
 
@@ -805,7 +788,7 @@ describe('UndoRedoManager', () => {
 
       // 1 change
       manager.addChange(
-        { selector: '#test', type: 'text', value: 'A', enabled: true },
+        { selector: '#test', type: 'text', value: 'A' },
         'original'
       )
       expect(manager.canUndo()).toBe(true)

@@ -83,8 +83,8 @@ test.describe('Claude Code Bridge Integration', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/sidepanel.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -111,7 +111,7 @@ test.describe('Claude Code Bridge Integration', () => {
 
     await page.waitForTimeout(500)
 
-    const saveButton = page.locator('button:has-text("Save Settings")')
+    const saveButton = page.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
@@ -125,12 +125,12 @@ test.describe('Claude Code Bridge Integration', () => {
     await page.goto(sidebarUrl)
     await page.waitForLoadState('networkidle')
 
-    await page.waitForSelector('button:has-text("Experiments")', { state: 'visible', timeout: 10000 })
-    await page.click('button:has-text("Experiments")')
+    await page.waitForSelector('#experiments-nav-button', { state: 'visible', timeout: 10000 })
+    await page.click('#experiments-nav-button')
 
     await page.waitForTimeout(1000)
 
-    const createButton = page.locator('button:has-text("Create Experiment"), button:has-text("+ New")')
+    const createButton = page.locator('#create-experiment-button')
     await createButton.first().waitFor({ state: 'visible', timeout: 5000 })
     await createButton.first().click()
 
@@ -142,7 +142,7 @@ test.describe('Claude Code Bridge Integration', () => {
 
     await page.waitForTimeout(500)
 
-    const saveExperimentButton = page.locator('button:has-text("Save"), button:has-text("Create")')
+    const saveExperimentButton = page.locator('#save-experiment-button, #create-experiment-draft-button')
     await saveExperimentButton.first().waitFor({ state: 'visible', timeout: 5000 })
     await saveExperimentButton.first().click()
 
@@ -158,7 +158,7 @@ test.describe('Claude Code Bridge Integration', () => {
 
     await textarea.fill('Change the h1 text to "Hello from Bridge!"')
 
-    const sendButton = page.locator('button:has-text("Send"), button[type="submit"]').first()
+    const sendButton = page.locator('#ai-send-button, button[type="submit"]').first()
     await sendButton.waitFor({ state: 'visible', timeout: 5000 })
 
     console.log('Sending AI request to bridge...')

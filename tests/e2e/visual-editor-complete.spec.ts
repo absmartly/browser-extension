@@ -134,9 +134,94 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Exit preview mode via toolbar button', async () => {
       step('Exiting preview mode', '🚪')
 
+      // Check if page is alive before attempting to exit preview
+      const pageAliveBefore = await testPage.evaluate(() => true).catch(() => false)
+      log(`Page alive before Exit Preview: ${pageAliveBefore}`)
+
+      if (!pageAliveBefore) {
+        await testPage.screenshot({ path: 'test-results/page-dead-before-exit-preview.png', fullPage: true })
+        log('Screenshot saved: page-dead-before-exit-preview.png')
+        throw new Error('Page crashed before Exit Preview button click')
+      }
+
+      // Take screenshot before clicking Exit Preview
+      await testPage.screenshot({ path: 'test-results/before-exit-preview.png', fullPage: true })
+      log('Screenshot saved: before-exit-preview.png')
+
+      // Check if preview header exists in DOM
+      const previewHeaderExists = await testPage.evaluate(() => {
+        const header = document.getElementById('absmartly-preview-header')
+        return {
+          exists: header !== null,
+          visible: header ? window.getComputedStyle(header).display !== 'none' : false,
+          innerHTML: header ? header.innerHTML.substring(0, 200) : 'N/A'
+        }
+      })
+      log(`Preview header status: exists=${previewHeaderExists.exists}, visible=${previewHeaderExists.visible}`)
+      log(`Preview header content: ${previewHeaderExists.innerHTML}`)
+
+      if (!previewHeaderExists.exists) {
+        log('Preview header does NOT exist - VE auto-exited preview mode')
+
+        // Check if markers are still present (they should be cleaned up)
+        const markersStatus = await testPage.evaluate(() => {
+          const modified = document.querySelectorAll('[data-absmartly-modified]')
+          const experiment = document.querySelectorAll('[data-absmartly-experiment]')
+          return {
+            modifiedCount: modified.length,
+            experimentCount: experiment.length,
+            total: modified.length + experiment.length
+          }
+        })
+
+        log(`Markers remaining: modified=${markersStatus.modifiedCount}, experiment=${markersStatus.experimentCount}`)
+
+        if (markersStatus.total > 0) {
+          log('WARNING: Preview markers still present after VE exit - this is expected if preview was active during VE')
+          log('The markers will be cleaned up when we manually disable preview in the next step')
+        } else {
+          log('✓ All preview markers properly cleaned up')
+        }
+
+        // Take screenshot after checking
+        await testPage.screenshot({ path: 'test-results/after-ve-exit-no-preview-header.png', fullPage: true })
+        log('Screenshot saved: after-ve-exit-no-preview-header.png')
+
+        // VE already exited preview, so skip manual exit
+        return
+      }
+
+      // Wait for preview header to be visible before clicking
+      const previewHeader = testPage.locator('#absmartly-preview-header')
+      await previewHeader.waitFor({ state: 'visible', timeout: 10000 })
+      log('Preview header is visible')
+
+      // Wait for Exit Preview button to be visible and enabled
+      const exitButton = previewHeader.locator('#exit-preview-button')
+      await exitButton.waitFor({ state: 'visible', timeout: 10000 })
+      log('Exit Preview button is visible')
+
       // After VE exit, preview mode is still active - exit it via the toolbar button
-      await testPage.locator('#absmartly-preview-header button:has-text("Exit Preview")').click()
-      await debugWait(1000)
+      await exitButton.click()
+      log('Clicked Exit Preview button')
+
+      // Check if page is alive immediately after clicking
+      const pageAliveAfter = await testPage.evaluate(() => true).catch(() => false)
+      log(`Page alive after Exit Preview click: ${pageAliveAfter}`)
+
+      if (!pageAliveAfter) {
+        await testPage.screenshot({ path: 'test-results/page-dead-after-exit-preview.png', fullPage: true })
+        log('Screenshot saved: page-dead-after-exit-preview.png')
+        throw new Error('Page crashed immediately after Exit Preview button click')
+      }
+
+      // Wait for toolbar to be removed (with timeout)
+      await previewHeader.waitFor({ state: 'hidden', timeout: 5000 })
+      log('Preview header removed from DOM')
+
+      // Take screenshot after exit
+      await testPage.screenshot({ path: 'test-results/after-exit-preview.png', fullPage: true })
+      log('Screenshot saved: after-exit-preview.png')
 
       // Verify preview toolbar was removed
       const toolbarRemoved = await testPage.evaluate(() => document.getElementById('absmartly-preview-header') === null)
@@ -149,6 +234,25 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     await test.step('Test preview mode toggle', async () => {
       step('Testing preview toggle (enable/disable)', '👁️')
+
+      // First, ensure preview is disabled by clicking the preview toggle if it's active
+      const previewActive = await testPage.evaluate(() => {
+        return document.querySelectorAll('[data-absmartly-modified]').length > 0
+      })
+
+      if (previewActive) {
+        log('Preview is currently active, disabling it first...')
+        const previewToggle = sidebar.locator('#preview-variant-1')
+        await previewToggle.click()
+
+        // Wait for markers to be removed
+        await testPage.waitForFunction(() => {
+          return document.querySelectorAll('[data-absmartly-modified]').length === 0
+        }, { timeout: 5000 })
+
+        log('✓ Preview disabled, ready for toggle test')
+      }
+
       await testPreviewToggle(sidebar, testPage)
     })
 

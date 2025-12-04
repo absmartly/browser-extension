@@ -98,11 +98,11 @@ test.describe('Visual Editor Demo', () => {
     // Open first experiment
     console.log('📂 Opening experiment...')
     await experimentItem.click()
-    await sidebarFrame.locator('button:has-text("Visual Editor")').first().waitFor({ state: 'visible' })
+    await sidebarFrame.locator('#visual-editor-button').first().waitFor({ state: 'visible' })
 
     // Launch Visual Editor
     console.log('🚀 Launching Visual Editor...')
-    await sidebarFrame.locator('button:has-text("Visual Editor")').first().click()
+    await sidebarFrame.locator('#visual-editor-button').first().click()
     // TODO: Replace timeout with specific element wait
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {}) // Wait for full initialization
 

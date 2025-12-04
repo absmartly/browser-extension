@@ -16,19 +16,22 @@ export async function testIndividualPreviewToggle(sidebar: FrameLocator, testPag
   await firstCheckbox.waitFor({ state: 'visible', timeout: 5000 })
   log('Found DOM change checkboxes')
 
-  // Check if preview is already enabled by looking at the preview toolbar on the page
-  const previewToolbarVisible = await testPage.evaluate(() => {
-    return document.getElementById('absmartly-preview-header') !== null
+  // Check if preview is already enabled by looking at DOM markers (not toolbar, which only appears in VE mode)
+  const previewMarkersPresent = await testPage.evaluate(() => {
+    return document.querySelectorAll('[data-absmartly-modified]').length > 0
   })
-  log(`Preview currently enabled: ${previewToolbarVisible}`)
+  log(`Preview currently enabled: ${previewMarkersPresent}`)
 
   // If preview is not enabled, turn it on
-  if (!previewToolbarVisible) {
+  if (!previewMarkersPresent) {
     log('Enabling preview mode')
     const previewToggle = sidebar.locator('#preview-variant-1')
     await previewToggle.click()
-    await testPage.waitForSelector('#absmartly-preview-header', { state: 'visible' })
-    log('Preview mode enabled')
+    // Wait for DOM changes to be applied (markers added)
+    await testPage.waitForFunction(() => {
+      return document.querySelectorAll('[data-absmartly-modified]').length > 0
+    }, { timeout: 5000 })
+    log('Preview mode enabled (DOM changes applied)')
   } else {
     log('Preview already enabled, continuing...')
   }
@@ -159,9 +162,9 @@ export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page
   await testPage.screenshot({ path: 'test-results/before-preview-attribute.png', fullPage: true })
   log('Screenshot saved: before-preview-attribute.png')
 
-  // Check if preview is already enabled
+  // Check if preview is already enabled (by checking for DOM markers, not toolbar)
   const previewAlreadyEnabled = await testPage.evaluate(() => {
-    return document.getElementById('absmartly-preview-header') !== null
+    return document.querySelectorAll('[data-absmartly-modified]').length > 0
   })
   log(`Preview already enabled: ${previewAlreadyEnabled}`)
 
@@ -173,57 +176,41 @@ export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page
     log('Enabling preview mode')
     await previewToggle.waitFor({ state: 'visible' })
     await click(sidebar, previewToggle)
+
+    // Wait for DOM changes to be applied
+    await testPage.waitForFunction(() => {
+      return document.querySelectorAll('[data-absmartly-modified]').length > 0
+    }, { timeout: 5000 })
+    log('Preview mode enabled (DOM changes applied)')
   } else {
     log('Preview already enabled, skipping toggle')
   }
 
-  log('Preview mode enabled, waiting for preview toolbar...')
-
-  // Take screenshot right after clicking preview
+  // Take screenshot right after enabling preview
   await testPage.screenshot({ path: 'test-results/after-preview-click-attribute.png', fullPage: true })
   log('Screenshot saved: after-preview-click-attribute.png')
 
-  // Check if page is still alive and capture any console errors
-  try {
-    const pageAlive = await testPage.evaluate(() => true).catch(() => false)
-    log(`Page alive after preview click: ${pageAlive}`)
-    
-    if (!pageAlive) {
-      log('ERROR: Page crashed immediately after preview click!')
-      throw new Error('Page crashed after enabling preview mode')
-    }
+  // Check if page is still alive
+  const pageAlive = await testPage.evaluate(() => true).catch(() => false)
+  log(`Page alive after preview enable: ${pageAlive}`)
 
-    // Wait for preview toolbar with timeout
-    log('Waiting for preview toolbar to appear...')
-    await testPage.waitForSelector('#absmartly-preview-header', { 
-      state: 'visible', 
-      timeout: 5000 
-    }).catch(async (e) => {
-      log('ERROR: Preview toolbar did not appear')
-      await testPage.screenshot({ path: 'test-results/preview-toolbar-missing.png', fullPage: true })
-      log('Screenshot saved: preview-toolbar-missing.png')
-      throw e
-    })
-    log('Preview toolbar appeared')
-
-    // Wait for main title element
-    log('Waiting for main title element...')
-    const mainTitleExists = await testPage.evaluate(() => document.getElementById('main-title') !== null)
-    log(`Main title exists: ${mainTitleExists}`)
-
-    if (!mainTitleExists) {
-      log('ERROR: Main title element not found')
-      await testPage.screenshot({ path: 'test-results/main-title-missing.png', fullPage: true })
-      log('Screenshot saved: main-title-missing.png')
-      throw new Error('Main title element not found')
-    }
-    log('Main title element found on page')
-  } catch (error) {
-    log(`ERROR during preview verification: ${error.message}`)
-    await testPage.screenshot({ path: 'test-results/preview-error.png', fullPage: true })
-    log('Screenshot saved: preview-error.png')
-    throw error
+  if (!pageAlive) {
+    log('ERROR: Page crashed after enabling preview!')
+    throw new Error('Page crashed after enabling preview mode')
   }
+
+  // Wait for main title element
+  log('Waiting for main title element...')
+  const mainTitleExists = await testPage.evaluate(() => document.getElementById('main-title') !== null)
+  log(`Main title exists: ${mainTitleExists}`)
+
+  if (!mainTitleExists) {
+    log('ERROR: Main title element not found')
+    await testPage.screenshot({ path: 'test-results/main-title-missing.png', fullPage: true })
+    log('Screenshot saved: main-title-missing.png')
+    throw new Error('Main title element not found')
+  }
+  log('Main title element found on page')
 
   // Verify attributes are applied on the test page
   const mainTitle = testPage.locator('#main-title')

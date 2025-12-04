@@ -1,3 +1,7 @@
+// TODO: All tests in this file hang indefinitely. Root cause unknown.
+// Likely issues: 1) Direct sidebar.html navigation without proper setup,
+// 2) Settings page not loading, 3) Infinite wait for element that never appears.
+// Tests need debugging with --headed --debug to find hang point.
 import { test, expect } from '../fixtures/extension'
 
 test.describe('Claude API Key Authentication', () => {
@@ -41,7 +45,7 @@ test.describe('Claude API Key Authentication', () => {
     await apiKeyInput.fill('sk-ant-test-key-12345678901234567890')
 
     // Save settings
-    await page.click('button:has-text("Save Settings")')
+    await page.click('#save-settings-button')
 
     // Wait a moment for save to complete
     await page.waitForLoadState('networkidle')
@@ -73,7 +77,7 @@ test.describe('Claude API Key Authentication', () => {
     await apiKeyInput.fill('sk-ant-persistent-key-123')
 
     // Save settings
-    await page.click('button:has-text("Save Settings")')
+    await page.click('#save-settings-button')
 
     // Wait for save to complete
     await page.waitForLoadState('networkidle')

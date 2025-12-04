@@ -50,7 +50,7 @@ test.describe('Settings Auth Refresh Button', () => {
       sidebar = await injectSidebar(testPage, extensionUrl)
 
       // Click settings - find configure button or settings icon
-      const configureButton = sidebar.locator('button:has-text("Configure Settings")')
+      const configureButton = sidebar.locator('#configure-settings-button')
       const hasWelcomeScreen = await configureButton.isVisible().catch(() => false)
 
       if (hasWelcomeScreen) {

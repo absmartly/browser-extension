@@ -97,7 +97,7 @@ test.describe('Visual Editor Unified Tests', () => {
     await experimentItems.first().click()
 
     // Step 3: Click visual editor button to start visual editor
-    const visualEditorBtn = sidebar.locator('button:has-text("Visual Editor")')
+    const visualEditorBtn = sidebar.locator('#visual-editor-button')
     await visualEditorBtn.click()
 
     // Wait for visual editor to be active
@@ -141,10 +141,10 @@ test.describe('Visual Editor Unified Tests', () => {
     // Monaco editor should be open - type some HTML
     await testPage.keyboard.type('<strong>Bold Title</strong>')
     // Look for save button and click it
-    await testPage.locator('button:has-text("Save"), .save-button').click()
+    await testPage.locator('#save-button, .save-button').click()
 
     // Step 5: Save changes by clicking save button in visual editor header
-    const saveButton = testPage.locator('[data-absmartly-banner] button:has-text("Save"), .absmartly-save-btn')
+    const saveButton = testPage.locator('[data-absmartly-banner] #save-button, .absmartly-save-btn')
     await saveButton.click()
     // Wait for UI update
     await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})

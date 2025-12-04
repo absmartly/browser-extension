@@ -5,8 +5,8 @@ test.describe('AI Provider Settings', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -32,8 +32,8 @@ test.describe('AI Provider Settings', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -59,8 +59,8 @@ test.describe('AI Provider Settings', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -80,8 +80,8 @@ test.describe('AI Provider Settings', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -104,8 +104,8 @@ test.describe('AI Provider Settings', () => {
     await page.goto(sidebarUrl)
     await page.waitForLoadState('networkidle')
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -126,8 +126,8 @@ test.describe('AI Provider Settings', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -158,8 +158,8 @@ test.describe('AI Provider Settings', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.waitForSelector('button:has-text("Settings")', { state: 'visible' })
-    await page.click('button:has-text("Settings")')
+    await page.waitForSelector('#settings-nav-button', { state: 'visible' })
+    await page.click('#settings-nav-button')
 
     await page.waitForLoadState('networkidle')
 
@@ -167,7 +167,7 @@ test.describe('AI Provider Settings', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
-    const advancedToggle = page.locator('summary:has-text("Advanced: Custom Port Configuration")')
+    const advancedToggle = page.locator('#advanced-port-config-summary')
     await advancedToggle.waitFor({ state: 'visible', timeout: 2000 })
     await advancedToggle.click()
 

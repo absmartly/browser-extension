@@ -202,7 +202,7 @@ test.describe('Visual Editor Test', () => {
 
     // Check for experiments or config needed
     console.log('🔍 Checking sidebar state...')
-    const needsConfig = await frame.locator('button:has-text("Configure Settings")').isVisible().catch(() => false)
+    const needsConfig = await frame.locator('#configure-settings-button').isVisible().catch(() => false)
     const hasExperiments = await frame.locator('.experiment-item').count().catch(() => 0)
 
     console.log('Needs configuration:', needsConfig)
@@ -216,7 +216,7 @@ test.describe('Visual Editor Test', () => {
       console.log('✅ Clicked first experiment')
 
       console.log('⏳ Waiting for Visual Editor button...')
-      const visualEditorBtn = frame.locator('button:has-text("Visual Editor")').first()
+      const visualEditorBtn = frame.locator('#visual-editor-button').first()
 
       const hasVisualEditorBtn = await visualEditorBtn.isVisible().catch(() => false)
       console.log('Visual Editor button visible:', hasVisualEditorBtn)

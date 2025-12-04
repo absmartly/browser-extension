@@ -128,7 +128,7 @@ test.describe('Events Debug Page', () => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
         // Click the confirm button in the modal
-        const confirmButton = sidebar.locator('button:has-text("Clear All")')
+        const confirmButton = sidebar.locator('#clear-all-button')
         await confirmButton.waitFor({ state: 'visible', timeout: 5000 })
         await confirmButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -342,7 +342,7 @@ test.describe('Events Debug Page', () => {
         })
 
         // Wait for confirmation modal and click confirm
-        const confirmButton = sidebar.locator('button:has-text("Clear All")')
+        const confirmButton = sidebar.locator('#clear-all-button')
         await confirmButton.waitFor({ state: 'visible', timeout: 5000 })
         await confirmButton.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true }))

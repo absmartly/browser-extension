@@ -46,7 +46,7 @@ test.describe('IndexedDB Conversation Persistence', () => {
       await debugWait()
 
       log('Clicking "From Scratch"...')
-      await click(sidebar, 'button:has-text("From Scratch"), button:has-text("from scratch")', 5000)
+      await click(sidebar, '#from-scratch-button', 5000)
       await debugWait()
       log('✓ From Scratch clicked')
 
@@ -71,7 +71,7 @@ test.describe('IndexedDB Conversation Persistence', () => {
       await domChangesText.scrollIntoViewIfNeeded().catch(() => {})
       await debugWait()
 
-      const generateWithAIButton = sidebar.locator('button:has-text("Generate with AI")').first()
+      const generateWithAIButton = sidebar.locator('#generate-with-ai-button').first()
       await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
       await generateWithAIButton.scrollIntoViewIfNeeded().catch(() => {})
       await debugWait()
@@ -303,7 +303,7 @@ test.describe('IndexedDB Conversation Persistence', () => {
         if (needsReinit) {
           log('AI page needs reinitialization - will navigate from experiment list')
 
-          const returnButton = sidebar.locator('button:has-text("Return to Variant Editor")').first()
+          const returnButton = sidebar.locator('#return-to-variant-editor-button').first()
           await returnButton.waitFor({ state: 'visible', timeout: 5000 })
           await click(sidebar, returnButton)
           await debugWait()
@@ -344,7 +344,7 @@ test.describe('IndexedDB Conversation Persistence', () => {
           throw new Error('Cannot navigate - unknown page state')
         }
 
-        const generateWithAIButton = sidebar.locator('button:has-text("Generate with AI")').first()
+        const generateWithAIButton = sidebar.locator('#generate-with-ai-button').first()
         await generateWithAIButton.scrollIntoViewIfNeeded().catch(() => {})
         await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
         await click(sidebar, generateWithAIButton)

@@ -236,7 +236,7 @@ test.describe('Visual Editor Context Menu Tests', () => {
           console.log('   HTML editor opened')
 
           // Close the editor
-          const closeBtn = page.locator('button:has-text("Cancel"), button:has-text("Close")').first()
+          const closeBtn = page.locator('#cancel-button, #close-button').first()
           if (await closeBtn.isVisible()) {
             await closeBtn.click()
           }
@@ -301,13 +301,13 @@ test.describe('Visual Editor Context Menu Tests', () => {
       }
 
       // Check for Save button
-      const saveBtn = toolbar.locator('button:has-text("Save")').first()
+      const saveBtn = toolbar.locator('#save-button').first()
       if (await saveBtn.isVisible()) {
         console.log('✅ Save button available')
       }
 
       // Check for Cancel/Exit button
-      const exitBtn = toolbar.locator('button:has-text("Cancel"), button:has-text("Exit")').first()
+      const exitBtn = toolbar.locator('#cancel-button, #exit-button').first()
       if (await exitBtn.isVisible()) {
         console.log('✅ Exit button available')
       }
@@ -357,7 +357,7 @@ test.describe('Visual Editor Context Menu Tests', () => {
     await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Look for Visual Editor button
-      const visualEditorBtn = sidebarPage.locator('button:has-text("Visual Editor"), button:has-text("Launch Visual Editor")').first()
+      const visualEditorBtn = sidebarPage.locator('#visual-editor-button').first()
       if (await visualEditorBtn.isVisible()) {
         console.log('✅ Visual Editor button found')
         await visualEditorBtn.click()
@@ -387,7 +387,7 @@ test.describe('Visual Editor Context Menu Tests', () => {
       console.log('⚠️ No experiments available in sidebar')
 
       // Check if configuration is needed
-      const needsConfig = await sidebarPage.locator('button:has-text("Configure Settings")').isVisible().catch(() => false)
+      const needsConfig = await sidebarPage.locator('#configure-settings-button').isVisible().catch(() => false)
       if (needsConfig) {
         console.log('ℹ️ Extension needs configuration')
       }

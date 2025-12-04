@@ -53,17 +53,17 @@ test.describe('Bug Fixes E2E Tests', () => {
       await experimentItems.first().click()
 
       // Wait for experiment detail
-      await sidebar.waitForSelector('button:has-text("Back")', { timeout: 5000 })
+      await sidebar.waitForSelector('#back-button', { timeout: 5000 })
 
       // Wait for VE button to appear
-      await sidebar.waitForSelector('button:has-text("Visual Editor")', { timeout: 5000 })
+      await sidebar.waitForSelector('#visual-editor-button', { timeout: 5000 })
 
       // Start VE mode
-      await sidebar.locator('button:has-text("Visual Editor")').first().click()
+      await sidebar.locator('#visual-editor-button').first().click()
       await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
       // Click back button
-      await sidebar.locator('button:has-text("Back")').click()
+      await sidebar.locator('#back-button').click()
 
       // Verify we're back at experiment list
       await sidebar.waitForSelector('.experiment-item', { timeout: 3000 })
@@ -129,7 +129,7 @@ test.describe('Bug Fixes E2E Tests', () => {
         await expect(reloadBanner).toBeVisible()
 
         // Look for "Clear All" button within the banner area
-        const clearAllButton = sidebar.locator('button:has-text("Clear All")')
+        const clearAllButton = sidebar.locator('#clear-all-button')
         await expect(clearAllButton).toBeVisible()
       } else {
         // This is a valid test outcome - not all experiments show the reload banner
@@ -170,7 +170,7 @@ test.describe('Bug Fixes E2E Tests', () => {
         testPage.on('dialog', dialog => dialog.accept())
 
         // Find and click clear all button
-        const clearAllButton = sidebar.locator('button:has-text("Clear All")')
+        const clearAllButton = sidebar.locator('#clear-all-button')
         await clearAllButton.click()
         await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
@@ -202,7 +202,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       }
 
       // Click Create Experiment
-      const createButton = sidebar.locator('button:has-text("Create Experiment")')
+      const createButton = sidebar.locator('#create-experiment-button')
       const hasCreateButton = await createButton.count()
 
       if (hasCreateButton > 0) {
@@ -250,7 +250,7 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Click on first experiment
       await experimentItems.first().click()
-      await sidebar.waitForSelector('button:has-text("Back")', { timeout: 5000 })
+      await sidebar.waitForSelector('#back-button', { timeout: 5000 })
 
       // Look for unit type field
       const unitTypeLabel = sidebar.locator('text=Unit Type')
@@ -308,7 +308,7 @@ test.describe('Bug Fixes E2E Tests', () => {
             await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
             // Navigate away
-            await sidebar.locator('button:has-text("Back")').click()
+            await sidebar.locator('#back-button').click()
             await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
             // Re-open experiment
@@ -344,7 +344,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       }
 
       // Click Create Experiment
-      const createButton = sidebar.locator('button:has-text("Create Experiment")')
+      const createButton = sidebar.locator('#create-experiment-button')
       if (await createButton.count() > 0) {
         await createButton.click()
         await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
@@ -394,13 +394,13 @@ test.describe('Bug Fixes E2E Tests', () => {
       await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
       // Start VE mode
-      const veButton = sidebar.locator('button:has-text("Visual Editor")')
+      const veButton = sidebar.locator('#visual-editor-button')
       if (await veButton.count() > 0) {
         await veButton.first().click()
         await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
         // Try to click JSON button
-        const jsonButton = sidebar.locator('button:has-text("Json")')
+        const jsonButton = sidebar.locator('#json-view-button')
         if (await jsonButton.count() > 0) {
           await jsonButton.first().click()
           await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})

@@ -8,7 +8,7 @@ import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { setupTestPage, debugWait, click } from './utils/test-helpers'
 
-const TEST_PAGE_URL = '/local-test-page.html'
+const TEST_PAGE_URL = '/visual-editor-test.html'
 
 // Save experiment mode - set to true to actually save the experiment to the database
 // WARNING: This writes to the production database! Only use when needed.
@@ -61,7 +61,7 @@ test.describe('Experiment Code Injection UI', () => {
       await debugWait()
 
       // Select "From Scratch" option
-      const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = sidebar.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await click(sidebar, fromScratchButton)
       console.log('  ✓ Selected "From Scratch"')
@@ -219,15 +219,14 @@ test.describe('Experiment Code Injection UI', () => {
     await test.step('Save the code in modal', async () => {
       console.log('\n💾 STEP 8: Saving code in modal')
 
-      // Click Save button
-      await click(testPage, 'button:has-text("Save")')
+      // Wait for save button to be ready and click it
+      await testPage.locator('#save-button').waitFor({ state: 'visible', timeout: 15000 })
+      await testPage.locator('#save-button').click()
       console.log('✅ Clicked Save button')
-      await debugWait(800)
 
       // Wait for modal to close
       await testPage.waitForSelector('#absmartly-code-editor-fullscreen', { state: 'hidden', timeout: 10000 })
       console.log('✅ Modal closed')
-      await debugWait(1000)
 
       // Wait a moment for the save to process
       // TODO: Replace timeout with specific element wait
@@ -272,7 +271,7 @@ test.describe('Experiment Code Injection UI', () => {
       await debugWait(1000)
 
       // Close the modal
-      await click(testPage, 'button:has-text("Cancel")')
+      await click(testPage, '#cancel-button')
       await debugWait(500)
       console.log('✅ Code persistence verified!')
     })
@@ -287,7 +286,7 @@ test.describe('Experiment Code Injection UI', () => {
         await debugWait(1000)
 
         // Scroll to save button
-        const saveButton = sidebar.locator('button:has-text("Save Changes")')
+        const saveButton = sidebar.locator('#save-changes-button')
         await saveButton.scrollIntoViewIfNeeded()
         console.log('  ✓ Scrolled to save button')
         await debugWait(500)
@@ -324,7 +323,7 @@ test.describe('Experiment Code Injection UI', () => {
         })
 
         // Alternative: Check the JSON view of the variant
-        const jsonButton = sidebar.locator('button:has-text("JSON")').first()
+        const jsonButton = sidebar.locator('#json-view-button').first()
         const jsonButtonExists = await jsonButton.isVisible({ timeout: 2000 }).catch(() => false)
 
         if (jsonButtonExists) {

@@ -92,7 +92,7 @@ test.describe('AI Storage Quota Management', () => {
       await sidebar.locator('#save-experiment-button').click()
       await debugWait(500)
 
-      const generateButton = sidebar.locator(`button:has-text("Generate with AI")`).first()
+      const generateButton = sidebar.locator('#generate-with-ai-button').first()
       await generateButton.waitFor({ state: 'visible' })
       await generateButton.click()
       await debugWait(500)
@@ -305,7 +305,7 @@ test.describe('AI Storage Quota Management', () => {
       await sidebar.locator('#save-experiment-button').click()
       await debugWait(500)
 
-      const generateButton = sidebar.locator(`button:has-text("Generate with AI")`).first()
+      const generateButton = sidebar.locator('#generate-with-ai-button').first()
       await generateButton.waitFor({ state: 'visible' })
       await generateButton.click()
       await debugWait(500)
@@ -424,7 +424,7 @@ test.describe('AI Storage Quota Management', () => {
       await sidebar.locator('#save-experiment-button').click()
       await debugWait(500)
 
-      const generateButton = sidebar.locator(`button:has-text("Generate with AI")`).first()
+      const generateButton = sidebar.locator('#generate-with-ai-button').first()
       await generateButton.waitFor({ state: 'visible' })
       await generateButton.click()
       await debugWait(500)
@@ -490,7 +490,7 @@ test.describe('AI Storage Quota Management', () => {
       await sidebar.locator('#save-experiment-button').click()
       await debugWait(500)
 
-      const generateButton = sidebar.locator(`button:has-text("Generate with AI")`).first()
+      const generateButton = sidebar.locator('#generate-with-ai-button').first()
       await generateButton.waitFor({ state: 'visible' })
       await generateButton.click()
       await debugWait(500)

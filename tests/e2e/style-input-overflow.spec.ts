@@ -45,7 +45,7 @@ test.describe('Style Input Overflow Test', () => {
 
     // Click "Add DOM Change" button
     log('➕ Adding DOM change')
-    const addButton = sidebar.locator('button:has-text("Add DOM Change")').first()
+    const addButton = sidebar.locator('#add-dom-change-button').first()
     await addButton.scrollIntoViewIfNeeded()
     await addButton.click()
     await debugWait()
