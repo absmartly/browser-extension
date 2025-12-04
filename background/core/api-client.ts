@@ -42,11 +42,18 @@ export function isAuthError(error: any): boolean {
  */
 export async function getJWTCookie(domain: string): Promise<string | null> {
   try {
+    debugLog('[getJWTCookie] Starting cookie check for domain:', domain)
+
     let parsedUrl: URL
     try {
       parsedUrl = new URL(domain.startsWith('http') ? domain : `https://${domain}`)
+      debugLog('[getJWTCookie] Parsed URL:', {
+        hostname: parsedUrl.hostname,
+        protocol: parsedUrl.protocol,
+        href: parsedUrl.href
+      })
     } catch (e) {
-      debugError('Failed to parse URL:', domain, e)
+      debugError('[getJWTCookie] Failed to parse URL:', domain, e)
       return null
     }
 
@@ -54,18 +61,29 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
     const protocol = parsedUrl.protocol
     const baseUrl = `${protocol}//${hostname}`
 
+    debugLog('[getJWTCookie] Fetching cookies for baseUrl:', baseUrl)
     const urlCookies = await chrome.cookies.getAll({ url: baseUrl })
+    debugLog('[getJWTCookie] URL cookies found:', urlCookies.length, urlCookies.map(c => ({ name: c.name, domain: c.domain, secure: c.secure, httpOnly: c.httpOnly })))
 
     const domainParts = hostname.split('.')
     const baseDomain = domainParts.length > 2
       ? domainParts.slice(-2).join('.')
       : hostname
 
+    debugLog('[getJWTCookie] Base domain:', baseDomain)
+    debugLog('[getJWTCookie] Fetching cookies for domain:', baseDomain)
     const domainCookies = await chrome.cookies.getAll({ domain: baseDomain })
+    debugLog('[getJWTCookie] Domain cookies found:', domainCookies.length, domainCookies.map(c => ({ name: c.name, domain: c.domain, secure: c.secure, httpOnly: c.httpOnly })))
+
+    debugLog('[getJWTCookie] Fetching cookies for .domain:', `.${baseDomain}`)
     const dotDomainCookies = await chrome.cookies.getAll({ domain: `.${baseDomain}` })
+    debugLog('[getJWTCookie] Dot domain cookies found:', dotDomainCookies.length, dotDomainCookies.map(c => ({ name: c.name, domain: c.domain, secure: c.secure, httpOnly: c.httpOnly })))
 
     const allCookies = [...urlCookies, ...domainCookies, ...dotDomainCookies]
     const uniqueCookies = Array.from(new Map(allCookies.map(c => [`${c.name}-${c.value}`, c])).values())
+
+    debugLog('[getJWTCookie] Total unique cookies:', uniqueCookies.length)
+    debugLog('[getJWTCookie] All cookie names:', uniqueCookies.map(c => c.name))
 
     let jwtCookie = uniqueCookies.find(cookie =>
       cookie.name === 'jwt' ||
@@ -75,20 +93,56 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
       cookie.name === 'authorization'
     )
 
-    if (!jwtCookie) {
-      jwtCookie = uniqueCookies.find(cookie => {
-        const value = cookie.value
-        return value && value.includes('.') && value.split('.').length === 3
-      })
-    }
-
     if (jwtCookie) {
+      debugLog('[getJWTCookie] Found JWT cookie by name:', jwtCookie.name)
       return jwtCookie.value
     }
 
+    debugLog('[getJWTCookie] No named JWT cookie found, checking for JWT-like values...')
+
+    // Known tracking/analytics cookies that are NOT auth tokens
+    const excludedCookieNames = [
+      'cc_cookie',           // Cookie consent
+      'cfz_',                // CloudFlare Zaraz (prefix)
+      'cfzs_',               // CloudFlare Zaraz session (prefix)
+      '_reb2b',              // Reb2B tracking (prefix)
+      '_ga',                 // Google Analytics (prefix)
+      '_gid',                // Google Analytics (prefix)
+      'ajs_',                // Segment.io (prefix)
+      '__stripe_',           // Stripe (prefix)
+      '_fbp',                // Facebook Pixel
+      '_gcl_',               // Google Click ID (prefix)
+      'amplitude_',          // Amplitude (prefix)
+      'mp_',                 // Mixpanel (prefix)
+    ]
+
+    jwtCookie = uniqueCookies.find(cookie => {
+      const value = cookie.value
+      const isJWT = value && value.includes('.') && value.split('.').length === 3
+
+      // Exclude known tracking cookies
+      const isExcluded = excludedCookieNames.some(excluded =>
+        cookie.name === excluded || cookie.name.startsWith(excluded)
+      )
+
+      if (isJWT && !isExcluded) {
+        debugLog('[getJWTCookie] Found JWT-like cookie:', cookie.name)
+        return true
+      } else if (isJWT && isExcluded) {
+        debugLog('[getJWTCookie] Skipping excluded JWT-like cookie:', cookie.name)
+      }
+      return false
+    })
+
+    if (jwtCookie) {
+      debugLog('[getJWTCookie] Found JWT cookie by value pattern:', jwtCookie.name)
+      return jwtCookie.value
+    }
+
+    debugLog('[getJWTCookie] No JWT cookie found')
     return null
   } catch (error) {
-    debugError('Error getting JWT cookie:', error)
+    debugError('[getJWTCookie] Error getting JWT cookie:', error)
     return null
   }
 }
@@ -129,6 +183,13 @@ export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ 
  * @returns Headers object
  */
 async function buildHeaders(config: ABsmartlyConfig, useApiKey: boolean = true): Promise<Record<string, string>> {
+  debugLog('[buildHeaders] Building headers with config:', {
+    authMethod: config.authMethod,
+    hasApiKey: !!config.apiKey,
+    apiEndpoint: config.apiEndpoint,
+    useApiKey
+  })
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -137,35 +198,63 @@ async function buildHeaders(config: ABsmartlyConfig, useApiKey: boolean = true):
   const authMethod = config.authMethod || 'jwt'
   const shouldTryJwtFirst = authMethod === 'jwt'
 
+  debugLog('[buildHeaders] Auth method:', authMethod, 'shouldTryJwtFirst:', shouldTryJwtFirst)
+
   if (shouldTryJwtFirst) {
+    debugLog('[buildHeaders] Trying JWT first (auth method is jwt)')
     const jwtToken = await getJWTCookie(config.apiEndpoint)
 
     if (jwtToken) {
+      debugLog('[buildHeaders] JWT token found, length:', jwtToken.length)
       if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
         headers['Authorization'] = `JWT ${jwtToken}`
+        debugLog('[buildHeaders] Set Authorization header to JWT format')
       } else {
         headers['Authorization'] = `Bearer ${jwtToken}`
+        debugLog('[buildHeaders] Set Authorization header to Bearer format')
+      }
+    } else {
+      debugLog('[buildHeaders] No JWT token found from cookies')
+
+      // Fall back to API key if no JWT cookie found
+      if (config.apiKey && useApiKey) {
+        debugLog('[buildHeaders] Falling back to API key from config')
+        const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
+          ? `JWT ${config.apiKey}`
+          : `Api-Key ${config.apiKey}`
+        headers['Authorization'] = authHeader
+        debugLog('[buildHeaders] Set Authorization header from API key (fallback)')
       }
     }
     return headers
   } else {
+    debugLog('[buildHeaders] Not trying JWT first (auth method is apikey)')
     if (config.apiKey && useApiKey) {
+      debugLog('[buildHeaders] Using API key from config')
       const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
         ? `JWT ${config.apiKey}`
         : `Api-Key ${config.apiKey}`
       headers['Authorization'] = authHeader
+      debugLog('[buildHeaders] Set Authorization header from API key')
     } else if (!config.apiKey) {
+      debugLog('[buildHeaders] No API key in config, falling back to JWT cookie')
       const jwtToken = await getJWTCookie(config.apiEndpoint)
       if (jwtToken) {
+        debugLog('[buildHeaders] JWT token found from fallback, length:', jwtToken.length)
         if (jwtToken.includes('.') && jwtToken.split('.').length === 3) {
           headers['Authorization'] = `JWT ${jwtToken}`
+          debugLog('[buildHeaders] Set Authorization header to JWT format (fallback)')
         } else {
           headers['Authorization'] = `Bearer ${jwtToken}`
+          debugLog('[buildHeaders] Set Authorization header to Bearer format (fallback)')
         }
+      } else {
+        debugLog('[buildHeaders] No JWT token found from fallback')
       }
     }
   }
 
+  debugLog('[buildHeaders] Final headers have Authorization?', !!headers['Authorization'])
   return headers
 }
 
@@ -185,11 +274,20 @@ export async function makeAPIRequest(
   retryWithJWT: boolean = true,
   configOverride?: ABsmartlyConfig
 ): Promise<any> {
+  debugLog('[makeAPIRequest] Starting request:', { method, path, hasData: !!data })
+
   const config = configOverride || await getConfig()
 
   if (!config?.apiEndpoint) {
+    debugError('[makeAPIRequest] No API endpoint configured')
     throw new Error('No API endpoint configured')
   }
+
+  debugLog('[makeAPIRequest] Config loaded:', {
+    apiEndpoint: config.apiEndpoint,
+    authMethod: config.authMethod,
+    hasApiKey: !!config.apiKey
+  })
 
   const headers = await buildHeaders(config)
 
@@ -218,14 +316,20 @@ export async function makeAPIRequest(
     requestData = data
   }
 
+  debugLog('[makeAPIRequest] Making request to:', url)
+  debugLog('[makeAPIRequest] Request headers:', { ...headers, Authorization: headers.Authorization ? '[REDACTED]' : undefined })
+  debugLog('[makeAPIRequest] Using withCredentials: true (browser will include HttpOnly cookies)')
+
   try {
     const response = await axios({
       method,
       url,
       data: requestData,
       headers,
-      withCredentials: false
+      withCredentials: true
     })
+
+    debugLog('[makeAPIRequest] Request successful, status:', response.status)
 
     const responseData = response.data
 
@@ -246,10 +350,17 @@ export async function makeAPIRequest(
     return responseData
   } catch (error) {
     const axiosError = error as AxiosError
-    debugError('Request failed:', axiosError.response?.status, axiosError.response?.data)
+    debugError('[makeAPIRequest] Request failed:', {
+      status: axiosError.response?.status,
+      statusText: axiosError.response?.statusText,
+      data: axiosError.response?.data,
+      message: axiosError.message,
+      code: axiosError.code
+    })
 
     // NO FALLBACKS - if auth fails, throw AUTH_EXPIRED immediately
     if (isAuthError(error)) {
+      debugError('[makeAPIRequest] Auth error detected (401/403), throwing AUTH_EXPIRED')
       throw new Error('AUTH_EXPIRED')
     }
     throw error
