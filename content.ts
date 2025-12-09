@@ -5,6 +5,7 @@ import type { PlasmoCSConfig } from "plasmo"
 // - PRODUCTION mode: Uses invalid URL pattern to prevent auto-loading
 //   Content script is injected programmatically when user clicks extension icon
 import { VisualEditor, JSONEditor, JavaScriptEditor } from '~src/visual-editor'
+import { MarkdownEditor } from '~src/visual-editor/ui/markdown-editor'
 import { EventViewer } from '~src/visual-editor/ui/event-viewer'
 import { ElementPicker } from '~src/content/element-picker'
 import type { DOMChange } from '~src/types/dom-changes'
@@ -380,6 +381,19 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
 
   if (message.type === 'CLOSE_JSON_EDITOR') {
     closeJSONEditor()
+    sendResponse({ success: true })
+    return true
+  }
+
+  // Markdown editor messages
+  if (message.type === 'OPEN_MARKDOWN_EDITOR') {
+    openMarkdownEditor(message.data)
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (message.type === 'CLOSE_MARKDOWN_EDITOR') {
+    closeMarkdownEditor()
     sendResponse({ success: true })
     return true
   }
@@ -1173,6 +1187,48 @@ function closeJSONEditor() {
   if (jsonEditorInstance) {
     // The editor cleans up when promise resolves/rejects
     jsonEditorInstance = null
+  }
+}
+
+// Markdown editor functionality
+let markdownEditorInstance: MarkdownEditor | null = null
+
+async function openMarkdownEditor(data: {
+  title: string
+  value: string
+}) {
+  closeMarkdownEditor()
+
+  const wasVEActive = isVisualEditorActive
+  if (wasVEActive && currentEditor) {
+    debugLog('[Markdown Editor] Temporarily disabling VE while markdown editor is open')
+    currentEditor.disable()
+  }
+
+  markdownEditorInstance = new MarkdownEditor()
+
+  const result = await markdownEditorInstance.show(data.title, data.value)
+
+  if (wasVEActive && currentEditor) {
+    debugLog('[Markdown Editor] Re-enabling VE after markdown editor closed')
+    currentEditor.enable()
+  }
+
+  if (result !== null) {
+    chrome.runtime.sendMessage({
+      type: 'MARKDOWN_EDITOR_SAVE',
+      value: result
+    })
+  } else {
+    chrome.runtime.sendMessage({
+      type: 'MARKDOWN_EDITOR_CLOSE'
+    })
+  }
+}
+
+function closeMarkdownEditor() {
+  if (markdownEditorInstance) {
+    markdownEditorInstance = null
   }
 }
 
