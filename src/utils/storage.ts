@@ -16,11 +16,11 @@ export const STORAGE_KEYS = {
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
   try {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.CONFIG)
-    const config = result[STORAGE_KEYS.CONFIG] as ABsmartlyConfig | null
+    const config = await storage.get(STORAGE_KEYS.CONFIG) as ABsmartlyConfig | null
 
     if (config) {
-      config.apiKey = config.apiKey || ''
+      config.apiKey = await secureStorage.get("absmartly-apikey") || ''
+      config.aiApiKey = await secureStorage.get("ai-apikey") || ''
     }
 
     return config
@@ -31,17 +31,22 @@ export async function getConfig(): Promise<ABsmartlyConfig | null> {
 }
 
 export async function setConfig(config: ABsmartlyConfig): Promise<void> {
-  // SECURITY: Don't store API key in regular storage
-  // Store it in encrypted storage instead
+  // SECURITY: Don't store API keys in regular storage
+  // Store them in encrypted storage instead
   if (config.apiKey) {
     await secureStorage.set("absmartly-apikey", config.apiKey)
   } else {
-    // Remove API key from secure storage if empty
     await secureStorage.remove("absmartly-apikey")
   }
 
-  // Store config without API key in regular storage
-  const configToStore = { ...config, apiKey: '' }
+  if (config.aiApiKey) {
+    await secureStorage.set("ai-apikey", config.aiApiKey)
+  } else {
+    await secureStorage.remove("ai-apikey")
+  }
+
+  // Store config without API keys in regular storage
+  const configToStore = { ...config, apiKey: '', aiApiKey: '' }
   await storage.set(STORAGE_KEYS.CONFIG, configToStore)
 }
 

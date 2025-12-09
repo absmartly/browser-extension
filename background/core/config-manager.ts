@@ -56,6 +56,15 @@ export async function getConfig(
       config.apiKey = config.apiKey || ''
     }
 
+    try {
+      const secureAiApiKey = await secureStorage.get("ai-apikey") as string | null
+      config.aiApiKey = secureAiApiKey || config.aiApiKey || ''
+      debugLog('[Config] Loaded AI API key from secure storage:', secureAiApiKey ? 'present' : 'missing')
+    } catch (error) {
+      debugLog('[Config] Failed to get AI API key from secure storage:', error)
+      config.aiApiKey = config.aiApiKey || ''
+    }
+
     if (config.apiEndpoint && !validateAPIEndpoint(config.apiEndpoint)) {
       throw new Error('Invalid API endpoint: Only ABsmartly domains are allowed')
     }
@@ -102,6 +111,13 @@ export async function initializeConfig(
     debugLog('[Config] Failed to get API key from secure storage during init:', error)
   }
 
+  let secureAiApiKey: string | null = null
+  try {
+    secureAiApiKey = await secureStorage.get("ai-apikey") as string | null
+  } catch (error) {
+    debugLog('[Config] Failed to get AI API key from secure storage during init:', error)
+  }
+
   // Only use environment auth method if no stored config exists
   let defaultAuthMethod: 'jwt' | 'apikey' = 'jwt'
   if (envAuthMethod && !storedConfig?.authMethod) {
@@ -116,7 +132,7 @@ export async function initializeConfig(
     authMethod: storedConfig?.authMethod || defaultAuthMethod,
     domChangesFieldName: storedConfig?.domChangesFieldName,
     aiProvider: storedConfig?.aiProvider,
-    claudeApiKey: storedConfig?.claudeApiKey
+    aiApiKey: storedConfig?.aiApiKey || secureAiApiKey || ''
   }
 
   // Only update fields that are empty AND have environment values

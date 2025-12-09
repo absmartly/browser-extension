@@ -4,32 +4,60 @@ import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
+import { getSystemPromptOverride } from '~src/components/SystemPromptEditor'
 
 const SYSTEM_PROMPT = AI_DOM_GENERATION_SYSTEM_PROMPT
+
+async function getSystemPrompt(): Promise<string> {
+  const override = await getSystemPromptOverride()
+  return override || SYSTEM_PROMPT
+}
 
 // Tool definition for Anthropic Claude
 const DOM_CHANGES_TOOL: Anthropic.Tool = {
   name: 'dom_changes_generator',
-  description: 'Generates DOM change objects for A/B tests following strict selector rules.',
+  description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
   input_schema: {
     type: 'object',
     properties: {
       domChanges: {
         type: 'array',
-        description: 'Array of DOM change instruction objects.'
+        description: 'Array of DOM change objects. Each must have: selector (CSS), type (text|html|style|styleRules|class|attribute|javascript|move|create|delete), and type-specific properties.',
+        items: {
+          type: 'object',
+          properties: {
+            selector: { type: 'string', description: 'CSS selector for target element(s)' },
+            type: {
+              type: 'string',
+              enum: ['text', 'html', 'style', 'styleRules', 'class', 'attribute', 'javascript', 'move', 'create', 'delete'],
+              description: 'Type of DOM change to apply'
+            },
+            value: { description: 'Value for text/html/attribute changes, or CSS object for style changes' },
+            css: { type: 'object', description: 'CSS properties object for style type (alternative to value)' },
+            states: { type: 'object', description: 'CSS states for styleRules type (normal, hover, active, focus)' },
+            add: { type: 'array', items: { type: 'string' }, description: 'Classes to add (for class type)' },
+            remove: { type: 'array', items: { type: 'string' }, description: 'Classes to remove (for class type)' },
+            element: { type: 'string', description: 'HTML to create (for create type)' },
+            targetSelector: { type: 'string', description: 'Target location (for move/create types)' },
+            position: { type: 'string', enum: ['before', 'after', 'firstChild', 'lastChild'], description: 'Position relative to target' },
+            important: { type: 'boolean', description: 'Add !important flag to styles' },
+            waitForElement: { type: 'boolean', description: 'Wait for element to appear (SPA mode)' }
+          },
+          required: ['selector', 'type']
+        }
       },
       response: {
         type: 'string',
-        description: 'Conversational explanation and reasoning.'
+        description: 'Markdown explanation of what you changed and why. No action descriptions (no "I\'ll click..." or "Let me navigate...").'
       },
       action: {
         type: 'string',
         enum: ['append', 'replace_all', 'replace_specific', 'remove_specific', 'none'],
-        description: 'How the DOM changes should be applied.'
+        description: 'How to apply changes: append=add to existing, replace_all=clear all first, replace_specific=replace specific selectors, remove_specific=remove specific selectors, none=no changes'
       },
       targetSelectors: {
         type: 'array',
-        description: 'Selectors to target for replace/remove actions.',
+        description: 'CSS selectors to target when action is replace_specific or remove_specific',
         items: { type: 'string' }
       }
     },
@@ -42,26 +70,48 @@ const DOM_CHANGES_TOOL_OPENAI: OpenAI.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'dom_changes_generator',
-    description: 'Generates DOM change objects for A/B tests following strict selector rules.',
+    description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
     parameters: {
       type: 'object',
       properties: {
         domChanges: {
           type: 'array',
-          description: 'Array of DOM change instruction objects.'
+          description: 'Array of DOM change objects. Each must have: selector (CSS), type (text|html|style|styleRules|class|attribute|javascript|move|create|delete), and type-specific properties.',
+          items: {
+            type: 'object',
+            properties: {
+              selector: { type: 'string', description: 'CSS selector for target element(s)' },
+              type: {
+                type: 'string',
+                enum: ['text', 'html', 'style', 'styleRules', 'class', 'attribute', 'javascript', 'move', 'create', 'delete'],
+                description: 'Type of DOM change to apply'
+              },
+              value: { description: 'Value for text/html/attribute changes, or CSS object for style changes' },
+              css: { type: 'object', description: 'CSS properties object for style type (alternative to value)' },
+              states: { type: 'object', description: 'CSS states for styleRules type (normal, hover, active, focus)' },
+              add: { type: 'array', items: { type: 'string' }, description: 'Classes to add (for class type)' },
+              remove: { type: 'array', items: { type: 'string' }, description: 'Classes to remove (for class type)' },
+              element: { type: 'string', description: 'HTML to create (for create type)' },
+              targetSelector: { type: 'string', description: 'Target location (for move/create types)' },
+              position: { type: 'string', enum: ['before', 'after', 'firstChild', 'lastChild'], description: 'Position relative to target' },
+              important: { type: 'boolean', description: 'Add !important flag to styles' },
+              waitForElement: { type: 'boolean', description: 'Wait for element to appear (SPA mode)' }
+            },
+            required: ['selector', 'type']
+          }
         },
         response: {
           type: 'string',
-          description: 'Conversational explanation and reasoning.'
+          description: 'Markdown explanation of what you changed and why. No action descriptions (no "I\'ll click..." or "Let me navigate...").'
         },
         action: {
           type: 'string',
           enum: ['append', 'replace_all', 'replace_specific', 'remove_specific', 'none'],
-          description: 'How the DOM changes should be applied.'
+          description: 'How to apply changes: append=add to existing, replace_all=clear all first, replace_specific=replace specific selectors, remove_specific=remove specific selectors, none=no changes'
         },
         targetSelectors: {
           type: 'array',
-          description: 'Selectors to target for replace/remove actions.',
+          description: 'CSS selectors to target when action is replace_specific or remove_specific',
           items: { type: 'string' }
         }
       },
@@ -289,6 +339,173 @@ Example response:
 
 Analyze the provided HTML and user request, then generate the appropriate DOM changes.`
 
+// Shared HTML sanitization - removes invalid Unicode characters
+function sanitizeHtml(htmlStr: string): string {
+  return htmlStr
+    .split('')
+    .map((char, index, arr) => {
+      const code = char.charCodeAt(0)
+
+      if (code >= 0xD800 && code <= 0xDBFF) {
+        if (index + 1 < arr.length) {
+          const nextCode = arr[index + 1].charCodeAt(0)
+          if (nextCode >= 0xDC00 && nextCode <= 0xDFFF) {
+            return char
+          }
+        }
+        return ''
+      }
+
+      if (code >= 0xDC00 && code <= 0xDFFF) {
+        return ''
+      }
+
+      if (code >= 0x00 && code <= 0x08) return ''
+      if (code === 0x0B || code === 0x0C) return ''
+      if (code >= 0x0E && code <= 0x1F) return ''
+      if (code === 0xFFFD) return ''
+
+      return char
+    })
+    .join('')
+}
+
+// Shared HTML compression - removes extension elements and reduces size
+function compressHtml(html: string): string {
+  if (!html) {
+    console.error('[Compress] ❌ HTML is undefined or empty!')
+    return ''
+  }
+
+  let compressed = html
+  console.log('[Compress] Starting compression, original length:', html.length)
+
+  const plasmoLoadingStart = compressed.indexOf('<div id="__plasmo-loading__"')
+  if (plasmoLoadingStart !== -1) {
+    let depth = 0
+    let inTag = false
+    let currentTag = ''
+    let plasmoEnd = -1
+
+    for (let i = plasmoLoadingStart; i < compressed.length; i++) {
+      const char = compressed[i]
+
+      if (char === '<') {
+        inTag = true
+        currentTag = ''
+      } else if (char === '>') {
+        inTag = false
+
+        if (currentTag.startsWith('div') || currentTag.startsWith('div ')) {
+          depth++
+        } else if (currentTag === '/div') {
+          depth--
+          if (depth === 0) {
+            plasmoEnd = i + 1
+            break
+          }
+        }
+        currentTag = ''
+      } else if (inTag) {
+        currentTag += char
+      }
+    }
+
+    if (plasmoEnd !== -1) {
+      console.log('[Compress] Removing Plasmo loading div:', plasmoEnd - plasmoLoadingStart, 'characters')
+      compressed = compressed.substring(0, plasmoLoadingStart) + compressed.substring(plasmoEnd)
+    }
+  }
+
+  const beforeOtherPlasmo = compressed.length
+  compressed = compressed
+    .replace(/<div[^>]*id="__plasmo"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<plasmo-csui[^>]*>[\s\S]*?<\/plasmo-csui>/gi, '')
+    .replace(/<div[^>]*data-plasmo[^>]*>[\s\S]*?<\/div>/gi, '')
+    // Remove extension debug divs
+    .replace(/<div[^>]*id="absmartly-debug-[^"]*"[^>]*>.*?<\/div>/gi, '')
+
+  console.log('[Compress] After other Plasmo removal:', compressed.length, 'Removed:', beforeOtherPlasmo - compressed.length)
+
+  compressed = compressed
+    .replace(/<iframe[^>]*id="absmartly-sidebar-iframe"[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<iframe[^>]*chrome-extension[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<div[^>]*id="absmartly-preview-header-host"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/\s+data-absmartly-preview-[a-z-]+="[^"]*"/gi, '')
+    .replace(/\s+data-absmartly-original-[a-z-]+="[^"]*"/gi, '')
+    .replace(/\s+data-absmartly-modified="[^"]*"/gi, '')
+    .replace(/<div[^>]*class="[^"]*extension[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    // Remove noisy Framer framework attributes (keep data-framer-name as it's useful)
+    .replace(/\s+data-framer-hydrate-v2="[^"]*"/gi, '')
+    .replace(/\s+data-framer-appear-id="[^"]*"/gi, '')
+    .replace(/\s+data-framer-ssr-released-at="[^"]*"/gi, '')
+    .replace(/\s+data-framer-page-optimized-at="[^"]*"/gi, '')
+    .replace(/\s+data-framer-generated-page="[^"]*"/gi, '')
+    .replace(/\s+data-framer-component-type="[^"]*"/gi, '')
+    .replace(/\s+data-styles-preset="[^"]*"/gi, '')
+    .replace(/\s+data-framer-page-link-current="[^"]*"/gi, '')
+
+  const beforeHeadStrip = compressed.length
+  compressed = compressed.replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, (match, headContent) => {
+    let styleTags = (headContent.match(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi) || [])
+      // Filter out framework styles
+      .filter(tag => {
+        return !tag.includes('plasmo') &&
+               !tag.includes('__plasmo') &&
+               !tag.includes('data-plasmo') &&
+               !tag.includes('data-framer-css-ssr-minified') && // Framer framework CSS
+               !tag.includes('__framer-editorbar') && // Framer editor
+               !tag.includes('_goober') && // Goober framework
+               !tag.includes('type="text/css"') // External font imports
+      })
+      .map(tag => {
+        // Remove @font-face declarations
+        let cleaned = tag.replace(/@font-face\s*\{[^}]*\}/gi, '')
+        // Remove empty font comments
+        cleaned = cleaned.replace(/\/\*\s*(vietnamese|latin-ext|latin|cyrillic-ext|cyrillic|greek)\s*\*\//gi, '')
+        // Remove ALL CSS comments
+        cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '')
+        // Remove @import statements (external fonts)
+        cleaned = cleaned.replace(/@import\s+url\([^)]+\);?/gi, '')
+        return cleaned
+      })
+      .filter(tag => {
+        const content = tag.replace(/<\/?style[^>]*>/gi, '').trim()
+        // Keep if has actual CSS (not just comments/whitespace)
+        return content.length > 0 && !content.match(/^\/\*[\s\S]*\*\/$/)
+      })
+
+    console.log('[Compress] Found', styleTags.length, 'essential style tags in head')
+    return styleTags.length > 0 ? `<head>${styleTags.join('')}</head>` : '<head></head>'
+  })
+  console.log('[Compress] After head strip:', compressed.length, 'Removed:', beforeHeadStrip - compressed.length)
+
+  return compressed
+    // Remove Framer editor UI elements
+    .replace(/<div[^>]*id="__framer-editorbar-container"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<iframe[^>]*id="__framer-editorbar"[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    // Remove tooltip containers
+    .replace(/<div[^>]*id="tooltip-root"[^>]*>[\s\S]*?<\/div>/gi, '')
+    // Remove HubSpot interactives
+    .replace(/<div[^>]*id="hs-web-interactives-[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    // Remove other framework containers
+    .replace(/<div[^>]*id="tldx-[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<tldx-lmi-shadow-root[^>]*>[\s\S]*?<\/tldx-lmi-shadow-root>/gi, '')
+    // Remove archetype and other tracking iframes
+    .replace(/<iframe[^>]*owner="archetype"[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+    // Remove scripts, comments, inline styles, and inline JS handlers
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\s+style="[^"]*"/gi, '')
+    // Remove inline JavaScript event handlers
+    .replace(/\s+on[a-z]+="[^"]*"/gi, '')
+    // Collapse whitespace
+    .replace(/\s+/g, ' ')
+    .replace(/>\s+</g, '><')
+    .trim()
+}
+
 export async function generateDOMChanges(
   html: string,
   prompt: string,
@@ -305,6 +522,8 @@ export async function generateDOMChanges(
   try {
     console.log('[AI Gen] 🤖 Generating DOM changes with AI...')
     console.log('[AI Gen] 📝 Prompt:', prompt)
+    console.log('[AI Gen] 📄 HTML defined:', !!html)
+    console.log('[AI Gen] 📄 HTML type:', typeof html)
     console.log('[AI Gen] 📄 HTML length:', html?.length || 'undefined')
     console.log('[AI Gen] 🖼️ Images:', images?.length || 0)
     console.log('[AI Gen] 💾 Has conversation session:', !!options?.conversationSession)
@@ -314,12 +533,25 @@ export async function generateDOMChanges(
       console.log('[AI Gen] Session htmlSent:', options.conversationSession.htmlSent)
     }
 
-    // Try Claude Code Bridge first (uses Claude subscription, no API costs)
-    // Skip bridge if explicitly using OpenAI API
-    if (options?.aiProvider !== 'openai-api') {
+    // Validate HTML is provided (unless session already has it sent)
+    if (!html && !options?.conversationSession?.htmlSent) {
+      throw new Error('HTML is required for the first message in a conversation')
+    }
+
+    // SHARED: Compress and sanitize HTML for all providers (only if HTML provided)
+    const compressedHtml = html ? compressHtml(html) : ''
+    const cleanHtml = html ? sanitizeHtml(compressedHtml) : ''
+    if (html) {
+      console.log('[AI Gen] Original HTML:', html.length, '→ Compressed:', compressedHtml.length, '→ Sanitized:', cleanHtml.length)
+    } else {
+      console.log('[AI Gen] Skipping HTML compression (using existing session HTML)')
+    }
+
+    // Try Claude Code Bridge only if explicitly using 'claude-subscription'
+    if (options?.aiProvider === 'claude-subscription') {
       try {
         console.log('[AI Gen] 🔗 Attempting to use Claude Code Bridge...')
-        const result = await generateWithBridge(html, prompt, currentChanges, images, options?.conversationSession)
+        const result = await generateWithBridge(cleanHtml, prompt, currentChanges, images, options?.conversationSession)
         console.log('[AI Gen] ✅ Successfully generated with Claude Code Bridge')
         return result
       } catch (bridgeError) {
@@ -331,7 +563,7 @@ export async function generateDOMChanges(
     // Use OpenAI API if specified
     if (options?.aiProvider === 'openai-api') {
       console.log('[AI Gen] 🤖 Using OpenAI API')
-      return await generateWithOpenAI(html, prompt, apiKey, currentChanges, images, options)
+      return await generateWithOpenAI(cleanHtml, prompt, apiKey, currentChanges, images, options)
     }
 
     // Default to Anthropic API
@@ -362,15 +594,21 @@ export async function generateDOMChanges(
       }
     }
 
-    let systemPrompt = SYSTEM_PROMPT
+    let systemPrompt = sanitizeHtml(await getSystemPrompt())
+    console.log('[AI Gen] Base system prompt length:', systemPrompt.length)
+
     if (!session.htmlSent) {
-      if (!html) {
+      if (!cleanHtml) {
         throw new Error('HTML is required for first message in conversation')
       }
-      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
+
+      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${cleanHtml}\n\`\`\``
       session.htmlSent = true
       console.log('📄 Including HTML in system prompt (initializing conversation)')
     }
+
+    systemPrompt = sanitizeHtml(systemPrompt)
+    console.log('[AI Gen] Final system prompt length after sanitization:', systemPrompt.length)
 
     // Print the complete system prompt to console
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
@@ -384,10 +622,12 @@ export async function generateDOMChanges(
     let userMessageText = ''
 
     if (currentChanges.length > 0) {
-      userMessageText += `Current DOM Changes:\n\`\`\`json\n${JSON.stringify(currentChanges, null, 2)}\n\`\`\`\n\n`
+      const sanitizedChanges = sanitizeHtml(JSON.stringify(currentChanges, null, 2))
+      userMessageText += `Current DOM Changes:\n\`\`\`json\n${sanitizedChanges}\n\`\`\`\n\n`
     }
 
-    userMessageText += `User Request: ${prompt}`
+    const sanitizedPrompt = sanitizeHtml(prompt)
+    userMessageText += `User Request: ${sanitizedPrompt}`
 
     const contentParts: Anthropic.MessageParam['content'] = [
       {
@@ -421,17 +661,28 @@ export async function generateDOMChanges(
     }
     session.messages.push({ role: 'user', content: userMessageText })
 
-    const message = await anthropic.messages.create({
+    const requestBody = {
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       system: systemPrompt,
       messages: [...session.messages.slice(0, -1).map(m => ({
         role: m.role,
-        content: m.content
+        content: sanitizeHtml(m.content) // Sanitize historical messages too
       })), newUserMessage] as Anthropic.MessageParam[],
       tools: [DOM_CHANGES_TOOL],
       tool_choice: { type: 'tool', name: 'dom_changes_generator' }
-    })
+    }
+
+    // Test if request body can be JSON encoded before sending
+    try {
+      JSON.stringify(requestBody)
+      console.log('[AI Gen] ✅ Request body is valid JSON')
+    } catch (jsonError) {
+      console.error('[AI Gen] ❌ Request body contains invalid JSON:', jsonError)
+      throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
+    }
+
+    const message = await anthropic.messages.create(requestBody as any)
 
     const content = message.content[0]
 
@@ -558,7 +809,7 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
 
     let session = conversationSession
     let conversationId: string
-    let systemPromptToSend = SYSTEM_PROMPT
+    let systemPromptToSend = await getSystemPrompt()
 
     if (!session || !session.conversationId) {
       console.log('[Bridge] No session or no conversationId, creating new conversation')
@@ -585,9 +836,11 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       const result = await bridgeClient.createConversation(
         sessionId,
         '/',
-        'allow'
+        'allow',
+        DOM_CHANGES_TOOL.input_schema // Pass schema to bridge
       )
       conversationId = result.conversationId
+      console.log('[Bridge] ✅ Conversation created with JSON schema from extension')
 
       session = {
         id: sessionId,
@@ -653,8 +906,8 @@ async function generateWithBridge(html: string, prompt: string, currentChanges: 
       setTimeout(async () => {
         console.log('[Bridge] Sending message to conversation:', conversationId)
         try {
-          await bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend)
-          console.log('[Bridge] Message sent successfully')
+          await bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend, DOM_CHANGES_TOOL.input_schema)
+          console.log('[Bridge] Message sent successfully (with schema)')
         } catch (error) {
           console.error('[Bridge] Failed to send message:', error)
           eventSource.close()
@@ -800,14 +1053,14 @@ async function generateWithOpenAI(
     }
   }
 
-  let systemPrompt = SYSTEM_PROMPT
+  let systemPrompt = await getSystemPrompt()
   if (!session.htmlSent) {
     if (!html) {
       throw new Error('HTML is required for first message in conversation')
     }
     systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
     session.htmlSent = true
-    console.log('[OpenAI] Including HTML in system prompt (initializing conversation)')
+    console.log('[OpenAI] Including HTML in system prompt (initializing conversation, using pre-cleaned HTML)')
   }
 
   console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')

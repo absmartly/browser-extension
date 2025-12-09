@@ -358,15 +358,19 @@ export function initializeBackgroundScript() {
           console.log('[Background] AI_GENERATE_DOM_CHANGES - Starting generation...')
           const config = await getConfig(storage, secureStorage)
           const { html, prompt, currentChanges, images, conversationSession } = message
+          console.log('[Background] Message keys:', Object.keys(message))
+          console.log('[Background] HTML defined:', !!html, 'type:', typeof html)
           console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length, 'Current changes:', currentChanges?.length || 0, 'Images:', images?.length || 0)
           console.log('[Background] Session:', conversationSession?.id || 'null')
           console.log('[Background] AI Provider:', config?.aiProvider)
 
-          const apiKeyToUse = config?.aiProvider === 'anthropic-api'
-            ? config?.anthropicApiKey
+          const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api')
+            ? config?.aiApiKey
             : config?.apiKey
 
-          console.log('[Background] Using API key from config:', apiKeyToUse ? 'present' : 'missing')
+          console.log('[Background] Config aiApiKey:', config?.aiApiKey ? `present (${config?.aiApiKey.substring(0, 10)}...)` : 'missing')
+          console.log('[Background] Config apiKey:', config?.apiKey ? 'present' : 'missing')
+          console.log('[Background] Using API key from config:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing')
 
           const options: any = {
             aiProvider: config?.aiProvider
@@ -377,8 +381,14 @@ export function initializeBackgroundScript() {
             console.log('[Background] Passing session to generateDOMChanges:', conversationSession.id)
           }
 
+          // Validate HTML is provided if session hasn't been initialized
+          if (!html && !conversationSession?.htmlSent) {
+            throw new Error('HTML is required for the first message in a conversation')
+          }
+
           console.error('🚀 [Background] Calling generateDOMChanges with aiProvider:', config?.aiProvider)
-          const result = await generateDOMChanges(html, prompt, apiKeyToUse || '', currentChanges || [], images, options)
+          console.log('[Background] Passing HTML:', html ? `${html.length} chars` : 'undefined (using session)')
+          const result = await generateDOMChanges(html || '', prompt, apiKeyToUse || '', currentChanges || [], images, options)
 
           console.log('[Background] Generated result:', JSON.stringify(result, null, 2))
           console.log('[Background] Result keys:', Object.keys(result))
@@ -435,11 +445,14 @@ export function initializeBackgroundScript() {
           const { html, conversationSession } = message
           console.log('[Background] HTML length:', html?.length, 'Session:', conversationSession?.id)
 
-          const apiKeyToUse = config?.aiProvider === 'anthropic-api'
-            ? config?.anthropicApiKey
+          const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api')
+            ? config?.aiApiKey
             : config?.apiKey
 
-          console.log('[Background] Using API key from config:', apiKeyToUse ? 'present' : 'missing')
+          console.log('[Background] AI Provider:', config?.aiProvider)
+          console.log('[Background] Config aiApiKey:', config?.aiApiKey ? `present (${config?.aiApiKey.substring(0, 10)}...)` : 'missing')
+          console.log('[Background] Config apiKey:', config?.apiKey ? 'present' : 'missing')
+          console.log('[Background] Using API key from config:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing')
 
           const options: any = {
             aiProvider: config?.aiProvider,

@@ -153,7 +153,7 @@ export class ClaudeCodeBridgeClient {
     }
   }
 
-  async createConversation(sessionId: string, cwd: string, permissionMode: 'ask' | 'allow' = 'ask'): Promise<{ conversationId: string }> {
+  async createConversation(sessionId: string, cwd: string, permissionMode: 'ask' | 'allow' = 'ask', jsonSchema?: any): Promise<{ conversationId: string }> {
     if (!this.connection) {
       await this.connect()
     }
@@ -164,7 +164,8 @@ export class ClaudeCodeBridgeClient {
       body: JSON.stringify({
         session_id: sessionId,
         cwd,
-        permissionMode
+        permissionMode,
+        jsonSchema // Pass schema to bridge if provided
       })
     })
 
@@ -175,7 +176,7 @@ export class ClaudeCodeBridgeClient {
     return await response.json()
   }
 
-  async sendMessage(conversationId: string, content: string, files: string[] = [], systemPrompt?: string): Promise<void> {
+  async sendMessage(conversationId: string, content: string, files: string[] = [], systemPrompt?: string, jsonSchema?: any): Promise<void> {
     if (!this.connection) {
       await this.connect()
     }
@@ -186,7 +187,8 @@ export class ClaudeCodeBridgeClient {
       body: JSON.stringify({
         content,
         files,
-        systemPrompt
+        systemPrompt,
+        jsonSchema // Send schema with every message for bridge restart safety
       })
     })
 

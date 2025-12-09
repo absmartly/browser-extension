@@ -7,16 +7,16 @@ import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } fr
 
 interface AIProviderSectionProps {
   aiProvider: 'claude-subscription' | 'anthropic-api' | 'openai-api'
-  claudeApiKey: string
+  aiApiKey: string
   onAiProviderChange: (value: 'claude-subscription' | 'anthropic-api' | 'openai-api') => void
-  onClaudeApiKeyChange: (value: string) => void
+  onAiApiKeyChange: (value: string) => void
 }
 
 export const AIProviderSection = React.memo(function AIProviderSection({
   aiProvider,
-  claudeApiKey,
+  aiApiKey,
   onAiProviderChange,
-  onClaudeApiKeyChange
+  onAiApiKeyChange
 }: AIProviderSectionProps) {
   const [bridgeClient] = useState(() => new ClaudeCodeBridgeClient())
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NOT_CONFIGURED)
@@ -135,7 +135,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                     <div>
                       <p className="font-medium text-xs">1. Login to Claude CLI (one-time setup):</p>
                       <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
-                        npx @anthropic-ai/claude-code login
+                        npx @anthropic-ai/claude-code /login
                       </code>
                     </div>
 
@@ -179,11 +179,11 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       {aiProvider === 'anthropic-api' && (
         <div className="mt-4">
           <Input
-            id="claude-api-key"
+            id="ai-api-key"
             label="Anthropic API Key"
             type="password"
-            value={claudeApiKey}
-            onChange={(e) => onClaudeApiKeyChange(e.target.value)}
+            value={aiApiKey}
+            onChange={(e) => onAiApiKeyChange(e.target.value)}
             placeholder="sk-ant-..."
             showPasswordToggle={true}
           />
@@ -202,11 +202,28 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       )}
 
       {aiProvider === 'openai-api' && (
-        <Alert variant="destructive" className="mt-3">
-          <AlertDescription>
-            OpenAI API integration is not yet implemented. Please select Claude Subscription or Anthropic API Key.
-          </AlertDescription>
-        </Alert>
+        <div className="mt-4">
+          <Input
+            id="ai-api-key"
+            label="OpenAI API Key"
+            type="password"
+            value={aiApiKey}
+            onChange={(e) => onAiApiKeyChange(e.target.value)}
+            placeholder="sk-..."
+            showPasswordToggle={true}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Get your API key from{' '}
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              platform.openai.com
+            </a>
+          </p>
+        </div>
       )}
     </div>
   )

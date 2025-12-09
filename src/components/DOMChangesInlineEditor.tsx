@@ -870,7 +870,21 @@ export function DOMChangesInlineEditor({
 
       if (!response.success) {
         console.error('[AI Generate] ❌ Response failed:', response.error)
-        throw new Error(response.error || 'Failed to generate DOM changes')
+        console.error('[AI Generate] Error type:', typeof response.error)
+        console.error('[AI Generate] Error keys:', response.error ? Object.keys(response.error) : 'null')
+
+        let errorMsg = 'Failed to generate DOM changes'
+        try {
+          if (typeof response.error === 'string') {
+            errorMsg = response.error
+          } else if (response.error && typeof response.error === 'object') {
+            errorMsg = response.error.message || String(response.error)
+          }
+        } catch (e) {
+          console.error('[AI Generate] Error extracting error message:', e)
+        }
+
+        throw new Error(errorMsg)
       }
 
       // Validate response.result exists
@@ -1213,7 +1227,8 @@ export function DOMChangesInlineEditor({
           </span>
         )
       case 'style':
-        const styles = Object.entries(change.value)
+        const styleValue = (change as any).css || change.value || {}
+        const styles = Object.entries(styleValue)
         return (
           <div className="flex flex-wrap gap-1.5">
             {styles.map(([key, value], i) => (
