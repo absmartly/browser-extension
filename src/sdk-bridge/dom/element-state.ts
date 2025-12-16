@@ -73,12 +73,12 @@ export class ElementStateManager {
 
       // Restore attributes (always safe to restore)
       if (originalState.attributes) {
-        // First, remove all current attributes except data-* ones we want to clean
+        // First, remove all current attributes except ones that will be handled separately
         const currentAttrs = Array.from(element.attributes)
         currentAttrs.forEach((attr) => {
-          // Skip removing core structural attributes
+          // Skip removing 'class' (handled separately via classList) and tracking attributes (removed explicitly later)
           if (!originalState.attributes.hasOwnProperty(attr.name) &&
-              !['id', 'class', 'data-absmartly-experiment', 'data-absmartly-modified'].includes(attr.name)) {
+              !['class', 'data-absmartly-experiment', 'data-absmartly-modified'].includes(attr.name)) {
             element.removeAttribute(attr.name)
           }
         })

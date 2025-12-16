@@ -1,0 +1,536 @@
+import { AnthropicProvider } from '../anthropic'
+import Anthropic from '@anthropic-ai/sdk'
+import type { AIProviderConfig } from '../base'
+import * as utils from '../utils'
+
+jest.mock('@anthropic-ai/sdk')
+jest.mock('../utils', () => ({
+  sanitizeHtml: jest.fn((html) => html),
+  getSystemPrompt: jest.fn(),
+  buildUserMessage: jest.fn()
+}))
+
+const createConfig = (overrides?: Partial<AIProviderConfig>): AIProviderConfig => ({
+  apiKey: 'sk-ant-test-key',
+  aiProvider: 'anthropic-api',
+  ...overrides
+})
+
+describe('AnthropicProvider', () => {
+  let mockAnthropicInstance: jest.Mocked<Anthropic>
+  let mockMessages: any
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.spyOn(console, 'log').mockImplementation()
+    jest.spyOn(console, 'error').mockImplementation()
+    jest.spyOn(console, 'warn').mockImplementation()
+
+    mockMessages = {
+      create: jest.fn()
+    }
+
+    mockAnthropicInstance = {
+      messages: mockMessages
+    } as any
+
+    ;(Anthropic as jest.MockedClass<typeof Anthropic>).mockImplementation(() => mockAnthropicInstance)
+
+    jest.mocked(utils.getSystemPrompt).mockResolvedValue('System prompt for testing')
+    jest.mocked(utils.buildUserMessage).mockReturnValue('User message: test prompt')
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  describe('constructor', () => {
+    it('should initialize with API key only', () => {
+      const config = createConfig()
+      const provider = new AnthropicProvider(config)
+
+      expect(provider).toBeInstanceOf(AnthropicProvider)
+    })
+
+    it('should initialize with OAuth settings', () => {
+      const config = createConfig({
+        apiKey: '',
+        useOAuth: true,
+        oauthToken: 'oauth-token-123'
+      })
+
+      const provider = new AnthropicProvider(config)
+
+      expect(provider).toBeInstanceOf(AnthropicProvider)
+    })
+
+    it('should default useOAuth to false when not provided', () => {
+      const config = createConfig()
+      const provider = new AnthropicProvider(config)
+
+      expect(provider).toBeInstanceOf(AnthropicProvider)
+    })
+  })
+
+  describe('getToolDefinition', () => {
+    it('should return Anthropic tool definition with correct structure', () => {
+      const provider = new AnthropicProvider(createConfig())
+      const toolDef = provider.getToolDefinition()
+
+      expect(toolDef).toHaveProperty('name')
+      expect(toolDef).toHaveProperty('description')
+      expect(toolDef).toHaveProperty('input_schema')
+    })
+
+    it('should have correct tool name', () => {
+      const provider = new AnthropicProvider(createConfig())
+      const toolDef = provider.getToolDefinition()
+
+      expect(toolDef.name).toBe('dom_changes_generator')
+    })
+
+    it('should have meaningful description', () => {
+      const provider = new AnthropicProvider(createConfig())
+      const toolDef = provider.getToolDefinition()
+
+      expect(toolDef.description).toContain('DOM change')
+      expect(toolDef.description).toContain('A/B test')
+    })
+
+    it('should reference shared schema', () => {
+      const provider = new AnthropicProvider(createConfig())
+      const toolDef = provider.getToolDefinition()
+
+      expect(toolDef.input_schema).toBeDefined()
+      expect(toolDef.input_schema).toHaveProperty('type')
+      expect(toolDef.input_schema).toHaveProperty('properties')
+    })
+  })
+
+  describe('generate', () => {
+    it('should create Anthropic client with API key', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(Anthropic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: 'sk-ant-test-key',
+          dangerouslyAllowBrowser: true
+        })
+      )
+    })
+
+    it('should create Anthropic client with OAuth token when useOAuth is true', async () => {
+      const provider = new AnthropicProvider(createConfig({ apiKey: '', useOAuth: true, oauthToken: 'oauth-token-123' }))
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(Anthropic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: 'oauth-token-123',
+          defaultHeaders: {
+            'Authorization': 'Bearer oauth-token-123'
+          }
+        })
+      )
+    })
+
+    it('should throw error when neither API key nor OAuth token is provided', async () => {
+      const provider = new AnthropicProvider(createConfig({ apiKey: '', useOAuth: false }))
+
+      await expect(
+        provider.generate('<html></html>', 'test prompt', [], undefined, {})
+      ).rejects.toThrow('Either API key or OAuth token is required')
+    })
+
+    it('should include HTML in system prompt for new session', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html><body>Test</body></html>', 'test prompt', [], undefined, {})
+
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: expect.stringContaining('<html><body>Test</body></html>')
+        })
+      )
+    })
+
+    it('should not include HTML in system prompt for existing session with htmlSent=true', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate(
+        '',
+        'test prompt',
+        [],
+        undefined,
+        {
+          conversationSession: {
+            id: 'session-123',
+            htmlSent: true,
+            messages: []
+          }
+        }
+      )
+
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: expect.not.stringContaining('<html>')
+        })
+      )
+    })
+
+    it('should throw error when HTML is required but not provided', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      await expect(
+        provider.generate('', 'test prompt', [], undefined, {})
+      ).rejects.toThrow('HTML is required for first message in conversation')
+    })
+
+    it('should sanitize system prompt', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      jest.mocked(utils.sanitizeHtml).mockImplementation((html) => html.replace(/\x00/g, ''))
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(utils.sanitizeHtml).toHaveBeenCalled()
+    })
+
+    it('should include images in message content', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      const images = ['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==']
+
+      await provider.generate('<html></html>', 'test prompt', [], images, {})
+
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.arrayContaining([
+                expect.objectContaining({
+                  type: 'image',
+                  source: expect.objectContaining({
+                    type: 'base64',
+                    media_type: 'image/png'
+                  })
+                })
+              ])
+            })
+          ])
+        })
+      )
+    })
+
+    it('should use claude-sonnet-4-5-20250929 model', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'claude-sonnet-4-5-20250929'
+        })
+      )
+    })
+
+    it('should force tool use with tool_choice', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tool_choice: { type: 'tool', name: 'dom_changes_generator' }
+        })
+      )
+    })
+
+    it('should return result with domChanges from tool_use response', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      const mockDomChanges = [
+        { selector: '.button', type: 'style', value: { color: 'red' } }
+      ]
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: mockDomChanges,
+            response: 'Changed button color to red',
+            action: 'append'
+          }
+        }]
+      })
+
+      const result = await provider.generate('<html></html>', 'Change button color', [], undefined, {})
+
+      expect(result.domChanges).toEqual(mockDomChanges)
+      expect(result.response).toBe('Changed button color to red')
+      expect(result.action).toBe('append')
+      expect(result.session).toBeDefined()
+    })
+
+    it('should create new session when not provided', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.session).toBeDefined()
+      expect(result.session.id).toBeDefined()
+      expect(result.session.htmlSent).toBe(true)
+      expect(result.session.messages).toEqual([
+        { role: 'user', content: 'User message: test prompt' },
+        { role: 'assistant', content: 'Test response' }
+      ])
+    })
+
+    it('should preserve existing session messages', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Second response',
+            action: 'none'
+          }
+        }]
+      })
+
+      const existingSession = {
+        id: 'session-123',
+        htmlSent: true,
+        messages: [
+          { role: 'user' as const, content: 'First message' },
+          { role: 'assistant' as const, content: 'First response' }
+        ]
+      }
+
+      const result = await provider.generate('', 'Second message', [], undefined, {
+        conversationSession: existingSession
+      })
+
+      expect(result.session.messages).toHaveLength(4)
+      expect(result.session.messages[0].content).toBe('First message')
+      expect(result.session.messages[3].content).toBe('Second response')
+    })
+
+    it('should handle text response when tool_use is not used', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'text',
+          text: '{"domChanges": [], "response": "Plain text response", "action": "none"}'
+        }]
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.domChanges).toEqual([])
+      expect(result.response).toBe('Plain text response')
+      expect(result.action).toBe('none')
+    })
+
+    it('should handle text response with markdown code blocks', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'text',
+          text: '```json\n{"domChanges": [], "response": "Wrapped response", "action": "none"}\n```'
+        }]
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.domChanges).toEqual([])
+      expect(result.response).toBe('Wrapped response')
+      expect(result.action).toBe('none')
+    })
+
+    it('should handle conversational response when no JSON is present', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'text',
+          text: 'This is just a conversational message without JSON'
+        }]
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.domChanges).toEqual([])
+      expect(result.response).toBe('This is just a conversational message without JSON')
+      expect(result.action).toBe('none')
+    })
+
+    it('should throw error for invalid tool_use response', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            response: 'Missing domChanges and action'
+          }
+        }]
+      })
+
+      await expect(
+        provider.generate('<html></html>', 'test prompt', [], undefined, {})
+      ).rejects.toThrow('Tool use validation failed')
+    })
+
+    it('should include current changes in user message when provided', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      const currentChanges = [
+        { selector: '.existing', type: 'text' as const, value: 'Old text' }
+      ]
+
+      await provider.generate('<html></html>', 'Add more changes', currentChanges, undefined, {})
+
+      expect(utils.buildUserMessage).toHaveBeenCalledWith('Add more changes', currentChanges)
+    })
+
+    it('should set max_tokens to 4096', async () => {
+      const provider = new AnthropicProvider(createConfig())
+
+      mockMessages.create.mockResolvedValue({
+        content: [{
+          type: 'tool_use',
+          input: {
+            domChanges: [],
+            response: 'Test response',
+            action: 'none'
+          }
+        }]
+      })
+
+      await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          max_tokens: 4096
+        })
+      )
+    })
+  })
+})

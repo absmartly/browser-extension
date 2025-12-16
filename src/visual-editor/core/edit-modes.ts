@@ -562,8 +562,7 @@ export class EditModes {
       selector: elementSelector,
       type: 'move',
       targetSelector,
-      position,
-      enabled: true
+      position
     }
 
     console.log('[ABSmartly] Creating move change with original position:', moveChange)
@@ -596,8 +595,7 @@ export class EditModes {
       const styleChange: DOMChange = {
         selector: elementSelector,
         type: 'style',
-        value: currentStyles,
-        enabled: true
+        value: currentStyles
       }
 
       console.log('[ABSmartly] Creating resize/style change:', styleChange)

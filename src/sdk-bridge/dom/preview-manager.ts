@@ -6,7 +6,7 @@
  * @module PreviewManager
  */
 
-import type { DOMChange } from '../types/dom-changes'
+import type { DOMChange, DOMChangeStyleRules } from '../types/dom-changes'
 import { ElementStateManager, type ElementState } from './element-state'
 import { sanitizeHTML } from '../utils/html-sanitizer'
 import { Logger } from '../utils/logger'
@@ -45,7 +45,7 @@ export class PreviewManager {
     }
 
     // Skip disabled changes
-    if (change.disabled) {
+    if ('disabled' in change && change.disabled) {
       Logger.log('Skipping disabled change:', change.selector)
       return false
     }
@@ -191,7 +191,7 @@ export class PreviewManager {
    * Apply style rules (CSS rules that affect all matching elements)
    * Matches SDK plugin behavior exactly
    */
-  private applyStyleRules(change: DOMChange, experimentName: string): boolean {
+  private applyStyleRules(change: DOMChangeStyleRules, experimentName: string): boolean {
     try {
       // Use same ruleKey format as SDK plugin: ${change.selector}::states
       const ruleKey = `${change.selector}::states`

@@ -5,28 +5,24 @@ describe('DOM Change Operations', () => {
   const createMockTextChange = (selector: string, value: string = 'test'): DOMChange => ({
     selector,
     type: 'text',
-    value,
-    enabled: true
+    value
   })
 
   const createMockHtmlChange = (selector: string, value: string = '<div>test</div>'): DOMChange => ({
     selector,
     type: 'html',
-    value,
-    enabled: true
+    value
   })
 
   const createMockStyleChange = (selector: string, value: Record<string, string> = { color: 'red' }): DOMChange => ({
     selector,
     type: 'style',
-    value,
-    enabled: true
+    value
   })
 
   const createMockRemoveChange = (selector: string): DOMChange => ({
     selector,
-    type: 'remove',
-    enabled: true
+    type: 'remove'
   })
 
   const createMockChange = createMockTextChange
@@ -462,7 +458,6 @@ describe('DOM Change Operations', () => {
       const complexChange: DOMChange = {
         selector: '.complex',
         type: 'style',
-        enabled: true,
         value: { color: 'red', fontSize: '16px' }
       }
       const currentChanges = [complexChange]
@@ -482,7 +477,7 @@ describe('DOM Change Operations', () => {
         selector: '.disabled',
         type: 'text',
         value: 'disabled text',
-        enabled: false
+        disabled: true
       }
       const currentChanges = [disabledChange]
       const result: AIDOMGenerationResult = {
@@ -494,7 +489,7 @@ describe('DOM Change Operations', () => {
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated[0]).toEqual(disabledChange)
-      expect(updated[0].enabled).toBe(false)
+      expect(updated[0].disabled).toBe(true)
     })
 
     it('should handle special characters in selectors', () => {

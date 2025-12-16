@@ -788,8 +788,8 @@ describe('ElementActions', () => {
     it('should clear all changes when confirmed', () => {
       // Setup some changes
       const changes: DOMChange[] = [
-        { selector: '#test1', type: 'style', value: { color: 'red' }, enabled: true },
-        { selector: '#test2', type: 'style', value: { color: 'blue' }, enabled: true }
+        { selector: '#test1', type: 'style', value: { color: 'red' } },
+        { selector: '#test2', type: 'style', value: { color: 'blue' } }
       ]
 
       const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
@@ -815,7 +815,7 @@ describe('ElementActions', () => {
     it('should not clear changes when cancelled', () => {
       // Setup some changes
       const changes: DOMChange[] = [
-        { selector: '#test1', type: 'style', value: { color: 'red' }, enabled: true }
+        { selector: '#test1', type: 'style', value: { color: 'red' } }
       ]
 
       const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]

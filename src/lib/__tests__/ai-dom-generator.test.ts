@@ -1,8 +1,16 @@
 import { generateDOMChanges } from '../ai-dom-generator'
-import Anthropic from '@anthropic-ai/sdk'
+import { createAIProvider } from '~src/lib/ai-providers'
 import { jest } from '@jest/globals'
+import type { AIProvider } from '~src/lib/ai-providers/base'
+import type { AIDOMGenerationResult } from '~src/types/dom-changes'
+import type { ConversationSession } from '~src/types/absmartly'
 
-jest.mock('@anthropic-ai/sdk')
+jest.mock('~src/lib/ai-providers', () => ({
+  createAIProvider: jest.fn(),
+  compressHtml: jest.fn((html: string) => html),
+  sanitizeHtml: jest.fn((html: string) => html)
+}))
+
 jest.mock('~src/utils/debug', () => ({
   debugLog: jest.fn(),
   debugError: jest.fn(),
@@ -16,327 +24,227 @@ describe('AI DOM Generator', () => {
   const mockHtml = '<html><body><p id="test">Test content</p></body></html>'
   const mockPrompt = 'Change the text to "Hello"'
 
+  let mockProvider: jest.Mocked<AIProvider>
+
   beforeEach(() => {
     jest.clearAllMocks()
+
+    mockProvider = {
+      generate: mockFn()
+    } as any
+
+    jest.mocked(createAIProvider).mockReturnValue(mockProvider)
   })
 
   describe('generateDOMChanges', () => {
-    it('should generate DOM changes from Claude API response', async () => {
-      const mockChanges = [
-        {
-          selector: '#test',
-          type: 'text',
-          value: 'Hello',
-          enabled: true
-        }
-      ]
-
-      const mockMessage = {
-        content: [
+    it('should generate DOM changes using provider factory', async () => {
+      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+        domChanges: [
           {
+            selector: '#test',
             type: 'text',
-            text: JSON.stringify(mockChanges)
+            value: 'Hello'
           }
-        ]
+        ],
+        response: 'Changed the text',
+        action: 'append',
+        session: {
+          id: 'test-session',
+          htmlSent: true,
+          messages: []
+        }
       }
 
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
+      mockProvider.generate.mockResolvedValue(mockResult)
 
       const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
 
-      expect(result).toEqual(mockChanges)
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 4096,
-          messages: expect.arrayContaining([
-            expect.objectContaining({
-              role: 'user',
-              content: expect.stringContaining(mockPrompt)
-            })
-          ])
-        })
+      expect(result).toEqual(mockResult)
+      expect(createAIProvider).toHaveBeenCalledWith({
+        apiKey: mockApiKey,
+        aiProvider: 'claude-subscription',
+        useOAuth: undefined,
+        oauthToken: undefined
+      })
+      expect(mockProvider.generate).toHaveBeenCalledWith(
+        mockHtml,
+        mockPrompt,
+        [],
+        undefined,
+        { conversationSession: undefined }
       )
     })
 
-    it('should handle markdown code block formatting in response', async () => {
-      const mockChanges = [
-        {
-          selector: '.button',
-          type: 'style',
-          value: { color: 'red' },
-          enabled: true
-        }
-      ]
-
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: '```json\n' + JSON.stringify(mockChanges) + '\n```'
-          }
-        ]
-      }
-
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
-
-      expect(result).toEqual(mockChanges)
-    })
-
-    it('should throw error when neither API key nor OAuth token is provided', async () => {
-      await expect(generateDOMChanges(mockHtml, mockPrompt, '')).rejects.toThrow(
-        'Either API key or OAuth token is required'
-      )
-    })
-
-    it('should use OAuth token when provided with useOAuth option', async () => {
+    it('should use OAuth token when provided', async () => {
       const mockOAuthToken = 'oauth-token-xyz'
-      const mockChanges = [
-        {
-          selector: '#test',
-          type: 'text',
-          value: 'Hello',
-          enabled: true
+      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+        domChanges: [],
+        response: 'Done',
+        action: 'none',
+        session: {
+          id: 'test-session',
+          htmlSent: true,
+          messages: []
         }
-      ]
-
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(mockChanges)
-          }
-        ]
       }
 
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
+      mockProvider.generate.mockResolvedValue(mockResult)
 
-      const result = await generateDOMChanges(mockHtml, mockPrompt, '', {
+      await generateDOMChanges(mockHtml, mockPrompt, '', [], undefined, {
         useOAuth: true,
         oauthToken: mockOAuthToken
       })
 
-      expect(result).toEqual(mockChanges)
-      expect(jest.mocked(Anthropic)).toHaveBeenCalledWith(
-        expect.objectContaining({
-          apiKey: mockOAuthToken,
-          dangerouslyAllowBrowser: true
-        })
-      )
-    })
-
-    it('should handle non-text response type', async () => {
-      const mockMessage = {
-        content: [
-          {
-            type: 'image',
-            text: 'some image'
-          }
-        ]
-      }
-
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow(
-        'Unexpected response type from Claude'
-      )
-    })
-
-    it('should throw error when response is not an array', async () => {
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ selector: '#test', type: 'text' })
-          }
-        ]
-      }
-
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow(
-        'AI response is not an array'
-      )
-    })
-
-    it('should handle JSON parsing errors', async () => {
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: 'Invalid JSON {'
-          }
-        ]
-      }
-
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow()
-    })
-
-    it('should generate multiple DOM changes', async () => {
-      const mockChanges = [
-        {
-          selector: '#title',
-          type: 'text',
-          value: 'New Title',
-          enabled: true
-        },
-        {
-          selector: '.button',
-          type: 'style',
-          value: { backgroundColor: '#ff0000' },
-          enabled: true
-        },
-        {
-          selector: '.hidden',
-          type: 'class',
-          add: ['hidden'],
-          enabled: true
-        }
-      ]
-
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(mockChanges)
-          }
-        ]
-      }
-
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
-
-      expect(result).toHaveLength(3)
-      expect(result).toEqual(mockChanges)
-    })
-
-    it('should handle API errors from Claude', async () => {
-      const mockError = new Error('API Error: Rate limit exceeded')
-
-      const mockCreate = mockFn().mockRejectedValue(mockError)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      await expect(generateDOMChanges(mockHtml, mockPrompt, mockApiKey)).rejects.toThrow(
-        'API Error: Rate limit exceeded'
-      )
-    })
-
-    it('should initialize Anthropic client with dangerouslyAllowBrowser flag', async () => {
-      const mockChanges = []
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(mockChanges)
-          }
-        ]
-      }
-
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
-
-      await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
-
-      expect(jest.mocked(Anthropic)).toHaveBeenCalledWith({
-        apiKey: mockApiKey,
-        dangerouslyAllowBrowser: true
+      expect(createAIProvider).toHaveBeenCalledWith({
+        apiKey: '',
+        aiProvider: 'claude-subscription',
+        useOAuth: true,
+        oauthToken: mockOAuthToken
       })
     })
 
-    it('should handle empty HTML gracefully', async () => {
-      const mockChanges = []
-
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(mockChanges)
-          }
-        ]
+    it('should use specified AI provider', async () => {
+      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+        domChanges: [],
+        response: 'Done',
+        action: 'none',
+        session: {
+          id: 'test-session',
+          htmlSent: true,
+          messages: []
+        }
       }
 
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
-        }
-      } as any))
+      mockProvider.generate.mockResolvedValue(mockResult)
 
-      const result = await generateDOMChanges('', mockPrompt, mockApiKey)
+      await generateDOMChanges(mockHtml, mockPrompt, mockApiKey, [], undefined, {
+        aiProvider: 'openai-api'
+      })
 
-      expect(result).toEqual([])
+      expect(createAIProvider).toHaveBeenCalledWith({
+        apiKey: mockApiKey,
+        aiProvider: 'openai-api',
+        useOAuth: undefined,
+        oauthToken: undefined
+      })
     })
 
-    it('should handle empty prompt gracefully', async () => {
-      const mockChanges = []
+    it('should throw error when HTML is required but not provided', async () => {
+      await expect(
+        generateDOMChanges('', mockPrompt, mockApiKey)
+      ).rejects.toThrow('HTML is required for the first message in a conversation')
+    })
 
-      const mockMessage = {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(mockChanges)
-          }
-        ]
+    it('should allow empty HTML when session has htmlSent=true', async () => {
+      const mockSession: ConversationSession = {
+        id: 'existing-session',
+        htmlSent: true,
+        messages: []
       }
 
-      const mockCreate = mockFn().mockResolvedValue(mockMessage)
-      jest.mocked(Anthropic).mockImplementation(() => ({
-        messages: {
-          create: mockCreate
+      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+        domChanges: [],
+        response: 'Done',
+        action: 'none',
+        session: mockSession
+      }
+
+      mockProvider.generate.mockResolvedValue(mockResult)
+
+      await generateDOMChanges('', mockPrompt, mockApiKey, [], undefined, {
+        conversationSession: mockSession
+      })
+
+      expect(mockProvider.generate).toHaveBeenCalledWith(
+        '',
+        mockPrompt,
+        [],
+        undefined,
+        { conversationSession: mockSession }
+      )
+    })
+
+    it('should pass currentChanges and images to provider', async () => {
+      const mockCurrentChanges = [
+        { selector: '.test', type: 'text' as const, value: 'Test' }
+      ]
+      const mockImages = ['data:image/png;base64,abc123']
+
+      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+        domChanges: [],
+        response: 'Done',
+        action: 'append',
+        session: {
+          id: 'test-session',
+          htmlSent: true,
+          messages: []
         }
-      } as any))
+      }
 
-      const result = await generateDOMChanges(mockHtml, '', mockApiKey)
+      mockProvider.generate.mockResolvedValue(mockResult)
 
-      expect(result).toEqual([])
+      await generateDOMChanges(
+        mockHtml,
+        mockPrompt,
+        mockApiKey,
+        mockCurrentChanges,
+        mockImages
+      )
+
+      expect(mockProvider.generate).toHaveBeenCalledWith(
+        mockHtml,
+        mockPrompt,
+        mockCurrentChanges,
+        mockImages,
+        { conversationSession: undefined }
+      )
+    })
+
+    it('should handle provider errors', async () => {
+      const mockError = new Error('Provider error: Rate limit exceeded')
+      mockProvider.generate.mockRejectedValue(mockError)
+
+      await expect(
+        generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
+      ).rejects.toThrow('Provider error: Rate limit exceeded')
+    })
+
+    it('should handle multiple DOM changes', async () => {
+      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+        domChanges: [
+          {
+            selector: '#title',
+            type: 'text',
+            value: 'New Title'
+          },
+          {
+            selector: '.button',
+            type: 'style',
+            value: { backgroundColor: '#ff0000' }
+          },
+          {
+            selector: '.hidden',
+            type: 'class',
+            add: ['hidden']
+          }
+        ],
+        response: 'Applied multiple changes',
+        action: 'append',
+        session: {
+          id: 'test-session',
+          htmlSent: true,
+          messages: []
+        }
+      }
+
+      mockProvider.generate.mockResolvedValue(mockResult)
+
+      const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
+
+      expect(result.domChanges).toHaveLength(3)
+      expect(result.domChanges[0].selector).toBe('#title')
+      expect(result.domChanges[1].selector).toBe('.button')
+      expect(result.domChanges[2].selector).toBe('.hidden')
     })
   })
 })
