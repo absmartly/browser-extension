@@ -153,7 +153,13 @@ export class ClaudeCodeBridgeClient {
     }
   }
 
-  async createConversation(sessionId: string, cwd: string, permissionMode: 'ask' | 'allow' = 'ask', jsonSchema?: any): Promise<{ conversationId: string }> {
+  async createConversation(
+    sessionId: string,
+    cwd: string,
+    permissionMode: 'ask' | 'allow' = 'ask',
+    jsonSchema?: any,
+    html?: string
+  ): Promise<{ conversationId: string }> {
     if (!this.connection) {
       await this.connect()
     }
@@ -165,12 +171,65 @@ export class ClaudeCodeBridgeClient {
         session_id: sessionId,
         cwd,
         permissionMode,
-        jsonSchema // Pass schema to bridge if provided
+        jsonSchema,
+        html // Pass HTML to bridge for chunk retrieval
       })
     })
 
     if (!response.ok) {
       throw new Error(`Failed to create conversation: ${response.status}`)
+    }
+
+    return await response.json()
+  }
+
+  async refreshHtml(conversationId: string, html: string): Promise<void> {
+    if (!this.connection) {
+      await this.connect()
+    }
+
+    const response = await fetch(`${this.connection!.url}/conversations/${conversationId}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to refresh HTML: ${response.status}`)
+    }
+  }
+
+  async getHtmlChunks(conversationId: string, selectors: string[]): Promise<{ results: Array<{ selector: string, html: string, found: boolean, error?: string }> }> {
+    if (!this.connection) {
+      await this.connect()
+    }
+
+    const response = await fetch(`${this.connection!.url}/conversations/${conversationId}/chunks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selectors })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to get HTML chunks: ${response.status}`)
+    }
+
+    return await response.json()
+  }
+
+  async queryXPath(conversationId: string, xpath: string, maxResults: number = 10): Promise<{ xpath: string, matches: Array<{ selector: string, html: string, textContent: string, nodeType: string }>, found: boolean, error?: string }> {
+    if (!this.connection) {
+      await this.connect()
+    }
+
+    const response = await fetch(`${this.connection!.url}/conversations/${conversationId}/xpath`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ xpath, maxResults })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to execute XPath: ${response.status}`)
     }
 
     return await response.json()

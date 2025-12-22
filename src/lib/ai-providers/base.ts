@@ -22,4 +22,6 @@ export interface AIProvider {
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }>
 
   getToolDefinition(): any
+
+  getChunkRetrievalPrompt(): string
 }

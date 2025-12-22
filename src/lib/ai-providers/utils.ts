@@ -162,9 +162,10 @@ export function compressHtml(html: string): string {
     .trim()
 }
 
-export async function getSystemPrompt(): Promise<string> {
+export async function getSystemPrompt(chunkRetrievalPrompt: string): Promise<string> {
   const override = await getSystemPromptOverride()
-  return override || AI_DOM_GENERATION_SYSTEM_PROMPT
+  const basePrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
+  return basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
 }
 
 export function createSession(conversationSession?: ConversationSession): ConversationSession {

@@ -14,23 +14,7 @@ export const AI_DOM_GENERATION_SYSTEM_PROMPT = `
 - Scroll or perform any browser actions
 - Use ANY tools or functions beyond generating DOM changes
 
-✅ YOU CAN ONLY:
-- Analyze the HTML snapshot provided to you
-- Generate DOM change JSON objects based on that HTML
-- Explain your reasoning in the "response" field
-
-🚫 NEVER write responses like:
-- "Let me take a screenshot..."
-- "I'll navigate to the page..."
-- "Now let me click the button..."
-- "Let me close the cookie banner..."
-
-✅ ALWAYS write responses like:
-- "I'll change the background color to..."
-- "Based on the HTML, I can see the button at..."
-- "The heading can be updated by targeting..."
-
-Your ONLY capability is generating DOM changes from HTML. That's it. Nothing else.
+{{CHUNK_RETRIEVAL_DOCUMENTATION}}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨 CRITICAL: HOW YOU MUST RESPOND 🚨

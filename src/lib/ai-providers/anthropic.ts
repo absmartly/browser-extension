@@ -4,6 +4,11 @@ import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import { sanitizeHtml, getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
+import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
+import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
+import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
+
+const MAX_TOOL_ITERATIONS = 10
 
 interface ValidationError {
   isValid: false
@@ -66,11 +71,54 @@ function validateAIDOMGenerationResult(responseText: string): ValidationResult {
 export class AnthropicProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
+  getChunkRetrievalPrompt(): string {
+    return API_CHUNK_RETRIEVAL_PROMPT
+  }
+
   getToolDefinition(): Anthropic.Tool {
     return {
       name: 'dom_changes_generator',
       description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
       input_schema: SHARED_TOOL_SCHEMA as any
+    }
+  }
+
+  getCssQueryTool(): Anthropic.Tool {
+    return {
+      name: 'css_query',
+      description: 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          selectors: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
+          }
+        },
+        required: ['selectors']
+      } as any
+    }
+  }
+
+  getXPathQueryTool(): Anthropic.Tool {
+    return {
+      name: 'xpath_query',
+      description: 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          xpath: {
+            type: 'string',
+            description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Maximum number of results to return (default: 10)'
+          }
+        },
+        required: ['xpath']
+      } as any
     }
   }
 
@@ -81,7 +129,7 @@ export class AnthropicProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[Anthropic] Using Anthropic API')
+    console.log('[Anthropic] Using Anthropic API with agentic loop')
     let authConfig: any = { dangerouslyAllowBrowser: true }
 
     if (this.config.useOAuth && this.config.oauthToken) {
@@ -108,17 +156,34 @@ export class AnthropicProvider implements AIProvider {
       }
     }
 
-    let systemPrompt = sanitizeHtml(await getSystemPrompt())
+    let systemPrompt = sanitizeHtml(await getSystemPrompt(this.getChunkRetrievalPrompt()))
     console.log('[Anthropic] Base system prompt length:', systemPrompt.length)
 
+    // For new conversations, include DOM structure instead of full HTML
     if (!session.htmlSent) {
       if (!html) {
         throw new Error('HTML is required for first message in conversation')
       }
 
-      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
+      // Generate DOM structure instead of including full HTML
+      const domStructure = generateDOMStructure(html, { maxDepth: 5 })
+      const structureText = formatDOMStructureAsText(domStructure)
+
+      systemPrompt += `\n\n## Page DOM Structure
+
+The following is a tree representation of the page structure. Use the \`get_html_chunk\` tool to retrieve specific HTML sections when needed.
+
+\`\`\`
+${structureText}
+\`\`\`
+
+To inspect sections, call \`get_html_chunk\` with an array of CSS selectors:
+- \`get_html_chunk({ selectors: ["#main-content", ".hero-section", "header"] })\`
+
+Request multiple sections in one call for efficiency.
+`
       session.htmlSent = true
-      console.log('📄 Including HTML in system prompt (initializing conversation)')
+      console.log(`[Anthropic] 📄 Including DOM structure in system prompt (${domStructure.totalElements} elements, max depth ${domStructure.maxDepth})`)
     }
 
     systemPrompt = sanitizeHtml(systemPrompt)
@@ -166,124 +231,162 @@ export class AnthropicProvider implements AIProvider {
     }
     session.messages.push({ role: 'user', content: userMessageText })
 
-    const requestBody = {
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [...session.messages.slice(0, -1).map(m => ({
-        role: m.role,
+    // Build messages array for the agentic loop
+    const messages: Anthropic.MessageParam[] = [
+      ...session.messages.slice(0, -1).map(m => ({
+        role: m.role as 'user' | 'assistant',
         content: sanitizeHtml(m.content)
-      })), newUserMessage] as Anthropic.MessageParam[],
-      tools: [this.getToolDefinition()],
-      tool_choice: { type: 'tool', name: 'dom_changes_generator' }
-    }
+      })),
+      newUserMessage
+    ]
 
-    try {
-      JSON.stringify(requestBody)
-      console.log('[Anthropic] ✅ Request body is valid JSON')
-    } catch (jsonError) {
-      console.error('[Anthropic] ❌ Request body contains invalid JSON:', jsonError)
-      throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
-    }
+    const tools = [this.getToolDefinition(), this.getCssQueryTool(), this.getXPathQueryTool()]
 
-    const message = await anthropic.messages.create(requestBody as any)
+    // Agentic loop - process tool calls until we get the final result
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      console.log(`[Anthropic] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
-    const content = message.content[0]
-
-    if (content.type === 'tool_use') {
-      console.log('🔧 Received tool_use response from Claude')
-      const toolInput = content.input as any
-
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-      console.log('📦 RAW STRUCTURED OUTPUT FROM ANTHROPIC (tool call arguments):')
-      console.log(JSON.stringify(toolInput, null, 2))
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-      const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
-
-      if (!validation.isValid) {
-        const errorValidation = validation as ValidationError
-        console.error('❌ Tool use validation failed:', errorValidation.errors)
-        throw new Error(`Tool use validation failed: ${errorValidation.errors.join(', ')}`)
+      const requestBody = {
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: messages,
+        tools: tools
       }
 
-      console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+      try {
+        JSON.stringify(requestBody)
+        console.log('[Anthropic] ✅ Request body is valid JSON')
+      } catch (jsonError) {
+        console.error('[Anthropic] ❌ Request body contains invalid JSON:', jsonError)
+        throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
+      }
 
-      session.messages.push({ role: 'assistant', content: validation.result.response })
+      const message = await anthropic.messages.create(requestBody as any)
 
-      return {
-        ...validation.result,
-        session
+      // Check if we got tool use or final response
+      const toolUseBlocks = message.content.filter(block => block.type === 'tool_use')
+      const textBlocks = message.content.filter(block => block.type === 'text')
+
+      if (toolUseBlocks.length === 0) {
+        // No tool calls - this is a conversational response
+        console.log('[Anthropic] ℹ️ No tool calls - conversational response')
+
+        const responseText = textBlocks.map(block => (block as any).text).join('\n').trim()
+        session.messages.push({ role: 'assistant', content: responseText })
+
+        return {
+          domChanges: [],
+          response: responseText,
+          action: 'none' as const,
+          session
+        }
+      }
+
+      // Process tool calls
+      const toolResults: Anthropic.MessageParam['content'] = []
+
+      for (const toolBlock of toolUseBlocks) {
+        const tool = toolBlock as any
+        console.log(`[Anthropic] 🔧 Tool call: ${tool.name}`)
+
+        if (tool.name === 'dom_changes_generator') {
+          // This is the final result tool - validate and return
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          console.log('📦 RAW STRUCTURED OUTPUT FROM ANTHROPIC (tool call arguments):')
+          console.log(JSON.stringify(tool.input, null, 2))
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+          const validation = validateAIDOMGenerationResult(JSON.stringify(tool.input))
+
+          if (!validation.isValid) {
+            const errorValidation = validation as ValidationError
+            console.error('❌ Tool use validation failed:', errorValidation.errors)
+            throw new Error(`Tool use validation failed: ${errorValidation.errors.join(', ')}`)
+          }
+
+          console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+
+          session.messages.push({ role: 'assistant', content: validation.result.response })
+
+          return {
+            ...validation.result,
+            session
+          }
+        } else if (tool.name === 'css_query') {
+          const selectors = tool.input.selectors as string[]
+          console.log(`[Anthropic] 📄 CSS query for ${selectors.length} selector(s):`, selectors)
+
+          const chunkResults = await captureHTMLChunks(selectors)
+
+          const resultParts: string[] = []
+          for (const chunkResult of chunkResults) {
+            if (chunkResult.found) {
+              resultParts.push(`## ${chunkResult.selector}\n\`\`\`html\n${chunkResult.html}\n\`\`\``)
+            } else {
+              resultParts.push(`## ${chunkResult.selector}\nError: ${chunkResult.error || 'Element not found'}`)
+            }
+          }
+
+          const resultContent = resultParts.join('\n\n')
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tool.id,
+            content: resultContent
+          } as any)
+        } else if (tool.name === 'xpath_query') {
+          const xpath = tool.input.xpath as string
+          const maxResults = (tool.input.maxResults as number) || 10
+          console.log(`[Anthropic] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
+
+          const xpathResult = await queryXPath(xpath, maxResults)
+
+          let resultContent: string
+          if (xpathResult.found) {
+            const parts: string[] = [`Found ${xpathResult.matches.length} node(s) matching XPath "${xpath}":\n`]
+            for (const match of xpathResult.matches) {
+              const selectorInfo = match.selector ? `Selector: \`${match.selector}\`` : '(No CSS selector available)'
+              parts.push(`## ${selectorInfo}\nNode type: ${match.nodeType}\nText preview: ${match.textContent}\n\`\`\`html\n${match.html}\n\`\`\``)
+            }
+            resultContent = parts.join('\n\n')
+          } else {
+            resultContent = xpathResult.error || `No nodes found matching XPath: "${xpath}"`
+          }
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tool.id,
+            content: resultContent
+          } as any)
+        } else {
+          // Unknown tool
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tool.id,
+            content: `Error: Unknown tool "${tool.name}"`
+          } as any)
+        }
+      }
+
+      // If we processed get_html_chunk calls, add the assistant message and tool results
+      if (toolResults.length > 0) {
+        // Add assistant message with tool use
+        messages.push({
+          role: 'assistant',
+          content: message.content
+        })
+
+        // Add tool results
+        messages.push({
+          role: 'user',
+          content: toolResults
+        })
+
+        console.log(`[Anthropic] ✅ Processed ${toolResults.length} tool results, continuing loop...`)
       }
     }
 
-    console.warn('⚠️ Tool calling not used - falling back to text parsing')
-
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude')
-    }
-
-    let responseText = content.text.trim()
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('📝 FULL TEXT RESPONSE FROM ANTHROPIC:')
-    console.log(responseText)
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-    let jsonText = responseText
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
-    }
-
-    const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      jsonText = jsonMatch[0]
-    }
-
-    const validation = validateAIDOMGenerationResult(jsonText)
-
-    if (!validation.isValid) {
-      console.log('ℹ️ Response is not structured JSON, normalizing as conversational message')
-
-      session.messages.push({ role: 'assistant', content: responseText })
-
-      const returnValue = {
-        domChanges: [],
-        response: responseText,
-        action: 'none' as const,
-        session
-      }
-
-      console.log('[Anthropic] Returning conversational message:', {
-        domChanges: returnValue.domChanges.length,
-        response: returnValue.response.substring(0, 50),
-        action: returnValue.action,
-        session: returnValue.session?.id
-      })
-
-      return returnValue
-    }
-
-    console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-
-    if (!validation.result.domChanges || !Array.isArray(validation.result.domChanges)) {
-      console.error('⚠️ validation.result.domChanges is invalid:', validation.result.domChanges)
-      throw new Error('Validation result missing domChanges array')
-    }
-
-    session.messages.push({ role: 'assistant', content: validation.result.response })
-
-    const returnValue = {
-      ...validation.result,
-      session
-    }
-
-    console.log('[Anthropic] Returning from Anthropic API:', {
-      domChanges: returnValue.domChanges?.length,
-      response: returnValue.response?.substring(0, 50),
-      action: returnValue.action,
-      session: returnValue.session?.id
-    })
-
-    return returnValue
+    throw new Error(`Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`)
   }
 }

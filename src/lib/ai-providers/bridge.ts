@@ -4,6 +4,8 @@ import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import { getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
+import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
+import { BRIDGE_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 
 interface ValidationError {
   isValid: false
@@ -70,6 +72,10 @@ export class BridgeProvider implements AIProvider {
     this.bridgeClient = new ClaudeCodeBridgeClient()
   }
 
+  getChunkRetrievalPrompt(): string {
+    return BRIDGE_CHUNK_RETRIEVAL_PROMPT
+  }
+
   getToolDefinition(): any {
     return SHARED_TOOL_SCHEMA as any
   }
@@ -94,7 +100,7 @@ export class BridgeProvider implements AIProvider {
 
       let session = options.conversationSession
       let conversationId: string
-      let systemPromptToSend = await getSystemPrompt()
+      let systemPromptToSend = await getSystemPrompt(this.getChunkRetrievalPrompt())
 
       if (!session || !session.conversationId) {
         console.log('[Bridge] No session or no conversationId, creating new conversation')
@@ -105,8 +111,43 @@ export class BridgeProvider implements AIProvider {
         if (!html) {
           throw new Error('HTML is required for creating new bridge conversation')
         }
-        systemPromptToSend += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
-        console.log('[Bridge] Including HTML in system prompt (initializing conversation)')
+
+        // Get the actual bridge URL (may be on a different port than default 3000)
+        // This is important because the CLI defaults to port 3000 but bridge may be on 3001-3004
+        const connection = this.bridgeClient.getConnection()
+        const bridgeUrl = connection?.url || 'http://localhost:3000'
+        console.log('[Bridge] Using bridge URL for CLI commands:', bridgeUrl)
+
+        // Generate DOM structure instead of including full HTML
+        const domStructure = generateDOMStructure(html, { maxDepth: 5 })
+        const structureText = formatDOMStructureAsText(domStructure)
+
+        // Add DOM structure to system prompt (not full HTML)
+        // Include --bridge-url parameter so CLI connects to correct port
+        systemPromptToSend += `\n\n## Page DOM Structure
+
+The following is a tree representation of the page structure. Use the get-chunk CLI to retrieve specific HTML sections when needed.
+
+\`\`\`
+${structureText}
+\`\`\`
+
+## Retrieving HTML Chunks
+
+To get the HTML for specific section(s), run:
+
+\`\`\`bash
+# Single selector
+npx @absmartly/claude-code-bridge get-chunk --bridge-url ${bridgeUrl} --conversation-id ${sessionId} --selector ".hero-section"
+
+# Multiple selectors at once (more efficient)
+npx @absmartly/claude-code-bridge get-chunk --bridge-url ${bridgeUrl} --conversation-id ${sessionId} --selectors "header,#main-content,.hero-section"
+\`\`\`
+
+The response will contain the HTML for each selector. Use this to inspect elements before generating DOM changes.
+`
+        console.log('[Bridge] Including DOM structure in system prompt (not full HTML)')
+        console.log(`[Bridge] DOM structure: ${domStructure.totalElements} elements, max depth ${domStructure.maxDepth}`)
 
         console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         console.log('[Bridge] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
@@ -117,14 +158,16 @@ export class BridgeProvider implements AIProvider {
         console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
         console.log('[Bridge] About to create conversation with sessionId:', sessionId)
+        // Pass HTML to bridge for storage (used by get-chunk CLI)
         const result = await this.bridgeClient.createConversation(
           sessionId,
           '/',
           'allow',
-          SHARED_TOOL_SCHEMA
+          SHARED_TOOL_SCHEMA,
+          html // Store full HTML on bridge for chunk retrieval
         )
         conversationId = result.conversationId
-        console.log('[Bridge] ✅ Conversation created with JSON schema from extension')
+        console.log('[Bridge] ✅ Conversation created with JSON schema and HTML stored on bridge')
 
         session = {
           id: sessionId,
@@ -141,34 +184,92 @@ export class BridgeProvider implements AIProvider {
       const userMessage = buildUserMessage(prompt, currentChanges)
       session.messages.push({ role: 'user', content: userMessage })
 
-      const responseData = await new Promise<{ type: 'text' | 'tool_use', data: any }>((resolve, reject) => {
+      // Wait for the final response from Claude Code
+      // Claude Code handles all intermediate tool calls (css_query, xpath_query) internally via CLI
+      // We only care about the final result (dom_changes_generator or text response)
+      const result = await new Promise<AIDOMGenerationResult>((resolve, reject) => {
         let fullResponse = ''
-        let receivedToolUse = false
+        let finalToolResult: any = null
 
         console.log('[Bridge] Starting stream for conversation:', conversationId)
         const eventSource = this.bridgeClient.streamResponses(
           conversationId,
           (event) => {
-            console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-            console.log(`[Bridge] 📦 RAW EVENT TYPE: ${event.type}`)
-            console.log('[Bridge] Full event data:', JSON.stringify(event, null, 2))
-            console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+            console.log(`[Bridge] 📦 Event: ${event.type}`)
 
             if (event.type === 'tool_use') {
-              console.log('[Bridge] 🔧 Received tool_use response from Claude')
-              receivedToolUse = true
-              eventSource.close()
-              resolve({ type: 'tool_use', data: event.data })
+              let toolInput = event.data
+
+              // Parse if string
+              if (typeof toolInput === 'string') {
+                try {
+                  toolInput = JSON.parse(toolInput)
+                } catch (e) {
+                  // Not JSON, ignore
+                }
+              }
+
+              // Unwrap {name, input} structure
+              if (toolInput && toolInput.input) {
+                toolInput = toolInput.input
+              }
+
+              // Check if this is the FINAL result (dom_changes_generator)
+              if (toolInput && (toolInput.domChanges !== undefined || toolInput.response !== undefined || toolInput.action !== undefined)) {
+                console.log('[Bridge] 📦 Received final dom_changes_generator result')
+                finalToolResult = toolInput
+                // Don't close yet - wait for 'done' event
+              } else {
+                // Intermediate tool call (css_query, xpath_query) - Claude Code handles these via CLI
+                console.log('[Bridge] ℹ️ Intermediate tool call (handled by Claude Code internally)')
+              }
             } else if (event.type === 'text') {
               fullResponse += event.data
             } else if (event.type === 'done') {
-              console.log('[Bridge] Stream done, full response length:', fullResponse.length)
+              console.log('[Bridge] ✅ Stream done')
               eventSource.close()
-              if (!receivedToolUse) {
-                resolve({ type: 'text', data: fullResponse })
+
+              // If we got a final tool result, validate and return it
+              if (finalToolResult) {
+                const validation = validateAIDOMGenerationResult(JSON.stringify(finalToolResult))
+                if (validation.isValid) {
+                  console.log('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes')
+                  resolve(validation.result)
+                } else {
+                  reject(new Error(`Validation failed: ${(validation as ValidationError).errors.join(', ')}`))
+                }
+                return
+              }
+
+              // Otherwise try to parse text response as JSON
+              const responseText = fullResponse.trim()
+              if (responseText) {
+                let jsonText = responseText
+                if (jsonText.startsWith('```')) {
+                  jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
+                }
+                const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+                if (jsonMatch) {
+                  jsonText = jsonMatch[0]
+                }
+
+                const validation = validateAIDOMGenerationResult(jsonText)
+                if (validation.isValid) {
+                  resolve(validation.result)
+                  return
+                }
+
+                // Not valid JSON - return as conversational response
+                resolve({
+                  domChanges: [],
+                  response: responseText,
+                  action: 'none' as const
+                })
+              } else {
+                reject(new Error('No response received from Claude Code'))
               }
             } else if (event.type === 'error') {
-              console.error('[Bridge] Claude error:', event.data)
+              console.error('[Bridge] ❌ Error:', event.data)
               eventSource.close()
               reject(new Error(`Claude error: ${event.data || 'Unknown error'}`))
             }
@@ -180,114 +281,30 @@ export class BridgeProvider implements AIProvider {
           }
         )
 
+        // Send the message
         setTimeout(async () => {
-          console.log('[Bridge] Sending message to conversation:', conversationId)
           try {
             await this.bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend, SHARED_TOOL_SCHEMA)
-            console.log('[Bridge] Message sent successfully (with schema)')
+            console.log('[Bridge] Message sent')
           } catch (error) {
-            console.error('[Bridge] Failed to send message:', error)
             eventSource.close()
             reject(error)
           }
         }, 100)
 
+        // Timeout after 5 minutes (Claude Code may take a while with multiple tool calls)
         setTimeout(() => {
-          console.error('[Bridge] Response timeout after 60s')
           eventSource.close()
-          reject(new Error('Bridge response timeout after 60s'))
-        }, 60000)
+          reject(new Error('Response timeout after 5 minutes'))
+        }, 300000)
       })
 
-      if (responseData.type === 'tool_use') {
-        console.log('[Bridge] Processing tool_use response')
+      session.messages.push({ role: 'assistant', content: result.response })
 
-        console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log('[Bridge] 📦 RAW STRUCTURED OUTPUT FROM CLAUDE (tool call arguments):')
-        console.log(JSON.stringify(responseData.data, null, 2))
-        console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-        const validation = validateAIDOMGenerationResult(JSON.stringify(responseData.data))
-
-        if (!validation.isValid) {
-          const errorValidation = validation as ValidationError
-          console.error('[Bridge] ❌ Tool use validation failed:', errorValidation.errors)
-          throw new Error(`Tool use validation failed: ${errorValidation.errors.join(', ')}`)
-        }
-
-        console.log('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-        session.messages.push({ role: 'assistant', content: validation.result.response })
-
-        return {
-          ...validation.result,
-          session
-        }
-      }
-
-      console.warn('[Bridge] ⚠️ Tool calling not used - falling back to text parsing')
-
-      let responseText = responseData.data.trim()
-      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-      console.log('[Bridge] 📝 FULL TEXT RESPONSE:')
-      console.log(responseText)
-      console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-      let jsonText = responseText
-      if (jsonText.startsWith('```')) {
-        jsonText = jsonText.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
-      }
-
-      const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        jsonText = jsonMatch[0]
-      }
-
-      const validation = validateAIDOMGenerationResult(jsonText)
-
-      if (!validation.isValid) {
-        console.log('[Bridge] ℹ️ Response is not structured JSON, normalizing as conversational message')
-
-        session.messages.push({ role: 'assistant', content: responseText })
-
-        const returnValueConv = {
-          domChanges: [],
-          response: responseText,
-          action: 'none' as const,
-          session
-        }
-
-        console.log('[AI Generator] Returning from Bridge (conversational):', {
-          domChanges: returnValueConv.domChanges.length,
-          response: returnValueConv.response.substring(0, 50),
-          action: returnValueConv.action,
-          session: returnValueConv.session?.id
-        })
-
-        return returnValueConv
-      }
-
-      console.log('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-
-      if (!validation.result.domChanges || !Array.isArray(validation.result.domChanges)) {
-        console.error('⚠️ Bridge validation.result.domChanges is invalid:', validation.result.domChanges)
-        throw new Error('Bridge validation result missing domChanges array')
-      }
-
-      session.messages.push({ role: 'assistant', content: validation.result.response })
-
-      const returnValue = {
-        ...validation.result,
+      return {
+        ...result,
         session
       }
-
-      console.log('[AI Generator] Returning from Bridge (validated):', {
-        domChanges: returnValue.domChanges?.length,
-        response: returnValue.response?.substring(0, 50),
-        action: returnValue.action,
-        session: returnValue.session?.id
-      })
-
-      return returnValue
     } catch (error) {
       console.error('❌ Bridge generation failed:', error)
       throw new Error(`Claude Code Bridge error: ${error instanceof Error ? error.message : 'Unknown error'}`)

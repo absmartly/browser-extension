@@ -2,8 +2,13 @@ import OpenAI from 'openai'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
-import { sanitizeHtml, getSystemPrompt, buildUserMessage } from './utils'
+import { getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
+import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
+import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
+import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
+
+const MAX_TOOL_ITERATIONS = 10
 
 interface ValidationError {
   isValid: false
@@ -66,6 +71,10 @@ function validateAIDOMGenerationResult(responseText: string): ValidationResult {
 export class OpenAIProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
+  getChunkRetrievalPrompt(): string {
+    return API_CHUNK_RETRIEVAL_PROMPT
+  }
+
   getToolDefinition(): OpenAI.ChatCompletionTool {
     return {
       type: 'function',
@@ -77,6 +86,51 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 
+  getCssQueryTool(): OpenAI.ChatCompletionTool {
+    return {
+      type: 'function',
+      function: {
+        name: 'css_query',
+        description: 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.',
+        parameters: {
+          type: 'object',
+          properties: {
+            selectors: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
+            }
+          },
+          required: ['selectors']
+        }
+      }
+    }
+  }
+
+  getXPathQueryTool(): OpenAI.ChatCompletionTool {
+    return {
+      type: 'function',
+      function: {
+        name: 'xpath_query',
+        description: 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.',
+        parameters: {
+          type: 'object',
+          properties: {
+            xpath: {
+              type: 'string',
+              description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
+            },
+            maxResults: {
+              type: 'number',
+              description: 'Maximum number of results to return (default: 10)'
+            }
+          },
+          required: ['xpath']
+        }
+      }
+    }
+  }
+
   async generate(
     html: string,
     prompt: string,
@@ -84,7 +138,7 @@ export class OpenAIProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[OpenAI] generateWithOpenAI() called')
+    console.log('[OpenAI] generateWithOpenAI() called with agentic loop')
 
     const openai = new OpenAI({
       apiKey: this.config.apiKey,
@@ -100,14 +154,33 @@ export class OpenAIProvider implements AIProvider {
       }
     }
 
-    let systemPrompt = await getSystemPrompt()
+    let systemPrompt = await getSystemPrompt(this.getChunkRetrievalPrompt())
+
+    // For new conversations, include DOM structure instead of full HTML
     if (!session.htmlSent) {
       if (!html) {
         throw new Error('HTML is required for first message in conversation')
       }
-      systemPrompt += `\n\nHTML Content:\n\`\`\`html\n${html}\n\`\`\``
+
+      // Generate DOM structure instead of including full HTML
+      const domStructure = generateDOMStructure(html, { maxDepth: 5 })
+      const structureText = formatDOMStructureAsText(domStructure)
+
+      systemPrompt += `\n\n## Page DOM Structure
+
+The following is a tree representation of the page structure. Use the \`get_html_chunk\` function to retrieve specific HTML sections when needed.
+
+\`\`\`
+${structureText}
+\`\`\`
+
+To inspect sections, call \`get_html_chunk\` with an array of CSS selectors:
+- \`get_html_chunk({ selectors: ["#main-content", ".hero-section", "header"] })\`
+
+Request multiple sections in one call for efficiency.
+`
       session.htmlSent = true
-      console.log('[OpenAI] Including HTML in system prompt (initializing conversation, using pre-cleaned HTML)')
+      console.log(`[OpenAI] 📄 Including DOM structure in system prompt (${domStructure.totalElements} elements, max depth ${domStructure.maxDepth})`)
     }
 
     console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
@@ -120,6 +193,7 @@ export class OpenAIProvider implements AIProvider {
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
+    // Build messages array for the agentic loop
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
       ...session.messages.map(m => ({
@@ -135,50 +209,149 @@ export class OpenAIProvider implements AIProvider {
 
     session.messages.push({ role: 'user', content: userMessageText })
 
-    console.log('[OpenAI] Calling OpenAI API with tool_choice forcing...')
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: messages,
-      tools: [this.getToolDefinition()],
-      tool_choice: { type: 'function', function: { name: 'dom_changes_generator' } }
-    })
+    const tools = [this.getToolDefinition(), this.getCssQueryTool(), this.getXPathQueryTool()]
 
-    console.log('[OpenAI] Received response from OpenAI')
-    const message = completion.choices[0]?.message
+    // Agentic loop - process tool calls until we get the final result
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      console.log(`[OpenAI] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
-    if (!message) {
-      throw new Error('No message in OpenAI response')
-    }
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4-turbo',
+        messages: messages,
+        tools: tools
+      })
 
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      console.log('[OpenAI] 🔧 Received tool_calls response from OpenAI')
-      const toolCall = message.tool_calls[0]
+      console.log('[OpenAI] Received response from OpenAI')
+      const message = completion.choices[0]?.message
 
-      if (toolCall.type === 'function' && toolCall.function.name === 'dom_changes_generator') {
-        console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log('[OpenAI] 📦 RAW STRUCTURED OUTPUT FROM OPENAI (tool call arguments):')
-        console.log(toolCall.function.arguments)
-        console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      if (!message) {
+        throw new Error('No message in OpenAI response')
+      }
 
-        const toolInput = JSON.parse(toolCall.function.arguments)
-        const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
+      // Check if we have tool calls
+      if (!message.tool_calls || message.tool_calls.length === 0) {
+        // No tool calls - this is a conversational response
+        console.log('[OpenAI] ℹ️ No tool calls - conversational response')
 
-        if (!validation.isValid) {
-          const errorValidation = validation as ValidationError
-          console.error('[OpenAI] ❌ Tool call validation failed:', errorValidation.errors)
-          throw new Error(`Tool call validation failed: ${errorValidation.errors.join(', ')}`)
-        }
-
-        console.log('[OpenAI] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-        session.messages.push({ role: 'assistant', content: validation.result.response })
+        const responseText = message.content || ''
+        session.messages.push({ role: 'assistant', content: responseText })
 
         return {
-          ...validation.result,
+          domChanges: [],
+          response: responseText,
+          action: 'none' as const,
           session
         }
       }
+
+      // Process tool calls
+      const toolResultMessages: OpenAI.ChatCompletionMessageParam[] = []
+
+      // First, add the assistant message with tool calls
+      messages.push({
+        role: 'assistant',
+        content: message.content,
+        tool_calls: message.tool_calls
+      })
+
+      for (const toolCall of message.tool_calls) {
+        // Type guard for function tool calls
+        if (toolCall.type !== 'function') {
+          console.log(`[OpenAI] ⚠️ Skipping non-function tool call type: ${toolCall.type}`)
+          continue
+        }
+
+        const fn = toolCall.function
+        console.log(`[OpenAI] 🔧 Tool call: ${fn.name}`)
+
+        if (fn.name === 'dom_changes_generator') {
+          // This is the final result tool - validate and return
+          console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          console.log('[OpenAI] 📦 RAW STRUCTURED OUTPUT FROM OPENAI (tool call arguments):')
+          console.log(fn.arguments)
+          console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+          const toolInput = JSON.parse(fn.arguments)
+          const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
+
+          if (!validation.isValid) {
+            const errorValidation = validation as ValidationError
+            console.error('[OpenAI] ❌ Tool call validation failed:', errorValidation.errors)
+            throw new Error(`Tool call validation failed: ${errorValidation.errors.join(', ')}`)
+          }
+
+          console.log('[OpenAI] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+          session.messages.push({ role: 'assistant', content: validation.result.response })
+
+          return {
+            ...validation.result,
+            session
+          }
+        } else if (fn.name === 'css_query') {
+          const args = JSON.parse(fn.arguments)
+          const selectors = args.selectors as string[]
+          console.log(`[OpenAI] 📄 CSS query for ${selectors.length} selector(s):`, selectors)
+
+          const chunkResults = await captureHTMLChunks(selectors)
+
+          const resultParts: string[] = []
+          for (const chunkResult of chunkResults) {
+            if (chunkResult.found) {
+              resultParts.push(`## ${chunkResult.selector}\n\`\`\`html\n${chunkResult.html}\n\`\`\``)
+            } else {
+              resultParts.push(`## ${chunkResult.selector}\nError: ${chunkResult.error || 'Element not found'}`)
+            }
+          }
+
+          const resultContent = resultParts.join('\n\n')
+
+          toolResultMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: resultContent
+          })
+        } else if (fn.name === 'xpath_query') {
+          const args = JSON.parse(fn.arguments)
+          const xpath = args.xpath as string
+          const maxResults = (args.maxResults as number) || 10
+          console.log(`[OpenAI] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
+
+          const xpathResult = await queryXPath(xpath, maxResults)
+
+          let resultContent: string
+          if (xpathResult.found) {
+            const parts: string[] = [`Found ${xpathResult.matches.length} node(s) matching XPath "${xpath}":\n`]
+            for (const match of xpathResult.matches) {
+              const selectorInfo = match.selector ? `Selector: \`${match.selector}\`` : '(No CSS selector available)'
+              parts.push(`## ${selectorInfo}\nNode type: ${match.nodeType}\nText preview: ${match.textContent}\n\`\`\`html\n${match.html}\n\`\`\``)
+            }
+            resultContent = parts.join('\n\n')
+          } else {
+            resultContent = xpathResult.error || `No nodes found matching XPath: "${xpath}"`
+          }
+
+          toolResultMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: resultContent
+          })
+        } else {
+          // Unknown tool
+          toolResultMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: `Error: Unknown tool "${fn.name}"`
+          })
+        }
+      }
+
+      // If we processed get_html_chunk calls, add the tool results
+      if (toolResultMessages.length > 0) {
+        messages.push(...toolResultMessages)
+        console.log(`[OpenAI] ✅ Processed ${toolResultMessages.length} tool results, continuing loop...`)
+      }
     }
 
-    throw new Error('OpenAI did not return a tool call')
+    throw new Error(`Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`)
   }
 }

@@ -306,39 +306,43 @@ describe('AI Provider Utils', () => {
       jest.clearAllMocks()
     })
 
-    it('should return default system prompt when no override exists', async () => {
+    it('should return default system prompt with chunk retrieval docs interpolated when no override exists', async () => {
       jest.spyOn(SystemPromptEditor, 'getSystemPromptOverride').mockResolvedValue(null)
 
-      const result = await getSystemPrompt()
+      const chunkRetrievalPrompt = 'Test chunk retrieval docs'
+      const result = await getSystemPrompt(chunkRetrievalPrompt)
 
-      expect(result).toBe('Default system prompt for AI DOM generation')
+      expect(result).toContain('Test chunk retrieval docs')
       expect(SystemPromptEditor.getSystemPromptOverride).toHaveBeenCalledTimes(1)
     })
 
-    it('should return override system prompt when one exists', async () => {
-      const customPrompt = 'Custom AI system prompt for testing'
+    it('should return override system prompt with chunk retrieval docs when one exists', async () => {
+      const customPrompt = 'Custom prompt with {{CHUNK_RETRIEVAL_DOCUMENTATION}} placeholder'
       jest.spyOn(SystemPromptEditor, 'getSystemPromptOverride').mockResolvedValue(customPrompt)
 
-      const result = await getSystemPrompt()
+      const chunkRetrievalPrompt = 'Replaced docs'
+      const result = await getSystemPrompt(chunkRetrievalPrompt)
 
-      expect(result).toBe(customPrompt)
+      expect(result).toBe('Custom prompt with Replaced docs placeholder')
       expect(SystemPromptEditor.getSystemPromptOverride).toHaveBeenCalledTimes(1)
     })
 
-    it('should return default when override is empty string', async () => {
+    it('should return default with chunk retrieval docs when override is empty string', async () => {
       jest.spyOn(SystemPromptEditor, 'getSystemPromptOverride').mockResolvedValue('')
 
-      const result = await getSystemPrompt()
+      const chunkRetrievalPrompt = 'Test docs'
+      const result = await getSystemPrompt(chunkRetrievalPrompt)
 
-      expect(result).toBe('Default system prompt for AI DOM generation')
+      expect(result).toContain('Test docs')
     })
 
     it('should handle undefined override', async () => {
       jest.spyOn(SystemPromptEditor, 'getSystemPromptOverride').mockResolvedValue(undefined as any)
 
-      const result = await getSystemPrompt()
+      const chunkRetrievalPrompt = 'Test docs'
+      const result = await getSystemPrompt(chunkRetrievalPrompt)
 
-      expect(result).toBe('Default system prompt for AI DOM generation')
+      expect(result).toContain('Test docs')
     })
   })
 
