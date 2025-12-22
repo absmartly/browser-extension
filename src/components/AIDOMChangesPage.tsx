@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Header } from './Header'
-import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, SparklesIcon, PlusIcon, XMarkIcon, PhotoIcon, ClockIcon, EyeIcon, ArrowUturnLeftIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { ChangeViewerModal } from './ChangeViewerModal'
 import { renderMarkdown } from '~src/utils/markdown'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
@@ -12,7 +12,7 @@ import { needsMigration, migrateConversation } from '~src/utils/ai-conversation-
 import { formatConversationTimestamp } from '~src/utils/time-format'
 import { capturePageHTML } from '~src/utils/html-capture'
 import { sendToBackground } from '~src/lib/messaging'
-import { compressImages } from '~src/utils/image-compression'
+import { compressImagesForLLM } from '~src/utils/image-compression'
 import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
 
 interface AIDOMChangesPageProps {
@@ -57,6 +57,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [previewEnabledOnce, setPreviewEnabledOnce] = useState(false)
   const [isPreviewEnabled, setIsPreviewEnabled] = useState(false)
+  const [isRefreshingHTML, setIsRefreshingHTML] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -254,21 +255,21 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     setLoading(true)
     setError(null)
 
-    const compressedImages = attachedImages.length > 0 ? await compressImages(attachedImages) : undefined
-    console.log('[AIDOMChangesPage] Compressed images:', compressedImages?.length || 0)
+    const llmImages = attachedImages.length > 0 ? await compressImagesForLLM(attachedImages) : undefined
+    console.log('[AIDOMChangesPage] LLM images:', llmImages?.length || 0)
 
     const timestamp = Date.now()
     const userMessage: ChatMessage = {
       role: 'user',
       content: prompt,
-      images: compressedImages,
+      images: llmImages,
       timestamp,
       id: `user-${timestamp}`
     }
     setChatHistory(prev => [...prev, userMessage])
 
     try {
-      const result = await onGenerate(prompt, compressedImages, conversationSession)
+      const result = await onGenerate(prompt, llmImages, conversationSession)
 
       if (result.session) {
         setConversationSession(result.session)
@@ -385,6 +386,40 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       if (newState) {
         setPreviewEnabledOnce(true)
       }
+    }
+  }
+
+  const handleRefreshHTML = async () => {
+    if (!conversationSession) {
+      setError('No active conversation to refresh')
+      return
+    }
+
+    setIsRefreshingHTML(true)
+    setError(null)
+
+    try {
+      console.log('[AIDOMChangesPage] Refreshing HTML context...')
+      const html = await capturePageHTML()
+      console.log('[AIDOMChangesPage] HTML captured, length:', html.length)
+
+      const response = await sendToBackground({
+        type: 'AI_REFRESH_HTML',
+        html,
+        conversationSession
+      })
+
+      if (response.success && response.session) {
+        setConversationSession(response.session as ConversationSession)
+        console.log('[AIDOMChangesPage] ✅ HTML context refreshed successfully')
+      } else {
+        throw new Error(response.error || 'Failed to refresh HTML')
+      }
+    } catch (error) {
+      console.error('[AIDOMChangesPage] ❌ HTML refresh failed:', error)
+      setError(error instanceof Error ? error.message : 'Failed to refresh HTML')
+    } finally {
+      setIsRefreshingHTML(false)
     }
   }
 
@@ -584,6 +619,19 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
               </div>
             )}
           </div>
+          <button
+            id="refresh-html-button"
+            onClick={handleRefreshHTML}
+            disabled={isRefreshingHTML || loading}
+            className="p-2 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+            title="Refresh HTML Context"
+          >
+            {isRefreshingHTML ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600" />
+            ) : (
+              <ArrowPathIcon className="h-5 w-5 text-gray-600" />
+            )}
+          </button>
           <button
             onClick={handleNewChat}
             className="p-2 hover:bg-gray-100 rounded-md transition-colors"
