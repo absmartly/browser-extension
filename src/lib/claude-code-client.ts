@@ -158,7 +158,8 @@ export class ClaudeCodeBridgeClient {
     cwd: string,
     permissionMode: 'ask' | 'allow' = 'ask',
     jsonSchema?: any,
-    html?: string
+    html?: string,
+    model?: string
   ): Promise<{ conversationId: string }> {
     if (!this.connection) {
       await this.connect()
@@ -172,7 +173,8 @@ export class ClaudeCodeBridgeClient {
         cwd,
         permissionMode,
         jsonSchema,
-        html // Pass HTML to bridge for chunk retrieval
+        html, // Pass HTML to bridge for chunk retrieval
+        model // Pass model selection to bridge
       })
     })
 

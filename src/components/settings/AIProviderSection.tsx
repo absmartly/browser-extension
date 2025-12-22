@@ -8,15 +8,19 @@ import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } fr
 interface AIProviderSectionProps {
   aiProvider: 'claude-subscription' | 'anthropic-api' | 'openai-api'
   aiApiKey: string
+  llmModel: string
   onAiProviderChange: (value: 'claude-subscription' | 'anthropic-api' | 'openai-api') => void
   onAiApiKeyChange: (value: string) => void
+  onLlmModelChange: (value: string) => void
 }
 
 export const AIProviderSection = React.memo(function AIProviderSection({
   aiProvider,
   aiApiKey,
+  llmModel,
   onAiProviderChange,
-  onAiApiKeyChange
+  onAiApiKeyChange,
+  onLlmModelChange
 }: AIProviderSectionProps) {
   const [bridgeClient] = useState(() => new ClaudeCodeBridgeClient())
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NOT_CONFIGURED)
@@ -101,6 +105,21 @@ export const AIProviderSection = React.memo(function AIProviderSection({
 
       {aiProvider === 'claude-subscription' && (
         <div className="mt-4 space-y-3">
+          <Select
+            id="llm-model-select"
+            label="Claude Model"
+            value={llmModel}
+            onChange={(e) => onLlmModelChange(e.target.value)}
+            options={[
+              { value: 'sonnet', label: 'Claude Sonnet (Recommended)' },
+              { value: 'opus', label: 'Claude Opus (Most Capable)' },
+              { value: 'haiku', label: 'Claude Haiku (Fastest)' }
+            ]}
+          />
+          <p className="text-xs text-gray-500">
+            Sonnet is recommended for best balance of speed and capability.
+          </p>
+
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 rounded-full ${getStatusColor(connectionState)}`} />

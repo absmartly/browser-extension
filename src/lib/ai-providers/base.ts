@@ -6,6 +6,7 @@ export interface AIProviderConfig {
   aiProvider: 'claude-subscription' | 'anthropic-api' | 'openai-api'
   useOAuth?: boolean
   oauthToken?: string
+  llmModel?: string  // Model for LLM provider (e.g., 'sonnet', 'opus', 'haiku' for Claude)
 }
 
 export interface GenerateOptions {

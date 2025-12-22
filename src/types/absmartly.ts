@@ -65,6 +65,7 @@ export interface ABsmartlyConfig {
   sdkUrl?: string  // Custom SDK URL (defaults to https://sdk.absmartly.com/sdk.js)
   aiProvider?: 'claude-subscription' | 'anthropic-api' | 'openai-api'  // AI provider for DOM generation
   aiApiKey?: string  // API key for AI provider (Anthropic or OpenAI)
+  llmModel?: string  // Model for LLM provider (e.g., 'sonnet', 'opus', 'haiku' for Claude)
 }
 
 export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'
@@ -170,6 +171,7 @@ export interface ConversationSession {
   htmlSent: boolean
   messages: Array<{role: 'user' | 'assistant', content: string}>
   conversationId?: string
+  tabId?: number  // Store the tab ID for chunk retrieval
 }
 
 export interface ChatMessage {

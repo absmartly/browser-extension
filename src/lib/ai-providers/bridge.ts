@@ -160,13 +160,15 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
         console.log('[Bridge] About to create conversation with sessionId:', sessionId)
+        console.log('[Bridge] Model:', this.config.llmModel || 'sonnet (default)')
         // Pass HTML to bridge for storage (used by get-chunk CLI)
         const result = await this.bridgeClient.createConversation(
           sessionId,
           '/',
           'allow',
           SHARED_TOOL_SCHEMA,
-          html // Store full HTML on bridge for chunk retrieval
+          html, // Store full HTML on bridge for chunk retrieval
+          this.config.llmModel || 'sonnet' // Pass model selection (default to sonnet)
         )
         conversationId = result.conversationId
         console.log('[Bridge] ✅ Conversation created with JSON schema and HTML stored on bridge')

@@ -40,6 +40,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const [sdkUrl, setSdkUrl] = useState('') // Custom SDK URL
   const [aiProvider, setAiProvider] = useState<'claude-subscription' | 'anthropic-api' | 'openai-api'>('claude-subscription') // AI provider for DOM generation
   const [aiApiKey, setAiApiKey] = useState('') // API key for AI provider (Anthropic or OpenAI)
+  const [llmModel, setLlmModel] = useState('sonnet') // LLM model for provider
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
@@ -82,6 +83,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       let loadedSdkUrl = config?.sdkUrl || ''
       let loadedAiProvider = config?.aiProvider || 'claude-subscription'
       let loadedAiApiKey = config?.aiApiKey || ''
+      let loadedLlmModel = config?.llmModel || 'sonnet'
 
 
       // In development, auto-load from environment variables if fields are empty
@@ -118,6 +120,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       setSdkUrl(loadedSdkUrl)
       setAiProvider(loadedAiProvider)
       setAiApiKey(loadedAiApiKey)
+      setLlmModel(loadedLlmModel)
 
       // Auto-save config if values were loaded from environment variables
       // This ensures env vars are persisted to storage on first load
@@ -422,7 +425,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       injectSDK,
       sdkUrl: sdkUrl.trim() || undefined,
       aiProvider,
-      aiApiKey: aiApiKey.trim() || undefined
+      aiApiKey: aiApiKey.trim() || undefined,
+      llmModel: llmModel || 'sonnet'
     }
 
     try {
@@ -622,8 +626,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       <AIProviderSection
         aiProvider={aiProvider}
         aiApiKey={aiApiKey}
+        llmModel={llmModel}
         onAiProviderChange={setAiProvider}
         onAiApiKeyChange={setAiApiKey}
+        onLlmModelChange={setLlmModel}
       />
 
       {/* System Prompt Configuration */}
