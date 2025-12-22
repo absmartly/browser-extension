@@ -134,15 +134,21 @@ ${structureText}
 
 ## Retrieving HTML Chunks
 
-To get the HTML for specific section(s), run:
+To get the HTML for specific section(s), use curl (preferred) or the CLI:
 
 \`\`\`bash
+# Using curl (faster):
 # Single selector
-npx @absmartly/claude-code-bridge get-chunk --bridge-url ${bridgeUrl} --conversation-id ${sessionId} --selector ".hero-section"
+curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selector=.hero-section"
 
-# Multiple selectors at once (more efficient)
+# Multiple selectors (comma-separated)
+curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selectors=header,%23main-content,.hero-section"
+
+# Using CLI (alternative):
 npx @absmartly/claude-code-bridge get-chunk --bridge-url ${bridgeUrl} --conversation-id ${sessionId} --selectors "header,#main-content,.hero-section"
 \`\`\`
+
+**IMPORTANT**: Always use the exact URL \`${bridgeUrl}\` shown above. Do NOT use localhost:3000 directly.
 
 The response will contain the HTML for each selector. Use this to inspect elements before generating DOM changes.
 `
