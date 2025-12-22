@@ -90,3 +90,8 @@ test-*.png
 
 # Docs and PRPs
 PRPs
+
+# Temporary test files
+TEST_SUMMARY.md
+test-html-compression.js
+docs/get_html_chunk_tool.md
