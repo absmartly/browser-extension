@@ -440,36 +440,16 @@ export function initializeBackgroundScript() {
 
       ;(async () => {
         try {
-          console.log('[Background] AI_INITIALIZE_SESSION - Initializing session...')
-          const config = await getConfig(storage, secureStorage)
-          const { html, conversationSession } = message
-          console.log('[Background] HTML length:', html?.length, 'Session:', conversationSession?.id)
+          console.log('[Background] AI_INITIALIZE_SESSION - Preparing session (no LLM call)...')
+          const { conversationSession } = message
 
-          const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api')
-            ? config?.aiApiKey
-            : config?.apiKey
-
-          console.log('[Background] AI Provider:', config?.aiProvider)
-          console.log('[Background] Config aiApiKey:', config?.aiApiKey ? `present (${config?.aiApiKey.substring(0, 10)}...)` : 'missing')
-          console.log('[Background] Config apiKey:', config?.apiKey ? 'present' : 'missing')
-          console.log('[Background] Using API key from config:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing')
-
-          const options: any = {
-            aiProvider: config?.aiProvider,
-            conversationSession: conversationSession
+          const initializedSession = {
+            ...conversationSession,
+            htmlSent: false
           }
 
-          const initPrompt = "I'm ready to help you make DOM changes to the page. Please describe what you'd like to change."
-
-          console.log('[Background] Initializing conversation with HTML...')
-          const result = await generateDOMChanges(html, initPrompt, apiKeyToUse || '', [], undefined, options)
-
-          if (result.session) {
-            console.log('[Background] Session initialized:', result.session.id, 'htmlSent:', result.session.htmlSent)
-            sendResponse({ success: true, session: result.session })
-          } else {
-            throw new Error('Session not returned from initialization')
-          }
+          console.log('[Background] Session prepared:', initializedSession.id, 'htmlSent:', initializedSession.htmlSent)
+          sendResponse({ success: true, session: initializedSession })
           console.log('[Background] Initialization response sent successfully')
         } catch (error) {
           console.error('[Background] Session initialization error:', error)
@@ -477,6 +457,82 @@ export function initializeBackgroundScript() {
           sendResponse({
             success: false,
             error: error instanceof Error ? error.message : 'Failed to initialize session'
+          })
+        }
+      })()
+      return true
+    } else if (message.type === 'AI_REFRESH_HTML') {
+      debugLog('[Background] Handling AI_REFRESH_HTML')
+
+      ;(async () => {
+        try {
+          console.log('[Background] AI_REFRESH_HTML - Refreshing HTML context...')
+          const config = await getConfig(storage, secureStorage)
+          const { html, conversationSession } = message
+          console.log('[Background] New HTML length:', html?.length, 'Session:', conversationSession?.id)
+
+          if (!conversationSession) {
+            throw new Error('No conversation session provided')
+          }
+
+          if (!html) {
+            throw new Error('No HTML provided for refresh')
+          }
+
+          // For API providers (Anthropic/OpenAI), just reset htmlSent flag
+          // The next message will include the new DOM structure in the system prompt
+          if (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api') {
+            console.log('[Background] Resetting htmlSent flag for API provider')
+            const updatedSession = {
+              ...conversationSession,
+              htmlSent: false
+            }
+            sendResponse({ success: true, session: updatedSession })
+            return
+          }
+
+          // For Bridge provider (claude-subscription), call the refresh endpoint
+          if (config?.aiProvider === 'claude-subscription') {
+            console.log('[Background] Refreshing HTML on Bridge server')
+            const { ClaudeCodeBridgeClient } = await import('~src/lib/claude-code-client')
+            const bridgeClient = new ClaudeCodeBridgeClient()
+
+            try {
+              await bridgeClient.connect()
+              if (conversationSession.conversationId) {
+                await bridgeClient.refreshHtml(conversationSession.conversationId, html)
+                console.log('[Background] ✅ HTML refreshed on Bridge')
+              }
+              bridgeClient.disconnect()
+            } catch (bridgeError) {
+              console.error('[Background] Bridge refresh error:', bridgeError)
+              bridgeClient.disconnect()
+              throw bridgeError
+            }
+
+            // Also reset htmlSent so the next message includes new DOM structure
+            const updatedSession = {
+              ...conversationSession,
+              htmlSent: false
+            }
+            sendResponse({ success: true, session: updatedSession })
+            return
+          }
+
+          // Unknown provider - just reset htmlSent
+          console.log('[Background] Unknown provider, resetting htmlSent flag')
+          const updatedSession = {
+            ...conversationSession,
+            htmlSent: false
+          }
+          sendResponse({ success: true, session: updatedSession })
+
+        } catch (error) {
+          console.error('[Background] HTML refresh error:', error)
+          debugError('[Background] HTML refresh error:', error)
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to refresh HTML'
           })
         }
       })()
@@ -492,6 +548,7 @@ export function initializeBackgroundScript() {
 }
 
 // Re-export all modules for external use
+// Note: Use background/index.ts for public API imports - it has explicit exports without conflicts
 export * from './core/message-router'
 export * from './core/api-client'
 export * from './core/config-manager'
@@ -499,8 +556,23 @@ export * from './handlers/storage-handler'
 export * from './handlers/event-buffer'
 export * from './handlers/injection-handler'
 export * from './handlers/avatar-proxy'
-export * from './utils/validation'
+// Validation utilities - export only non-conflicting items (validateConfig/validateAPIRequest have different signatures in core/)
+export {
+  ConfigSchema,
+  APIRequestSchema,
+  safeValidateConfig,
+  safeValidateAPIRequest
+} from './utils/validation'
+export type { ValidatedConfig, ValidatedAPIRequest } from './utils/validation'
+// Security utilities - no conflicts
 export * from './utils/security'
-export type * from './types'
+// Types - export only non-conflicting items (RouteResult is in message-router)
+export type {
+  APIRequest,
+  APIResponse,
+  MessageHandler,
+  StorageInstances,
+  ConfigValidationResult
+} from './types'
 export type { ABsmartlyConfig } from '~src/types/absmartly'
 export type { ExtensionMessage } from '~src/lib/messaging'

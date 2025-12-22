@@ -180,28 +180,11 @@ export function DOMChangesInlineEditor({
           
           // Apply the selected element to the restored editing state
           if (pickerResult.fieldId === 'selector' && result.editingChange) {
-            // For move changes, preserve the original position data
-            if (result.editingChange.type === 'move' && result.editingChange.value && typeof result.editingChange.value === 'object') {
-              setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
-            } else {
-              setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
-            }
+            // Update selector while preserving all other properties (including move data)
+            setEditingChange({ ...result.editingChange, selector: pickerResult.selector })
           } else if (pickerResult.fieldId === 'targetSelector' && result.editingChange) {
-            // When updating target selector, preserve original position if not already set
-            if (result.editingChange.type === 'move' && result.editingChange.value && typeof result.editingChange.value === 'object') {
-              const currentValue = result.editingChange.value as any
-              // Only update the targetSelector, keep original position data intact
-              setEditingChange({
-                ...result.editingChange,
-                targetSelector: pickerResult.selector,
-                value: {
-                  ...currentValue,
-                  targetSelector: pickerResult.selector
-                }
-              })
-            } else {
-              setEditingChange({ ...result.editingChange, targetSelector: pickerResult.selector })
-            }
+            // Update targetSelector while preserving position and other properties
+            setEditingChange({ ...result.editingChange, targetSelector: pickerResult.selector })
           } else if (pickerResult.fieldId === 'observerRoot' && result.editingChange) {
             setEditingChange({ ...result.editingChange, observerRoot: pickerResult.selector })
           }
@@ -1026,7 +1009,6 @@ export function DOMChangesInlineEditor({
           selector: change.selector,
           type: 'text',
           value: change.textValue || '',
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -1036,7 +1018,6 @@ export function DOMChangesInlineEditor({
           selector: change.selector,
           type: 'html',
           value: change.htmlValue || '',
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -1046,7 +1027,6 @@ export function DOMChangesInlineEditor({
           selector: change.selector,
           type: 'javascript',
           value: change.jsValue || '',
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -1066,7 +1046,6 @@ export function DOMChangesInlineEditor({
           selector: change.selector,
           type: 'style',
           value: styleValue,
-          enabled: true,
           mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
@@ -1078,7 +1057,6 @@ export function DOMChangesInlineEditor({
           type: 'styleRules',
           states: change.styleRulesStates || {},
           important: change.styleRulesImportant,
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         } as DOMChangeStyleRules
@@ -1092,7 +1070,6 @@ export function DOMChangesInlineEditor({
           selector: change.selector,
           type: 'attribute',
           value: attrValue,
-          enabled: true,
           mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
@@ -1104,7 +1081,6 @@ export function DOMChangesInlineEditor({
           type: 'class',
           add: change.classAdd?.filter(c => c) || [],
           remove: change.classRemove?.filter(c => c) || [],
-          enabled: true,
           mode: change.mode || 'merge',
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
@@ -1116,7 +1092,6 @@ export function DOMChangesInlineEditor({
           type: 'move',
           targetSelector: change.targetSelector || '',
           position: change.position || 'after',
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -1125,7 +1100,6 @@ export function DOMChangesInlineEditor({
         domChange = {
           selector: change.selector,
           type: 'remove',
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }
@@ -1136,7 +1110,6 @@ export function DOMChangesInlineEditor({
           type: 'insert',
           html: change.htmlValue || '',
           position: change.position || 'after',
-          enabled: true,
           waitForElement: change.waitForElement,
           observerRoot: change.observerRoot
         }

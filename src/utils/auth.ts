@@ -1,4 +1,3 @@
-import { debugLog, debugError } from './debug'
 import { getJWTCookie } from './cookies'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 
@@ -29,19 +28,14 @@ export function buildAuthFetchOptions(
 
   if (authMethod === 'jwt') {
     if (useAuthHeader && jwtToken) {
-      // Strategy 2: Use Authorization header with JWT token
       fetchOptions.credentials = 'omit'
       fetchOptions.headers = {
         'Authorization': `JWT ${jwtToken}`
       }
-      debugLog('buildAuthFetchOptions: JWT with Authorization header')
     } else {
-      // Strategy 1: Use credentials to send cookies automatically
       fetchOptions.credentials = 'include'
-      debugLog('buildAuthFetchOptions: JWT with credentials include')
     }
   } else if (authMethod === 'apikey') {
-    // API Key authentication
     fetchOptions.credentials = 'omit'
 
     if (config.apiKey) {
@@ -53,7 +47,6 @@ export function buildAuthFetchOptions(
         'Authorization': authHeader
       }
     }
-    debugLog('buildAuthFetchOptions: API Key authentication')
   }
 
   return fetchOptions
@@ -126,13 +119,9 @@ async function processFetchResponse(
         const avatarProxyUrl = await fetchAuthenticatedImage(avatarUrl, imageConfig as any)
         if (avatarProxyUrl) {
           minimalUser.avatarUrl = avatarProxyUrl
-          console.log('[Avatar] Created proxy URL for avatar')
-        } else {
-          console.log('[Avatar] Skipping avatar (proxy URL not available)')
         }
       } catch (avatarError) {
         // Avatar fetching failed, but don't fail the auth check
-        console.log('[Avatar] Skipping avatar due to error:', avatarError)
       }
     }
 
@@ -169,29 +158,21 @@ export async function fetchAuthenticatedImage(
   config: ABsmartlyConfig
 ): Promise<string | null> {
   try {
-    // Check if we're in an extension context with service worker
-    // In test mode, chrome.runtime.getURL might work but service worker won't be running
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
-      console.log('[Avatar] Not in extension context, skipping avatar')
       return null
     }
 
-    // Encode auth config in the proxy URL so service worker knows how to authenticate
     const params = new URLSearchParams({
       url: url,
       authMethod: config.authMethod || 'jwt'
     })
 
-    // Include API key if using API key auth
     if (config.authMethod === 'apikey' && config.apiKey) {
       params.set('apiKey', config.apiKey)
     }
 
-    const proxyUrl = `${chrome.runtime.getURL('/api/avatar')}?${params.toString()}`
-    console.log('[Avatar] Created proxy URL with auth context:', proxyUrl.replace(/apiKey=[^&]+/, 'apiKey=***'))
-    return proxyUrl
+    return `${chrome.runtime.getURL('/api/avatar')}?${params.toString()}`
   } catch (error) {
-    console.error('[Avatar] Error creating proxy URL:', error)
     return null
   }
 }

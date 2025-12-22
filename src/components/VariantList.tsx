@@ -10,7 +10,7 @@ import { VariantConfigJSONEditor } from './VariantConfigJSONEditor'
 import { DOMChangeOptions } from './DOMChangeOptions'
 import { URLFilterSection } from './URLFilterSection'
 import { GlobalDefaultsSection } from './GlobalDefaultsSection'
-import type { DOMChange, DOMChangesData, DOMChangesConfig, URLFilter } from '~src/types/dom-changes'
+import type { DOMChange, DOMChangesData, DOMChangesConfig, URLFilter, AIDOMGenerationResult } from '~src/types/dom-changes'
 
 const storage = new Storage({ area: "local" })
 

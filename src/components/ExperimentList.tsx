@@ -412,7 +412,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
                                   }}
                                 />
                                 <div
-                                  className="hidden h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
+                                  className="h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
                                   style={{ display: 'none', backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
                                 >
                                   {avatarData.initials}

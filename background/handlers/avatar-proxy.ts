@@ -1,9 +1,9 @@
 import { debugError } from '~src/utils/debug'
 import { buildAuthFetchOptions } from '~src/utils/auth'
-import { getJWTCookie } from '~src/utils/cookies'
 import { Storage } from '@plasmohq/storage'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { getConfig as getConfigFromManager } from '../core/config-manager'
+import { getJWTCookie } from '../core/api-client'
 
 /**
  * Avatar Proxy Module
@@ -85,18 +85,20 @@ export async function handleAvatarFetch(
       apiKey: apiKey || config.apiKey
     }
 
+    // For JWT auth, read the token via chrome.cookies API (works for HTTP-only cookies)
+    // and send it via Authorization header. credentials: 'include' doesn't work due to
+    // invalid CORS config on server (Access-Control-Allow-Origin: * with credentials)
     let jwtToken: string | null = null
-    if (authMethod === 'jwt') {
+    if (avatarConfig.authMethod === 'jwt') {
       jwtToken = await getJWTCookie(config.apiEndpoint)
       if (!jwtToken) {
-        console.log('[AvatarProxy] No JWT token available, will try credentials')
+        return new Response('No JWT token available for avatar authentication', { status: 401 })
       }
     }
 
-    // For service worker context, prefer Authorization header when token is available
-    // Service workers can't reliably send cookies, so we use the header when possible
-    const useAuthHeader = authMethod === 'jwt' && !!jwtToken
-    const fetchOptions = buildAuthFetchOptions(authMethod, avatarConfig, jwtToken, useAuthHeader)
+    // Always use Authorization header (credentials: 'include' doesn't work cross-origin)
+    const useAuthHeader = true
+    const fetchOptions = buildAuthFetchOptions(avatarConfig.authMethod, avatarConfig, jwtToken, useAuthHeader)
 
     // Add Accept header for images
     fetchOptions.headers = {
@@ -104,11 +106,9 @@ export async function handleAvatarFetch(
       'Accept': 'image/*'
     }
 
-    // Fetch the image with authentication
     const response = await fetch(avatarUrl, fetchOptions)
 
     if (!response.ok) {
-      console.error('[AvatarProxy] Fetch failed:', response.status)
       return new Response('Avatar fetch failed', { status: response.status })
     }
 
@@ -126,9 +126,7 @@ export async function handleAvatarFetch(
 
     return cachedResponse
   } catch (error) {
-    console.error('[AvatarProxy] Error:', error)
-    console.error('[AvatarProxy] Error stack:', error instanceof Error ? error.stack : 'No stack')
-    console.error('[AvatarProxy] Error message:', error instanceof Error ? error.message : String(error))
+    debugError('[AvatarProxy] Error:', error)
     return new Response(`Avatar proxy error: ${error instanceof Error ? error.message : String(error)}`, { status: 500 })
   }
 }
@@ -160,6 +158,5 @@ export function handleFetchEvent(event: any): void {
 export function initializeAvatarProxy(): void {
   if (typeof self !== 'undefined' && 'addEventListener' in self) {
     self.addEventListener('fetch', handleFetchEvent as EventListener)
-    console.log('[AvatarProxy] Initialized fetch interceptor')
   }
 }

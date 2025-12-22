@@ -242,8 +242,7 @@ export class EditorCoordinator {
           this.undoRedoManager.addChange(
             {
               selector,
-              type: 'remove',
-              enabled: true
+              type: 'remove'
             },
             oldValue
           )
@@ -411,8 +410,7 @@ export class EditorCoordinator {
           {
             selector,
             type: 'html',
-            value: newValue,
-            enabled: true
+            value: newValue
           },
           oldValue
         )
@@ -425,8 +423,7 @@ export class EditorCoordinator {
           {
             selector,
             type: 'text',
-            value: newValue,
-            enabled: true
+            value: newValue
           },
           oldValue
         )
@@ -480,8 +477,7 @@ export class EditorCoordinator {
         {
           selector,
           type: 'html',
-          value: newHtml,
-          enabled: true
+          value: newHtml
         },
         oldValue
       )
@@ -536,7 +532,6 @@ export class EditorCoordinator {
           selector,
           type: 'attribute',
           value: { src: newSrc },
-          enabled: true,
           mode: 'merge'
         },
         { src: oldSrc }
@@ -555,7 +550,6 @@ export class EditorCoordinator {
           selector,
           type: 'style',
           value: { 'background-image': `url('${newSrc}')` },
-          enabled: true,
           mode: 'merge'
         },
         { 'background-image': oldBgImage }

@@ -17,8 +17,8 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
       return new BridgeProvider(config)
 
     default:
-      console.warn('[Factory] Unknown provider, defaulting to Anthropic:', config.aiProvider)
-      return new AnthropicProvider(config)
+      console.warn('[Factory] Unknown provider, defaulting to BridgeProvider:', config.aiProvider)
+      return new BridgeProvider(config)
   }
 }
 

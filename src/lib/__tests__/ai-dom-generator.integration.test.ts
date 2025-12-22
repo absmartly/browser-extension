@@ -87,8 +87,7 @@ describe('AI DOM Generator Integration Tests (with real bridge)', () => {
         {
           selector: '.existing',
           type: 'text',
-          value: 'Existing text',
-          enabled: true
+          value: 'Existing text'
         }
       ]
 
@@ -105,8 +104,7 @@ describe('AI DOM Generator Integration Tests (with real bridge)', () => {
         {
           selector: '.old',
           type: 'text',
-          value: 'Old text',
-          enabled: true
+          value: 'Old text'
         }
       ]
 
@@ -151,14 +149,12 @@ describe('AI DOM Generator Integration Tests (with real bridge)', () => {
         {
           selector: '.cta-button',
           type: 'style',
-          value: { color: 'blue' },
-          enabled: true
+          value: { color: 'blue' }
         },
         {
           selector: '.main-title',
           type: 'text',
-          value: 'Old Title',
-          enabled: true
+          value: 'Old Title'
         }
       ]
 

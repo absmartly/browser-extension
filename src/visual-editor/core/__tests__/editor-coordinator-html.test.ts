@@ -151,8 +151,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(changes[0]).toMatchObject({
         selector: '.test-element',
         type: 'html',
-        value: newHtml,
-        enabled: true
+        value: newHtml
       })
     })
 
@@ -325,8 +324,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(changes[0]).toMatchObject({
         selector: '.test-element',
         type: 'html',
-        value: '<span>Modified</span>',
-        enabled: true
+        value: '<span>Modified</span>'
       })
     })
   })
@@ -399,8 +397,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(changes).toHaveLength(1)
       expect(changes[0]).toMatchObject({
         type: 'html',
-        value: '<div>State Test</div>',
-        enabled: true
+        value: '<div>State Test</div>'
       })
     })
 

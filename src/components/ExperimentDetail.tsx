@@ -17,7 +17,7 @@ import { ExperimentActions } from './ExperimentDetail/ExperimentActions'
 import { getExperimentStateLabel, getExperimentStateBadgeVariant } from '~src/utils/experiment-state'
 import { ExperimentCodeInjection } from './ExperimentCodeInjection'
 import type { ExperimentInjectionCode } from '~src/types/absmartly'
-import type { URLFilter, DOMChangesData } from '~src/types/dom-changes'
+import type { URLFilter, DOMChangesData, DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import { clearAllExperimentStorage } from '~src/utils/storage-cleanup'
 
 const storage = new Storage({ area: "local" })

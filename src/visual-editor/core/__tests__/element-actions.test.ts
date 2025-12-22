@@ -160,7 +160,7 @@ describe('ElementActions', () => {
       const newState = {
         selectedElement: testDiv,
         hoveredElement: testButton,
-        changes: [{ selector: '#test', type: 'style', value: { color: 'red' }, enabled: true }],
+        changes: [{ selector: '#test', type: 'style', value: { color: 'red' } }],
         undoStack: [],
         redoStack: [],
         originalValues: new Map(),
@@ -302,8 +302,7 @@ describe('ElementActions', () => {
         expect.objectContaining({
           selector: '#test-div',
           type: 'style',
-          value: { display: 'none' },
-          enabled: true
+          value: { display: 'none' }
         }),
         expect.any(Object)
       )
@@ -362,7 +361,6 @@ describe('ElementActions', () => {
           selector: '#test-img',
           type: 'attribute',
           value: { src: 'https://example.com/new.jpg' },
-          enabled: true,
           mode: 'merge'
         }),
         { src: 'https://example.com/old.jpg' }
@@ -396,7 +394,6 @@ describe('ElementActions', () => {
           selector: '#test-bg',
           type: 'style',
           value: { 'background-image': "url('https://example.com/new-bg.jpg')" },
-          enabled: true,
           mode: 'merge'
         }),
         { 'background-image': 'url("https://example.com/old-bg.jpg")' }
@@ -565,8 +562,7 @@ describe('ElementActions', () => {
           selector: '#child-2',
           type: 'move',
           targetSelector: 'div',
-          position: 'before',
-          enabled: true
+          position: 'before'
         }),
         'down' // oldValue is opposite direction
       )
@@ -684,8 +680,7 @@ describe('ElementActions', () => {
           selector: '#test-div',
           type: 'insert',
           html: '<div class="inserted">New Block</div>',
-          position: 'after',
-          enabled: true
+          position: 'after'
         }),
         expect.objectContaining({
           insertedSelector: expect.any(String)
@@ -760,8 +755,7 @@ describe('ElementActions', () => {
           selector: '#test-div',
           type: 'insert',
           html: '<div class="safe">Safe Content</div>',
-          position: 'before',
-          enabled: true
+          position: 'before'
         }),
         expect.objectContaining({
           insertedSelector: expect.any(String)
@@ -1165,14 +1159,12 @@ describe('ElementActions', () => {
             color: 'red',
             backgroundColor: 'blue',
             fontSize: '16px'
-          },
-          enabled: true
+          }
         },
         {
           selector: '#complex-2',
           type: 'attribute',
-          value: { 'data-test': 'new-value' },
-          enabled: false
+          value: { 'data-test': 'new-value' }
         }
       ]
 

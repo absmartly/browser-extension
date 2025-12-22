@@ -23,7 +23,7 @@ export interface DragDropResult {
   variantName: string
   selector: string
   targetSelector: string
-  position: string
+  position: 'before' | 'after' | 'firstChild' | 'lastChild'
 }
 
 export interface VisualEditorChanges {

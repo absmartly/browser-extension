@@ -137,7 +137,7 @@ describe('Message Bridge Communication', () => {
       mockChrome.runtime.sendMessage.mockResolvedValue({
         success: true,
         changes: [
-          { selector: '#test', type: 'text', value: 'Updated', enabled: true }
+          { selector: '#test', type: 'text', value: 'Updated' }
         ]
       })
 

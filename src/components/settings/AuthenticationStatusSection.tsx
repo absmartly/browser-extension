@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '../ui/Button'
 import { getAvatarColor, getInitials } from '~src/utils/avatar'
 import { debugError } from '~src/utils/debug'
@@ -25,6 +25,14 @@ export const AuthenticationStatusSection = React.memo(function AuthenticationSta
   onCheckAuth,
   onAuthenticate
 }: AuthenticationStatusSectionProps) {
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
+  useEffect(() => {
+    setAvatarFailed(false)
+  }, [avatarUrl])
+
+  const showAvatar = avatarUrl && !avatarFailed
+
   return (
     <div className="bg-gray-50 p-3 rounded-md" data-testid="auth-status-section">
       <div className="flex items-center justify-between mb-2">
@@ -50,18 +58,18 @@ export const AuthenticationStatusSection = React.memo(function AuthenticationSta
         <div data-testid="auth-user-info">
           <div className="flex items-center space-x-3">
             <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-              {(avatarUrl || user.picture) ? (
+              {showAvatar ? (
                 <img
-                  src={avatarUrl || user.picture}
+                  src={avatarUrl}
                   alt={user.name || 'User'}
                   className="w-full h-full object-cover"
-                  onError={(e) => {
-                    debugError('Avatar failed to load:', avatarUrl || user.picture)
-                    e.currentTarget.style.display = 'none'
+                  onError={() => {
+                    debugError('Avatar failed to load:', avatarUrl)
+                    setAvatarFailed(true)
                   }}
                 />
               ) : (
-                <div 
+                <div
                   className="w-full h-full flex items-center justify-center text-white text-sm font-medium"
                   style={{ backgroundColor: getAvatarColor(user.name || 'User') }}
                 >

@@ -126,8 +126,7 @@ export class ElementActions {
         {
           selector,
           type: 'style',
-          value: { display: 'none' },
-          enabled: true
+          value: { display: 'none' }
         },
         { display: oldValue }
       )
@@ -161,7 +160,6 @@ export class ElementActions {
             selector,
             type: 'attribute',
             value: { src: newSrc },
-            enabled: true,
             mode: 'merge'
           },
           { src: oldSrc }
@@ -177,7 +175,6 @@ export class ElementActions {
             selector,
             type: 'style',
             value: { 'background-image': `url('${newSrc}')` },
-            enabled: true,
             mode: 'merge'
           },
           { 'background-image': oldBgImage }
@@ -231,8 +228,7 @@ export class ElementActions {
     this.undoRedoManager.addChange(
       {
         selector,
-        type: 'remove',
-        enabled: true
+        type: 'remove'
       },
       htmlElement.outerHTML
     )
@@ -303,8 +299,7 @@ export class ElementActions {
         selector,
         type: 'move',
         targetSelector: parent.tagName.toLowerCase(),
-        position: direction === 'up' ? 'before' : 'after',
-        enabled: true
+        position: direction === 'up' ? 'before' : 'after'
       } as any,
       oldDirection
     )
@@ -355,8 +350,7 @@ export class ElementActions {
           selector: referenceSelector,
           type: 'insert',
           html: sanitizedHtml,
-          position: options.position,
-          enabled: true
+          position: options.position
         }
 
         // Store the inserted element's selector for undo
