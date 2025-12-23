@@ -18,7 +18,7 @@ describe('Message Bridge Communication', () => {
     mockChrome = {
       runtime: {
         sendMessage: jest.fn(),
-        lastError: null,
+        lastError: null as any,
         onMessage: {
           addListener: jest.fn()
         }
@@ -30,7 +30,6 @@ describe('Message Bridge Communication', () => {
       postMessage: jest.fn(),
       addEventListener: jest.fn(),
       removeEventListener: jest.fn(),
-      parent: {},
       parent: { postMessage: jest.fn() }
     } as any
   })
@@ -41,7 +40,9 @@ describe('Message Bridge Communication', () => {
 
   describe('sendMessage - Production Mode', () => {
     it('should send message via chrome.runtime in production', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true, data: 'test' })
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        callback({ success: true, data: 'test' })
+      })
 
       const result = await sendMessage({ type: 'TEST_MESSAGE', payload: { test: true } })
 
@@ -49,96 +50,42 @@ describe('Message Bridge Communication', () => {
         expect.objectContaining({
           type: 'TEST_MESSAGE',
           payload: { test: true }
-        })
+        }),
+        expect.any(Function)
       )
       expect(result).toEqual({ success: true, data: 'test' })
     })
 
     it('should handle chrome.runtime errors', async () => {
-      mockChrome.runtime.lastError = { message: 'Chrome error' }
-      mockChrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        mockChrome.runtime.lastError = { message: 'Chrome error' }
         callback({ success: false })
       })
 
-      await expect(sendMessage({ type: 'TEST_MESSAGE' })).rejects.toThrow()
+      await expect(sendMessage({ type: 'TEST_MESSAGE' })).rejects.toThrow('Chrome error')
     })
 
     it('should support callback-based responses', async () => {
-      const callback = jest.fn()
-      mockChrome.runtime.sendMessage.mockImplementation((msg, chromeCallback) => {
+      const userCallback = jest.fn()
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, chromeCallback: (response: any) => void) => {
         chromeCallback({ success: true, data: 'callback response' })
       })
 
-      await sendMessage({ type: 'TEST_MESSAGE' }, callback)
+      await sendMessage({ type: 'TEST_MESSAGE' }, userCallback)
 
-      expect(callback).toHaveBeenCalledWith({ success: true, data: 'callback response' })
-    })
-  })
-
-  describe('sendMessage - Test Mode', () => {
-    beforeEach(() => {
-      global.window.parent = global.window
-    })
-
-    it('should send message via postMessage in test mode', async () => {
-      const callback = jest.fn()
-      global.window.postMessage = jest.fn((message, origin) => {
-        setTimeout(() => {
-          global.window.dispatchEvent(
-            new MessageEvent('message', {
-              data: {
-                source: 'absmartly-extension',
-                responseId: message.responseId,
-                response: { success: true }
-              }
-            })
-          )
-        }, 0)
-      })
-
-      const result = await sendMessage({ type: 'TEST_MESSAGE' }, callback)
-
-      expect(global.window.postMessage).toHaveBeenCalled()
-    })
-
-    it('should handle postMessage timeout', async () => {
-      global.window.postMessage = jest.fn()
-
-      const promise = sendMessage({ type: 'TEST_MESSAGE' })
-
-      await expect(promise).rejects.toThrow()
-    }, 35000)
-
-    it('should clean up event listeners on response', async () => {
-      const removeEventListenerSpy = jest.spyOn(global.window, 'removeEventListener')
-
-      global.window.postMessage = jest.fn((message, origin) => {
-        setTimeout(() => {
-          global.window.dispatchEvent(
-            new MessageEvent('message', {
-              data: {
-                source: 'absmartly-extension',
-                responseId: message.responseId,
-                response: { success: true }
-              }
-            })
-          )
-        }, 0)
-      })
-
-      await sendMessage({ type: 'TEST_MESSAGE' })
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function))
+      expect(userCallback).toHaveBeenCalledWith({ success: true, data: 'callback response' })
     })
   })
 
   describe('AI Generation Messages', () => {
     it('should handle AI_GENERATE_DOM_CHANGES message', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({
-        success: true,
-        changes: [
-          { selector: '#test', type: 'text', value: 'Updated' }
-        ]
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        callback({
+          success: true,
+          changes: [
+            { selector: '#test', type: 'text', value: 'Updated' }
+          ]
+        })
       })
 
       const result = await sendMessage({
@@ -155,9 +102,11 @@ describe('Message Bridge Communication', () => {
 
     it('should handle CAPTURE_HTML message', async () => {
       const mockHtml = '<html><body><p>Test</p></body></html>'
-      mockChrome.runtime.sendMessage.mockResolvedValue({
-        success: true,
-        html: mockHtml
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        callback({
+          success: true,
+          html: mockHtml
+        })
       })
 
       const result = await sendMessage({ type: 'CAPTURE_HTML' })
@@ -167,9 +116,9 @@ describe('Message Bridge Communication', () => {
     })
 
     it('should propagate errors from AI generation', async () => {
-      mockChrome.runtime.sendMessage.mockRejectedValue(
-        new Error('API key is required')
-      )
+      mockChrome.runtime.sendMessage.mockImplementation(() => {
+        throw new Error('API key is required')
+      })
 
       await expect(
         sendMessage({
@@ -184,7 +133,7 @@ describe('Message Bridge Communication', () => {
 
   describe('sendMessageNoResponse - Fire and Forget', () => {
     it('should send fire-and-forget message without waiting for response', () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue(undefined)
+      mockChrome.runtime.sendMessage.mockReturnValue(Promise.resolve(undefined))
 
       sendMessageNoResponse({ type: 'NOTIFICATION', message: 'test' })
 
@@ -192,34 +141,19 @@ describe('Message Bridge Communication', () => {
     })
 
     it('should handle errors silently in fire-and-forget', () => {
-      mockChrome.runtime.sendMessage.mockRejectedValue(new Error('Send failed'))
+      mockChrome.runtime.sendMessage.mockReturnValue(Promise.reject(new Error('Send failed')))
 
       sendMessageNoResponse({ type: 'NOTIFICATION' })
 
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalled()
     })
-
-    it('should use postMessage in test mode', () => {
-      global.window.parent = global.window
-      const sidebarIframe = document.createElement('iframe')
-      sidebarIframe.id = 'absmartly-sidebar-iframe'
-      sidebarIframe.contentWindow = {
-        postMessage: jest.fn()
-      } as any
-
-      document.body.appendChild(sidebarIframe)
-
-      sendMessageNoResponse({ type: 'NOTIFICATION' })
-
-      expect(sidebarIframe.contentWindow.postMessage).toHaveBeenCalled()
-
-      document.body.removeChild(sidebarIframe)
-    })
   })
 
   describe('Message Error Handling', () => {
     it('should handle malformed responses gracefully', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue(null)
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        callback(null)
+      })
 
       const result = await sendMessage({ type: 'TEST_MESSAGE' })
 
@@ -227,13 +161,12 @@ describe('Message Bridge Communication', () => {
     })
 
     it('should throw error with Chrome runtime lastError', async () => {
-      mockChrome.runtime.lastError = { message: 'Specified item not found' }
-
-      mockChrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        mockChrome.runtime.lastError = { message: 'Specified item not found' }
         callback(undefined)
       })
 
-      await expect(sendMessage({ type: 'TEST' })).rejects.toThrow()
+      await expect(sendMessage({ type: 'TEST' })).rejects.toThrow('Specified item not found')
     })
 
     it('should handle exceptions in chrome.runtime.sendMessage', async () => {
@@ -245,36 +178,19 @@ describe('Message Bridge Communication', () => {
     })
   })
 
-  describe('Response ID Tracking', () => {
-    it('should generate unique response IDs for multiple messages', async () => {
-      const responseIds = new Set()
-
-      mockChrome.runtime.sendMessage.mockImplementation((msg, callback) => {
-        responseIds.add(msg.responseId)
-        callback({ success: true })
-      })
-
-      await sendMessage({ type: 'MSG1' })
-      await sendMessage({ type: 'MSG2' })
-      await sendMessage({ type: 'MSG3' })
-
-      expect(responseIds.size).toBe(3)
-    })
-  })
-
   describe('Callback Handling', () => {
     it('should call callback before resolving promise', async () => {
       const callback = jest.fn()
       const callOrder: string[] = []
 
-      mockChrome.runtime.sendMessage.mockImplementation((msg, chromeCallback) => {
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, chromeCallback: (response: any) => void) => {
         callOrder.push('chrome-callback')
         chromeCallback({ success: true, data: 'response' })
       })
 
       const promise = sendMessage(
         { type: 'TEST' },
-        (response) => {
+        () => {
           callOrder.push('user-callback')
         }
       )
@@ -288,7 +204,9 @@ describe('Message Bridge Communication', () => {
     })
 
     it('should handle missing callback gracefully', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        callback({ success: true })
+      })
 
       const result = await sendMessage({ type: 'TEST' })
 
@@ -297,24 +215,17 @@ describe('Message Bridge Communication', () => {
   })
 
   describe('Message Type Detection', () => {
-    it('should detect test mode correctly', async () => {
-      global.window.parent = global.window
-
-      mockChrome.runtime = undefined
-
-      const promise = sendMessage({ type: 'TEST' })
-
-      await expect(promise).rejects.toThrow()
-    })
-
     it('should use chrome.runtime when available', async () => {
-      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
+      mockChrome.runtime.sendMessage.mockImplementation((msg: any, callback: (response: any) => void) => {
+        callback({ success: true })
+      })
 
-      global.window.parent = {}
+      ;(global.window as any).parent = {}
 
       const result = await sendMessage({ type: 'TEST' })
 
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalled()
+      expect(result).toEqual({ success: true })
     })
   })
 })

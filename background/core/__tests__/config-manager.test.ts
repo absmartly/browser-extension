@@ -257,6 +257,9 @@ describe('config-manager', () => {
     })
 
     it('should use default JWT auth method when not specified', async () => {
+      delete process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+      delete process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
+      delete process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://api.absmartly.com'
 
       jest.spyOn(storage, 'get').mockResolvedValue(null)

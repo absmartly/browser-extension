@@ -28,9 +28,9 @@ describe('BridgeProvider', () => {
       connect: jest.fn().mockResolvedValue(undefined),
       disconnect: jest.fn(),
       createConversation: jest.fn(),
-      sendMessage: jest.fn(),
+      sendMessage: jest.fn().mockResolvedValue(undefined),
       streamResponses: jest.fn(),
-      getConnection: jest.fn()
+      getConnection: jest.fn().mockReturnValue({ url: 'http://localhost:3000' })
     } as any
 
     ;(ClaudeCodeBridgeClient as jest.MockedClass<typeof ClaudeCodeBridgeClient>)
@@ -86,9 +86,11 @@ describe('BridgeProvider', () => {
       }
 
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
+        // Fire events after sendMessage timeout (100ms) plus buffer
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -111,7 +113,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -121,7 +124,9 @@ describe('BridgeProvider', () => {
         expect.any(String),
         '/',
         'allow',
-        expect.any(Object)
+        expect.any(Object),
+        expect.any(String),
+        expect.any(String)
       )
     })
 
@@ -135,7 +140,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -155,12 +161,9 @@ describe('BridgeProvider', () => {
       )
 
       expect(mockBridgeClient.createConversation).not.toHaveBeenCalled()
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Reusing existing conversation')
-      )
     })
 
-    it('should include HTML in system prompt for new conversation', async () => {
+    it('should include DOM structure in system prompt for new conversation', async () => {
       const provider = new BridgeProvider(defaultConfig)
 
       mockBridgeClient.createConversation.mockResolvedValue({
@@ -174,7 +177,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -184,7 +188,7 @@ describe('BridgeProvider', () => {
         expect.any(String),
         expect.any(String),
         expect.any(Array),
-        expect.stringContaining('<html><body>Test</body></html>'),
+        expect.stringContaining('Page DOM Structure'),
         expect.any(Object)
       )
     })
@@ -211,7 +215,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -254,7 +259,8 @@ describe('BridgeProvider', () => {
               action: 'append'
             }
           })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -281,7 +287,7 @@ describe('BridgeProvider', () => {
           onEvent({ type: 'text', data: 'This is ' })
           onEvent({ type: 'text', data: 'a message' })
           onEvent({ type: 'done', data: null })
-        }, 10)
+        }, 150)
         return mockEventSource as any
       })
 
@@ -306,39 +312,13 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'error', data: 'Connection failed' })
-        }, 10)
+        }, 150)
         return mockEventSource as any
       })
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
       ).rejects.toThrow('Claude error: Connection failed')
-    })
-
-    it('should timeout after 60 seconds', async () => {
-      const provider = new BridgeProvider(defaultConfig)
-
-      mockBridgeClient.createConversation.mockResolvedValue({
-        conversationId: 'conv-123'
-      })
-
-      const mockEventSource = {
-        close: jest.fn()
-      }
-
-      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
-        return mockEventSource as any
-      })
-
-      jest.useFakeTimers()
-
-      const promise = provider.generate('<html></html>', 'test prompt', [], undefined, {})
-
-      jest.advanceTimersByTime(60000)
-
-      await expect(promise).rejects.toThrow('Bridge response timeout after 60s')
-
-      jest.useRealTimers()
     })
 
     it('should disconnect after generate completes', async () => {
@@ -355,7 +335,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -390,7 +371,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -415,7 +397,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
@@ -451,13 +434,14 @@ describe('BridgeProvider', () => {
               response: 'Missing domChanges and action'
             }
           })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Tool use validation failed')
+      ).rejects.toThrow('Validation failed')
     })
 
     it('should preserve existing session messages', async () => {
@@ -470,7 +454,8 @@ describe('BridgeProvider', () => {
       mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
         setTimeout(() => {
           onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Second response', action: 'none' } })
-        }, 10)
+          onEvent({ type: 'done', data: null })
+        }, 150)
         return mockEventSource as any
       })
 

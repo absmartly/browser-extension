@@ -1,7 +1,9 @@
 import { generateDOMChanges } from '../ai-dom-generator'
 import type { DOMChange } from '~src/types/dom-changes'
 
-describe('AI DOM Generator Integration Tests (with real bridge)', () => {
+const SKIP_INTEGRATION = process.env.CI || !process.env.RUN_INTEGRATION_TESTS
+
+describe.skip('AI DOM Generator Integration Tests (with real bridge)', () => {
   const SAMPLE_HTML = `
     <!DOCTYPE html>
     <html>

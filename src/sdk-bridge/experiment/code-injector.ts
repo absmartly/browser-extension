@@ -41,7 +41,6 @@ export class CodeInjector {
 
     const data = context.data_
 
-    // Iterate through all experiments in the context
     if (!data.experiments || !Array.isArray(data.experiments)) {
       Logger.log('[ABsmartly Extension] No experiments found in context')
       return
@@ -51,10 +50,9 @@ export class CodeInjector {
 
     data.experiments.forEach((experiment: any, idx: number) => {
       try {
-        // Get the assigned variant for this experiment
         const assignment = context.assignments_ ? context.assignments_[experiment.id] : null
         if (assignment === null || assignment === undefined) {
-          return // Not assigned to this experiment
+          return
         }
 
         const variant = experiment.variants ? experiment.variants[assignment] : null
@@ -62,7 +60,6 @@ export class CodeInjector {
           return
         }
 
-        // Parse variant config
         let variantConfig: any
         try {
           variantConfig =
@@ -75,17 +72,15 @@ export class CodeInjector {
           return
         }
 
-        // Check for __inject_html variable
         const injectHtml = variantConfig.__inject_html
         if (!injectHtml) {
-          return // No injection code for this variant
+          return
         }
 
         Logger.log(
           `[ABsmartly Extension] Found __inject_html in experiment "${experiment.name}", variant ${assignment}`
         )
 
-        // Parse injection code
         let injectionCode: InjectionCode
         try {
           injectionCode =
@@ -98,7 +93,6 @@ export class CodeInjector {
           return
         }
 
-        // Check URL filter
         if (injectionCode.urlFilter && !this.matchesUrlFilter(injectionCode.urlFilter)) {
           Logger.log(
             `[ABsmartly Extension] Skipping injection for experiment "${experiment.name}" - URL filter not matched`
@@ -106,14 +100,14 @@ export class CodeInjector {
           return
         }
 
-        // Inject code at each location
         const locations: InjectionLocation[] = ['headStart', 'headEnd', 'bodyStart', 'bodyEnd']
         locations.forEach((location) => {
           if (injectionCode[location]) {
             Logger.log(
               `[ABsmartly Extension] Injecting code for experiment "${experiment.name}" at ${location}`
             )
-            this.executeScriptsInHTML(injectionCode[location]!, location)
+            const sanitizedHtml = sanitizeHTML(injectionCode[location]!)
+            this.executeScriptsInHTML(sanitizedHtml, location)
           }
         })
 
@@ -133,11 +127,9 @@ export class CodeInjector {
   executeScriptsInHTML(html: string, location: InjectionLocation): void {
     Logger.log(`[ABsmartly Extension] Processing scripts for ${location}`)
 
-    // Create a temporary container
     const temp = document.createElement('div')
-    temp.innerHTML = sanitizeHTML(html)
+    temp.innerHTML = html
 
-    // Find all script tags
     const scripts = temp.querySelectorAll('script')
 
     scripts.forEach((script, index) => {
@@ -145,11 +137,9 @@ export class CodeInjector {
 
       try {
         if (script.src) {
-          // External script - create a new script element
           const newScript = document.createElement('script')
           newScript.src = script.src
 
-          // Copy async/defer attributes (check both property and attribute for JSDOM compatibility)
           if (script.async || script.hasAttribute('async')) {
             newScript.async = true
           }
@@ -159,10 +149,8 @@ export class CodeInjector {
 
           newScript.setAttribute('data-absmartly-injected', location)
 
-          // Add to appropriate location
           this.insertAtLocation(newScript, location)
         } else {
-          // Inline script execution disabled for security (prevents code injection)
           Logger.warn(
             `[ABsmartly Extension] Inline script execution disabled for security from ${location}`
           )
@@ -208,7 +196,7 @@ export class CodeInjector {
    * Returns true if URL matches or if no filter is specified
    */
   matchesUrlFilter(urlFilter: UrlFilter): boolean {
-    if (!urlFilter) return true // No filter means apply on all pages
+    if (!urlFilter) return true
 
     const currentUrl = window.location.href
     const currentPath = window.location.pathname
@@ -216,7 +204,6 @@ export class CodeInjector {
     const currentQuery = window.location.search
     const currentHash = window.location.hash
 
-    // Determine what to match against
     let matchTarget: string
     const matchType =
       typeof urlFilter === 'object' && !Array.isArray(urlFilter)
@@ -241,7 +228,6 @@ export class CodeInjector {
         matchTarget = currentPath
     }
 
-    // Get patterns
     let includePatterns: string[] = []
     let excludePatterns: string[] = []
     let isRegex = false
@@ -256,7 +242,6 @@ export class CodeInjector {
       isRegex = urlFilter.mode === 'regex'
     }
 
-    // Check exclude patterns first
     if (excludePatterns.length > 0) {
       for (const pattern of excludePatterns) {
         if (isRegex) {
@@ -270,12 +255,10 @@ export class CodeInjector {
             Logger.warn(`[ABsmartly Extension] Invalid regex pattern: ${pattern}`, e)
           }
         } else {
-          // Simple wildcard matching
-          // First escape regex special characters, then replace wildcards
           const escapedPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except * and ?
-            .replace(/\*/g, '.*') // Convert * to .*
-            .replace(/\?/g, '.') // Convert ? to .
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')
+            .replace(/\?/g, '.')
           const regex = new RegExp(`^${escapedPattern}$`)
           if (regex.test(matchTarget)) {
             Logger.log(`[ABsmartly Extension] URL excluded by pattern: ${pattern}`)
@@ -285,9 +268,8 @@ export class CodeInjector {
       }
     }
 
-    // Check include patterns
     if (includePatterns.length === 0) {
-      return true // No include patterns means include all (that aren't excluded)
+      return true
     }
 
     for (const pattern of includePatterns) {
@@ -302,12 +284,10 @@ export class CodeInjector {
           Logger.warn(`[ABsmartly Extension] Invalid regex pattern: ${pattern}`, e)
         }
       } else {
-        // Simple wildcard matching
-        // First escape regex special characters, then replace wildcards
         const escapedPattern = pattern
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except * and ?
-          .replace(/\*/g, '.*') // Convert * to .*
-          .replace(/\?/g, '.') // Convert ? to .
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.')
         const regex = new RegExp(`^${escapedPattern}$`)
         if (regex.test(matchTarget)) {
           Logger.log(`[ABsmartly Extension] URL matched by pattern: ${pattern}`)

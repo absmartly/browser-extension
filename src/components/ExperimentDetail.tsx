@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { sendToContent } from '~src/lib/messaging'
-import { Storage } from '@plasmohq/storage'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import type { Experiment } from '~src/types/absmartly'
@@ -19,8 +18,7 @@ import { ExperimentCodeInjection } from './ExperimentCodeInjection'
 import type { ExperimentInjectionCode } from '~src/types/absmartly'
 import type { URLFilter, DOMChangesData, DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import { clearAllExperimentStorage } from '~src/utils/storage-cleanup'
-
-const storage = new Storage({ area: "local" })
+import { localAreaStorage as storage } from "~src/utils/storage"
 
 interface ExperimentDetailProps {
   experiment: Experiment
@@ -42,9 +40,8 @@ interface ExperimentDetailProps {
     onPreviewToggle: (enabled: boolean) => void
   ) => void
   autoNavigateToAI?: string | null
+  onError?: (message: string) => void
 }
-
-// Removed - now using Variant from VariantList
 
 export function ExperimentDetail({
   experiment,
@@ -59,24 +56,23 @@ export function ExperimentDetail({
   teams = [],
   tags = [],
   onNavigateToAI,
-  autoNavigateToAI
+  autoNavigateToAI,
+  onError
 }: ExperimentDetailProps) {
   debugLog('🔍 ExperimentDetail render start - experiment:', experiment)
   debugLog('🔍 ExperimentDetail render start - experiment.variants:', experiment?.variants)
   debugLog('🔍 ExperimentDetail render start - loading:', loading)
   debugLog('🔍 ExperimentDetail props - unitTypes:', unitTypes?.length, 'owners:', owners?.length, 'tags:', tags?.length)
 
-  // Always in edit mode - removed isEditing state
   const [editingName, setEditingName] = useState(false)
   const [displayName, setDisplayName] = useState(experiment.display_name || experiment.name)
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
 
-  // Use hooks
   const { initialVariants, currentVariants, hasUnsavedChanges, setHasUnsavedChanges, handleVariantsChange } = useExperimentVariants({
     experiment,
     domFieldName
   })
-  const { save } = useExperimentSave({ experiment, domFieldName })
+  const { save } = useExperimentSave({ experiment, domFieldName, onError })
   const [metadata, setMetadata] = useState({
     percentage_of_traffic: experiment.percentage_of_traffic || 100,
     unit_type_id: experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
@@ -90,7 +86,6 @@ export function ExperimentDetail({
   debugLog('🔍 ExperimentDetail state - variants length:', experiment?.variants?.length)
   debugLog('🔍 ExperimentDetail state - should show variants section:', experiment.variants && experiment.variants.length > 0)
 
-  // Load config on mount to get the DOM changes field name
   useEffect(() => {
     const loadConfig = async () => {
       const config = await getConfig()
@@ -121,7 +116,6 @@ export function ExperimentDetail({
 
     await save(formData, currentVariants, onUpdate)
 
-    // Clear all storage after successful save - changes are now in the API
     try {
       await clearAllExperimentStorage(experiment.id)
       debugLog('🧹 Cleared all DOM changes storage (session + local) after save for experiment', experiment.id)
@@ -129,11 +123,9 @@ export function ExperimentDetail({
       debugError('Failed to clear storage after save:', error)
     }
 
-    // Reset unsaved changes flag after successful save
     setHasUnsavedChanges(false)
   }
 
-  // Helper functions for code injection
   const extractInjectionCode = (variant: Variant): ExperimentInjectionCode | undefined => {
     if (!variant || !variant.config) return undefined
     const injectHtml = variant.config.__inject_html
@@ -153,7 +145,6 @@ export function ExperimentDetail({
     debugLog('🔧 Current currentVariants[0]:', currentVariants[0])
     const updatedVariants = [...currentVariants]
     if (updatedVariants[0]) {
-      // Check if the code has actually changed
       const oldCode = updatedVariants[0].config.__inject_html
       const codeChanged = JSON.stringify(oldCode) !== JSON.stringify(code)
 
@@ -166,7 +157,6 @@ export function ExperimentDetail({
       }
       debugLog('🔧 Updated variant config:', updatedVariants[0].config)
       debugLog('🔧 Code changed:', codeChanged)
-      // Only mark as changed if the code actually changed
       if (codeChanged) {
         handleVariantsChange(updatedVariants, true)
       } else {
@@ -180,15 +170,12 @@ export function ExperimentDetail({
                          experiment.status !== 'running'
 
   const handleBack = () => {
-    // Cleanup function to stop VE and Preview
     const cleanup = async () => {
       try {
-        // Stop Visual Editor
         await sendToContent({
           type: 'STOP_VISUAL_EDITOR'
         })
 
-        // Remove Preview
         await sendToContent({
           type: 'ABSMARTLY_PREVIEW',
           action: 'remove',
@@ -202,7 +189,6 @@ export function ExperimentDetail({
     if (hasUnsavedChanges) {
       if (window.confirm('You have unsaved changes. Do you want to discard them?')) {
         debugLog('🧹 User chose to discard changes for experiment', experiment.id)
-        // Clear all storage when discarding
         clearAllExperimentStorage(experiment.id).then(() => {
           debugLog('🧹 Cleared all DOM changes storage (session + local) when discarding for experiment', experiment.id)
           cleanup()
@@ -261,7 +247,6 @@ export function ExperimentDetail({
           >
             <h2 className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</h2>
 
-            {/* Click to edit tooltip */}
             <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
               Click to edit
               <div className="absolute bottom-full left-4 w-0 h-0 border-4 border-transparent border-b-gray-900"></div>
@@ -272,7 +257,6 @@ export function ExperimentDetail({
             <div className="relative group">
               <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap cursor-help">{experiment.name}</p>
 
-              {/* Experiment info tooltip */}
               <div className="absolute top-full mt-2 left-0 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 max-w-[280px] break-words">
                 <div className="break-words">{displayName}</div>
                 <div className="text-gray-300 break-words">{experiment.name}</div>
@@ -301,7 +285,6 @@ export function ExperimentDetail({
         onBack={handleBack}
       />
 
-      {/* Status badge and actions */}
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {loading && (
@@ -323,7 +306,6 @@ export function ExperimentDetail({
 
       <div className="space-y-4">
 
-        {/* Metadata Section */}
         <ExperimentMetadata
           data={metadata}
           onChange={(newMetadata) => {
@@ -337,7 +319,6 @@ export function ExperimentDetail({
           tags={tags}
         />
 
-        {/* Variants Section */}
         {currentVariants.length > 0 && (
           <VariantList
             initialVariants={currentVariants}
@@ -352,7 +333,6 @@ export function ExperimentDetail({
           />
         )}
 
-        {/* Code Injection Section - Only for control variant */}
         {currentVariants.length > 0 && currentVariants[0] && (
           <ExperimentCodeInjection
             experimentId={experiment.id}
@@ -364,7 +344,6 @@ export function ExperimentDetail({
           />
         )}
 
-        {/* Warning for running/development experiments */}
         {(experiment.state === 'running' || experiment.state === 'development') && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -376,7 +355,6 @@ export function ExperimentDetail({
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="pt-4 flex gap-2">
           <Button
             onClick={handleSaveChanges}
@@ -396,7 +374,7 @@ export function ExperimentDetail({
           </Button>
         </div>
       </div>
-      
+
 
     </div>
   )

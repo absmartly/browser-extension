@@ -180,7 +180,7 @@ describe('SearchableSelect', () => {
   })
 
   describe('Multi Select Mode', () => {
-    it('should keep dropdown open when option is clicked', async () => {
+    it('should close dropdown after adding an option', async () => {
       const onChange = jest.fn()
       render(
         <SearchableSelect
@@ -202,14 +202,13 @@ describe('SearchableSelect', () => {
       // Should call onChange
       expect(onChange).toHaveBeenCalledWith([2])
 
-      // Dropdown should STAY OPEN for multi-select
+      // Dropdown closes after adding an item
       await waitFor(() => {
-        expect(screen.getByText('Option 1')).toBeInTheDocument()
-        expect(screen.getByText('Option 2')).toBeInTheDocument()
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
       })
     })
 
-    it('should select multiple options', () => {
+    it('should select multiple options by reopening dropdown', () => {
       const onChange = jest.fn()
       const { rerender } = render(
         <SearchableSelect
@@ -225,7 +224,7 @@ describe('SearchableSelect', () => {
       const trigger = screen.getByText('Select...').closest('div')
       fireEvent.click(trigger!)
 
-      // Click first option
+      // Click first option (dropdown closes)
       fireEvent.click(screen.getByText('Option 1'))
       expect(onChange).toHaveBeenCalledWith([1])
 
@@ -240,8 +239,12 @@ describe('SearchableSelect', () => {
         />
       )
 
+      // Open dropdown again
+      const trigger2 = screen.getByText('Option 1').closest('div')?.parentElement
+      fireEvent.click(trigger2!)
+
       // Click second option
-      fireEvent.click(screen.getByText('Option 2'))
+      fireEvent.click(screen.getAllByText('Option 2')[1] || screen.getByText('Option 2'))
       expect(onChange).toHaveBeenCalledWith([1, 2])
     })
 
@@ -495,7 +498,7 @@ describe('SearchableSelect', () => {
   })
 
   describe('Event Propagation', () => {
-    it('should not close dropdown when clicking option (stopPropagation)', async () => {
+    it('should close dropdown after adding an option in multi-select mode', async () => {
       const onChange = jest.fn()
       render(
         <SearchableSelect
@@ -511,14 +514,13 @@ describe('SearchableSelect', () => {
       const trigger = screen.getByText('Select...').closest('div')
       fireEvent.click(trigger!)
 
-      // Click option - this should NOT propagate to trigger
+      // Click option
       const option = screen.getByText('Option 1')
       fireEvent.click(option)
 
-      // Dropdown should stay open (multi-select)
+      // Dropdown should close after adding an item
       await waitFor(() => {
-        expect(screen.getByText('Option 1')).toBeInTheDocument()
-        expect(screen.getByText('Option 2')).toBeInTheDocument()
+        expect(screen.queryByText('Option 2')).not.toBeInTheDocument()
       })
 
       // onChange should be called

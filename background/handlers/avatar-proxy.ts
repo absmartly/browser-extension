@@ -50,13 +50,11 @@ async function getConfig(): Promise<ABsmartlyConfig | null> {
  * Handle avatar fetch request with authentication
  * @param avatarUrl - The full URL to the avatar image
  * @param authMethod - Authentication method ('jwt' or 'apikey')
- * @param apiKey - API key (if using apikey auth)
  * @returns Response with the avatar image or error
  */
 export async function handleAvatarFetch(
   avatarUrl: string,
-  authMethod: string,
-  apiKey?: string | null
+  authMethod: string
 ): Promise<Response> {
   try {
     const avatarHostUrl = new URL(avatarUrl)
@@ -81,8 +79,7 @@ export async function handleAvatarFetch(
 
     const avatarConfig: ABsmartlyConfig = {
       ...config,
-      authMethod: authMethod as 'jwt' | 'apikey',
-      apiKey: apiKey || config.apiKey
+      authMethod: authMethod as 'jwt' | 'apikey'
     }
 
     // For JWT auth, read the token via chrome.cookies API (works for HTTP-only cookies)
@@ -118,7 +115,7 @@ export async function handleAvatarFetch(
       headers: {
         'Content-Type': response.headers.get('content-type') || 'image/png',
         'Cache-Control': 'public, max-age=3600',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': `chrome-extension://${chrome.runtime.id}`
       }
     })
 
@@ -143,9 +140,8 @@ export function handleFetchEvent(event: any): void {
       (async () => {
         const avatarUrl = url.searchParams.get('url')!
         const authMethod = url.searchParams.get('authMethod') || 'jwt'
-        const apiKey = url.searchParams.get('apiKey')
 
-        return await handleAvatarFetch(avatarUrl, authMethod, apiKey)
+        return await handleAvatarFetch(avatarUrl, authMethod)
       })()
     )
   }

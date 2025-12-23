@@ -5,11 +5,13 @@ import { Button } from '../ui/Button'
 import { Alert, AlertDescription } from '../ui/Alert'
 import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } from '~src/lib/claude-code-client'
 
+type AIProviderType = 'claude-subscription' | 'anthropic-api' | 'openai-api' | 'anthropic' | 'openai'
+
 interface AIProviderSectionProps {
-  aiProvider: 'claude-subscription' | 'anthropic-api' | 'openai-api'
+  aiProvider: AIProviderType
   aiApiKey: string
   llmModel: string
-  onAiProviderChange: (value: 'claude-subscription' | 'anthropic-api' | 'openai-api') => void
+  onAiProviderChange: (value: AIProviderType) => void
   onAiApiKeyChange: (value: string) => void
   onLlmModelChange: (value: string) => void
 }
@@ -92,7 +94,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         id="ai-provider-select"
         label="AI Provider"
         value={aiProvider}
-        onChange={(e) => onAiProviderChange(e.target.value as 'claude-subscription' | 'anthropic-api' | 'openai-api')}
+        onChange={(e) => onAiProviderChange(e.target.value as AIProviderType)}
         options={[
           { value: 'claude-subscription', label: 'Claude Subscription (Default)' },
           { value: 'anthropic-api', label: 'Anthropic API Key' },

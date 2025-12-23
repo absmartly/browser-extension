@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { Badge } from './ui/Badge'
-import type { Experiment, ExperimentUser } from '~src/types/absmartly'
-import { ChevronRightIcon, UserCircleIcon, ClockIcon, ArrowTopRightOnSquareIcon, StarIcon, PencilSquareIcon, BeakerIcon } from '@heroicons/react/24/outline'
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
-import { getAvatarColor, getInitials } from '~src/utils/avatar'
+import type { Experiment } from '~src/types/absmartly'
 import { ReloadBanner } from './experiment-list/ReloadBanner'
 import {
   type ExperimentOverrides,
@@ -16,9 +12,9 @@ import {
   saveDevelopmentEnvironment,
   getDevelopmentEnvironment
 } from '~src/utils/overrides'
-import { getCurrentVariantAssignments, type VariantAssignments, type SDKVariantData } from '~src/utils/sdk-bridge'
+import { getCurrentVariantAssignments, type VariantAssignments } from '~src/utils/sdk-bridge'
 import { getConfig } from '~src/utils/storage'
-import { getExperimentStateLabel, getExperimentStateClasses } from '~src/utils/experiment-state'
+import { ExperimentListItem } from './experiment/ExperimentListItem'
 
 interface ExperimentListProps {
   experiments: Experiment[]
@@ -36,30 +32,24 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
   const [developmentEnv, setDevelopmentEnv] = useState<string | null>(null)
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
 
-  // Initialize overrides and fetch environments on mount
   useEffect(() => {
     const init = async () => {
-      // Get config for field name
       const config = await getConfig()
       const fieldName = config?.domChangesFieldName || '__dom_changes'
       setDomFieldName(fieldName)
 
-      // Load overrides
       const loadedOverrides = await initializeOverrides()
       setOverrides(loadedOverrides)
 
-      // Check if we have a stored dev environment, if not fetch and store it
       let devEnv = await getDevelopmentEnvironment()
       if (!devEnv) {
         try {
-          // Fetch environments from API using BackgroundAPIClient
           const { BackgroundAPIClient } = await import('~src/lib/background-api-client')
           const client = new BackgroundAPIClient()
 
           const environments = await client.getEnvironments()
           debugLog('Fetched environments:', environments)
 
-          // Find first development environment
           const firstDevEnv = environments.find(env => env.type === 'development')
           if (firstDevEnv) {
             devEnv = firstDevEnv.name
@@ -74,8 +64,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     }
     init()
   }, [])
-  
-  // Get real variant assignments from SDK
+
   useEffect(() => {
     if (experiments.length > 0) {
       const experimentNames = experiments.map(exp => exp.name)
@@ -105,18 +94,16 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     }
   }, [experiments, overrides])
 
-  const handleOverrideChange = async (experimentName: string, variantIndex: number, experiment: Experiment) => {
+  const handleOverrideChange = useCallback(async (experimentName: string, variantIndex: number, experiment: Experiment) => {
     const newOverrides = { ...overrides }
     if (variantIndex === -1) {
       delete newOverrides[experimentName]
     } else {
-      // Determine environment type based on experiment status
       const status = experiment.state || experiment.status || 'created'
       let overrideValue: number | OverrideValue = variantIndex
       console.log('[ABsmartly] handleOverrideChange - experiment:', experimentName, 'status:', status, 'variantIndex:', variantIndex)
 
       if (status === 'development') {
-        // Development experiments need env flag and ID
         overrideValue = {
           variant: variantIndex,
           env: ENV_TYPE.DEVELOPMENT,
@@ -124,7 +111,6 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         }
         console.log('[ABsmartly] Setting development override:', overrideValue)
       } else if (status !== 'running' && status !== 'full_on') {
-        // Non-running experiments (draft, stopped, etc) need API fetch flag and ID
         overrideValue = {
           variant: variantIndex,
           env: ENV_TYPE.API_FETCH,
@@ -132,59 +118,34 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
         }
         console.log('[ABsmartly] Setting non-running override:', overrideValue)
       }
-      // Running experiments just use the variant number (no env or ID needed)
 
       newOverrides[experimentName] = overrideValue
     }
     console.log('[ABsmartly] New overrides to save:', newOverrides)
     setOverrides(newOverrides)
 
-    // Save to storage and sync to cookie
     await saveOverrides(newOverrides)
 
-    // Check if any overrides differ from real variants
     const hasActiveOverrides = Object.entries(newOverrides).some(([expName, overrideValue]) => {
       const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
       return realVariants[expName] !== variant
     })
 
-    // Only show reload banner if there are active overrides that differ from real variants
     setShowReloadBanner(hasActiveOverrides)
-  }
+  }, [overrides, realVariants])
 
-  const handleReload = async () => {
+  const handleReload = useCallback(async () => {
     await reloadPageWithOverrides()
     setShowReloadBanner(false)
-  }
+  }, [])
 
-  const handleClearAll = async () => {
+  const handleClearAll = useCallback(async () => {
     await saveOverrides({})
     setOverrides({})
     setShowReloadBanner(false)
     await reloadPageWithOverrides()
-  }
+  }, [])
 
-  const getDOMChangesCount = (experiment: Experiment): number => {
-    let totalChanges = 0
-    experiment.variants.forEach(variant => {
-      try {
-        if (!variant.config) return
-        const config = typeof variant.config === 'string' ? JSON.parse(variant.config) : variant.config
-        if (config[domFieldName] && Array.isArray(config[domFieldName])) {
-          totalChanges += config[domFieldName].length
-        }
-      } catch {
-        // ignore
-      }
-    })
-    return totalChanges
-  }
-
-  const getVariantLabel = (index: number): string => {
-    // Convert index to letter: 0->A, 1->B, 2->C, etc.
-    return String.fromCharCode(65 + index) // 65 is 'A' in ASCII
-  }
-  
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -204,131 +165,6 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     )
   }
 
-
-  const formatDuration = (startedAt?: string, stoppedAt?: string) => {
-    if (!startedAt) return null
-    
-    const start = new Date(startedAt)
-    const end = stoppedAt ? new Date(stoppedAt) : new Date()
-    const diff = end.getTime() - start.getTime()
-    
-    const weeks = Math.floor(diff / (1000 * 60 * 60 * 24 * 7))
-    const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 7)) / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    
-    const parts = []
-    if (weeks > 0) parts.push(`${weeks}w`)
-    if (days > 0) parts.push(`${days}d`)
-    if (hours > 0 && weeks === 0) parts.push(`${hours}h`)
-    if (minutes > 0 && weeks === 0 && days === 0) parts.push(`${minutes}m`)
-    
-    return parts.length > 0 ? parts.join(', ') : 'Just started'
-  }
-
-  const getAllAvatars = (experiment: Experiment) => {
-    const avatars: Array<{
-      user: ExperimentUser | undefined
-      avatar?: string
-      name: string
-      initials: string
-      isTeam?: boolean
-      color?: string
-    }> = []
-
-    // Add created_by as the first avatar
-    if (experiment.created_by) {
-      const user = experiment.created_by
-      const avatar = user.avatar?.base_url ?
-        `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${user.avatar.base_url}/crop/32x32.webp` :
-        null
-      const name = user.first_name || user.last_name ?
-        `${user.first_name || ''} ${user.last_name || ''}`.trim() :
-        user.email || 'Unknown'
-      const initials = getInitials(name)
-
-      avatars.push({
-        user,
-        avatar: avatar || undefined,
-        name,
-        initials
-      })
-    }
-
-    // Add owners if they exist - handle nested structure with owner.user
-    if ((experiment as any).owners && Array.isArray((experiment as any).owners)) {
-      (experiment as any).owners.forEach((ownerWrapper: any) => {
-        // Extract the actual user from the wrapper object
-        const owner = ownerWrapper.user || ownerWrapper
-
-        // Skip if no user data
-        if (!owner) return
-
-        // Skip if this owner is the same as created_by
-        if (experiment.created_by &&
-            ((owner.id && owner.id === experiment.created_by.id) ||
-             (owner.user_id && owner.user_id === experiment.created_by.user_id))) {
-          return
-        }
-
-        const avatar = owner.avatar?.base_url ?
-          `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${owner.avatar.base_url}/crop/32x32.webp` :
-          null
-        const name = owner.first_name || owner.last_name ?
-          `${owner.first_name || ''} ${owner.last_name || ''}`.trim() :
-          owner.email || 'Unknown'
-        const initials = getInitials(name)
-
-        avatars.push({
-          user: owner,
-          avatar: avatar || undefined,
-          name,
-          initials
-        })
-      })
-    }
-
-    // Add teams as avatars
-    if (experiment.teams && Array.isArray(experiment.teams)) {
-      experiment.teams.forEach((teamWrapper: any) => {
-        const team = teamWrapper.team || teamWrapper
-        const name = team.name || `Team ${team.team_id || team.id}`
-        const initials = team.initials || getInitials(name)
-        const color = team.color
-
-        // Handle team avatar similar to user avatars
-        const avatar = team.avatar?.base_url ?
-          `${localStorage.getItem('absmartly-endpoint')?.replace(/\/+$/, '').replace(/\/v1$/, '')}${team.avatar.base_url}/crop/32x32.webp` :
-          null
-
-        avatars.push({
-          user: undefined,
-          avatar: avatar || undefined,
-          name,
-          initials,
-          isTeam: true,
-          color
-        })
-      })
-    }
-
-    return avatars
-  }
-  const getOwnerAvatar = (experiment: Experiment) => {
-    const avatars = getAllAvatars(experiment)
-    return avatars[0]?.avatar || null
-  }
-
-  const getOwnerName = (experiment: Experiment) => {
-    const avatars = getAllAvatars(experiment)
-    return avatars[0]?.name || 'Unknown'
-  }
-
-  const getOwnerInitials = (experiment: Experiment) => {
-    const avatars = getAllAvatars(experiment)
-    return avatars[0]?.initials || '?'
-  }
-
   return (
     <div>
       {showReloadBanner && (
@@ -338,315 +174,22 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
           onClearAll={handleClearAll}
         />
       )}
-      
+
       <div className="divide-y divide-gray-200">
-      {experiments.map((experiment) => {
-        // Debug: Check owners structure
-        if (experiment.name === 'larger_product_image_size') {
-          debugLog('Experiment with owners:', experiment.name, 'Owners:', (experiment as any).owners, 'Created by:', experiment.created_by)
-        }
-        const allAvatars = getAllAvatars(experiment)
-        const duration = formatDuration(experiment.started_at, experiment.stopped_at)
-        const status = experiment.state || experiment.status || 'created'
-        
-        return (
-          <div
+        {experiments.map((experiment) => (
+          <ExperimentListItem
             key={experiment.id}
-            className="experiment-item px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100"
-          >
-            <div
-              onClick={() => onExperimentClick(experiment)}
-              className="flex items-start gap-3 flex-1 min-w-0 text-left cursor-pointer"
-            >
-              {/* Favorite Star Icon */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onToggleFavorite?.(experiment.id)
-                }}
-                className="flex-shrink-0 p-0.5 text-gray-400 hover:text-yellow-500 rounded transition-colors"
-                aria-label={favoriteExperiments.has(experiment.id) ? "Remove from favorites" : "Add to favorites"}
-              >
-                {favoriteExperiments.has(experiment.id) ? (
-                  <StarIconSolid className="h-5 w-5 text-yellow-500" />
-                ) : (
-                  <StarIcon className="h-5 w-5" />
-                )}
-              </button>
-              
-              {/* Experiment Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
-                      {experiment.display_name || experiment.name}
-                    </h3>
-                    <p className="text-xs text-gray-500 truncate">
-                      {experiment.name}
-                    </p>
-                  </div>
-                  
-                  {/* Owner Avatar and Team */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Stacked Avatars with Tooltips */}
-                    <div className="flex items-center">
-                      {allAvatars.slice(0, 3).map((avatarData, idx) => (
-                        <div 
-                          key={idx} 
-                          className={`relative group ${idx > 0 ? '-ml-2' : ''}`}
-                          style={{ zIndex: allAvatars.length - idx }}>
-                          <div className="relative">
-                            {avatarData.avatar ? (
-                              <>
-                                <img 
-                                  src={avatarData.avatar} 
-                                  alt={avatarData.name}
-                                  className="h-7 w-7 rounded-full object-cover border-2 border-white shadow-sm"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none'
-                                    const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
-                                    if (fallbackElement) {
-                                      fallbackElement.style.display = 'flex'
-                                    }
-                                  }}
-                                />
-                                <div
-                                  className="h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                                  style={{ display: 'none', backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
-                                >
-                                  {avatarData.initials}
-                                </div>
-                              </>
-                            ) : (
-                              <div
-                                className="flex h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                                style={{ backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
-                              >
-                                {avatarData.initials}
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                            {avatarData.name}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        </div>
-                      ))}
-                      {allAvatars.length > 3 && (
-                        <div className="relative group -ml-2" style={{ zIndex: 0 }}>
-                          <div className="flex h-7 w-7 rounded-full bg-gray-200 items-center justify-center text-[11px] text-gray-600 font-semibold border-2 border-white shadow-sm">
-                            +{allAvatars.length - 3}
-                          </div>
-                          {/* Tooltip showing remaining names */}
-                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                            {allAvatars.slice(3).map(a => a.name).join(', ')}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Status, Metrics and Override Row */}
-                <div className="mt-2 flex items-center gap-3 flex-wrap">
-                  <span className={`inline-flex items-center h-[26px] px-3 text-xs font-medium rounded-full ${getExperimentStateClasses(status)}`}>
-                    {getExperimentStateLabel(status)}
-                  </span>
-                  
-                  {(() => {
-                    const domChangesCount = getDOMChangesCount(experiment)
-                    if (domChangesCount > 0) {
-                      return (
-                        <div className="relative group">
-                          <span className="inline-flex items-center h-[26px] px-2 text-xs font-medium rounded-full bg-purple-100 text-purple-700 border border-purple-200">
-                            <BeakerIcon className="h-3.5 w-3.5" />
-                            <span className="ml-1 font-semibold">{domChangesCount}</span>
-                          </span>
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                            {domChangesCount} DOM {domChangesCount === 1 ? 'change' : 'changes'}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  })()}
-                  
-                  {/* Variant Display with Override Controls */}
-                  {experiment.variants.length > 0 && (
-                    <>
-                      <div className="inline-flex items-center gap-1.5">
-                        <div className="inline-flex rounded-md shadow-sm" role="group">
-                          {experiment.variants.map((variant, idx) => {
-                            const overrideValue = overrides[experiment.name]
-                            const overriddenVariant = typeof overrideValue === 'number' ? overrideValue : overrideValue?.variant
-                            const isOverridden = overriddenVariant === idx
-                            const isRealVariant = realVariants[experiment.name] === idx
-                            const hasRealVariant = realVariants[experiment.name] !== undefined
-                            const experimentInContext = experimentsInContext.includes(experiment.name)
-                            const label = getVariantLabel(idx)
-                            const variantName = variant.name || `Variant ${label}`
-                            
-                            // Determine button state and styling
-                            let buttonClass = 'px-2.5 py-1 text-xs font-medium transition-colors '
-                            if (idx === 0) buttonClass += 'rounded-l-md '
-                            if (idx === experiment.variants.length - 1) buttonClass += 'rounded-r-md '
-                            if (idx > 0) buttonClass += 'border-l '
-                            
-                            // Color based on state
-                            if (isOverridden) {
-                              // Override is active - blue
-                              buttonClass += 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 '
-                            } else if (isRealVariant && !overrides[experiment.name] && hasRealVariant && experimentInContext) {
-                              // Real variant, no override, AND experiment exists in SDK context - green
-                              buttonClass += 'bg-green-600 text-white border-green-600 hover:bg-green-700 '
-                            } else if (isRealVariant && !overrides[experiment.name] && hasRealVariant && !experimentInContext) {
-                              // Real variant but experiment not in SDK context - gray
-                              buttonClass += 'bg-gray-400 text-white border-gray-400 hover:bg-gray-500 '
-                            } else if (isRealVariant && overrides[experiment.name] !== undefined) {
-                              // Real variant but overridden to something else - gray/muted
-                              buttonClass += 'bg-gray-200 text-gray-500 border-gray-300 hover:bg-gray-300 '
-                            } else {
-                              // Other variants or no SDK data - default
-                              buttonClass += 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 '
-                            }
-                            
-                            buttonClass += 'border-t border-b '
-                            if (idx === 0) buttonClass += 'border-l '
-                            if (idx === experiment.variants.length - 1) buttonClass += 'border-r '
-                            
-                            return (
-                              <div key={variant.id || idx} className="relative group">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    // If clicking the real variant while override exists, remove override
-                                    // If clicking any other variant, set override
-                                    if (isRealVariant && overrides[experiment.name] !== undefined) {
-                                      handleOverrideChange(experiment.name, -1, experiment)
-                                    } else if (!isOverridden) {
-                                      handleOverrideChange(experiment.name, idx, experiment)
-                                    } else {
-                                      // Clicking active override removes it
-                                      handleOverrideChange(experiment.name, -1, experiment)
-                                    }
-                                  }}
-                                  className={buttonClass}
-                                >
-                                  {label}
-                                </button>
-                                {/* Tooltip with variant name */}
-                                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                                  {variantName}
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                        
-                        {/* Overridden indicator pill */}
-                        {overrides[experiment.name] !== undefined && (
-                          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
-                            overridden
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  )}
-                  
-                  {experiment.exposures !== undefined && (
-                    <span className="text-xs text-gray-500">
-                      {experiment.exposures.toLocaleString()} exposures
-                    </span>
-                  )}
-                  
-                  {duration && (
-                    <div className="flex items-center gap-1">
-                      <ClockIcon className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{duration}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Action buttons stacked vertically, aligned to top */}
-            <div className="flex flex-col items-center gap-0.5 ml-2 self-start">
-              {/* Chevron button for opening detail view */}
-              <div className="relative group">
-                <button
-                  onClick={() => onExperimentClick(experiment)}
-                  className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                  aria-label="View experiment details"
-                >
-                  <ChevronRightIcon className="h-5 w-5" />
-                </button>
-                
-                {/* Tooltip */}
-                <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                  View details
-                  <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                </div>
-              </div>
-              
-              <div className="flex flex-col gap-0.5">
-                {/* Open in ABsmartly */}
-                <div className="relative group">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const endpoint = localStorage.getItem('absmartly-endpoint') || ''
-                      const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                      const url = `${baseUrl}/experiments/${experiment.id}`
-                      chrome.tabs.create({ url })
-                    }}
-                    className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                    aria-label="Open in ABsmartly"
-                  >
-                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                  </button>
-                  
-                  {/* Tooltip with high z-index */}
-                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                    Open in ABsmartly
-                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                  </div>
-                </div>
-                
-                {/* Edit in ABsmartly */}
-                <div className="relative group">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const endpoint = localStorage.getItem('absmartly-endpoint') || ''
-                      const baseUrl = endpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-                      const url = `${baseUrl}/experiments/${experiment.id}/edit`
-                      chrome.tabs.create({ url })
-                    }}
-                    className="p-0.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                    aria-label="Edit in ABsmartly"
-                  >
-                    <PencilSquareIcon className="h-4 w-4" />
-                  </button>
-                  
-                  {/* Tooltip with high z-index */}
-                  <div className="absolute right-0 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                    Edit in ABsmartly
-                    <div className="absolute top-full right-2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })}
+            experiment={experiment}
+            overrides={overrides}
+            realVariants={realVariants}
+            experimentsInContext={experimentsInContext}
+            domFieldName={domFieldName}
+            isFavorite={favoriteExperiments.has(experiment.id)}
+            onExperimentClick={onExperimentClick}
+            onToggleFavorite={(experimentId) => onToggleFavorite?.(experimentId)}
+            onOverrideChange={handleOverrideChange}
+          />
+        ))}
       </div>
     </div>
   )

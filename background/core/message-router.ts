@@ -7,6 +7,67 @@ export interface RouteResult {
 }
 
 /**
+ * Validates the URL of a message sender
+ * Only allows messages from chrome-extension:// URLs, absmartly.com, or localhost
+ *
+ * @param url - The URL to validate
+ * @returns true if URL is valid, false otherwise
+ */
+function isValidSenderUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+
+    if (parsed.protocol === 'chrome-extension:') {
+      return true
+    }
+
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      return true
+    }
+
+    if (parsed.hostname.endsWith('absmartly.com') || parsed.hostname.endsWith('absmartly.io')) {
+      return true
+    }
+
+    debugWarn('[Router] Rejected sender URL with invalid origin:', url)
+    return false
+  } catch (error) {
+    debugWarn('[Router] Invalid sender URL format:', url)
+    return false
+  }
+}
+
+/**
+ * Validates a message sender to prevent unauthorized access
+ * Checks both extension ID and frame origin
+ *
+ * @param sender - The message sender to validate
+ * @returns True if sender is valid, false otherwise
+ */
+export function validateSender(sender: chrome.runtime.MessageSender): boolean {
+  if (!sender.id || sender.id !== chrome.runtime.id) {
+    debugWarn('[Router] Rejected message from unauthorized extension ID:', sender.id)
+    return false
+  }
+
+  if (sender.frameId !== undefined && sender.frameId !== 0) {
+    if (!sender.url || !isValidSenderUrl(sender.url)) {
+      debugWarn('[Router] Rejected message from iframe with invalid origin:', {
+        frameId: sender.frameId,
+        url: sender.url
+      })
+      return false
+    }
+  }
+
+  if (sender.url && !isValidSenderUrl(sender.url)) {
+    return false
+  }
+
+  return true
+}
+
+/**
  * Routes a message to the appropriate destination (content script or sidebar)
  * @param message - The extension message to route
  * @param sender - The message sender information
@@ -22,8 +83,8 @@ export function routeMessage(
     return { handled: false, async: false }
   }
 
-  if (!sender.id || sender.id !== chrome.runtime.id) {
-    debugWarn('[Router] Rejected message from unauthorized sender:', sender)
+  if (!validateSender(sender)) {
+    debugWarn('[Router] Sender validation failed, rejecting message route')
     return { handled: false, async: false }
   }
 
@@ -81,19 +142,6 @@ function routeToSidebar(
     debugError('[Router] Error forwarding to sidebar:', error)
     sendResponse({ error: error.message })
   })
-}
-
-/**
- * Validates a message sender to prevent unauthorized access
- * @param sender - The message sender to validate
- * @returns True if sender is valid, false otherwise
- */
-export function validateSender(sender: chrome.runtime.MessageSender): boolean {
-  if (!sender.id || sender.id !== chrome.runtime.id) {
-    debugWarn('[Router] Rejected message from unauthorized sender:', sender)
-    return false
-  }
-  return true
 }
 
 /**

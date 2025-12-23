@@ -411,12 +411,12 @@ describe('CodeInjector', () => {
       expect(scripts[1].getAttribute('src')).toContain('test2.js')
     })
 
-    it('should call sanitizeHTML before processing', () => {
+    it('should process scripts without calling sanitizeHTML directly', () => {
       const html = '<script src="test.js"></script>'
 
       injector.executeScriptsInHTML(html, 'headEnd')
 
-      expect(sanitizeHTML).toHaveBeenCalledWith(html)
+      expect(sanitizeHTML).not.toHaveBeenCalled()
     })
 
     it('should handle script execution errors', () => {
@@ -601,12 +601,12 @@ describe('CodeInjector', () => {
       expect(mockLogger.log).toHaveBeenCalled()
     })
 
-    it('should sanitize HTML before processing scripts', () => {
+    it('should not call sanitizeHTML in executeScriptsInHTML (sanitization happens in caller)', () => {
       const html = '<script src="test.js"></script><img src=x onerror=alert(1)>'
 
       injector.executeScriptsInHTML(html, 'headEnd')
 
-      expect(sanitizeHTML).toHaveBeenCalledWith(html)
+      expect(sanitizeHTML).not.toHaveBeenCalled()
     })
   })
 })

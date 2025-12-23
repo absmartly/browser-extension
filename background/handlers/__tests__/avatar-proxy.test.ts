@@ -31,11 +31,10 @@ jest.mock('~src/utils/auth', () => ({
   })
 }))
 
-jest.mock('~src/utils/cookies', () => ({
+jest.mock('../../core/api-client', () => ({
   getJWTCookie: jest.fn()
 }))
 
-// Create storage instances inside the mock factory to avoid hoisting issues
 jest.mock('@plasmohq/storage', () => {
   const mockRegularStorage = {
     get: jest.fn(),
@@ -49,13 +48,11 @@ jest.mock('@plasmohq/storage', () => {
 
   return {
     Storage: jest.fn().mockImplementation((options?: any) => {
-      // Return different instances based on whether secretKeyring is set
       if (options?.secretKeyring) {
         return mockSecureStorage
       }
       return mockRegularStorage
     }),
-    // Export instances so tests can access them
     __mockStorageInstances: {
       regular: mockRegularStorage,
       secure: mockSecureStorage
@@ -63,12 +60,10 @@ jest.mock('@plasmohq/storage', () => {
   }
 })
 
-import { getJWTCookie } from '~src/utils/cookies'
+import { getJWTCookie } from '../../core/api-client'
 
-// Get the mock storage instances from the mocked module
 const { __mockStorageInstances: mockStorageInstances } = jest.requireMock('@plasmohq/storage')
 
-// Mock Response and Request for Service Worker APIs
 class MockResponse {
   status: number
   headers: any
@@ -128,9 +123,9 @@ class MockRequest {
 describe('AvatarProxy', () => {
   let mockCaches: any
   let mockFetch: jest.Mock
+  let mockChrome: any
 
   beforeEach(() => {
-    // Setup global Response and Request
     global.Response = MockResponse as any
     global.Request = MockRequest as any
 
@@ -145,6 +140,13 @@ describe('AvatarProxy', () => {
     global.caches = mockCaches as any
     global.console.log = jest.fn()
     global.console.error = jest.fn()
+
+    mockChrome = {
+      runtime: {
+        id: 'test-extension-id'
+      }
+    }
+    global.chrome = mockChrome as any
 
     jest.clearAllMocks()
   })
@@ -211,7 +213,6 @@ describe('AvatarProxy', () => {
 
       expect(response).toBe(mockCachedResponse)
       expect(mockFetch).not.toHaveBeenCalled()
-      // Console logging was removed but caching functionality still works
     })
 
     it('should fetch avatar with JWT authentication', async () => {
@@ -264,8 +265,7 @@ describe('AvatarProxy', () => {
 
       const response = await handleAvatarFetch(
         'https://cdn.example.com/avatar.jpg',
-        'apikey',
-        'test-api-key'
+        'apikey'
       )
 
       expect(response.status).toBe(200)
@@ -280,7 +280,7 @@ describe('AvatarProxy', () => {
       )
     })
 
-    it('should handle JWT token not available', async () => {
+    it('should return 401 when JWT token not available', async () => {
       mockStorageInstances.regular.get.mockResolvedValue({
         apiEndpoint: 'https://api.absmartly.com',
         authMethod: 'jwt'
@@ -288,22 +288,14 @@ describe('AvatarProxy', () => {
       mockStorageInstances.secure.get.mockResolvedValue(null)
       ;(getJWTCookie as jest.Mock).mockResolvedValue(null)
 
-      const mockBlob = new Blob(['avatar-data'])
-      const mockFetchResponse = new MockResponse(mockBlob, {
-        status: 200,
-        headers: { 'content-type': 'image/png' }
-      })
-      mockFetch.mockResolvedValue(mockFetchResponse)
-
       const response = await handleAvatarFetch(
         'https://cdn.example.com/avatar.png',
         'jwt'
       )
 
-      expect(console.log).toHaveBeenCalledWith(
-        '[AvatarProxy] No JWT token available, will try credentials'
-      )
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(401)
+      const text = await response.text()
+      expect(text).toBe('No JWT token available for avatar authentication')
     })
 
     it('should handle fetch failure', async () => {
@@ -392,10 +384,9 @@ describe('AvatarProxy', () => {
           status: 200
         })
       )
-      // Console logging was removed but caching functionality still works
     })
 
-    it('should set appropriate cache headers', async () => {
+    it('should set appropriate cache headers with restricted CORS', async () => {
       mockStorageInstances.regular.get.mockResolvedValue({
         apiEndpoint: 'https://api.absmartly.com',
         authMethod: 'jwt'
@@ -416,7 +407,7 @@ describe('AvatarProxy', () => {
       )
 
       expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600')
-      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*')
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('chrome-extension://test-extension-id')
       expect(response.headers.get('Content-Type')).toBe('image/png')
     })
   })
@@ -443,7 +434,6 @@ describe('AvatarProxy', () => {
 
       handleFetchEvent(mockEvent)
 
-      // Console logging was removed but interception functionality still works
       expect(mockEvent.respondWith).toHaveBeenCalledWith(expect.any(Promise))
     })
 
@@ -486,10 +476,10 @@ describe('AvatarProxy', () => {
     it('should use apikey auth method from URL params', async () => {
       mockStorageInstances.regular.get.mockResolvedValue({
         apiEndpoint: 'https://api.absmartly.com',
-        authMethod: 'jwt',
-        apiKey: 'default-key'
+        authMethod: 'apikey',
+        apiKey: 'stored-key'
       })
-      mockStorageInstances.secure.get.mockResolvedValue('default-key')
+      mockStorageInstances.secure.get.mockResolvedValue('stored-key')
 
       const mockBlob = new Blob(['avatar-data'])
       const mockFetchResponse = new MockResponse(mockBlob, {
@@ -498,7 +488,7 @@ describe('AvatarProxy', () => {
       })
       mockFetch.mockResolvedValue(mockFetchResponse)
 
-      mockEvent.request.url = 'chrome-extension://test-id/api/avatar?url=https://example.com/avatar.png&authMethod=apikey&apiKey=custom-key'
+      mockEvent.request.url = 'chrome-extension://test-id/api/avatar?url=https://example.com/avatar.png&authMethod=apikey'
 
       handleFetchEvent(mockEvent)
 
@@ -509,7 +499,7 @@ describe('AvatarProxy', () => {
         'https://example.com/avatar.png',
         expect.objectContaining({
           headers: expect.objectContaining({
-            'Authorization': 'Api-Key custom-key'
+            'Authorization': 'Api-Key stored-key'
           })
         })
       )
@@ -529,9 +519,6 @@ describe('AvatarProxy', () => {
         'fetch',
         expect.any(Function)
       )
-      expect(console.log).toHaveBeenCalledWith(
-        '[AvatarProxy] Initialized fetch interceptor'
-      )
     })
 
     it('should not register if not in Service Worker context', () => {
@@ -539,10 +526,6 @@ describe('AvatarProxy', () => {
       delete (global as any).self
 
       initializeAvatarProxy()
-
-      expect(console.log).not.toHaveBeenCalledWith(
-        '[AvatarProxy] Initialized fetch interceptor'
-      )
 
       global.self = originalSelf
     })
@@ -597,8 +580,7 @@ describe('AvatarProxy', () => {
 
       const response = await handleAvatarFetch(
         'https://cdn.example.com/avatar.png',
-        'apikey',
-        ''
+        'apikey'
       )
 
       expect(response.status).toBe(200)

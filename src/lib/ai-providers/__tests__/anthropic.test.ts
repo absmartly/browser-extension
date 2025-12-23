@@ -114,6 +114,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -138,6 +139,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -166,12 +168,13 @@ describe('AnthropicProvider', () => {
       ).rejects.toThrow('Either API key or OAuth token is required')
     })
 
-    it('should include HTML in system prompt for new session', async () => {
+    it('should include DOM structure in system prompt for new session', async () => {
       const provider = new AnthropicProvider(createConfig())
 
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -184,7 +187,7 @@ describe('AnthropicProvider', () => {
 
       expect(mockMessages.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          system: expect.stringContaining('<html><body>Test</body></html>')
+          system: expect.stringContaining('Page DOM Structure')
         })
       )
     })
@@ -195,6 +198,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -240,6 +244,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -259,6 +264,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -296,6 +302,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -313,12 +320,13 @@ describe('AnthropicProvider', () => {
       )
     })
 
-    it('should force tool use with tool_choice', async () => {
+    it('should include tools in the API call', async () => {
       const provider = new AnthropicProvider(createConfig())
 
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -331,7 +339,9 @@ describe('AnthropicProvider', () => {
 
       expect(mockMessages.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          tool_choice: { type: 'tool', name: 'dom_changes_generator' }
+          tools: expect.arrayContaining([
+            expect.objectContaining({ name: 'dom_changes_generator' })
+          ])
         })
       )
     })
@@ -346,6 +356,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: mockDomChanges,
             response: 'Changed button color to red',
@@ -368,6 +379,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -393,6 +405,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Second response',
@@ -419,37 +432,39 @@ describe('AnthropicProvider', () => {
       expect(result.session.messages[3].content).toBe('Second response')
     })
 
-    it('should handle text response when tool_use is not used', async () => {
+    it('should handle text response as conversational when tool_use is not used', async () => {
       const provider = new AnthropicProvider(createConfig())
 
+      const conversationalText = 'I can help you with that. What specific changes would you like to make?'
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'text',
-          text: '{"domChanges": [], "response": "Plain text response", "action": "none"}'
+          text: conversationalText
         }]
       })
 
       const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
 
       expect(result.domChanges).toEqual([])
-      expect(result.response).toBe('Plain text response')
+      expect(result.response).toBe(conversationalText)
       expect(result.action).toBe('none')
     })
 
-    it('should handle text response with markdown code blocks', async () => {
+    it('should return raw text when model provides text instead of tool use', async () => {
       const provider = new AnthropicProvider(createConfig())
 
+      const textWithJson = '```json\n{"domChanges": [], "response": "Wrapped response", "action": "none"}\n```'
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'text',
-          text: '```json\n{"domChanges": [], "response": "Wrapped response", "action": "none"}\n```'
+          text: textWithJson
         }]
       })
 
       const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
 
       expect(result.domChanges).toEqual([])
-      expect(result.response).toBe('Wrapped response')
+      expect(result.response).toBe(textWithJson)
       expect(result.action).toBe('none')
     })
 
@@ -476,6 +491,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             response: 'Missing domChanges and action'
           }
@@ -493,6 +509,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',
@@ -516,6 +533,7 @@ describe('AnthropicProvider', () => {
       mockMessages.create.mockResolvedValue({
         content: [{
           type: 'tool_use',
+          name: 'dom_changes_generator',
           input: {
             domChanges: [],
             response: 'Test response',

@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { useCustomFields } from '../useCustomFields'
 import { BackgroundAPIClient } from '~src/lib/background-api-client'
 
@@ -157,13 +157,22 @@ describe('useCustomFields', () => {
       expect(result.current.loading).toBe(false)
     })
 
-    mockGetCustomSectionFields.mockResolvedValue([
-      { id: 1, title: 'Field', type: 'text' as const, required: true }
-    ])
+    let resolveRefetch: (value: any) => void
+    mockGetCustomSectionFields.mockImplementation(() =>
+      new Promise(resolve => { resolveRefetch = resolve })
+    )
 
-    result.current.refetch()
+    act(() => {
+      result.current.refetch()
+    })
 
-    expect(result.current.loading).toBe(true)
+    await waitFor(() => {
+      expect(result.current.loading).toBe(true)
+    })
+
+    await act(async () => {
+      resolveRefetch([{ id: 1, title: 'Field', type: 'text' as const, required: true }])
+    })
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)

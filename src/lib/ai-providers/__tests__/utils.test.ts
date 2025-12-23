@@ -4,7 +4,7 @@ import * as SystemPromptEditor from '~src/components/SystemPromptEditor'
 
 jest.mock('~src/components/SystemPromptEditor')
 jest.mock('~src/prompts/ai-dom-generation-system-prompt', () => ({
-  AI_DOM_GENERATION_SYSTEM_PROMPT: 'Default system prompt for AI DOM generation'
+  AI_DOM_GENERATION_SYSTEM_PROMPT: 'Default system prompt {{CHUNK_RETRIEVAL_DOCUMENTATION}} for AI DOM generation'
 }))
 
 describe('AI Provider Utils', () => {

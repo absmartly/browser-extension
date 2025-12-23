@@ -7,6 +7,7 @@
  */
 
 import { Logger } from '../utils/logger'
+import { validateExperimentCode } from '~src/utils/code-validator'
 
 export interface ExecutionContext {
   element?: HTMLElement
@@ -38,11 +39,25 @@ export class CodeExecutor {
       return false
     }
 
+    const validationResult = validateExperimentCode(code)
+    if (!validationResult.valid) {
+      Logger.error(
+        `[CodeExecutor] Code validation failed: ${validationResult.reason}`
+      )
+      Logger.error(`[CodeExecutor] Rejected code for experiment: ${context.experimentName || 'unknown'}`)
+      return false
+    }
+
+    if (validationResult.warnings && validationResult.warnings.length > 0) {
+      Logger.warn(
+        `[CodeExecutor] Code validation warnings for experiment ${context.experimentName}:`,
+        validationResult.warnings
+      )
+    }
+
     try {
       const { element, experimentName } = context
 
-      // Create a safe execution function using Function constructor
-      // This prevents direct eval() usage and provides a controlled scope
       const executeFn = new Function(
         'element',
         'document',
@@ -52,8 +67,6 @@ export class CodeExecutor {
         code
       )
 
-      // Execute the function with provided context
-      // Note: element, document, window, console are the actual page objects
       executeFn(
         element,
         document,
@@ -89,32 +102,16 @@ export class CodeExecutor {
       return { isValid: false, errors }
     }
 
-    if (code.length > 50000) {
-      errors.push('Code exceeds maximum length of 50KB')
+    const validationResult = validateExperimentCode(code)
+    if (!validationResult.valid) {
+      errors.push(validationResult.reason || 'Code validation failed')
     }
 
-    // Check for obviously dangerous patterns (these are just warnings)
-    // Note: These patterns can still be legitimately used, but we log warnings
-    const dangerousPatterns = [
-      { pattern: /\beval\s*\(/, description: 'Direct eval() call' },
-      {
-        pattern: /Function\s*\(/,
-        description: 'Function constructor (allowed but unusual)'
-      },
-      {
-        pattern: /window\.location\s*=|location\.href\s*=/,
-        description: 'Page navigation'
-      },
-      { pattern: /document\.write/, description: 'document.write()' }
-    ]
-
-    dangerousPatterns.forEach((check) => {
-      if (check.pattern.test(code)) {
-        Logger.warn(
-          `[CodeExecutor] Potentially sensitive pattern detected: ${check.description}`
-        )
-      }
-    })
+    if (validationResult.warnings) {
+      validationResult.warnings.forEach(warning => {
+        Logger.warn(`[CodeExecutor] Validation warning: ${warning}`)
+      })
+    }
 
     return { isValid: errors.length === 0, errors }
   }

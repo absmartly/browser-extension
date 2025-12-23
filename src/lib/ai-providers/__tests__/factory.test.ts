@@ -85,7 +85,7 @@ describe('AI Provider Factory', () => {
       )
     })
 
-    it('should default to AnthropicProvider for unknown provider type', () => {
+    it('should default to BridgeProvider for unknown provider type', () => {
       const config: AIProviderConfig = {
         apiKey: 'test-key',
         aiProvider: 'unknown-provider' as any
@@ -93,15 +93,15 @@ describe('AI Provider Factory', () => {
 
       createAIProvider(config)
 
-      expect(AnthropicProvider).toHaveBeenCalledWith(config)
-      expect(AnthropicProvider).toHaveBeenCalledTimes(1)
+      expect(BridgeProvider).toHaveBeenCalledWith(config)
+      expect(BridgeProvider).toHaveBeenCalledTimes(1)
       expect(console.warn).toHaveBeenCalledWith(
-        '[Factory] Unknown provider, defaulting to Anthropic:',
+        '[Factory] Unknown provider, defaulting to BridgeProvider:',
         'unknown-provider'
       )
     })
 
-    it('should default to AnthropicProvider for null provider type', () => {
+    it('should default to BridgeProvider for null provider type', () => {
       const config: AIProviderConfig = {
         apiKey: 'test-key',
         aiProvider: null as any
@@ -109,14 +109,14 @@ describe('AI Provider Factory', () => {
 
       createAIProvider(config)
 
-      expect(AnthropicProvider).toHaveBeenCalledWith(config)
+      expect(BridgeProvider).toHaveBeenCalledWith(config)
       expect(console.warn).toHaveBeenCalledWith(
-        '[Factory] Unknown provider, defaulting to Anthropic:',
+        '[Factory] Unknown provider, defaulting to BridgeProvider:',
         null
       )
     })
 
-    it('should default to AnthropicProvider for undefined provider type', () => {
+    it('should default to BridgeProvider for undefined provider type', () => {
       const config: AIProviderConfig = {
         apiKey: 'test-key',
         aiProvider: undefined as any
@@ -124,9 +124,9 @@ describe('AI Provider Factory', () => {
 
       createAIProvider(config)
 
-      expect(AnthropicProvider).toHaveBeenCalledWith(config)
+      expect(BridgeProvider).toHaveBeenCalledWith(config)
       expect(console.warn).toHaveBeenCalledWith(
-        '[Factory] Unknown provider, defaulting to Anthropic:',
+        '[Factory] Unknown provider, defaulting to BridgeProvider:',
         undefined
       )
     })

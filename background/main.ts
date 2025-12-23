@@ -16,12 +16,10 @@ import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication } from '~src/utils/auth'
 import { generateDOMChanges } from '~src/lib/ai-dom-generator'
 
-// Import core modules
 import { routeMessage, validateSender } from './core/message-router'
 import { makeAPIRequest, openLoginPage } from './core/api-client'
 import { getConfig, initializeConfig } from './core/config-manager'
 
-// Import handlers
 import {
   handleStorageGet,
   handleStorageSet,
@@ -42,10 +40,9 @@ import {
   initializeAvatarProxy
 } from './handlers/avatar-proxy'
 
-// Import validation
-import { safeValidateAPIRequest } from './utils/validation'
+import { safeValidateAPIRequest, ConfigSchema } from './utils/validation'
+import { checkRateLimit } from './utils/rate-limiter'
 
-// Storage instances for message handlers
 const storage = new Storage()
 const secureStorage = new Storage({
   area: "local",
@@ -61,16 +58,13 @@ const sessionStorage = new Storage({ area: "session" })
 export function initializeBackgroundScript() {
   debugLog('[Background] Initializing background script...')
 
-  // Initialize configuration on startup
   initializeConfig(storage, secureStorage).catch(err =>
     debugError('[Background] Init config error:', err)
   )
 
-  // Initialize handlers
   initializeInjectionHandler()
   initializeAvatarProxy()
 
-  // Set up message listener
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('[Background] Message received:', message.type, 'from sender:', {
       id: sender.id,
@@ -79,7 +73,6 @@ export function initializeBackgroundScript() {
     })
     console.log('[Background] Our extension ID:', chrome.runtime.id)
 
-    // Validate sender - only accept messages from our own extension
     if (!validateSender(sender)) {
       console.error('[Background] REJECTED message from unauthorized sender:', {
         senderId: sender.id,
@@ -90,22 +83,28 @@ export function initializeBackgroundScript() {
       return false
     }
 
+    const senderId = sender.tab?.id?.toString() || sender.id || 'unknown'
+    if (!checkRateLimit(senderId)) {
+      debugWarn(`[Background] Rate limit exceeded for sender: ${senderId}`)
+      sendResponse({
+        success: false,
+        error: 'Rate limit exceeded. Please slow down your requests.'
+      })
+      return false
+    }
+
     debugLog('[Background] Received message:', message.type)
 
-    // NEW UNIFIED MESSAGE ROUTER
-    // Route messages based on 'to' field if present (new message format)
     if (message.from && message.to) {
       const extensionMessage = message as ExtensionMessage
       debugLog(
         `[Background Router] Received message: ${extensionMessage.type} from ${extensionMessage.from} to ${extensionMessage.to}`
       )
 
-      // Use the message router - pass all required parameters
       const result = routeMessage(extensionMessage, sender, sendResponse)
-      return result.async // Return true only if async response is expected
+      return result.async
     }
 
-    // EXISTING MESSAGE HANDLERS (for backward compatibility)
     if (message.type === 'STORAGE_GET') {
       handleStorageGet(message.key)
         .then(value => {
@@ -159,7 +158,6 @@ export function initializeBackgroundScript() {
       bufferSDKEvent(message.payload)
         .then(() => {
           console.log('[Background] Event buffered, broadcasting...')
-          // Broadcast new event to all extension pages for real-time updates
           chrome.runtime.sendMessage({
             type: 'SDK_EVENT_BROADCAST',
             payload: message.payload
@@ -200,7 +198,6 @@ export function initializeBackgroundScript() {
       return true
     } else if (message.type === 'ENSURE_SDK_PLUGIN_INJECTED') {
       console.log('[Background] ENSURE_SDK_PLUGIN_INJECTED requested, forwarding to active tab')
-      // Forward to content script in active tab to inject SDK plugin
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, { type: 'INJECT_SDK_PLUGIN' }, (response) => {
@@ -214,33 +211,28 @@ export function initializeBackgroundScript() {
       })
       return true
     } else if (message.type === 'TOGGLE_VISUAL_EDITOR') {
-      // Forward to content script in active tab
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, message)
         }
       })
     } else if (message.type === 'ELEMENT_SELECTED') {
-      // Element picker returned a selector
-      // Get the current state to find out which field we were picking for
       sessionStorage.get<DOMChangesInlineState>('domChangesInlineState').then(async (state) => {
         if (state && state.pickingForField) {
 
-          // Store the result
           await sessionStorage.set('elementPickerResult', {
             variantName: state.variantName,
             fieldId: state.pickingForField,
             selector: message.selector
           })
 
-          // Send message to sidebar to refresh with the selected element
           chrome.runtime.sendMessage({
             type: 'ELEMENT_PICKER_RESULT',
             variantName: state.variantName,
             fieldId: state.pickingForField,
             selector: message.selector
           }).catch(() => {
-            // Ignore errors if no sidebar is open
+            debugLog("[Background] No sidebar listening for ELEMENT_PICKER_RESULT - this is expected if sidebar is closed")
           })
         }
       })
@@ -259,7 +251,6 @@ export function initializeBackgroundScript() {
       })
       return true
     } else if (message.type === 'API_REQUEST') {
-      // Handle API requests
       debugLog('[Background] Received API_REQUEST:', {
         method: message.method,
         path: message.path,
@@ -287,7 +278,6 @@ export function initializeBackgroundScript() {
         })
       return true
     } else if (message.type === 'OPEN_LOGIN') {
-      // Open login page with auth check
       openLoginPage()
         .then(result => {
           sendResponse({ success: true, ...result })
@@ -297,26 +287,38 @@ export function initializeBackgroundScript() {
         })
       return true
     } else if (message.type === 'PREVIEW_STATE_CHANGED') {
-      // Forward preview state change to all extension pages (sidebar, inline editor, etc.)
       chrome.runtime.sendMessage(message).catch(() => {
-        // Ignore errors if no extension pages are listening
+        debugLog("[Background] No extension pages listening for PREVIEW_STATE_CHANGED - this is expected if sidebar is closed")
       })
       sendResponse({ success: true })
     } else if (message.type === 'CHECK_AUTH') {
       debugLog('[Background CHECK_AUTH] Received with requestId:', message.requestId)
 
-      // Parse config from JSON if present (allows passing current form values)
       let configToUse: ABsmartlyConfig | null = null
       if (message.configJson) {
         try {
-          configToUse = JSON.parse(message.configJson)
-          debugLog('[Background CHECK_AUTH] Using config from message:', configToUse)
+          const parsed = JSON.parse(message.configJson)
+          const validationResult = ConfigSchema.safeParse(parsed)
+          if (!validationResult.success) {
+            debugError('[Background CHECK_AUTH] Config validation failed:', validationResult.error)
+            sendResponse({
+              success: false,
+              error: 'Invalid configuration: ' + validationResult.error.issues.map(i => i.message).join(', ')
+            })
+            return true
+          }
+          configToUse = validationResult.data as ABsmartlyConfig
+          debugLog('[Background CHECK_AUTH] Using validated config from message')
         } catch (e) {
           debugError('[Background CHECK_AUTH] Failed to parse configJson:', e)
+          sendResponse({
+            success: false,
+            error: 'Failed to parse configuration JSON'
+          })
+          return true
         }
       }
 
-      // If no config in message, get from storage
       const configPromise = configToUse
         ? Promise.resolve(configToUse)
         : getConfig(storage, secureStorage)
@@ -335,12 +337,10 @@ export function initializeBackgroundScript() {
           const authResult = await checkAuthentication(config)
           debugLog('[Background CHECK_AUTH] Auth result:', authResult)
 
-          // Send result directly in response
           sendResponse(authResult)
         } catch (error) {
           debugError('[Background CHECK_AUTH] Error:', error)
 
-          // Send error result
           const errorResult = {
             success: false,
             error: error instanceof Error ? error.message : String(error)
@@ -381,7 +381,6 @@ export function initializeBackgroundScript() {
             console.log('[Background] Passing session to generateDOMChanges:', conversationSession.id)
           }
 
-          // Validate HTML is provided if session hasn't been initialized
           if (!html && !conversationSession?.htmlSent) {
             throw new Error('HTML is required for the first message in a conversation')
           }
@@ -396,7 +395,6 @@ export function initializeBackgroundScript() {
           console.log('[Background] Result.action:', result.action)
           console.log('[Background] Result.response:', result.response?.substring(0, 100))
 
-          // Validate result structure
           if (!result.domChanges) {
             console.error('[Background] ⚠️ Result missing domChanges property!', result)
             throw new Error('Invalid result: missing domChanges property')
@@ -407,7 +405,6 @@ export function initializeBackgroundScript() {
             throw new Error('Invalid result: domChanges must be an array')
           }
 
-          // Normalize response format
           const normalizedResult = {
             domChanges: result.domChanges || [],
             response: result.response || '',
@@ -479,8 +476,6 @@ export function initializeBackgroundScript() {
             throw new Error('No HTML provided for refresh')
           }
 
-          // For API providers (Anthropic/OpenAI), just reset htmlSent flag
-          // The next message will include the new DOM structure in the system prompt
           if (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api') {
             console.log('[Background] Resetting htmlSent flag for API provider')
             const updatedSession = {
@@ -491,7 +486,6 @@ export function initializeBackgroundScript() {
             return
           }
 
-          // For Bridge provider (claude-subscription), call the refresh endpoint
           if (config?.aiProvider === 'claude-subscription') {
             console.log('[Background] Refreshing HTML on Bridge server')
             const { ClaudeCodeBridgeClient } = await import('~src/lib/claude-code-client')
@@ -510,7 +504,6 @@ export function initializeBackgroundScript() {
               throw bridgeError
             }
 
-            // Also reset htmlSent so the next message includes new DOM structure
             const updatedSession = {
               ...conversationSession,
               htmlSent: false
@@ -519,7 +512,6 @@ export function initializeBackgroundScript() {
             return
           }
 
-          // Unknown provider - just reset htmlSent
           console.log('[Background] Unknown provider, resetting htmlSent flag')
           const updatedSession = {
             ...conversationSession,
@@ -547,8 +539,6 @@ export function initializeBackgroundScript() {
   debugLog('[Background] Background script initialized')
 }
 
-// Re-export all modules for external use
-// Note: Use background/index.ts for public API imports - it has explicit exports without conflicts
 export * from './core/message-router'
 export * from './core/api-client'
 export * from './core/config-manager'
@@ -556,7 +546,6 @@ export * from './handlers/storage-handler'
 export * from './handlers/event-buffer'
 export * from './handlers/injection-handler'
 export * from './handlers/avatar-proxy'
-// Validation utilities - export only non-conflicting items (validateConfig/validateAPIRequest have different signatures in core/)
 export {
   ConfigSchema,
   APIRequestSchema,
@@ -564,9 +553,7 @@ export {
   safeValidateAPIRequest
 } from './utils/validation'
 export type { ValidatedConfig, ValidatedAPIRequest } from './utils/validation'
-// Security utilities - no conflicts
 export * from './utils/security'
-// Types - export only non-conflicting items (RouteResult is in message-router)
 export type {
   APIRequest,
   APIResponse,

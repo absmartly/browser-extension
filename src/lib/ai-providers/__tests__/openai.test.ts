@@ -104,7 +104,7 @@ describe('OpenAIProvider', () => {
       )
     })
 
-    it('should include HTML in system message for new session', async () => {
+    it('should include DOM structure in system prompt for new session', async () => {
       const provider = new OpenAIProvider({ apiKey: 'sk-openai-test-key', aiProvider: 'openai-api' })
 
       mockChatCompletions.create.mockResolvedValue({
@@ -132,7 +132,7 @@ describe('OpenAIProvider', () => {
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
-              content: expect.stringContaining('<html><body>Test</body></html>')
+              content: expect.stringContaining('Page DOM Structure')
             })
           ])
         })
@@ -216,7 +216,7 @@ describe('OpenAIProvider', () => {
       )
     })
 
-    it('should force function tool_choice', async () => {
+    it('should include tools in the API call', async () => {
       const provider = new OpenAIProvider({ apiKey: 'sk-openai-test-key', aiProvider: 'openai-api' })
 
       mockChatCompletions.create.mockResolvedValue({
@@ -241,7 +241,12 @@ describe('OpenAIProvider', () => {
 
       expect(mockChatCompletions.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          tool_choice: { type: 'function', function: { name: 'dom_changes_generator' } }
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'function',
+              function: expect.objectContaining({ name: 'dom_changes_generator' })
+            })
+          ])
         })
       )
     })
@@ -357,20 +362,23 @@ describe('OpenAIProvider', () => {
       ).rejects.toThrow('No message in OpenAI response')
     })
 
-    it('should throw error when no tool_calls in response', async () => {
+    it('should handle text response as conversational when tool_calls is not used', async () => {
       const provider = new OpenAIProvider({ apiKey: 'sk-openai-test-key', aiProvider: 'openai-api' })
 
+      const conversationalText = 'I can help you with that. What specific changes would you like to make?'
       mockChatCompletions.create.mockResolvedValue({
         choices: [{
           message: {
-            content: 'Plain text response without tool calls'
+            content: conversationalText
           }
         }]
       })
 
-      await expect(
-        provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('OpenAI did not return a tool call')
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.domChanges).toEqual([])
+      expect(result.response).toBe(conversationalText)
+      expect(result.action).toBe('none')
     })
 
     it('should log warning about image support not yet implemented', async () => {

@@ -1,7 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BackgroundAPIClient } from '~src/lib/background-api-client'
 import { getConfig } from '~src/utils/storage'
-import type { ABsmartlyConfig, Experiment } from '~src/types/absmartly'
+import type {
+  ABsmartlyConfig,
+  Experiment,
+  Application,
+  UnitType,
+  Metric,
+  ExperimentTag,
+  ExperimentUser,
+  ExperimentTeam
+} from '~src/types/absmartly'
+
+interface ExperimentParams {
+  page?: number
+  items?: number
+  [key: string]: unknown
+}
 
 export function useABsmartly() {
   const [client] = useState(() => new BackgroundAPIClient())
@@ -17,13 +32,11 @@ export function useABsmartly() {
     try {
       let savedConfig = await getConfig()
 
-      // If no config in storage, check environment variables
       if (!savedConfig) {
         const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
         const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
         const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
 
-        // If env vars are available, create config from them
         if (envApiKey && envApiEndpoint) {
           savedConfig = {
             apiKey: envApiKey,
@@ -31,8 +44,7 @@ export function useABsmartly() {
             applicationName: envApplicationName,
             authMethod: 'apikey',
             domChangesFieldName: '__dom_changes'
-          }
-          // Don't auto-save to storage - let user confirm in settings
+          } as ABsmartlyConfig
           console.log('[useABsmartly] Using config from environment variables (not saved to storage)')
         }
       }
@@ -52,7 +64,7 @@ export function useABsmartly() {
     setConfig(newConfig)
   }, [])
 
-  const getExperiments = useCallback(async (params?: any): Promise<{experiments: Experiment[], total?: number, hasMore?: boolean}> => {
+  const getExperiments = useCallback(async (params?: ExperimentParams): Promise<{experiments: Experiment[], total?: number, hasMore?: boolean}> => {
     return client.getExperiments(params)
   }, [client])
 
@@ -68,11 +80,11 @@ export function useABsmartly() {
     return client.stopExperiment(id)
   }, [client])
 
-  const createExperiment = useCallback(async (experimentData: any): Promise<Experiment> => {
+  const createExperiment = useCallback(async (experimentData: Partial<Experiment>): Promise<Experiment> => {
     return client.createExperiment(experimentData)
   }, [client])
 
-  const updateExperiment = useCallback(async (id: number, experimentData: any): Promise<Experiment> => {
+  const updateExperiment = useCallback(async (id: number, experimentData: Partial<Experiment>): Promise<Experiment> => {
     return client.updateExperiment(id, experimentData)
   }, [client])
 
@@ -84,31 +96,31 @@ export function useABsmartly() {
     return client.setExperimentFavorite(id, favorite)
   }, [client])
 
-  const getApplications = useCallback(async (): Promise<any[]> => {
+  const getApplications = useCallback(async (): Promise<Application[]> => {
     return client.getApplications()
   }, [client])
 
-  const getUnitTypes = useCallback(async (): Promise<any[]> => {
+  const getUnitTypes = useCallback(async (): Promise<UnitType[]> => {
     return client.getUnitTypes()
   }, [client])
 
-  const getMetrics = useCallback(async (): Promise<any[]> => {
+  const getMetrics = useCallback(async (): Promise<Metric[]> => {
     return client.getMetrics()
   }, [client])
 
-  const getExperimentTags = useCallback(async (): Promise<any[]> => {
+  const getExperimentTags = useCallback(async (): Promise<ExperimentTag[]> => {
     return client.getExperimentTags()
   }, [client])
 
-  const getOwners = useCallback(async (): Promise<any[]> => {
+  const getOwners = useCallback(async (): Promise<ExperimentUser[]> => {
     return client.getOwners()
   }, [client])
 
-  const getTeams = useCallback(async (): Promise<any[]> => {
+  const getTeams = useCallback(async (): Promise<ExperimentTeam[]> => {
     return client.getTeams()
   }, [client])
 
-  const getTemplates = useCallback(async (type: 'test_template' | 'feature_template' | 'test_template,feature_template' = 'test_template'): Promise<any[]> => {
+  const getTemplates = useCallback(async (type: 'test_template' | 'feature_template' | 'test_template,feature_template' = 'test_template'): Promise<Experiment[]> => {
     return client.getTemplates(type)
   }, [client])
 

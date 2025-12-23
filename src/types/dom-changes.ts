@@ -1,6 +1,5 @@
 export type DOMChangeType = 'text' | 'style' | 'styleRules' | 'class' | 'attribute' | 'html' | 'javascript' | 'move' | 'remove' | 'insert' | 'create';
 
-// URL filtering types
 export interface URLFilterConfig {
   include?: string[];
   exclude?: string[];
@@ -42,7 +41,7 @@ export interface DOMChangeText {
   selector: string;
   type: 'text';
   value: string;
-  originalText?: string; // Store original text for restoration when preview is removed
+  originalText?: string;
   disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
@@ -74,7 +73,7 @@ export interface DOMChangeHTML {
   selector: string;
   type: 'html';
   value: string;
-  originalHtml?: string; // Store original HTML for restoration when preview is removed
+  originalHtml?: string;
   disabled?: boolean;
   waitForElement?: boolean;
   observerRoot?: string;
@@ -108,9 +107,9 @@ export interface DOMChangeRemove {
 }
 
 export interface DOMChangeInsert {
-  selector: string; // Reference element selector
+  selector: string;
   type: 'insert';
-  html: string; // HTML content to insert
+  html: string;
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
   disabled?: boolean;
   waitForElement?: boolean;
@@ -118,9 +117,9 @@ export interface DOMChangeInsert {
 }
 
 export interface DOMChangeCreate {
-  selector: string; // Unique ID for created element
+  selector: string;
   type: 'create';
-  element: string; // HTML content to create
+  element: string;
   targetSelector: string;
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
   disabled?: boolean;
@@ -141,28 +140,25 @@ export type DOMChange =
   | DOMChangeInsert
   | DOMChangeCreate;
 
-// New format for __dom_changes with URL filtering and global defaults
 export interface DOMChangesConfig {
   changes: DOMChange[];
   urlFilter?: URLFilter;
 
-  // Global defaults that can be overridden per-change
   waitForElement?: boolean;
   persistStyle?: boolean;
   important?: boolean;
   observerRoot?: string;
 }
 
-// Union type supporting both legacy array format and new config format
 export type DOMChangesData = DOMChange[] | DOMChangesConfig;
 
 export interface DOMChangeTemplate {
   id: string;
   name: string;
   type: DOMChangeType;
-  value?: Record<string, string> | string; // For style/attribute (Record) or text/html/javascript (string)
-  add?: string[]; // For class type
-  remove?: string[]; // For class type
+  value?: Record<string, string> | string;
+  add?: string[];
+  remove?: string[];
 }
 
 export interface StyleRulesTemplate {
@@ -292,7 +288,6 @@ export const STYLE_RULES_TEMPLATES: StyleRulesTemplate[] = [
   }
 ];
 
-// AI DOM Generation Types
 export type DOMChangeAction =
   | 'append'
   | 'replace_all'
@@ -308,14 +303,7 @@ export interface AIDOMGenerationResult {
   session?: import('./absmartly').ConversationSession;
 }
 
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  images?: string[];
-  domChangesSnapshot?: DOMChange[];
-  timestamp: number;
-  id: string;
-}
+export type { ChatMessage } from './absmartly'
 
 export const DOM_CHANGE_TEMPLATES: DOMChangeTemplate[] = [
   {

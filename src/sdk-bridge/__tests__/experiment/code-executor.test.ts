@@ -208,14 +208,16 @@ describe('CodeExecutor', () => {
       )
     })
 
-    it('should warn about eval patterns', () => {
+    it('should reject eval patterns', () => {
       const result = CodeExecutor.validate("eval('code')")
-      expect(result.isValid).toBe(true) // Still valid, just warns
+      expect(result.isValid).toBe(false) // Security: eval is rejected
+      expect(result.errors.some((e) => e.toLowerCase().includes('eval'))).toBe(true)
     })
 
-    it('should warn about Function constructor', () => {
+    it('should reject Function constructor', () => {
       const result = CodeExecutor.validate("new Function('return 42')()")
-      expect(result.isValid).toBe(true) // Still valid, just warns
+      expect(result.isValid).toBe(false) // Security: Function constructor is rejected
+      expect(result.errors.some((e) => e.toLowerCase().includes('function constructor'))).toBe(true)
     })
 
     it('should allow normal code patterns', () => {

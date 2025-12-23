@@ -6,6 +6,7 @@ import { getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
 import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
+import { validateXPath } from '~src/utils/xpath-validator'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 
 const MAX_TOOL_ITERATIONS = 10
@@ -215,11 +216,18 @@ Request multiple sections in one call for efficiency.
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       console.log(`[OpenAI] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo',
-        messages: messages,
-        tools: tools
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), 60000)
       })
+
+      const completion: OpenAI.ChatCompletion = await Promise.race([
+        openai.chat.completions.create({
+          model: 'gpt-4-turbo',
+          messages: messages,
+          tools: tools
+        }),
+        timeoutPromise
+      ])
 
       console.log('[OpenAI] Received response from OpenAI')
       const message = completion.choices[0]?.message
@@ -314,6 +322,18 @@ Request multiple sections in one call for efficiency.
           const args = JSON.parse(fn.arguments)
           const xpath = args.xpath as string
           const maxResults = (args.maxResults as number) || 10
+
+          // Validate XPath expression before execution
+          if (!validateXPath(xpath)) {
+            const errorContent = `Invalid XPath expression: "${xpath}". XPath must use safe patterns only.`
+            console.log(`[OpenAI] ⚠️  ${errorContent}`)
+            toolResultMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: errorContent
+            })
+            continue
+          }
           console.log(`[OpenAI] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
 
           const xpathResult = await queryXPath(xpath, maxResults)

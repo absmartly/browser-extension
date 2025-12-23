@@ -68,31 +68,31 @@ describe('api-client', () => {
       expect(token).toBe('header.payload.signature')
     })
 
-    it('should find JWT cookie by name "JWT"', async () => {
+    it('should NOT find cookie by name "JWT" (only lowercase jwt is supported)', async () => {
       mockChrome.cookies.getAll.mockResolvedValue([
         { name: 'JWT', value: 'header.payload.signature', domain: '.absmartly.com' }
       ])
 
       const token = await getJWTCookie('https://api.absmartly.com')
-      expect(token).toBe('header.payload.signature')
+      expect(token).toBeNull()
     })
 
-    it('should find JWT cookie by name "access_token"', async () => {
+    it('should NOT find cookie by name "access_token" (only jwt is supported)', async () => {
       mockChrome.cookies.getAll.mockResolvedValue([
         { name: 'access_token', value: 'token123', domain: '.absmartly.com' }
       ])
 
       const token = await getJWTCookie('https://api.absmartly.com')
-      expect(token).toBe('token123')
+      expect(token).toBeNull()
     })
 
-    it('should find JWT-like cookie (3 parts with dots)', async () => {
+    it('should NOT find cookie by custom name (only jwt is supported)', async () => {
       mockChrome.cookies.getAll.mockResolvedValue([
         { name: 'custom_token', value: 'part1.part2.part3', domain: '.absmartly.com' }
       ])
 
       const token = await getJWTCookie('https://api.absmartly.com')
-      expect(token).toBe('part1.part2.part3')
+      expect(token).toBeNull()
     })
 
     it('should return null when no JWT cookie is found', async () => {
@@ -228,7 +228,7 @@ describe('api-client', () => {
       }))
     })
 
-    it('should handle JWT token that looks like Bearer token', async () => {
+    it('should use JWT prefix for all JWT tokens', async () => {
       const jwtConfig: ABsmartlyConfig = {
         apiEndpoint: 'https://api.absmartly.com',
         authMethod: 'jwt'
@@ -244,7 +244,7 @@ describe('api-client', () => {
 
       expect(axios).toHaveBeenCalledWith(expect.objectContaining({
         headers: expect.objectContaining({
-          'Authorization': 'Bearer not-a-jwt-token'
+          'Authorization': 'JWT not-a-jwt-token'
         })
       }))
     })

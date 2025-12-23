@@ -150,7 +150,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
  * Returns a proxy URL for an authenticated image that will be fetched by the service worker
  * In test environments without service workers, returns null to skip avatar loading
  * @param url - Full URL to the image (should already include base URL)
- * @param config - ABsmartly config with auth method and credentials
+ * @param config - ABsmartly config with auth method (API key retrieved from secure storage)
  * @returns Proxy URL that can be used in img src, or null if service worker not available
  */
 export async function fetchAuthenticatedImage(
@@ -166,10 +166,6 @@ export async function fetchAuthenticatedImage(
       url: url,
       authMethod: config.authMethod || 'jwt'
     })
-
-    if (config.authMethod === 'apikey' && config.apiKey) {
-      params.set('apiKey', config.apiKey)
-    }
 
     return `${chrome.runtime.getURL('/api/avatar')}?${params.toString()}`
   } catch (error) {

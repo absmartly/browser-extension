@@ -13,26 +13,25 @@ export const config: PlasmoCSConfig = {
 
 const storage = new Storage()
 
-// Loading component for Suspense
 const LoadingContent = () => {
   return (
     <div style={{ padding: '20px' }}>
-      <h2 style={{ 
-        fontSize: '18px', 
+      <h2 style={{
+        fontSize: '18px',
         fontWeight: '600',
         marginBottom: '16px',
         color: '#111827'
       }}>
         ABSmartly Extension
       </h2>
-      
+
       <div style={{
         padding: '16px',
         backgroundColor: '#f9fafb',
         borderRadius: '8px',
         marginBottom: '16px'
       }}>
-        <p style={{ 
+        <p style={{
           fontSize: '14px',
           color: '#6b7280',
           marginBottom: '12px'
@@ -58,22 +57,17 @@ const LoadingContent = () => {
   )
 }
 
-// Global variables to track sidebar state
 let sidebarContainer: HTMLElement | null = null
 let sidebarVisible = false
 let sidebarMinimized = false
 let reactRoot: any = null
 
-// Function to create and inject sidebar (exported for use from content.ts)
 export const injectSidebar = () => {
-  // Check if sidebar already exists
   const existing = document.getElementById('absmartly-sidebar-root')
   if (existing) {
-    // Check if it has a shadow root - if not, it's a stale div, remove it
     if (!existing.shadowRoot) {
       debugLog('🔵 ABSmartly Extension: Found stale sidebar without shadow DOM, removing it')
       existing.remove()
-      // Continue to create a fresh sidebar below
     } else {
       debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
       const currentTransform = existing.style.transform
@@ -82,19 +76,22 @@ export const injectSidebar = () => {
       if (isVisible) {
         existing.style.transform = 'translateX(100%)'
         sidebarVisible = false
-        storage.set('sidebar-visible', false).catch(() => {})
+        storage.set('sidebar-visible', false).catch((error) => {
+          debugError('Failed to save sidebar visibility state:', error)
+        })
       } else {
         existing.style.transform = 'translateX(0)'
         sidebarVisible = true
-        storage.set('sidebar-visible', true).catch(() => {})
+        storage.set('sidebar-visible', true).catch((error) => {
+          debugError('Failed to save sidebar visibility state:', error)
+        })
       }
       return
     }
   }
 
   debugLog('🔵 ABSmartly Extension: Creating sidebar with shadow DOM')
-  
-  // Create container
+
   sidebarContainer = document.createElement('div')
   sidebarContainer.id = 'absmartly-sidebar-root'
   sidebarContainer.style.cssText = `
@@ -108,11 +105,9 @@ export const injectSidebar = () => {
     transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   `
-  
-  // Create shadow root
+
   const shadowRoot = sidebarContainer.attachShadow({ mode: 'open' })
-  
-  // Add styles to shadow DOM
+
   const styleSheet = document.createElement('style')
   styleSheet.textContent = `
     :host {
@@ -228,28 +223,23 @@ export const injectSidebar = () => {
     }
   `
   shadowRoot.appendChild(styleSheet)
-  
-  // Create sidebar structure
+
   const container = document.createElement('div')
   container.className = 'sidebar-container'
-  
-  // Create header
+
   const header = document.createElement('div')
   header.className = 'sidebar-header'
-  
-  // Create body for React content
+
   const body = document.createElement('div')
   body.className = 'sidebar-body'
   body.id = 'extension-ui-root'
-  
-  // Function to update sidebar UI
+
   const updateSidebar = () => {
     sidebarContainer!.style.width = sidebarMinimized ? '48px' : '384px'
     header.innerHTML = ''
     header.className = sidebarMinimized ? 'sidebar-header minimized' : 'sidebar-header'
-    
+
     if (sidebarMinimized) {
-      // Minimized state
       const expandBtn = document.createElement('button')
       expandBtn.className = 'expand-btn'
       expandBtn.innerHTML = '←'
@@ -259,33 +249,32 @@ export const injectSidebar = () => {
         updateSidebar()
         chrome.storage.local.set({ sidebarMinimized: false })
       }
-      
+
       const text = document.createElement('div')
       text.className = 'vertical-text'
       text.innerText = 'ABSmartly'
-      
+
       header.appendChild(expandBtn)
       header.appendChild(text)
     } else {
-      // Full state
       const logoContainer = document.createElement('div')
       logoContainer.className = 'logo-container'
-      
+
       const logo = document.createElement('img')
       logo.src = chrome.runtime.getURL('assets/icon.png')
       logo.alt = 'ABSmartly'
       logo.className = 'logo'
-      
+
       const title = document.createElement('span')
       title.className = 'title'
       title.innerText = 'ABSmartly'
-      
+
       logoContainer.appendChild(logo)
       logoContainer.appendChild(title)
-      
+
       const buttonsContainer = document.createElement('div')
       buttonsContainer.className = 'buttons-container'
-      
+
       const minimizeBtn = document.createElement('button')
       minimizeBtn.className = 'btn'
       minimizeBtn.innerHTML = '→'
@@ -295,7 +284,7 @@ export const injectSidebar = () => {
         updateSidebar()
         chrome.storage.local.set({ sidebarMinimized: true })
       }
-      
+
       const closeBtn = document.createElement('button')
       closeBtn.className = 'btn'
       closeBtn.innerHTML = '✕'
@@ -304,49 +293,46 @@ export const injectSidebar = () => {
         sidebarVisible = false
         sidebarContainer!.style.transform = 'translateX(100%)'
       }
-      
+
       buttonsContainer.appendChild(minimizeBtn)
       buttonsContainer.appendChild(closeBtn)
-      
+
       header.appendChild(logoContainer)
       header.appendChild(buttonsContainer)
     }
   }
-  
-  // Load saved minimized state
+
   chrome.storage.local.get(['sidebarMinimized'], (result) => {
     sidebarMinimized = result.sidebarMinimized || false
     updateSidebar()
   })
-  
+
   container.appendChild(header)
   container.appendChild(body)
   shadowRoot.appendChild(container)
-  
-  // Append to document
+
   document.body.appendChild(sidebarContainer)
-  
-  // Mount React component with Suspense
+
   reactRoot = createRoot(body)
   reactRoot.render(
     <Suspense fallback={<LoadingContent />}>
       <ExtensionUI />
     </Suspense>
   )
-  
-  // Show sidebar after React mounts
+
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       sidebarContainer!.style.transform = 'translateX(0)'
       sidebarVisible = true
-      storage.set('sidebar-visible', true).catch(() => {})
+      storage.set('sidebar-visible', true).catch((error) => {
+        debugError('Failed to save sidebar visibility state:', error)
+      })
     })
   })
 
   debugLog('🔵 ABSmartly Extension: Sidebar injected with shadow DOM')
 }
 
-// Listen for messages to toggle sidebar
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'TOGGLE_SIDEBAR') {
     injectSidebar()
@@ -355,7 +341,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 })
 
-// Export for HMR support
 if ((module as any).hot) {
   (module as any).hot.accept()
   (module as any).hot.dispose(() => {
@@ -368,7 +353,6 @@ if ((module as any).hot) {
   })
 }
 
-// Auto-inject sidebar if it was previously visible
 export default async () => {
   debugLog('🔵 ABSmartly Extension: Sidebar content script loaded')
 
@@ -382,5 +366,3 @@ export default async () => {
     debugError('Failed to check sidebar visibility state:', error)
   }
 }
-
-// Export injectSidebar for dynamic imports

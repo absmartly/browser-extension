@@ -51,7 +51,6 @@ export async function getConfig(
       const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
       config.apiKey = secureApiKey || config.apiKey || ''
     } catch (error) {
-      // If secure storage fails (e.g., JSON parse error for legacy data), fall back to config.apiKey
       debugLog('[Config] Failed to get API key from secure storage:', error)
       config.apiKey = config.apiKey || ''
     }
@@ -107,7 +106,6 @@ export async function initializeConfig(
   try {
     secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
   } catch (error) {
-    // If secure storage fails (e.g., JSON parse error for legacy data), continue without it
     debugLog('[Config] Failed to get API key from secure storage during init:', error)
   }
 
@@ -118,7 +116,6 @@ export async function initializeConfig(
     debugLog('[Config] Failed to get AI API key from secure storage during init:', error)
   }
 
-  // Only use environment auth method if no stored config exists
   let defaultAuthMethod: 'jwt' | 'apikey' = 'jwt'
   if (envAuthMethod && !storedConfig?.authMethod) {
     defaultAuthMethod = envAuthMethod as 'jwt' | 'apikey'
@@ -135,8 +132,6 @@ export async function initializeConfig(
     aiApiKey: storedConfig?.aiApiKey || secureAiApiKey || ''
   }
 
-  // Only update fields that are empty AND have environment values
-  // Don't overwrite existing stored config values
   if (!storedConfig?.apiKey && !secureApiKey && envApiKey) {
     newConfig.apiKey = envApiKey
     await secureStorage.set("absmartly-apikey", envApiKey)
@@ -145,9 +140,13 @@ export async function initializeConfig(
   }
 
   if (!storedConfig?.apiEndpoint && envApiEndpoint) {
-    newConfig.apiEndpoint = envApiEndpoint
-    updated = true
-    debugLog('[Config] Using API endpoint from environment')
+    if (!validateAPIEndpoint(envApiEndpoint)) {
+      debugLog('[Config] Invalid API endpoint from environment, skipping:', envApiEndpoint)
+    } else {
+      newConfig.apiEndpoint = envApiEndpoint
+      updated = true
+      debugLog('[Config] Using API endpoint from environment')
+    }
   }
 
   if (!storedConfig?.applicationId && envApplicationId) {
@@ -157,12 +156,10 @@ export async function initializeConfig(
   }
 
   if (updated) {
-    // Only write back if we actually updated something from environment
-    // Preserve any fields that were already in storedConfig (like aiProvider from tests)
     const configToStore = {
-      ...storedConfig,  // Preserve existing fields first
-      ...newConfig,     // Then apply our updates
-      apiKey: ''        // Always remove apiKey from non-secure storage
+      ...storedConfig,
+      ...newConfig,
+      apiKey: ''
     }
     await storage.set("absmartly-config", configToStore)
     debugLog('[Config] Updated config with environment variables (API key stored securely)')

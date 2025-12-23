@@ -4,7 +4,7 @@
  * Types for DOM manipulation and changes
  */
 
-export type DOMChangeType = 'text' | 'html' | 'style' | 'styles' | 'class' | 'attribute' | 'delete' | 'javascript'
+export type DOMChangeType = 'text' | 'html' | 'style' | 'styles' | 'styleRules' | 'class' | 'attribute' | 'delete' | 'javascript'
 
 export interface DOMChange {
   selector: string
@@ -25,6 +25,23 @@ export interface DOMChange {
   // Attribute changes
   attribute?: string
   attributeName?: string
+}
+
+export interface DOMChangeStyleRules {
+  selector: string
+  type: 'styleRules'
+  value?: string
+  states?: {
+    normal?: Record<string, string>
+    hover?: Record<string, string>
+    active?: Record<string, string>
+    focus?: Record<string, string>
+  }
+  important?: boolean
+  disabled?: boolean
+  waitForElement?: boolean
+  persistStyle?: boolean
+  observerRoot?: string
 }
 
 export interface ElementState {

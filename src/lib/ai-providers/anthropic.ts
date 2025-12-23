@@ -6,6 +6,7 @@ import { sanitizeHtml, getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
 import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
+import { validateXPath } from '~src/utils/xpath-validator'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 
 const MAX_TOOL_ITERATIONS = 10
@@ -151,7 +152,7 @@ export class AnthropicProvider implements AIProvider {
     if (!session) {
       session = {
         id: crypto.randomUUID(),
-        htmlSent: true,
+        htmlSent: false,
         messages: []
       }
     }
@@ -262,7 +263,23 @@ Request multiple sections in one call for efficiency.
         throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
       }
 
-      const message = await anthropic.messages.create(requestBody as any)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000)
+
+      let message: Anthropic.Message
+      try {
+        message = await anthropic.messages.create({
+          ...(requestBody as any),
+          signal: controller.signal as any
+        })
+        clearTimeout(timeoutId)
+      } catch (error: any) {
+        clearTimeout(timeoutId)
+        if (error.name === 'AbortError') {
+          throw new Error('AI request timed out after 60 seconds')
+        }
+        throw error
+      }
 
       // Check if we got tool use or final response
       const toolUseBlocks = message.content.filter(block => block.type === 'tool_use')
@@ -338,6 +355,18 @@ Request multiple sections in one call for efficiency.
         } else if (tool.name === 'xpath_query') {
           const xpath = tool.input.xpath as string
           const maxResults = (tool.input.maxResults as number) || 10
+
+          // Validate XPath expression before execution
+          if (!validateXPath(xpath)) {
+            const errorContent = `Invalid XPath expression: "${xpath}". XPath must use safe patterns only.`
+            console.log(`[Anthropic] ⚠️  ${errorContent}`)
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: tool.id,
+              content: errorContent
+            } as any)
+            continue
+          }
           console.log(`[Anthropic] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
 
           const xpathResult = await queryXPath(xpath, maxResults)

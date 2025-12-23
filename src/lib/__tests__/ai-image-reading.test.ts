@@ -4,10 +4,11 @@ import { TEST_IMAGES } from './test-images'
 
 describe('AI Image Reading', () => {
   const apiKey = process.env.ANTHROPIC_API_KEY || ''
+  const runIntegrationTests = process.env.RUN_INTEGRATION_TESTS === '1'
 
-  const skipIfNoApiKey = apiKey ? it : it.skip
+  const skipIfNoApiKey = (apiKey && runIntegrationTests) ? it : it.skip
 
-  describe('Anthropic API Tests (requires API key)', () => {
+  describe.skip('Anthropic API Tests (requires API key and RUN_INTEGRATION_TESTS=1)', () => {
     skipIfNoApiKey('should read text from an image using Claude', async () => {
     const imageDataUrl = TEST_IMAGES.HELLO
 

@@ -1,9 +1,3 @@
-/**
- * Message Type Definitions
- *
- * Types for messages passed between page context and extension
- */
-
 export type MessageSource = 'absmartly-page' | 'absmartly-extension'
 
 export type MessageType =
@@ -17,7 +11,7 @@ export type MessageType =
   | 'REMOVE_PREVIEW'
   | 'APPLY_OVERRIDES'
 
-export interface ExtensionMessage<T = any> {
+export interface ExtensionMessage<T = unknown> {
   source: MessageSource
   type: MessageType
   payload?: T
@@ -25,7 +19,7 @@ export interface ExtensionMessage<T = any> {
 
 export interface SDKEventPayload {
   eventName: string
-  data: any | null
+  data: unknown
   timestamp: string
 }
 
@@ -35,7 +29,7 @@ export interface PluginInitializedPayload {
 }
 
 export interface PreviewChangesPayload {
-  changes: any[]
+  changes: unknown[]
   experimentName: string
 }
 
@@ -44,7 +38,7 @@ export interface RemovePreviewPayload {
 }
 
 export interface ApplyOverridesPayload {
-  overrides: Record<string, any>
+  overrides: Record<string, unknown>
 }
 
 export interface InitializePluginPayload {

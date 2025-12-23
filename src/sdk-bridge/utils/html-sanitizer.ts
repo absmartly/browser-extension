@@ -1,11 +1,13 @@
 /**
  * HTML Sanitization Utility
  *
- * Provides XSS protection by sanitizing HTML content.
+ * Provides XSS protection by sanitizing HTML content using DOMPurify.
  * Removes dangerous tags, attributes, and URIs.
  *
  * @module HTMLSanitizer
  */
+
+import DOMPurify from 'dompurify'
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -14,6 +16,8 @@
  * - Dangerous tags: script, iframe, object, embed, link, style, meta, base
  * - Event handler attributes: onerror, onload, onclick, etc.
  * - Dangerous URIs: javascript:, data:
+ *
+ * Uses DOMPurify for robust sanitization with proper XSS protection.
  *
  * @param html - The HTML string to sanitize
  * @returns Sanitized HTML string safe for insertion into DOM
@@ -27,68 +31,22 @@
 export function sanitizeHTML(html: string): string {
   if (!html) return ''
 
-  // Create a temporary element to parse the HTML
-  const temp = document.createElement('div')
-  temp.innerHTML = html
-
-  // List of dangerous tags to remove
-  const dangerousTags = [
-    'script',
-    'iframe',
-    'object',
-    'embed',
-    'link',
-    'style',
-    'meta',
-    'base'
-  ]
-
-  // List of dangerous attributes to remove
-  const dangerousAttrs = [
-    'onerror',
-    'onload',
-    'onclick',
-    'onmouseover',
-    'onfocus',
-    'onblur',
-    'onchange',
-    'onsubmit'
-  ]
-
-  // Remove dangerous tags
-  dangerousTags.forEach((tag) => {
-    const elements = temp.querySelectorAll(tag)
-    elements.forEach((el) => el.remove())
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'div', 'span', 'p', 'a', 'img', 'br', 'hr',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'ul', 'ol', 'li',
+      'table', 'thead', 'tbody', 'tr', 'td', 'th',
+      'strong', 'em', 'b', 'i', 'u',
+      'blockquote', 'pre', 'code'
+    ],
+    ALLOWED_ATTR: [
+      'class', 'id', 'style',
+      'href', 'src', 'alt', 'title',
+      'width', 'height',
+      'colspan', 'rowspan'
+    ],
+    ALLOW_DATA_ATTR: false,
+    KEEP_CONTENT: true
   })
-
-  // Remove dangerous attributes from all elements
-  const allElements = temp.querySelectorAll('*')
-  allElements.forEach((el) => {
-    // Remove event handler attributes
-    dangerousAttrs.forEach((attr) => {
-      if (el.hasAttribute(attr)) {
-        el.removeAttribute(attr)
-      }
-    })
-
-    // Remove any attribute starting with 'on'
-    Array.from(el.attributes).forEach((attr) => {
-      if (attr.name.toLowerCase().startsWith('on')) {
-        el.removeAttribute(attr.name)
-      }
-    })
-
-    // Sanitize href and src attributes
-    ;['href', 'src'].forEach((attr) => {
-      if (el.hasAttribute(attr)) {
-        const value = el.getAttribute(attr)
-        // Remove javascript: and data: URIs
-        if (value && /^(javascript|data):/i.test(value)) {
-          el.removeAttribute(attr)
-        }
-      }
-    })
-  })
-
-  return temp.innerHTML
 }

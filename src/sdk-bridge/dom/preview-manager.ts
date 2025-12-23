@@ -44,8 +44,8 @@ export class PreviewManager {
       return false
     }
 
-    // Skip disabled changes
-    if ('disabled' in change && change.disabled) {
+    // Skip disabled changes (check both 'disabled' and 'enabled' properties)
+    if (('disabled' in change && change.disabled) || ('enabled' in change && change.enabled === false)) {
       Logger.log('Skipping disabled change:', change.selector)
       return false
     }
@@ -181,7 +181,7 @@ export class PreviewManager {
 
     // Handle styleRules separately (affects all matching elements via CSS rules)
     if (change.type === 'styleRules') {
-      return this.applyStyleRules(change, experimentName)
+      return this.applyStyleRules(change as DOMChangeStyleRules, experimentName)
     }
 
     return true
