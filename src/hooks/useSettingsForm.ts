@@ -13,11 +13,8 @@ export function useSettingsForm() {
   const [domChangesFieldName, setDomChangesFieldName] = useState('__dom_changes')
   const [authMethod, setAuthMethod] = useState<'jwt' | 'apikey'>('jwt')
   const [sdkWindowProperty, setSdkWindowProperty] = useState('')
-  const [sdkEndpoint, setSdkEndpoint] = useState('')
   const [queryPrefix, setQueryPrefix] = useState<string>(DEFAULT_CONFIG.queryPrefix)
   const [persistQueryToCookie, setPersistQueryToCookie] = useState(true)
-  const [injectSDK, setInjectSDK] = useState(false)
-  const [sdkUrl, setSdkUrl] = useState('')
   const [aiProvider, setAiProvider] = useState<'claude-subscription' | 'anthropic-api' | 'openai-api' | 'anthropic' | 'openai'>('claude-subscription')
   const [aiApiKey, setAiApiKey] = useState('')
   const [llmModel, setLlmModel] = useState('sonnet')
@@ -46,11 +43,8 @@ export function useSettingsForm() {
       let loadedDomChangesFieldName = config?.domChangesFieldName || '__dom_changes'
       let loadedAuthMethod = config?.authMethod || 'jwt'
       let loadedSdkWindowProperty = config?.sdkWindowProperty || ''
-      let loadedSdkEndpoint = config?.sdkEndpoint || ''
       let loadedQueryPrefix = config?.queryPrefix || DEFAULT_CONFIG.queryPrefix
       let loadedPersistQueryToCookie = config?.persistQueryToCookie ?? true
-      let loadedInjectSDK = config?.injectSDK ?? false
-      let loadedSdkUrl = config?.sdkUrl || ''
       let loadedAiProvider = config?.aiProvider || 'claude-subscription'
       let loadedAiApiKey = config?.aiApiKey || ''
       let loadedLlmModel = config?.llmModel || 'sonnet'
@@ -75,11 +69,8 @@ export function useSettingsForm() {
       setDomChangesFieldName(loadedDomChangesFieldName)
       setAuthMethod(loadedAuthMethod)
       setSdkWindowProperty(loadedSdkWindowProperty)
-      setSdkEndpoint(loadedSdkEndpoint)
       setQueryPrefix(loadedQueryPrefix)
       setPersistQueryToCookie(loadedPersistQueryToCookie)
-      setInjectSDK(loadedInjectSDK)
-      setSdkUrl(loadedSdkUrl)
       setAiProvider(loadedAiProvider)
       setAiApiKey(loadedAiApiKey)
       setLlmModel(loadedLlmModel)
@@ -93,11 +84,8 @@ export function useSettingsForm() {
           domChangesFieldName: loadedDomChangesFieldName.trim() || '__dom_changes',
           authMethod: loadedAuthMethod,
           sdkWindowProperty: loadedSdkWindowProperty.trim() || undefined,
-          sdkEndpoint: loadedSdkEndpoint.trim() || undefined,
           queryPrefix: loadedQueryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
           persistQueryToCookie: loadedPersistQueryToCookie,
-          injectSDK: loadedInjectSDK,
-          sdkUrl: loadedSdkUrl.trim() || undefined,
           aiProvider: loadedAiProvider,
           aiApiKey: loadedAiApiKey.trim() || undefined,
           llmModel: loadedLlmModel || 'sonnet'
@@ -172,18 +160,21 @@ export function useSettingsForm() {
   }
 
   const validateEndpointReachable = async (endpoint: string): Promise<boolean> => {
-    const normalized = normalizeEndpoint(endpoint)
+    let normalized = normalizeEndpoint(endpoint)
+    normalized = normalized.replace(/\/v1$/, '')
+
     try {
       debugLog('Validating endpoint:', normalized)
-      const response = await axios.get(`${normalized}/version`, {
-        timeout: 5000
+      const response = await axios.get(`${normalized}/auth/current-user`, {
+        timeout: 5000,
+        validateStatus: (status) => status === 200 || status === 401 || status === 403
       })
 
-      if (response.status === 200) {
+      if (response.status === 200 || response.status === 401 || response.status === 403) {
         debugLog('Endpoint is reachable:', normalized)
         return true
       } else {
-        debugWarn('Endpoint returned non-200 status:', response.status)
+        debugWarn('Endpoint returned unexpected status:', response.status)
         return false
       }
     } catch (error) {
@@ -210,10 +201,6 @@ export function useSettingsForm() {
       }
     }
 
-    if (!applicationName.trim()) {
-      newErrors.applicationName = 'Application Name is required'
-    }
-
     if (authMethod === 'apikey' && !apiKey.trim()) {
       newErrors.apiKey = 'API Key is required when using API Key authentication'
     }
@@ -226,15 +213,12 @@ export function useSettingsForm() {
     return {
       apiKey: apiKey.trim() || undefined,
       apiEndpoint: normalizeEndpoint(apiEndpoint),
-      sdkEndpoint: sdkEndpoint.trim() || undefined,
       applicationName: applicationName.trim() || undefined,
       domChangesFieldName: domChangesFieldName.trim() || '__dom_changes',
       authMethod,
       sdkWindowProperty: sdkWindowProperty.trim() || undefined,
       queryPrefix: queryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
       persistQueryToCookie,
-      injectSDK,
-      sdkUrl: sdkUrl.trim() || undefined,
       aiProvider,
       aiApiKey: aiApiKey.trim() || undefined,
       llmModel: llmModel || 'sonnet'
@@ -275,16 +259,10 @@ export function useSettingsForm() {
     setAuthMethod,
     sdkWindowProperty,
     setSdkWindowProperty,
-    sdkEndpoint,
-    setSdkEndpoint,
     queryPrefix,
     setQueryPrefix,
     persistQueryToCookie,
     setPersistQueryToCookie,
-    injectSDK,
-    setInjectSDK,
-    sdkUrl,
-    setSdkUrl,
     aiProvider,
     setAiProvider,
     aiApiKey,
