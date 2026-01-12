@@ -316,6 +316,12 @@ export function VariantList({
 
     const variantIndex = variants.findIndex(v => v.name === variantName)
 
+    const wrappedPreviewToggle = (enabled: boolean) => {
+      if (variantIndex !== -1) {
+        handlePreviewToggle(enabled, variantIndex)
+      }
+    }
+
     const wrappedPreviewWithChanges = (enabled: boolean, changes: DOMChange[]) => {
       if (variantIndex !== -1) {
         handlePreviewWithChanges(enabled, variantIndex, changes)
@@ -330,11 +336,11 @@ export function VariantList({
 
     if (onNavigateToAI) {
       console.log('[VariantList] Calling parent onNavigateToAI with all 7 parameters')
-      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, onPreviewToggle, wrappedPreviewRefresh, wrappedPreviewWithChanges)
+      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, wrappedPreviewToggle, wrappedPreviewRefresh, wrappedPreviewWithChanges)
     } else {
       console.warn('[VariantList] onNavigateToAI is not defined!')
     }
-  }, [variants, onNavigateToAI, handlePreviewRefresh, handlePreviewWithChanges])
+  }, [variants, onNavigateToAI, handlePreviewToggle, handlePreviewRefresh, handlePreviewWithChanges])
 
   React.useEffect(() => {
     debugLog('[VariantList] Rendering with state:', {

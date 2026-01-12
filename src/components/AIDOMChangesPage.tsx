@@ -187,6 +187,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           }
           if (onPreviewWithChanges) {
             onPreviewWithChanges(true, finalChanges)
+            setIsPreviewEnabled(true)
           }
         }
       }

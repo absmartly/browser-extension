@@ -193,6 +193,7 @@ export function ChatInput({
           )}
         </Button>
         <button
+          id="vibe-studio-preview-toggle"
           onClick={onPreviewToggle}
           className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
             isPreviewEnabled
