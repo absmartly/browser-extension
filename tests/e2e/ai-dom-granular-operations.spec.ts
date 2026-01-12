@@ -191,8 +191,9 @@ test.describe('AI DOM Granular Operations', () => {
       await generateWithAIButton.click()
       await debugWait(1000)
 
-      await testPage.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
-      log('✓ AI page opened')
+      const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
+      log('✓ AI page opened (Vibe Studio)')
     })
 
     await test.step('Generate initial DOM changes', async () => {

@@ -27,7 +27,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
   })
 
   // TODO: SKIPPED - Multiple issues requiring significant refactoring:
-  // 1. Uses forbidden text selector: 'text=AI DOM Generator' (should use #ai-dom-generator-heading)
+  // 1. Uses forbidden text selector: '#ai-dom-generator-heading' (should use #ai-dom-generator-heading)
   // 2. Uses forbidden debugWait() pattern instead of explicit waits
   // 3. AI page heading never becomes visible (same issue affecting other AI tests)
   // 4. Tests console message capture infrastructure which is complex to debug
@@ -55,7 +55,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
       await generateButton.click()
       await debugWait(500)
 
-      await sidebar.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page loaded')
 
       await debugWait(1000)
@@ -166,7 +166,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
       await generateButton.click()
       await debugWait(500)
 
-      await freshSidebar.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await freshSidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page reopened')
 
       await debugWait(1000)
@@ -256,7 +256,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
       await generateButton.click()
       await debugWait(500)
 
-      await sidebar.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page loaded')
     })
 

@@ -151,7 +151,7 @@ test.describe('AI Conversation Switching', () => {
       await generateButton.click()
       await debugWait(500)
 
-      await sidebar.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page loaded')
 
       await debugWait(1000)
@@ -335,7 +335,7 @@ test.describe('AI Conversation Switching', () => {
       await generateButton.click()
       await debugWait(500)
 
-      await sidebar.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page loaded')
 
       await debugWait(1000)

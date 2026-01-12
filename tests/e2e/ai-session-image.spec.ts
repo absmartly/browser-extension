@@ -114,7 +114,7 @@ test.describe('AI Session & Image Handling', () => {
       await generateButton.click()
       await debugWait(500)
 
-      await sidebar.locator('text=AI DOM Generator').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI DOM Generator page loaded')
     })
 
