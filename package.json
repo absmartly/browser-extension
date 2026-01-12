@@ -4,6 +4,7 @@
   "version": "1.0.1",
   "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
   "author": "Jonas Alves",
+  "private": true,
   "scripts": {
     "postinstall": "patch-package",
     "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
