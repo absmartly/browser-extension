@@ -10,11 +10,8 @@ const ConfigSchema = z.object({
   applicationId: z.number().int().positive().optional(),
   authMethod: z.enum(['jwt', 'apikey']).optional(),
   domChangesFieldName: z.string().optional(),
-  sdkEndpoint: z.string().url().optional(),
   queryPrefix: z.string().optional(),
-  persistQueryToCookie: z.boolean().optional(),
-  injectSDK: z.boolean().optional(),
-  sdkUrl: z.string().url().optional()
+  persistQueryToCookie: z.boolean().optional()
 })
 
 /**

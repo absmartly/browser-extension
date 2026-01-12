@@ -7,7 +7,6 @@ import { AuthenticationStatusSection } from './settings/AuthenticationStatusSect
 import { DOMChangesStorageSection } from './settings/DOMChangesStorageSection'
 import { SDKConfigSection } from './settings/SDKConfigSection'
 import { QueryStringOverridesSection } from './settings/QueryStringOverridesSection'
-import { SDKInjectionSection } from './settings/SDKInjectionSection'
 import { AIProviderSection } from './settings/AIProviderSection'
 import { SystemPromptSection } from './settings/SystemPromptSection'
 import { useSettingsForm } from '~src/hooks/useSettingsForm'
@@ -34,16 +33,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setAuthMethod,
     sdkWindowProperty,
     setSdkWindowProperty,
-    sdkEndpoint,
-    setSdkEndpoint,
     queryPrefix,
     setQueryPrefix,
     persistQueryToCookie,
     setPersistQueryToCookie,
-    injectSDK,
-    setInjectSDK,
-    sdkUrl,
-    setSdkUrl,
     aiProvider,
     setAiProvider,
     aiApiKey,
@@ -239,9 +232,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
       <SDKConfigSection
         sdkWindowProperty={sdkWindowProperty}
-        sdkEndpoint={sdkEndpoint}
         onSdkWindowPropertyChange={setSdkWindowProperty}
-        onSdkEndpointChange={setSdkEndpoint}
       />
 
       <QueryStringOverridesSection
@@ -249,13 +240,6 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         persistQueryToCookie={persistQueryToCookie}
         onQueryPrefixChange={setQueryPrefix}
         onPersistQueryToCookieChange={setPersistQueryToCookie}
-      />
-
-      <SDKInjectionSection
-        injectSDK={injectSDK}
-        sdkUrl={sdkUrl}
-        onInjectSDKChange={setInjectSDK}
-        onSdkUrlChange={setSdkUrl}
       />
 
       <AIProviderSection

@@ -138,11 +138,8 @@ export interface ABsmartlyConfig {
   sdkApplicationName?: string
   sdkWindowProperty?: string
   domChangesFieldName?: string
-  sdkEndpoint?: string
   queryPrefix?: string
   persistQueryToCookie?: boolean
-  injectSDK?: boolean
-  sdkUrl?: string
 }
 
 export interface ABsmartlyUser {
