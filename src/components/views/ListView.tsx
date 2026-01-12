@@ -5,6 +5,8 @@ import { Pagination } from "~src/components/Pagination"
 import { Button } from "~src/components/ui/Button"
 import { Logo } from "~src/components/Logo"
 import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
+import { SDKStatusAlert } from "~src/components/SDKStatusAlert"
+import { useSDKStatus } from "~src/hooks/useSDKStatus"
 import { CogIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline"
 import type { Experiment, ABsmartlyConfig, Application } from "~src/types/absmartly"
 import type { ExperimentFilters } from "~src/types/filters"
@@ -75,6 +77,8 @@ export function ListView({
   setTemplateSearchQuery,
   loadExperiments
 }: ListViewProps) {
+  const { sdkDetected, checking } = useSDKStatus()
+
   return (
     <>
       <div className="border-b px-4 py-3 flex-shrink-0 relative">
@@ -159,6 +163,11 @@ export function ListView({
               </Button>
             )}
           </div>
+        </div>
+      )}
+      {!checking && (
+        <div className="px-4 pt-4">
+          <SDKStatusAlert sdkDetected={sdkDetected} />
         </div>
       )}
       <div className="flex-1 flex flex-col">
