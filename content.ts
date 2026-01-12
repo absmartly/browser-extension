@@ -1223,6 +1223,7 @@ let markdownEditorInstance: MarkdownEditor | null = null
 async function openMarkdownEditor(data: {
   title: string
   value: string
+  defaultValue?: string
 }) {
   closeMarkdownEditor()
 
@@ -1234,7 +1235,7 @@ async function openMarkdownEditor(data: {
 
   markdownEditorInstance = new MarkdownEditor()
 
-  const result = await markdownEditorInstance.show(data.title, data.value)
+  const result = await markdownEditorInstance.show(data.title, data.value, data.defaultValue)
 
   if (wasVEActive && currentEditor) {
     debugLog('[Markdown Editor] Re-enabling VE after markdown editor closed')

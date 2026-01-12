@@ -13,7 +13,7 @@ export class MarkdownEditor {
   private editorHost: HTMLElement | null = null
   private editorView: EditorView | null = null
 
-  async show(title: string, currentMarkdown: string): Promise<string | null> {
+  async show(title: string, currentMarkdown: string, defaultValue?: string): Promise<string | null> {
     return new Promise((resolve) => {
       this.editorHost = document.createElement('div')
       this.editorHost.id = 'absmartly-markdown-editor-host'
@@ -71,6 +71,33 @@ export class MarkdownEditor {
       `
 
       toolbar.appendChild(tipsEl)
+
+      if (defaultValue !== undefined) {
+        const resetBtn = document.createElement('button')
+        resetBtn.id = 'reset-prompt-to-default-button'
+        resetBtn.className = 'markdown-editor-button markdown-editor-button-reset'
+        resetBtn.innerHTML = '<span>↺</span> Reset to Default'
+
+        resetBtn.addEventListener('click', (e) => {
+          e.stopPropagation()
+          e.preventDefault()
+
+          if (confirm('Reset to default prompt? Your custom changes will be lost.')) {
+            if (this.editorView) {
+              this.editorView.dispatch({
+                changes: {
+                  from: 0,
+                  to: this.editorView.state.doc.length,
+                  insert: defaultValue
+                }
+              })
+              charCountEl.textContent = `${defaultValue.length} characters`
+            }
+          }
+        })
+
+        toolbar.appendChild(resetBtn)
+      }
 
       const buttons = document.createElement('div')
       buttons.className = 'markdown-editor-buttons'
@@ -336,6 +363,18 @@ export class MarkdownEditor {
         background: #0084db;
         border-color: #0084db;
         box-shadow: 0 2px 8px rgba(0, 122, 204, 0.3);
+      }
+
+      .markdown-editor-button-reset {
+        background: #4a4a4a;
+        color: #e0e0e0;
+        border: 1px solid #666;
+        margin-left: auto;
+      }
+
+      .markdown-editor-button-reset:hover {
+        background: #5a5a5a;
+        border-color: #777;
       }
     `
   }

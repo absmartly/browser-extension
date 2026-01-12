@@ -52,7 +52,8 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
           type: 'OPEN_MARKDOWN_EDITOR',
           data: {
             title: 'System Prompt Override',
-            value: currentPrompt
+            value: currentPrompt,
+            defaultValue: AI_DOM_GENERATION_SYSTEM_PROMPT
           }
         })
       } catch (error) {
