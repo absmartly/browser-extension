@@ -10,7 +10,6 @@ import { Logger } from '../utils/logger'
 import { SDKDetector } from '../sdk/sdk-detector'
 import { PluginDetector } from '../sdk/plugin-detector'
 import { SDKInterceptor } from '../sdk/sdk-interceptor'
-import { CodeInjector } from '../experiment/code-injector'
 import { OverrideManager } from '../experiment/override-manager'
 import { PreviewManager } from '../dom/preview-manager'
 
@@ -33,7 +32,6 @@ export class Orchestrator {
   private sdkDetector: SDKDetector
   private pluginDetector: PluginDetector
   private sdkInterceptor: SDKInterceptor
-  private codeInjector: CodeInjector
   private overrideManager: OverrideManager
   private previewManager: PreviewManager
   private messageListenerSet: boolean = false
@@ -59,7 +57,6 @@ export class Orchestrator {
         this.handleSDKEvent(eventName, data)
       }
     })
-    this.codeInjector = new CodeInjector()
     this.overrideManager = new OverrideManager()
     this.previewManager = new PreviewManager()
   }
@@ -386,21 +383,13 @@ export class Orchestrator {
       return
     }
 
-    // Inject experiment code
-    try {
-      Logger.log('[ABsmartly Extension] Checking for experiment-specific injection code')
-      this.codeInjector.injectExperimentCode(context)
-    } catch (error) {
-      Logger.error('[ABsmartly Extension] Failed to inject experiment code:', error)
-    }
-
     // Notify extension that initialization is complete
     this.sendMessageToExtension({
       source: 'absmartly-page',
       type: 'PLUGIN_INITIALIZED',
       payload: {
         version: '1.0.0',
-        capabilities: ['code-injection']
+        capabilities: ['dom-preview', 'variant-override']
       }
     })
 
