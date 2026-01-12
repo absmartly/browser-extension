@@ -74,6 +74,22 @@ function SidebarContent() {
   } = useExperimentFilters(config)
 
   const {
+    error,
+    setError,
+    isAuthExpired,
+    setIsAuthExpired,
+    toast,
+    setToast,
+    createPanelOpen,
+    setCreatePanelOpen,
+    hasInitialized,
+    setHasInitialized,
+    handleAuthExpired
+  } = useExtensionState({
+    config
+  })
+
+  const {
     filteredExperiments,
     experimentsLoading,
     currentPage,
@@ -87,27 +103,8 @@ function SidebarContent() {
   } = useExperimentLoading({
     getExperiments,
     requestPermissionsIfNeeded,
-    onAuthExpired: () => {},
-    onError: () => {}
-  })
-
-  const {
-    error,
-    setError,
-    isAuthExpired,
-    setIsAuthExpired,
-    toast,
-    setToast,
-    createPanelOpen,
-    setCreatePanelOpen,
-    hasInitialized,
-    setHasInitialized,
-    handleAuthExpired
-  } = useExtensionState({
-    config,
-    view,
-    currentPage,
-    setCurrentPage
+    onAuthExpired: setIsAuthExpired,
+    onError: setError
   })
 
   const {
@@ -228,6 +225,12 @@ function SidebarContent() {
     }))
     prevViewRef.current = view
   }, [view, aiDomContext])
+
+  useEffect(() => {
+    if (view === 'list' && currentPage !== 1) {
+      setCurrentPage(1)
+    }
+  }, [view, currentPage, setCurrentPage])
 
   useEffect(() => {
     const handleVisibilityChange = () => {
