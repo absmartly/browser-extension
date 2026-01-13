@@ -59,22 +59,46 @@ if (fs.existsSync(tabsDir)) {
 // Copy inject-sdk-plugin.js with hash from public to build directory
 const injectScriptSource = path.join(publicDir, 'inject-sdk-plugin.js');
 if (fs.existsSync(injectScriptSource)) {
-  // Read the file content and generate a hash
-  const fileContent = fs.readFileSync(injectScriptSource, 'utf8');
+  let fileContent = fs.readFileSync(injectScriptSource, 'utf8');
+
+  // Minify for production to remove console statements
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const { execSync } = require('child_process');
+      const tempInput = path.join(__dirname, '..', 'temp-inject-input.js');
+      const tempOutput = path.join(__dirname, '..', 'temp-inject-output.js');
+
+      fs.writeFileSync(tempInput, fileContent);
+      execSync(`npx esbuild "${tempInput}" --minify --drop:console --outfile="${tempOutput}"`, { stdio: 'inherit' });
+      fileContent = fs.readFileSync(tempOutput, 'utf8');
+
+      // Clean up temp files
+      fs.unlinkSync(tempInput);
+      fs.unlinkSync(tempOutput);
+      console.log('Minified inject-sdk-plugin.js for production (console removed)');
+    } catch (error) {
+      console.warn('Failed to minify inject-sdk-plugin.js, using original:', error.message);
+      fileContent = fs.readFileSync(injectScriptSource, 'utf8');
+    }
+  }
+
+  // Generate hash from processed content
   const hash = crypto.createHash('md5').update(fileContent).digest('hex').substring(0, 8);
   const hashedFilename = `inject-sdk-plugin.${hash}.js`;
-  
-  // Copy to prod build with hash
+
+  // Write to prod build with hash
   const injectScriptDest = path.join(buildDir, hashedFilename);
-  fs.copyFileSync(injectScriptSource, injectScriptDest);
+  fs.writeFileSync(injectScriptDest, fileContent);
   console.log(`Copied inject-sdk-plugin.js as ${hashedFilename} to build directory`);
   
-  // Also copy to dev build if it exists
+  // Also copy to dev build if it exists (use original unminified version)
   const devBuildDir = path.join(__dirname, '..', 'build', 'chrome-mv3-dev');
   if (fs.existsSync(devBuildDir)) {
     const devInjectScriptDest = path.join(devBuildDir, hashedFilename);
-    fs.copyFileSync(injectScriptSource, devInjectScriptDest);
-    console.log(`Copied inject-sdk-plugin.js as ${hashedFilename} to dev build directory`);
+    // Always use original for dev build
+    const devFileContent = fs.readFileSync(injectScriptSource, 'utf8');
+    fs.writeFileSync(devInjectScriptDest, devFileContent);
+    console.log(`Copied inject-sdk-plugin.js as ${hashedFilename} to dev build directory (unminified)`);
   }
   
   // Create a mapping file so the content script knows which file to load

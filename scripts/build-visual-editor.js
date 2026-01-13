@@ -27,6 +27,7 @@ try {
   // Build the bundle
   // Check if PLASMO_PUBLIC_DISABLE_SHADOW_DOM is set and pass it to esbuild
   const disableShadowDOM = process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM === 'true';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // Build the esbuild command with define flags
   // We use '"\\\"true\\\""' to ensure esbuild replaces process.env.X with the STRING "true", not the boolean true
@@ -50,8 +51,9 @@ try {
     '--loader:.ttf=dataurl',
     '--loader:.woff=dataurl',
     '--loader:.woff2=dataurl',
+    isProduction ? '--drop:console' : '',
     ...defineFlags
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 
   console.log('[Visual Editor Build] Running esbuild...');
   if (disableShadowDOM) {
@@ -83,8 +85,8 @@ if (typeof ABSmartlyVisualEditor !== 'undefined') {
   // Also expose the entire unified API for advanced usage
   window.ABSmartlyVisualEditor = ABSmartlyVisualEditor;
 
-  console.log('[ABSmartly] Unified visual editor bundled script loaded successfully');
-  console.log('[ABSmartly] Visual editor version:', ABSmartlyVisualEditor.VISUAL_EDITOR_VERSION || '3.0.0-unified');
+  ${!isProduction ? "console.log('[ABSmartly] Unified visual editor bundled script loaded successfully');" : ""}
+  ${!isProduction ? "console.log('[ABSmartly] Visual editor version:', ABSmartlyVisualEditor.VISUAL_EDITOR_VERSION || '3.0.0-unified');" : ""}
 } else {
   console.error('[ABSmartly] Failed to load visual editor bundle - ABSmartlyVisualEditor not found');
 }
