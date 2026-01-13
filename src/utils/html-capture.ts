@@ -629,6 +629,83 @@ function generateDOMStructureInPage(): string {
     return lines
   }
 
+  function compressRepeatedSubtrees(lines: string[]): string[] {
+    const result: string[] = [lines[0]] // Keep 'body'
+    let i = 1
+
+    while (i < lines.length) {
+      const currentLine = lines[i]
+      const indent = currentLine.match(/^(\s*)/)?.[1] || ''
+
+      // Find the subtree for this node (all lines with greater indentation)
+      const subtreeStart = i
+      let subtreeEnd = i + 1
+
+      while (subtreeEnd < lines.length) {
+        const nextIndent = lines[subtreeEnd].match(/^(\s*)/)?.[1] || ''
+        if (nextIndent.length <= indent.length && subtreeEnd > subtreeStart) {
+          break
+        }
+        subtreeEnd++
+      }
+
+      const subtree = lines.slice(subtreeStart, subtreeEnd)
+
+      // Check if there are consecutive identical subtrees
+      let count = 1
+      let compareStart = subtreeEnd
+
+      while (compareStart < lines.length) {
+        const compareEnd = compareStart + subtree.length
+        if (compareEnd > lines.length) break
+
+        const candidateSubtree = lines.slice(compareStart, compareEnd)
+
+        // Check if subtrees are identical
+        let identical = true
+        for (let j = 0; j < subtree.length; j++) {
+          if (subtree[j] !== candidateSubtree[j]) {
+            identical = false
+            break
+          }
+        }
+
+        if (identical) {
+          count++
+          compareStart = compareEnd
+        } else {
+          break
+        }
+      }
+
+      if (count > 1) {
+        // Add count to the first line if not already present
+        let firstLine = subtree[0]
+        if (!firstLine.includes('(×')) {
+          const match = firstLine.match(/^(\s*[├└]── )(.+)$/)
+          if (match) {
+            firstLine = match[1] + match[2] + ` (×${count})`
+          }
+        } else {
+          // Already has a count, multiply it
+          firstLine = firstLine.replace(/\(×(\d+)\)/, (_, n) => `(×${parseInt(n) * count})`)
+        }
+        result.push(firstLine)
+        // Add rest of subtree
+        for (let j = 1; j < subtree.length; j++) {
+          result.push(subtree[j])
+        }
+        i = compareStart
+      } else {
+        // No repetition, add subtree as-is
+        result.push(...subtree)
+        i = subtreeEnd
+      }
+    }
+
+    return result
+  }
+
   const lines: string[] = ['body']
   const bodyChildren = Array.from(document.body.children).filter(c => !shouldExclude(c))
   for (let i = 0; i < bodyChildren.length; i++) {
@@ -637,7 +714,10 @@ function generateDOMStructureInPage(): string {
     lines.push(...formatNode(child, '', isLast, 1))
   }
 
-  return lines.join('\n')
+  // Compress repeated subtrees
+  const compressed = compressRepeatedSubtrees(lines)
+
+  return compressed.join('\n')
 }
 
 export async function capturePageHTML(): Promise<PageCaptureResult> {
