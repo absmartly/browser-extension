@@ -272,8 +272,8 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
           }
           onBack={onBack}
           actions={
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex items-center gap-2 relative">
+              <div>
                 <button
                   ref={historyButtonRef}
                   onClick={() => setShowHistory(!showHistory)}
