@@ -91,16 +91,6 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
-      const closeEditor = async () => {
-        try {
-          await sendToContent({
-            type: 'CLOSE_MARKDOWN_EDITOR'
-          })
-        } catch (error) {
-          console.error('Error closing markdown editor:', error)
-        }
-      }
-      closeEditor()
     }
   }, [isOpen])
 
