@@ -32,6 +32,16 @@ function testDOMStructureGeneration() {
       return false
     }
 
+    function getElementSignature(el) {
+      let sig = el.tagName.toLowerCase()
+      if (el.id) sig += `#${el.id}`
+      const classes = Array.from(el.classList)
+        .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+        .slice(0, MAX_CLASSES)
+      if (classes.length > 0) sig += '.' + classes.join('.')
+      return sig
+    }
+
     function formatNode(el, prefix, isLast, depth) {
       if (shouldExclude(el) || depth > MAX_DEPTH) return []
 
@@ -90,10 +100,40 @@ function testDOMStructureGeneration() {
       lines.push(prefix + connector + label)
 
       if (depth < MAX_DEPTH) {
-        for (let i = 0; i < validChildren.length; i++) {
+        // Group consecutive children with same signature
+        let i = 0
+        while (i < validChildren.length) {
           const child = validChildren[i]
-          const isChildLast = i === validChildren.length - 1
-          lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+          const childSig = getElementSignature(child)
+
+          // Count consecutive elements with same signature
+          let count = 1
+          while (i + count < validChildren.length &&
+                 getElementSignature(validChildren[i + count]) === childSig) {
+            count++
+          }
+
+          if (count > 1) {
+            // Show compressed format for duplicates
+            const childLines = formatNode(child, prefix + childPrefix, false, depth + 1)
+
+            // Modify the first line to add count
+            if (childLines.length > 0) {
+              const firstLine = childLines[0]
+              const indentMatch = firstLine.match(/^(\s*[├└]── )(.+)$/)
+              if (indentMatch) {
+                childLines[0] = indentMatch[1] + indentMatch[2] + ` (×${count})`
+              }
+            }
+
+            lines.push(...childLines)
+            i += count
+          } else {
+            // Show normally (single element)
+            const isChildLast = i === validChildren.length - 1
+            lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+            i++
+          }
         }
       }
 

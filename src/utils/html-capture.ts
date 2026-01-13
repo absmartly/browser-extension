@@ -368,6 +368,16 @@ function generateDOMStructureInPage(): string {
     return false
   }
 
+  function getElementSignature(el: Element): string {
+    let sig = el.tagName.toLowerCase()
+    if (el.id) sig += `#${el.id}`
+    const classes = Array.from(el.classList)
+      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .slice(0, MAX_CLASSES)
+    if (classes.length > 0) sig += '.' + classes.join('.')
+    return sig
+  }
+
   function formatNode(el: Element, prefix: string, isLast: boolean, depth: number): string[] {
     if (shouldExclude(el) || depth > MAX_DEPTH) return []
 
@@ -426,10 +436,62 @@ function generateDOMStructureInPage(): string {
     lines.push(prefix + connector + label)
 
     if (depth < MAX_DEPTH) {
-      for (let i = 0; i < validChildren.length; i++) {
+      // Group consecutive children with same signature
+      let i = 0
+      while (i < validChildren.length) {
         const child = validChildren[i]
-        const isChildLast = i === validChildren.length - 1
-        lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+        const childSig = getElementSignature(child)
+
+        // Count consecutive elements with same signature
+        let count = 1
+        while (i + count < validChildren.length &&
+               getElementSignature(validChildren[i + count]) === childSig) {
+          count++
+        }
+
+        if (count > 1) {
+          // Show compressed format for duplicates
+          const isChildLast = i + count >= validChildren.length
+
+          // Build label for compressed item
+          let compressedLabel = child.tagName.toLowerCase()
+          if (child.id) compressedLabel += `#${child.id}`
+
+          const classes = Array.from(child.classList)
+            .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+            .slice(0, MAX_CLASSES)
+          if (classes.length > 0) {
+            compressedLabel += '.' + classes.join('.')
+          }
+
+          // Check if all children have identical structure
+          let childrenIdentical = true
+          if (child.children.length > 0) {
+            const firstChildHTML = child.children[0]?.outerHTML
+            for (let j = 1; j < count; j++) {
+              const nextChild = validChildren[i + j].children[0]
+              if (nextChild?.outerHTML !== firstChildHTML) {
+                childrenIdentical = false
+                break
+              }
+            }
+          }
+
+          compressedLabel += ` (×${count})`
+          if (!childrenIdentical && child.children.length > 0) {
+            compressedLabel += ' [children vary]'
+          }
+
+          const connector = isChildLast ? '└── ' : '├── '
+          lines.push(prefix + childPrefix + connector + compressedLabel)
+
+          i += count
+        } else {
+          // Show normally (single element)
+          const isChildLast = i === validChildren.length - 1
+          lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+          i++
+        }
       }
     }
 
