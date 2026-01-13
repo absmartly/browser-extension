@@ -378,6 +378,158 @@ function generateDOMStructureInPage(): string {
     return sig
   }
 
+  function findVaryingClasses(elements: Element[]): Set<string> {
+    if (elements.length <= 1) return new Set()
+
+    const allClassSets = elements.map(el => new Set(Array.from(el.classList)))
+    const firstClasses = allClassSets[0]
+    const varying = new Set<string>()
+
+    // Check each class in first element
+    for (const cls of firstClasses) {
+      for (let i = 1; i < allClassSets.length; i++) {
+        if (!allClassSets[i].has(cls)) {
+          varying.add(cls)
+          break
+        }
+      }
+    }
+
+    // Check for classes in other elements not in first
+    for (let i = 1; i < allClassSets.length; i++) {
+      for (const cls of allClassSets[i]) {
+        if (!firstClasses.has(cls)) {
+          varying.add(cls)
+        }
+      }
+    }
+
+    return varying
+  }
+
+  function formatNodeWithVariations(
+    el: Element,
+    allElements: Element[],
+    prefix: string,
+    isLast: boolean,
+    depth: number,
+    count: number
+  ): string[] {
+    if (shouldExclude(el) || depth > MAX_DEPTH) return []
+
+    const lines: string[] = []
+    const connector = isLast ? '└── ' : '├── '
+    const childPrefix = isLast ? '    ' : '│   '
+
+    let label = el.tagName.toLowerCase()
+
+    if (el.id) {
+      label += `#${el.id}`
+    }
+
+    // Find which classes vary across all elements
+    const varyingClasses = findVaryingClasses(allElements)
+    const classes = Array.from(el.classList)
+      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .slice(0, MAX_CLASSES)
+
+    if (classes.length > 0) {
+      const stableClasses = classes.filter(c => !varyingClasses.has(c))
+      if (stableClasses.length > 0) {
+        label += '.' + stableClasses.join('.')
+      }
+      if (varyingClasses.size > 0) {
+        const varyingList = classes.filter(c => varyingClasses.has(c))
+        if (varyingList.length > 0) {
+          label += '.[varies]'
+        }
+      }
+    }
+
+    const role = el.getAttribute('role')
+    if (role) {
+      label += ` [role="${role}"]`
+    }
+
+    const ariaLabel = el.getAttribute('aria-label')
+    if (ariaLabel) {
+      const short = ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + '...' : ariaLabel
+      label += ` [aria-label="${short}"]`
+    }
+
+    const dataAttrs: string[] = []
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.startsWith('data-') && !attr.name.includes('plasmo')) {
+        const val = attr.value.length > 30 ? attr.value.slice(0, 30) + '...' : attr.value
+        dataAttrs.push(`${attr.name}="${val}"`)
+        if (dataAttrs.length >= 3) break
+      }
+    }
+    if (dataAttrs.length > 0) {
+      label += ` {${dataAttrs.join(' ')}}`
+    }
+
+    label += ` (×${count})`
+
+    const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
+    if (validChildren.length > 0 && depth >= MAX_DEPTH) {
+      label += ` (${validChildren.length} children)`
+    }
+
+    if (el.children.length === 0) {
+      const text = el.textContent?.trim()
+      if (text && text.length > 0 && text.length < 50) {
+        label += ` "${text}"`
+      }
+    }
+
+    lines.push(prefix + connector + label)
+
+    // Recurse into children with same compression logic
+    if (depth < MAX_DEPTH && validChildren.length > 0) {
+      // Group children by signature across all parent elements
+      const childrenByPosition: Element[][] = []
+      for (let childIdx = 0; childIdx < validChildren.length; childIdx++) {
+        childrenByPosition[childIdx] = []
+        for (const parentEl of allElements) {
+          const parentChildren = Array.from(parentEl.children).filter(c => !shouldExclude(c))
+          if (parentChildren[childIdx]) {
+            childrenByPosition[childIdx].push(parentChildren[childIdx])
+          }
+        }
+      }
+
+      for (let childIdx = 0; childIdx < validChildren.length; childIdx++) {
+        const childGroup = childrenByPosition[childIdx]
+        if (childGroup.length === 0) continue
+
+        const isChildLast = childIdx === validChildren.length - 1
+        const childSig = getElementSignature(childGroup[0])
+
+        // Check if all children at this position have same signature
+        const allSame = childGroup.every(c => getElementSignature(c) === childSig)
+
+        if (allSame && childGroup.length > 1) {
+          // Use formatNodeWithVariations for this child position
+          const childLines = formatNodeWithVariations(
+            childGroup[0],
+            childGroup,
+            prefix + childPrefix,
+            isChildLast,
+            depth + 1,
+            childGroup.length
+          )
+          lines.push(...childLines)
+        } else {
+          // Format normally
+          lines.push(...formatNode(validChildren[childIdx], prefix + childPrefix, isChildLast, depth + 1))
+        }
+      }
+    }
+
+    return lines
+  }
+
   function formatNode(el: Element, prefix: string, isLast: boolean, depth: number): string[] {
     if (shouldExclude(el) || depth > MAX_DEPTH) return []
 
@@ -450,41 +602,20 @@ function generateDOMStructureInPage(): string {
         }
 
         if (count > 1) {
-          // Show compressed format for duplicates
+          // Show compressed format with ONE representative structure
           const isChildLast = i + count >= validChildren.length
 
-          // Build label for compressed item
-          let compressedLabel = child.tagName.toLowerCase()
-          if (child.id) compressedLabel += `#${child.id}`
+          // Generate the structure for the first element but mark it as repeated
+          const childLines = formatNodeWithVariations(
+            child,
+            validChildren.slice(i, i + count),
+            prefix + childPrefix,
+            isChildLast,
+            depth + 1,
+            count
+          )
 
-          const classes = Array.from(child.classList)
-            .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
-            .slice(0, MAX_CLASSES)
-          if (classes.length > 0) {
-            compressedLabel += '.' + classes.join('.')
-          }
-
-          // Check if all children have identical structure
-          let childrenIdentical = true
-          if (child.children.length > 0) {
-            const firstChildHTML = child.children[0]?.outerHTML
-            for (let j = 1; j < count; j++) {
-              const nextChild = validChildren[i + j].children[0]
-              if (nextChild?.outerHTML !== firstChildHTML) {
-                childrenIdentical = false
-                break
-              }
-            }
-          }
-
-          compressedLabel += ` (×${count})`
-          if (!childrenIdentical && child.children.length > 0) {
-            compressedLabel += ' [children vary]'
-          }
-
-          const connector = isChildLast ? '└── ' : '├── '
-          lines.push(prefix + childPrefix + connector + compressedLabel)
-
+          lines.push(...childLines)
           i += count
         } else {
           // Show normally (single element)
