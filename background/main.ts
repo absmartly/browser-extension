@@ -357,11 +357,13 @@ export function initializeBackgroundScript() {
         try {
           console.log('[Background] AI_GENERATE_DOM_CHANGES - Starting generation...')
           const config = await getConfig(storage, secureStorage)
-          const { html, prompt, currentChanges, images, conversationSession } = message
+          const { html, prompt, currentChanges, images, conversationSession, pageUrl, domStructure } = message
           console.log('[Background] Message keys:', Object.keys(message))
           console.log('[Background] HTML defined:', !!html, 'type:', typeof html)
           console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length, 'Current changes:', currentChanges?.length || 0, 'Images:', images?.length || 0)
           console.log('[Background] Session:', conversationSession?.id || 'null')
+          console.log('[Background] Page URL:', pageUrl)
+          console.log('[Background] DOM Structure:', domStructure ? `${domStructure.substring(0, 100)}...` : 'not provided')
           console.log('[Background] AI Provider:', config?.aiProvider)
 
           const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api')
@@ -373,13 +375,16 @@ export function initializeBackgroundScript() {
           console.log('[Background] Using API key from config:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing')
 
           const options: any = {
-            aiProvider: config?.aiProvider
+            aiProvider: config?.aiProvider,
+            pageUrl,
+            domStructure
           }
 
           if (conversationSession) {
             options.conversationSession = conversationSession
             console.log('[Background] Passing session to generateDOMChanges:', conversationSession.id)
           }
+          console.log('[Background] Passing pageUrl to generateDOMChanges:', pageUrl)
 
           if (!html && !conversationSession?.htmlSent) {
             throw new Error('HTML is required for the first message in a conversation')

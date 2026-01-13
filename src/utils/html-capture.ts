@@ -338,7 +338,116 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
   }
 }
 
-export async function capturePageHTML(): Promise<string> {
+export interface PageCaptureResult {
+  html: string
+  url: string
+  domStructure: string
+}
+
+function generateDOMStructureInPage(): string {
+  const MAX_DEPTH = 10
+  const MAX_CLASSES = 5
+
+  const EXCLUDE_SELECTORS = [
+    '#__plasmo',
+    '#__plasmo-loading__',
+    '[data-plasmo]',
+    'plasmo-csui',
+    'script',
+    'style',
+    'noscript',
+    'iframe[id^="absmartly-"]'
+  ]
+
+  function shouldExclude(el: Element): boolean {
+    for (const sel of EXCLUDE_SELECTORS) {
+      try {
+        if (el.matches(sel)) return true
+      } catch { /* ignore */ }
+    }
+    return false
+  }
+
+  function formatNode(el: Element, prefix: string, isLast: boolean, depth: number): string[] {
+    if (shouldExclude(el) || depth > MAX_DEPTH) return []
+
+    const lines: string[] = []
+    const connector = isLast ? '└── ' : '├── '
+    const childPrefix = isLast ? '    ' : '│   '
+
+    let label = el.tagName.toLowerCase()
+
+    if (el.id) {
+      label += `#${el.id}`
+    }
+
+    const classes = Array.from(el.classList)
+      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .slice(0, MAX_CLASSES)
+    if (classes.length > 0) {
+      label += '.' + classes.join('.')
+    }
+
+    const role = el.getAttribute('role')
+    if (role) {
+      label += ` [role="${role}"]`
+    }
+
+    const ariaLabel = el.getAttribute('aria-label')
+    if (ariaLabel) {
+      const short = ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + '...' : ariaLabel
+      label += ` [aria-label="${short}"]`
+    }
+
+    const dataAttrs: string[] = []
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.startsWith('data-') && !attr.name.includes('plasmo')) {
+        const val = attr.value.length > 30 ? attr.value.slice(0, 30) + '...' : attr.value
+        dataAttrs.push(`${attr.name}="${val}"`)
+        if (dataAttrs.length >= 3) break
+      }
+    }
+    if (dataAttrs.length > 0) {
+      label += ` {${dataAttrs.join(' ')}}`
+    }
+
+    const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
+    if (validChildren.length > 0 && depth >= MAX_DEPTH) {
+      label += ` (${validChildren.length} children)`
+    }
+
+    if (el.children.length === 0) {
+      const text = el.textContent?.trim()
+      if (text && text.length > 0 && text.length < 50) {
+        label += ` "${text}"`
+      }
+    }
+
+    lines.push(prefix + connector + label)
+
+    if (depth < MAX_DEPTH) {
+      for (let i = 0; i < validChildren.length; i++) {
+        const child = validChildren[i]
+        const isChildLast = i === validChildren.length - 1
+        lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+      }
+    }
+
+    return lines
+  }
+
+  const lines: string[] = ['body']
+  const bodyChildren = Array.from(document.body.children).filter(c => !shouldExclude(c))
+  for (let i = 0; i < bodyChildren.length; i++) {
+    const child = bodyChildren[i]
+    const isLast = i === bodyChildren.length - 1
+    lines.push(...formatNode(child, '', isLast, 1))
+  }
+
+  return lines.join('\n')
+}
+
+export async function capturePageHTML(): Promise<PageCaptureResult> {
   console.log('[HTML Capture] Function called')
 
   try {
@@ -365,24 +474,33 @@ export async function capturePageHTML(): Promise<string> {
       throw new Error('Please open the extension on a webpage, not an extension page')
     }
 
-    console.log('[HTML Capture] Injecting script to capture HTML...')
+    const pageUrl = activeTab.url
+    console.log('[HTML Capture] Page URL:', pageUrl)
+    console.log('[HTML Capture] Injecting script to capture HTML and DOM structure...')
 
     const results = await chrome.scripting.executeScript({
+      target: { tabId: activeTab.id },
+      func: generateDOMStructureInPage
+    })
+
+    const htmlResults = await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
       func: () => document.documentElement.outerHTML
     })
 
     console.log('[HTML Capture] Script executed, results:', results?.length)
 
-    if (!results || results.length === 0 || !results[0]?.result) {
-      console.error('[HTML Capture] No results returned from script')
+    if (!htmlResults || htmlResults.length === 0 || !htmlResults[0]?.result) {
+      console.error('[HTML Capture] No HTML results returned from script')
       throw new Error('Failed to capture HTML: No results returned')
     }
 
-    const html = results[0].result
-    debugLog('📸 Captured HTML from page, length:', html?.length)
-    console.log('[HTML Capture] Success! HTML length:', html?.length)
-    return html
+    const html = htmlResults[0].result
+    const domStructure = results?.[0]?.result || 'body\n└── (structure unavailable)'
+
+    debugLog('📸 Captured HTML from page, length:', html?.length, 'URL:', pageUrl)
+    console.log('[HTML Capture] Success! HTML length:', html?.length, 'Structure lines:', domStructure.split('\n').length)
+    return { html, url: pageUrl, domStructure }
   } catch (error) {
     console.error('[HTML Capture] Error:', error)
     debugError('❌ Failed to capture page HTML:', error)

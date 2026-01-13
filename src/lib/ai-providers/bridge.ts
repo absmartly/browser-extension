@@ -4,7 +4,6 @@ import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import { getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
-import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
 import { BRIDGE_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 
 interface ValidationError {
@@ -97,8 +96,11 @@ export class BridgeProvider implements AIProvider {
 
       console.log('[Bridge] Input session:', JSON.stringify(options.conversationSession))
       console.log('[Bridge] Input HTML:', html ? `${html.length} chars` : 'undefined')
+      console.log('[Bridge] Input pageUrl:', options.pageUrl)
+      console.log('[Bridge] Input domStructure:', options.domStructure ? `${options.domStructure.length} chars` : 'not provided')
 
       let session = options.conversationSession
+      const pageUrl = options.pageUrl || session?.pageUrl
       let conversationId: string
       let systemPromptToSend = await getSystemPrompt(this.getChunkRetrievalPrompt())
 
@@ -112,21 +114,23 @@ export class BridgeProvider implements AIProvider {
           throw new Error('HTML is required for creating new bridge conversation')
         }
 
-        // Get the actual bridge URL (may be on a different port than default 3000)
-        // This is important because the CLI defaults to port 3000 but bridge may be on 3001-3004
         const connection = this.bridgeClient.getConnection()
         const bridgeUrl = connection?.url || 'http://localhost:3000'
         console.log('[Bridge] Using bridge URL for CLI commands:', bridgeUrl)
 
-        // Generate DOM structure instead of including full HTML
-        const domStructure = generateDOMStructure(html, { maxDepth: 5 })
-        const structureText = formatDOMStructureAsText(domStructure)
+        const structureText = options.domStructure || '(DOM structure not available)'
+        console.log('[Bridge] Using pre-generated DOM structure:', structureText.substring(0, 100) + '...')
 
-        // Add DOM structure to system prompt (not full HTML)
+        // Add page URL and DOM structure to system prompt
         // Include --bridge-url parameter so CLI connects to correct port
-        systemPromptToSend += `\n\n## Page DOM Structure
+        systemPromptToSend += `\n\n## Page Being Edited
 
-The following is a tree representation of the page structure. Use the get-chunk CLI to retrieve specific HTML sections when needed.
+**URL**: ${pageUrl || 'Unknown'}
+${pageUrl ? `**Domain**: ${new URL(pageUrl).hostname}` : ''}
+
+## Page DOM Structure
+
+The following is a tree representation of the page structure. Use curl to retrieve specific HTML sections when needed.
 
 \`\`\`
 ${structureText}
@@ -134,22 +138,26 @@ ${structureText}
 
 ## Retrieving HTML Chunks
 
-To get the HTML for specific section(s), use curl:
+To get the HTML for specific section(s), use curl with the **localhost bridge URL** (NOT the page URL):
 
 \`\`\`bash
-# Single selector
-curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selector=.hero-section"
+# Single selector - use actual class/id from the DOM structure above
+curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selector=.actual-class-from-structure"
 
 # Multiple selectors (comma-separated, URL-encode # as %23)
-curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selectors=header,%23main-content,.hero-section"
+curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selectors=header,%23main-content,section"
 \`\`\`
 
-**IMPORTANT**: Always use the exact URL \`${bridgeUrl}\` shown above.
+**CRITICAL RULES**:
+1. ✅ Always use \`${bridgeUrl}\` for curl - this is the localhost bridge server
+2. ❌ NEVER curl the actual website URL (${pageUrl ? new URL(pageUrl).hostname : 'the page domain'})
+3. ✅ Use selectors you see in the DOM structure above - don't invent selectors
+4. ❌ NEVER use generic selectors like ".hero-section" unless you see them in the structure
 
 The response will contain the HTML for each selector. Use this to inspect elements before generating DOM changes.
 `
         console.log('[Bridge] Including DOM structure in system prompt (not full HTML)')
-        console.log(`[Bridge] DOM structure: ${domStructure.totalElements} elements, max depth ${domStructure.maxDepth}`)
+        console.log(`[Bridge] DOM structure: ${structureText.length} chars`)
 
         console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         console.log('[Bridge] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
@@ -176,6 +184,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         session = {
           id: sessionId,
           htmlSent: true,
+          pageUrl,
           messages: [],
           conversationId
         }

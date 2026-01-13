@@ -4,7 +4,6 @@ import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import { sanitizeHtml, getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
-import { generateDOMStructure, formatDOMStructureAsText } from './dom-structure'
 import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
 import { validateXPath } from '~src/utils/xpath-validator'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
@@ -160,31 +159,29 @@ export class AnthropicProvider implements AIProvider {
     let systemPrompt = sanitizeHtml(await getSystemPrompt(this.getChunkRetrievalPrompt()))
     console.log('[Anthropic] Base system prompt length:', systemPrompt.length)
 
-    // For new conversations, include DOM structure instead of full HTML
     if (!session.htmlSent) {
-      if (!html) {
-        throw new Error('HTML is required for first message in conversation')
+      if (!html && !options.domStructure) {
+        throw new Error('HTML or DOM structure is required for first message in conversation')
       }
 
-      // Generate DOM structure instead of including full HTML
-      const domStructure = generateDOMStructure(html, { maxDepth: 5 })
-      const structureText = formatDOMStructureAsText(domStructure)
+      const structureText = options.domStructure || '(DOM structure not available)'
+      console.log('[Anthropic] Using pre-generated DOM structure:', structureText.substring(0, 100) + '...')
 
       systemPrompt += `\n\n## Page DOM Structure
 
-The following is a tree representation of the page structure. Use the \`get_html_chunk\` tool to retrieve specific HTML sections when needed.
+The following is a tree representation of the page structure. Use the \`css_query\` tool to retrieve specific HTML sections when needed.
 
 \`\`\`
 ${structureText}
 \`\`\`
 
-To inspect sections, call \`get_html_chunk\` with an array of CSS selectors:
-- \`get_html_chunk({ selectors: ["#main-content", ".hero-section", "header"] })\`
+To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
+- \`css_query({ selectors: ["section", "header", "nav"] })\`
 
-Request multiple sections in one call for efficiency.
+IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
 `
       session.htmlSent = true
-      console.log(`[Anthropic] 📄 Including DOM structure in system prompt (${domStructure.totalElements} elements, max depth ${domStructure.maxDepth})`)
+      console.log(`[Anthropic] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
     }
 
     systemPrompt = sanitizeHtml(systemPrompt)

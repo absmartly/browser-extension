@@ -17,12 +17,14 @@ export function useConversationHistory(variantName: string) {
     console.log('[initializeSessionHTML] Starting background HTML capture...')
 
     try {
-      const html = await capturePageHTML()
-      console.log('[initializeSessionHTML] HTML captured, length:', html.length)
+      const captureResult = await capturePageHTML()
+      console.log('[initializeSessionHTML] HTML captured, length:', captureResult.html.length, 'URL:', captureResult.url, 'structure lines:', captureResult.domStructure?.split('\n').length)
 
       const response = await sendToBackground({
         type: 'AI_INITIALIZE_SESSION',
-        html,
+        html: captureResult.html,
+        pageUrl: captureResult.url,
+        domStructure: captureResult.domStructure,
         conversationSession: session
       })
 
@@ -210,12 +212,14 @@ export function useConversationHistory(variantName: string) {
 
     try {
       console.log('[useConversationHistory] Refreshing HTML context...')
-      const html = await capturePageHTML()
-      console.log('[useConversationHistory] HTML captured, length:', html.length)
+      const captureResult = await capturePageHTML()
+      console.log('[useConversationHistory] HTML captured, length:', captureResult.html.length, 'URL:', captureResult.url, 'structure lines:', captureResult.domStructure?.split('\n').length)
 
       const response = await sendToBackground({
         type: 'AI_REFRESH_HTML',
-        html,
+        html: captureResult.html,
+        pageUrl: captureResult.url,
+        domStructure: captureResult.domStructure,
         conversationSession
       })
 

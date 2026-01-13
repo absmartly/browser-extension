@@ -297,42 +297,33 @@ export function useDOMChangesEditor({
       }
 
       let html: string | undefined
+      let pageUrl: string | undefined
+      let domStructure: string | undefined
 
       if (conversationSession?.htmlSent) {
         console.log('[AI Generate] Session already has HTML sent, skipping capture')
         html = undefined
+        pageUrl = conversationSession.pageUrl
+        domStructure = undefined
       } else {
         console.log('[AI Generate] ===== About to call capturePageHTML =====')
-        console.log('[AI Generate] capturePageHTML function exists:', typeof capturePageHTML)
-        console.log('[AI Generate] capturePageHTML is:', capturePageHTML?.name)
 
-        let htmlPromise
         try {
           console.log('[AI Generate] Calling capturePageHTML()...')
-          htmlPromise = capturePageHTML()
-          console.log('[AI Generate] capturePageHTML() returned:', htmlPromise)
+          const captureResult = await capturePageHTML()
+          html = captureResult.html
+          pageUrl = captureResult.url
+          domStructure = captureResult.domStructure
+          console.log('[AI Generate] capturePageHTML completed, HTML length:', html?.length, 'url:', pageUrl, 'structure lines:', domStructure?.split('\n').length)
         } catch (callError) {
           console.error('[AI Generate] capturePageHTML() call threw:', callError)
           throw callError
         }
-
-        htmlPromise = htmlPromise.then(
-          (result) => {
-            console.log('[AI Generate] capturePageHTML resolved, length:', result?.length)
-            return result
-          },
-          (error) => {
-            console.error('[AI Generate] capturePageHTML rejected:', error)
-            throw error
-          }
-        )
-        console.log('[AI Generate] capturePageHTML promise created, awaiting...')
-        html = await htmlPromise
-        console.log('[AI Generate] capturePageHTML await completed, length:', html?.length)
       }
 
       console.log('[AI Generate] Sending message to background script...')
       console.log('[AI Generate] Session:', conversationSession?.id || 'null')
+      console.log('[AI Generate] Page URL:', pageUrl)
       const response = await sendToBackground({
         type: 'AI_GENERATE_DOM_CHANGES',
         html,
@@ -340,7 +331,9 @@ export function useDOMChangesEditor({
         apiKey,
         images,
         currentChanges: changes,
-        conversationSession: conversationSession || null
+        conversationSession: conversationSession || null,
+        pageUrl,
+        domStructure
       })
 
       console.log('[AI Generate] Response received:', JSON.stringify(response, null, 2))

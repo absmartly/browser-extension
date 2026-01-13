@@ -11,6 +11,8 @@ export interface AIProviderConfig {
 
 export interface GenerateOptions {
   conversationSession?: ConversationSession
+  pageUrl?: string
+  domStructure?: string
 }
 
 export interface AIProvider {

@@ -2,6 +2,9 @@ export interface DOMNode {
   tag: string
   id?: string
   classes?: string[]
+  dataAttrs?: Record<string, string>
+  ariaLabel?: string
+  role?: string
   selector: string
   childCount: number
   textPreview?: string
@@ -17,7 +20,16 @@ export interface DOMStructure {
 export interface DOMStructureOptions {
   maxDepth?: number
   includeTextPreview?: boolean
+  includeDataAttrs?: boolean
+  maxClasses?: number
   excludeSelectors?: string[]
+}
+
+export const DEFAULT_DOM_STRUCTURE_OPTIONS: DOMStructureOptions = {
+  maxDepth: 10,
+  maxClasses: 5,
+  includeDataAttrs: true,
+  includeTextPreview: true
 }
 
 const DEFAULT_EXCLUDE_SELECTORS = [
@@ -108,8 +120,7 @@ function buildDOMNode(
   const id = element.id || undefined
   const classes = Array.from(element.classList).filter(c =>
     !c.startsWith('__') &&
-    !c.includes('plasmo') &&
-    c.length < 30
+    !c.includes('plasmo')
   )
 
   const node: DOMNode = {
@@ -123,7 +134,30 @@ function buildDOMNode(
   }
 
   if (classes.length > 0) {
-    node.classes = classes.slice(0, 3)
+    node.classes = classes.slice(0, options.maxClasses)
+  }
+
+  if (options.includeDataAttrs) {
+    const dataAttrs: Record<string, string> = {}
+    for (const attr of Array.from(element.attributes)) {
+      if (attr.name.startsWith('data-') && !attr.name.includes('plasmo')) {
+        const shortValue = attr.value.length > 50 ? attr.value.slice(0, 50) + '...' : attr.value
+        dataAttrs[attr.name] = shortValue
+      }
+    }
+    if (Object.keys(dataAttrs).length > 0) {
+      node.dataAttrs = dataAttrs
+    }
+
+    const ariaLabel = element.getAttribute('aria-label')
+    if (ariaLabel) {
+      node.ariaLabel = ariaLabel.length > 50 ? ariaLabel.slice(0, 50) + '...' : ariaLabel
+    }
+
+    const role = element.getAttribute('role')
+    if (role) {
+      node.role = role
+    }
   }
 
   if (options.includeTextPreview && element.children.length === 0) {
@@ -160,8 +194,10 @@ export function generateDOMStructure(
   options?: DOMStructureOptions
 ): DOMStructure {
   const opts: Required<DOMStructureOptions> = {
-    maxDepth: options?.maxDepth ?? 4,
+    maxDepth: options?.maxDepth ?? 8,
     includeTextPreview: options?.includeTextPreview ?? true,
+    includeDataAttrs: options?.includeDataAttrs ?? true,
+    maxClasses: options?.maxClasses ?? 5,
     excludeSelectors: options?.excludeSelectors ?? DEFAULT_EXCLUDE_SELECTORS
   }
 
@@ -246,8 +282,25 @@ function formatNode(node: DOMNode, prefix: string, isLast: boolean): string[] {
   let label = node.tag
   if (node.id) {
     label += `#${node.id}`
-  } else if (node.classes && node.classes.length > 0) {
+  }
+  if (node.classes && node.classes.length > 0) {
     label += '.' + node.classes.join('.')
+  }
+
+  if (node.role) {
+    label += ` [role="${node.role}"]`
+  }
+
+  if (node.ariaLabel) {
+    label += ` [aria-label="${node.ariaLabel}"]`
+  }
+
+  if (node.dataAttrs && Object.keys(node.dataAttrs).length > 0) {
+    const attrs = Object.entries(node.dataAttrs)
+      .slice(0, 3)
+      .map(([k, v]) => `${k}="${v}"`)
+      .join(' ')
+    label += ` {${attrs}}`
   }
 
   if (node.childCount > 0 && !node.children) {

@@ -170,6 +170,7 @@ export interface ConversationSession {
   id?: string
   conversationId?: string
   htmlSent?: boolean
+  pageUrl?: string
   anthropicSystemParameter?: string[]
   nextPrompt?: string
   messages: Array<{

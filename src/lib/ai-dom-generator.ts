@@ -13,6 +13,8 @@ export async function generateDOMChanges(
     oauthToken?: string
     aiProvider?: 'claude-subscription' | 'anthropic-api' | 'openai-api'
     conversationSession?: ConversationSession
+    pageUrl?: string
+    domStructure?: string
   }
 ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
   try {
@@ -23,6 +25,8 @@ export async function generateDOMChanges(
     console.log('[AI Gen] 📄 HTML length:', html?.length || 'undefined')
     console.log('[AI Gen] 🖼️ Images:', images?.length || 0)
     console.log('[AI Gen] 💾 Has conversation session:', !!options?.conversationSession)
+    console.log('[AI Gen] 🌐 Page URL:', options?.pageUrl)
+    console.log('[AI Gen] 🌲 DOM Structure:', options?.domStructure ? `${options.domStructure.length} chars` : 'not provided')
 
     if (!html && !options?.conversationSession?.htmlSent) {
       throw new Error('HTML is required for the first message in a conversation')
@@ -50,7 +54,11 @@ export async function generateDOMChanges(
       prompt,
       currentChanges,
       images,
-      { conversationSession: options?.conversationSession }
+      {
+        conversationSession: options?.conversationSession,
+        pageUrl: options?.pageUrl,
+        domStructure: options?.domStructure
+      }
     )
 
     console.log('[AI Gen] ✅ Generation successful')
