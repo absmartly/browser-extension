@@ -58,6 +58,12 @@ export class PreviewManager {
       }
     }
 
+    // Handle styleRules early - they don't need querySelector validation
+    // because they inject CSS that can contain pseudo-states like :hover
+    if (change.type === 'styleRules') {
+      return this.applyStyleRules(change as DOMChangeStyleRules, experimentName)
+    }
+
     const allElements = document.querySelectorAll(change.selector)
 
     // Filter out extension UI shadow hosts (sidebar, toolbars wrapped in shadow DOM)
@@ -178,11 +184,6 @@ export class PreviewManager {
 
       Logger.log('Applied change to element:', element)
     })
-
-    // Handle styleRules separately (affects all matching elements via CSS rules)
-    if (change.type === 'styleRules') {
-      return this.applyStyleRules(change as DOMChangeStyleRules, experimentName)
-    }
 
     return true
   }
