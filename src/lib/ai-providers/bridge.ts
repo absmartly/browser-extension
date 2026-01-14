@@ -150,7 +150,7 @@ curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selectors=header,%23main-
 
 **CRITICAL RULES**:
 1. ✅ Always use \`${bridgeUrl}\` for curl - this is the localhost bridge server
-2. ❌ NEVER curl the actual website URL (${pageUrl ? new URL(pageUrl).hostname : 'the page domain'})
+2. ⚠️  Only curl the actual website URL (${pageUrl || 'the page URL'}) as a LAST RESORT if the bridge tool is not working
 3. ✅ Use selectors you see in the DOM structure above - don't invent selectors
 4. ❌ NEVER use generic selectors like ".hero-section" unless you see them in the structure
 
