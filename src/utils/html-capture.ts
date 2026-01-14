@@ -647,72 +647,72 @@ function generateDOMStructureInPage(): string {
     let i = 1
 
     while (i < lines.length) {
-      const currentLine = lines[i]
-      const indent = currentLine.match(/^(\s*)/)?.[1] || ''
+      const currentIndent = lines[i].match(/^(\s*)/)?.[1] || ''
 
-      // Find the subtree for this node (all lines with greater indentation)
-      const subtreeStart = i
-      let subtreeEnd = i + 1
+      // Collect all siblings at this indent level (same parent)
+      const siblings: { subtree: string[]; startIdx: number }[] = []
 
-      while (subtreeEnd < lines.length) {
-        const nextIndent = lines[subtreeEnd].match(/^(\s*)/)?.[1] || ''
-        if (nextIndent.length <= indent.length && subtreeEnd > subtreeStart) {
-          break
-        }
-        subtreeEnd++
-      }
-
-      const subtree = lines.slice(subtreeStart, subtreeEnd)
-
-      // Check if there are consecutive identical subtrees
-      let count = 1
-      let compareStart = subtreeEnd
-
-      while (compareStart < lines.length) {
-        const compareEnd = compareStart + subtree.length
-        if (compareEnd > lines.length) break
-
-        const candidateSubtree = lines.slice(compareStart, compareEnd)
-
-        // Check if subtrees are identical
-        let identical = true
-        for (let j = 0; j < subtree.length; j++) {
-          if (subtree[j] !== candidateSubtree[j]) {
-            identical = false
-            break
-          }
+      while (i < lines.length) {
+        const lineIndent = lines[i].match(/^(\s*)/)?.[1] || ''
+        if (lineIndent.length < currentIndent.length) break
+        if (lineIndent.length > currentIndent.length) {
+          i++
+          continue
         }
 
-        if (identical) {
-          count++
-          compareStart = compareEnd
-        } else {
-          break
-        }
-      }
+        // Found a sibling - extract its complete subtree
+        const subtreeStart = i
+        let subtreeEnd = i + 1
 
-      if (count > 1) {
-        // Add count to the first line if not already present
-        let firstLine = subtree[0]
-        if (!firstLine.includes('(×')) {
-          const match = firstLine.match(/^(\s*[├└]── )(.+)$/)
-          if (match) {
-            firstLine = match[1] + match[2] + ` (×${count})`
-          }
-        } else {
-          // Already has a count, multiply it
-          firstLine = firstLine.replace(/\(×(\d+)\)/, (_, n) => `(×${parseInt(n) * count})`)
+        while (subtreeEnd < lines.length) {
+          const nextIndent = lines[subtreeEnd].match(/^(\s*)/)?.[1] || ''
+          if (nextIndent.length <= currentIndent.length) break
+          subtreeEnd++
         }
-        result.push(firstLine)
-        // Add rest of subtree
-        for (let j = 1; j < subtree.length; j++) {
-          result.push(subtree[j])
-        }
-        i = compareStart
-      } else {
-        // No repetition, add subtree as-is
-        result.push(...subtree)
+
+        siblings.push({
+          subtree: lines.slice(subtreeStart, subtreeEnd),
+          startIdx: subtreeStart
+        })
+
         i = subtreeEnd
+      }
+
+      // Group siblings by subtree content
+      const groups = new Map<string, { subtree: string[]; count: number }>()
+
+      for (const sibling of siblings) {
+        const key = sibling.subtree.join('\n')
+        const existing = groups.get(key)
+        if (existing) {
+          existing.count++
+        } else {
+          groups.set(key, { subtree: sibling.subtree, count: 1 })
+        }
+      }
+
+      // Output groups (unique subtrees with counts)
+      for (const group of groups.values()) {
+        if (group.count > 1) {
+          // Add/update count on first line
+          let firstLine = group.subtree[0]
+          if (!firstLine.includes('(×')) {
+            const match = firstLine.match(/^(\s*[├└]── )(.+)$/)
+            if (match) {
+              firstLine = match[1] + match[2] + ` (×${group.count})`
+            }
+          } else {
+            // Already has count, multiply it
+            firstLine = firstLine.replace(/\(×(\d+)\)/, (_, n) => `(×${parseInt(n) * group.count})`)
+          }
+          result.push(firstLine)
+          for (let j = 1; j < group.subtree.length; j++) {
+            result.push(group.subtree[j])
+          }
+        } else {
+          // Unique subtree, add as-is
+          result.push(...group.subtree)
+        }
       }
     }
 
