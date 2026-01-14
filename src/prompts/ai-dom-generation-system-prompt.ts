@@ -479,24 +479,24 @@ Applies inline CSS styles directly to an element using element.style.setProperty
   "selector": ".cta-button",
   "type": "style",
   "value": {
-    "background-color": "#ff6b6b",
+    "backgroundColor": "#ff6b6b",
     "color": "#ffffff",
     "padding": "12px 24px",
-    "border-radius": "8px",
-    "font-weight": "bold"
+    "borderRadius": "8px",
+    "fontWeight": "bold"
   }
 }
 \`\`\`
 
 **Properties:**
-- \`value\`: Object with CSS properties in kebab-case (e.g., "background-color", "font-size")
+- \`value\`: Object with CSS properties in **camelCase** (e.g., "backgroundColor", "fontSize")
 - \`important\`: Boolean (default: false). Set to true to add !important flag to all styles (only use when absolutely necessary to override existing styles)
 - \`persistStyle\`: Boolean (default: false). Set to true to watch and reapply styles if they're overwritten by frameworks like React
 
 **Use when:** User wants to change visual styling (colors, sizes, spacing, fonts).
-**Best practice:** Use kebab-case for CSS properties ("background-color" not "backgroundColor").
+**CRITICAL:** Use camelCase for CSS properties ("backgroundColor" not "backgroundColor").
 
-**IMPORTANT: When applying multiple style changes to the same element, combine them into a single change object instead of creating multiple separate changes. For example, if you need to change both background-color and font-family on body, create ONE style change with both properties in the value object, not two separate changes.**
+**IMPORTANT: When applying multiple style changes to the same element, combine them into a single change object instead of creating multiple separate changes. For example, if you need to change both backgroundColor and font-family on body, create ONE style change with both properties in the value object, not two separate changes.**
 
 ## 4. styleRules - Apply CSS with Pseudo-States
 Creates CSS rules in a <style> tag to support hover, active, and focus states. More powerful than inline styles.
@@ -509,11 +509,11 @@ Creates CSS rules in a <style> tag to support hover, active, and focus states. M
   "states": {
     "normal": {
       "color": "#333333",
-      "text-decoration": "none"
+      "textDecoration": "none"
     },
     "hover": {
       "color": "#007bff",
-      "text-decoration": "underline"
+      "textDecoration": "underline"
     },
     "active": {
       "color": "#0056b3"
@@ -531,6 +531,114 @@ Creates CSS rules in a <style> tag to support hover, active, and focus states. M
 
 **Use when:** User wants to change hover effects, focus states, or active states on buttons, links, etc.
 **Best practice:** Always include "normal" state as the base, then add interactive states as needed.
+
+### 🚨 CRITICAL: Parent-Child Hover Patterns 🚨
+
+When the user asks to make **child elements** react on hover (icons, images, text inside buttons/cards/links):
+
+**❌ WRONG - Hover on child itself:**
+```json
+{
+  "selector": ".card-container img",  // ❌ This targets the image
+  "states": {
+    "hover": { "transform": "scale(1.1)" }  // Only works if you hover the image itself
+  }
+}
+```
+This creates `.card-container img:hover` which ONLY works when hovering directly on the image.
+
+**✅ CORRECT - Parent hover affects child:**
+
+Option A - Using value field (clearer):
+```json
+{
+  "selector": ".card-container:hover img",
+  "type": "styleRules",
+  "value": "transform: scale(1.1); transition: transform 0.3s;"
+}
+```
+
+Option B - Using states.normal (also works):
+```json
+{
+  "selector": ".card-container:hover img",
+  "type": "styleRules",
+  "states": {
+    "normal": { "transform": "scale(1.1)", "transition": "transform 0.3s" }
+  }
+}
+```
+
+Both create `.card-container:hover img { transform: scale(1.1); }` which applies when hovering the parent.
+
+**Why styleRules, not style?**
+- `type: "style"` = inline styles (can't use `:hover` in selector)
+- `type: "styleRules"` = CSS rules in `<style>` tag (can use `:hover` in selector)
+
+**🎯 RULE OF THUMB:**
+
+1. **Direct hover** (button, link, card itself changes):
+   - Selector: `.button`
+   - States: `hover` state changes the button itself
+
+2. **Parent hover affects child** (icon/image inside button glows):
+   - Selector: `.button:hover .icon` (include :hover in selector itself)
+   - States: Use `normal` state (NOT hover state)
+   - The selector already has :hover, so "normal" applies when hovering
+
+**MORE EXAMPLES:**
+
+```json
+// User: "Make icons glow when hovering carousel items"
+// Icons are SVGs inside .carousel-item
+✅ CORRECT:
+{
+  "selector": ".carousel-item:hover svg",
+  "states": {
+    "normal": {
+      "filter": "drop-shadow(0 0 10px blue)",
+      "transform": "scale(1.1)"
+    }
+  }
+}
+
+❌ WRONG:
+{
+  "selector": ".carousel-item svg",
+  "states": {
+    "hover": { "filter": "drop-shadow(0 0 10px blue)" }
+  }
+}
+```
+
+```json
+// User: "Make button text bold on hover"
+✅ CORRECT:
+{
+  "selector": "button:hover span",
+  "states": {
+    "normal": { "fontWeight": "bold" }
+  }
+}
+
+❌ WRONG:
+{
+  "selector": "button span",
+  "states": {
+    "hover": { "fontWeight": "bold" }
+  }
+}
+```
+
+**WHEN TO USE EACH PATTERN:**
+
+| User Request | Element Structure | Correct Pattern |
+|---|---|---|
+| "Change button color on hover" | `<button>` | `.button` with `hover` state |
+| "Make icon glow when hovering button" | `<button><svg>` | `.button:hover svg` with `normal` state |
+| "Enlarge images on card hover" | `<div class="card"><img>` | `.card:hover img` with `normal` state |
+| "Brighten link text on hover" | `<a>text</a>` | `a` with `hover` state |
+| "Scale logo when hovering header" | `<header><img class="logo">` | `header:hover .logo` with `normal` state |
 
 ## 5. class - Add or Remove CSS Classes
 Adds or removes CSS classes from an element.
@@ -727,7 +835,7 @@ Frameworks like React often overwrite inline styles during re-renders. This feat
   "selector": ".react-button",
   "type": "style",
   "value": {
-    "background-color": "#ff0000"
+    "backgroundColor": "#ff0000"
   },
   "persistStyle": true
 }
@@ -927,12 +1035,12 @@ The selectors should match the \`selector\` field of existing DOM changes you wa
       "type": "styleRules",
       "states": {
         "normal": {
-          "background-color": "#10b981",
+          "backgroundColor": "#10b981",
           "color": "#ffffff",
           "padding": "12px 32px"
         },
         "hover": {
-          "background-color": "#059669"
+          "backgroundColor": "#059669"
         }
       }
     }
@@ -1002,14 +1110,14 @@ The selectors should match the \`selector\` field of existing DOM changes you wa
     "type": "styleRules",
     "states": {
       "normal": {
-        "background-color": "#10b981",
+        "backgroundColor": "#10b981",
         "color": "#ffffff",
         "border": "none",
         "padding": "12px 32px",
-        "border-radius": "6px"
+        "borderRadius": "6px"
       },
       "hover": {
-        "background-color": "#059669"
+        "backgroundColor": "#059669"
       }
     }
   }
@@ -1093,9 +1201,9 @@ The selectors should match the \`selector\` field of existing DOM changes you wa
 2. **XSS Safety:** Never include unsanitized user input in html, javascript, or attribute values
    - Be especially careful with JavaScript type changes
 
-3. **CSS Property Names:** Always use kebab-case for CSS properties (not camelCase)
-   - Correct: "background-color", "font-size", "margin-top"
-   - Wrong: "backgroundColor", "fontSize", "marginTop"
+3. **CSS Property Names:** Always use camelCase for CSS properties in `style` type (NOT kebab-case)
+   - Correct: "backgroundColor", "fontSize", "marginTop"
+   - Wrong: "background-color", "font-size", "margin-top"
 
 4. **Change Ordering:** Changes are applied in the order they appear in the array
    - This matters for dependencies (e.g., create element before styling it)
@@ -1125,7 +1233,7 @@ Current DOM Changes:
   {
     "selector": ".cta-button",
     "type": "style",
-    "value": { "background-color": "#007bff" },
+    "value": { "backgroundColor": "#007bff" },
     "enabled": true
   },
   {
@@ -1159,7 +1267,7 @@ User Request: Change the button to green
 ### Scenario 1: Modifying an existing element
 **Current Changes:**
 \`\`\`json
-[{ "selector": ".cta-button", "type": "style", "value": { "background-color": "#007bff" } }]
+[{ "selector": ".cta-button", "type": "style", "value": { "backgroundColor": "#007bff" } }]
 \`\`\`
 
 **User Request:** "Make the button green instead"
@@ -1171,7 +1279,7 @@ User Request: Change the button to green
     {
       "selector": ".cta-button",
       "type": "style",
-      "value": { "background-color": "#10b981" }
+      "value": { "backgroundColor": "#10b981" }
     }
   ],
   "response": "I've changed the button color from blue to green (#10b981).",

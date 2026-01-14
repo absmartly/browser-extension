@@ -485,44 +485,39 @@ function generateDOMStructureInPage(): string {
 
     lines.push(prefix + connector + label)
 
-    // Recurse into children with same compression logic
+    // Just show the first element's children with normal compression
+    // No need to cross-analyze - just show one representative structure
     if (depth < MAX_DEPTH && validChildren.length > 0) {
-      // Group children by signature across all parent elements
-      const childrenByPosition: Element[][] = []
-      for (let childIdx = 0; childIdx < validChildren.length; childIdx++) {
-        childrenByPosition[childIdx] = []
-        for (const parentEl of allElements) {
-          const parentChildren = Array.from(parentEl.children).filter(c => !shouldExclude(c))
-          if (parentChildren[childIdx]) {
-            childrenByPosition[childIdx].push(parentChildren[childIdx])
-          }
+      let i = 0
+      while (i < validChildren.length) {
+        const child = validChildren[i]
+        const childSig = getElementSignature(child)
+
+        // Count consecutive elements with same signature within first parent
+        let childCount = 1
+        while (i + childCount < validChildren.length &&
+               getElementSignature(validChildren[i + childCount]) === childSig) {
+          childCount++
         }
-      }
 
-      for (let childIdx = 0; childIdx < validChildren.length; childIdx++) {
-        const childGroup = childrenByPosition[childIdx]
-        if (childGroup.length === 0) continue
+        const isChildLast = i + childCount >= validChildren.length
 
-        const isChildLast = childIdx === validChildren.length - 1
-        const childSig = getElementSignature(childGroup[0])
-
-        // Check if all children at this position have same signature
-        const allSame = childGroup.every(c => getElementSignature(c) === childSig)
-
-        if (allSame && childGroup.length > 1) {
-          // Use formatNodeWithVariations for this child position
-          const childLines = formatNodeWithVariations(
-            childGroup[0],
-            childGroup,
-            prefix + childPrefix,
-            isChildLast,
-            depth + 1,
-            childGroup.length
-          )
-          lines.push(...childLines)
+        if (childCount > 1) {
+          // Show compressed children
+          const childLines = formatNode(child, prefix + childPrefix, isChildLast, depth + 1)
+          if (childLines.length > 0) {
+            const firstLine = childLines[0]
+            const indentMatch = firstLine.match(/^(\s*[├└]── )(.+)$/)
+            if (indentMatch) {
+              childLines[0] = indentMatch[1] + indentMatch[2] + ` (×${childCount})`
+            }
+            lines.push(...childLines)
+          }
+          i += childCount
         } else {
-          // Format normally
-          lines.push(...formatNode(validChildren[childIdx], prefix + childPrefix, isChildLast, depth + 1))
+          // Single child
+          lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+          i++
         }
       }
     }
