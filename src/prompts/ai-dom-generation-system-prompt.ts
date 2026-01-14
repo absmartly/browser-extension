@@ -549,27 +549,31 @@ This creates `.card-container img:hover` which ONLY works when hovering directly
 
 **✅ CORRECT - Parent hover affects child:**
 
-Option A - Using value field (clearer):
+Option A - Using value field with raw CSS (clearer):
 ```json
 {
   "selector": ".card-container:hover img",
   "type": "styleRules",
-  "value": "transform: scale(1.1); transition: transform 0.3s;"
+  "value": "transform: scale(1.1); transition: transform 0.3s;"  // kebab-case (raw CSS)
 }
 ```
 
-Option B - Using states.normal (also works):
+Option B - Using states.normal with object (also works):
 ```json
 {
   "selector": ".card-container:hover img",
   "type": "styleRules",
   "states": {
-    "normal": { "transform": "scale(1.1)", "transition": "transform 0.3s" }
+    "normal": { "transform": "scale(1.1)", "transition": "transform 0.3s" }  // camelCase (converted to CSS)
   }
 }
 ```
 
 Both create `.card-container:hover img { transform: scale(1.1); }` which applies when hovering the parent.
+
+**Property Syntax:**
+- `value` string → kebab-case (raw CSS: "transform: scale(1.1)")
+- `states` object → camelCase (JS object: "transform": "scale(1.1)")
 
 **Why styleRules, not style?**
 - `type: "style"` = inline styles (can't use `:hover` in selector)
