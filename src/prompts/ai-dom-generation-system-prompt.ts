@@ -530,16 +530,16 @@ Creates CSS rules in a <style> tag to support hover, active, and focus states. M
 - \`value\`: Alternatively, provide complete CSS rule(s) as a string (must include selector and braces)
 
 **Value String Format:**
-```json
+\`\`\`json
 {
   "selector": "ignored-when-using-value",
   "type": "styleRules",
-  "value": ".actual-selector { color: red; }\n.another { font-size: 16px; }"
+  "value": ".actual-selector { color: red; }\\n.another { font-size: 16px; }"
 }
-```
+\`\`\`
 
 **States Object Format (Recommended):**
-```json
+\`\`\`json
 {
   "selector": ".button",
   "type": "styleRules",
@@ -548,7 +548,7 @@ Creates CSS rules in a <style> tag to support hover, active, and focus states. M
     "hover": { "backgroundColor": "#0056b3" }
   }
 }
-```
+\`\`\`
 
 **Use when:** User wants to change hover effects, focus states, or active states on buttons, links, etc.
 **Best practice:** Use \`states\` object (clearer and less error-prone than raw CSS strings).
@@ -558,29 +558,29 @@ Creates CSS rules in a <style> tag to support hover, active, and focus states. M
 When the user asks to make **child elements** react on hover (icons, images, text inside buttons/cards/links):
 
 **❌ WRONG - Hover on child itself:**
-```json
+\`\`\`json
 {
-  "selector": ".card-container img",  // ❌ This targets the image
+  "selector": ".card-container img",
   "states": {
-    "hover": { "transform": "scale(1.1)" }  // Only works if you hover the image itself
+    "hover": { "transform": "scale(1.1)" }
   }
 }
-```
-This creates `.card-container img:hover` which ONLY works when hovering directly on the image.
+\`\`\`
+This creates \`.card-container img:hover\` which ONLY works when hovering directly on the image.
 
 **✅ CORRECT - Parent hover affects child:**
 
 Option A - Using value field with complete CSS rule:
-```json
+\`\`\`json
 {
-  "selector": ".card-container",  // selector field (ignored when using value)
+  "selector": ".card-container",
   "type": "styleRules",
   "value": ".card-container:hover img { transform: scale(1.1); transition: transform 0.3s; }"
 }
-```
+\`\`\`
 
 Option B - Using states with structured CSS (recommended):
-```json
+\`\`\`json
 {
   "selector": ".card-container:hover img",
   "type": "styleRules",
@@ -588,34 +588,34 @@ Option B - Using states with structured CSS (recommended):
     "normal": { "transform": "scale(1.1)", "transition": "transform 0.3s" }
   }
 }
-```
+\`\`\`
 
-Both create `.card-container:hover img { transform: scale(1.1); }` which applies when hovering the parent.
+Both create \`.card-container:hover img { transform: scale(1.1); }\` which applies when hovering the parent.
 
 **Property Syntax:**
-- `value` string → complete CSS rule with selector: `".card:hover img { transform: scale(1.1); }"`
-- `states` object → camelCase properties (auto-converted): `{ "transform": "scale(1.1)" }`
+- \`value\` string → complete CSS rule with selector: \`".card:hover img { transform: scale(1.1); }"\`
+- \`states\` object → camelCase properties (auto-converted): \`{ "transform": "scale(1.1)" }\`
 
 **Prefer states over value** - it's clearer and less error-prone.
 
 **Why styleRules, not style?**
-- `type: "style"` = inline styles (can't use `:hover` in selector)
-- `type: "styleRules"` = CSS rules in `<style>` tag (can use `:hover` in selector)
+- \`type: "style"\` = inline styles (can't use \`:hover\` in selector)
+- \`type: "styleRules"\` = CSS rules in \`<style>\` tag (can use \`:hover\` in selector)
 
 **🎯 RULE OF THUMB:**
 
 1. **Direct hover** (button, link, card itself changes):
-   - Selector: `.button`
-   - States: `hover` state changes the button itself
+   - Selector: \`.button\`
+   - States: \`hover\` state changes the button itself
 
 2. **Parent hover affects child** (icon/image inside button glows):
-   - Selector: `.button:hover .icon` (include :hover in selector itself)
-   - States: Use `normal` state (NOT hover state)
+   - Selector: \`.button:hover .icon\` (include :hover in selector itself)
+   - States: Use \`normal\` state (NOT hover state)
    - The selector already has :hover, so "normal" applies when hovering
 
 **MORE EXAMPLES:**
 
-```json
+\`\`\`json
 // User: "Make icons glow when hovering carousel items"
 // Icons are SVGs inside .carousel-item
 ✅ CORRECT:
@@ -636,9 +636,9 @@ Both create `.card-container:hover img { transform: scale(1.1); }` which applies
     "hover": { "filter": "drop-shadow(0 0 10px blue)" }
   }
 }
-```
+\`\`\`
 
-```json
+\`\`\`json
 // User: "Make button text bold on hover"
 ✅ CORRECT:
 {
@@ -655,17 +655,17 @@ Both create `.card-container:hover img { transform: scale(1.1); }` which applies
     "hover": { "fontWeight": "bold" }
   }
 }
-```
+\`\`\`
 
 **WHEN TO USE EACH PATTERN:**
 
 | User Request | Element Structure | Correct Pattern |
 |---|---|---|
-| "Change button color on hover" | `<button>` | `.button` with `hover` state |
-| "Make icon glow when hovering button" | `<button><svg>` | `.button:hover svg` with `normal` state |
-| "Enlarge images on card hover" | `<div class="card"><img>` | `.card:hover img` with `normal` state |
-| "Brighten link text on hover" | `<a>text</a>` | `a` with `hover` state |
-| "Scale logo when hovering header" | `<header><img class="logo">` | `header:hover .logo` with `normal` state |
+| "Change button color on hover" | \`<button>\` | \`.button\` with \`hover\` state |
+| "Make icon glow when hovering button" | \`<button><svg>\` | \`.button:hover svg\` with \`normal\` state |
+| "Enlarge images on card hover" | \`<div class="card"><img>\` | \`.card:hover img\` with \`normal\` state |
+| "Brighten link text on hover" | \`<a>text</a>\` | \`a\` with \`hover\` state |
+| "Scale logo when hovering header" | \`<header><img class="logo">\` | \`header:hover .logo\` with \`normal\` state |
 
 ## 5. class - Add or Remove CSS Classes
 Adds or removes CSS classes from an element.
@@ -1228,7 +1228,7 @@ The selectors should match the \`selector\` field of existing DOM changes you wa
 2. **XSS Safety:** Never include unsanitized user input in html, javascript, or attribute values
    - Be especially careful with JavaScript type changes
 
-3. **CSS Property Names:** Always use camelCase for CSS properties in `style` type (NOT kebab-case)
+3. **CSS Property Names:** Always use camelCase for CSS properties in \`style\` type (NOT kebab-case)
    - Correct: "backgroundColor", "fontSize", "marginTop"
    - Wrong: "background-color", "font-size", "margin-top"
 
