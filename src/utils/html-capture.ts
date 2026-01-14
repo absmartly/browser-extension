@@ -473,7 +473,16 @@ function generateDOMStructureInPage(): string {
 
     const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
     if (validChildren.length > 0 && depth >= MAX_DEPTH) {
-      label += ` (${validChildren.length} children)`
+      // Show child signatures instead of just count
+      const childSigs = validChildren.map(c => getElementSignature(c))
+      const uniqueSigs = Array.from(new Set(childSigs))
+      if (uniqueSigs.length === 1) {
+        label += ` (${validChildren.length} × ${uniqueSigs[0]})`
+      } else if (uniqueSigs.length <= 3) {
+        label += ` (${validChildren.length} children: ${uniqueSigs.join(', ')})`
+      } else {
+        label += ` (${validChildren.length} children)`
+      }
     }
 
     if (el.children.length === 0) {
@@ -570,7 +579,16 @@ function generateDOMStructureInPage(): string {
 
     const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
     if (validChildren.length > 0 && depth >= MAX_DEPTH) {
-      label += ` (${validChildren.length} children)`
+      // Show child signatures instead of just count
+      const childSigs = validChildren.map(c => getElementSignature(c))
+      const uniqueSigs = Array.from(new Set(childSigs))
+      if (uniqueSigs.length === 1) {
+        label += ` (${validChildren.length} × ${uniqueSigs[0]})`
+      } else if (uniqueSigs.length <= 3) {
+        label += ` (${validChildren.length} children: ${uniqueSigs.join(', ')})`
+      } else {
+        label += ` (${validChildren.length} children)`
+      }
     }
 
     if (el.children.length === 0) {
@@ -582,7 +600,7 @@ function generateDOMStructureInPage(): string {
 
     lines.push(prefix + connector + label)
 
-    if (depth < MAX_DEPTH) {
+    if (depth < MAX_DEPTH && validChildren.length > 0) {
       // Group consecutive children with same signature
       let i = 0
       while (i < validChildren.length) {
