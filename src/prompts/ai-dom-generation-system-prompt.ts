@@ -526,11 +526,32 @@ Creates CSS rules in a <style> tag to support hover, active, and focus states. M
 \`\`\`
 
 **Properties:**
-- \`states\`: Object containing "normal", "hover", "active", and/or "focus" state styles
-- You can also provide raw CSS in \`value\` field as a string instead of structured states
+- \`states\`: Object containing "normal", "hover", "active", and/or "focus" state styles (camelCase properties)
+- \`value\`: Alternatively, provide complete CSS rule(s) as a string (must include selector and braces)
+
+**Value String Format:**
+```json
+{
+  "selector": "ignored-when-using-value",
+  "type": "styleRules",
+  "value": ".actual-selector { color: red; }\n.another { font-size: 16px; }"
+}
+```
+
+**States Object Format (Recommended):**
+```json
+{
+  "selector": ".button",
+  "type": "styleRules",
+  "states": {
+    "normal": { "backgroundColor": "#007bff" },
+    "hover": { "backgroundColor": "#0056b3" }
+  }
+}
+```
 
 **Use when:** User wants to change hover effects, focus states, or active states on buttons, links, etc.
-**Best practice:** Always include "normal" state as the base, then add interactive states as needed.
+**Best practice:** Use \`states\` object (clearer and less error-prone than raw CSS strings).
 
 ### 🚨 CRITICAL: Parent-Child Hover Patterns 🚨
 
@@ -549,22 +570,22 @@ This creates `.card-container img:hover` which ONLY works when hovering directly
 
 **✅ CORRECT - Parent hover affects child:**
 
-Option A - Using value field with raw CSS (clearer):
+Option A - Using value field with complete CSS rule:
 ```json
 {
-  "selector": ".card-container:hover img",
+  "selector": ".card-container",  // selector field (ignored when using value)
   "type": "styleRules",
-  "value": "transform: scale(1.1); transition: transform 0.3s;"  // kebab-case (raw CSS)
+  "value": ".card-container:hover img { transform: scale(1.1); transition: transform 0.3s; }"
 }
 ```
 
-Option B - Using states.normal with object (also works):
+Option B - Using states with structured CSS (recommended):
 ```json
 {
   "selector": ".card-container:hover img",
   "type": "styleRules",
   "states": {
-    "normal": { "transform": "scale(1.1)", "transition": "transform 0.3s" }  // camelCase (converted to CSS)
+    "normal": { "transform": "scale(1.1)", "transition": "transform 0.3s" }
   }
 }
 ```
@@ -572,8 +593,10 @@ Option B - Using states.normal with object (also works):
 Both create `.card-container:hover img { transform: scale(1.1); }` which applies when hovering the parent.
 
 **Property Syntax:**
-- `value` string → kebab-case (raw CSS: "transform: scale(1.1)")
-- `states` object → camelCase (JS object: "transform": "scale(1.1)")
+- `value` string → complete CSS rule with selector: `".card:hover img { transform: scale(1.1); }"`
+- `states` object → camelCase properties (auto-converted): `{ "transform": "scale(1.1)" }`
+
+**Prefer states over value** - it's clearer and less error-prone.
 
 **Why styleRules, not style?**
 - `type: "style"` = inline styles (can't use `:hover` in selector)
