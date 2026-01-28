@@ -82,19 +82,16 @@ export async function handleAvatarFetch(
       authMethod: authMethod as 'jwt' | 'apikey'
     }
 
-    // For JWT auth, read the token via chrome.cookies API (works for HTTP-only cookies)
-    // and send it via Authorization header. credentials: 'include' doesn't work due to
-    // invalid CORS config on server (Access-Control-Allow-Origin: * with credentials)
+    // For JWT auth, use credentials: 'include' to send cookies automatically
+    // For API Key auth, use Authorization header
     let jwtToken: string | null = null
     if (avatarConfig.authMethod === 'jwt') {
       jwtToken = await getJWTCookie(config.apiEndpoint)
-      if (!jwtToken) {
-        return new Response('No JWT token available for avatar authentication', { status: 401 })
-      }
+      console.log('[AvatarProxy] JWT token for avatar:', jwtToken ? 'found' : 'NOT FOUND', 'endpoint:', config.apiEndpoint)
     }
 
-    // Always use Authorization header (credentials: 'include' doesn't work cross-origin)
-    const useAuthHeader = true
+    // JWT: cookies only (no header), API Key: Authorization header
+    const useAuthHeader = avatarConfig.authMethod === 'apikey'
     const fetchOptions = buildAuthFetchOptions(avatarConfig.authMethod, avatarConfig, jwtToken, useAuthHeader)
 
     // Add Accept header for images
@@ -103,9 +100,20 @@ export async function handleAvatarFetch(
       'Accept': 'image/*'
     }
 
+    console.log('[AvatarProxy] Fetching avatar with options:', {
+      url: avatarUrl,
+      authMethod: avatarConfig.authMethod,
+      authHeader: fetchOptions.headers?.['Authorization'] ?
+        `${fetchOptions.headers['Authorization'].substring(0, 20)}...` : 'MISSING',
+      credentials: fetchOptions.credentials
+    })
+
     const response = await fetch(avatarUrl, fetchOptions)
 
+    console.log('[AvatarProxy] Avatar fetch response:', response.status, response.statusText)
+
     if (!response.ok) {
+      console.error('[AvatarProxy] Avatar fetch failed with status:', response.status)
       return new Response('Avatar fetch failed', { status: response.status })
     }
 
