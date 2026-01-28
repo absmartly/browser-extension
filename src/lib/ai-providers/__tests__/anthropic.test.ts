@@ -233,7 +233,7 @@ describe('AnthropicProvider', () => {
 
       await expect(
         provider.generate('', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('HTML is required for first message in conversation')
+      ).rejects.toThrow('HTML or DOM structure is required for first message in conversation')
     })
 
     it('should sanitize system prompt', async () => {

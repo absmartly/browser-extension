@@ -260,23 +260,14 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
         throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
       }
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), 60000)
+      })
 
-      let message: Anthropic.Message
-      try {
-        message = await anthropic.messages.create({
-          ...(requestBody as any),
-          signal: controller.signal as any
-        })
-        clearTimeout(timeoutId)
-      } catch (error: any) {
-        clearTimeout(timeoutId)
-        if (error.name === 'AbortError') {
-          throw new Error('AI request timed out after 60 seconds')
-        }
-        throw error
-      }
+      const message: Anthropic.Message = await Promise.race([
+        anthropic.messages.create(requestBody as any),
+        timeoutPromise
+      ])
 
       // Check if we got tool use or final response
       const toolUseBlocks = message.content.filter(block => block.type === 'tool_use')
