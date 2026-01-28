@@ -238,7 +238,20 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
 
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`OpenRouter API error: ${response.status} ${errorText}`)
+        let errorMessage = `OpenRouter API error (${response.status})`
+        try {
+          const parsed = JSON.parse(errorText)
+          if (parsed.error?.message) {
+            errorMessage = parsed.error.message
+          } else if (parsed.message) {
+            errorMessage = parsed.message
+          } else {
+            errorMessage = errorText
+          }
+        } catch {
+          errorMessage = errorText
+        }
+        throw new Error(errorMessage)
       }
 
       const completion = await response.json()

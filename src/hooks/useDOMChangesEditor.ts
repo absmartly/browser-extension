@@ -355,7 +355,22 @@ export function useDOMChangesEditor({
         let errorMsg = 'Failed to generate DOM changes'
         try {
           if (typeof response.error === 'string') {
-            errorMsg = response.error
+            // Try to parse as JSON to extract nested error message
+            try {
+              const parsed = JSON.parse(response.error)
+              if (parsed.error?.message) {
+                errorMsg = parsed.error.message
+              } else if (parsed.message) {
+                errorMsg = parsed.message
+              } else if (parsed.error?.error?.message) {
+                errorMsg = parsed.error.error.message
+              } else {
+                errorMsg = response.error
+              }
+            } catch {
+              // Not JSON, use as is
+              errorMsg = response.error
+            }
           } else if (response.error && typeof response.error === 'object') {
             errorMsg = response.error.message || String(response.error)
           }

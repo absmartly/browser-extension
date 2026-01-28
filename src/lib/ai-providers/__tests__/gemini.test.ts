@@ -346,7 +346,7 @@ describe('GeminiProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Gemini API error: 401 Invalid API key')
+      ).rejects.toThrow('Invalid API key')
     })
 
     it('should throw error when no candidates in response', async () => {

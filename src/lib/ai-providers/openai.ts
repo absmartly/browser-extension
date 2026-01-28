@@ -217,14 +217,26 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
         setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), 60000)
       })
 
-      const completion: OpenAI.ChatCompletion = await Promise.race([
-        openai.chat.completions.create({
-          model: 'gpt-4-turbo',
-          messages: messages,
-          tools: tools
-        }),
-        timeoutPromise
-      ])
+      let completion: OpenAI.ChatCompletion
+      try {
+        completion = await Promise.race([
+          openai.chat.completions.create({
+            model: 'gpt-4-turbo',
+            messages: messages,
+            tools: tools
+          }),
+          timeoutPromise
+        ])
+      } catch (error: any) {
+        // Extract clean error message from OpenAI SDK error
+        let errorMessage = 'OpenAI API error'
+        if (error.message) {
+          errorMessage = error.message
+        } else if (error.error?.message) {
+          errorMessage = error.error.message
+        }
+        throw new Error(errorMessage)
+      }
 
       console.log('[OpenAI] Received response from OpenAI')
       const message = completion.choices[0]?.message

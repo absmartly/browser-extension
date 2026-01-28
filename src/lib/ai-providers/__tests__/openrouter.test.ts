@@ -320,7 +320,7 @@ describe('OpenRouterProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('OpenRouter API error: 401 Invalid API key')
+      ).rejects.toThrow('Invalid API key')
     })
 
     it('should throw error when no message in response', async () => {

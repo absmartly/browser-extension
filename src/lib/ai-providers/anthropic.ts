@@ -264,10 +264,31 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
         setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), 60000)
       })
 
-      const message: Anthropic.Message = await Promise.race([
-        anthropic.messages.create(requestBody as any),
-        timeoutPromise
-      ])
+      let message: Anthropic.Message
+      try {
+        message = await Promise.race([
+          anthropic.messages.create(requestBody as any),
+          timeoutPromise
+        ])
+      } catch (error: any) {
+        // Extract clean error message from Anthropic API error
+        let errorMessage = 'Anthropic API error'
+        if (error.message) {
+          try {
+            const parsed = JSON.parse(error.message)
+            if (parsed.error?.message) {
+              errorMessage = parsed.error.message
+            } else if (parsed.message) {
+              errorMessage = parsed.message
+            } else {
+              errorMessage = error.message
+            }
+          } catch {
+            errorMessage = error.message
+          }
+        }
+        throw new Error(errorMessage)
+      }
 
       // Check if we got tool use or final response
       const toolUseBlocks = message.content.filter(block => block.type === 'tool_use')
