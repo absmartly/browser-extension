@@ -130,10 +130,10 @@ export function useSettingsForm() {
         }
       })
 
-      if (response.success && response.user) {
-        setUser(response.user)
-        if (response.user.avatar_url) {
-          setAvatarUrl(response.user.avatar_url)
+      if (response.success && response.data?.user) {
+        setUser(response.data.user)
+        if (response.data.user.avatarUrl) {
+          setAvatarUrl(response.data.user.avatarUrl)
         }
       } else {
         setUser(null)

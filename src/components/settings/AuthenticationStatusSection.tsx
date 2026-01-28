@@ -54,7 +54,7 @@ export const AuthenticationStatusSection = React.memo(function AuthenticationSta
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
           Checking authentication...
         </div>
-      ) : user && user.authenticated ? (
+      ) : user ? (
         <div data-testid="auth-user-info">
           <div className="flex items-center space-x-3">
             <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">

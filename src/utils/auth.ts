@@ -91,11 +91,16 @@ async function processFetchResponse(
   // Return only essential user fields to minimize data transfer
   const userData = finalUserData.user
   if (userData) {
+    const firstName = userData.first_name || ''
+    const lastName = userData.last_name || ''
+    const fullName = [firstName, lastName].filter(Boolean).join(' ')
+
     const minimalUser: any = {
       id: userData.id,
       email: userData.email,
       first_name: userData.first_name,
       last_name: userData.last_name,
+      name: fullName || userData.email || 'User',
       picture: userData.picture,
       avatar: userData.avatar?.base_url ? {
         base_url: userData.avatar.base_url,

@@ -94,7 +94,8 @@ export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ 
 
 /**
  * Builds request headers with authentication
- * No fallbacks - uses exactly the auth method specified in config
+ * For JWT: relies on withCredentials (cookies), no Authorization header
+ * For API Key: uses Authorization header
  */
 async function buildHeaders(config: ABsmartlyConfig): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -104,12 +105,7 @@ async function buildHeaders(config: ABsmartlyConfig): Promise<Record<string, str
 
   const authMethod = config.authMethod || 'jwt'
 
-  if (authMethod === 'jwt') {
-    const jwtToken = await getJWTCookie(config.apiEndpoint)
-    if (jwtToken) {
-      headers['Authorization'] = `JWT ${jwtToken}`
-    }
-  } else if (authMethod === 'apikey' && config.apiKey) {
+  if (authMethod === 'apikey' && config.apiKey) {
     const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
       ? `JWT ${config.apiKey}`
       : `Api-Key ${config.apiKey}`

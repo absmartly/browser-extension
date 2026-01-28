@@ -143,12 +143,17 @@ export interface ABsmartlyConfig {
 }
 
 export interface ABsmartlyUser {
-  authenticated: boolean
-  name?: string
+  id: number
   email?: string
+  first_name?: string
+  last_name?: string
+  name?: string
+  picture?: string
   avatar?: {
     base_url?: string
+    file_name?: string
   }
+  avatarUrl?: string
 }
 
 export interface Template {
