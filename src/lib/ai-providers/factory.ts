@@ -2,6 +2,8 @@ import type { AIProvider, AIProviderConfig } from './base'
 import { AnthropicProvider } from './anthropic'
 import { OpenAIProvider } from './openai'
 import { BridgeProvider } from './bridge'
+import { OpenRouterProvider } from './openrouter'
+import { GeminiProvider } from './gemini'
 
 export function createAIProvider(config: AIProviderConfig): AIProvider {
   console.log('[Factory] Creating AI provider:', config.aiProvider)
@@ -13,6 +15,12 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
     case 'openai-api':
       return new OpenAIProvider(config)
 
+    case 'openrouter-api':
+      return new OpenRouterProvider(config)
+
+    case 'gemini-api':
+      return new GeminiProvider(config)
+
     case 'claude-subscription':
       return new BridgeProvider(config)
 
@@ -22,5 +30,5 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
   }
 }
 
-export { AnthropicProvider, OpenAIProvider, BridgeProvider }
+export { AnthropicProvider, OpenAIProvider, BridgeProvider, OpenRouterProvider, GeminiProvider }
 export type { AIProvider, AIProviderConfig }
