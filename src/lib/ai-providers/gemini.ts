@@ -8,62 +8,13 @@ import type {
   GeminiFunctionDeclaration,
   GeminiTool
 } from '~src/types/gemini'
-import { getSystemPrompt, buildUserMessage } from './utils'
+import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
-import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
-import { validateXPath } from '~src/utils/xpath-validator'
+import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
+import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-
-const MAX_TOOL_ITERATIONS = 10
+import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
-
-interface ValidationError {
-  isValid: false
-  errors: string[]
-}
-
-interface ValidationSuccess {
-  isValid: true
-  result: AIDOMGenerationResult
-}
-
-type ValidationResult = ValidationError | ValidationSuccess
-
-function validateAIDOMGenerationResult(result: any): ValidationResult {
-  const errors: string[] = []
-
-  if (!result.domChanges) {
-    errors.push('Missing required field: "domChanges" (must be an array of DOM change objects)')
-  } else if (!Array.isArray(result.domChanges)) {
-    errors.push('"domChanges" must be an array, got: ' + typeof result.domChanges)
-  }
-
-  if (!result.response) {
-    errors.push('Missing required field: "response" (must be a string with your conversational message)')
-  } else if (typeof result.response !== 'string') {
-    errors.push('"response" must be a string, got: ' + typeof result.response)
-  }
-
-  if (!result.action) {
-    errors.push('Missing required field: "action" (must be one of: append, replace_all, replace_specific, remove_specific, none)')
-  } else if (!['append', 'replace_all', 'replace_specific', 'remove_specific', 'none'].includes(result.action)) {
-    errors.push(`"action" must be one of: append, replace_all, replace_specific, remove_specific, none. Got: "${result.action}"`)
-  }
-
-  if ((result.action === 'replace_specific' || result.action === 'remove_specific') &&
-      (!result.targetSelectors || !Array.isArray(result.targetSelectors) || result.targetSelectors.length === 0)) {
-    errors.push(`Action "${result.action}" requires a non-empty "targetSelectors" array`)
-  }
-
-  if (errors.length > 0) {
-    return { isValid: false, errors }
-  }
-
-  return {
-    isValid: true,
-    result: result as AIDOMGenerationResult
-  }
-}
 
 export class GeminiProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
@@ -132,14 +83,7 @@ export class GeminiProvider implements AIProvider {
       throw new Error('Model is required for Gemini provider')
     }
 
-    let session = options.conversationSession
-    if (!session) {
-      session = {
-        id: crypto.randomUUID(),
-        htmlSent: false,
-        messages: []
-      }
-    }
+    let session = createSession(options.conversationSession)
 
     let systemPrompt = await getSystemPrompt(this.getChunkRetrievalPrompt())
 
@@ -148,24 +92,12 @@ export class GeminiProvider implements AIProvider {
         throw new Error('HTML or DOM structure is required for first message in conversation')
       }
 
-      const structureText = options.domStructure || '(DOM structure not available)'
-      console.log('[Gemini] Using pre-generated DOM structure:', structureText.substring(0, 100) + '...')
-
-      systemPrompt += `\n\n## Page DOM Structure
-
-The following is a tree representation of the page structure. Use the \`css_query\` function to retrieve specific HTML sections when needed.
-
-\`\`\`
-${structureText}
-\`\`\`
-
-To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
-- \`css_query({ selectors: ["section", "header", "nav"] })\`
-
-IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
-`
+      systemPrompt = buildSystemPromptWithDOMStructure(
+        systemPrompt,
+        options.domStructure,
+        'Gemini'
+      )
       session.htmlSent = true
-      console.log(`[Gemini] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
     }
 
     console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
@@ -225,7 +157,7 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
       }
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), 60000)
+        setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
       })
 
       const modelName = this.config.llmModel.includes('models/')
@@ -305,7 +237,7 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
           console.log(JSON.stringify(functionCall.args, null, 2))
           console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
-          const validation = validateAIDOMGenerationResult(functionCall.args)
+          const validation = validateAIDOMGenerationResult(JSON.stringify(functionCall.args))
 
           if (!validation.isValid) {
             const errorValidation = validation as ValidationError
@@ -322,68 +254,23 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
           }
         } else if (functionCall.name === 'css_query') {
           const selectors = functionCall.args.selectors as string[]
-          console.log(`[Gemini] 📄 CSS query for ${selectors.length} selector(s):`, selectors)
-
-          const chunkResults = await captureHTMLChunks(selectors)
-
-          const resultParts: string[] = []
-          for (const chunkResult of chunkResults) {
-            if (chunkResult.found) {
-              resultParts.push(`## ${chunkResult.selector}\n\`\`\`html\n${chunkResult.html}\n\`\`\``)
-            } else {
-              resultParts.push(`## ${chunkResult.selector}\nError: ${chunkResult.error || 'Element not found'}`)
-            }
-          }
-
-          const resultContent = resultParts.join('\n\n')
+          const result = await handleCssQuery(selectors)
 
           functionResponses.push({
             functionResponse: {
               name: 'css_query',
-              response: {
-                result: resultContent
-              }
+              response: result.error ? { error: result.error } : { result: result.result }
             }
           })
         } else if (functionCall.name === 'xpath_query') {
           const xpath = functionCall.args.xpath as string
           const maxResults = (functionCall.args.maxResults as number) || 10
-
-          if (!validateXPath(xpath)) {
-            const errorContent = `Invalid XPath expression: "${xpath}". XPath must use safe patterns only.`
-            console.log(`[Gemini] ⚠️  ${errorContent}`)
-            functionResponses.push({
-              functionResponse: {
-                name: 'xpath_query',
-                response: {
-                  error: errorContent
-                }
-              }
-            })
-            continue
-          }
-          console.log(`[Gemini] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
-
-          const xpathResult = await queryXPath(xpath, maxResults)
-
-          let resultContent: string
-          if (xpathResult.found) {
-            const parts: string[] = [`Found ${xpathResult.matches.length} node(s) matching XPath "${xpath}":\n`]
-            for (const match of xpathResult.matches) {
-              const selectorInfo = match.selector ? `Selector: \`${match.selector}\`` : '(No CSS selector available)'
-              parts.push(`## ${selectorInfo}\nNode type: ${match.nodeType}\nText preview: ${match.textContent}\n\`\`\`html\n${match.html}\n\`\`\``)
-            }
-            resultContent = parts.join('\n\n')
-          } else {
-            resultContent = xpathResult.error || `No nodes found matching XPath: "${xpath}"`
-          }
+          const result = await handleXPathQuery(xpath, maxResults)
 
           functionResponses.push({
             functionResponse: {
               name: 'xpath_query',
-              response: {
-                result: resultContent
-              }
+              response: result.error ? { error: result.error } : { result: result.result }
             }
           })
         } else {

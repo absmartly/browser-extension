@@ -7,7 +7,15 @@ jest.mock('@anthropic-ai/sdk')
 jest.mock('../utils', () => ({
   sanitizeHtml: jest.fn((html) => html),
   getSystemPrompt: jest.fn(),
-  buildUserMessage: jest.fn()
+  buildUserMessage: jest.fn(),
+  buildSystemPromptWithDOMStructure: jest.fn((prompt, domStructure) =>
+    domStructure ? prompt + '\n\n## Page DOM Structure\n' + domStructure : prompt
+  ),
+  createSession: jest.fn((session) => session || {
+    id: 'test-session-id',
+    htmlSent: false,
+    messages: []
+  })
 }))
 
 const createConfig = (overrides?: Partial<AIProviderConfig>): AIProviderConfig => ({
@@ -183,7 +191,9 @@ describe('AnthropicProvider', () => {
         }]
       })
 
-      await provider.generate('<html><body>Test</body></html>', 'test prompt', [], undefined, {})
+      await provider.generate('<html><body>Test</body></html>', 'test prompt', [], undefined, {
+        domStructure: 'html\n  body\n    test content'
+      })
 
       expect(mockMessages.create).toHaveBeenCalledWith(
         expect.objectContaining({

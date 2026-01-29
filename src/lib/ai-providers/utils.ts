@@ -163,9 +163,12 @@ export function compressHtml(html: string): string {
 }
 
 export async function getSystemPrompt(chunkRetrievalPrompt: string): Promise<string> {
-  const override = await getSystemPromptOverride()
-  const basePrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
-  return basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
+  // TEMPORARY: Skip system prompt for debugging
+  return ''
+
+  // const override = await getSystemPromptOverride()
+  // const basePrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
+  // return basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
 }
 
 export function createSession(conversationSession?: ConversationSession): ConversationSession {
@@ -188,4 +191,39 @@ export function buildUserMessage(prompt: string, currentChanges: DOMChange[]): s
   userMessageText += `User Request: ${sanitizedPrompt}`
 
   return userMessageText
+}
+
+export function buildSystemPromptWithDOMStructure(
+  basePrompt: string,
+  domStructure: string | undefined,
+  providerName: string
+): string {
+  if (!domStructure) return basePrompt
+
+  const structureText = domStructure || '(DOM structure not available)'
+  console.log(`[${providerName}] Using pre-generated DOM structure:`, structureText.substring(0, 100) + '...')
+
+  const fullPrompt = basePrompt + `\n\n## Page DOM Structure
+
+The following is a tree representation of the page structure. Use the \`css_query\` tool to retrieve specific HTML sections when needed.
+
+\`\`\`
+${structureText}
+\`\`\`
+
+To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
+- \`css_query({ selectors: ["section", "header", "nav"] })\`
+
+IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
+`
+
+  console.log(`[${providerName}] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
+
+  return fullPrompt
+}
+
+export function createTimeoutPromise(timeoutMs: number = 60000): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), timeoutMs)
+  })
 }

@@ -7,7 +7,15 @@ jest.mock('openai')
 jest.mock('../utils', () => ({
   sanitizeHtml: jest.fn((html) => html),
   getSystemPrompt: jest.fn(),
-  buildUserMessage: jest.fn()
+  buildUserMessage: jest.fn(),
+  buildSystemPromptWithDOMStructure: jest.fn((prompt, domStructure) =>
+    domStructure ? prompt + '\n\n## Page DOM Structure\n' + domStructure : prompt
+  ),
+  createSession: jest.fn((session) => session || {
+    id: 'test-session-id',
+    htmlSent: false,
+    messages: []
+  })
 }))
 
 describe('OpenAIProvider', () => {
@@ -125,7 +133,9 @@ describe('OpenAIProvider', () => {
         }]
       })
 
-      await provider.generate('<html><body>Test</body></html>', 'test prompt', [], undefined, {})
+      await provider.generate('<html><body>Test</body></html>', 'test prompt', [], undefined, {
+        domStructure: 'html\n  body\n    test content'
+      })
 
       expect(mockChatCompletions.create).toHaveBeenCalledWith(
         expect.objectContaining({

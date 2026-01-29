@@ -4,7 +4,15 @@ import * as utils from '../utils'
 
 jest.mock('../utils', () => ({
   getSystemPrompt: jest.fn(),
-  buildUserMessage: jest.fn()
+  buildUserMessage: jest.fn(),
+  buildSystemPromptWithDOMStructure: jest.fn((prompt, domStructure) =>
+    domStructure ? prompt + '\n\n## Page DOM Structure\n' + domStructure : prompt
+  ),
+  createSession: jest.fn((session) => session || {
+    id: 'test-session-id',
+    htmlSent: false,
+    messages: []
+  })
 }))
 
 global.fetch = jest.fn()
