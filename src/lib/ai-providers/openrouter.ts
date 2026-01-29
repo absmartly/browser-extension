@@ -276,19 +276,27 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
         setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), 60000)
       })
 
-      const response = await Promise.race([
-        fetch(`${OPENROUTER_API_BASE}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': chrome.runtime.getURL(''),
-            'X-Title': 'ABsmartly Browser Extension'
-          },
-          body: JSON.stringify(requestBody)
-        }),
-        timeoutPromise
-      ])
+      let response
+      try {
+        response = await Promise.race([
+          fetch(`${OPENROUTER_API_BASE}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.config.apiKey}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': chrome.runtime.getURL(''),
+              'X-Title': 'ABsmartly Browser Extension'
+            },
+            body: JSON.stringify(requestBody)
+          }),
+          timeoutPromise
+        ])
+      } catch (fetchError: any) {
+        console.error('[OpenRouter] ❌ Fetch failed:', fetchError)
+        console.error('[OpenRouter] Error name:', fetchError?.name)
+        console.error('[OpenRouter] Error message:', fetchError?.message)
+        throw new Error(`Network error: ${fetchError?.message || 'Failed to fetch'}`)
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
