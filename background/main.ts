@@ -344,7 +344,7 @@ export function initializeBackgroundScript() {
           console.log('[Background] AI Provider:', config?.aiProvider)
           console.log('[Background] LLM Model from config:', config?.llmModel || 'not set')
 
-          const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api')
+          const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api' || config?.aiProvider === 'openrouter-api' || config?.aiProvider === 'gemini-api')
             ? config?.aiApiKey
             : config?.apiKey
 
