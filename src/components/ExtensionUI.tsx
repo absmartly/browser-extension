@@ -31,6 +31,8 @@ function SidebarContent() {
     client,
     config,
     loading: configLoading,
+    user,
+    isAuthenticated,
     updateConfig,
     getExperiments,
     getExperiment,
@@ -144,6 +146,7 @@ function SidebarContent() {
     setApplications
   } = useEditorResources({
     config,
+    isAuthenticated,
     getApplications,
     getUnitTypes,
     getMetrics,
@@ -185,6 +188,7 @@ function SidebarContent() {
 
   useExperimentInitialization({
     config,
+    isAuthenticated,
     view,
     hasInitialized,
     experimentsLoading,

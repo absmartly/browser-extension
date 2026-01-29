@@ -7,6 +7,7 @@ import type { ExperimentFilters } from "~src/types/filters"
 
 interface UseExperimentInitializationProps {
   config: ABsmartlyConfig | null
+  isAuthenticated: boolean
   view: string
   hasInitialized: boolean
   experimentsLoading: boolean
@@ -26,6 +27,7 @@ interface UseExperimentInitializationProps {
 
 export function useExperimentInitialization({
   config,
+  isAuthenticated,
   view,
   hasInitialized,
   experimentsLoading,
@@ -43,7 +45,7 @@ export function useExperimentInitialization({
   loadEditorResources
 }: UseExperimentInitializationProps) {
   useEffect(() => {
-    if (config && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
+    if (config && isAuthenticated && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
 
@@ -86,10 +88,10 @@ export function useExperimentInitialization({
 
       loadFavorites()
     }
-  }, [config, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, setApplications, setFilters, setHasInitialized])
+  }, [config, isAuthenticated, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, setApplications, setFilters, setHasInitialized])
 
   useEffect(() => {
-    if (config && view === 'list' && applications.length === 0) {
+    if (config && isAuthenticated && view === 'list' && applications.length === 0) {
       debugLog('Loading applications for filter')
       getApplications().then(apps => {
         if (apps && apps.length > 0) {
@@ -99,12 +101,12 @@ export function useExperimentInitialization({
         debugError('Failed to load applications for filter:', error)
       })
     }
-  }, [config, view, applications.length, getApplications, setApplications])
+  }, [config, isAuthenticated, view, applications.length, getApplications, setApplications])
 
   useEffect(() => {
-    if ((view === 'create' || view === 'edit') && config && unitTypes.length === 0) {
+    if ((view === 'create' || view === 'edit') && config && isAuthenticated && unitTypes.length === 0) {
       debugLog('Loading editor resources for create/edit view')
       loadEditorResources()
     }
-  }, [view, config, unitTypes.length, loadEditorResources])
+  }, [view, config, isAuthenticated, unitTypes.length, loadEditorResources])
 }

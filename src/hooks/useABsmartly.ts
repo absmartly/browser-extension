@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BackgroundAPIClient } from '~src/lib/background-api-client'
 import { getConfig } from '~src/utils/storage'
+import { debugLog } from '~src/utils/debug'
 import type {
   ABsmartlyConfig,
   Experiment,
@@ -23,10 +24,41 @@ export function useABsmartly() {
   const [config, setConfig] = useState<ABsmartlyConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [user, setUser] = useState<ExperimentUser | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  const checkAuth = useCallback(async () => {
+    if (!config) return
+
+    try {
+      debugLog('[useABsmartly] Checking authentication...')
+      const result = await chrome.runtime.sendMessage({ type: 'CHECK_AUTH' })
+
+      if (result?.success && result?.data?.user) {
+        debugLog('[useABsmartly] ✅ Authenticated as:', result.data.user.email)
+        setUser(result.data.user)
+        setIsAuthenticated(true)
+      } else {
+        debugLog('[useABsmartly] ❌ Not authenticated:', result?.error)
+        setUser(null)
+        setIsAuthenticated(false)
+      }
+    } catch (err) {
+      debugLog('[useABsmartly] ❌ Auth check failed:', err)
+      setUser(null)
+      setIsAuthenticated(false)
+    }
+  }, [config])
 
   useEffect(() => {
     loadConfig()
   }, [])
+
+  useEffect(() => {
+    if (config && !isAuthenticated) {
+      checkAuth()
+    }
+  }, [config, isAuthenticated, checkAuth])
 
   const loadConfig = async () => {
     try {
@@ -129,7 +161,10 @@ export function useABsmartly() {
     config,
     loading,
     error,
+    user,
+    isAuthenticated,
     updateConfig,
+    checkAuth,
     getExperiments,
     getExperiment,
     startExperiment,

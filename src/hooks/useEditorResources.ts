@@ -13,6 +13,7 @@ import type {
 
 interface UseEditorResourcesParams {
   config: ABsmartlyConfig | null
+  isAuthenticated: boolean
   getApplications: () => Promise<Application[]>
   getUnitTypes: () => Promise<UnitType[]>
   getMetrics: () => Promise<Metric[]>
@@ -24,6 +25,7 @@ interface UseEditorResourcesParams {
 
 export function useEditorResources({
   config,
+  isAuthenticated,
   getApplications,
   getUnitTypes,
   getMetrics,
@@ -80,11 +82,13 @@ export function useEditorResources({
   }, [requestPermissionsIfNeeded, getApplications, getUnitTypes, getMetrics, getExperimentTags, getOwners, getTeams])
 
   useEffect(() => {
-    if (config && unitTypes.length === 0) {
-      debugLog('Loading editor resources (config available, resources not loaded)')
+    if (config && isAuthenticated && unitTypes.length === 0) {
+      debugLog('Loading editor resources (config available, authenticated, resources not loaded)')
       loadEditorResources()
+    } else if (config && !isAuthenticated) {
+      debugLog('Skipping editor resources load - not authenticated')
     }
-  }, [config, unitTypes.length, loadEditorResources])
+  }, [config, isAuthenticated, unitTypes.length, loadEditorResources])
 
   return {
     applications,
