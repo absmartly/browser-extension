@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { DEFAULT_CONFIG } from '../config/defaults'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import type { ABsmartlyConfig, ABsmartlyUser } from '~src/types/absmartly'
+import type { AIProviderType } from '~src/lib/ai-providers'
 import { getConfig, setConfig } from '~src/utils/storage'
 import axios from 'axios'
 import { sendToBackground } from '~src/lib/messaging'
@@ -15,7 +16,7 @@ export function useSettingsForm() {
   const [sdkWindowProperty, setSdkWindowProperty] = useState('')
   const [queryPrefix, setQueryPrefix] = useState<string>(DEFAULT_CONFIG.queryPrefix)
   const [persistQueryToCookie, setPersistQueryToCookie] = useState(true)
-  const [aiProvider, setAiProvider] = useState<'claude-subscription' | 'anthropic-api' | 'openai-api' | 'anthropic' | 'openai'>('claude-subscription')
+  const [aiProvider, setAiProvider] = useState<AIProviderType>('claude-subscription')
   const [aiApiKey, setAiApiKey] = useState('')
   const [llmModel, setLlmModel] = useState('sonnet')
   const [errors, setErrors] = useState<Record<string, string>>({})

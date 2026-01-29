@@ -1,5 +1,5 @@
 export { createAIProvider } from './factory'
 export { sanitizeHtml, compressHtml, getSystemPrompt } from './utils'
 export { SHARED_TOOL_SCHEMA } from './shared-schema'
-export type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
+export type { AIProvider, AIProviderConfig, AIProviderType, GenerateOptions } from './base'
 export { AnthropicProvider, OpenAIProvider, BridgeProvider, OpenRouterProvider, GeminiProvider } from './factory'

@@ -123,6 +123,8 @@ export interface Environment {
   name: string
 }
 
+import type { AIProviderType } from '~src/lib/ai-providers'
+
 export interface ABsmartlyConfig {
   apiEndpoint: string
   apiKey?: string
@@ -130,7 +132,7 @@ export interface ABsmartlyConfig {
   authMethod?: 'jwt' | 'apikey'
   applicationId?: number
   applicationName?: string
-  aiProvider?: 'claude-subscription' | 'anthropic-api' | 'openai-api' | 'anthropic' | 'openai'
+  aiProvider?: AIProviderType
   aiModel?: string
   aiApiKey?: string
   llmModel?: string

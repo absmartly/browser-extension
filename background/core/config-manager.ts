@@ -1,6 +1,7 @@
 import { Storage } from "@plasmohq/storage"
 import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
+import type { AIProviderType } from '~src/lib/ai-providers'
 import { debugLog } from '~src/utils/debug'
 import { validateAPIEndpoint } from '../utils/security'
 
@@ -87,7 +88,7 @@ export async function initializeConfig(
   const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
   const envApplicationId = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID
   const envAuthMethod = process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
-  const envAIProvider = process.env.PLASMO_PUBLIC_ABSMARTLY_AI_PROVIDER as 'claude-subscription' | 'anthropic-api' | 'openai-api' | undefined
+  const envAIProvider = process.env.PLASMO_PUBLIC_ABSMARTLY_AI_PROVIDER as AIProviderType | undefined
 
   debugLog('[Config] Environment variables:', {
     hasApiKey: !!envApiKey,

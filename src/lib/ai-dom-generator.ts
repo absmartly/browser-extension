@@ -1,4 +1,5 @@
 import { createAIProvider, compressHtml, sanitizeHtml } from '~src/lib/ai-providers'
+import type { AIProviderType } from '~src/lib/ai-providers'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 
@@ -11,10 +12,11 @@ export async function generateDOMChanges(
   options?: {
     useOAuth?: boolean
     oauthToken?: string
-    aiProvider?: 'claude-subscription' | 'anthropic-api' | 'openai-api'
+    aiProvider?: AIProviderType
     conversationSession?: ConversationSession
     pageUrl?: string
     domStructure?: string
+    llmModel?: string
   }
 ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
   try {
@@ -27,6 +29,7 @@ export async function generateDOMChanges(
     console.log('[AI Gen] 💾 Has conversation session:', !!options?.conversationSession)
     console.log('[AI Gen] 🌐 Page URL:', options?.pageUrl)
     console.log('[AI Gen] 🌲 DOM Structure:', options?.domStructure ? `${options.domStructure.length} chars` : 'not provided')
+    console.log('[AI Gen] 🎯 LLM Model:', options?.llmModel || 'not specified')
 
     if (!html && !options?.conversationSession?.htmlSent) {
       throw new Error('HTML is required for the first message in a conversation')
@@ -44,7 +47,8 @@ export async function generateDOMChanges(
       apiKey,
       aiProvider: options?.aiProvider || 'claude-subscription',
       useOAuth: options?.useOAuth,
-      oauthToken: options?.oauthToken
+      oauthToken: options?.oauthToken,
+      llmModel: options?.llmModel
     })
 
     console.log('[AI Gen] 🤖 Using provider:', options?.aiProvider || 'claude-subscription')

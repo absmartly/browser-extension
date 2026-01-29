@@ -365,6 +365,7 @@ export function initializeBackgroundScript() {
           console.log('[Background] Page URL:', pageUrl)
           console.log('[Background] DOM Structure:', domStructure ? `${domStructure.substring(0, 100)}...` : 'not provided')
           console.log('[Background] AI Provider:', config?.aiProvider)
+          console.log('[Background] LLM Model from config:', config?.llmModel || 'not set')
 
           const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api')
             ? config?.aiApiKey
@@ -377,7 +378,8 @@ export function initializeBackgroundScript() {
           const options: any = {
             aiProvider: config?.aiProvider,
             pageUrl,
-            domStructure
+            domStructure,
+            llmModel: config?.llmModel
           }
 
           if (conversationSession) {

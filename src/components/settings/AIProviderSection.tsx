@@ -5,8 +5,7 @@ import { Button } from '../ui/Button'
 import { Alert, AlertDescription } from '../ui/Alert'
 import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } from '~src/lib/claude-code-client'
 import { ModelFetcher, type ModelInfo, type GroupedModels } from '~src/lib/model-fetcher'
-
-type AIProviderType = 'claude-subscription' | 'anthropic-api' | 'openai-api' | 'openrouter-api' | 'gemini-api' | 'anthropic' | 'openai'
+import type { AIProviderType } from '~src/lib/ai-providers'
 
 interface AIProviderSectionProps {
   aiProvider: AIProviderType
