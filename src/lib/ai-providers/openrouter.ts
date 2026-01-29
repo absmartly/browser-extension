@@ -238,9 +238,17 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
 
       if (!response.ok) {
         const errorText = await response.text()
+        console.error('[OpenRouter] ❌ API error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        })
+
         let errorMessage = `OpenRouter API error (${response.status})`
         try {
           const parsed = JSON.parse(errorText)
+          console.error('[OpenRouter] Parsed error:', parsed)
+
           if (parsed.error?.message) {
             errorMessage = parsed.error.message
           } else if (parsed.message) {
@@ -249,8 +257,11 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
             errorMessage = errorText
           }
         } catch {
+          console.error('[OpenRouter] Could not parse error response as JSON')
           errorMessage = errorText
         }
+
+        console.error('[OpenRouter] Final error message:', errorMessage)
         throw new Error(errorMessage)
       }
 
