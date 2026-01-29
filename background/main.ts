@@ -344,13 +344,10 @@ export function initializeBackgroundScript() {
           console.log('[Background] AI Provider:', config?.aiProvider)
           console.log('[Background] LLM Model from config:', config?.llmModel || 'not set')
 
-          const apiKeyToUse = (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api' || config?.aiProvider === 'openrouter-api' || config?.aiProvider === 'gemini-api')
-            ? config?.aiApiKey
-            : config?.apiKey
+          const apiKeyToUse = config?.aiApiKey || ''
 
           console.log('[Background] Config aiApiKey:', config?.aiApiKey ? `present (${config?.aiApiKey.substring(0, 10)}...)` : 'missing')
-          console.log('[Background] Config apiKey:', config?.apiKey ? 'present' : 'missing')
-          console.log('[Background] Using API key from config:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing')
+          console.log('[Background] Using API key for AI:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing (OK for Claude subscription)')
 
           const options: any = {
             aiProvider: config?.aiProvider,
