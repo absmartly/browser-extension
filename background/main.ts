@@ -403,12 +403,17 @@ export function initializeBackgroundScript() {
           }
           console.log('[Background] Response sent successfully')
         } catch (error) {
-          console.error('[Background] AI generation error:', error)
-          console.error('[Background] Error stack:', error instanceof Error ? error.stack : 'No stack')
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          const errorStack = error instanceof Error ? error.stack : 'No stack trace'
+
+          console.error('[Background] ❌ AI generation error:', errorMessage)
+          console.error('[Background] Error stack:', errorStack)
+          console.error('[Background] Full error object:', error)
           debugError('[Background] AI generation error:', error)
+
           sendResponse({
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to generate DOM changes'
+            error: errorMessage
           })
         }
       })()

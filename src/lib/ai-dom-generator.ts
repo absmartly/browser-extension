@@ -69,7 +69,14 @@ export async function generateDOMChanges(
     return result
 
   } catch (error) {
-    console.error('❌ Failed to generate DOM changes:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ Failed to generate DOM changes:', errorMessage)
+    console.error('[AI Gen] Error details:', error)
+
+    if (error instanceof Error) {
+      console.error('[AI Gen] Error stack:', error.stack)
+    }
+
     throw error
   }
 }
