@@ -11,6 +11,19 @@ import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 const MAX_TOOL_ITERATIONS = 10
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
+/**
+ * Remove emojis and other problematic Unicode characters that some providers can't handle
+ */
+function stripEmojis(text: string): string {
+  // Remove emojis and other non-BMP characters
+  return text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1FFFF}]/gu, '')
+    // Remove other decorative Unicode symbols
+    .replace(/[━─│┌┐└┘├┤┬┴┼]/g, '-')
+    // Clean up multiple spaces
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 interface ValidationError {
   isValid: false
   errors: string[]
@@ -155,6 +168,8 @@ export class OpenRouterProvider implements AIProvider {
     }
 
     let systemPrompt = await getSystemPrompt(this.getChunkRetrievalPrompt())
+    // Strip emojis for providers that can't handle them (Arcee AI, etc.)
+    systemPrompt = stripEmojis(systemPrompt)
 
     if (!session.htmlSent) {
       if (!html && !options.domStructure) {
@@ -189,13 +204,13 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
     console.log(`[OpenRouter] 📊 System prompt length: ${systemPrompt.length} characters`)
     console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
-    const userMessageText = buildUserMessage(prompt, currentChanges)
+    const userMessageText = stripEmojis(buildUserMessage(prompt, currentChanges))
 
     const messages: OpenRouterChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...session.messages.map(m => ({
         role: m.role as 'user' | 'assistant',
-        content: m.content
+        content: stripEmojis(m.content)
       })),
       { role: 'user', content: userMessageText }
     ]
@@ -251,6 +266,19 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
 
           if (parsed.error?.message) {
             errorMessage = parsed.error.message
+
+            // Check for nested error in metadata.raw
+            if (parsed.error.metadata?.raw) {
+              try {
+                const nestedError = JSON.parse(parsed.error.metadata.raw)
+                console.error('[OpenRouter] Nested provider error:', nestedError)
+                if (nestedError.error?.message) {
+                  errorMessage = `${parsed.error.metadata.provider_name || 'Provider'}: ${nestedError.error.message}`
+                }
+              } catch (e) {
+                console.error('[OpenRouter] Could not parse nested error')
+              }
+            }
           } else if (parsed.message) {
             errorMessage = parsed.message
           } else {
