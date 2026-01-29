@@ -13,8 +13,12 @@ export function useSDKStatus() {
   })
 
   useEffect(() => {
+    let isInitialCheck = true
+
     const checkSDK = async () => {
-      setStatus(prev => ({ ...prev, checking: true }))
+      if (isInitialCheck) {
+        setStatus(prev => ({ ...prev, checking: true }))
+      }
 
       const detected = await isSDKAvailable()
 
@@ -22,6 +26,8 @@ export function useSDKStatus() {
         sdkDetected: detected,
         checking: false
       })
+
+      isInitialCheck = false
     }
 
     checkSDK()

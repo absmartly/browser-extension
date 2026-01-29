@@ -215,7 +215,7 @@ export async function loadOverridesFromCookie(): Promise<ExperimentOverrides> {
 
       const result = await chrome.scripting.executeScript({
         target: { tabId: tabs[0].id },
-        func: (cookieName: string, devEnvKey: string, parserScript: string) => {
+        func: (cookieName: string, devEnvKey: string) => {
           const cookieValue = document.cookie
             .split('; ')
             .find(row => row.startsWith(`${cookieName}=`))
@@ -224,21 +224,57 @@ export async function loadOverridesFromCookie(): Promise<ExperimentOverrides> {
           if (!cookieValue) return {}
 
           try {
-            // Execute the generated parser script
-            const parsedResult = eval(parserScript) as { overrides: Record<string, any>, devEnv?: string }
+            // Parse cookie value directly (no eval needed)
+            let devEnv: string | undefined
+            let experimentsStr = cookieValue
 
-            // Store dev env if found (for migration purposes)
-            if (parsedResult.devEnv && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-              chrome.storage.local.set({ [devEnvKey]: parsedResult.devEnv })
+            // Check if dev environment is included
+            if (cookieValue.startsWith('devEnv=')) {
+              const parts = cookieValue.split('|')
+              devEnv = decodeURIComponent(parts[0].substring(7))
+              experimentsStr = parts[1] || ''
             }
 
-            return parsedResult.overrides
+            const overrides: Record<string, any> = {}
+            if (experimentsStr) {
+              const experiments = experimentsStr.split(',')
+
+              for (const exp of experiments) {
+                const [name, values] = exp.split(':')
+                if (!name || !values) continue
+
+                const decodedName = decodeURIComponent(name)
+                const parts = values.split('.')
+
+                if (parts.length === 1) {
+                  overrides[decodedName] = parseInt(parts[0], 10)
+                } else if (parts.length === 2) {
+                  overrides[decodedName] = {
+                    variant: parseInt(parts[0], 10),
+                    env: parseInt(parts[1], 10)
+                  }
+                } else {
+                  overrides[decodedName] = {
+                    variant: parseInt(parts[0], 10),
+                    env: parseInt(parts[1], 10),
+                    id: parseInt(parts[2], 10)
+                  }
+                }
+              }
+            }
+
+            // Store dev env if found (for migration purposes)
+            if (devEnv && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              chrome.storage.local.set({ [devEnvKey]: devEnv })
+            }
+
+            return overrides
           } catch (error) {
             console.warn('Failed to parse cookie:', error)
             return {}
           }
         },
-        args: [OVERRIDES_COOKIE_NAME, DEV_ENV_STORAGE_KEY, generateCookieParserScript(OVERRIDES_COOKIE_NAME)]
+        args: [OVERRIDES_COOKIE_NAME, DEV_ENV_STORAGE_KEY]
       })
 
       return result[0]?.result || {}

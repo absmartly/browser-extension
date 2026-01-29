@@ -1439,6 +1439,36 @@
     if (event.data && event.data.source === 'absmartly-extension') {
       debugLog('[ABsmartly Page] Received message from extension:', event.data);
 
+      // Handle plugin status check
+      if (event.data.type === 'CHECK_PLUGIN_STATUS') {
+        debugLog('[ABsmartly Page] Checking plugin status');
+
+        // Check if plugins are registered in the global registry
+        // Plugins register themselves at window.__ABSMARTLY_PLUGINS__ when initialized
+        const registry = window.__ABSMARTLY_PLUGINS__;
+        const pluginDetected = !!(
+          registry &&
+          (registry.dom?.initialized || registry.overrides?.initialized)
+        );
+
+        debugLog('[ABsmartly Page] Plugin detection result:', {
+          pluginDetected,
+          registry: registry ? Object.keys(registry) : []
+        });
+
+        // Send response back
+        window.postMessage({
+          source: 'absmartly-page',
+          type: 'PLUGIN_STATUS_RESPONSE',
+          payload: {
+            pluginDetected,
+            plugins: registry || {},
+            timestamp: Date.now()
+          }
+        }, '*');
+        return;
+      }
+
       // Handle dynamic override updates
       if (event.data.type === 'APPLY_OVERRIDES') {
         debugLog('[ABsmartly Page] Applying overrides dynamically');
@@ -1528,7 +1558,8 @@
         }
         
         // Check if the website already has the plugins loaded and initialized
-        if (window.ABsmartlySDKPlugins && context.__domPlugin && context.__domPlugin.initialized) {
+        // using the new global plugin registry
+        if (window.__ABSMARTLY_PLUGINS__ && window.__ABSMARTLY_PLUGINS__.dom?.initialized) {
           debugLog('[ABsmartly Extension] Plugins already loaded and initialized by website, skipping extension initialization');
           isInitialized = true;
           isInitializing = false;
@@ -1536,7 +1567,7 @@
         }
 
         // Check if plugins are available, if not load them from extension
-        if (typeof window.ABsmartlySDKPlugins === 'undefined' || typeof window.ABsmartlyExtensionPlugin === 'undefined') {
+        if (!window.__ABSMARTLY_PLUGINS__ || !window.__ABSMARTLY_PLUGINS__.dom) {
           debugLog('[ABsmartly Extension] Plugins not found, loading from extension...');
 
           // Use the captured extension URL
@@ -1563,20 +1594,22 @@
                 });
 
                 // Verify SDK plugins are loaded
+                // The bundled extension plugins still expose ABsmartlySDKPlugins as the UMD library name
+                // but we'll transition to using the registry once plugins are initialized
                 if (window.ABsmartlySDKPlugins) {
                   const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
 
                   if (DOMChangesPluginLite && OverridesPluginLite) {
-                    debugLog('[ABsmartly Extension] SDK plugin classes loaded successfully');
+                    debugLog('[ABsmartly Extension] Plugin classes loaded successfully from extension bundle');
                     window.__absmartlyPluginClasses = {
                       DOMChangesPluginLite,
                       OverridesPluginLite
                     };
                   } else {
-                    debugError('[ABsmartly Extension] Required plugin classes not found');
+                    debugError('[ABsmartly Extension] Required plugin classes not found in bundle');
                   }
                 } else {
-                  debugError('[ABsmartly Extension] SDK plugins not properly loaded');
+                  debugError('[ABsmartly Extension] Extension plugin bundle not properly loaded');
                 }
               } catch (error) {
                 debugError('[ABsmartly Extension] Error loading plugins:', error);
@@ -1591,29 +1624,35 @@
           }
         }
         
-        // If plugins are already available, prepare for initialization
-        if (window.ABsmartlySDKPlugins) {
+        // If plugins are already available (from extension bundle or website), prepare for initialization
+        // Check the global registry first, then fall back to UMD bundle
+        if (window.__ABSMARTLY_PLUGINS__?.dom?.initialized || window.ABsmartlySDKPlugins) {
           debugLog('[ABsmartly Extension] Plugin libraries already loaded');
 
-          // Check if already initialized by the website
-          if (context.__domPlugin && context.__domPlugin.initialized) {
-            debugLog('[ABsmartly Extension] Plugin already initialized by website, skipping');
+          // Check if already initialized by the website via registry
+          if (window.__ABSMARTLY_PLUGINS__?.dom?.initialized) {
+            debugLog('[ABsmartly Extension] Plugin already initialized by website (via registry), skipping');
             isInitialized = true;
             isInitializing = false;
             return;
           }
 
-          const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
+          // Get plugin classes from UMD bundle (extension's bundled version or website's UMD script)
+          if (window.ABsmartlySDKPlugins) {
+            const { DOMChangesPluginLite, OverridesPluginLite } = window.ABsmartlySDKPlugins;
 
-          if (DOMChangesPluginLite && OverridesPluginLite) {
-            debugLog('[ABsmartly Extension] All plugin classes available, ready for initialization');
-            // Store classes for initialization
-            window.__absmartlyPluginClasses = {
-              DOMChangesPluginLite,
-              OverridesPluginLite
-            };
+            if (DOMChangesPluginLite && OverridesPluginLite) {
+              debugLog('[ABsmartly Extension] Plugin classes available from bundle, ready for initialization');
+              // Store classes for initialization
+              window.__absmartlyPluginClasses = {
+                DOMChangesPluginLite,
+                OverridesPluginLite
+              };
+            } else {
+              debugError('[ABsmartly Extension] Required plugin classes not found in bundle');
+            }
           } else {
-            debugError('[ABsmartly Extension] Required plugin classes not found');
+            debugLog('[ABsmartly Extension] Plugins initialized via registry but classes not accessible (ES module import)');
           }
         }
 

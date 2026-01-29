@@ -18,10 +18,10 @@ export function SDKStatusAlert({ sdkDetected }: SDKStatusAlertProps) {
         </div>
         <div className="ml-3">
           <p className="text-sm text-yellow-700">
-            <strong>ABsmartly SDK not detected on this page.</strong>
+            <strong>ABsmartly DOM changes plugin not installed on this page.</strong>
           </p>
           <p className="text-xs text-yellow-600 mt-1">
-            You can use all the extension features to create and edit experiments, but the SDK is required to actually run experiments on this page.
+            You can use all the extension features to create and edit experiments, but the DOM changes plugin is required to run visual experiments on this page.
           </p>
         </div>
       </div>

@@ -228,6 +228,35 @@ const messageListenerRegistered = chrome.runtime.onMessage.addListener((message,
     return true
   }
 
+  if (message.type === 'CHECK_PLUGIN_STATUS') {
+    debugLog('[Content Script] Forwarding CHECK_PLUGIN_STATUS to page script');
+
+    // Forward the message to the page script
+    window.postMessage({
+      source: 'absmartly-extension',
+      type: 'CHECK_PLUGIN_STATUS'
+    }, '*');
+
+    // Set up a one-time listener for the response
+    const handleResponse = (event: MessageEvent) => {
+      if (event.data && event.data.source === 'absmartly-page' && event.data.type === 'PLUGIN_STATUS_RESPONSE') {
+        debugLog('[Content Script] Received plugin status response:', event.data.payload);
+        window.removeEventListener('message', handleResponse);
+        sendResponse(event.data.payload);
+      }
+    };
+
+    window.addEventListener('message', handleResponse);
+
+    // Timeout after 2 seconds if no response
+    setTimeout(() => {
+      window.removeEventListener('message', handleResponse);
+      sendResponse({ pluginDetected: false, timeout: true });
+    }, 2000);
+
+    return true; // Keep message channel open for async response
+  }
+
   if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
     const isActive = isVisualEditorActive || isVisualEditorStarting
     debugLog('[Visual Editor Content Script] CHECK_VISUAL_EDITOR_ACTIVE:', {
