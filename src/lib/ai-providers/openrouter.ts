@@ -7,20 +7,29 @@ import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
 import { validateXPath } from '~src/utils/xpath-validator'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
+import emojiRegex from 'emoji-regex'
 
 const MAX_TOOL_ITERATIONS = 10
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
 /**
  * Remove emojis and other problematic Unicode characters that some providers can't handle
+ * Uses emoji-regex package for comprehensive emoji detection
  */
 function stripEmojis(text: string): string {
-  // Remove emojis and other non-BMP characters
-  return text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1FFFF}]/gu, '')
-    // Remove other decorative Unicode symbols
+  const regex = emojiRegex()
+  return text
+    // Remove all emojis
+    .replace(regex, '')
+    // Remove other decorative Unicode symbols (box drawing)
     .replace(/[━─│┌┐└┘├┤┬┴┼]/g, '-')
-    // Clean up multiple spaces
+    // Remove variation selectors
+    .replace(/[\uFE00-\uFE0F]/g, '')
+    // Remove zero-width characters
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    // Clean up multiple spaces and dashes
     .replace(/\s+/g, ' ')
+    .replace(/-+/g, '-')
     .trim()
 }
 
