@@ -224,6 +224,12 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
     console.log('[OpenRouter] Char at position 75 after strip:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
     console.log('[OpenRouter] System prompt length:', systemPrompt.length, 'characters')
 
+    console.log('================================================================')
+    console.log('COMPLETE SYSTEM PROMPT:')
+    console.log('================================================================')
+    console.log(systemPrompt)
+    console.log('================================================================')
+
     const userMessageText = stripEmojis(buildUserMessage(prompt, currentChanges))
 
     const messages: OpenRouterChatMessage[] = [
