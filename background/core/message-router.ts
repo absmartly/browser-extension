@@ -88,8 +88,6 @@ export function routeMessage(
     return { handled: false, async: false }
   }
 
-  debugLog(`[Router] Received message: ${message.type} from ${message.from} to ${message.to}`)
-
   if (message.to === 'content') {
     routeToContent(message, sendResponse)
     return { handled: true, async: true }

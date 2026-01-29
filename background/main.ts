@@ -66,13 +66,6 @@ export function initializeBackgroundScript() {
   initializeAvatarProxy()
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('[Background] Message received:', message.type, 'from sender:', {
-      id: sender.id,
-      url: sender.url,
-      tab: sender.tab?.id
-    })
-    console.log('[Background] Our extension ID:', chrome.runtime.id)
-
     if (!validateSender(sender)) {
       console.error('[Background] REJECTED message from unauthorized sender:', {
         senderId: sender.id,
@@ -93,14 +86,8 @@ export function initializeBackgroundScript() {
       return false
     }
 
-    debugLog('[Background] Received message:', message.type)
-
     if (message.from && message.to) {
       const extensionMessage = message as ExtensionMessage
-      debugLog(
-        `[Background Router] Received message: ${extensionMessage.type} from ${extensionMessage.from} to ${extensionMessage.to}`
-      )
-
       const result = routeMessage(extensionMessage, sender, sendResponse)
       return result.async
     }
@@ -251,12 +238,6 @@ export function initializeBackgroundScript() {
       })
       return true
     } else if (message.type === 'API_REQUEST') {
-      debugLog('[Background] Received API_REQUEST:', {
-        method: message.method,
-        path: message.path,
-        data: message.data
-      })
-
       makeAPIRequest(message.method, message.path, message.data)
         .then(data => {
           sendResponse({ success: true, data })
