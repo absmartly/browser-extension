@@ -141,17 +141,13 @@ export function initializeBackgroundScript() {
         })
       return true
     } else if (message.type === 'SDK_EVENT') {
-      console.log('[Background] Received SDK_EVENT:', message.payload)
       bufferSDKEvent(message.payload)
         .then(() => {
-          console.log('[Background] Event buffered, broadcasting...')
           chrome.runtime.sendMessage({
             type: 'SDK_EVENT_BROADCAST',
             payload: message.payload
-          }).then(() => {
-            console.log('[Background] SDK_EVENT_BROADCAST sent successfully')
-          }).catch((err) => {
-            console.log('[Background] No listeners for SDK_EVENT_BROADCAST (this is normal if sidebar not open):', err?.message)
+          }).catch(() => {
+            // Ignore - no listeners if sidebar not open
           })
           sendResponse({ success: true })
         })

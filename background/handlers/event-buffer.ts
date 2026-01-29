@@ -21,14 +21,12 @@ export async function bufferSDKEvent(payload: {
   timestamp: number | string
 }): Promise<void> {
   const { eventName, data, timestamp } = payload
-  console.log("[Background] 🔵 Received SDK_EVENT:", { eventName, data, timestamp })
 
   const sessionStorage = new Storage({ area: "session" })
 
   try {
     const buffer = await sessionStorage.get(EVENT_BUFFER_KEY) as SDKEvent[] | null
     const events: SDKEvent[] = buffer || []
-    console.log("[Background] Current buffer size:", events.length)
 
     const newEvent: SDKEvent = {
       id: `${Date.now()}-${Math.random()}`,
@@ -37,21 +35,16 @@ export async function bufferSDKEvent(payload: {
       timestamp
     }
     events.push(newEvent)
-    console.log("[Background] ✅ Added event to buffer:", newEvent)
 
     const trimmedEvents = events.slice(-MAX_BUFFER_SIZE)
 
     await sessionStorage.set(EVENT_BUFFER_KEY, trimmedEvents)
-    console.log("[Background] ✅ Event buffered, now broadcasting...")
-    debugLog("[Background] SDK event buffered:", eventName)
 
     chrome.runtime.sendMessage({
       type: "SDK_EVENT_BROADCAST",
       payload: { eventName, data, timestamp }
-    }).then(() => {
-      console.log("[Background] ✅ SDK_EVENT_BROADCAST sent successfully")
-    }).catch((err) => {
-      console.log("[Background] ⚠️ No listeners for SDK_EVENT_BROADCAST (this is normal if sidebar not open):", err?.message)
+    }).catch(() => {
+      // Ignore - no listeners if sidebar not open
     })
   } catch (error) {
     console.error("[Background] ❌ Failed to buffer event:", error)
@@ -69,7 +62,6 @@ export async function getBufferedEvents(): Promise<SDKEvent[]> {
 
   try {
     const events = await sessionStorage.get(EVENT_BUFFER_KEY) as SDKEvent[] | null
-    debugLog("[Background] Retrieved buffered events:", events?.length || 0)
     return events || []
   } catch (error) {
     debugError("[Background] Failed to get buffered events:", error)
@@ -85,7 +77,6 @@ export async function clearBufferedEvents(): Promise<void> {
 
   try {
     await sessionStorage.remove(EVENT_BUFFER_KEY)
-    debugLog("[Background] Cleared buffered events")
   } catch (error) {
     debugError("[Background] Failed to clear buffered events:", error)
     throw error
