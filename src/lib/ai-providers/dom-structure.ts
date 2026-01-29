@@ -276,8 +276,8 @@ function generateFallbackStructure(html: string): DOMStructure {
 function formatNode(node: DOMNode, prefix: string, isLast: boolean): string[] {
   const lines: string[] = []
 
-  const connector = isLast ? '└── ' : '├── '
-  const childPrefix = isLast ? '    ' : '│   '
+  const connector = isLast ? '`-- ' : '|-- '
+  const childPrefix = isLast ? '    ' : '|   '
 
   let label = node.tag
   if (node.id) {

@@ -14,22 +14,20 @@ const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
 /**
  * Remove emojis and other problematic Unicode characters that some providers can't handle
- * Uses emoji-regex package for comprehensive emoji detection
+ * CRITICAL: Must remove ALL surrogates to prevent UTF-8 encoding errors
  */
 function stripEmojis(text: string): string {
-  const regex = emojiRegex()
   return text
-    // Remove all emojis
-    .replace(regex, '')
-    // Remove other decorative Unicode symbols (box drawing)
-    .replace(/[━─│┌┐└┘├┤┬┴┼]/g, '-')
+    // FIRST: Remove ALL surrogate pairs (emojis stored as 2-char sequences)
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+    // SECOND: Remove any orphaned surrogates
+    .replace(/[\uD800-\uDFFF]/g, '')
     // Remove variation selectors
     .replace(/[\uFE00-\uFE0F]/g, '')
     // Remove zero-width characters
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    // Clean up multiple spaces and dashes
+    // Clean up multiple spaces
     .replace(/\s+/g, ' ')
-    .replace(/-+/g, '-')
     .trim()
 }
 
@@ -177,8 +175,6 @@ export class OpenRouterProvider implements AIProvider {
     }
 
     let systemPrompt = await getSystemPrompt(this.getChunkRetrievalPrompt())
-    // Strip emojis for providers that can't handle them (Arcee AI, etc.)
-    systemPrompt = stripEmojis(systemPrompt)
 
     if (!session.htmlSent) {
       if (!html && !options.domStructure) {
@@ -202,16 +198,31 @@ To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
 IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
 `
       session.htmlSent = true
-      console.log(`[OpenRouter] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
+      console.log(`[OpenRouter] Including DOM structure in system prompt (${structureText.length} chars)`)
     }
 
-    console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('[OpenRouter] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO OPENROUTER:')
-    console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(systemPrompt)
-    console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(`[OpenRouter] 📊 System prompt length: ${systemPrompt.length} characters`)
-    console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    console.log('[OpenRouter] System prompt BEFORE stripping, length:', systemPrompt.length)
+    console.log('[OpenRouter] Char at position 75:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
+
+    // Strip emojis AFTER building complete system prompt
+    systemPrompt = stripEmojis(systemPrompt)
+
+    console.log('[OpenRouter] System prompt AFTER stripping, length:', systemPrompt.length)
+
+    // Check for any remaining surrogates
+    const surrogateTest = /[\uD800-\uDFFF]/
+    if (surrogateTest.test(systemPrompt)) {
+      console.error('[OpenRouter] WARNING: System prompt still contains surrogate characters!')
+      const match = systemPrompt.match(surrogateTest)
+      if (match) {
+        const pos = systemPrompt.indexOf(match[0])
+        console.error('[OpenRouter] First surrogate at position:', pos, 'char code:', systemPrompt.charCodeAt(pos))
+        console.error('[OpenRouter] Context:', systemPrompt.substring(Math.max(0, pos - 20), pos + 20))
+      }
+    }
+
+    console.log('[OpenRouter] Char at position 75 after strip:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
+    console.log('[OpenRouter] System prompt length:', systemPrompt.length, 'characters')
 
     const userMessageText = stripEmojis(buildUserMessage(prompt, currentChanges))
 
@@ -240,6 +251,19 @@ IMPORTANT: Only use selectors you see in the structure above. Never invent or gu
         messages: messages,
         tools: tools,
         max_tokens: 4096
+      }
+
+      // Verify no surrogates in request body
+      const bodyStr = JSON.stringify(requestBody)
+      const surrogateCheck = /[\uD800-\uDFFF]/
+      if (surrogateCheck.test(bodyStr)) {
+        console.error('[OpenRouter] ❌ REQUEST BODY CONTAINS SURROGATES!')
+        const match = bodyStr.match(surrogateCheck)
+        if (match) {
+          const pos = bodyStr.indexOf(match[0])
+          console.error('[OpenRouter] Surrogate at position:', pos)
+          console.error('[OpenRouter] Context:', bodyStr.substring(Math.max(0, pos - 50), pos + 50))
+        }
       }
 
       const timeoutPromise = new Promise<never>((_, reject) => {
