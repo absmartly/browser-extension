@@ -163,12 +163,9 @@ export function compressHtml(html: string): string {
 }
 
 export async function getSystemPrompt(chunkRetrievalPrompt: string): Promise<string> {
-  // TEMPORARY: Skip system prompt for debugging
-  return ''
-
-  // const override = await getSystemPromptOverride()
-  // const basePrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
-  // return basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
+  const override = await getSystemPromptOverride()
+  const basePrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
+  return basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
 }
 
 export function createSession(conversationSession?: ConversationSession): ConversationSession {

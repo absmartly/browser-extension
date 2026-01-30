@@ -181,6 +181,8 @@ export class OpenRouterProvider implements AIProvider {
         max_tokens: 4096
       }
 
+      console.log('[OpenRouter] Request includes', tools.length, 'tools:', tools.map(t => t.function?.name || t.name))
+
       // Verify no surrogates in request body
       const bodyStr = JSON.stringify(requestBody)
       const surrogateCheck = /[\uD800-\uDFFF]/
