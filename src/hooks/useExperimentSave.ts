@@ -263,7 +263,11 @@ async function saveExistingExperiment(
           order_index: m.order_index || 0
         })) || [],
         variants: updatedVariants,
-        variant_screenshots: fullExperiment.variant_screenshots || [],
+        variant_screenshots: (fullExperiment.variant_screenshots || []).map((screenshot: any) => ({
+          variant: screenshot.variant,
+          screenshot_file_upload_id: screenshot.screenshot_file_upload_id,
+          label: screenshot.label
+        })),
         custom_section_field_values: {},
         parent_experiment: fullExperiment.parent_experiment || null,
         template_permission: fullExperiment.template_permission || {},
@@ -334,7 +338,7 @@ async function saveExistingExperiment(
       putPayload.data.custom_section_field_values = customFieldsObj
     }
 
-    onUpdate(experiment.id, putPayload)
+    await onUpdate(experiment.id, putPayload)
 
   } catch (error) {
     const errorMessage = 'Failed to save changes: ' + (error as Error).message
