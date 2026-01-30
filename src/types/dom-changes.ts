@@ -24,7 +24,8 @@ export interface DOMChangeStyle {
 export interface DOMChangeStyleRules {
   selector: string;
   type: 'styleRules';
-  states: {
+  value?: string;  // Raw CSS string (alternative to states)
+  states?: {
     normal?: Record<string, string>;
     hover?: Record<string, string>;
     active?: Record<string, string>;
