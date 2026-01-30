@@ -9,12 +9,16 @@ interface ToastProps {
 
 export function Toast({ message, type = 'info', duration = 3000, onClose }: ToastProps) {
   useEffect(() => {
+    if (type === 'error') {
+      return
+    }
+
     const timer = setTimeout(() => {
       onClose()
     }, duration)
 
     return () => clearTimeout(timer)
-  }, [duration, onClose])
+  }, [duration, onClose, type])
 
   const typeClasses = {
     success: 'bg-green-500 text-white',
