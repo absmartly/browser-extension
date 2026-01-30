@@ -129,7 +129,7 @@ function SidebarContent() {
     updateExperiment,
     loadExperiments,
     onAuthExpired: handleAuthExpired,
-    onError: setError,
+    onError: (message) => setToast({ message, type: 'error' }),
     onSuccess: (message) => setToast({ message, type: 'success' }),
     setView,
     pageSize

@@ -104,26 +104,34 @@ export function ExperimentDetail({
   }
 
   const handleSaveChanges = async () => {
-    const formData = {
-      display_name: displayName,
-      percentage_of_traffic: metadata.percentage_of_traffic,
-      unit_type_id: metadata.unit_type_id,
-      application_ids: metadata.application_ids,
-      owner_ids: metadata.owner_ids,
-      team_ids: metadata.team_ids,
-      tag_ids: metadata.tag_ids
-    }
-
-    await save(formData, currentVariants, onUpdate)
-
     try {
-      await clearAllExperimentStorage(experiment.id)
-      debugLog('🧹 Cleared all DOM changes storage (session + local) after save for experiment', experiment.id)
-    } catch (error) {
-      debugError('Failed to clear storage after save:', error)
-    }
+      const formData = {
+        display_name: displayName,
+        percentage_of_traffic: metadata.percentage_of_traffic,
+        unit_type_id: metadata.unit_type_id,
+        application_ids: metadata.application_ids,
+        owner_ids: metadata.owner_ids,
+        team_ids: metadata.team_ids,
+        tag_ids: metadata.tag_ids
+      }
 
-    setHasUnsavedChanges(false)
+      await save(formData, currentVariants, onUpdate)
+
+      try {
+        await clearAllExperimentStorage(experiment.id)
+        debugLog('🧹 Cleared all DOM changes storage (session + local) after save for experiment', experiment.id)
+      } catch (error) {
+        debugError('Failed to clear storage after save:', error)
+      }
+
+      setHasUnsavedChanges(false)
+    } catch (error) {
+      debugError('Failed to save experiment:', error)
+      if (onError) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to save experiment'
+        onError(errorMessage)
+      }
+    }
   }
 
   const extractInjectionCode = (variant: Variant): ExperimentInjectionCode | undefined => {

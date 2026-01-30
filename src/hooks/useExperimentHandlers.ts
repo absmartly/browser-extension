@@ -73,7 +73,8 @@ export function useExperimentHandlers({
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
         onAuthExpired()
       } else {
-        onError('Failed to start experiment')
+        const errorMessage = error.message || 'Failed to start experiment'
+        onError(errorMessage)
       }
       debugError('Failed to start experiment:', error)
     }
@@ -88,7 +89,8 @@ export function useExperimentHandlers({
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
         onAuthExpired()
       } else {
-        onError('Failed to stop experiment')
+        const errorMessage = error.message || 'Failed to stop experiment'
+        onError(errorMessage)
       }
       debugError('Failed to stop experiment:', error)
     }
@@ -114,7 +116,8 @@ export function useExperimentHandlers({
     } catch (err) {
       const error = APIError.fromError(err)
       console.error('Failed to load template:', error)
-      onError('Failed to load template')
+      const errorMessage = error.message || 'Failed to load template'
+      onError(errorMessage)
     }
   }, [getExperiment, setView, onError])
 
@@ -161,7 +164,8 @@ export function useExperimentHandlers({
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
         onAuthExpired()
       } else {
-        onError('Failed to update experiment')
+        const errorMessage = error.message || 'Failed to update experiment'
+        onError(errorMessage)
       }
       debugError('Failed to update experiment:', error)
     }
