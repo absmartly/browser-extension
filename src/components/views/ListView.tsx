@@ -24,7 +24,7 @@ interface ListViewProps {
   totalExperiments: number
   hasMore: boolean
   error: string | null
-  isAuthExpired: boolean
+  isAuthenticated: boolean
   createPanelOpen: boolean
   templates: Experiment[]
   templatesLoading: boolean
@@ -57,7 +57,7 @@ export function ListView({
   totalExperiments,
   hasMore,
   error,
-  isAuthExpired,
+  isAuthenticated,
   createPanelOpen,
   templates,
   templatesLoading,
@@ -148,21 +148,24 @@ export function ListView({
           config={config}
         />
       </div>
-      {error && (
-        <div role="alert" className="bg-red-50 text-red-700 px-4 py-2 text-sm">
+      {!isAuthenticated && (
+        <div role="alert" className="bg-blue-50 text-blue-700 px-4 py-2 text-sm">
           <div className="flex items-center justify-between">
-            <span>{error}</span>
-            {isAuthExpired && (
-              <Button
-                onClick={onLoginRedirect}
-                size="sm"
-                variant="primary"
-                className="ml-2"
-              >
-                Login
-              </Button>
-            )}
+            <span>You are not logged in. Log in to load fresh experiments.</span>
+            <Button
+              onClick={onLoginRedirect}
+              size="sm"
+              variant="primary"
+              className="ml-2"
+            >
+              Login
+            </Button>
           </div>
+        </div>
+      )}
+      {error && isAuthenticated && (
+        <div role="alert" className="bg-red-50 text-red-700 px-4 py-2 text-sm">
+          {error}
         </div>
       )}
       {!checking && (

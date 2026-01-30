@@ -78,7 +78,6 @@ function SidebarContent() {
   const {
     error,
     setError,
-    isAuthExpired,
     setIsAuthExpired,
     toast,
     setToast,
@@ -99,6 +98,7 @@ function SidebarContent() {
     totalExperiments,
     hasMore,
     loadExperiments,
+    loadCachedExperiments,
     handlePageChange,
     handlePageSizeChange,
     setCurrentPage
@@ -238,7 +238,7 @@ function SidebarContent() {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && (isAuthExpired || error) && config && view === 'list') {
+      if (!document.hidden && (!isAuthenticated || error) && config && view === 'list') {
         debugLog('Document became visible with error state, attempting to refresh...')
         loadExperiments(true, 1, pageSize)
       }
@@ -246,7 +246,7 @@ function SidebarContent() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [isAuthExpired, error, config, view, pageSize, loadExperiments])
+  }, [isAuthenticated, error, config, view, pageSize, loadExperiments])
 
   const handleSettingsSave = (newConfig: Partial<ABsmartlyConfig>) => {
     updateConfig(newConfig)
@@ -295,7 +295,7 @@ function SidebarContent() {
           totalExperiments={totalExperiments}
           hasMore={hasMore}
           error={error}
-          isAuthExpired={isAuthExpired}
+          isAuthenticated={isAuthenticated}
           createPanelOpen={createPanelOpen}
           templates={templates}
           templatesLoading={templatesLoading}

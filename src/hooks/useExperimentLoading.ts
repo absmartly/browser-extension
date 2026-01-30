@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { setExperimentsCache } from '~src/utils/storage'
+import { setExperimentsCache, getExperimentsCache } from '~src/utils/storage'
 import type { Experiment } from '~src/types/absmartly'
 import type { ExperimentFilters } from '~src/types/storage-state'
 import { buildFilterParams } from './useExperimentFilters'
@@ -100,6 +100,27 @@ export function useExperimentLoading({
     loadExperiments(true, 1, size)
   }, [loadExperiments])
 
+  const loadCachedExperiments = useCallback(async () => {
+    try {
+      const cache = await getExperimentsCache()
+      if (cache && cache.experiments && cache.experiments.length > 0) {
+        debugLog('Loading cached experiments:', cache.experiments.length)
+        setExperiments(cache.experiments)
+        setFilteredExperiments(cache.experiments)
+        setTotalExperiments(cache.experiments.length)
+        return true
+      }
+      return false
+    } catch (error) {
+      debugWarn('Failed to load cached experiments:', error)
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCachedExperiments()
+  }, [loadCachedExperiments])
+
   return {
     experiments,
     filteredExperiments,
@@ -109,6 +130,7 @@ export function useExperimentLoading({
     totalExperiments,
     hasMore,
     loadExperiments,
+    loadCachedExperiments,
     handlePageChange,
     handlePageSizeChange,
     setCurrentPage,
