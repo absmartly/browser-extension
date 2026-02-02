@@ -41,6 +41,7 @@ export interface EditingDOMChange {
   observerRoot?: string
   persistStyle?: boolean
   persistAttribute?: boolean
+  persistScript?: boolean
 }
 
 export const createEmptyChange = (): EditingDOMChange => ({
@@ -278,25 +279,6 @@ export const DOMChangeEditor = ({
             styleProperties={localChange.styleProperties}
             onChange={(newProps) => setLocalChange({ ...localChange, styleProperties: newProps })}
           />
-
-          {/* Checkboxes for important flag and lazy loading */}
-          <div className="pt-2 border-t border-gray-200">
-            <DOMChangeOptions
-              important={localChange.styleImportant || false}
-              waitForElement={localChange.waitForElement || false}
-              triggerOnView={localChange.triggerOnView || false}
-              persistStyle={localChange.persistStyle || false}
-              observerRoot={localChange.observerRoot || ''}
-              onImportantChange={(value) => setLocalChange({ ...localChange, styleImportant: value })}
-              onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
-              onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
-              onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistStyle: value })}
-              onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
-              onStartPicker={onStartPicker}
-              pickingForField={pickingForField}
-              idPrefix={`style-${isEditMode ? 'edit' : 'new'}`}
-            />
-          </div>
         </div>
       )}
 
@@ -408,24 +390,6 @@ export const DOMChangeEditor = ({
             onChange={(attrs) => setLocalChange({ ...localChange, attributeProperties: attrs })}
             idSuffix={idSuffix}
           />
-
-          {/* Options for attributes */}
-          <div className="pt-2 border-t border-gray-200">
-            <DOMChangeOptions
-              waitForElement={localChange.waitForElement || false}
-              triggerOnView={localChange.triggerOnView || false}
-              persistStyle={localChange.persistAttribute || false}
-              observerRoot={localChange.observerRoot || ''}
-              onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
-              onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
-              onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistAttribute: value })}
-              onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
-              onStartPicker={onStartPicker}
-              pickingForField={pickingForField}
-              idPrefix={`attribute-${isEditMode ? 'edit' : 'new'}`}
-              showImportant={false}
-            />
-          </div>
         </div>
       )}
 
@@ -487,21 +451,6 @@ export const DOMChangeEditor = ({
 console.log('Hello from experiment:', experimentName);"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
               rows={6}
-            />
-          </div>
-
-          {/* Wait for element checkbox and options */}
-          <div className="pt-2 border-t border-gray-200">
-            <DOMChangeOptions
-              waitForElement={localChange.waitForElement || false}
-              triggerOnView={localChange.triggerOnView || false}
-              observerRoot={localChange.observerRoot || ''}
-              onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
-              onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
-              onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
-              onStartPicker={onStartPicker}
-              pickingForField={pickingForField}
-              idPrefix={`js-${isEditMode ? 'edit' : 'new'}`}
             />
           </div>
         </div>
@@ -567,12 +516,22 @@ console.log('Hello from experiment:', experimentName);"
             important={localChange.type === 'style' ? (localChange.styleImportant || false) : undefined}
             waitForElement={localChange.waitForElement || false}
             triggerOnView={localChange.triggerOnView || false}
-            persistStyle={localChange.type === 'style' ? (localChange.persistStyle || false) : localChange.type === 'attribute' ? (localChange.persistAttribute || false) : undefined}
+            persistStyle={
+              localChange.type === 'style' ? (localChange.persistStyle || false) :
+              localChange.type === 'attribute' ? (localChange.persistAttribute || false) :
+              localChange.type === 'javascript' ? (localChange.persistScript || false) :
+              undefined
+            }
             observerRoot={localChange.observerRoot || ''}
             onImportantChange={localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, styleImportant: value })) : undefined}
             onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
             onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
-            onPersistStyleChange={localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, persistStyle: value })) : localChange.type === 'attribute' ? ((value) => setLocalChange({ ...localChange, persistAttribute: value })) : undefined}
+            onPersistStyleChange={
+              localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, persistStyle: value })) :
+              localChange.type === 'attribute' ? ((value) => setLocalChange({ ...localChange, persistAttribute: value })) :
+              localChange.type === 'javascript' ? ((value) => setLocalChange({ ...localChange, persistScript: value })) :
+              undefined
+            }
             onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
             onStartPicker={onStartPicker}
             pickingForField={pickingForField}
@@ -580,7 +539,7 @@ console.log('Hello from experiment:', experimentName);"
             showImportant={localChange.type === 'style'}
             showWaitForElement={true}
             showTriggerOnView={true}
-            showPersistStyle={localChange.type === 'style' || localChange.type === 'attribute'}
+            showPersistStyle={localChange.type === 'style' || localChange.type === 'attribute' || localChange.type === 'javascript'}
             showObserverRoot={true}
           />
         </div>

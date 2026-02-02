@@ -70,6 +70,9 @@ export function useDOMChangesEditor({
       mode: (change as any).mode || 'merge',
       waitForElement: (change as any).waitForElement,
       triggerOnView: (change as any).triggerOnView,
+      persistStyle: change.type === 'style' ? (change as any).persistStyle : undefined,
+      persistAttribute: change.type === 'attribute' ? (change as any).persistAttribute : undefined,
+      persistScript: change.type === 'javascript' ? (change as any).persistScript : undefined,
       observerRoot: (change as any).observerRoot
     }
     setEditingChange(editing)
@@ -114,6 +117,7 @@ export function useDOMChangesEditor({
           value: changeToSave.jsValue || '',
           waitForElement: changeToSave.waitForElement,
           triggerOnView: changeToSave.triggerOnView,
+          persistScript: changeToSave.persistScript,
           observerRoot: changeToSave.observerRoot
         }
         break

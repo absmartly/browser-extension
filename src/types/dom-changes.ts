@@ -93,6 +93,7 @@ export interface DOMChangeJavaScript {
   disabled?: boolean;
   waitForElement?: boolean;
   triggerOnView?: boolean;
+  persistScript?: boolean;
   observerRoot?: string;
 }
 

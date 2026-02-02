@@ -110,8 +110,8 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
             className="mt-0.5 mr-2"
           />
           <label htmlFor={`${idPrefix}-persist`} className="text-xs">
-            <span className="font-medium text-gray-700">Persist styles (React/Vue/Angular)</span>
-            <p className="text-gray-500">Re-apply styles when frameworks overwrite them</p>
+            <span className="font-medium text-gray-700">Persist change</span>
+            <p className="text-gray-500">Re-apply change when frameworks or interactions overwrite it</p>
           </label>
         </div>
       )}

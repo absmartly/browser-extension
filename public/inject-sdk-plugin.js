@@ -1446,14 +1446,23 @@
         // Check if plugins are registered in the global registry
         // Plugins register themselves at window.__ABSMARTLY_PLUGINS__ when initialized
         const registry = window.__ABSMARTLY_PLUGINS__;
+
+        // Plugin is detected if it has the dom or overrides property with initialized flag
         const pluginDetected = !!(
           registry &&
-          (registry.dom?.initialized || registry.overrides?.initialized)
+          (
+            (registry.dom && registry.dom.initialized) ||
+            (registry.overrides && registry.overrides.initialized)
+          )
         );
 
         debugLog('[ABsmartly Page] Plugin detection result:', {
           pluginDetected,
-          registry: registry ? Object.keys(registry) : []
+          registry: registry ? Object.keys(registry) : [],
+          registryDetails: registry ? {
+            dom: registry.dom ? { initialized: registry.dom.initialized, name: registry.dom.name } : null,
+            overrides: registry.overrides ? { initialized: registry.overrides.initialized, name: registry.overrides.name } : null
+          } : null
         });
 
         // Send response back
