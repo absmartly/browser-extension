@@ -102,8 +102,7 @@
       "activeTab",
       "tabs",
       "scripting",
-      "cookies",
-      "clipboardWrite"
+      "cookies"
     ],
     "host_permissions": [
       "https://*.absmartly.com/*",

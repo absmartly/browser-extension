@@ -64,11 +64,8 @@ describe('config-manager', () => {
         applicationId: 123,
         authMethod: 'apikey' as const,
         domChangesFieldName: 'customField',
-        sdkEndpoint: 'https://sdk.absmartly.io',
         queryPrefix: '_exp_',
-        persistQueryToCookie: true,
-        injectSDK: true,
-        sdkUrl: 'https://sdk.absmartly.com/sdk.js'
+        persistQueryToCookie: true
       }
 
       const result = validateConfig(config)

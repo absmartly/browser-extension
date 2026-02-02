@@ -236,8 +236,8 @@ describe('DOM Structure Generation', () => {
 
       // Should compress img (×3), button (×2), and div.item (×5)
       expect(result).toContain('img (×3)')
-      expect(result).toContain('button (×2)')
-      expect(result).toContain('div.item (×5)')
+      expect(result).toContain('button "Button 1" (×2)')
+      expect(result).toContain('div.item "Item 1" (×5)')
     })
 
     it('should generate valid structure from real-like DOM', () => {

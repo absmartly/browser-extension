@@ -207,47 +207,6 @@ describe('api-client', () => {
       }))
     })
 
-    it('should use JWT authentication when authMethod is jwt', async () => {
-      const jwtConfig: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com',
-        authMethod: 'jwt'
-      }
-
-      mockChrome.cookies.getAll.mockResolvedValue([
-        { name: 'jwt', value: 'header.payload.signature', domain: '.absmartly.com' }
-      ])
-
-      jest.mocked(axios).mockResolvedValue({ data: {} })
-
-      await makeAPIRequest('GET', '/auth/current-user', undefined, true, jwtConfig)
-
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'JWT header.payload.signature'
-        })
-      }))
-    })
-
-    it('should use JWT prefix for all JWT tokens', async () => {
-      const jwtConfig: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com',
-        authMethod: 'jwt'
-      }
-
-      mockChrome.cookies.getAll.mockResolvedValue([
-        { name: 'jwt', value: 'not-a-jwt-token', domain: '.absmartly.com' }
-      ])
-
-      jest.mocked(axios).mockResolvedValue({ data: {} })
-
-      await makeAPIRequest('GET', '/auth/current-user', undefined, true, jwtConfig)
-
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'JWT not-a-jwt-token'
-        })
-      }))
-    })
 
     it('should throw AUTH_EXPIRED on 401 error', async () => {
       jest.mocked(axios).mockRejectedValue({

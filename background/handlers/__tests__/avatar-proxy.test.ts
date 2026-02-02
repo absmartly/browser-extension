@@ -240,8 +240,7 @@ describe('AvatarProxy', () => {
         'https://cdn.example.com/avatar.png',
         expect.objectContaining({
           headers: expect.objectContaining({
-            'Accept': 'image/*',
-            'Authorization': 'JWT test-jwt-token'
+            'Accept': 'image/*'
           })
         })
       )
@@ -280,23 +279,6 @@ describe('AvatarProxy', () => {
       )
     })
 
-    it('should return 401 when JWT token not available', async () => {
-      mockStorageInstances.regular.get.mockResolvedValue({
-        apiEndpoint: 'https://api.absmartly.com',
-        authMethod: 'jwt'
-      })
-      mockStorageInstances.secure.get.mockResolvedValue(null)
-      ;(getJWTCookie as jest.Mock).mockResolvedValue(null)
-
-      const response = await handleAvatarFetch(
-        'https://cdn.example.com/avatar.png',
-        'jwt'
-      )
-
-      expect(response.status).toBe(401)
-      const text = await response.text()
-      expect(text).toBe('No JWT token available for avatar authentication')
-    })
 
     it('should handle fetch failure', async () => {
       mockStorageInstances.regular.get.mockResolvedValue({

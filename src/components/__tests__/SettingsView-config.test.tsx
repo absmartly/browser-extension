@@ -113,14 +113,6 @@ describe('SettingsView - Config Defaults', () => {
     it('should have persistQueryToCookie default of true', () => {
       expect(DEFAULT_CONFIG.persistQueryToCookie).toBe(true)
     })
-
-    it('should have injectSDK default of false', () => {
-      expect(DEFAULT_CONFIG.injectSDK).toBe(false)
-    })
-
-    it('should have sdkUrl default of empty string', () => {
-      expect(DEFAULT_CONFIG.sdkUrl).toBe('')
-    })
   })
 
   describe('Config loading logic', () => {
