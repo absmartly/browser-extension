@@ -37,6 +37,7 @@ export interface EditingDOMChange {
   position?: 'before' | 'after' | 'firstChild' | 'lastChild'
   mode?: 'replace' | 'merge'
   waitForElement?: boolean
+  triggerOnView?: boolean
   observerRoot?: string
   persistStyle?: boolean
   persistAttribute?: boolean
@@ -283,10 +284,12 @@ export const DOMChangeEditor = ({
             <DOMChangeOptions
               important={localChange.styleImportant || false}
               waitForElement={localChange.waitForElement || false}
+              triggerOnView={localChange.triggerOnView || false}
               persistStyle={localChange.persistStyle || false}
               observerRoot={localChange.observerRoot || ''}
               onImportantChange={(value) => setLocalChange({ ...localChange, styleImportant: value })}
               onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+              onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
               onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistStyle: value })}
               onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
               onStartPicker={onStartPicker}
@@ -410,9 +413,11 @@ export const DOMChangeEditor = ({
           <div className="pt-2 border-t border-gray-200">
             <DOMChangeOptions
               waitForElement={localChange.waitForElement || false}
+              triggerOnView={localChange.triggerOnView || false}
               persistStyle={localChange.persistAttribute || false}
               observerRoot={localChange.observerRoot || ''}
               onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+              onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
               onPersistStyleChange={(value) => setLocalChange({ ...localChange, persistAttribute: value })}
               onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
               onStartPicker={onStartPicker}
@@ -489,8 +494,10 @@ console.log('Hello from experiment:', experimentName);"
           <div className="pt-2 border-t border-gray-200">
             <DOMChangeOptions
               waitForElement={localChange.waitForElement || false}
+              triggerOnView={localChange.triggerOnView || false}
               observerRoot={localChange.observerRoot || ''}
               onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+              onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
               onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
               onStartPicker={onStartPicker}
               pickingForField={pickingForField}
@@ -553,36 +560,29 @@ console.log('Hello from experiment:', experimentName);"
         </div>
       )}
 
-      {/* Wait for element checkbox for applicable types */}
-      {localChange.type !== 'style' && localChange.type !== 'styleRules' && localChange.type !== 'javascript' && (
-        <div className="space-y-2 pt-2 border-t border-gray-200">
-          <div className="flex items-start">
-            <input
-              type="checkbox"
-              id={`wait-${isEditMode ? 'edit' : 'new'}`}
-              checked={localChange.waitForElement || false}
-              onChange={(e) => setLocalChange({ ...localChange, waitForElement: e.target.checked })}
-              className="mt-1 mr-2"
-            />
-            <label htmlFor={`wait-${isEditMode ? 'edit' : 'new'}`} className="text-sm">
-              <span className="font-medium text-gray-700">Wait for element (lazy-loaded)</span>
-              <p className="text-gray-500">Apply change when element appears in DOM</p>
-            </label>
-          </div>
-
-          {localChange.waitForElement && (
-            <div className="ml-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observer Root (optional)
-              </label>
-              <Input
-                value={localChange.observerRoot || ''}
-                onChange={(e) => setLocalChange({ ...localChange, observerRoot: e.target.value })}
-                placeholder="body, .container, #app"
-                className="text-xs"
-              />
-            </div>
-          )}
+      {/* Unified DOM change options section for applicable types */}
+      {localChange.type !== 'styleRules' && (
+        <div className="pt-2 border-t border-gray-200">
+          <DOMChangeOptions
+            important={localChange.type === 'style' ? (localChange.styleImportant || false) : undefined}
+            waitForElement={localChange.waitForElement || false}
+            triggerOnView={localChange.triggerOnView || false}
+            persistStyle={localChange.type === 'style' ? (localChange.persistStyle || false) : localChange.type === 'attribute' ? (localChange.persistAttribute || false) : undefined}
+            observerRoot={localChange.observerRoot || ''}
+            onImportantChange={localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, styleImportant: value })) : undefined}
+            onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+            onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
+            onPersistStyleChange={localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, persistStyle: value })) : localChange.type === 'attribute' ? ((value) => setLocalChange({ ...localChange, persistAttribute: value })) : undefined}
+            onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+            onStartPicker={onStartPicker}
+            pickingForField={pickingForField}
+            idPrefix={`options-${isEditMode ? 'edit' : 'new'}`}
+            showImportant={localChange.type === 'style'}
+            showWaitForElement={true}
+            showTriggerOnView={true}
+            showPersistStyle={localChange.type === 'style' || localChange.type === 'attribute'}
+            showObserverRoot={true}
+          />
         </div>
       )}
     </div>

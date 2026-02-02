@@ -17,6 +17,7 @@ export interface DOMChangeStyle {
   disabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   persistStyle?: boolean;
   observerRoot?: string;
 }
@@ -34,6 +35,7 @@ export interface DOMChangeStyleRules {
   important?: boolean;
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   persistStyle?: boolean;
   observerRoot?: string;
 }
@@ -45,6 +47,7 @@ export interface DOMChangeText {
   originalText?: string;
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 
@@ -56,6 +59,7 @@ export interface DOMChangeClass {
   disabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 
@@ -66,6 +70,7 @@ export interface DOMChangeAttribute {
   disabled?: boolean;
   mode?: 'replace' | 'merge';
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   persistAttribute?: boolean;
   observerRoot?: string;
 }
@@ -77,6 +82,7 @@ export interface DOMChangeHTML {
   originalHtml?: string;
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 
@@ -86,6 +92,7 @@ export interface DOMChangeJavaScript {
   value: string;
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 
@@ -96,6 +103,7 @@ export interface DOMChangeMove {
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 
@@ -104,6 +112,7 @@ export interface DOMChangeRemove {
   type: 'remove';
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 
@@ -114,6 +123,7 @@ export interface DOMChangeInsert {
   position: 'before' | 'after' | 'firstChild' | 'lastChild';
   disabled?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   observerRoot?: string;
 }
 

@@ -69,6 +69,7 @@ export function useDOMChangesEditor({
       position: change.type === 'move' ? (change.position || 'after') : change.type === 'insert' ? (change as any).position : 'after',
       mode: (change as any).mode || 'merge',
       waitForElement: (change as any).waitForElement,
+      triggerOnView: (change as any).triggerOnView,
       observerRoot: (change as any).observerRoot
     }
     setEditingChange(editing)
@@ -92,6 +93,7 @@ export function useDOMChangesEditor({
           type: 'text',
           value: changeToSave.textValue || '',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -101,6 +103,7 @@ export function useDOMChangesEditor({
           type: 'html',
           value: changeToSave.htmlValue || '',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -110,6 +113,7 @@ export function useDOMChangesEditor({
           type: 'javascript',
           value: changeToSave.jsValue || '',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -129,6 +133,7 @@ export function useDOMChangesEditor({
           value: styleValue,
           mode: changeToSave.mode || 'merge',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -139,6 +144,7 @@ export function useDOMChangesEditor({
           states: changeToSave.styleRulesStates || {},
           important: changeToSave.styleRulesImportant,
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         } as any
         break
@@ -153,6 +159,7 @@ export function useDOMChangesEditor({
           value: attrValue,
           mode: changeToSave.mode || 'merge',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -164,6 +171,7 @@ export function useDOMChangesEditor({
           remove: changeToSave.classRemove?.filter(c => c) || [],
           mode: changeToSave.mode || 'merge',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -174,6 +182,7 @@ export function useDOMChangesEditor({
           targetSelector: changeToSave.targetSelector || '',
           position: changeToSave.position || 'after',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -182,6 +191,7 @@ export function useDOMChangesEditor({
           selector: changeToSave.selector,
           type: 'remove',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -192,6 +202,7 @@ export function useDOMChangesEditor({
           html: changeToSave.htmlValue || '',
           position: changeToSave.position || 'after',
           waitForElement: changeToSave.waitForElement,
+          triggerOnView: changeToSave.triggerOnView,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -268,9 +279,12 @@ export function useDOMChangesEditor({
     setPickingForField(field)
 
     try {
-      await sendToContent({
-        type: 'START_ELEMENT_PICKER'
-      })
+      const msg = {
+        type: 'START_ELEMENT_PICKER',
+        fieldId: field
+      }
+      console.log('[useDOMChangesEditor] SENDING START_ELEMENT_PICKER with fieldId:', msg)
+      await sendToContent(msg)
     } catch (error) {
       debugError('Error starting element picker:', error)
       alert('Element picker cannot run on this page.\n\nPlease navigate to a regular website and try again.')

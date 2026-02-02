@@ -66,7 +66,17 @@ function copyWithHash() {
     console.warn('[Dev Build] Warning: absmartly-sdk-bridge.bundle.js not found in public directory');
   }
 
-  // Update manifest to include visual editor in web_accessible_resources
+  // Copy SDK plugins dev bundle to dev build
+  const sdkPluginsSource = path.join(publicDir, 'absmartly-sdk-plugins.dev.js');
+  const sdkPluginsDest = path.join(devBuildDir, 'absmartly-sdk-plugins.dev.js');
+  if (fs.existsSync(sdkPluginsSource)) {
+    fs.copyFileSync(sdkPluginsSource, sdkPluginsDest);
+    console.log('[Dev Build] Copied absmartly-sdk-plugins.dev.js');
+  } else {
+    console.warn('[Dev Build] Warning: absmartly-sdk-plugins.dev.js not found in public directory');
+  }
+
+  // Update manifest to include visual editor and SDK plugins in web_accessible_resources
   const manifestPath = path.join(devBuildDir, 'manifest.json');
   if (fs.existsSync(manifestPath)) {
     try {
@@ -74,11 +84,22 @@ function copyWithHash() {
       if (manifest.web_accessible_resources && manifest.web_accessible_resources[0]) {
         const resources = manifest.web_accessible_resources[0].resources;
         const visualEditorResource = 'src/injected/build/visual-editor-injection.js';
+        const sdkPluginsResource = 'absmartly-sdk-plugins.dev.js';
 
+        let modified = false;
         if (!resources.includes(visualEditorResource)) {
           resources.push(visualEditorResource);
-          fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+          modified = true;
           console.log('[Dev Build] Added visual-editor-injection.js to web accessible resources');
+        }
+        if (!resources.includes(sdkPluginsResource)) {
+          resources.push(sdkPluginsResource);
+          modified = true;
+          console.log('[Dev Build] Added absmartly-sdk-plugins.dev.js to web accessible resources');
+        }
+
+        if (modified) {
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest));
         }
       }
     } catch (err) {

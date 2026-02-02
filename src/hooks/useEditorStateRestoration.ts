@@ -13,6 +13,7 @@ interface UseEditorStateRestorationProps {
   setEditingChange: (change: EditingDOMChange | null) => void
   setPickingForField: (field: string | null) => void
   editingChange: EditingDOMChange | null
+  pickingForField: string | null
 }
 
 export function useEditorStateRestoration({
@@ -21,7 +22,8 @@ export function useEditorStateRestoration({
   onChange,
   setEditingChange,
   setPickingForField,
-  editingChange
+  editingChange,
+  pickingForField
 }: UseEditorStateRestorationProps) {
 
   useEffect(() => {
@@ -121,26 +123,45 @@ export function useEditorStateRestoration({
   }, [variantName])
 
   useEffect(() => {
-    const handleElementSelected = (message: ChromeMessage) => {
+    const handleElementSelected = (message: ChromeMessage, sender: any, sendResponse: any) => {
+      console.log('[useEditorStateRestoration] RECEIVED ELEMENT_SELECTED, pickingForField:', pickingForField)
       debugLog('DOMChangesInlineEditor received message:', message)
       if (message.type === 'ELEMENT_SELECTED' && 'selector' in message && message.selector) {
         const storage = sessionStorage
+        console.log('[useEditorStateRestoration] Using pickingForField as fieldId:', pickingForField)
 
-        storage.set('elementPickerResult', {
+        const pickerResult = {
           variantName,
-          fieldId: 'fieldId' in message ? message.fieldId : undefined,
+          fieldId: pickingForField,
           selector: message.selector
-        })
+        }
 
+        storage.set('elementPickerResult', pickerResult)
+        console.log('[useEditorStateRestoration] Stored to sessionStorage:', pickerResult)
+
+        // Also apply immediately
+        if (pickingForField && editingChange) {
+          console.log('[useEditorStateRestoration] Applying picker result immediately to field:', pickingForField)
+          if (pickingForField === 'selector') {
+            setEditingChange({ ...editingChange, selector: message.selector })
+          } else if (pickingForField === 'targetSelector') {
+            setEditingChange({ ...editingChange, targetSelector: message.selector })
+          } else if (pickingForField === 'observerRoot') {
+            setEditingChange({ ...editingChange, observerRoot: message.selector })
+          }
+        }
+
+        sendResponse({ success: true })
         chrome.runtime.onMessage.removeListener(handleElementSelected)
       }
+      return false
     }
 
     chrome.runtime.onMessage.addListener(handleElementSelected)
     return () => {
       chrome.runtime.onMessage.removeListener(handleElementSelected)
     }
-  }, [variantName])
+  }, [variantName, pickingForField, editingChange])
 
   useEffect(() => {
     debugLog('📡 Setting up drag-drop listener for variant:', variantName)

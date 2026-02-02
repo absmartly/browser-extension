@@ -5,10 +5,12 @@ import { Button } from './ui/Button';
 export interface DOMChangeOptionsProps {
   important?: boolean;
   waitForElement?: boolean;
+  triggerOnView?: boolean;
   persistStyle?: boolean;
   observerRoot?: string;
   onImportantChange?: (value: boolean) => void;
   onWaitForElementChange?: (value: boolean) => void;
+  onTriggerOnViewChange?: (value: boolean) => void;
   onPersistStyleChange?: (value: boolean) => void;
   onObserverRootChange?: (value: string) => void;
   onStartPicker?: (field: string) => void;
@@ -17,6 +19,7 @@ export interface DOMChangeOptionsProps {
   idPrefix?: string;
   showImportant?: boolean;
   showWaitForElement?: boolean;
+  showTriggerOnView?: boolean;
   showPersistStyle?: boolean;
   showObserverRoot?: boolean;
 }
@@ -24,10 +27,12 @@ export interface DOMChangeOptionsProps {
 export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
   important = false,
   waitForElement = false,
+  triggerOnView = false,
   persistStyle = false,
   observerRoot = '',
   onImportantChange,
   onWaitForElementChange,
+  onTriggerOnViewChange,
   onPersistStyleChange,
   onObserverRootChange,
   onStartPicker,
@@ -36,6 +41,7 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
   idPrefix = 'dom-options',
   showImportant = true,
   showWaitForElement = true,
+  showTriggerOnView = true,
   showPersistStyle = true,
   showObserverRoot = true,
 }) => {
@@ -72,6 +78,23 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
           <label htmlFor={`${idPrefix}-wait`} className="text-xs">
             <span className="font-medium text-gray-700">Wait for element (lazy-loaded)</span>
             <p className="text-gray-500">Apply change when element appears in DOM</p>
+          </label>
+        </div>
+      )}
+
+      {showTriggerOnView && onTriggerOnViewChange && (
+        <div className="flex items-start">
+          <input
+            type="checkbox"
+            id={`${idPrefix}-trigger-view`}
+            checked={triggerOnView}
+            onChange={(e) => onTriggerOnViewChange(e.target.checked)}
+            disabled={disabled}
+            className="mt-0.5 mr-2"
+          />
+          <label htmlFor={`${idPrefix}-trigger-view`} className="text-xs">
+            <span className="font-medium text-gray-700">Trigger on-view</span>
+            <p className="text-gray-500">Only register exposure when element is visible</p>
           </label>
         </div>
       )}

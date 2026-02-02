@@ -34,6 +34,7 @@ try {
     '--minify-syntax',
     '--keep-names',
     '--sourcemap',
+    '--external:@absmartly/sdk-plugins',
     isProduction ? '--drop:console' : ''
   ].filter(Boolean).join(' ')
 

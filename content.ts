@@ -39,6 +39,7 @@ let currentEditor: VisualEditor | null = null
 let elementPicker: ElementPicker | null = null
 let isVisualEditorActive = false
 let isVisualEditorStarting = false
+let currentElementPickerFieldId: string | null = null
 
 // Track plugin status checks to prevent concurrent calls
 let pluginStatusCheckInProgress = false
@@ -255,6 +256,8 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
       // Handle element picker message
       if (message.type === "START_ELEMENT_PICKER") {
+        console.log('[content.ts] RECEIVED START_ELEMENT_PICKER, storing fieldId:', message.fieldId)
+        currentElementPickerFieldId = message.fieldId
         debugLog("[Visual Editor Content Script] Starting element picker")
 
         if (!elementPicker) {
@@ -262,10 +265,14 @@ if (!w.__absmartlyMessageListenerRegistered) {
         }
 
         elementPicker.start((selector: string) => {
-          chrome.runtime.sendMessage({
+          const responseMsg = {
             type: "ELEMENT_SELECTED",
-            selector: selector
-          })
+            selector: selector,
+            fieldId: currentElementPickerFieldId
+          }
+          console.log('[content.ts] SENDING ELEMENT_SELECTED with fieldId from storage:', responseMsg)
+          chrome.runtime.sendMessage(responseMsg)
+          currentElementPickerFieldId = null
           elementPicker = null
         })
 

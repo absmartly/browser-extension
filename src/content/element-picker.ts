@@ -296,12 +296,18 @@ export class ElementPicker {
   }
 
   private handleClick = (e: MouseEvent) => {
-    if (!this.isActive) return
+    console.log('[ElementPicker] handleClick called, isActive:', this.isActive)
+    if (!this.isActive) {
+      console.log('[ElementPicker] handleClick: picker not active, returning')
+      return
+    }
 
+    console.log('[ElementPicker] handleClick: processing click at', e.clientX, e.clientY)
     e.preventDefault()
     e.stopPropagation()
 
     const element = document.elementFromPoint(e.clientX, e.clientY)
+    console.log('[ElementPicker] Element at click point:', element?.tagName, element?.className)
     if (element) {
       const selector = this.generateSelector(element, true) // Enable debug logging on click
       this.selectedElement = element

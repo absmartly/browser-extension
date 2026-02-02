@@ -88,7 +88,8 @@ export function DOMChangesInlineEditor({
     onChange,
     setEditingChange,
     setPickingForField,
-    editingChange
+    editingChange,
+    pickingForField
   })
 
   const { handleLaunchVisualEditor } = useVisualEditorCoordination({
