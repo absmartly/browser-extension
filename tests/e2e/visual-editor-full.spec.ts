@@ -1,6 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import path from 'path'
-import fs from 'fs'
+import { injectSidebar, setupTestPage } from './utils/test-helpers'
 
 test.describe('Visual Editor Full Test with Context Menu', () => {
   test.beforeEach(async ({ clearStorage, seedStorage }) => {
@@ -13,34 +12,54 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
       'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
       'absmartly-auth-method': 'apikey'
     })
-
-    // Copy test page to build directory
-    const testPageSource = path.join(__dirname, '..', 'test-page.html')
-    const testPageDest = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev', 'test-page.html')
-    if (fs.existsSync(testPageSource)) {
-      fs.copyFileSync(testPageSource, testPageDest)
-      console.log('Copied test page to build directory')
-    }
   })
 
   test('Complete visual editor workflow with all context menu actions', async ({ context, extensionUrl, extensionId }) => {
-    // Step 1: Open the extension sidebar to get access to experiments
-    console.log('\n📱 Opening extension sidebar...')
-    const sidebarPage = await context.newPage()
-    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
-    await sidebarPage.setViewportSize({ width: 400, height: 1080 })
+    // Step 1: Load test page and inject sidebar
+    console.log('\n📱 Loading test page with sidebar...')
+    const testPage = await context.newPage()
+    await testPage.goto('data:text/html,<html><body><div id="test-area"></div></body></html>')
+    await testPage.setViewportSize({ width: 1520, height: 1080 })
+
+    // Inject the sidebar
+    console.log('📱 Injecting extension sidebar...')
+    const sidebar = await injectSidebar(testPage, extensionUrl)
 
     // Wait for sidebar to load
-    await sidebarPage.waitForSelector('body', { timeout: 5000 })
-    // TODO: Replace timeout with specific element wait
-    await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
+    await sidebar.locator('body').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
 
-    // Step 2: Open test page in new tab (this will have content script injected)
-    console.log('📄 Opening test page...')
-    const testPage = await context.newPage()
-    await testPage.goto(extensionUrl('test-page.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
-    await testPage.setViewportSize({ width: 1520, height: 1080 })
-    await testPage.waitForSelector('body', { timeout: 5000 })
+    // Step 2: Load actual test page content with required elements
+    console.log('📄 Setting up test content...')
+    const testHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Visual Editor Test Page</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; }
+    .test-button { padding: 10px 20px; margin: 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; }
+    .test-text { margin: 20px 0; font-size: 18px; }
+    .test-link { color: #3b82f6; text-decoration: underline; }
+    .test-list { margin: 20px 0; }
+    .test-container { padding: 20px; border: 2px solid #ddd; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1 id="main-title">Test Page for Visual Editor</h1>
+  <button id="test-button" class="test-button">Click Me</button>
+  <div id="test-container" class="test-container">
+    <h2 id="section-title">Section Title</h2>
+    <a href="https://example.com" id="test-link" class="test-link">Test Link</a>
+  </div>
+  <ul id="test-list" class="test-list">
+    <li id="list-item-1">First item</li>
+    <li id="list-item-2">Second item</li>
+    <li id="list-item-3">Third item</li>
+  </ul>
+</body>
+</html>
+    `
+    await testPage.goto('data:text/html,' + encodeURIComponent(testHTML))
 
     // Step 3: Check if extension content script is injected
     const hasContentScript = await testPage.evaluate(() => {
@@ -53,19 +72,17 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
     console.log('\n🎯 Attempting to activate visual editor...')
 
     // Method 1: Try through sidebar
-    await sidebarPage.bringToFront()
-    const experimentCount = await sidebarPage.locator('.experiment-item').count()
+    const experimentCount = await sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').count()
     console.log(`Found ${experimentCount} experiments in sidebar`)
 
     if (experimentCount > 0) {
       // Click on first experiment
-      await sidebarPage.locator('.experiment-item').first().click()
-      // TODO: Replace timeout with specific element wait
-    await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
+      await sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').first().click()
+      await sidebar.locator('body').waitFor({ state: 'visible', timeout: 1000 }).catch(() => {})
 
       // Look for Visual Editor button
-      const visualEditorBtn = sidebarPage.locator('#visual-editor-button').first()
-      if (await visualEditorBtn.isVisible()) {
+      const visualEditorBtn = sidebar.locator('#visual-editor-button, button:has-text("Visual Editor")').first()
+      if (await visualEditorBtn.isVisible().catch(() => false)) {
         console.log('✅ Found Visual Editor button, clicking...')
         await visualEditorBtn.click()
         // Wait briefly for UI update
@@ -84,8 +101,7 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
           variantName: 'variant_1'
         }, '*')
       })
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
+      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
     }
 
     // Step 5: Check if visual editor is active

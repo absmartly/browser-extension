@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/extension'
+import { injectSidebar, setupTestPage } from './utils/test-helpers'
 
 // Create a test HTML page for visual editor testing
 const createTestPage = () => `
@@ -329,45 +330,31 @@ test.describe('Visual Editor Context Menu Tests', () => {
   })
 
   test('Visual editor with real extension sidebar', async ({ context, extensionUrl }) => {
-    // Open the sidebar first
-    const sidebarPage = await context.newPage()
-    await sidebarPage.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
-    await sidebarPage.setViewportSize({ width: 400, height: 1080 })
-
-    // Open test page in another tab
+    // Load test page with sidebar injected
     const testPage = await context.newPage()
     await testPage.goto('data:text/html,' + encodeURIComponent(createTestPage()))
-    await testPage.setViewportSize({ width: 1520, height: 1080 })
+    await testPage.setViewportSize({ width: 1920, height: 1080 })
 
+    // Inject sidebar
+    const sidebar = await injectSidebar(testPage, extensionUrl)
     console.log('📱 Sidebar and test page loaded')
 
-    // Wait for sidebar to load
-    // TODO: Replace timeout with specific element wait
-    await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
-
     // Check if experiments are available
-    const hasExperiments = await sidebarPage.locator('.experiment-item').count().then(c => c > 0).catch(() => false)
+    const hasExperiments = await sidebar.locator('[data-test-id="experiment-row"], .experiment-item').count().then(c => c > 0).catch(() => false)
 
     if (hasExperiments) {
       console.log('✅ Found experiments in sidebar')
 
       // Click first experiment
-      await sidebarPage.locator('.experiment-item').first().click()
-      // TODO: Replace timeout with specific element wait
-    await sidebarPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
+      await sidebar.locator('[data-test-id="experiment-row"], .experiment-item').first().click()
 
       // Look for Visual Editor button
-      const visualEditorBtn = sidebarPage.locator('#visual-editor-button').first()
-      if (await visualEditorBtn.isVisible()) {
+      const visualEditorBtn = sidebar.locator('#visual-editor-button, button:has-text("Visual Editor")').first()
+      if (await visualEditorBtn.isVisible().catch(() => false)) {
         console.log('✅ Visual Editor button found')
         await visualEditorBtn.click()
 
-        // Switch to test page and check for visual editor
-        await testPage.bringToFront()
-        // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 2000 }).catch(() => {})
-
-        // Check if visual editor loaded
+        // Check if visual editor loaded on the page
         const hasVisualEditor = await testPage.locator('#absmartly-visual-editor-toolbar, [data-visual-editor-toolbar]').isVisible().catch(() => false)
         console.log('Visual editor active on page:', hasVisualEditor)
 
@@ -387,7 +374,7 @@ test.describe('Visual Editor Context Menu Tests', () => {
       console.log('⚠️ No experiments available in sidebar')
 
       // Check if configuration is needed
-      const needsConfig = await sidebarPage.locator('#configure-settings-button').isVisible().catch(() => false)
+      const needsConfig = await sidebar.locator('#configure-settings-button, button:has-text("Configure")').isVisible().catch(() => false)
       if (needsConfig) {
         console.log('ℹ️ Extension needs configuration')
       }

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/extension'
+import { injectSidebar } from './utils/test-helpers'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -20,17 +21,14 @@ test.describe('AI Conversation History', () => {
   })
 
   test('should display conversation history UI with correct behavior', async ({ context, extensionUrl }) => {
-    const contentPage = await context.newPage()
-    await contentPage.goto(`http://localhost:3456${TEST_PAGE_URL}`, { waitUntil: 'load' })
-    await debugWait(500)
-    log('✓ Content page loaded')
+    const testPageUrl = '/visual-editor-test.html'
 
     await test.step('Setup: Create conversations in IndexedDB before loading AI page', async () => {
       log('Pre-populating IndexedDB with conversations...')
 
-      const sidebarUrl = extensionUrl('tabs/sidebar.html')
+      // Create a temporary setup page to initialize IndexedDB with the conversations
       const setupPage = await context.newPage()
-      await setupPage.goto(sidebarUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+      await setupPage.goto(`http://localhost:3456${testPageUrl}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
       await setupPage.evaluate(async () => {
         const DB_NAME = 'absmartly-conversations'
@@ -111,9 +109,13 @@ test.describe('AI Conversation History', () => {
     })
 
     await test.step('Load sidebar and navigate to AI page', async () => {
-      log('Loading sidebar in extension context...')
-      const sidebarUrl = extensionUrl('tabs/sidebar.html')
-      await testPage.goto(sidebarUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+      log('Loading content page and injecting sidebar...')
+      const testPageUrl = '/visual-editor-test.html'
+      await testPage.goto(`http://localhost:3456${testPageUrl}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
+      await debugWait(500)
+
+      // Inject sidebar
+      const sidebar = await injectSidebar(testPage, extensionUrl)
       await debugWait(500)
 
       await testPage.screenshot({ path: 'test-results/conv-history-0-sidebar.png', fullPage: true })

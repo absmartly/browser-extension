@@ -1,4 +1,7 @@
 import { test, expect } from '../fixtures/extension'
+import { injectSidebar, setupTestPage } from './utils/test-helpers'
+
+const TEST_PAGE_URL = '/visual-editor-test.html'
 
 test.describe('API Integration Tests', () => {
   test.beforeEach(async ({ clearStorage }) => {
@@ -24,29 +27,27 @@ test.describe('API Integration Tests', () => {
 
     // 2) Load sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
-
-    // Wait for sidebar to load
-    await page.waitForSelector('body', { timeout: 5000 })
+    await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
+    const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // 3) Check if sidebar loaded properly
-    const hasContent = await page.locator('body').isVisible()
+    const hasContent = await sidebar.locator('body').isVisible()
     expect(hasContent).toBeTruthy()
 
     // Wait for loading spinner to disappear
-    await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
+    await sidebar.locator('[role="status"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
     // Wait for either experiments to appear or empty state message
     await Promise.race([
-      page.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}),
-      page.locator('text=/no experiments/i').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
+      sidebar.locator('[data-test-id="experiment-row"], .experiment-item').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}),
+      sidebar.locator('text=/no experiments/i').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
     ])
 
     // Look for ABsmartly branding or experiment list
-    const hasABsmartly = await page.locator('text=/ABsmartly/i').isVisible().catch(() => false)
-    const hasExperiments = await page.locator('.experiment-item').count().then(c => c > 0).catch(() => false)
-    const hasEmptyState = await page.locator('text=/no experiments/i').isVisible().catch(() => false)
-    const hasConfigButton = await page.locator('text=/Configure Settings/i').isVisible().catch(() => false)
+    const hasABsmartly = await sidebar.locator('text=/ABsmartly/i').isVisible().catch(() => false)
+    const hasExperiments = await sidebar.locator('[data-test-id="experiment-row"], .experiment-item').count().then(c => c > 0).catch(() => false)
+    const hasEmptyState = await sidebar.locator('text=/no experiments/i').isVisible().catch(() => false)
+    const hasConfigButton = await sidebar.locator('text=/Configure Settings/i').isVisible().catch(() => false)
 
     // Should have loaded some UI (indicates API call was made successfully)
     expect(hasABsmartly || hasExperiments || hasEmptyState || hasConfigButton).toBeTruthy()
@@ -68,20 +69,21 @@ test.describe('API Integration Tests', () => {
 
     // Load sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+    await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
+    const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Wait for either experiments to load or empty state to appear (no loading spinner)
-    await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
+    await sidebar.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
     // Wait for either experiments to appear or empty state message
     await Promise.race([
-      page.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}),
-      page.locator('text=/no experiments/i').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
+      sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}),
+      sidebar.locator('text=/no experiments/i').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
     ])
 
     // Check for experiments or empty state
-    const experimentCount = await page.locator('.experiment-item').count()
-    const hasEmptyState = await page.locator('text=/no experiments/i').isVisible().catch(() => false)
+    const experimentCount = await sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').count()
+    const hasEmptyState = await sidebar.locator('text=/no experiments/i').isVisible().catch(() => false)
 
     // Should either have experiments or show empty state (not error)
     expect(experimentCount > 0 || hasEmptyState).toBeTruthy()
@@ -102,26 +104,27 @@ test.describe('API Integration Tests', () => {
     })
 
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+    await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
+    const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Wait for loading spinner to disappear
-    await page.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
+    await sidebar.locator('[role="status"][aria-label="Loading experiments"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
 
     // Wait for either experiments to appear or empty state message
     await Promise.race([
-      page.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}),
-      page.locator('text=/no experiments/i').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
+      sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}),
+      sidebar.locator('text=/no experiments/i').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
     ])
 
-    const experimentCount = await page.locator('.experiment-item').count()
+    const experimentCount = await sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').count()
 
     if (experimentCount > 0) {
       // Click first experiment
-      await page.locator('.experiment-item').first().click()
+      await sidebar.locator('.experiment-item, [data-test-id="experiment-row"]').first().click()
 
       // Should navigate to experiment detail
-      const hasBackButton = await page.locator('#back-button').isVisible().catch(() => false)
-      const hasVisualEditorButton = await page.locator('text=/visual editor/i').isVisible().catch(() => false)
+      const hasBackButton = await sidebar.locator('#back-button').isVisible().catch(() => false)
+      const hasVisualEditorButton = await sidebar.locator('text=/visual editor/i').isVisible().catch(() => false)
 
       // Should show experiment details
       expect(hasBackButton || hasVisualEditorButton).toBeTruthy()
@@ -145,7 +148,8 @@ test.describe('API Integration Tests', () => {
 
     // Open sidebar
     const page = await context.newPage()
-    await page.goto(extensionUrl('tabs/sidebar.html', { waitUntil: 'domcontentloaded', timeout: 10000 }))
+    await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
+    const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Reload page
     await page.reload()
