@@ -122,7 +122,7 @@ export function initializeBackgroundScript() {
         })
         .catch(error => {
           debugError('[Background] Storage REMOVE error:', error)
-          sendResponse({ success: false, error: message })
+          sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) })
         })
       return true
     } else if (message.type === 'GET_CONFIG') {

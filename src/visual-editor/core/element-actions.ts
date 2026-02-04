@@ -498,10 +498,8 @@ export class ElementActions {
       // Push to redo stack
       this.stateManager.pushRedo(undoItem)
     } else if (undoItem.type === 'update') {
-      // TODO: Handle update undo (revert to previous version of change)
       const currentChange = currentChanges[undoItem.index]
       currentChanges[undoItem.index] = undoItem.change
-      // Push current state to redo with swapped change
       this.stateManager.pushRedo({
         ...undoItem,
         change: currentChange
@@ -651,10 +649,8 @@ export class ElementActions {
       // Push to undo stack
       this.stateManager.pushUndo(redoItem)
     } else if (redoItem.type === 'update') {
-      // TODO: Handle update redo
       const currentChange = currentChanges[redoItem.index]
       currentChanges[redoItem.index] = redoItem.change
-      // Push current state to undo with swapped change
       this.stateManager.pushUndo({
         ...redoItem,
         change: currentChange

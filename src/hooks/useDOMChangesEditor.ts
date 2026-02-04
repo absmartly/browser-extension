@@ -306,7 +306,7 @@ export function useDOMChangesEditor({
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
 
       console.log('[AI Generate] Using API key from environment...')
-      const apiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || "***REMOVED_API_KEY***"
+      const apiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
 
       console.log('[AI Generate] Has API key:', !!apiKey, 'API key length:', apiKey?.length)
       if (!apiKey) {

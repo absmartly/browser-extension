@@ -1,20 +1,29 @@
-import { html } from "@codemirror/lang-html"
-import { EditorState } from "@codemirror/state"
-import { oneDark } from "@codemirror/theme-one-dark"
-import { basicSetup, EditorView } from "codemirror"
 import type { PlasmoCSConfig } from "plasmo"
-
-import { ElementPicker } from "~src/content/element-picker"
 import type { DOMChange } from "~src/types/dom-changes"
 import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 import { initializeOverrides } from "~src/utils/overrides"
-// Content script configuration:
-// - DEV mode: Auto-injects on all URLs for easier development and testing
-// - PRODUCTION mode: Uses invalid URL pattern to prevent auto-loading
-//   Content script is injected programmatically when user clicks extension icon
-import { JavaScriptEditor, JSONEditor, VisualEditor } from "~src/visual-editor"
-import { EventViewer } from "~src/visual-editor/ui/event-viewer"
-import { MarkdownEditor } from "~src/visual-editor/ui/markdown-editor"
+import { VisualEditor } from "~src/visual-editor"
+import { createPreviewHeader, removePreviewHeader } from "~content/preview-header"
+import { ensureSDKPluginInjected } from "~content/sdk-bridge"
+import { startVisualEditor } from "~content/visual-editor-manager"
+import {
+  openCodeEditor,
+  closeCodeEditor,
+  openJSONEditor,
+  closeJSONEditor,
+  openEventViewer,
+  closeEventViewer,
+  openMarkdownEditor,
+  closeMarkdownEditor,
+  openJavaScriptEditor,
+  closeJavaScriptEditor
+} from "~content/editors"
+import { handleCaptureHTML, handleGetHTMLChunk } from "~content/handlers/html-capture"
+import { handleStartElementPicker, handleCancelElementPicker } from "~content/handlers/element-picker"
+import { handleCheckPluginStatus } from "~content/handlers/plugin-status"
+import { handlePreviewMessage } from "~content/handlers/preview"
+import { setupWindowMessageListener } from "~content/window-message-handler"
+import { validateMessage } from "~src/lib/message-security"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -36,14 +45,8 @@ debugLog("[Visual Editor Content Script] Content script loaded")
 
 // Keep track of the current visual editor instance
 let currentEditor: VisualEditor | null = null
-let elementPicker: ElementPicker | null = null
 let isVisualEditorActive = false
 let isVisualEditorStarting = false
-let currentElementPickerFieldId: string | null = null
-
-// Track plugin status checks to prevent concurrent calls
-let pluginStatusCheckInProgress = false
-let pluginStatusCheckQueue: Array<(result: any) => void> = []
 
 // Initialize overrides on page load
 // This ensures storage is synced to cookie for SSR compatibility
@@ -57,114 +60,14 @@ initializeOverrides()
     debugWarn("[Content Script] Failed to initialize overrides:", error)
   })
 
-/**
- * Start the visual editor with the given configuration
- * Shared logic used by both chrome.runtime messages and test messages
- */
-async function startVisualEditor(config: {
-  variantName: string
-  experimentName?: string
-  changes?: DOMChange[]
-  useShadowDOM?: boolean
-}): Promise<{ success: boolean; error?: string }> {
-  console.log(
-    "[ABsmartly] startVisualEditor called with config:",
-    JSON.stringify(config)
-  )
-  debugLog(
-    "[Visual Editor Content Script] Starting visual editor with config:",
-    config
-  )
-  debugLog("[Visual Editor Content Script] Variant:", config.variantName)
-  debugLog(
-    "[Visual Editor Content Script] Experiment name:",
-    config.experimentName
-  )
-
-  await ensureSDKPluginInjected()
-
-  try {
-    // Stop any existing editor
-    if (currentEditor) {
-      currentEditor.destroy()
-      currentEditor = null
-    }
-
-    // Mark visual editor as active BEFORE starting
-    isVisualEditorActive = true
-    isVisualEditorStarting = false
-
-    // Hide preview header if it exists, since VE has its own toolbar
-    removePreviewHeader()
-
-    // Get the extension URL for the logo
-    const logoUrl = chrome.runtime.getURL("assets/absmartly-logo-white.svg")
-
-    // Check if we're in test mode (URL param or window flag)
-    const urlParams = new URLSearchParams(window.location.search)
-    const isTestMode =
-      urlParams.get("use_shadow_dom_for_visual_editor_context_menu") === "0"
-    debugLog("[Visual Editor Content Script] Test mode:", isTestMode)
-
-    // Use shadow DOM by default, unless explicitly disabled (for testing)
-    // If in test mode, always disable shadow DOM
-    const useShadowDOM = isTestMode ? false : config.useShadowDOM !== false
-    debugLog("[Visual Editor Content Script] Use Shadow DOM:", useShadowDOM)
-
-    // Create and start new editor
-    currentEditor = new VisualEditor({
-      variantName: config.variantName,
-      experimentName: config.experimentName,
-      logoUrl: logoUrl,
-      initialChanges: config.changes || [],
-      useShadowDOM: useShadowDOM,
-      onChangesUpdate: (changes: DOMChange[]) => {
-        console.log("[Visual Editor Content Script] CALLBACK START")
-        debugLog(
-          "[Visual Editor Content Script] Changes updated:",
-          changes?.length
-        )
-        console.log(
-          "[Visual Editor Content Script] AFTER debugLog - about to send message"
-        )
-        console.log(
-          "[Visual Editor Content Script] NOW SENDING VISUAL_EDITOR_CHANGES message with",
-          changes.length,
-          "changes"
-        )
-
-        chrome.runtime.sendMessage({
-          type: "VISUAL_EDITOR_CHANGES",
-          variantName: config.variantName,
-          changes: changes
-        })
-      }
-    })
-
-    const result = currentEditor.start()
-    debugLog(
-      "[Visual Editor Content Script] Visual editor start result:",
-      result
-    )
-
-    if (!result.success) {
-      throw new Error("Visual editor failed to start")
-    }
-
-    debugLog(
-      "[Visual Editor Content Script] Visual editor started successfully"
-    )
-    return { success: true }
-  } catch (error) {
-    debugError(
-      "[Visual Editor Content Script] Error starting visual editor:",
-      error
-    )
-    console.error("[Visual Editor Content Script] Full error:", error)
-    isVisualEditorActive = false
-    return { success: false, error: error.message }
+// Setup window message listener for SDK communication
+setupWindowMessageListener(
+  () => ({ isActive: isVisualEditorActive, isStarting: isVisualEditorStarting }),
+  (updates) => {
+    if (updates.isActive !== undefined) isVisualEditorActive = updates.isActive
+    if (updates.isStarting !== undefined) isVisualEditorStarting = updates.isStarting
   }
-}
+)
 
 // Listen for messages from the background script
 // Prevent multiple listener registrations (can happen during hot reload)
@@ -176,6 +79,20 @@ if (!w.__absmartlyMessageListenerRegistered) {
     (message, sender, sendResponse) => {
       console.log("[ABsmartly] Message received:", message?.type)
       debugLog("[Visual Editor Content Script] Received message:", message.type)
+
+      // Validate message security
+      const validation = validateMessage(message, sender, {
+        requireExtensionOrigin: true,
+        requireMainFrame: false
+      })
+
+      if (!validation.valid) {
+        if (validation.securityViolation) {
+          debugError('[Content Script] Security violation:', validation.error)
+        }
+        sendResponse({ success: false, error: validation.error })
+        return true
+      }
 
       // Handle PING message (content script health check)
       if (message.type === "PING") {
@@ -202,166 +119,26 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
       // Handle HTML capture request
       if (message.type === "CAPTURE_HTML") {
-        console.log("[ABsmartly] Capture HTML request received")
-        try {
-          const html = document.documentElement.outerHTML
-          console.log("[ABsmartly] HTML captured, length:", html.length)
-          sendResponse({ success: true, html })
-        } catch (error) {
-          console.error("[ABsmartly] Capture error:", error)
-          sendResponse({ success: false, error: (error as Error).message })
-        }
-        return true
+        return handleCaptureHTML(sendResponse)
       }
 
       // Handle HTML chunk request (for API providers' agentic loop)
       if (message.type === "GET_HTML_CHUNK") {
-        const selector = message.selector
-        console.log("[ABsmartly] HTML chunk request for selector:", selector)
-        try {
-          if (!selector) {
-            sendResponse({
-              success: false,
-              found: false,
-              error: "Selector is required"
-            })
-            return true
-          }
-
-          const element = document.querySelector(selector)
-          if (!element) {
-            console.log("[ABsmartly] Element not found for selector:", selector)
-            sendResponse({
-              success: true,
-              found: false,
-              html: "",
-              error: `Element not found: ${selector}`
-            })
-            return true
-          }
-
-          const html = element.outerHTML
-          console.log("[ABsmartly] HTML chunk captured, length:", html.length)
-          sendResponse({ success: true, found: true, html })
-        } catch (error) {
-          console.error("[ABsmartly] HTML chunk error:", error)
-          sendResponse({
-            success: false,
-            found: false,
-            error: (error as Error).message
-          })
-        }
-        return true
+        return handleGetHTMLChunk(message.selector, sendResponse)
       }
 
       // Handle element picker message
       if (message.type === "START_ELEMENT_PICKER") {
-        console.log('[content.ts] RECEIVED START_ELEMENT_PICKER, storing fieldId:', message.fieldId)
-        currentElementPickerFieldId = message.fieldId
-        debugLog("[Visual Editor Content Script] Starting element picker")
-
-        if (!elementPicker) {
-          elementPicker = new ElementPicker()
-        }
-
-        elementPicker.start((selector: string) => {
-          const responseMsg = {
-            type: "ELEMENT_SELECTED",
-            selector: selector,
-            fieldId: currentElementPickerFieldId
-          }
-          console.log('[content.ts] SENDING ELEMENT_SELECTED with fieldId from storage:', responseMsg)
-          chrome.runtime.sendMessage(responseMsg)
-          currentElementPickerFieldId = null
-          elementPicker = null
-        })
-
-        sendResponse({ success: true })
-        return true
+        return handleStartElementPicker(message.fieldId, sendResponse)
       }
 
       // Handle cancel element picker message
       if (message.type === "CANCEL_ELEMENT_PICKER") {
-        debugLog("[Visual Editor Content Script] Canceling element picker")
-
-        if (elementPicker) {
-          elementPicker.stop()
-          elementPicker = null
-        }
-
-        sendResponse({ success: true })
-        return true
+        return handleCancelElementPicker(sendResponse)
       }
 
       if (message.type === "CHECK_PLUGIN_STATUS") {
-        // If check already in progress, queue this response
-        if (pluginStatusCheckInProgress) {
-          debugLog(
-            "[Content Script] Plugin status check already in progress, queuing request"
-          )
-          pluginStatusCheckQueue.push(sendResponse)
-          return true // Keep channel open
-        }
-
-        pluginStatusCheckInProgress = true
-        debugLog(
-          "[Content Script] Forwarding CHECK_PLUGIN_STATUS to page script"
-        )
-
-        // Forward the message to the page script
-        window.postMessage(
-          {
-            source: "absmartly-extension",
-            type: "CHECK_PLUGIN_STATUS"
-          },
-          "*"
-        )
-
-        // Set up a one-time listener for the response
-        const handleResponse = (event: MessageEvent) => {
-          if (
-            event.data &&
-            event.data.source === "absmartly-page" &&
-            event.data.type === "PLUGIN_STATUS_RESPONSE"
-          ) {
-            debugLog(
-              "[Content Script] Received plugin status response:",
-              event.data.payload
-            )
-            window.removeEventListener("message", handleResponse)
-
-            const result = event.data.payload
-
-            // Send to original requestor
-            sendResponse(result)
-
-            // Send to queued requestors
-            pluginStatusCheckQueue.forEach((queuedResponse) =>
-              queuedResponse(result)
-            )
-            pluginStatusCheckQueue = []
-
-            pluginStatusCheckInProgress = false
-          }
-        }
-
-        window.addEventListener("message", handleResponse)
-
-        // Timeout after 2 seconds if no response
-        setTimeout(() => {
-          if (pluginStatusCheckInProgress) {
-            window.removeEventListener("message", handleResponse)
-            const timeoutResult = { pluginDetected: false, timeout: true }
-            sendResponse(timeoutResult)
-            pluginStatusCheckQueue.forEach((queuedResponse) =>
-              queuedResponse(timeoutResult)
-            )
-            pluginStatusCheckQueue = []
-            pluginStatusCheckInProgress = false
-          }
-        }, 2000)
-
-        return true // Keep message channel open for async response
+        return handleCheckPluginStatus(sendResponse)
       }
 
       if (message.type === "CHECK_VISUAL_EDITOR_ACTIVE") {
@@ -397,14 +174,25 @@ if (!w.__absmartlyMessageListenerRegistered) {
           }
         )
 
-        // Use shared start function
-        startVisualEditor({
-          variantName: message.variantName,
-          experimentName: message.experimentName,
-          changes: message.changes,
-          useShadowDOM: message.useShadowDOM
-        })
+        if (currentEditor) {
+          currentEditor.destroy()
+          currentEditor = null
+        }
+
+        startVisualEditor(
+          {
+            variantName: message.variantName,
+            experimentName: message.experimentName,
+            changes: message.changes,
+            useShadowDOM: message.useShadowDOM
+          },
+          (active) => { isVisualEditorActive = active },
+          (starting) => { isVisualEditorStarting = starting }
+        )
           .then((result) => {
+            if (result.editor) {
+              currentEditor = result.editor
+            }
             console.log(
               "[ABsmartly] ✅ startVisualEditor completed with result:",
               JSON.stringify(result)
@@ -424,7 +212,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
             sendResponse({ success: false, error: error.message })
           })
 
-        return true // Keep message channel open for async response
+        return true
       }
 
       if (message.type === "STOP_VISUAL_EDITOR") {
@@ -458,112 +246,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
       // Handle preview messages
       if (message.type === "ABSMARTLY_PREVIEW") {
-        // Extract payload data (new messaging API has data in payload)
-        const payload = message.payload || message
-        const action = payload.action
-        const changes = payload.changes
-        const experimentName = payload.experimentName
-        const variantName = payload.variantName
-        const experimentId = payload.experimentId
-
-        console.log(
-          "[ABSmartly Content Script] Received preview message:",
-          action
-        )
-        console.log(
-          `[ABSmartly Content Script] VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`
-        )
-
-        // If visual editor is active or starting, ignore preview update messages
-        // The visual editor manages its own changes and we don't want conflicts
-        if (
-          (isVisualEditorActive || isVisualEditorStarting) &&
-          action === "update"
-        ) {
-          console.log(
-            "[ABSmartly Content Script] Visual editor is active/starting, ignoring preview update"
-          )
-          sendResponse({
-            success: true,
-            message: "Visual editor active, preview update ignored"
-          })
-          return true
-        }
-
-        // Respond immediately to prevent message channel timeout
-        sendResponse({ success: true })
-
-        // Ensure SDK plugin is injected and handle preview asynchronously
-        ;(async () => {
-          try {
-            await ensureSDKPluginInjected()
-
-            if (action === "apply") {
-              console.log(
-                `[ABSmartly Content Script] Handling preview apply. VE state: isActive=${isVisualEditorActive}, isStarting=${isVisualEditorStarting}`
-              )
-              // Create preview header (it will check visual editor state internally)
-              createPreviewHeader(experimentName, variantName)
-
-              // Send message to SDK plugin to preview changes
-              window.postMessage(
-                {
-                  source: "absmartly-extension",
-                  type: "PREVIEW_CHANGES",
-                  payload: {
-                    changes: changes || [],
-                    experimentName: experimentName,
-                    variantName: variantName,
-                    experimentId: experimentId
-                  }
-                },
-                "*"
-              )
-            } else if (action === "update") {
-              // Update changes WITHOUT recreating the header
-              // Just send the new changes to the SDK plugin with updateMode flag
-              window.postMessage(
-                {
-                  source: "absmartly-extension",
-                  type: "PREVIEW_CHANGES",
-                  payload: {
-                    changes: changes || [],
-                    experimentName: experimentName,
-                    variantName: variantName,
-                    experimentId: experimentId,
-                    updateMode: "replace" // Tell plugin to replace all changes instead of incremental
-                  }
-                },
-                "*"
-              )
-            } else if (action === "remove") {
-              // Only remove preview header if visual editor is NOT active
-              if (!isVisualEditorActive) {
-                removePreviewHeader()
-              }
-
-              // Send message to SDK plugin to remove preview
-              window.postMessage(
-                {
-                  source: "absmartly-extension",
-                  type: "REMOVE_PREVIEW",
-                  payload: {
-                    experimentName: experimentName
-                  }
-                },
-                "*"
-              )
-            }
-          } catch (error) {
-            console.error(
-              "[ABSmartly Content Script] Error handling preview:",
-              error
-            )
-          }
-        })()
-
-        // Return false since we already called sendResponse synchronously
-        return false
+        return handlePreviewMessage(message, isVisualEditorActive, isVisualEditorStarting, sendResponse)
       }
 
       // Code editor messages
@@ -581,7 +264,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
       // JSON editor messages
       if (message.type === "OPEN_JSON_EDITOR") {
-        openJSONEditor(message.data)
+        openJSONEditor(message.data, isVisualEditorActive, currentEditor)
         sendResponse({ success: true })
         return true
       }
@@ -594,7 +277,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
       // Markdown editor messages
       if (message.type === "OPEN_MARKDOWN_EDITOR") {
-        openMarkdownEditor(message.data)
+        openMarkdownEditor(message.data, isVisualEditorActive, currentEditor)
         sendResponse({ success: true })
         return true
       }
@@ -607,7 +290,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
       // JavaScript Editor messages
       if (message.type === "OPEN_JAVASCRIPT_EDITOR") {
-        openJavaScriptEditor(message.data)
+        openJavaScriptEditor(message.data, isVisualEditorActive, currentEditor)
         sendResponse({ success: true })
         return true
       }
@@ -714,11 +397,18 @@ window.addEventListener("message", (event) => {
     if (event.data.type === "TEST_START_VISUAL_EDITOR") {
       debugLog("[Content Script] Received TEST_START_VISUAL_EDITOR from tests")
       // Use shared start function directly
-      startVisualEditor({
-        variantName: event.data.variantName || "test-variant",
-        experimentName: event.data.experimentName,
-        changes: event.data.changes || []
-      }).then((result) => {
+      startVisualEditor(
+        {
+          variantName: event.data.variantName || "test-variant",
+          experimentName: event.data.experimentName,
+          changes: event.data.changes || []
+        },
+        (active) => { isVisualEditorActive = active },
+        (starting) => { isVisualEditorStarting = starting }
+      ).then((result) => {
+        if (result.editor) {
+          currentEditor = result.editor
+        }
         window.postMessage(
           {
             source: "absmartly-extension",
@@ -790,392 +480,15 @@ window.addEventListener("message", (event) => {
           changeCount: changes.length
         })
 
-        createPreviewHeader(experimentName, variantName)
+        createPreviewHeader(experimentName, variantName, isVisualEditorActive, isVisualEditorStarting)
       }
     }
   }
 })
 
-interface PreviewHeaderState {
-  shadowHost: HTMLElement
-  mouseMoveHandler: (e: MouseEvent) => void
-  mouseUpHandler: () => void
-}
 
-let currentPreviewHeader: PreviewHeaderState | null = null
-
-// Function to create preview header
-function createPreviewHeader(experimentName: string, variantName: string) {
-  // Remove any existing preview header
-  removePreviewHeader()
-
-  // Don't create header if visual editor is active or starting
-  // The visual editor has its own toolbar with exit button
-  if (isVisualEditorActive || isVisualEditorStarting) {
-    console.log(
-      `[Content Script] Skipping preview header creation: isVisualEditorActive=${isVisualEditorActive}, isVisualEditorStarting=${isVisualEditorStarting}`
-    )
-    return
-  }
-
-  console.log(
-    `[Content Script] Creating preview header for ${experimentName} / ${variantName}`
-  )
-
-  // Create Shadow DOM host for complete isolation from page styles
-  const shadowHost = document.createElement("div")
-  shadowHost.id = "absmartly-preview-header-host"
-  shadowHost.style.cssText =
-    "all: initial; position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;"
-
-  // Attach shadow root (closed mode for better encapsulation)
-  const shadowRoot = shadowHost.attachShadow({ mode: "closed" })
-
-  // Create preview header container - floating bar style
-  const headerContainer = document.createElement("div")
-  headerContainer.id = "absmartly-preview-header"
-  headerContainer.style.cssText = `
-    position: fixed;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(10px);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 24px;
-    z-index: 2147483647;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    font-size: 14px;
-    min-width: 500px;
-    max-width: 90vw;
-    cursor: grab;
-    pointer-events: auto;
-  `
-
-  // Drag functionality
-  let isDragging = false
-  let startX = 0
-  let startY = 0
-  let currentX = 0
-  let currentY = 0
-
-  headerContainer.addEventListener("mousedown", (e) => {
-    if ((e.target as HTMLElement).closest("button")) return
-    isDragging = true
-    headerContainer.style.cursor = "grabbing"
-    startX = e.clientX - currentX
-    startY = e.clientY - currentY
-  })
-
-  const mouseMoveHandler = (e: MouseEvent) => {
-    if (!isDragging) return
-    currentX = e.clientX - startX
-    currentY = e.clientY - startY
-    headerContainer.style.transform = `translate(calc(-50% + ${currentX}px), ${currentY}px)`
-  }
-
-  const mouseUpHandler = () => {
-    if (isDragging) {
-      isDragging = false
-      headerContainer.style.cursor = "grab"
-    }
-  }
-
-  document.addEventListener("mousemove", mouseMoveHandler)
-  document.addEventListener("mouseup", mouseUpHandler)
-
-  // Create content
-  const content = document.createElement("div")
-  content.style.cssText =
-    "flex: 1; display: flex; flex-direction: column; align-items: center;"
-
-  // Get the extension URL for the logo
-  const logoUrl = chrome.runtime.getURL("assets/absmartly-logo-white.svg")
-
-  content.innerHTML = `
-    <div style="font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 10px;">
-      <img src="${logoUrl}" alt="ABSmartly" style="width: 24px; height: 24px;">
-      <span>Preview Mode - ${experimentName}</span>
-    </div>
-    <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">
-      Variant: <strong>${variantName}</strong>
-    </div>
-  `
-
-  // Create close button
-  const closeButton = document.createElement("button")
-  closeButton.style.cssText = `
-    background: rgba(255, 255, 255, 0.15);
-    border: none;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 16px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
-    white-space: nowrap;
-    flex-shrink: 0;
-  `
-  closeButton.textContent = "Exit Preview"
-  closeButton.onmouseover = () => {
-    closeButton.style.background = "rgba(255, 255, 255, 0.25)"
-  }
-  closeButton.onmouseout = () => {
-    closeButton.style.background = "rgba(255, 255, 255, 0.15)"
-  }
-  closeButton.onclick = () => {
-    // Remove preview header immediately
-    removePreviewHeader()
-
-    // Remove preview markers and revert DOM changes directly
-    const markedElements = document.querySelectorAll(
-      `[data-absmartly-experiment="${experimentName}"]`
-    )
-    console.log(
-      `[Content Script] Found ${markedElements.length} elements with preview markers`
-    )
-
-    markedElements.forEach((element) => {
-      // Restore original values if they exist
-      const original = element.getAttribute("data-absmartly-original")
-      if (original) {
-        try {
-          const originalData = JSON.parse(original)
-          // Restore based on the visual editor's data format
-          if (originalData.textContent !== undefined) {
-            element.textContent = originalData.textContent
-          }
-          if (originalData.innerHTML !== undefined) {
-            element.innerHTML = originalData.innerHTML
-          }
-          if (originalData.styles) {
-            const htmlElement = element as HTMLElement
-            if (originalData.styles.display !== undefined) {
-              htmlElement.style.display = originalData.styles.display
-            }
-            if (originalData.styles.width !== undefined) {
-              htmlElement.style.width = originalData.styles.width
-            }
-            if (originalData.styles.height !== undefined) {
-              htmlElement.style.height = originalData.styles.height
-            }
-          }
-        } catch (e) {
-          console.error("[Content Script] Error restoring element:", e)
-        }
-      }
-
-      // Remove markers
-      element.removeAttribute("data-absmartly-experiment")
-      element.removeAttribute("data-absmartly-original")
-      element.removeAttribute("data-absmartly-modified")
-    })
-
-    // Notify sidebar to turn off preview toggle
-    chrome.runtime.sendMessage({
-      type: "PREVIEW_STATE_CHANGED",
-      enabled: false
-    })
-  }
-
-  headerContainer.appendChild(content)
-  headerContainer.appendChild(closeButton)
-
-  // Append header to shadow root (not to main DOM)
-  shadowRoot.appendChild(headerContainer)
-
-  // Append shadow host to document body
-  document.body.appendChild(shadowHost)
-
-  // Store references for cleanup
-  currentPreviewHeader = {
-    shadowHost,
-    mouseMoveHandler,
-    mouseUpHandler
-  }
-}
-
-// Function to remove preview header
-function removePreviewHeader() {
-  if (currentPreviewHeader) {
-    // Remove document listeners FIRST
-    document.removeEventListener("mousemove", currentPreviewHeader.mouseMoveHandler)
-    document.removeEventListener("mouseup", currentPreviewHeader.mouseUpHandler)
-
-    // Then remove the DOM element
-    currentPreviewHeader.shadowHost.remove()
-
-    // Clear reference
-    currentPreviewHeader = null
-  }
-}
-
-// Inject the SDK bridge bundle into the page
-async function injectSDKBridgeScript(): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    try {
-      const script = document.createElement("script")
-      script.src = chrome.runtime.getURL("absmartly-sdk-bridge.bundle.js")
-      script.onload = () => {
-        debugLog("[Content Script] SDK bridge bundle loaded")
-        script.remove()
-        resolve()
-      }
-      script.onerror = () => {
-        debugError("[Content Script] Failed to load SDK bridge bundle")
-        reject(new Error("Failed to load SDK bridge bundle"))
-      }
-      document.documentElement.appendChild(script)
-    } catch (error) {
-      debugError("[Content Script] Error loading SDK bridge bundle:", error)
-      reject(error)
-    }
-  })
-}
-
-// Don't automatically inject SDK bridge on every page
-// Only inject when the user actually opens the sidebar or uses extension features
-// This prevents breaking websites that don't need the SDK
-let sdkBridgeInjected = false
-let sdkBridgeInjecting = false
-
-async function ensureSDKPluginInjected() {
-  if (!sdkBridgeInjected && !sdkBridgeInjecting) {
-    console.log("[Content Script] 🚀 Injecting SDK bridge...")
-    sdkBridgeInjecting = true
-    try {
-      await injectSDKBridgeScript()
-      sdkBridgeInjected = true
-      console.log("[Content Script] ✅ SDK bridge injected successfully")
-    } catch (error) {
-      console.error("[Content Script] ❌ Failed to inject SDK bridge:", error)
-    } finally {
-      sdkBridgeInjecting = false
-    }
-    // Give the script a moment to set up its message listener
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  } else if (sdkBridgeInjecting) {
-    console.log(
-      "[Content Script] ⏳ SDK bridge injection already in progress, waiting..."
-    )
-    // Wait for injection to complete
-    while (sdkBridgeInjecting) {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-  }
-  // Don't log "already injected" message - it's not useful and clutters console
-}
 
 // Listen for messages from the injected script and SDK plugin
-window.addEventListener("message", async (event) => {
-  // Only accept messages from the same origin
-  // Allow file:// protocol for testing (origin is "null" for file:// URLs)
-  const isFileProtocol =
-    window.location.protocol === "file:" || event.origin === "null"
-  if (!isFileProtocol && event.origin !== window.location.origin) {
-    return
-  }
-
-  // Handle visual editor closed message
-  if (
-    event.data &&
-    event.data.source === "absmartly-visual-editor" &&
-    event.data.type === "VISUAL_EDITOR_CLOSED"
-  ) {
-    debugLog("[Content Script] Visual editor closed, updating state")
-    isVisualEditorActive = false
-    isVisualEditorStarting = false
-
-    // Always create preview header if we have experiment info (preview is still on)
-    if (event.data.experimentName && event.data.variantName) {
-      debugLog(
-        "[Content Script] Creating preview header after visual editor close"
-      )
-      createPreviewHeader(event.data.experimentName, event.data.variantName)
-    }
-    return
-  }
-
-  // Handle messages from the injected script (absmartly-page)
-  if (event.data && event.data.source === "absmartly-page") {
-    debugLog("[Content Script] Received message from page:", event.data)
-
-    if (event.data.type === "SDK_EVENT") {
-      // Forward SDK events to background script for buffering
-      chrome.runtime
-        .sendMessage({
-          type: "SDK_EVENT",
-          payload: event.data.payload
-        })
-        .catch((err) => {
-          debugError(
-            "[Content Script] Failed to send SDK_EVENT to background:",
-            err
-          )
-        })
-    } else if (
-      event.data.type === "REQUEST_CUSTOM_CODE" ||
-      event.data.type === "SDK_CONTEXT_READY"
-    ) {
-      // Get config from extension settings (per-experiment __inject_html only, no global custom code)
-      const response = await chrome.runtime.sendMessage({
-        type: "REQUEST_INJECTION_CODE",
-        source: "content-script"
-      })
-
-      const config = response?.config || null
-
-      // Send config to the page for plugin initialization
-      window.postMessage(
-        {
-          source: "absmartly-extension",
-          type: "INITIALIZE_PLUGIN",
-          payload: { config }
-        },
-        window.location.origin
-      )
-    } else if (event.data.type === "REQUEST_SDK_INJECTION_CONFIG") {
-      // Get SDK injection config from extension settings
-      const response = await chrome.runtime.sendMessage({
-        type: "REQUEST_INJECTION_CODE",
-        source: "content-script"
-      })
-
-      const config = response?.config || null
-
-      // Send config to the page for SDK injection decision
-      window.postMessage(
-        {
-          source: "absmartly-extension",
-          type: "SDK_INJECTION_CONFIG",
-          payload: { config }
-        },
-        window.location.origin
-      )
-    } else if (event.data.type === "PLUGIN_INITIALIZED") {
-      // Notify background script that plugin is ready
-      chrome.runtime.sendMessage({
-        type: "PLUGIN_INITIALIZED",
-        source: "content-script"
-      })
-    }
-  }
-
-  // Handle messages from the SDK plugin (absmartly-sdk)
-  else if (event.data && event.data.source === "absmartly-sdk") {
-    debugLog("[Content Script] Received message from SDK plugin:", event.data)
-
-    // We can handle other plugin messages here if needed
-    // but we don't need to handle REQUEST_INJECTION_CODE anymore
-    // since we inject the code directly during plugin initialization
-  }
-})
 
 // Also listen for test events
 document.addEventListener("absmartly-test", (event: any) => {
@@ -1190,412 +503,6 @@ document.addEventListener("absmartly-test", (event: any) => {
   )
 })
 
-// Code editor functionality
-let codeEditorContainer: HTMLDivElement | null = null
-let codeEditorView: EditorView | null = null
-
-/**
- * Helper function to send messages back to the sidebar
- * Detects if we're in iframe mode (test environment) or production mode
- * and uses the appropriate messaging method
- */
-function openCodeEditor(data: {
-  section: string
-  value: string
-  sectionTitle: string
-  placeholder: string
-  readOnly?: boolean
-}) {
-  console.log("[openCodeEditor] Function called with:", {
-    section: data.section,
-    valueLength: data.value?.length,
-    timestamp: Date.now()
-  })
-  // Remove any existing editor
-  closeCodeEditor()
-  console.log(
-    "[openCodeEditor] After closeCodeEditor, now creating new container"
-  )
-
-  // Create the editor container
-  codeEditorContainer = document.createElement("div")
-  codeEditorContainer.id = "absmartly-code-editor-fullscreen"
-  codeEditorContainer.style.cssText = `
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: 2147483647 !important;
-    background: rgba(0, 0, 0, 0.5) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  `
-
-  // Create the editor modal
-  const modal = document.createElement("div")
-  modal.style.cssText = `
-    width: calc(100vw - 32px) !important;
-    height: calc(100vh - 32px) !important;
-    max-width: 100vw !important;
-    max-height: 100vh !important;
-    background: white !important;
-    border-radius: 8px !important;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  `
-
-  // Create header
-  const header = document.createElement("div")
-  header.style.cssText = `
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    padding: 16px !important;
-    border-bottom: 1px solid #e5e7eb !important;
-    background: white !important;
-  `
-
-  const title = document.createElement("h2")
-  title.style.cssText = `
-    font-size: 18px !important;
-    font-weight: 600 !important;
-    color: #111827 !important;
-    margin: 0 !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-  `
-  title.textContent = `</> ${data.sectionTitle}`
-
-  const closeBtn = document.createElement("button")
-  closeBtn.style.cssText = `
-    padding: 8px !important;
-    background: transparent !important;
-    border: none !important;
-    cursor: pointer !important;
-    color: #6b7280 !important;
-    font-size: 24px !important;
-    line-height: 1 !important;
-    border-radius: 4px !important;
-    transition: background-color 0.2s !important;
-  `
-  closeBtn.innerHTML = "×"
-  closeBtn.onmouseover = () => (closeBtn.style.backgroundColor = "#f3f4f6")
-  closeBtn.onmouseout = () => (closeBtn.style.backgroundColor = "transparent")
-  closeBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: "CODE_EDITOR_CLOSE" })
-    closeCodeEditor()
-  }
-
-  header.appendChild(title)
-  header.appendChild(closeBtn)
-
-  // Create editor container
-  const editorContainer = document.createElement("div")
-  editorContainer.style.cssText = `
-    flex: 1 !important;
-    padding: 16px !important;
-    overflow: hidden !important;
-    background: #f9fafb !important;
-    display: flex !important;
-    flex-direction: column !important;
-  `
-
-  // Create CodeMirror wrapper
-  const editorWrapper = document.createElement("div")
-  editorWrapper.style.cssText = `
-    flex: 1 !important;
-    overflow: auto !important;
-    border-radius: 6px !important;
-    background: #1f2937 !important;
-  `
-
-  // Initialize CodeMirror editor
-  const extensions = [basicSetup, html(), oneDark, EditorView.lineWrapping]
-
-  // Add readOnly extension if needed
-  if (data.readOnly) {
-    extensions.push(EditorState.readOnly.of(true))
-  }
-
-  const startState = EditorState.create({
-    doc: data.value || "",
-    extensions
-  })
-
-  codeEditorView = new EditorView({
-    state: startState,
-    parent: editorWrapper
-  })
-
-  editorContainer.appendChild(editorWrapper)
-
-  // Create footer
-  const footer = document.createElement("div")
-  footer.style.cssText = `
-    display: flex !important;
-    justify-content: flex-end !important;
-    gap: 8px !important;
-    padding: 16px !important;
-    border-top: 1px solid #e5e7eb !important;
-    background: white !important;
-  `
-
-  const cancelBtn = document.createElement("button")
-  cancelBtn.id = "cancel-button"
-  cancelBtn.style.cssText = `
-    padding: 8px 16px !important;
-    background: white !important;
-    color: #374151 !important;
-    border: 1px solid #d1d5db !important;
-    border-radius: 6px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-    transition: all 0.2s !important;
-  `
-  cancelBtn.textContent = data.readOnly ? "Close" : "Cancel"
-  cancelBtn.onmouseover = () => (cancelBtn.style.backgroundColor = "#f9fafb")
-  cancelBtn.onmouseout = () => (cancelBtn.style.backgroundColor = "white")
-  cancelBtn.onclick = () => {
-    chrome.runtime.sendMessage({ type: "CODE_EDITOR_CLOSE" })
-    closeCodeEditor()
-  }
-
-  footer.appendChild(cancelBtn)
-
-  // Only show Save button if not in read-only mode
-  if (!data.readOnly) {
-    const saveBtn = document.createElement("button")
-    saveBtn.id = "save-button"
-    saveBtn.style.cssText = `
-      padding: 8px 16px !important;
-      background: #3b82f6 !important;
-      color: white !important;
-      border: none !important;
-      border-radius: 6px !important;
-      font-size: 14px !important;
-      font-weight: 500 !important;
-      cursor: pointer !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-      transition: all 0.2s !important;
-    `
-    saveBtn.textContent = "Save"
-    saveBtn.onmouseover = () => (saveBtn.style.backgroundColor = "#2563eb")
-    saveBtn.onmouseout = () => (saveBtn.style.backgroundColor = "#3b82f6")
-    saveBtn.onclick = () => {
-      const value = codeEditorView?.state.doc.toString() || ""
-      chrome.runtime.sendMessage({
-        type: "CODE_EDITOR_SAVE",
-        value
-      })
-      closeCodeEditor()
-    }
-
-    footer.appendChild(saveBtn)
-  }
-
-  // Assemble the modal
-  modal.appendChild(header)
-  modal.appendChild(editorContainer)
-  modal.appendChild(footer)
-  codeEditorContainer.appendChild(modal)
-
-  // Add to page
-  document.body.appendChild(codeEditorContainer)
-
-  // Focus the editor
-  codeEditorView.focus()
-
-  // Prevent body scroll
-  document.body.style.overflow = "hidden"
-}
-
-function closeCodeEditor() {
-  console.log(
-    "[closeCodeEditor] Function called, container exists:",
-    !!codeEditorContainer,
-    "view exists:",
-    !!codeEditorView
-  )
-  if (codeEditorView) {
-    codeEditorView.destroy()
-    codeEditorView = null
-  }
-  if (codeEditorContainer) {
-    codeEditorContainer.remove()
-    codeEditorContainer = null
-    document.body.style.overflow = ""
-  }
-}
-
-// JSON editor functionality
-let jsonEditorInstance: any = null
-
-async function openJSONEditor(data: { variantName: string; value: string }) {
-  // Close any existing editor
-  closeJSONEditor()
-
-  // Temporarily disable VE if it's active (to prevent event conflicts)
-  const wasVEActive = isVisualEditorActive
-  if (wasVEActive && currentEditor) {
-    debugLog("[JSON Editor] Temporarily disabling VE while JSON editor is open")
-    currentEditor.disable()
-  }
-
-  jsonEditorInstance = new JSONEditor()
-
-  const title = `Edit DOM Changes - ${data.variantName}`
-  const result = await jsonEditorInstance.show(title, data.value)
-
-  // Re-enable VE if it was active before
-  if (wasVEActive && currentEditor) {
-    debugLog("[JSON Editor] Re-enabling VE after JSON editor closed")
-    currentEditor.enable()
-  }
-
-  if (result !== null) {
-    // User saved changes
-    chrome.runtime.sendMessage({
-      type: "JSON_EDITOR_SAVE",
-      value: result
-    })
-  } else {
-    // User cancelled
-    chrome.runtime.sendMessage({
-      type: "JSON_EDITOR_CLOSE"
-    })
-  }
-}
-
-// Event viewer functionality
-let eventViewerInstance: EventViewer | null = null
-
-function openEventViewer(data: {
-  eventName: string
-  timestamp: string
-  value: string
-}) {
-  // Close any existing viewer
-  closeEventViewer()
-
-  eventViewerInstance = new EventViewer()
-  eventViewerInstance.show(data.eventName, data.timestamp, data.value)
-}
-
-function closeEventViewer() {
-  if (eventViewerInstance) {
-    eventViewerInstance.close()
-    eventViewerInstance = null
-  }
-}
-
-function closeJSONEditor() {
-  if (jsonEditorInstance) {
-    // The editor cleans up when promise resolves/rejects
-    jsonEditorInstance = null
-  }
-}
-
-// Markdown editor functionality
-let markdownEditorInstance: MarkdownEditor | null = null
-
-async function openMarkdownEditor(data: {
-  title: string
-  value: string
-  defaultValue?: string
-}) {
-  closeMarkdownEditor()
-
-  const wasVEActive = isVisualEditorActive
-  if (wasVEActive && currentEditor) {
-    debugLog(
-      "[Markdown Editor] Temporarily disabling VE while markdown editor is open"
-    )
-    currentEditor.disable()
-  }
-
-  markdownEditorInstance = new MarkdownEditor()
-
-  const result = await markdownEditorInstance.show(
-    data.title,
-    data.value,
-    data.defaultValue
-  )
-
-  if (wasVEActive && currentEditor) {
-    debugLog("[Markdown Editor] Re-enabling VE after markdown editor closed")
-    currentEditor.enable()
-  }
-
-  if (result !== null) {
-    chrome.runtime.sendMessage({
-      type: "MARKDOWN_EDITOR_SAVE",
-      value: result
-    })
-  } else {
-    chrome.runtime.sendMessage({
-      type: "MARKDOWN_EDITOR_CLOSE"
-    })
-  }
-}
-
-function closeMarkdownEditor() {
-  if (markdownEditorInstance) {
-    markdownEditorInstance = null
-  }
-}
-
-// JavaScript editor functionality
-let jsEditorInstance: JavaScriptEditor | null = null
-
-async function openJavaScriptEditor(data: { value: string }) {
-  // Close any existing editor
-  closeJavaScriptEditor()
-
-  // Temporarily disable VE if it's active (to prevent event conflicts)
-  const wasVEActive = isVisualEditorActive
-  if (wasVEActive && currentEditor) {
-    debugLog(
-      "[JavaScript Editor] Temporarily disabling VE while JS editor is open"
-    )
-    currentEditor.disable()
-  }
-
-  jsEditorInstance = new JavaScriptEditor()
-
-  const title = "Edit JavaScript Code"
-  const result = await jsEditorInstance.show(title, data.value)
-
-  // Re-enable VE if it was active before
-  if (wasVEActive && currentEditor) {
-    debugLog("[JavaScript Editor] Re-enabling VE after JS editor closed")
-    currentEditor.enable()
-  }
-
-  if (result !== null) {
-    // User saved changes
-    chrome.runtime.sendMessage({
-      type: "JAVASCRIPT_EDITOR_SAVE",
-      value: result
-    })
-  } else {
-    // User cancelled
-    chrome.runtime.sendMessage({
-      type: "JAVASCRIPT_EDITOR_CLOSE"
-    })
-  }
-}
-
-function closeJavaScriptEditor() {
-  if (jsEditorInstance) {
-    // The editor cleans up when promise resolves/rejects
-    jsEditorInstance = null
-  }
-}
 
 // Automatically inject SDK bridge on page load to capture SDK events passively
 // This allows the Events Debug page to receive events without needing to be opened first

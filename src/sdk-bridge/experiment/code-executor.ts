@@ -8,6 +8,7 @@
 
 import { Logger } from '../utils/logger'
 import { validateExperimentCode } from '~src/utils/code-validator'
+import { SandboxExecutor } from './sandbox-executor'
 
 export interface ExecutionContext {
   element?: HTMLElement
@@ -34,55 +35,7 @@ export class CodeExecutor {
    * @returns boolean indicating success
    */
   static execute(code: string, context: ExecutionContext = {}): boolean {
-    if (!code || typeof code !== 'string') {
-      Logger.warn('Invalid code provided to CodeExecutor')
-      return false
-    }
-
-    const validationResult = validateExperimentCode(code)
-    if (!validationResult.valid) {
-      Logger.error(
-        `[CodeExecutor] Code validation failed: ${validationResult.reason}`
-      )
-      Logger.error(`[CodeExecutor] Rejected code for experiment: ${context.experimentName || 'unknown'}`)
-      return false
-    }
-
-    if (validationResult.warnings && validationResult.warnings.length > 0) {
-      Logger.warn(
-        `[CodeExecutor] Code validation warnings for experiment ${context.experimentName}:`,
-        validationResult.warnings
-      )
-    }
-
-    try {
-      const { element, experimentName } = context
-
-      const executeFn = new Function(
-        'element',
-        'document',
-        'window',
-        'console',
-        'experimentName',
-        code
-      )
-
-      executeFn(
-        element,
-        document,
-        window,
-        console,
-        experimentName || '__preview__'
-      )
-
-      Logger.log(
-        `[CodeExecutor] JavaScript code executed successfully for experiment: ${experimentName}`
-      )
-      return true
-    } catch (error) {
-      Logger.error('[CodeExecutor] Error executing JavaScript code:', error)
-      return false
-    }
+    return SandboxExecutor.execute(code, context)
   }
 
   /**

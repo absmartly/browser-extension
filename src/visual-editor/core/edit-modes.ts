@@ -45,7 +45,7 @@ export class EditModes {
     let originalParent: Element | null
     let originalNextSibling: Element | null
 
-    if (existingMoveChange && existingMoveChange.value?.originalTargetSelector) {
+    if (existingMoveChange && (existingMoveChange as any).value?.originalTargetSelector) {
       // This element was already moved, preserve its TRUE original position
       console.log('[ABSmartly] Element already has move change, preserving original position')
       originalParent = null // Will be handled by trackMoveChange
@@ -479,11 +479,11 @@ export class EditModes {
     let originalTargetSelector: string | null = null
     let originalPosition: 'before' | 'after' | 'firstChild' | 'lastChild' | null = null
 
-    if (existingMoveChange && existingMoveChange.value?.originalTargetSelector) {
+    if (existingMoveChange && (existingMoveChange as any).value?.originalTargetSelector) {
       // Preserve the TRUE original position from the first move
       console.log('[ABSmartly] Preserving original position from existing move change')
-      originalTargetSelector = existingMoveChange.value.originalTargetSelector
-      originalPosition = existingMoveChange.value.originalPosition
+      originalTargetSelector = (existingMoveChange as any).value.originalTargetSelector
+      originalPosition = (existingMoveChange as any).value.originalPosition
     } else if (originalNextSibling) {
       // Element was originally before its next sibling
       originalTargetSelector = generateRobustSelector(originalNextSibling, {

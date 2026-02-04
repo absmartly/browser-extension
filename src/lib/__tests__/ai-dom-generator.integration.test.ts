@@ -3,7 +3,9 @@ import type { DOMChange } from '~src/types/dom-changes'
 
 const SKIP_INTEGRATION = process.env.CI || !process.env.RUN_INTEGRATION_TESTS
 
-describe.skip('AI DOM Generator Integration Tests (with real bridge)', () => {
+const describeIf = SKIP_INTEGRATION ? describe.skip : describe
+
+describeIf('AI DOM Generator Integration Tests (with real bridge)', () => {
   const SAMPLE_HTML = `
     <!DOCTYPE html>
     <html>

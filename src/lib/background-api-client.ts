@@ -12,6 +12,14 @@ import type {
 } from '~src/types/absmartly'
 import { APIError } from '~src/types/errors'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import {
+  ExperimentSchema,
+  ExperimentsResponseSchema,
+  ApplicationsResponseSchema,
+  UnitTypesResponseSchema,
+  MetricsResponseSchema,
+  ExperimentTagsResponseSchema
+} from './api-schemas'
 
 interface ExperimentParams {
   page?: number
@@ -70,9 +78,15 @@ export class BackgroundAPIClient {
     try {
       debugLog('getExperiments called with params:', params)
 
-      const data = await this.makeRequest('GET', '/experiments', params) as Record<string, unknown>
-      debugLog('API response structure:', data)
+      const rawData = await this.makeRequest('GET', '/experiments', params)
+      debugLog('API response structure:', rawData)
 
+      const validation = ExperimentsResponseSchema.safeParse(rawData)
+      if (!validation.success) {
+        debugWarn('API response validation failed:', validation.error)
+      }
+
+      const data = rawData as Record<string, unknown>
       const experimentsData = data.experiments || data.data || data
       const experiments = Array.isArray(experimentsData) ? experimentsData as Experiment[] : []
       const total = typeof data.total === 'number' ? data.total :
@@ -80,6 +94,7 @@ export class BackgroundAPIClient {
                    typeof data.count === 'number' ? data.count : undefined
       const hasMore = data.has_more === true || data.hasMore === true ||
                      (params?.page && experiments.length === params.items)
+
       return {
         experiments,
         total,
@@ -93,8 +108,15 @@ export class BackgroundAPIClient {
 
   async getExperiment(id: number): Promise<Experiment> {
     try {
-      const response = await this.makeRequest('GET', `/experiments/${id}`) as Record<string, unknown>
-      return (response.experiment || response) as Experiment
+      const rawResponse = await this.makeRequest('GET', `/experiments/${id}`)
+      const experimentData = (rawResponse as any).experiment || rawResponse
+
+      const validation = ExperimentSchema.safeParse(experimentData)
+      if (!validation.success) {
+        debugWarn(`Experiment ${id} validation failed:`, validation.error)
+      }
+
+      return experimentData as Experiment
     } catch (error) {
       debugError(`Failed to fetch experiment ${id}:`, error)
       throw error

@@ -3,17 +3,20 @@ import '@testing-library/jest-dom'
 import { TextEncoder, TextDecoder } from 'util'
 import { config } from 'dotenv'
 import fetch from 'node-fetch'
-import EventSource from 'eventsource'
+import EventSourcePolyfill from 'eventsource'
 
 config({ path: '.env.development.local' })
 
-// Add TextEncoder/TextDecoder/fetch/EventSource for jsdom environment
+// Add TextEncoder/TextDecoder/fetch for jsdom environment
 Object.assign(global, {
   TextEncoder,
   TextDecoder,
   fetch,
-  EventSource,
 })
+
+// Configure EventSource polyfill for Node.js
+// The eventsource package exports the constructor directly
+;(global as any).EventSource = EventSourcePolyfill
 
 // Mock chrome APIs for testing
 const chrome = {

@@ -276,7 +276,10 @@ export class ClaudeCodeBridgeClient {
 
     eventSource.onerror = (error) => {
       debugError('[Bridge] SSE error:', error)
-      onError(new Error('Stream connection error'))
+      console.error('[Bridge] SSE error details:', JSON.stringify(error, null, 2))
+      console.error('[Bridge] EventSource readyState:', (eventSource as any).readyState)
+      console.error('[Bridge] EventSource URL:', (eventSource as any).url)
+      onError(new Error(`Stream connection error: ${JSON.stringify(error)}`))
       eventSource.close()
     }
 

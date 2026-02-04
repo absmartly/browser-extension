@@ -97,17 +97,14 @@ export class VisualEditorHelper {
    */
   async selectElement(selector: string) {
     await this.page.click(selector)
-    await this.page.waitForTimeout(300)
 
-    // Verify element is selected
-    const isSelected = await this.page.evaluate((sel) => {
+    // Wait for element to be selected
+    await this.page.waitForFunction((sel) => {
       const element = document.querySelector(sel)
       return element?.classList.contains('absmartly-selected')
-    }, selector)
-
-    if (!isSelected) {
+    }, selector, { timeout: 5000 }).catch(() => {
       console.warn(`Element ${selector} might not be properly selected`)
-    }
+    })
   }
 
   /**
@@ -116,9 +113,8 @@ export class VisualEditorHelper {
   async openContextMenu(selector: string) {
     await this.selectElement(selector)
     await this.page.click(selector, { button: 'right' })
-    await this.page.waitForTimeout(300)
 
-    // Wait for context menu
+    // Wait for context menu to appear
     await this.page.waitForFunction(() => {
       return document.getElementById('absmartly-menu-host') !== null
     }, { timeout: 5000 })
@@ -160,8 +156,11 @@ export class VisualEditorHelper {
     // Wait for editor container
     await this.page.waitForSelector('#absmartly-monaco-temp', { timeout: 10000 })
 
-    // Give Monaco time to fully initialize
-    await this.page.waitForTimeout(1000)
+    // Wait for Monaco to fully initialize with an editor instance
+    await this.page.waitForFunction(() => {
+      const monaco = window.monaco
+      return monaco && monaco.editor.getEditors().length > 0
+    }, { timeout: 10000 })
   }
 
   /**
@@ -272,7 +271,13 @@ export class VisualEditorHelper {
    */
   async triggerAutocomplete() {
     await this.page.keyboard.press('Control+Space')
-    await this.page.waitForTimeout(500)
+
+    // Wait for autocomplete widget to appear
+    await this.page.waitForFunction(() => {
+      return document.querySelector('.suggest-widget') !== null
+    }, { timeout: 5000 }).catch(() => {
+      console.warn('Autocomplete widget did not appear')
+    })
   }
 
   /**
@@ -314,6 +319,9 @@ export class VisualEditorHelper {
    * Format document in Monaco
    */
   async formatDocument() {
+    // Get content before formatting
+    const contentBefore = await this.getMonacoContent()
+
     // Try toolbar button first
     const clicked = await this.clickMonacoToolbarButton(0) // Format is usually first button
 
@@ -322,7 +330,20 @@ export class VisualEditorHelper {
       await this.page.keyboard.press('Shift+Alt+F')
     }
 
-    await this.page.waitForTimeout(1000)
+    // Wait for content to change (indicating formatting completed)
+    await this.page.waitForFunction((before) => {
+      const monaco = window.monaco
+      if (monaco) {
+        const editors = monaco.editor.getEditors()
+        if (editors.length > 0) {
+          const contentAfter = editors[0].getValue()
+          return contentAfter !== before
+        }
+      }
+      return false
+    }, contentBefore, { timeout: 5000 }).catch(() => {
+      console.warn('Document formatting may not have completed')
+    })
   }
 
   /**

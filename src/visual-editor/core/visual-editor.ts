@@ -11,7 +11,6 @@ import UndoRedoManager from './undo-redo-manager'
 import UIComponents from '../ui/components'
 import EditModes from './edit-modes'
 import Cleanup from './cleanup'
-// Removed toolbar import - using UIComponents banner instead
 import { Notifications } from '../ui/notifications'
 import { ElementActions } from './element-actions'
 import { EditorCoordinator } from './editor-coordinator'
@@ -41,7 +40,6 @@ export class VisualEditor {
   private uiComponents: UIComponents
   private editModes: EditModes
   private cleanup: Cleanup
-  // Removed toolbar - using UIComponents banner instead
   private notifications: Notifications
   private elementActions: ElementActions
   private coordinator: EditorCoordinator
@@ -90,7 +88,6 @@ export class VisualEditor {
     this.uiComponents = new UIComponents(this.stateManager)
     this.editModes = new EditModes(this.stateManager)
     this.cleanup = new Cleanup(this.stateManager)
-    // Removed toolbar - using UIComponents banner instead
     this.notifications = new Notifications()
 
     // Set the addChange callback for EditModes to track move/resize changes

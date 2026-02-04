@@ -47,9 +47,9 @@ describe('StateManager', () => {
     })
 
     it('should initialize with initial changes from config', () => {
-      const initialChanges = [
-        { selector: '.test', action: 'text', value: 'Hello' },
-        { selector: '.test2', action: 'style', css: { color: 'red' } }
+      const initialChanges: any[] = [
+        { selector: '.test', type: 'text', value: 'Hello' },
+        { selector: '.test2', type: 'style', value: { color: 'red' } }
       ]
 
       const configWithChanges: VisualEditorConfig = {
@@ -118,9 +118,9 @@ describe('StateManager', () => {
       const newState: VisualEditorState = {
         selectedElement: mockElement,
         hoveredElement: mockElement2,
-        changes: [{ selector: '.test', action: 'text', value: 'Test' }],
-        undoStack: [{ type: 'test' }],
-        redoStack: [{ type: 'test2' }],
+        changes: [{ selector: '.test', type: 'text', value: 'Test' }] as any,
+        undoStack: [{ type: 'add', change: { selector: '.test', type: 'text', value: 'Test' }, index: 0 }],
+        redoStack: [{ type: 'add', change: { selector: '.test', type: 'text', value: 'Test' }, index: 0 }],
         originalValues: new Map([['key', 'value']]),
         isRearranging: true,
         isResizing: true,
@@ -254,7 +254,7 @@ describe('StateManager', () => {
 
   describe('Changes Management', () => {
     it('should add change to empty changes array', () => {
-      const change = { selector: '.test', action: 'text', value: 'Hello' }
+      const change: any = { selector: '.test', type: 'text', value: 'Hello' }
 
       stateManager.addChange(change)
 
@@ -263,8 +263,8 @@ describe('StateManager', () => {
     })
 
     it('should add multiple changes', () => {
-      const change1 = { selector: '.test1', action: 'text', value: 'Hello' }
-      const change2 = { selector: '.test2', action: 'style', css: { color: 'red' } }
+      const change1: any = { selector: '.test1', type: 'text', value: 'Hello' }
+      const change2: any = { selector: '.test2', type: 'style', value: { color: 'red' } }
 
       stateManager.addChange(change1)
       stateManager.addChange(change2)
@@ -275,7 +275,7 @@ describe('StateManager', () => {
 
     it('should maintain immutability when adding changes', () => {
       const originalState = stateManager.getState()
-      const change = { selector: '.test', action: 'text', value: 'Hello' }
+      const change: any = { selector: '.test', type: 'text', value: 'Hello' }
 
       stateManager.addChange(change)
 
@@ -287,9 +287,9 @@ describe('StateManager', () => {
     })
 
     it('should set changes array', () => {
-      const changes = [
-        { selector: '.test1', action: 'text', value: 'Hello' },
-        { selector: '.test2', action: 'style', css: { color: 'red' } }
+      const changes: any[] = [
+        { selector: '.test1', type: 'text', value: 'Hello' },
+        { selector: '.test2', type: 'style', value: { color: 'red' } }
       ]
 
       stateManager.setChanges(changes)
@@ -302,9 +302,9 @@ describe('StateManager', () => {
     })
 
     it('should replace existing changes when setting', () => {
-      stateManager.addChange({ selector: '.old', action: 'text', value: 'Old' })
+      stateManager.addChange({ selector: '.old', type: 'text', value: 'Old' })
 
-      const newChanges = [{ selector: '.new', action: 'text', value: 'New' }]
+      const newChanges: any[] = [{ selector: '.new', type: 'text', value: 'New' }]
       stateManager.setChanges(newChanges)
 
       const state = stateManager.getState()
@@ -315,7 +315,7 @@ describe('StateManager', () => {
   describe('Undo/Redo Stack Management', () => {
     describe('Undo Stack', () => {
       it('should push action to undo stack', () => {
-        const action = { type: 'test', data: 'test-data' }
+        const action: any = { type: 'add', data: 'test-data' }
 
         stateManager.pushUndo(action)
 
@@ -324,8 +324,8 @@ describe('StateManager', () => {
       })
 
       it('should push multiple actions to undo stack', () => {
-        const action1 = { type: 'test1', data: 'data1' }
-        const action2 = { type: 'test2', data: 'data2' }
+        const action1: any = { type: 'test1', data: 'data1' }
+        const action2: any = { type: 'test2', data: 'data2' }
 
         stateManager.pushUndo(action1)
         stateManager.pushUndo(action2)
@@ -335,8 +335,8 @@ describe('StateManager', () => {
       })
 
       it('should clear redo stack when pushing to undo stack', () => {
-        const undoAction = { type: 'undo', data: 'undo-data' }
-        const redoAction = { type: 'redo', data: 'redo-data' }
+        const undoAction: any = { type: 'undo', data: 'undo-data' }
+        const redoAction: any = { type: 'redo', data: 'redo-data' }
 
         stateManager.pushRedo(redoAction)
         stateManager.pushUndo(undoAction)
@@ -347,8 +347,8 @@ describe('StateManager', () => {
       })
 
       it('should pop action from undo stack', () => {
-        const action1 = { type: 'test1', data: 'data1' }
-        const action2 = { type: 'test2', data: 'data2' }
+        const action1: any = { type: 'test1', data: 'data1' }
+        const action2: any = { type: 'test2', data: 'data2' }
 
         stateManager.pushUndo(action1)
         stateManager.pushUndo(action2)
@@ -372,7 +372,7 @@ describe('StateManager', () => {
 
       it('should maintain immutability of undo stack', () => {
         const originalState = stateManager.getState()
-        const action = { type: 'test', data: 'test-data' }
+        const action: any = { type: 'add', data: 'test-data' }
 
         stateManager.pushUndo(action)
 
@@ -386,7 +386,7 @@ describe('StateManager', () => {
 
     describe('Redo Stack', () => {
       it('should push action to redo stack', () => {
-        const action = { type: 'test', data: 'test-data' }
+        const action: any = { type: 'add', data: 'test-data' }
 
         stateManager.pushRedo(action)
 
@@ -395,8 +395,8 @@ describe('StateManager', () => {
       })
 
       it('should push multiple actions to redo stack', () => {
-        const action1 = { type: 'test1', data: 'data1' }
-        const action2 = { type: 'test2', data: 'data2' }
+        const action1: any = { type: 'test1', data: 'data1' }
+        const action2: any = { type: 'test2', data: 'data2' }
 
         stateManager.pushRedo(action1)
         stateManager.pushRedo(action2)
@@ -406,8 +406,8 @@ describe('StateManager', () => {
       })
 
       it('should pop action from redo stack', () => {
-        const action1 = { type: 'test1', data: 'data1' }
-        const action2 = { type: 'test2', data: 'data2' }
+        const action1: any = { type: 'test1', data: 'data1' }
+        const action2: any = { type: 'test2', data: 'data2' }
 
         stateManager.pushRedo(action1)
         stateManager.pushRedo(action2)
@@ -431,7 +431,7 @@ describe('StateManager', () => {
 
       it('should maintain immutability of redo stack', () => {
         const originalState = stateManager.getState()
-        const action = { type: 'test', data: 'test-data' }
+        const action: any = { type: 'add', data: 'test-data' }
 
         stateManager.pushRedo(action)
 
@@ -644,7 +644,7 @@ describe('StateManager', () => {
       // Start editing workflow
       stateManager.setSelectedElement(mockElement)
       stateManager.setResizing(true)
-      stateManager.addChange({ selector: '#test-element-1', action: 'style', css: { width: '200px' } })
+      stateManager.addChange({ selector: '#test-element-1', type: 'style', value: { width: '200px' } })
       stateManager.setResizing(false)
 
       expect(listener).toHaveBeenCalledTimes(4)
@@ -664,7 +664,7 @@ describe('StateManager', () => {
       stateManager.setRearranging(true)
 
       // Complete drag
-      stateManager.addChange({ selector: '#test-element-1', action: 'move', target: '#container' })
+      stateManager.addChange({ selector: '#test-element-1', type: 'move', target: '#container' } as any)
       stateManager.setDraggedElement(null)
       stateManager.setRearranging(false)
 
@@ -678,11 +678,11 @@ describe('StateManager', () => {
 
     it('should handle undo/redo workflow', () => {
       // Setup initial state
-      stateManager.addChange({ selector: '.test1', action: 'text', value: 'Text1' })
-      stateManager.pushUndo({ type: 'text', selector: '.test1', oldValue: 'Original' })
+      stateManager.addChange({ selector: '.test1', type: 'text', value: 'Text1' } as any)
+      stateManager.pushUndo({ type: 'add', change: { selector: '.test1', type: 'text', value: 'Text1' } as any, index: 0 })
 
-      stateManager.addChange({ selector: '.test2', action: 'text', value: 'Text2' })
-      stateManager.pushUndo({ type: 'text', selector: '.test2', oldValue: 'Original2' })
+      stateManager.addChange({ selector: '.test2', type: 'text', value: 'Text2' } as any)
+      stateManager.pushUndo({ type: 'add', change: { selector: '.test2', type: 'text', value: 'Text2' } as any, index: 1 })
 
       // Perform undo
       const undoAction = stateManager.popUndo()
@@ -773,7 +773,7 @@ describe('StateManager', () => {
 
       // Fill undo stack
       for (let i = 0; i < largeStackSize; i++) {
-        stateManager.pushUndo({ type: 'test', index: i })
+        stateManager.pushUndo({ type: 'add', change: { selector: `.test${i}`, type: 'text', value: 'test' } as any, index: i })
       }
 
       const state = stateManager.getState()
@@ -812,9 +812,9 @@ describe('StateManager', () => {
       // Modify all state properties
       stateManager.setSelectedElement(mockElement)
       stateManager.setHoveredElement(mockElement2)
-      stateManager.addChange({ selector: '.test', action: 'text', value: 'Test' })
-      stateManager.pushUndo({ type: 'test' })
-      stateManager.pushRedo({ type: 'test' })
+      stateManager.addChange({ selector: '.test', type: 'text', value: 'Test' } as any)
+      stateManager.pushUndo({ type: 'add', change: { selector: '.test', type: 'text', value: 'Test' }, index: 0 })
+      stateManager.pushRedo({ type: 'add', change: { selector: '.test', type: 'text', value: 'Test' }, index: 0 })
       stateManager.setOriginalValue('key', 'value')
       stateManager.setRearranging(true)
       stateManager.setResizing(true)
@@ -876,8 +876,8 @@ describe('StateManager', () => {
     it('should handle complex objects in state (shallow immutability)', () => {
       const complexChange = {
         selector: '.test',
-        action: 'style',
-        css: {
+        type: 'style',
+        value: {
           border: '1px solid red',
           background: {
             color: 'blue',
@@ -888,24 +888,20 @@ describe('StateManager', () => {
           timestamp: Date.now(),
           user: 'test-user'
         }
-      }
+      } as any
 
       stateManager.addChange(complexChange)
 
       const state1 = stateManager.getState()
       const state2 = stateManager.getState()
 
-      // States should be equal but not the same reference
       expect(state1).toEqual(state2)
       expect(state1).not.toBe(state2)
-      // Changes arrays from different getState() calls share the same reference (shallow copy)
       expect(state1.changes).toBe(state2.changes)
 
-      // Note: StateManager only provides shallow immutability
-      // The change objects themselves are shared references
       const changeRef = state1.changes[0]
       expect(changeRef).toBe(complexChange)
-      expect(changeRef.css).toBe(complexChange.css)
+      expect((changeRef as any).value).toBe(complexChange.value)
     })
   })
 })

@@ -298,7 +298,6 @@ describe('ContextMenu', () => {
     it('should create all menu actions', () => {
       const expectedActions = [
         'edit', 'editHtml', 'rearrange', 'resize',
-        // 'move-up', 'move-down', // Removed per feature requirements
         'copy', 'copySelector',
         'selectRelative', 'insert-block',
         'hide', 'delete'

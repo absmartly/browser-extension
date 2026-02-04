@@ -7,8 +7,9 @@ describe('AI Image Reading', () => {
   const runIntegrationTests = process.env.RUN_INTEGRATION_TESTS === '1'
 
   const skipIfNoApiKey = (apiKey && runIntegrationTests) ? it : it.skip
+  const describeIfApiKey = (apiKey && runIntegrationTests) ? describe : describe.skip
 
-  describe.skip('Anthropic API Tests (requires API key and RUN_INTEGRATION_TESTS=1)', () => {
+  describeIfApiKey('Anthropic API Tests (requires API key and RUN_INTEGRATION_TESTS=1)', () => {
     skipIfNoApiKey('should read text from an image using Claude', async () => {
     const imageDataUrl = TEST_IMAGES.HELLO
 
@@ -122,7 +123,7 @@ describe('AI Image Reading', () => {
   })
 
   describe('Claude Code Bridge Tests (no API key required)', () => {
-    it.skip('should generate DOM changes via bridge with text prompt', async () => {
+    skipIfNoApiKey('should generate DOM changes via bridge with text prompt', async () => {
       const html = '<html><body><h1>Test Page</h1><button id="cta">Click Me</button></body></html>'
 
       const result = await generateDOMChanges(
@@ -144,7 +145,7 @@ describe('AI Image Reading', () => {
       console.log('✓ Bridge generation works without API key')
     }, 60000)
 
-    it.skip('should handle image with bridge', async () => {
+    skipIfNoApiKey('should handle image with bridge', async () => {
       const imageDataUrl = TEST_IMAGES.BLUE_SQUARE
 
       const html = '<html><body><h1>Test</h1></body></html>'

@@ -157,7 +157,7 @@ describe('ElementActions', () => {
     it('should sync with state manager changes', () => {
       const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
 
-      const newState = {
+      const newState: any = {
         selectedElement: testDiv,
         hoveredElement: testButton,
         changes: [{ selector: '#test', type: 'style', value: { color: 'red' } }],

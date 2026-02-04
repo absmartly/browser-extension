@@ -24,7 +24,7 @@
     "test:claude": "node test-claude-api.js"
   },
   "dependencies": {
-    "@absmartly/sdk-plugins": "^1.1.2",
+    "@absmartly/sdk-plugins": "^1.2.1",
     "@anthropic-ai/sdk": "^0.65.0",
     "@codemirror/autocomplete": "^6.19.0",
     "@codemirror/commands": "^6.9.0",
@@ -53,7 +53,7 @@
     "openai": "^6.9.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "zod": "^4.1.12"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@absmartly/javascript-sdk": "^1.13.2",
@@ -69,7 +69,7 @@
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
     "autoprefixer": "^10.4.16",
-    "eventsource": "^4.0.0",
+    "eventsource": "^4.1.0",
     "fake-indexeddb": "^6.2.5",
     "fast-glob": "^3.3.3",
     "http-server": "^14.1.1",

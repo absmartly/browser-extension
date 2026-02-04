@@ -12,7 +12,6 @@ import UndoRedoManager from './undo-redo-manager'
 import UIComponents from '../ui/components'
 import EditModes from './edit-modes'
 import Cleanup from './cleanup'
-// Removed toolbar import - using UIComponents banner instead
 import { Notifications } from '../ui/notifications'
 import HtmlEditor from '../ui/html-editor'
 import ImageSourceDialog from '../ui/image-source-dialog'
@@ -48,7 +47,6 @@ export class EditorCoordinator {
   private uiComponents: UIComponents
   private editModes: EditModes
   private cleanup: Cleanup
-  // Removed toolbar - using UIComponents banner instead
   private notifications: Notifications
   private htmlEditor: HtmlEditor
   private imageSourceDialog: ImageSourceDialog
@@ -936,7 +934,6 @@ export class EditorCoordinator {
   startMutationObserver(): void {
     this.mutationObserver = new MutationObserver((mutations) => {
       if (this.isInternalChange) return
-      // TODO: Track external changes
     })
 
     this.mutationObserver.observe(document.body, {
