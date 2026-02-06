@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { PlusCircleIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import { fetchAuthenticatedImage } from "~src/utils/auth"

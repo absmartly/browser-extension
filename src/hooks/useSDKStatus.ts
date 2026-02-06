@@ -14,6 +14,7 @@ export function useSDKStatus() {
 
   useEffect(() => {
     let isInitialCheck = true
+    let isMounted = true
 
     const checkSDK = async () => {
       try {
@@ -23,18 +24,22 @@ export function useSDKStatus() {
 
         const detected = await isSDKAvailable()
 
-        setStatus({
-          sdkDetected: detected,
-          checking: false
-        })
+        if (isMounted) {
+          setStatus({
+            sdkDetected: detected,
+            checking: false
+          })
+        }
 
         isInitialCheck = false
       } catch (error) {
         console.error('[useSDKStatus] Error checking SDK availability:', error)
-        setStatus({
-          sdkDetected: false,
-          checking: false
-        })
+        if (isMounted) {
+          setStatus(prev => ({
+            sdkDetected: prev.sdkDetected,
+            checking: false
+          }))
+        }
       }
     }
 
@@ -42,7 +47,10 @@ export function useSDKStatus() {
 
     const intervalId = setInterval(checkSDK, 5000)
 
-    return () => clearInterval(intervalId)
+    return () => {
+      isMounted = false
+      clearInterval(intervalId)
+    }
   }, [])
 
   return status

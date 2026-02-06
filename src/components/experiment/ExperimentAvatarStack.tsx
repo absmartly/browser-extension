@@ -29,7 +29,7 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
       const initials = getInitials(name)
 
       avatars.push({
-        id: `user-${user.user_id || user.id || user.email}`,
+        id: `user-${user.user_id || (user as any).id || user.email}`,
         user,
         avatar: avatar || undefined,
         name,
@@ -44,7 +44,7 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
         if (!owner) return
 
         if (experiment.created_by &&
-            ((owner.id && owner.id === experiment.created_by.id) ||
+            (((owner as any).id && (owner as any).id === (experiment.created_by as any).id) ||
              (owner.user_id && owner.user_id === experiment.created_by.user_id))) {
           return
         }
@@ -56,7 +56,7 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
         const initials = getInitials(name)
 
         avatars.push({
-          id: `owner-${owner.user_id || owner.id || owner.email}`,
+          id: `owner-${owner.user_id || (owner as any).id || owner.email}`,
           user: owner,
           avatar: avatar || undefined,
           name,

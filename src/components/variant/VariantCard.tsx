@@ -189,7 +189,7 @@ export const VariantCard = React.memo(function VariantCard({
                     className="flex-1 text-sm"
                   />
                   <Input
-                    value={typeof value === 'object' ? JSON.stringify(value) : value}
+                    value={typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')}
                     onChange={(e) => onUpdateVariable(key, e.target.value)}
                     className="flex-1 text-sm"
                     disabled={!canEdit}

@@ -349,12 +349,12 @@ describe('useSDKStatus', () => {
 
       const { result } = renderHook(() => useSDKStatus())
 
-      expect(result.current.checking).toBe(true)
-      expect(result.current.sdkDetected).toBe(false)
-
       await waitFor(() => {
         expect(mockIsSDKAvailable).toHaveBeenCalled()
       })
+
+      expect(result.current.checking).toBe(false)
+      expect(result.current.sdkDetected).toBe(false)
 
       consoleErrorSpy.mockRestore()
     })

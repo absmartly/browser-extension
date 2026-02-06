@@ -48,6 +48,16 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     defaultModel: 'sonnet',
     modelDisplayType: 'static'
   },
+  'claude-code-bridge': {
+    label: 'Claude Code Bridge',
+    apiKeyPlaceholder: '',
+    apiKeyHelpLink: '',
+    apiKeyHelpText: '',
+    endpointPlaceholder: 'http://localhost:9000',
+    endpointDescription: 'Optional: Specify a custom port for the Claude Code bridge server.',
+    defaultModel: 'sonnet',
+    modelDisplayType: 'static'
+  },
   'anthropic-api': {
     label: 'Anthropic API Key',
     apiKeyPlaceholder: 'sk-ant-...',

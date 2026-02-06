@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import type { Experiment } from '~src/types/absmartly'
+import type { DOMChange } from '~src/types/dom-changes'
+import type { AIDOMGenerationResult } from '~src/lib/ai-dom-generator'
 import { LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
 import { Header } from './Header'
 import { VariantList } from './VariantList'
@@ -25,7 +27,15 @@ interface ExperimentEditorProps {
   tags?: any[]
   owners?: any[]
   teams?: any[]
-  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>, currentChanges: DOMChange[], variantIndex: number) => void
+  onNavigateToAI?: (
+    variantName: string,
+    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    currentChanges: DOMChange[],
+    onRestoreChanges: (changes: DOMChange[]) => void,
+    onPreviewToggle: (enabled: boolean) => void,
+    onPreviewRefresh: () => void,
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
+  ) => void
 }
 
 export function ExperimentEditor({
@@ -53,8 +63,8 @@ export function ExperimentEditor({
     audience: experiment?.audience || '{"filter":[{"and":[]}]}',
     unit_type_id: experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
     application_ids: experiment?.applications?.map(a => a.application_id) || [],
-    owner_ids: experiment?.owners?.map(o => o.user_id || o.id) || [],
-    team_ids: experiment?.teams?.map(t => t.team_id || t.id) || [],
+    owner_ids: experiment?.owners?.map(o => o.user_id || (o as any).id) || [],
+    team_ids: experiment?.teams?.map(t => t.team_id || (t as any).id) || [],
     tag_ids: experiment?.experiment_tags?.map(t => t.experiment_tag_id) || []
   })
 
