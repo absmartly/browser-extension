@@ -16,8 +16,8 @@ const ConfigSchema = z.object({
   aiModel: z.string().optional(),
   aiApiKey: z.string().optional(),
   llmModel: z.string().optional(),
-  providerModels: z.record(z.string()).optional(),
-  providerEndpoints: z.record(z.string()).optional(),
+  providerModels: z.record(z.string(), z.string()).optional(),
+  providerEndpoints: z.record(z.string(), z.string()).optional(),
   sdkApiKey: z.string().optional(),
   sdkApplicationName: z.string().optional(),
   sdkWindowProperty: z.string().optional(),
@@ -29,7 +29,7 @@ const ConfigSchema = z.object({
 export function validateConfig(config: any): { valid: boolean; config?: ABsmartlyConfig; error?: string } {
   try {
     const validatedConfig = ConfigSchema.parse(config)
-    return { valid: true, config: validatedConfig }
+    return { valid: true, config: validatedConfig as ABsmartlyConfig }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { valid: false, error: error.issues.map(e => e.message).join(', ') }
@@ -118,7 +118,7 @@ export async function initializeConfig(
     debugLog('[Config] Using auth method from environment (no stored config):', envAuthMethod)
   }
 
-  const newConfig: ABsmartlyConfig = {
+  const newConfig = {
     apiKey: storedConfig?.apiKey || secureApiKey || '',
     apiEndpoint: storedConfig?.apiEndpoint || '',
     applicationId: storedConfig?.applicationId,
@@ -126,7 +126,7 @@ export async function initializeConfig(
     domChangesFieldName: storedConfig?.domChangesFieldName,
     aiProvider: storedConfig?.aiProvider,
     aiApiKey: storedConfig?.aiApiKey || secureAiApiKey || ''
-  }
+  } as ABsmartlyConfig
 
   if (!storedConfig?.apiKey && !secureApiKey && envApiKey) {
     newConfig.apiKey = envApiKey

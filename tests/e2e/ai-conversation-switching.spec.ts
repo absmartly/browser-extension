@@ -62,11 +62,14 @@ test.describe('AI Conversation Switching', () => {
     }
   })
 
-  // TODO: SKIPPED - Test hangs during experiment creation (180s timeout)
-  // Redundant with ai-conversation-history.spec.ts which tests same functionality
-  // Uses forbidden debugWait() pattern
-  // To fix: Rewrite using proper waits, reduce timeout to <10s, or remove if duplicate
   test.skip('should load and switch between multiple conversations', async ({ extensionUrl, seedStorage, getStorage }) => {
+    // SKIP REASON: DUPLICATE TEST (LEGITIMATE)
+    // This test is fully covered by ai-conversation-history.spec.ts which provides
+    // better implementation without the following issues:
+    // - Test hangs during experiment creation (180s timeout)
+    // - Uses debugWait() pattern
+    // - Has timing/stability issues
+    // RESOLUTION: Use ai-conversation-history.spec.ts instead. This test can be removed.
     test.setTimeout(SLOW_MODE ? 240000 : 180000)
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -306,9 +309,14 @@ test.describe('AI Conversation Switching', () => {
     console.log('\n✅ Conversation switching test completed successfully!')
   })
 
-  // TODO: SKIPPED - Same issues as first test (hanging, forbidden debugWait(), 180s timeout)
-  // Redundant with ai-conversation-history.spec.ts test "New Chat button"
   test.skip('should start new chat while preserving old conversations', async ({ extensionUrl, getStorage }) => {
+    // SKIP REASON: DUPLICATE TEST (LEGITIMATE)
+    // This test is fully covered by ai-conversation-history.spec.ts "New Chat button" test
+    // which provides better implementation without the following issues:
+    // - Test hangs during execution (180s timeout)
+    // - Uses debugWait() pattern
+    // - Has timing/stability issues
+    // RESOLUTION: Use ai-conversation-history.spec.ts instead. This test can be removed.
     test.setTimeout(SLOW_MODE ? 180000 : 120000)
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')

@@ -25,7 +25,7 @@ interface ExperimentEditorProps {
   tags?: any[]
   owners?: any[]
   teams?: any[]
-  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<void>) => void
+  onNavigateToAI?: (variantName: string, onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>, currentChanges: DOMChange[], variantIndex: number) => void
 }
 
 export function ExperimentEditor({
@@ -141,7 +141,7 @@ export function ExperimentEditor({
 
   const extractDomChangesUrlFilter = (variant: Variant): URLFilter | undefined => {
     if (!variant || !variant.config) return undefined
-    const domChanges: DOMChangesData = variant.config[domFieldName]
+    const domChanges = variant.config[domFieldName] as DOMChangesData
     if (!domChanges || Array.isArray(domChanges)) return undefined
     return domChanges.urlFilter
   }

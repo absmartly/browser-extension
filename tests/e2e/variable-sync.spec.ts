@@ -42,12 +42,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
     if (testPage) await testPage.close()
   })
 
-  test.skip('Should preserve __inject_html and DOM changes when adding custom variables', async ({ extensionId, extensionUrl }) => {
-    // TODO: Fix variant mismatch - test expects __inject_html in Variant 1, but injection code only works on Control (Variant 0)
-    // Root cause: ExperimentCodeInjection component is only rendered for variantIndex=0 (Control)
-    // But test adds injection code, then checks Variant 1's JSON which is empty
-    // Either: (A) Change test to check Control variant's JSON, OR (B) Allow injection code on all variants
-    // Also: Verify that DOM changes from Visual Editor are properly synced to variant config
+  test('Should preserve __inject_html and DOM changes when adding custom variables', async ({ extensionId, extensionUrl }) => {
     test.setTimeout(process.env.SLOW === '1' ? 60000 : 45000)
 
     let sidebar: any

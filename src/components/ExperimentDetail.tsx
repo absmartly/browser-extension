@@ -15,7 +15,6 @@ import { useExperimentSave } from '~src/hooks/useExperimentSave'
 import { ExperimentActions } from './ExperimentDetail/ExperimentActions'
 import { getExperimentStateLabel, getExperimentStateBadgeVariant } from '~src/utils/experiment-state'
 import { ExperimentCodeInjection } from './ExperimentCodeInjection'
-import type { ExperimentInjectionCode } from '~src/types/absmartly'
 import type { URLFilter, DOMChangesData, DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import { clearAllExperimentStorage } from '~src/utils/storage-cleanup'
 import { localAreaStorage as storage } from "~src/utils/storage"
@@ -77,9 +76,9 @@ export function ExperimentDetail({
     percentage_of_traffic: experiment.percentage_of_traffic || 100,
     unit_type_id: experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
     application_ids: experiment.applications?.map(a => a.application_id || a.id) || [],
-    owner_ids: experiment.owners?.map(o => o.user_id || o.id) || [],
-    team_ids: experiment.teams?.map(t => t.team_id || t.id) || [],
-    tag_ids: experiment.experiment_tags?.map(t => t.experiment_tag_id || t.id || t.experiment_tag?.id).filter((id): id is number => id !== undefined) || []
+    owner_ids: experiment.owners?.map(o => o.user_id) || [],
+    team_ids: experiment.teams?.map(t => t.team_id) || [],
+    tag_ids: experiment.experiment_tags?.map(t => t.experiment_tag_id).filter((id): id is number => id !== undefined) || []
   })
 
   debugLog('🔍 ExperimentDetail state - displayName:', displayName)
@@ -143,7 +142,7 @@ export function ExperimentDetail({
 
   const extractDomChangesUrlFilter = (variant: Variant): URLFilter | undefined => {
     if (!variant || !variant.config) return undefined
-    const domChanges: DOMChangesData = variant.config.__dom_changes
+    const domChanges = variant.config.__dom_changes as DOMChangesData
     if (!domChanges || Array.isArray(domChanges)) return undefined
     return domChanges.urlFilter
   }

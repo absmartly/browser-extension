@@ -40,6 +40,7 @@ describe('useVariantPreview', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.useFakeTimers()
 
     mockSendToContent = jest.fn().mockResolvedValue(undefined)
     ;(messaging.sendToContent as jest.Mock) = mockSendToContent
@@ -55,6 +56,8 @@ describe('useVariantPreview', () => {
   })
 
   afterEach(() => {
+    jest.runOnlyPendingTimers()
+    jest.useRealTimers()
     jest.clearAllMocks()
   })
 
@@ -64,9 +67,14 @@ describe('useVariantPreview', () => {
 
       await act(async () => {
         await result.current.handlePreviewToggle(true, 0)
+        jest.advanceTimersByTime(300)
+        await Promise.resolve()
       })
 
-      expect(result.current.previewEnabled).toBe(true)
+      await waitFor(() => {
+        expect(result.current.previewEnabled).toBe(true)
+      })
+
       expect(result.current.activePreviewVariant).toBe(0)
       expect(mockSendToContent).toHaveBeenCalledWith({
         type: 'ABSMARTLY_PREVIEW',
@@ -82,13 +90,20 @@ describe('useVariantPreview', () => {
 
       await act(async () => {
         await result.current.handlePreviewToggle(true, 0)
+        jest.advanceTimersByTime(300)
+        await Promise.resolve()
       })
 
       await act(async () => {
         await result.current.handlePreviewToggle(false, 0)
+        jest.advanceTimersByTime(300)
+        await Promise.resolve()
       })
 
-      expect(result.current.previewEnabled).toBe(false)
+      await waitFor(() => {
+        expect(result.current.previewEnabled).toBe(false)
+      })
+
       expect(result.current.activePreviewVariant).toBeNull()
       expect(mockSendToContent).toHaveBeenLastCalledWith({
         type: 'ABSMARTLY_PREVIEW',
@@ -116,6 +131,12 @@ describe('useVariantPreview', () => {
 
       await act(async () => {
         await result.current.handlePreviewToggle(true, 0)
+        jest.advanceTimersByTime(300)
+        await Promise.resolve()
+      })
+
+      await waitFor(() => {
+        expect(mockSendToContent).toHaveBeenCalled()
       })
 
       expect(mockSendToContent).toHaveBeenCalledWith({
@@ -135,9 +156,14 @@ describe('useVariantPreview', () => {
         const toggle2 = result.current.handlePreviewToggle(false, 0)
         const toggle3 = result.current.handlePreviewToggle(true, 1)
         await Promise.all([toggle1, toggle2, toggle3])
+        jest.advanceTimersByTime(300)
+        await Promise.resolve()
       })
 
-      expect(result.current.previewEnabled).toBe(true)
+      await waitFor(() => {
+        expect(result.current.previewEnabled).toBe(true)
+      })
+
       expect(result.current.activePreviewVariant).toBe(1)
     })
 
@@ -454,9 +480,18 @@ describe('useVariantPreview', () => {
         await result.current.handlePreviewToggle(true, 1)
         await result.current.handlePreviewToggle(true, 0)
         await result.current.handlePreviewToggle(true, 1)
+        jest.advanceTimersByTime(300)
+        await Promise.resolve()
       })
 
-      expect(result.current.activePreviewVariant).toBe(1)
+      await waitFor(() => {
+        expect(result.current.activePreviewVariant).toBe(1)
+      })
+
+      await waitFor(() => {
+        expect(mockSendToContent).toHaveBeenCalled()
+      })
+
       expect(mockSendToContent).toHaveBeenLastCalledWith({
         type: 'ABSMARTLY_PREVIEW',
         action: 'apply',

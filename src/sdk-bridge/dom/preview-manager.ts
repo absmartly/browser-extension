@@ -202,7 +202,7 @@ export class PreviewManager {
       element.removeAttribute('data-absmartly-experiment')
       element.removeAttribute('data-absmartly-modified')
       restoredCount++
-    })
+    }
 
     // Remove styleRules for this experiment via StyleSheetManager
     const styleManager = this.styleManagers.get(experimentName)

@@ -11,8 +11,7 @@ jest.mock('../utils', () => ({
 }))
 
 const defaultConfig: AIProviderConfig = {
-  apiKey: '',
-  aiProvider: 'claude-subscription'
+  aiProvider: 'claude-code-bridge'
 }
 
 describe('BridgeProvider', () => {
@@ -323,8 +322,7 @@ describe('BridgeProvider', () => {
 
     it('should handle invalid model error with user-friendly message', async () => {
       const provider = new BridgeProvider({
-        apiKey: '',
-        aiProvider: 'claude-subscription',
+        aiProvider: 'claude-code-bridge',
         llmModel: 'invalid-model-name'
       })
 

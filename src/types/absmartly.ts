@@ -123,6 +123,14 @@ export interface Environment {
   readonly name: string
 }
 
+export interface ExperimentInjectionCode {
+  urlFilter?: URLFilter | string | string[]
+  headStart?: string
+  headEnd?: string
+  bodyStart?: string
+  bodyEnd?: string
+}
+
 import type { AIProviderType } from '~src/lib/ai-providers'
 
 type ABsmartlyConfigBase = {

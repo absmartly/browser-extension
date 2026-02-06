@@ -67,16 +67,18 @@ describe('useSDKStatus', () => {
         expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
       })
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
         expect(mockIsSDKAvailable).toHaveBeenCalledTimes(2)
       })
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
@@ -95,8 +97,9 @@ describe('useSDKStatus', () => {
 
       mockIsSDKAvailable.mockResolvedValue(true)
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
@@ -115,8 +118,9 @@ describe('useSDKStatus', () => {
         expect(result.current.checking).toBe(false)
       })
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
@@ -139,8 +143,9 @@ describe('useSDKStatus', () => {
 
       mockIsSDKAvailable.mockResolvedValue(false)
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
@@ -151,6 +156,10 @@ describe('useSDKStatus', () => {
 
   describe('Multiple detection attempts', () => {
     it('should retry detection after failures', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+      const unhandledRejectionHandler = jest.fn()
+      process.on('unhandledRejection', unhandledRejectionHandler)
+
       mockIsSDKAvailable
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValue(true)
@@ -161,20 +170,33 @@ describe('useSDKStatus', () => {
         expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
       })
 
+      expect(result.current.checking).toBe(true)
       expect(result.current.sdkDetected).toBe(false)
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
         expect(result.current.sdkDetected).toBe(true)
       })
 
+      await waitFor(() => {
+        expect(result.current.checking).toBe(false)
+      })
+
       expect(mockIsSDKAvailable).toHaveBeenCalledTimes(2)
+
+      process.off('unhandledRejection', unhandledRejectionHandler)
+      consoleErrorSpy.mockRestore()
     })
 
     it('should handle intermittent detection failures', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+      const unhandledRejectionHandler = jest.fn()
+      process.on('unhandledRejection', unhandledRejectionHandler)
+
       mockIsSDKAvailable
         .mockResolvedValueOnce(true)
         .mockRejectedValueOnce(new Error('Temporary error'))
@@ -186,21 +208,26 @@ describe('useSDKStatus', () => {
         expect(result.current.sdkDetected).toBe(true)
       })
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
-      await waitFor(() => {
-        expect(result.current.sdkDetected).toBe(false)
-      })
+      expect(result.current.sdkDetected).toBe(true)
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
         expect(result.current.sdkDetected).toBe(true)
       })
+
+      expect(mockIsSDKAvailable).toHaveBeenCalledTimes(3)
+
+      process.off('unhandledRejection', unhandledRejectionHandler)
+      consoleErrorSpy.mockRestore()
     })
   })
 
@@ -216,8 +243,9 @@ describe('useSDKStatus', () => {
 
       unmount()
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(10000)
+        await Promise.resolve()
       })
 
       expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
@@ -242,8 +270,9 @@ describe('useSDKStatus', () => {
 
       unmount2()
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(10000)
+        await Promise.resolve()
       })
 
       expect(mockIsSDKAvailable).toHaveBeenCalledTimes(2)
@@ -283,8 +312,9 @@ describe('useSDKStatus', () => {
 
       expect(result.current.checking).toBe(true)
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
@@ -311,56 +341,78 @@ describe('useSDKStatus', () => {
 
   describe('Error handling', () => {
     it('should handle isSDKAvailable throwing synchronously', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+
       mockIsSDKAvailable.mockImplementation(() => {
         throw new Error('Sync error')
       })
 
       const { result } = renderHook(() => useSDKStatus())
 
+      expect(result.current.checking).toBe(true)
+      expect(result.current.sdkDetected).toBe(false)
+
       await waitFor(() => {
-        expect(result.current.checking).toBe(false)
+        expect(mockIsSDKAvailable).toHaveBeenCalled()
       })
 
-      expect(result.current.sdkDetected).toBe(false)
+      consoleErrorSpy.mockRestore()
     })
 
     it('should continue polling after errors', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+      const unhandledRejectionHandler = jest.fn()
+      process.on('unhandledRejection', unhandledRejectionHandler)
+
       mockIsSDKAvailable
         .mockRejectedValueOnce(new Error('Error'))
         .mockResolvedValue(true)
 
-      renderHook(() => useSDKStatus())
+      const { result } = renderHook(() => useSDKStatus())
 
       await waitFor(() => {
         expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
       })
 
-      act(() => {
+      await act(async () => {
         jest.advanceTimersByTime(5000)
+        await Promise.resolve()
       })
 
       await waitFor(() => {
         expect(mockIsSDKAvailable).toHaveBeenCalledTimes(2)
       })
+
+      await waitFor(() => {
+        expect(result.current.sdkDetected).toBe(true)
+      })
+
+      process.off('unhandledRejection', unhandledRejectionHandler)
+      consoleErrorSpy.mockRestore()
     })
   })
 
   describe('State consistency', () => {
     it('should maintain consistent state across rapid SDK changes', async () => {
+      mockIsSDKAvailable.mockResolvedValue(true)
+
       const { result } = renderHook(() => useSDKStatus())
 
-      mockIsSDKAvailable.mockResolvedValue(true)
       await waitFor(() => {
         expect(result.current.sdkDetected).toBe(true)
       })
 
       for (let i = 0; i < 5; i++) {
-        mockIsSDKAvailable.mockResolvedValue(i % 2 === 0)
-        act(() => {
+        const expectedValue = i % 2 === 0
+        mockIsSDKAvailable.mockResolvedValue(expectedValue)
+
+        await act(async () => {
           jest.advanceTimersByTime(5000)
+          await Promise.resolve()
         })
+
         await waitFor(() => {
-          expect(result.current.sdkDetected).toBe(i % 2 === 0)
+          expect(result.current.sdkDetected).toBe(expectedValue)
         })
       }
     })

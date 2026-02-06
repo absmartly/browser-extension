@@ -210,8 +210,8 @@ export class AnthropicProvider implements AIProvider {
             session
           }
         } else if (tool.name === 'css_query') {
-          const selectors = tool.input.selectors as string[]
-          const result = await handleCssQuery(selectors)
+          const input = tool.input as { selectors: string[] }
+          const result = await handleCssQuery(input.selectors)
 
           toolResults.push({
             type: 'tool_result',
@@ -219,9 +219,8 @@ export class AnthropicProvider implements AIProvider {
             content: result.error || result.result || ''
           })
         } else if (tool.name === 'xpath_query') {
-          const xpath = tool.input.xpath as string
-          const maxResults = (tool.input.maxResults as number) || 10
-          const result = await handleXPathQuery(xpath, maxResults)
+          const input = tool.input as { xpath: string; maxResults?: number }
+          const result = await handleXPathQuery(input.xpath, input.maxResults || 10)
 
           toolResults.push({
             type: 'tool_result',

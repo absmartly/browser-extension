@@ -148,9 +148,9 @@ describe('config-manager', () => {
 
     it('should return stored config with API key from secure storage', async () => {
       const storedConfig: ABsmartlyConfig = {
-        apiKey: '',
         apiEndpoint: 'https://api.absmartly.com',
-        authMethod: 'jwt'
+        authMethod: 'apikey',
+        apiKey: ''
       }
 
       jest.spyOn(storage, 'get').mockResolvedValue(storedConfig)
@@ -179,7 +179,6 @@ describe('config-manager', () => {
 
     it('should throw error for invalid API endpoint domain', async () => {
       const storedConfig: ABsmartlyConfig = {
-        apiKey: 'test-key',
         apiEndpoint: 'https://evil.com',
         authMethod: 'jwt'
       }
@@ -239,7 +238,7 @@ describe('config-manager', () => {
       const existingConfig: ABsmartlyConfig = {
         apiKey: 'existing-key',
         apiEndpoint: 'https://existing.absmartly.com',
-        authMethod: 'jwt'
+        authMethod: 'apikey'
       }
 
       jest.spyOn(storage, 'get').mockResolvedValue(existingConfig)

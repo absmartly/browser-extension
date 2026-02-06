@@ -52,8 +52,9 @@ describe('AI Provider Factory', () => {
 
     it('should create BridgeProvider for claude-subscription', () => {
       const config: AIProviderConfig = {
-        apiKey: '',
-        aiProvider: 'claude-subscription'
+        aiProvider: 'claude-subscription',
+        useOAuth: true,
+        oauthToken: 'test-oauth-token'
       }
 
       createAIProvider(config)
@@ -65,20 +66,19 @@ describe('AI Provider Factory', () => {
       expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'claude-subscription')
     })
 
-    it('should pass config with OAuth settings to AnthropicProvider', () => {
+    it('should pass config with OAuth settings to claude-subscription provider', () => {
       const config: AIProviderConfig = {
-        apiKey: 'sk-ant-test-key',
-        aiProvider: 'anthropic-api',
+        aiProvider: 'claude-subscription',
         useOAuth: true,
         oauthToken: 'oauth-token-123'
       }
 
       createAIProvider(config)
 
-      expect(AnthropicProvider).toHaveBeenCalledWith(config)
-      expect(AnthropicProvider).toHaveBeenCalledWith(
+      expect(BridgeProvider).toHaveBeenCalledWith(config)
+      expect(BridgeProvider).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKey: 'sk-ant-test-key',
+          aiProvider: 'claude-subscription',
           useOAuth: true,
           oauthToken: 'oauth-token-123'
         })
@@ -131,10 +131,11 @@ describe('AI Provider Factory', () => {
       )
     })
 
-    it('should handle empty API key for bridge provider', () => {
+    it('should handle claude-subscription provider with OAuth token', () => {
       const config: AIProviderConfig = {
-        apiKey: '',
-        aiProvider: 'claude-subscription'
+        aiProvider: 'claude-subscription',
+        useOAuth: true,
+        oauthToken: 'test-token'
       }
 
       createAIProvider(config)
@@ -142,7 +143,9 @@ describe('AI Provider Factory', () => {
       expect(BridgeProvider).toHaveBeenCalledWith(config)
       expect(BridgeProvider).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKey: ''
+          aiProvider: 'claude-subscription',
+          useOAuth: true,
+          oauthToken: 'test-token'
         })
       )
     })
@@ -151,8 +154,7 @@ describe('AI Provider Factory', () => {
       const config: AIProviderConfig = {
         apiKey: 'test-key',
         aiProvider: 'anthropic-api',
-        useOAuth: false,
-        oauthToken: undefined
+        llmModel: 'claude-sonnet-4-5-20250929'
       }
 
       createAIProvider(config)
@@ -162,8 +164,7 @@ describe('AI Provider Factory', () => {
         expect.objectContaining({
           apiKey: 'test-key',
           aiProvider: 'anthropic-api',
-          useOAuth: false,
-          oauthToken: undefined
+          llmModel: 'claude-sonnet-4-5-20250929'
         })
       )
     })

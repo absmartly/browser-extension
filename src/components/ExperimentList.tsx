@@ -50,7 +50,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
           const environments = await client.getEnvironments()
           debugLog('Fetched environments:', environments)
 
-          const firstDevEnv = environments.find(env => env.type === 'development')
+          const firstDevEnv = environments.find(env => env.name.toLowerCase().includes('dev'))
           if (firstDevEnv) {
             devEnv = firstDevEnv.name
             await saveDevelopmentEnvironment(firstDevEnv.name)

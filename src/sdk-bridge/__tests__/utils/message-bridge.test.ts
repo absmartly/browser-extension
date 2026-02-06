@@ -34,7 +34,12 @@ describe('MessageBridge', () => {
     it('should log the message', () => {
       const message = {
         source: 'absmartly-page' as const,
-        type: 'SDK_EVENT' as const
+        type: 'SDK_EVENT' as const,
+        payload: {
+          eventName: 'test-event',
+          data: {},
+          timestamp: new Date().toISOString()
+        }
       }
 
       MessageBridge.sendToExtension(message)

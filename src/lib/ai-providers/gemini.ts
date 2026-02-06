@@ -35,7 +35,7 @@ export class GeminiProvider implements AIProvider {
     return {
       name: 'dom_changes_generator',
       description: DOM_CHANGES_TOOL_DESCRIPTION,
-      parameters: SHARED_TOOL_SCHEMA
+      parameters: SHARED_TOOL_SCHEMA as GeminiFunctionDeclaration['parameters']
     }
   }
 
@@ -43,7 +43,7 @@ export class GeminiProvider implements AIProvider {
     return {
       name: 'css_query',
       description: CSS_QUERY_DESCRIPTION,
-      parameters: CSS_QUERY_SCHEMA
+      parameters: CSS_QUERY_SCHEMA as GeminiFunctionDeclaration['parameters']
     }
   }
 
@@ -51,7 +51,7 @@ export class GeminiProvider implements AIProvider {
     return {
       name: 'xpath_query',
       description: XPATH_QUERY_DESCRIPTION,
-      parameters: XPATH_QUERY_SCHEMA
+      parameters: XPATH_QUERY_SCHEMA as GeminiFunctionDeclaration['parameters']
     }
   }
 

@@ -16,18 +16,26 @@ export function useSDKStatus() {
     let isInitialCheck = true
 
     const checkSDK = async () => {
-      if (isInitialCheck) {
-        setStatus(prev => ({ ...prev, checking: true }))
+      try {
+        if (isInitialCheck) {
+          setStatus(prev => ({ ...prev, checking: true }))
+        }
+
+        const detected = await isSDKAvailable()
+
+        setStatus({
+          sdkDetected: detected,
+          checking: false
+        })
+
+        isInitialCheck = false
+      } catch (error) {
+        console.error('[useSDKStatus] Error checking SDK availability:', error)
+        setStatus({
+          sdkDetected: false,
+          checking: false
+        })
       }
-
-      const detected = await isSDKAvailable()
-
-      setStatus({
-        sdkDetected: detected,
-        checking: false
-      })
-
-      isInitialCheck = false
     }
 
     checkSDK()

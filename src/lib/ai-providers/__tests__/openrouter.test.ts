@@ -74,9 +74,12 @@ describe('OpenRouterProvider', () => {
     it('should throw error when model is not provided', async () => {
       const config: AIProviderConfig = {
         apiKey: 'sk-or-test-key',
-        aiProvider: 'openrouter-api'
+        aiProvider: 'openrouter-api',
+        llmModel: 'openai/gpt-4-turbo'
       }
       const provider = new OpenRouterProvider(config)
+
+      provider['config'].llmModel = ''
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
