@@ -266,8 +266,11 @@ export class ClaudeCodeBridgeClient {
     const streamUrl = `${this.connection.url}/conversations/${conversationId}/stream`
     console.log('[Bridge] Creating EventSource for:', streamUrl)
     const eventSource = new EventSource(streamUrl)
+    let reconnectAttempts = 0
+    const MAX_RECONNECT_ATTEMPTS = 3
 
     eventSource.onmessage = (event) => {
+      reconnectAttempts = 0
       try {
         const data = JSON.parse(event.data)
         onMessage(data)
@@ -286,10 +289,16 @@ export class ClaudeCodeBridgeClient {
       let errorMessage: string
       switch (readyState) {
         case 0: // CONNECTING
-          errorMessage = 'Connection lost, attempting to reconnect...'
-          // Don't close - let it try to reconnect
-          console.log('[Bridge] Allowing reconnection attempt...')
-          return
+          reconnectAttempts++
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            errorMessage = `Connection lost, attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
+            console.log('[Bridge] Allowing reconnection attempt:', reconnectAttempts)
+            return
+          } else {
+            errorMessage = `Connection failed after ${MAX_RECONNECT_ATTEMPTS} reconnection attempts`
+            eventSource.close()
+          }
+          break
         case 2: // CLOSED
           errorMessage = 'Stream connection closed. The bridge server may have stopped or the conversation may have ended.'
           break

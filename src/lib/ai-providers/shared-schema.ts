@@ -46,3 +46,36 @@ export const SHARED_TOOL_SCHEMA = {
   },
   required: ['domChanges', 'response', 'action']
 } as const
+
+export const CSS_QUERY_SCHEMA = {
+  type: 'object',
+  properties: {
+    selectors: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
+    }
+  },
+  required: ['selectors']
+} as const
+
+export const CSS_QUERY_DESCRIPTION = 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.'
+
+export const XPATH_QUERY_SCHEMA = {
+  type: 'object',
+  properties: {
+    xpath: {
+      type: 'string',
+      description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
+    },
+    maxResults: {
+      type: 'number',
+      description: 'Maximum number of results to return (default: 10)'
+    }
+  },
+  required: ['xpath']
+} as const
+
+export const XPATH_QUERY_DESCRIPTION = 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.'
+
+export const DOM_CHANGES_TOOL_DESCRIPTION = 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.'

@@ -4,9 +4,10 @@ import { OpenAIProvider } from './openai'
 import { BridgeProvider } from './bridge'
 import { OpenRouterProvider } from './openrouter'
 import { GeminiProvider } from './gemini'
+import { debugLog } from '~src/utils/debug'
 
 export function createAIProvider(config: AIProviderConfig): AIProvider {
-  console.log('[Factory] Creating AI provider:', config.aiProvider)
+  debugLog('[Factory] Creating AI provider:', config.aiProvider)
 
   switch (config.aiProvider) {
     case 'anthropic-api':
@@ -25,7 +26,7 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
       return new BridgeProvider(config)
 
     default:
-      console.warn('[Factory] Unknown provider, defaulting to BridgeProvider:', config.aiProvider)
+      debugLog('[Factory] Unknown provider, defaulting to BridgeProvider:', config.aiProvider)
       return new BridgeProvider(config)
   }
 }

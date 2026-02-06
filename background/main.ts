@@ -349,11 +349,16 @@ export function initializeBackgroundScript() {
           console.log('[Background] Config aiApiKey:', config?.aiApiKey ? `present (${config?.aiApiKey.substring(0, 10)}...)` : 'missing')
           console.log('[Background] Using API key for AI:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing (OK for Claude subscription)')
 
+          const currentProvider = config?.aiProvider || ''
+          const currentModel = config?.providerModels?.[currentProvider] || config?.llmModel
+          const customEndpoint = config?.providerEndpoints?.[currentProvider]
+
           const options: any = {
             aiProvider: config?.aiProvider,
             pageUrl,
             domStructure,
-            llmModel: config?.llmModel
+            llmModel: currentModel,
+            customEndpoint
           }
 
           if (conversationSession) {

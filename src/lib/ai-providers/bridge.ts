@@ -67,33 +67,42 @@ export class BridgeProvider implements AIProvider {
 
         // Add page URL and DOM structure to system prompt
         // Include --bridge-url parameter so CLI connects to correct port
+        let domainInfo = ''
+        if (pageUrl) {
+          try {
+            domainInfo = `**Domain**: ${new URL(pageUrl).hostname}`
+          } catch {
+            domainInfo = '**Domain**: unknown (invalid URL)'
+          }
+        }
+
         systemPromptToSend += `\n\n## Page Being Edited
 
 **URL**: ${pageUrl || 'Unknown'}
-${pageUrl ? `**Domain**: ${new URL(pageUrl).hostname}` : ''}
+${domainInfo}
 
 ## Page DOM Structure
 
 The following is a tree representation of the page structure. Use curl to retrieve specific HTML sections when needed.
 
-\`\`\`
+` + '```' + `
 ${structureText}
-\`\`\`
+` + '```' + `
 
 ## Retrieving HTML Chunks
 
 To get the HTML for specific section(s), use curl with the **localhost bridge URL** (NOT the page URL):
 
-\`\`\`bash
+` + '```bash' + `
 # Single selector - use actual class/id from the DOM structure above
-curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selector=.actual-class-from-structure"
+curl -s "` + `${bridgeUrl}/conversations/${sessionId}` + `/chunk?selector=.actual-class-from-structure"
 
 # Multiple selectors (comma-separated, URL-encode # as %23)
-curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selectors=header,%23main-content,section"
-\`\`\`
+curl -s "` + `${bridgeUrl}/conversations/${sessionId}` + `/chunk?selectors=header,%23main-content,section"
+` + '```' + `
 
 **CRITICAL RULES**:
-1. ✅ Always use \`${bridgeUrl}\` for curl - this is the localhost bridge server
+1. ✅ Always use ` + '`${bridgeUrl}`' + ` for curl - this is the localhost bridge server
 2. ⚠️  Only curl the actual website URL (${pageUrl || 'the page URL'}) as a LAST RESORT if the bridge tool is not working
 3. ✅ Use selectors you see in the DOM structure above - don't invent selectors
 4. ❌ NEVER use generic selectors like ".hero-section" unless you see them in the structure
@@ -147,6 +156,15 @@ The response will contain the HTML for each selector. Use this to inspect elemen
       const result = await new Promise<AIDOMGenerationResult>((resolve, reject) => {
         let fullResponse = ''
         let finalToolResult: any = null
+        let sendTimeoutId: ReturnType<typeof setTimeout> | undefined
+        let responseTimeoutId: ReturnType<typeof setTimeout> | undefined
+        let resolved = false
+
+        const cleanup = () => {
+          if (sendTimeoutId !== undefined) clearTimeout(sendTimeoutId)
+          if (responseTimeoutId !== undefined) clearTimeout(responseTimeoutId)
+          resolved = true
+        }
 
         debugLog('[Bridge] Starting stream for conversation:', conversationId)
         debugLog('[Bridge] Bridge connection URL:', this.bridgeClient.getConnection()?.url)
@@ -185,6 +203,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
               fullResponse += event.data
             } else if (event.type === 'done') {
               debugLog('[Bridge] ✅ Stream done')
+              cleanup()
               eventSource.close()
 
               // If we got a final tool result, validate and return it
@@ -218,43 +237,50 @@ The response will contain the HTML for each selector. Use this to inspect elemen
                 }
 
                 // Not valid JSON - return as conversational response
+                cleanup()
                 resolve({
                   domChanges: [],
                   response: responseText,
                   action: 'none' as const
                 })
               } else {
+                cleanup()
                 reject(new Error('No response received from Claude Code'))
               }
             } else if (event.type === 'error') {
               console.error('[Bridge] ❌ Error:', event.data)
+              cleanup()
               eventSource.close()
-              // Don't add "Claude error:" prefix - it gets wrapped again in outer catch
               reject(new Error(event.data || 'Unknown error'))
             }
           },
           (error) => {
             console.error('[Bridge] Stream error:', error)
+            cleanup()
             eventSource.close()
             reject(error)
           }
         )
 
         // Send the message
-        setTimeout(async () => {
+        sendTimeoutId = setTimeout(async () => {
           try {
             await this.bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend, SHARED_TOOL_SCHEMA)
             debugLog('[Bridge] Message sent')
           } catch (error) {
+            cleanup()
             eventSource.close()
             reject(error)
           }
         }, 100)
 
         // Timeout after 5 minutes (Claude Code may take a while with multiple tool calls)
-        setTimeout(() => {
-          eventSource.close()
-          reject(new Error('Response timeout after 5 minutes'))
+        responseTimeoutId = setTimeout(() => {
+          if (!resolved) {
+            cleanup()
+            eventSource.close()
+            reject(new Error('Response timeout after 5 minutes'))
+          }
         }, 300000)
       })
 

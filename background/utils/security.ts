@@ -66,7 +66,7 @@ export function isSSRFSafe(url: string): boolean {
       if (blockedHost.endsWith('.')) {
         return hostname.startsWith(blockedHost)
       }
-      return hostname === blockedHost || hostname.includes(blockedHost)
+      return hostname === blockedHost
     })
 
     if (isBlocked) {

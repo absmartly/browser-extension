@@ -23,7 +23,12 @@ export async function openDatabase(): Promise<IDBDatabase> {
 
     request.onsuccess = () => {
       console.log('[IndexedDB] Database opened successfully')
-      resolve(request.result)
+      const db = request.result
+      db.onclose = () => {
+        console.warn('[IndexedDB] Database connection closed by browser')
+        dbPromise = null
+      }
+      resolve(db)
     }
 
     request.onupgradeneeded = (event) => {

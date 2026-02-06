@@ -160,7 +160,7 @@ describe('AnthropicProvider', () => {
 
       expect(Anthropic).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKey: 'oauth-token-123',
+          apiKey: 'oauth-placeholder',
           defaultHeaders: {
             'Authorization': 'Bearer oauth-token-123'
           }

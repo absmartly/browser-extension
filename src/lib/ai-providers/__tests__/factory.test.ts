@@ -95,7 +95,7 @@ describe('AI Provider Factory', () => {
 
       expect(BridgeProvider).toHaveBeenCalledWith(config)
       expect(BridgeProvider).toHaveBeenCalledTimes(1)
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(console.log).toHaveBeenCalledWith(
         '[Factory] Unknown provider, defaulting to BridgeProvider:',
         'unknown-provider'
       )
@@ -110,7 +110,7 @@ describe('AI Provider Factory', () => {
       createAIProvider(config)
 
       expect(BridgeProvider).toHaveBeenCalledWith(config)
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(console.log).toHaveBeenCalledWith(
         '[Factory] Unknown provider, defaulting to BridgeProvider:',
         null
       )
@@ -125,7 +125,7 @@ describe('AI Provider Factory', () => {
       createAIProvider(config)
 
       expect(BridgeProvider).toHaveBeenCalledWith(config)
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(console.log).toHaveBeenCalledWith(
         '[Factory] Unknown provider, defaulting to BridgeProvider:',
         undefined
       )

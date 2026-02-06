@@ -103,12 +103,14 @@ export function useConversationHistory(variantName: string) {
   }, [variantName, initializeSessionHTML])
 
   const handleNewChat = useCallback(async () => {
+    if (!conversationSession || !variantName) return
+
     if (chatHistory.length > 0 && currentConversationId) {
       const currentConv: StoredConversation = {
         id: currentConversationId,
         variantName,
         messages: chatHistory,
-        conversationSession: conversationSession!,
+        conversationSession,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: chatHistory.length,
@@ -144,12 +146,14 @@ export function useConversationHistory(variantName: string) {
   }, [chatHistory, currentConversationId, conversationSession, variantName])
 
   const switchConversation = useCallback(async (conv: ConversationListItem) => {
+    if (!conversationSession || !variantName) return
+
     if (chatHistory.length > 0 && currentConversationId !== conv.id) {
       const currentConv: StoredConversation = {
         id: currentConversationId,
         variantName,
         messages: chatHistory,
-        conversationSession: conversationSession!,
+        conversationSession,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: chatHistory.length,

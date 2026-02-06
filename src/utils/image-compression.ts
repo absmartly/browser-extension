@@ -94,8 +94,10 @@ export async function compressImages(
     return undefined
   }
 
-  const compressed = await Promise.all(images.map((img) => compressImageToThumbnail(img)))
-  const validThumbnails = compressed.filter((thumb): thumb is string => thumb !== null)
+  const results = await Promise.allSettled(images.map((img) => compressImageToThumbnail(img)))
+  const validThumbnails = results
+    .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled' && result.value !== null)
+    .map(result => result.value)
 
   return validThumbnails.length > 0 ? validThumbnails : undefined
 }
@@ -107,8 +109,10 @@ export async function compressImagesForLLM(
     return undefined
   }
 
-  const compressed = await Promise.all(images.map((img) => compressImageForLLM(img)))
-  const validImages = compressed.filter((img): img is string => img !== null)
+  const results = await Promise.allSettled(images.map((img) => compressImageForLLM(img)))
+  const validImages = results
+    .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled' && result.value !== null)
+    .map(result => result.value)
 
   return validImages.length > 0 ? validImages : undefined
 }

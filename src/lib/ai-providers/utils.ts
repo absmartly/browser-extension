@@ -198,15 +198,14 @@ export function buildSystemPromptWithDOMStructure(
 ): string {
   if (!domStructure) return basePrompt
 
-  const structureText = domStructure || '(DOM structure not available)'
-  debugLog(`[${providerName}] Using pre-generated DOM structure:`, structureText.substring(0, 100) + '...')
+  debugLog(`[${providerName}] Using pre-generated DOM structure:`, domStructure.substring(0, 100) + '...')
 
   const fullPrompt = basePrompt + `\n\n## Page DOM Structure
 
 The following is a tree representation of the page structure. Use the \`css_query\` tool to retrieve specific HTML sections when needed.
 
 \`\`\`
-${structureText}
+${domStructure}
 \`\`\`
 
 To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
@@ -215,13 +214,8 @@ To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
 IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
 `
 
-  debugLog(`[${providerName}] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
+  debugLog(`[${providerName}] Including DOM structure in system prompt (${domStructure.length} chars)`)
 
   return fullPrompt
 }
 
-export function createTimeoutPromise(timeoutMs: number = 60000): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('AI request timed out after 60 seconds')), timeoutMs)
-  })
-}

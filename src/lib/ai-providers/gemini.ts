@@ -9,11 +9,18 @@ import type {
   GeminiTool
 } from '~src/types/gemini'
 import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
-import { SHARED_TOOL_SCHEMA } from './shared-schema'
+import {
+  SHARED_TOOL_SCHEMA,
+  CSS_QUERY_SCHEMA,
+  CSS_QUERY_DESCRIPTION,
+  XPATH_QUERY_SCHEMA,
+  XPATH_QUERY_DESCRIPTION,
+  DOM_CHANGES_TOOL_DESCRIPTION
+} from './shared-schema'
 import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { MAX_TOOL_ITERATIONS, withTimeout, parseAPIError } from './constants'
 import { debugLog } from '~src/utils/debug'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
@@ -27,7 +34,7 @@ export class GeminiProvider implements AIProvider {
   getToolDefinition(): GeminiFunctionDeclaration {
     return {
       name: 'dom_changes_generator',
-      description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
+      description: DOM_CHANGES_TOOL_DESCRIPTION,
       parameters: SHARED_TOOL_SCHEMA as any
     }
   }
@@ -35,39 +42,16 @@ export class GeminiProvider implements AIProvider {
   getCssQueryTool(): GeminiFunctionDeclaration {
     return {
       name: 'css_query',
-      description: 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.',
-      parameters: {
-        type: 'object',
-        properties: {
-          selectors: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
-          }
-        },
-        required: ['selectors']
-      }
+      description: CSS_QUERY_DESCRIPTION,
+      parameters: CSS_QUERY_SCHEMA as any
     }
   }
 
   getXPathQueryTool(): GeminiFunctionDeclaration {
     return {
       name: 'xpath_query',
-      description: 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.',
-      parameters: {
-        type: 'object',
-        properties: {
-          xpath: {
-            type: 'string',
-            description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
-          },
-          maxResults: {
-            type: 'number',
-            description: 'Maximum number of results to return (default: 10)'
-          }
-        },
-        required: ['xpath']
-      }
+      description: XPATH_QUERY_DESCRIPTION,
+      parameters: XPATH_QUERY_SCHEMA as any
     }
   }
 
@@ -101,13 +85,7 @@ export class GeminiProvider implements AIProvider {
       session.htmlSent = true
     }
 
-    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog('[Gemini] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO GEMINI:')
-    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog(systemPrompt)
-    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog(`[Gemini] 📊 System prompt length: ${systemPrompt.length} characters`)
-    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    debugLog('[Gemini] System prompt length:', systemPrompt.length)
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
@@ -157,54 +135,21 @@ export class GeminiProvider implements AIProvider {
         }
       }
 
-      let timeoutId: ReturnType<typeof setTimeout> | undefined
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
-      })
-
       const modelName = this.config.llmModel.includes('models/')
         ? this.config.llmModel
         : `models/${this.config.llmModel}`
 
-      let response: Response
-      try {
-        response = await Promise.race([
-          fetch(`${GEMINI_API_BASE}/${modelName}:generateContent?key=${this.config.apiKey}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody)
-          }),
-          timeoutPromise
-        ])
-      } catch (error) {
-        if (timeoutId !== undefined) {
-          clearTimeout(timeoutId)
-        }
-        throw error
-      }
-
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId)
-      }
+      const response = await withTimeout(
+        fetch(`${this.config.customEndpoint || GEMINI_API_BASE}/${modelName}:generateContent?key=${this.config.apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        })
+      )
 
       if (!response.ok) {
         const errorText = await response.text()
-        let errorMessage = `Gemini API error (${response.status})`
-        try {
-          const parsed = JSON.parse(errorText)
-          if (parsed.error?.message) {
-            errorMessage = parsed.error.message
-          } else if (parsed.message) {
-            errorMessage = parsed.message
-          } else {
-            errorMessage = errorText
-          }
-        } catch {
-          errorMessage = errorText
-        }
-        throw new Error(errorMessage)
+        throw new Error(parseAPIError({ message: errorText }, `Gemini API error (${response.status})`))
       }
 
       const result: GeminiGenerateContentResponse = await response.json()
@@ -246,10 +191,7 @@ export class GeminiProvider implements AIProvider {
         debugLog(`[Gemini] 🔧 Function call: ${functionCall.name}`)
 
         if (functionCall.name === 'dom_changes_generator') {
-          debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          debugLog('[Gemini] 📦 RAW STRUCTURED OUTPUT FROM GEMINI (function call args):')
-          debugLog(JSON.stringify(functionCall.args, null, 2))
-          debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[Gemini] Received dom_changes_generator result')
 
           const validation = validateAIDOMGenerationResult(JSON.stringify(functionCall.args))
 

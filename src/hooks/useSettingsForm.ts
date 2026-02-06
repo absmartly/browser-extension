@@ -279,10 +279,6 @@ export function useSettingsForm() {
     return true
   }
 
-  const requestCookiePermission = async (): Promise<boolean> => {
-    return requestMissingPermissions()
-  }
-
   return {
     apiKey,
     setApiKey,
@@ -327,6 +323,6 @@ export function useSettingsForm() {
     validateEndpointReachable,
     validateForm,
     buildConfig,
-    requestCookiePermission
+    requestCookiePermission: requestMissingPermissions
   }
 }

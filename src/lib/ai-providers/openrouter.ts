@@ -3,13 +3,20 @@ import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import type { OpenRouterChatMessage, OpenRouterChatCompletionRequest } from '~src/types/openrouter'
 import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
-import { SHARED_TOOL_SCHEMA } from './shared-schema'
+import {
+  SHARED_TOOL_SCHEMA,
+  CSS_QUERY_SCHEMA,
+  CSS_QUERY_DESCRIPTION,
+  XPATH_QUERY_SCHEMA,
+  XPATH_QUERY_DESCRIPTION,
+  DOM_CHANGES_TOOL_DESCRIPTION
+} from './shared-schema'
 import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { MAX_TOOL_ITERATIONS, withTimeout } from './constants'
 import { debugLog } from '~src/utils/debug'
-import emojiRegex from 'emoji-regex'
+
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
 /**
@@ -43,7 +50,7 @@ export class OpenRouterProvider implements AIProvider {
       type: 'function',
       function: {
         name: 'dom_changes_generator',
-        description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
+        description: DOM_CHANGES_TOOL_DESCRIPTION,
         parameters: SHARED_TOOL_SCHEMA as any
       }
     }
@@ -54,18 +61,8 @@ export class OpenRouterProvider implements AIProvider {
       type: 'function',
       function: {
         name: 'css_query',
-        description: 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.',
-        parameters: {
-          type: 'object',
-          properties: {
-            selectors: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
-            }
-          },
-          required: ['selectors']
-        }
+        description: CSS_QUERY_DESCRIPTION,
+        parameters: CSS_QUERY_SCHEMA as any
       }
     }
   }
@@ -75,21 +72,8 @@ export class OpenRouterProvider implements AIProvider {
       type: 'function',
       function: {
         name: 'xpath_query',
-        description: 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.',
-        parameters: {
-          type: 'object',
-          properties: {
-            xpath: {
-              type: 'string',
-              description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results to return (default: 10)'
-            }
-          },
-          required: ['xpath']
-        }
+        description: XPATH_QUERY_DESCRIPTION,
+        parameters: XPATH_QUERY_SCHEMA as any
       }
     }
   }
@@ -124,34 +108,8 @@ export class OpenRouterProvider implements AIProvider {
       session.htmlSent = true
     }
 
-    debugLog('[OpenRouter] System prompt BEFORE stripping, length:', systemPrompt.length)
-    debugLog('[OpenRouter] Char at position 75:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
-
-    // Strip emojis AFTER building complete system prompt
     systemPrompt = stripEmojis(systemPrompt)
-
-    debugLog('[OpenRouter] System prompt AFTER stripping, length:', systemPrompt.length)
-
-    // Check for any remaining surrogates
-    const surrogateTest = /[\uD800-\uDFFF]/
-    if (surrogateTest.test(systemPrompt)) {
-      console.error('[OpenRouter] WARNING: System prompt still contains surrogate characters!')
-      const match = systemPrompt.match(surrogateTest)
-      if (match) {
-        const pos = systemPrompt.indexOf(match[0])
-        console.error('[OpenRouter] First surrogate at position:', pos, 'char code:', systemPrompt.charCodeAt(pos))
-        console.error('[OpenRouter] Context:', systemPrompt.substring(Math.max(0, pos - 20), pos + 20))
-      }
-    }
-
-    debugLog('[OpenRouter] Char at position 75 after strip:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
-    debugLog('[OpenRouter] System prompt length:', systemPrompt.length, 'characters')
-
-    debugLog('================================================================')
-    debugLog('COMPLETE SYSTEM PROMPT:')
-    debugLog('================================================================')
-    debugLog(systemPrompt)
-    debugLog('================================================================')
+    debugLog('[OpenRouter] System prompt length after emoji stripping:', systemPrompt.length)
 
     const userMessageText = stripEmojis(buildUserMessage(prompt, currentChanges))
 
@@ -182,30 +140,10 @@ export class OpenRouterProvider implements AIProvider {
         max_tokens: 4096
       }
 
-      debugLog('[OpenRouter] Request includes', tools.length, 'tools:', tools.map(t => t.function?.name || t.name))
-
-      // Verify no surrogates in request body
-      const bodyStr = JSON.stringify(requestBody)
-      const surrogateCheck = /[\uD800-\uDFFF]/
-      if (surrogateCheck.test(bodyStr)) {
-        console.error('[OpenRouter] ❌ REQUEST BODY CONTAINS SURROGATES!')
-        const match = bodyStr.match(surrogateCheck)
-        if (match) {
-          const pos = bodyStr.indexOf(match[0])
-          console.error('[OpenRouter] Surrogate at position:', pos)
-          console.error('[OpenRouter] Context:', bodyStr.substring(Math.max(0, pos - 50), pos + 50))
-        }
-      }
-
-      let timeoutId: ReturnType<typeof setTimeout> | undefined
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
-      })
-
       let response
       try {
-        response = await Promise.race([
-          fetch(`${OPENROUTER_API_BASE}/chat/completions`, {
+        response = await withTimeout(
+          fetch(`${this.config.customEndpoint || OPENROUTER_API_BASE}/chat/completions`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${this.config.apiKey}`,
@@ -214,49 +152,29 @@ export class OpenRouterProvider implements AIProvider {
               'X-Title': 'ABsmartly Browser Extension'
             },
             body: JSON.stringify(requestBody)
-          }),
-          timeoutPromise
-        ])
+          })
+        )
       } catch (fetchError: any) {
-        if (timeoutId !== undefined) {
-          clearTimeout(timeoutId)
-        }
-        console.error('[OpenRouter] ❌ Fetch failed:', fetchError)
-        console.error('[OpenRouter] Error name:', fetchError?.name)
-        console.error('[OpenRouter] Error message:', fetchError?.message)
         throw new Error(`Network error: ${fetchError?.message || 'Failed to fetch'}`)
-      }
-
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId)
       }
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('[OpenRouter] ❌ API error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        })
-
         let errorMessage = `OpenRouter API error (${response.status})`
+
         try {
           const parsed = JSON.parse(errorText)
-          console.error('[OpenRouter] Parsed error:', parsed)
-
           if (parsed.error?.message) {
             errorMessage = parsed.error.message
 
-            // Check for nested error in metadata.raw
             if (parsed.error.metadata?.raw) {
               try {
                 const nestedError = JSON.parse(parsed.error.metadata.raw)
-                console.error('[OpenRouter] Nested provider error:', nestedError)
                 if (nestedError.error?.message) {
                   errorMessage = `${parsed.error.metadata.provider_name || 'Provider'}: ${nestedError.error.message}`
                 }
-              } catch (e) {
-                console.error('[OpenRouter] Could not parse nested error')
+              } catch {
+                // nested error not parseable, use outer error
               }
             }
           } else if (parsed.message) {
@@ -265,11 +183,9 @@ export class OpenRouterProvider implements AIProvider {
             errorMessage = errorText
           }
         } catch {
-          console.error('[OpenRouter] Could not parse error response as JSON')
           errorMessage = errorText
         }
 
-        console.error('[OpenRouter] Final error message:', errorMessage)
         throw new Error(errorMessage)
       }
 
@@ -313,10 +229,7 @@ export class OpenRouterProvider implements AIProvider {
         debugLog(`[OpenRouter] 🔧 Tool call: ${fn.name}`)
 
         if (fn.name === 'dom_changes_generator') {
-          debugLog('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          debugLog('[OpenRouter] 📦 RAW STRUCTURED OUTPUT FROM OPENROUTER (tool call arguments):')
-          debugLog(fn.arguments)
-          debugLog('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[OpenRouter] Received dom_changes_generator result')
 
           const toolInput = JSON.parse(fn.arguments)
           const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))

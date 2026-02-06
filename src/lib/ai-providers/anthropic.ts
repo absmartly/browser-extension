@@ -3,11 +3,18 @@ import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import { sanitizeHtml, getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
-import { SHARED_TOOL_SCHEMA } from './shared-schema'
+import {
+  SHARED_TOOL_SCHEMA,
+  CSS_QUERY_SCHEMA,
+  CSS_QUERY_DESCRIPTION,
+  XPATH_QUERY_SCHEMA,
+  XPATH_QUERY_DESCRIPTION,
+  DOM_CHANGES_TOOL_DESCRIPTION
+} from './shared-schema'
 import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { MAX_TOOL_ITERATIONS, withTimeout, parseAPIError } from './constants'
 import { debugLog } from '~src/utils/debug'
 
 export class AnthropicProvider implements AIProvider {
@@ -20,7 +27,7 @@ export class AnthropicProvider implements AIProvider {
   getToolDefinition(): Anthropic.Tool {
     return {
       name: 'dom_changes_generator',
-      description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
+      description: DOM_CHANGES_TOOL_DESCRIPTION,
       input_schema: SHARED_TOOL_SCHEMA as any
     }
   }
@@ -28,39 +35,16 @@ export class AnthropicProvider implements AIProvider {
   getCssQueryTool(): Anthropic.Tool {
     return {
       name: 'css_query',
-      description: 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          selectors: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
-          }
-        },
-        required: ['selectors']
-      } as any
+      description: CSS_QUERY_DESCRIPTION,
+      input_schema: CSS_QUERY_SCHEMA as any
     }
   }
 
   getXPathQueryTool(): Anthropic.Tool {
     return {
       name: 'xpath_query',
-      description: 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          xpath: {
-            type: 'string',
-            description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
-          },
-          maxResults: {
-            type: 'number',
-            description: 'Maximum number of results to return (default: 10)'
-          }
-        },
-        required: ['xpath']
-      } as any
+      description: XPATH_QUERY_DESCRIPTION,
+      input_schema: XPATH_QUERY_SCHEMA as any
     }
   }
 
@@ -76,7 +60,7 @@ export class AnthropicProvider implements AIProvider {
 
     if (this.config.useOAuth && this.config.oauthToken) {
       debugLog('🔐 Using OAuth token for authentication')
-      authConfig.apiKey = this.config.oauthToken
+      authConfig.apiKey = 'oauth-placeholder'
       authConfig.defaultHeaders = {
         'Authorization': `Bearer ${this.config.oauthToken}`
       }
@@ -85,6 +69,10 @@ export class AnthropicProvider implements AIProvider {
       authConfig.apiKey = this.config.apiKey
     } else {
       throw new Error('Either API key or OAuth token is required')
+    }
+
+    if (this.config.customEndpoint) {
+      authConfig.baseURL = this.config.customEndpoint
     }
 
     const anthropic = new Anthropic(authConfig)
@@ -108,15 +96,7 @@ export class AnthropicProvider implements AIProvider {
     }
 
     systemPrompt = sanitizeHtml(systemPrompt)
-    debugLog('[Anthropic] Final system prompt length after sanitization:', systemPrompt.length)
-
-    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog('🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
-    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog(systemPrompt)
-    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog(`📊 System prompt length: ${systemPrompt.length} characters`)
-    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    debugLog('[Anthropic] System prompt length:', systemPrompt.length)
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
@@ -132,16 +112,14 @@ export class AnthropicProvider implements AIProvider {
         const match = img.match(/^data:(image\/\w+);base64,(.+)$/)
         if (match) {
           const [, mediaType, base64Data] = match
-          if (Array.isArray(contentParts)) {
-            contentParts.push({
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                data: base64Data
-              }
-            })
-          }
+          contentParts.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+              data: base64Data
+            }
+          })
         }
       }
     }
@@ -175,50 +153,11 @@ export class AnthropicProvider implements AIProvider {
         tools: tools
       }
 
-      try {
-        JSON.stringify(requestBody)
-        debugLog('[Anthropic] ✅ Request body is valid JSON')
-      } catch (jsonError) {
-        console.error('[Anthropic] ❌ Request body contains invalid JSON:', jsonError)
-        throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
-      }
-
-      let timeoutId: ReturnType<typeof setTimeout> | undefined
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
-      })
-
       let message: Anthropic.Message
       try {
-        message = await Promise.race([
-          anthropic.messages.create(requestBody as any),
-          timeoutPromise
-        ])
+        message = await withTimeout(anthropic.messages.create(requestBody as any))
       } catch (error: any) {
-        if (timeoutId !== undefined) {
-          clearTimeout(timeoutId)
-        }
-        // Extract clean error message from Anthropic API error
-        let errorMessage = 'Anthropic API error'
-        if (error.message) {
-          try {
-            const parsed = JSON.parse(error.message)
-            if (parsed.error?.message) {
-              errorMessage = parsed.error.message
-            } else if (parsed.message) {
-              errorMessage = parsed.message
-            } else {
-              errorMessage = error.message
-            }
-          } catch {
-            errorMessage = error.message
-          }
-        }
-        throw new Error(errorMessage)
-      }
-
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId)
+        throw new Error(parseAPIError(error, 'Anthropic API error'))
       }
 
       // Check if we got tool use or final response
@@ -248,11 +187,7 @@ export class AnthropicProvider implements AIProvider {
         debugLog(`[Anthropic] 🔧 Tool call: ${tool.name}`)
 
         if (tool.name === 'dom_changes_generator') {
-          // This is the final result tool - validate and return
-          debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          debugLog('📦 RAW STRUCTURED OUTPUT FROM ANTHROPIC (tool call arguments):')
-          debugLog(JSON.stringify(tool.input, null, 2))
-          debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[Anthropic] Received dom_changes_generator result')
 
           const validation = validateAIDOMGenerationResult(JSON.stringify(tool.input))
 

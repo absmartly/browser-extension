@@ -3,11 +3,18 @@ import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
-import { SHARED_TOOL_SCHEMA } from './shared-schema'
+import {
+  SHARED_TOOL_SCHEMA,
+  CSS_QUERY_SCHEMA,
+  CSS_QUERY_DESCRIPTION,
+  XPATH_QUERY_SCHEMA,
+  XPATH_QUERY_DESCRIPTION,
+  DOM_CHANGES_TOOL_DESCRIPTION
+} from './shared-schema'
 import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { MAX_TOOL_ITERATIONS, withTimeout } from './constants'
 import { debugLog } from '~src/utils/debug'
 
 export class OpenAIProvider implements AIProvider {
@@ -22,7 +29,7 @@ export class OpenAIProvider implements AIProvider {
       type: 'function',
       function: {
         name: 'dom_changes_generator',
-        description: 'Generates DOM change objects for A/B tests. Each change targets elements via CSS selectors.',
+        description: DOM_CHANGES_TOOL_DESCRIPTION,
         parameters: SHARED_TOOL_SCHEMA as any
       }
     }
@@ -33,18 +40,8 @@ export class OpenAIProvider implements AIProvider {
       type: 'function',
       function: {
         name: 'css_query',
-        description: 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.',
-        parameters: {
-          type: 'object',
-          properties: {
-            selectors: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Array of CSS selectors for elements to retrieve (e.g., ["#main-content", ".hero-section", "header"])'
-            }
-          },
-          required: ['selectors']
-        }
+        description: CSS_QUERY_DESCRIPTION,
+        parameters: CSS_QUERY_SCHEMA as any
       }
     }
   }
@@ -54,21 +51,8 @@ export class OpenAIProvider implements AIProvider {
       type: 'function',
       function: {
         name: 'xpath_query',
-        description: 'Executes an XPath query on the page DOM. Use this for complex element selection that CSS selectors cannot handle, such as selecting by text content, parent/ancestor traversal, or complex conditions. Returns matching nodes with their HTML and generated CSS selectors.',
-        parameters: {
-          type: 'object',
-          properties: {
-            xpath: {
-              type: 'string',
-              description: 'XPath expression to evaluate. Examples: "//button[contains(text(), \'Submit\')]", "//div[@class=\'card\']//h2", "//a[starts-with(@href, \'https\')]", "//*[contains(@class, \'hero\') and contains(text(), \'Welcome\')]"'
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results to return (default: 10)'
-            }
-          },
-          required: ['xpath']
-        }
+        description: XPATH_QUERY_DESCRIPTION,
+        parameters: XPATH_QUERY_SCHEMA as any
       }
     }
   }
@@ -84,7 +68,8 @@ export class OpenAIProvider implements AIProvider {
 
     const openai = new OpenAI({
       apiKey: this.config.apiKey,
-      dangerouslyAllowBrowser: true
+      dangerouslyAllowBrowser: true,
+      ...(this.config.customEndpoint && { baseURL: this.config.customEndpoint })
     })
 
     let session = createSession(options.conversationSession)
@@ -104,13 +89,7 @@ export class OpenAIProvider implements AIProvider {
       session.htmlSent = true
     }
 
-    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog('[OpenAI] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO OPENAI:')
-    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog(systemPrompt)
-    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    debugLog(`[OpenAI] 📊 System prompt length: ${systemPrompt.length} characters`)
-    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    debugLog('[OpenAI] System prompt length:', systemPrompt.length)
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
@@ -136,37 +115,18 @@ export class OpenAIProvider implements AIProvider {
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       debugLog(`[OpenAI] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
-      let timeoutId: ReturnType<typeof setTimeout> | undefined
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
-      })
-
       let completion: OpenAI.ChatCompletion
       try {
-        completion = await Promise.race([
+        completion = await withTimeout(
           openai.chat.completions.create({
             model: this.config.llmModel || 'gpt-4-turbo',
             messages: messages,
             tools: tools
-          }),
-          timeoutPromise
-        ])
+          })
+        )
       } catch (error: any) {
-        if (timeoutId !== undefined) {
-          clearTimeout(timeoutId)
-        }
-        // Extract clean error message from OpenAI SDK error
-        let errorMessage = 'OpenAI API error'
-        if (error.message) {
-          errorMessage = error.message
-        } else if (error.error?.message) {
-          errorMessage = error.error.message
-        }
+        const errorMessage = error.message || error.error?.message || 'OpenAI API error'
         throw new Error(errorMessage)
-      }
-
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId)
       }
 
       debugLog('[OpenAI] Received response from OpenAI')
@@ -213,11 +173,7 @@ export class OpenAIProvider implements AIProvider {
         debugLog(`[OpenAI] 🔧 Tool call: ${fn.name}`)
 
         if (fn.name === 'dom_changes_generator') {
-          // This is the final result tool - validate and return
-          debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          debugLog('[OpenAI] 📦 RAW STRUCTURED OUTPUT FROM OPENAI (tool call arguments):')
-          debugLog(fn.arguments)
-          debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[OpenAI] Received dom_changes_generator result')
 
           const toolInput = JSON.parse(fn.arguments)
           const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
