@@ -205,6 +205,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         let finalToolResult: any = null
 
         console.log('[Bridge] Starting stream for conversation:', conversationId)
+        console.log('[Bridge] Bridge connection URL:', this.bridgeClient.getConnection()?.url)
         const eventSource = this.bridgeClient.streamResponses(
           conversationId,
           (event) => {

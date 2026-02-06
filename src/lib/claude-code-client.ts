@@ -263,7 +263,9 @@ export class ClaudeCodeBridgeClient {
       throw new Error('Not connected to bridge')
     }
 
-    const eventSource = new EventSource(`${this.connection.url}/conversations/${conversationId}/stream`)
+    const streamUrl = `${this.connection.url}/conversations/${conversationId}/stream`
+    console.log('[Bridge] Creating EventSource for:', streamUrl)
+    const eventSource = new EventSource(streamUrl)
 
     eventSource.onmessage = (event) => {
       try {
@@ -275,11 +277,28 @@ export class ClaudeCodeBridgeClient {
     }
 
     eventSource.onerror = (error) => {
-      debugError('[Bridge] SSE error:', error)
-      console.error('[Bridge] SSE error details:', JSON.stringify(error, null, 2))
-      console.error('[Bridge] EventSource readyState:', (eventSource as any).readyState)
-      console.error('[Bridge] EventSource URL:', (eventSource as any).url)
-      onError(new Error(`Stream connection error: ${JSON.stringify(error)}`))
+      const readyState = eventSource.readyState
+      console.error('[Bridge] SSE error event received')
+      console.error('[Bridge] EventSource readyState:', readyState)
+      console.error('[Bridge] EventSource URL:', streamUrl)
+
+      // EventSource readyState values: 0=CONNECTING, 1=OPEN, 2=CLOSED
+      let errorMessage: string
+      switch (readyState) {
+        case 0: // CONNECTING
+          errorMessage = 'Connection lost, attempting to reconnect...'
+          // Don't close - let it try to reconnect
+          console.log('[Bridge] Allowing reconnection attempt...')
+          return
+        case 2: // CLOSED
+          errorMessage = 'Stream connection closed. The bridge server may have stopped or the conversation may have ended.'
+          break
+        default:
+          errorMessage = `Stream connection failed (readyState: ${readyState})`
+      }
+
+      debugError('[Bridge] SSE error:', errorMessage)
+      onError(new Error(errorMessage))
       eventSource.close()
     }
 
