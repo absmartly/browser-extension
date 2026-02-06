@@ -29,7 +29,7 @@ function cleanMarkdownContent(markdown: string): string {
 
 export function renderMarkdown(markdown: string): string {
   const cleaned = cleanMarkdownContent(markdown)
-  const rawHtml = marked(cleaned)
+  const rawHtml = marked(cleaned) as string
 
   // Sanitize and add custom CSS classes for code blocks
   const sanitized = DOMPurify.sanitize(rawHtml)
