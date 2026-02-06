@@ -318,7 +318,137 @@ describe('BridgeProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Claude error: Connection failed')
+      ).rejects.toThrow('Claude Code Bridge error: Connection failed')
+    })
+
+    it('should handle invalid model error with user-friendly message', async () => {
+      const provider = new BridgeProvider({
+        apiKey: '',
+        aiProvider: 'claude-subscription',
+        llmModel: 'invalid-model-name'
+      })
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'conv-123'
+      })
+
+      const mockEventSource = {
+        close: jest.fn()
+      }
+
+      const invalidModelError = 'Model not found: invalid-model-name is not a valid model. Available models: sonnet, opus, haiku'
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
+        setTimeout(() => {
+          onEvent({ type: 'error', data: invalidModelError })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      try {
+        await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+        fail('Should have thrown an error')
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        const errorMessage = (error as Error).message
+
+        // Verify error is wrapped with our prefix
+        expect(errorMessage).toContain('Claude Code Bridge error')
+
+        // Verify original error message is preserved
+        expect(errorMessage).toContain('invalid-model-name')
+        expect(errorMessage).toContain('not a valid model')
+
+        // Verify error is user-friendly (contains helpful information)
+        expect(errorMessage).toContain('Available models')
+
+        console.log('Error message that would be shown to user:', errorMessage)
+      }
+    })
+
+    it('should handle API error with parseable error object', async () => {
+      const provider = new BridgeProvider(defaultConfig)
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'conv-123'
+      })
+
+      const mockEventSource = {
+        close: jest.fn()
+      }
+
+      const apiError = JSON.stringify({
+        error: {
+          type: 'invalid_request_error',
+          message: 'model: Input should be \'opus\', \'sonnet\' or \'haiku\''
+        }
+      })
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
+        setTimeout(() => {
+          onEvent({ type: 'error', data: apiError })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      try {
+        await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+        fail('Should have thrown an error')
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        const errorMessage = (error as Error).message
+
+        // Verify error contains the API error message
+        expect(errorMessage).toContain('Claude Code Bridge error')
+        expect(errorMessage).toContain('invalid_request_error')
+
+        // User should be able to understand what went wrong
+        expect(errorMessage).toMatch(/opus|sonnet|haiku/)
+
+        console.log('API error message that would be shown to user:', errorMessage)
+      }
+    })
+
+    it('should format error messages for user display without double prefixes', async () => {
+      const provider = new BridgeProvider(defaultConfig)
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'conv-123'
+      })
+
+      const mockEventSource = {
+        close: jest.fn()
+      }
+
+      const userFacingError = 'Invalid model "gpt-5" - model not found'
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent, onError) => {
+        setTimeout(() => {
+          onEvent({ type: 'error', data: userFacingError })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      try {
+        await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+        fail('Should have thrown an error')
+      } catch (error) {
+        const errorMessage = (error as Error).message
+
+        // After fix: Clean error message without double prefixes
+        expect(errorMessage).toBe('Claude Code Bridge error: Invalid model "gpt-5" - model not found')
+
+        // Verify the core error message is preserved
+        expect(errorMessage).toContain('Invalid model "gpt-5"')
+        expect(errorMessage).toContain('model not found')
+
+        // Verify no redundant "error:" keywords
+        const errorCount = (errorMessage.match(/error:/gi) || []).length
+        expect(errorCount).toBeLessThanOrEqual(1)
+
+        // This is what the user sees in the UI - should be clear and actionable
+        console.log('✅ User-friendly error:', errorMessage)
+      }
     })
 
     it('should disconnect after generate completes', async () => {

@@ -285,7 +285,8 @@ The response will contain the HTML for each selector. Use this to inspect elemen
             } else if (event.type === 'error') {
               console.error('[Bridge] ❌ Error:', event.data)
               eventSource.close()
-              reject(new Error(`Claude error: ${event.data || 'Unknown error'}`))
+              // Don't add "Claude error:" prefix - it gets wrapped again in outer catch
+              reject(new Error(event.data || 'Unknown error'))
             }
           },
           (error) => {
