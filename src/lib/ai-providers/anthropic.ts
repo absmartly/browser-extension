@@ -167,7 +167,7 @@ export class AnthropicProvider implements AIProvider {
       console.log(`[Anthropic] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       const requestBody = {
-        model: 'claude-sonnet-4-5-20250929',
+        model: this.config.llmModel || 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
         system: systemPrompt,
         messages: messages,
@@ -182,8 +182,9 @@ export class AnthropicProvider implements AIProvider {
         throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
       }
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
+        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
       })
 
       let message: Anthropic.Message
@@ -193,6 +194,9 @@ export class AnthropicProvider implements AIProvider {
           timeoutPromise
         ])
       } catch (error: any) {
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId)
+        }
         // Extract clean error message from Anthropic API error
         let errorMessage = 'Anthropic API error'
         if (error.message) {
@@ -210,6 +214,10 @@ export class AnthropicProvider implements AIProvider {
           }
         }
         throw new Error(errorMessage)
+      }
+
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
       }
 
       // Check if we got tool use or final response

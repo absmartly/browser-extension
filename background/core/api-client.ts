@@ -4,17 +4,12 @@ import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { getConfig as getConfigWithStorages } from './config-manager'
 
-// Create storage instances for API client
 const storage = new Storage()
 const secureStorage = new Storage({
   area: "local",
   secretKeyring: true
 } as any)
 
-/**
- * Gets configuration from storage
- * @returns The configuration or null if not found
- */
 async function getConfig(): Promise<ABsmartlyConfig | null> {
   return getConfigWithStorages(storage, secureStorage)
 }
@@ -25,20 +20,10 @@ const APIRequestSchema = z.object({
   data: z.any().optional()
 })
 
-/**
- * Checks if an error is authentication related (401 or 403)
- * @param error - The error to check
- * @returns True if the error is an authentication error
- */
 export function isAuthError(error: any): boolean {
   return error.response?.status === 401 || error.response?.status === 403
 }
 
-/**
- * Gets JWT cookie for a domain
- * @param domain - The domain to get the JWT cookie from
- * @returns The JWT token or null if not found
- */
 export async function getJWTCookie(domain: string): Promise<string | null> {
   try {
     if (chrome.permissions) {
@@ -65,11 +50,6 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
   }
 }
 
-/**
- * Opens the ABsmartly login page if user is not authenticated
- * @param config - ABsmartly configuration (optional, will load from storage if not provided)
- * @returns Result indicating if user is authenticated
- */
 export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ authenticated: boolean }> {
   const actualConfig = config || await getConfig()
 
@@ -85,18 +65,12 @@ export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ 
       return { authenticated: true }
     }
   } catch (error) {
-    // Auth check failed, user needs to login
   }
 
   chrome.tabs.create({ url: baseUrl })
   return { authenticated: false }
 }
 
-/**
- * Builds request headers with authentication
- * For JWT: relies on withCredentials (cookies), no Authorization header
- * For API Key: uses Authorization header
- */
 async function buildHeaders(config: ABsmartlyConfig): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -115,10 +89,6 @@ async function buildHeaders(config: ABsmartlyConfig): Promise<Record<string, str
   return headers
 }
 
-/**
- * Makes an API request using the auth method specified in config
- * No fallbacks - if auth fails, throws AUTH_EXPIRED
- */
 export async function makeAPIRequest(
   method: string,
   path: string,
@@ -185,13 +155,6 @@ export async function makeAPIRequest(
   }
 }
 
-/**
- * Validates API request parameters
- * @param method - HTTP method
- * @param path - API path
- * @param data - Request data
- * @returns Validation result
- */
 export function validateAPIRequest(method: string, path: string, data?: any): { valid: boolean; error?: string } {
   try {
     APIRequestSchema.parse({ method, path, data })

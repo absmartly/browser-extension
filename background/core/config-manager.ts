@@ -15,11 +15,6 @@ const ConfigSchema = z.object({
   persistQueryToCookie: z.boolean().optional()
 })
 
-/**
- * Validates a configuration object using Zod schema
- * @param config - The configuration to validate
- * @returns Validation result with parsed config or error
- */
 export function validateConfig(config: any): { valid: boolean; config?: ABsmartlyConfig; error?: string } {
   try {
     const validatedConfig = ConfigSchema.parse(config)
@@ -32,12 +27,6 @@ export function validateConfig(config: any): { valid: boolean; config?: ABsmartl
   }
 }
 
-/**
- * Retrieves the current configuration from storage
- * @param storage - Plasmo Storage instance
- * @param secureStorage - Secure Plasmo Storage instance for API keys
- * @returns The configuration or null if not found
- */
 export async function getConfig(
   storage: Storage,
   secureStorage: Storage
@@ -70,11 +59,6 @@ export async function getConfig(
   return config
 }
 
-/**
- * Initializes configuration with environment variables on startup
- * @param storage - Plasmo Storage instance
- * @param secureStorage - Secure Plasmo Storage instance for API keys
- */
 export async function initializeConfig(
   storage: Storage,
   secureStorage: Storage

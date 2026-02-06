@@ -196,8 +196,9 @@ export class OpenRouterProvider implements AIProvider {
         }
       }
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
+        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
       })
 
       let response
@@ -216,10 +217,17 @@ export class OpenRouterProvider implements AIProvider {
           timeoutPromise
         ])
       } catch (fetchError: any) {
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId)
+        }
         console.error('[OpenRouter] ❌ Fetch failed:', fetchError)
         console.error('[OpenRouter] Error name:', fetchError?.name)
         console.error('[OpenRouter] Error message:', fetchError?.message)
         throw new Error(`Network error: ${fetchError?.message || 'Failed to fetch'}`)
+      }
+
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
       }
 
       if (!response.ok) {

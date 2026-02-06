@@ -11,10 +11,6 @@ export interface SDKEvent {
   timestamp: number | string
 }
 
-/**
- * Buffers an SDK event and broadcasts it to all extension pages
- * @param payload Event payload containing eventName, data, and timestamp
- */
 export async function bufferSDKEvent(payload: {
   eventName: string
   data: any
@@ -43,9 +39,7 @@ export async function bufferSDKEvent(payload: {
     chrome.runtime.sendMessage({
       type: "SDK_EVENT_BROADCAST",
       payload: { eventName, data, timestamp }
-    }).catch(() => {
-      // Ignore - no listeners if sidebar not open
-    })
+    }).catch(() => {})
   } catch (error) {
     console.error("[Background] ❌ Failed to buffer event:", error)
     debugError("[Background] Failed to buffer event:", error)
@@ -53,10 +47,6 @@ export async function bufferSDKEvent(payload: {
   }
 }
 
-/**
- * Retrieves all buffered SDK events
- * @returns Array of buffered events
- */
 export async function getBufferedEvents(): Promise<SDKEvent[]> {
   const sessionStorage = new Storage({ area: "session" })
 
@@ -69,9 +59,6 @@ export async function getBufferedEvents(): Promise<SDKEvent[]> {
   }
 }
 
-/**
- * Clears all buffered SDK events
- */
 export async function clearBufferedEvents(): Promise<void> {
   const sessionStorage = new Storage({ area: "session" })
 

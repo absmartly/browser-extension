@@ -1,13 +1,5 @@
-/**
- * Code Validation Utility
- *
- * Validates JavaScript code before execution to prevent dangerous patterns
- * Used by CodeExecutor to add a security layer before using Function constructor
- *
- * @module CodeValidator
- */
-
 import { debugWarn, debugLog } from './debug'
+import { BLOCKED_HOSTS } from '~background/utils/security'
 
 export interface ValidationResult {
   valid: boolean
@@ -37,21 +29,6 @@ const DANGEROUS_PATTERNS = [
 
 const MAX_CODE_LENGTH = 50000
 
-/**
- * Validates experiment JavaScript code before execution
- *
- * Checks for dangerous patterns that could compromise security or stability:
- * - eval() and Function() constructor
- * - Cookie, localStorage, sessionStorage access
- * - Network requests (fetch, XMLHttpRequest)
- * - Dynamic imports and requires
- * - Chrome/Browser API access
- * - Prototype manipulation
- * - Infinite loops
- *
- * @param code - The JavaScript code to validate
- * @returns Validation result with valid flag and optional reason/warnings
- */
 export function validateExperimentCode(code: string): ValidationResult {
   if (!code || typeof code !== 'string') {
     return {
@@ -96,13 +73,6 @@ export function validateExperimentCode(code: string): ValidationResult {
   }
 }
 
-/**
- * Validates URL for safe usage in experiments
- * Prevents SSRF and access to internal resources
- *
- * @param url - The URL to validate
- * @returns Validation result
- */
 export function validateExperimentURL(url: string): ValidationResult {
   if (!url || typeof url !== 'string') {
     return {
@@ -122,34 +92,16 @@ export function validateExperimentURL(url: string): ValidationResult {
       }
     }
 
-    const blockedHosts = [
-      'localhost',
-      '127.0.0.1',
-      '0.0.0.0',
-      '169.254.',
-      '192.168.',
-      '10.',
-      '172.16.',
-      '172.17.',
-      '172.18.',
-      '172.19.',
-      '172.20.',
-      '172.21.',
-      '172.22.',
-      '172.23.',
-      '172.24.',
-      '172.25.',
-      '172.26.',
-      '172.27.',
-      '172.28.',
-      '172.29.',
-      '172.30.',
-      '172.31.'
-    ]
-
     const hostname = parsed.hostname.toLowerCase()
-    for (const blocked of blockedHosts) {
-      if (hostname === blocked || hostname.startsWith(blocked)) {
+    for (const blocked of BLOCKED_HOSTS) {
+      if (blocked.endsWith('.')) {
+        if (hostname.startsWith(blocked)) {
+          return {
+            valid: false,
+            reason: `Access to internal network address blocked: ${hostname}`
+          }
+        }
+      } else if (hostname === blocked) {
         return {
           valid: false,
           reason: `Access to internal network address blocked: ${hostname}`

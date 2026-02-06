@@ -156,24 +156,37 @@ export class GeminiProvider implements AIProvider {
         }
       }
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
+        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
       })
 
       const modelName = this.config.llmModel.includes('models/')
         ? this.config.llmModel
         : `models/${this.config.llmModel}`
 
-      const response = await Promise.race([
-        fetch(`${GEMINI_API_BASE}/${modelName}:generateContent?key=${this.config.apiKey}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        }),
-        timeoutPromise
-      ])
+      let response: Response
+      try {
+        response = await Promise.race([
+          fetch(`${GEMINI_API_BASE}/${modelName}:generateContent?key=${this.config.apiKey}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          }),
+          timeoutPromise
+        ])
+      } catch (error) {
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId)
+        }
+        throw error
+      }
+
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
 
       if (!response.ok) {
         const errorText = await response.text()

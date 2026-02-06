@@ -135,21 +135,25 @@ export class OpenAIProvider implements AIProvider {
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       console.log(`[OpenAI] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
+        timeoutId = setTimeout(() => reject(new Error(AI_REQUEST_TIMEOUT_ERROR)), AI_REQUEST_TIMEOUT_MS)
       })
 
       let completion: OpenAI.ChatCompletion
       try {
         completion = await Promise.race([
           openai.chat.completions.create({
-            model: 'gpt-4-turbo',
+            model: this.config.llmModel || 'gpt-4-turbo',
             messages: messages,
             tools: tools
           }),
           timeoutPromise
         ])
       } catch (error: any) {
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId)
+        }
         // Extract clean error message from OpenAI SDK error
         let errorMessage = 'OpenAI API error'
         if (error.message) {
@@ -158,6 +162,10 @@ export class OpenAIProvider implements AIProvider {
           errorMessage = error.error.message
         }
         throw new Error(errorMessage)
+      }
+
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
       }
 
       console.log('[OpenAI] Received response from OpenAI')

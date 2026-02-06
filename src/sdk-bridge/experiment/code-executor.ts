@@ -8,7 +8,7 @@
 
 import { Logger } from '../utils/logger'
 import { validateExperimentCode } from '~src/utils/code-validator'
-import { SandboxExecutor } from './sandbox-executor'
+import { ExperimentExecutor } from './experiment-executor'
 
 export interface ExecutionContext {
   element?: HTMLElement
@@ -35,7 +35,7 @@ export class CodeExecutor {
    * @returns boolean indicating success
    */
   static execute(code: string, context: ExecutionContext = {}): boolean {
-    return SandboxExecutor.execute(code, context)
+    return ExperimentExecutor.execute(code, context)
   }
 
   /**
