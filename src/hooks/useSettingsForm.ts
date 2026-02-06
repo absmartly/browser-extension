@@ -19,6 +19,7 @@ export function useSettingsForm() {
   const [aiProvider, setAiProvider] = useState<AIProviderType>('claude-subscription')
   const [aiApiKey, setAiApiKey] = useState('')
   const [llmModel, setLlmModel] = useState('sonnet')
+  const [providerModels, setProviderModels] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ABsmartlyUser | null>(null)
@@ -48,7 +49,15 @@ export function useSettingsForm() {
       let loadedPersistQueryToCookie = config?.persistQueryToCookie ?? true
       let loadedAiProvider = config?.aiProvider || 'claude-subscription'
       let loadedAiApiKey = config?.aiApiKey || ''
-      let loadedLlmModel = config?.llmModel || 'sonnet'
+      let loadedProviderModels = config?.providerModels || {}
+
+      // Migrate from old llmModel to new providerModels structure
+      if (config?.llmModel && !loadedProviderModels[loadedAiProvider]) {
+        loadedProviderModels[loadedAiProvider] = config.llmModel
+      }
+
+      // Get model for current provider, with defaults
+      let loadedLlmModel = loadedProviderModels[loadedAiProvider] || 'sonnet'
 
       const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
       const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
@@ -74,6 +83,7 @@ export function useSettingsForm() {
       setPersistQueryToCookie(loadedPersistQueryToCookie)
       setAiProvider(loadedAiProvider)
       setAiApiKey(loadedAiApiKey)
+      setProviderModels(loadedProviderModels)
       setLlmModel(loadedLlmModel)
 
       const hasStoredConfig = (config?.apiKey || config?.apiEndpoint)
@@ -89,7 +99,7 @@ export function useSettingsForm() {
           persistQueryToCookie: loadedPersistQueryToCookie,
           aiProvider: loadedAiProvider,
           aiApiKey: loadedAiApiKey.trim() || undefined,
-          llmModel: loadedLlmModel || 'sonnet'
+          providerModels: loadedProviderModels
         }
         await setConfig(autoConfig)
         console.log('[useSettingsForm] Auto-saved config from environment variables')
@@ -211,6 +221,12 @@ export function useSettingsForm() {
   }
 
   const buildConfig = (): ABsmartlyConfig => {
+    // Update providerModels with current provider's model
+    const updatedProviderModels = {
+      ...providerModels,
+      [aiProvider]: llmModel
+    }
+
     return {
       apiKey: apiKey.trim() || undefined,
       apiEndpoint: normalizeEndpoint(apiEndpoint),
@@ -222,7 +238,7 @@ export function useSettingsForm() {
       persistQueryToCookie,
       aiProvider,
       aiApiKey: aiApiKey.trim() || undefined,
-      llmModel: llmModel || 'sonnet'
+      providerModels: updatedProviderModels
     }
   }
 
@@ -270,6 +286,8 @@ export function useSettingsForm() {
     setAiApiKey,
     llmModel,
     setLlmModel,
+    providerModels,
+    setProviderModels,
     errors,
     setErrors,
     loading,

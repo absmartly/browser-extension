@@ -43,6 +43,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setAiApiKey,
     llmModel,
     setLlmModel,
+    providerModels,
+    setProviderModels,
     errors,
     setErrors,
     loading,
@@ -246,9 +248,11 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         aiProvider={aiProvider}
         aiApiKey={aiApiKey}
         llmModel={llmModel}
+        providerModels={providerModels}
         onAiProviderChange={setAiProvider}
         onAiApiKeyChange={setAiApiKey}
         onLlmModelChange={setLlmModel}
+        onProviderModelsChange={setProviderModels}
       />
 
       <SystemPromptSection />

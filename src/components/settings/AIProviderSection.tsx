@@ -11,18 +11,22 @@ interface AIProviderSectionProps {
   aiProvider: AIProviderType
   aiApiKey: string
   llmModel: string
+  providerModels: Record<string, string>
   onAiProviderChange: (value: AIProviderType) => void
   onAiApiKeyChange: (value: string) => void
   onLlmModelChange: (value: string) => void
+  onProviderModelsChange: (value: Record<string, string>) => void
 }
 
 export const AIProviderSection = React.memo(function AIProviderSection({
   aiProvider,
   aiApiKey,
   llmModel,
+  providerModels,
   onAiProviderChange,
   onAiApiKeyChange,
-  onLlmModelChange
+  onLlmModelChange,
+  onProviderModelsChange
 }: AIProviderSectionProps) {
   const [bridgeClient] = useState(() => new ClaudeCodeBridgeClient())
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NOT_CONFIGURED)
@@ -36,9 +40,33 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const [fetchingModels, setFetchingModels] = useState(false)
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null)
 
+  // Check bridge connection on mount and when provider changes to claude-subscription
   useEffect(() => {
     if (aiProvider === 'claude-subscription') {
       checkBridgeConnection()
+    }
+  }, [aiProvider])
+
+  // Auto-select first model when provider changes if no model is saved for that provider
+  useEffect(() => {
+    if (aiProvider === 'claude-subscription') {
+      // If no saved model for claude-subscription, use default 'sonnet'
+      if (!providerModels[aiProvider]) {
+        onLlmModelChange('sonnet')
+      } else {
+        onLlmModelChange(providerModels[aiProvider])
+      }
+    } else if (aiProvider === 'anthropic-api') {
+      // If no saved model for anthropic-api, use first available
+      const anthropicModels = ModelFetcher.getStaticAnthropicModels()
+      if (!providerModels[aiProvider] && anthropicModels.length > 0) {
+        onLlmModelChange(anthropicModels[0].id)
+      } else if (providerModels[aiProvider]) {
+        onLlmModelChange(providerModels[aiProvider])
+      }
+    } else if (providerModels[aiProvider]) {
+      // Restore saved model for this provider
+      onLlmModelChange(providerModels[aiProvider])
     }
   }, [aiProvider])
 
@@ -47,6 +75,24 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       fetchModels()
     }
   }, [aiApiKey, aiProvider])
+
+  // Auto-select first model when models are fetched if no model is selected
+  useEffect(() => {
+    if (!llmModel || !providerModels[aiProvider]) {
+      if (aiProvider === 'openai-api' && models.length > 0) {
+        onLlmModelChange(models[0].id)
+      } else if (aiProvider === 'gemini-api' && models.length > 0) {
+        onLlmModelChange(models[0].id)
+      } else if (aiProvider === 'openrouter-api' && Object.keys(groupedModels).length > 0) {
+        // Get first model from first provider group
+        const firstProvider = Object.keys(groupedModels)[0]
+        const firstModel = groupedModels[firstProvider][0]
+        if (firstModel) {
+          onLlmModelChange(firstModel.id)
+        }
+      }
+    }
+  }, [models, groupedModels, aiProvider])
 
   const fetchModels = async () => {
     if (!aiApiKey) return
@@ -79,16 +125,23 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   }
 
   const checkBridgeConnection = async () => {
+    console.log('[AIProviderSection] Starting bridge connection check...')
     setConnectionState(ConnectionState.CONNECTING)
     try {
       await bridgeClient.connect()
       const connection = bridgeClient.getConnection()
+      console.log('[AIProviderSection] Bridge connection result:', connection)
       if (connection) {
         setBridgePort(connection.port)
         setSubscriptionType(connection.subscriptionType)
         setConnectionState(ConnectionState.CONNECTED)
+        console.log('[AIProviderSection] Bridge connected successfully on port', connection.port)
+      } else {
+        console.warn('[AIProviderSection] Bridge connect succeeded but no connection object returned')
+        setConnectionState(ConnectionState.SERVER_NOT_FOUND)
       }
     } catch (error) {
+      console.error('[AIProviderSection] Bridge connection failed:', error)
       setConnectionState(ConnectionState.SERVER_NOT_FOUND)
     }
   }

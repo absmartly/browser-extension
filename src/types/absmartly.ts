@@ -135,7 +135,10 @@ export interface ABsmartlyConfig {
   aiProvider?: AIProviderType
   aiModel?: string
   aiApiKey?: string
-  llmModel?: string
+  llmModel?: string // DEPRECATED: Use providerModels instead
+  providerModels?: {
+    [key: string]: string // Map of provider -> selected model
+  }
   sdkApiKey?: string
   sdkApplicationName?: string
   sdkWindowProperty?: string
