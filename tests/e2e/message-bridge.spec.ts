@@ -115,9 +115,7 @@ test.describe('Message Bridge System', () => {
     expect(pingResult.response).toHaveProperty('pong', true)
   })
 
-  // TODO: Test times out after 30s and page closes. CAPTURE_HTML message may not be reaching
-  // content script or response not coming back. Need to debug message routing.
-  test.skip('Test CAPTURE_HTML message (sidebar → content script)', async ({ extensionUrl }) => {
+  test('Test CAPTURE_HTML message (sidebar → content script)', async ({ extensionUrl }) => {
     test.setTimeout(30000)
 
     await testPage.evaluate((extUrl) => {

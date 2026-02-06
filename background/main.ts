@@ -234,6 +234,28 @@ export function initializeBackgroundScript() {
         }
       })
       return true
+    } else if (message.type === 'CAPTURE_HTML') {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, { type: "CAPTURE_HTML" }, (response) => {
+            sendResponse(response)
+          })
+        } else {
+          sendResponse({ success: false, error: 'No active tab' })
+        }
+      })
+      return true
+    } else if (message.type === 'CHECK_VISUAL_EDITOR_ACTIVE') {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, { type: "CHECK_VISUAL_EDITOR_ACTIVE" }, (response) => {
+            sendResponse(response)
+          })
+        } else {
+          sendResponse(false)
+        }
+      })
+      return true
     } else if (message.type === 'API_REQUEST') {
       makeAPIRequest(message.method, message.path, message.data)
         .then(data => {
