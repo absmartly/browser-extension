@@ -29,6 +29,12 @@ interface ProviderConfig {
   apiKeyHelpText: string
   endpointPlaceholder: string
   endpointDescription: string
+  defaultModel?: string
+  fetchModels?: (apiKey: string) => Promise<ModelInfo[] | GroupedModels>
+  getStaticModels?: () => ModelInfo[]
+  modelDisplayType: 'simple' | 'grouped' | 'static'
+  modelLabel?: string
+  modelHelpText?: string
 }
 
 const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
@@ -38,7 +44,9 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     apiKeyHelpLink: '',
     apiKeyHelpText: '',
     endpointPlaceholder: 'Leave blank to use default Claude API',
-    endpointDescription: 'Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).'
+    endpointDescription: 'Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).',
+    defaultModel: 'sonnet',
+    modelDisplayType: 'static'
   },
   'anthropic-api': {
     label: 'Anthropic API Key',
@@ -46,7 +54,11 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     apiKeyHelpLink: 'https://console.anthropic.com/',
     apiKeyHelpText: 'console.anthropic.com',
     endpointPlaceholder: 'https://api.anthropic.com',
-    endpointDescription: 'Optional: Use a custom API endpoint (e.g., for proxy or self-hosted deployments). Leave blank for default.'
+    endpointDescription: 'Optional: Use a custom API endpoint (e.g., for proxy or self-hosted deployments). Leave blank for default.',
+    getStaticModels: () => ModelFetcher.getStaticAnthropicModels(),
+    modelDisplayType: 'static',
+    modelLabel: 'Claude Model',
+    modelHelpText: 'Select the Claude model to use for generating DOM changes.'
   },
   'openai-api': {
     label: 'OpenAI API Key',
@@ -54,7 +66,11 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     apiKeyHelpLink: 'https://platform.openai.com/api-keys',
     apiKeyHelpText: 'platform.openai.com',
     endpointPlaceholder: 'https://api.openai.com/v1',
-    endpointDescription: 'Optional: Use a custom OpenAI-compatible endpoint (e.g., local LLM, Azure OpenAI). Leave blank for default.'
+    endpointDescription: 'Optional: Use a custom OpenAI-compatible endpoint (e.g., local LLM, Azure OpenAI). Leave blank for default.',
+    fetchModels: (apiKey) => ModelFetcher.fetchOpenAIModels(apiKey),
+    modelDisplayType: 'simple',
+    modelLabel: 'Model',
+    modelHelpText: 'Select the OpenAI model to use for generating DOM changes.'
   },
   'openrouter-api': {
     label: 'OpenRouter API Key',
@@ -62,7 +78,11 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     apiKeyHelpLink: 'https://openrouter.ai/keys',
     apiKeyHelpText: 'openrouter.ai/keys',
     endpointPlaceholder: 'https://openrouter.ai/api/v1',
-    endpointDescription: 'Optional: Use a custom OpenRouter endpoint. Leave blank for default.'
+    endpointDescription: 'Optional: Use a custom OpenRouter endpoint. Leave blank for default.',
+    fetchModels: (apiKey) => ModelFetcher.fetchOpenRouterModels(apiKey),
+    modelDisplayType: 'grouped',
+    modelLabel: 'Model',
+    modelHelpText: 'Models are grouped by provider. Pricing shown as input/output per 1M tokens.'
   },
   'gemini-api': {
     label: 'Google Gemini API Key',
@@ -70,7 +90,11 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     apiKeyHelpLink: 'https://makersuite.google.com/app/apikey',
     apiKeyHelpText: 'Google AI Studio',
     endpointPlaceholder: 'https://generativelanguage.googleapis.com/v1beta',
-    endpointDescription: 'Optional: Use a custom Gemini-compatible endpoint. Leave blank for default.'
+    endpointDescription: 'Optional: Use a custom Gemini-compatible endpoint. Leave blank for default.',
+    fetchModels: (apiKey) => ModelFetcher.fetchGeminiModels(apiKey),
+    modelDisplayType: 'simple',
+    modelLabel: 'Model',
+    modelHelpText: 'Select the Gemini model to use for generating DOM changes.'
   }
 }
 
@@ -100,7 +124,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const [fetchingModels, setFetchingModels] = useState(false)
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null)
 
-  const providerConfig = PROVIDER_CONFIGS[aiProvider]
+  const config = PROVIDER_CONFIGS[aiProvider]
 
   useEffect(() => {
     if (aiProvider === 'claude-subscription') {
@@ -112,37 +136,30 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     const savedEndpoint = providerEndpoints[aiProvider] || ''
     onCustomEndpointChange(savedEndpoint)
 
-    if (aiProvider === 'claude-subscription') {
-      if (!providerModels[aiProvider]) {
-        onLlmModelChange('sonnet')
-      } else {
-        onLlmModelChange(providerModels[aiProvider])
+    const savedModel = providerModels[aiProvider]
+    if (savedModel) {
+      onLlmModelChange(savedModel)
+    } else if (config.getStaticModels) {
+      const staticModels = config.getStaticModels()
+      if (staticModels.length > 0) {
+        onLlmModelChange(staticModels[0].id)
       }
-    } else if (aiProvider === 'anthropic-api') {
-      const anthropicModels = ModelFetcher.getStaticAnthropicModels()
-      if (!providerModels[aiProvider] && anthropicModels.length > 0) {
-        onLlmModelChange(anthropicModels[0].id)
-      } else if (providerModels[aiProvider]) {
-        onLlmModelChange(providerModels[aiProvider])
-      }
-    } else if (providerModels[aiProvider]) {
-      onLlmModelChange(providerModels[aiProvider])
+    } else if (config.defaultModel) {
+      onLlmModelChange(config.defaultModel)
     }
   }, [aiProvider])
 
   useEffect(() => {
-    if (aiApiKey && (aiProvider === 'openai-api' || aiProvider === 'gemini-api' || aiProvider === 'openrouter-api')) {
+    if (aiApiKey && config.fetchModels) {
       fetchModels()
     }
   }, [aiApiKey, aiProvider])
 
   useEffect(() => {
     if (!llmModel || !providerModels[aiProvider]) {
-      if (aiProvider === 'openai-api' && models.length > 0) {
+      if (config.modelDisplayType === 'simple' && models.length > 0) {
         onLlmModelChange(models[0].id)
-      } else if (aiProvider === 'gemini-api' && models.length > 0) {
-        onLlmModelChange(models[0].id)
-      } else if (aiProvider === 'openrouter-api' && Object.keys(groupedModels).length > 0) {
+      } else if (config.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
         const firstProvider = Object.keys(groupedModels)[0]
         const firstModel = groupedModels[firstProvider][0]
         if (firstModel) {
@@ -153,24 +170,19 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   }, [models, groupedModels, aiProvider])
 
   const fetchModels = async () => {
-    if (!aiApiKey) return
+    if (!aiApiKey || !config.fetchModels) return
 
     setFetchingModels(true)
     setModelsFetchError(null)
 
     try {
-      if (aiProvider === 'openai-api') {
-        const fetchedModels = await ModelFetcher.fetchOpenAIModels(aiApiKey)
-        setModels(fetchedModels)
-        setGroupedModels({})
-      } else if (aiProvider === 'gemini-api') {
-        const fetchedModels = await ModelFetcher.fetchGeminiModels(aiApiKey)
-        setModels(fetchedModels)
-        setGroupedModels({})
-      } else if (aiProvider === 'openrouter-api') {
-        const grouped = await ModelFetcher.fetchOpenRouterModels(aiApiKey)
-        setGroupedModels(grouped)
+      const result = await config.fetchModels(aiApiKey)
+      if (config.modelDisplayType === 'grouped') {
+        setGroupedModels(result as GroupedModels)
         setModels([])
+      } else {
+        setModels(result as ModelInfo[])
+        setGroupedModels({})
       }
     } catch (error) {
       console.error('Error fetching models:', error)
@@ -252,10 +264,10 @@ export const AIProviderSection = React.memo(function AIProviderSection({
           type="url"
           value={customEndpoint}
           onChange={(e) => onCustomEndpointChange(e.target.value)}
-          placeholder={providerConfig.endpointPlaceholder}
+          placeholder={config.endpointPlaceholder}
         />
         <p className="text-xs text-gray-500">
-          {providerConfig.endpointDescription}
+          {config.endpointDescription}
         </p>
       </div>
     </details>
@@ -265,22 +277,22 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     <>
       <Input
         id="ai-api-key"
-        label={`${providerConfig.label.replace(' API Key', '')} API Key`}
+        label={`${config.label.replace(' API Key', '')} API Key`}
         type="password"
         value={aiApiKey}
         onChange={(e) => onAiApiKeyChange(e.target.value)}
-        placeholder={providerConfig.apiKeyPlaceholder}
+        placeholder={config.apiKeyPlaceholder}
         showPasswordToggle={true}
       />
       <p className="mt-1 text-xs text-gray-500">
         Get your API key from{' '}
         <a
-          href={providerConfig.apiKeyHelpLink}
+          href={config.apiKeyHelpLink}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 hover:underline"
         >
-          {providerConfig.apiKeyHelpText}
+          {config.apiKeyHelpText}
         </a>
       </p>
     </>
@@ -306,34 +318,35 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       )
     }
 
-    if (aiProvider === 'anthropic-api') {
+    if (config.modelDisplayType === 'static' && config.getStaticModels) {
+      const staticModels = config.getStaticModels()
       return (
         <>
           <Select
-            id="anthropic-model-select"
-            label="Claude Model"
+            id={`${aiProvider}-model-select`}
+            label={config.modelLabel || 'Model'}
             value={llmModel || ''}
             onChange={(e) => onLlmModelChange(e.target.value)}
-            options={ModelFetcher.getStaticAnthropicModels().map(m => ({
+            options={staticModels.map(m => ({
               value: m.id,
               label: m.name
             }))}
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Select the Claude model to use for generating DOM changes.
-          </p>
+          {config.modelHelpText && (
+            <p className="mt-1 text-xs text-gray-500">{config.modelHelpText}</p>
+          )}
         </>
       )
     }
 
-    if (aiProvider === 'openrouter-api' && Object.keys(groupedModels).length > 0) {
+    if (config.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
       return (
         <>
-          <label htmlFor="openrouter-model-select" className="block text-sm font-medium text-gray-700 mb-1">
-            Model
+          <label htmlFor={`${aiProvider}-model-select`} className="block text-sm font-medium text-gray-700 mb-1">
+            {config.modelLabel || 'Model'}
           </label>
           <select
-            id="openrouter-model-select"
+            id={`${aiProvider}-model-select`}
             value={llmModel || ''}
             onChange={(e) => onLlmModelChange(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -350,31 +363,31 @@ export const AIProviderSection = React.memo(function AIProviderSection({
               </optgroup>
             ))}
           </select>
-          <p className="mt-1 text-xs text-gray-500">
-            Models are grouped by provider. Pricing shown as input/output per 1M tokens.
-          </p>
+          {config.modelHelpText && (
+            <p className="mt-1 text-xs text-gray-500">{config.modelHelpText}</p>
+          )}
         </>
       )
     }
 
-    if (models.length > 0) {
+    if (config.modelDisplayType === 'simple' && models.length > 0) {
       return (
         <>
           <Select
             id={`${aiProvider}-model-select`}
-            label="Model"
+            label={config.modelLabel || 'Model'}
             value={llmModel || ''}
             onChange={(e) => onLlmModelChange(e.target.value)}
             options={models.map(m => ({
               value: m.id,
-              label: aiProvider === 'gemini-api' && m.contextWindow
+              label: m.contextWindow
                 ? `${m.name} (${(m.contextWindow / 1024).toFixed(0)}K context)`
                 : m.name
             }))}
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Select the {aiProvider === 'openai-api' ? 'OpenAI' : 'Gemini'} model to use for generating DOM changes.
-          </p>
+          {config.modelHelpText && (
+            <p className="mt-1 text-xs text-gray-500">{config.modelHelpText}</p>
+          )}
         </>
       )
     }
@@ -389,9 +402,9 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         label="AI Provider"
         value={aiProvider}
         onChange={(e) => onAiProviderChange(e.target.value as AIProviderType)}
-        options={Object.entries(PROVIDER_CONFIGS).map(([value, config]) => ({
+        options={Object.entries(PROVIDER_CONFIGS).map(([value, cfg]) => ({
           value,
-          label: config.label
+          label: cfg.label
         }))}
       />
       <p className="mt-1 text-xs text-gray-500">
