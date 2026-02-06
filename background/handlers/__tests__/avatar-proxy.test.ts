@@ -1,5 +1,4 @@
 import {
-  isBlockedHost,
   handleAvatarFetch,
   handleFetchEvent,
   initializeAvatarProxy
@@ -149,33 +148,6 @@ describe('AvatarProxy', () => {
     global.chrome = mockChrome as any
 
     jest.clearAllMocks()
-  })
-
-  describe('isBlockedHost', () => {
-    it('should block localhost', () => {
-      expect(isBlockedHost('localhost')).toBe(true)
-    })
-
-    it('should block 127.0.0.1', () => {
-      expect(isBlockedHost('127.0.0.1')).toBe(true)
-    })
-
-    it('should block 0.0.0.0', () => {
-      expect(isBlockedHost('0.0.0.0')).toBe(true)
-    })
-
-    it('should block private network ranges', () => {
-      expect(isBlockedHost('192.168.1.1')).toBe(true)
-      expect(isBlockedHost('10.0.0.1')).toBe(true)
-      expect(isBlockedHost('172.16.0.1')).toBe(true)
-      expect(isBlockedHost('172.31.255.255')).toBe(true)
-    })
-
-    it('should allow public domains', () => {
-      expect(isBlockedHost('example.com')).toBe(false)
-      expect(isBlockedHost('absmartly.com')).toBe(false)
-      expect(isBlockedHost('cdn.example.com')).toBe(false)
-    })
   })
 
   describe('handleAvatarFetch', () => {

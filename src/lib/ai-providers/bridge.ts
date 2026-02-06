@@ -5,7 +5,7 @@ import { getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { BRIDGE_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { validateAIDOMGenerationResult } from './validation'
+import { validateAIDOMGenerationResult, type ValidationError } from './validation'
 
 export class BridgeProvider implements AIProvider {
   private bridgeClient: ClaudeCodeBridgeClient
