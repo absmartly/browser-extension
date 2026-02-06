@@ -17,6 +17,7 @@ export async function generateDOMChanges(
     pageUrl?: string
     domStructure?: string
     llmModel?: string
+    customEndpoint?: string
   }
 ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
   try {
@@ -48,7 +49,8 @@ export async function generateDOMChanges(
       aiProvider: options?.aiProvider || 'claude-subscription',
       useOAuth: options?.useOAuth,
       oauthToken: options?.oauthToken,
-      llmModel: options?.llmModel
+      llmModel: options?.llmModel,
+      customEndpoint: options?.customEndpoint
     })
 
     console.log('[AI Gen] 🤖 Using provider:', options?.aiProvider || 'claude-subscription')

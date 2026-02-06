@@ -12,10 +12,66 @@ interface AIProviderSectionProps {
   aiApiKey: string
   llmModel: string
   providerModels: Record<string, string>
+  customEndpoint: string
+  providerEndpoints: Record<string, string>
   onAiProviderChange: (value: AIProviderType) => void
   onAiApiKeyChange: (value: string) => void
   onLlmModelChange: (value: string) => void
   onProviderModelsChange: (value: Record<string, string>) => void
+  onCustomEndpointChange: (value: string) => void
+  onProviderEndpointsChange: (value: Record<string, string>) => void
+}
+
+interface ProviderConfig {
+  label: string
+  apiKeyPlaceholder: string
+  apiKeyHelpLink: string
+  apiKeyHelpText: string
+  endpointPlaceholder: string
+  endpointDescription: string
+}
+
+const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
+  'claude-subscription': {
+    label: 'Claude Subscription (Default)',
+    apiKeyPlaceholder: '',
+    apiKeyHelpLink: '',
+    apiKeyHelpText: '',
+    endpointPlaceholder: 'Leave blank to use default Claude API',
+    endpointDescription: 'Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).'
+  },
+  'anthropic-api': {
+    label: 'Anthropic API Key',
+    apiKeyPlaceholder: 'sk-ant-...',
+    apiKeyHelpLink: 'https://console.anthropic.com/',
+    apiKeyHelpText: 'console.anthropic.com',
+    endpointPlaceholder: 'https://api.anthropic.com',
+    endpointDescription: 'Optional: Use a custom API endpoint (e.g., for proxy or self-hosted deployments). Leave blank for default.'
+  },
+  'openai-api': {
+    label: 'OpenAI API Key',
+    apiKeyPlaceholder: 'sk-...',
+    apiKeyHelpLink: 'https://platform.openai.com/api-keys',
+    apiKeyHelpText: 'platform.openai.com',
+    endpointPlaceholder: 'https://api.openai.com/v1',
+    endpointDescription: 'Optional: Use a custom OpenAI-compatible endpoint (e.g., local LLM, Azure OpenAI). Leave blank for default.'
+  },
+  'openrouter-api': {
+    label: 'OpenRouter API Key',
+    apiKeyPlaceholder: 'sk-or-...',
+    apiKeyHelpLink: 'https://openrouter.ai/keys',
+    apiKeyHelpText: 'openrouter.ai/keys',
+    endpointPlaceholder: 'https://openrouter.ai/api/v1',
+    endpointDescription: 'Optional: Use a custom OpenRouter endpoint. Leave blank for default.'
+  },
+  'gemini-api': {
+    label: 'Google Gemini API Key',
+    apiKeyPlaceholder: 'AIza...',
+    apiKeyHelpLink: 'https://makersuite.google.com/app/apikey',
+    apiKeyHelpText: 'Google AI Studio',
+    endpointPlaceholder: 'https://generativelanguage.googleapis.com/v1beta',
+    endpointDescription: 'Optional: Use a custom Gemini-compatible endpoint. Leave blank for default.'
+  }
 }
 
 export const AIProviderSection = React.memo(function AIProviderSection({
@@ -23,10 +79,14 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   aiApiKey,
   llmModel,
   providerModels,
+  customEndpoint,
+  providerEndpoints,
   onAiProviderChange,
   onAiApiKeyChange,
   onLlmModelChange,
-  onProviderModelsChange
+  onProviderModelsChange,
+  onCustomEndpointChange,
+  onProviderEndpointsChange
 }: AIProviderSectionProps) {
   const [bridgeClient] = useState(() => new ClaudeCodeBridgeClient())
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NOT_CONFIGURED)
@@ -40,24 +100,25 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const [fetchingModels, setFetchingModels] = useState(false)
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null)
 
-  // Check bridge connection on mount and when provider changes to claude-subscription
+  const providerConfig = PROVIDER_CONFIGS[aiProvider]
+
   useEffect(() => {
     if (aiProvider === 'claude-subscription') {
       checkBridgeConnection()
     }
   }, [aiProvider])
 
-  // Auto-select first model when provider changes if no model is saved for that provider
   useEffect(() => {
+    const savedEndpoint = providerEndpoints[aiProvider] || ''
+    onCustomEndpointChange(savedEndpoint)
+
     if (aiProvider === 'claude-subscription') {
-      // If no saved model for claude-subscription, use default 'sonnet'
       if (!providerModels[aiProvider]) {
         onLlmModelChange('sonnet')
       } else {
         onLlmModelChange(providerModels[aiProvider])
       }
     } else if (aiProvider === 'anthropic-api') {
-      // If no saved model for anthropic-api, use first available
       const anthropicModels = ModelFetcher.getStaticAnthropicModels()
       if (!providerModels[aiProvider] && anthropicModels.length > 0) {
         onLlmModelChange(anthropicModels[0].id)
@@ -65,7 +126,6 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         onLlmModelChange(providerModels[aiProvider])
       }
     } else if (providerModels[aiProvider]) {
-      // Restore saved model for this provider
       onLlmModelChange(providerModels[aiProvider])
     }
   }, [aiProvider])
@@ -76,7 +136,6 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     }
   }, [aiApiKey, aiProvider])
 
-  // Auto-select first model when models are fetched if no model is selected
   useEffect(() => {
     if (!llmModel || !providerModels[aiProvider]) {
       if (aiProvider === 'openai-api' && models.length > 0) {
@@ -84,7 +143,6 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       } else if (aiProvider === 'gemini-api' && models.length > 0) {
         onLlmModelChange(models[0].id)
       } else if (aiProvider === 'openrouter-api' && Object.keys(groupedModels).length > 0) {
-        // Get first model from first provider group
         const firstProvider = Object.keys(groupedModels)[0]
         const firstModel = groupedModels[firstProvider][0]
         if (firstModel) {
@@ -182,6 +240,148 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     }
   }
 
+  const CustomEndpointSection = () => (
+    <details className="text-sm mt-3">
+      <summary className="cursor-pointer text-gray-700 hover:text-gray-900">
+        Advanced: Custom API Endpoint
+      </summary>
+      <div className="mt-2 space-y-2">
+        <Input
+          id={`custom-${aiProvider}-endpoint`}
+          label="Custom API Endpoint"
+          type="url"
+          value={customEndpoint}
+          onChange={(e) => onCustomEndpointChange(e.target.value)}
+          placeholder={providerConfig.endpointPlaceholder}
+        />
+        <p className="text-xs text-gray-500">
+          {providerConfig.endpointDescription}
+        </p>
+      </div>
+    </details>
+  )
+
+  const ApiKeySection = () => (
+    <>
+      <Input
+        id="ai-api-key"
+        label={`${providerConfig.label.replace(' API Key', '')} API Key`}
+        type="password"
+        value={aiApiKey}
+        onChange={(e) => onAiApiKeyChange(e.target.value)}
+        placeholder={providerConfig.apiKeyPlaceholder}
+        showPasswordToggle={true}
+      />
+      <p className="mt-1 text-xs text-gray-500">
+        Get your API key from{' '}
+        <a
+          href={providerConfig.apiKeyHelpLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline"
+        >
+          {providerConfig.apiKeyHelpText}
+        </a>
+      </p>
+    </>
+  )
+
+  const ModelSelectionSection = () => {
+    if (!aiApiKey) return null
+
+    if (fetchingModels) {
+      return <div className="text-sm text-gray-500">Loading models...</div>
+    }
+
+    if (modelsFetchError) {
+      return (
+        <Alert className="mb-3">
+          <AlertDescription>
+            <p className="text-sm text-red-600">Error: {modelsFetchError}</p>
+            <Button onClick={fetchModels} variant="secondary" className="mt-2">
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (aiProvider === 'anthropic-api') {
+      return (
+        <>
+          <Select
+            id="anthropic-model-select"
+            label="Claude Model"
+            value={llmModel || ''}
+            onChange={(e) => onLlmModelChange(e.target.value)}
+            options={ModelFetcher.getStaticAnthropicModels().map(m => ({
+              value: m.id,
+              label: m.name
+            }))}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Select the Claude model to use for generating DOM changes.
+          </p>
+        </>
+      )
+    }
+
+    if (aiProvider === 'openrouter-api' && Object.keys(groupedModels).length > 0) {
+      return (
+        <>
+          <label htmlFor="openrouter-model-select" className="block text-sm font-medium text-gray-700 mb-1">
+            Model
+          </label>
+          <select
+            id="openrouter-model-select"
+            value={llmModel || ''}
+            onChange={(e) => onLlmModelChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Select a model...</option>
+            {Object.entries(groupedModels).map(([provider, providerModels]) => (
+              <optgroup key={provider} label={provider}>
+                {providerModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                    {model.pricing && ` ($${model.pricing.input.toFixed(2)}/$${model.pricing.output.toFixed(2)} per 1M)`}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Models are grouped by provider. Pricing shown as input/output per 1M tokens.
+          </p>
+        </>
+      )
+    }
+
+    if (models.length > 0) {
+      return (
+        <>
+          <Select
+            id={`${aiProvider}-model-select`}
+            label="Model"
+            value={llmModel || ''}
+            onChange={(e) => onLlmModelChange(e.target.value)}
+            options={models.map(m => ({
+              value: m.id,
+              label: aiProvider === 'gemini-api' && m.contextWindow
+                ? `${m.name} (${(m.contextWindow / 1024).toFixed(0)}K context)`
+                : m.name
+            }))}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Select the {aiProvider === 'openai-api' ? 'OpenAI' : 'Gemini'} model to use for generating DOM changes.
+          </p>
+        </>
+      )
+    }
+
+    return null
+  }
+
   return (
     <div className="border-t pt-4 mt-4">
       <Select
@@ -189,13 +389,10 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         label="AI Provider"
         value={aiProvider}
         onChange={(e) => onAiProviderChange(e.target.value as AIProviderType)}
-        options={[
-          { value: 'claude-subscription', label: 'Claude Subscription (Default)' },
-          { value: 'anthropic-api', label: 'Anthropic API Key' },
-          { value: 'openai-api', label: 'OpenAI API Key' },
-          { value: 'openrouter-api', label: 'OpenRouter API Key' },
-          { value: 'gemini-api', label: 'Google Gemini API Key' }
-        ]}
+        options={Object.entries(PROVIDER_CONFIGS).map(([value, config]) => ({
+          value,
+          label: config.label
+        }))}
       />
       <p className="mt-1 text-xs text-gray-500">
         Choose how to generate AI-powered DOM changes. Claude Subscription uses your local Claude CLI. OpenRouter provides access to 100+ models.
@@ -217,6 +414,8 @@ export const AIProviderSection = React.memo(function AIProviderSection({
           <p className="text-xs text-gray-500">
             Sonnet is recommended for best balance of speed and capability.
           </p>
+
+          <CustomEndpointSection />
 
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
             <div className="flex items-center gap-3">
@@ -293,226 +492,13 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         </div>
       )}
 
-      {aiProvider === 'anthropic-api' && (
+      {aiProvider !== 'claude-subscription' && (
         <div className="mt-4 space-y-3">
-          <Input
-            id="ai-api-key"
-            label="Anthropic API Key"
-            type="password"
-            value={aiApiKey}
-            onChange={(e) => onAiApiKeyChange(e.target.value)}
-            placeholder="sk-ant-..."
-            showPasswordToggle={true}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Get your API key from{' '}
-            <a
-              href="https://console.anthropic.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              console.anthropic.com
-            </a>
-          </p>
-
-          {aiApiKey && (
-            <>
-              <Select
-                id="anthropic-model-select"
-                label="Claude Model"
-                value={llmModel || ''}
-                onChange={(e) => onLlmModelChange(e.target.value)}
-                options={ModelFetcher.getStaticAnthropicModels().map(m => ({
-                  value: m.id,
-                  label: m.name
-                }))}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Select the Claude model to use for generating DOM changes.
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      {aiProvider === 'openai-api' && (
-        <div className="mt-4 space-y-3">
-          <Input
-            id="ai-api-key"
-            label="OpenAI API Key"
-            type="password"
-            value={aiApiKey}
-            onChange={(e) => onAiApiKeyChange(e.target.value)}
-            placeholder="sk-..."
-            showPasswordToggle={true}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Get your API key from{' '}
-            <a
-              href="https://platform.openai.com/api-keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              platform.openai.com
-            </a>
-          </p>
-
+          <ApiKeySection />
           {aiApiKey && (
             <div>
-              {fetchingModels ? (
-                <div className="text-sm text-gray-500">Loading models...</div>
-              ) : modelsFetchError ? (
-                <Alert className="mb-3">
-                  <AlertDescription>
-                    <p className="text-sm text-red-600">Error: {modelsFetchError}</p>
-                    <Button onClick={fetchModels} variant="secondary" className="mt-2">
-                      Retry
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : models.length > 0 ? (
-                <>
-                  <Select
-                    id="openai-model-select"
-                    label="Model"
-                    value={llmModel || ''}
-                    onChange={(e) => onLlmModelChange(e.target.value)}
-                    options={models.map(m => ({ value: m.id, label: m.name }))}
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Select the OpenAI model to use for generating DOM changes.
-                  </p>
-                </>
-              ) : null}
-            </div>
-          )}
-        </div>
-      )}
-
-      {aiProvider === 'openrouter-api' && (
-        <div className="mt-4 space-y-3">
-          <Input
-            id="ai-api-key"
-            label="OpenRouter API Key"
-            type="password"
-            value={aiApiKey}
-            onChange={(e) => onAiApiKeyChange(e.target.value)}
-            placeholder="sk-or-..."
-            showPasswordToggle={true}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Get your API key from{' '}
-            <a
-              href="https://openrouter.ai/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              openrouter.ai/keys
-            </a>
-          </p>
-
-          {aiApiKey && (
-            <div>
-              {fetchingModels ? (
-                <div className="text-sm text-gray-500">Loading models...</div>
-              ) : modelsFetchError ? (
-                <Alert className="mb-3">
-                  <AlertDescription>
-                    <p className="text-sm text-red-600">Error: {modelsFetchError}</p>
-                    <Button onClick={fetchModels} variant="secondary" className="mt-2">
-                      Retry
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : Object.keys(groupedModels).length > 0 ? (
-                <>
-                  <label htmlFor="openrouter-model-select" className="block text-sm font-medium text-gray-700 mb-1">
-                    Model
-                  </label>
-                  <select
-                    id="openrouter-model-select"
-                    value={llmModel || ''}
-                    onChange={(e) => onLlmModelChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select a model...</option>
-                    {Object.entries(groupedModels).map(([provider, providerModels]) => (
-                      <optgroup key={provider} label={provider}>
-                        {providerModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name}
-                            {model.pricing && ` ($${model.pricing.input.toFixed(2)}/$${model.pricing.output.toFixed(2)} per 1M)`}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Models are grouped by provider. Pricing shown as input/output per 1M tokens.
-                  </p>
-                </>
-              ) : null}
-            </div>
-          )}
-        </div>
-      )}
-
-      {aiProvider === 'gemini-api' && (
-        <div className="mt-4 space-y-3">
-          <Input
-            id="ai-api-key"
-            label="Google Gemini API Key"
-            type="password"
-            value={aiApiKey}
-            onChange={(e) => onAiApiKeyChange(e.target.value)}
-            placeholder="AIza..."
-            showPasswordToggle={true}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Get your API key from{' '}
-            <a
-              href="https://makersuite.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              Google AI Studio
-            </a>
-          </p>
-
-          {aiApiKey && (
-            <div>
-              {fetchingModels ? (
-                <div className="text-sm text-gray-500">Loading models...</div>
-              ) : modelsFetchError ? (
-                <Alert className="mb-3">
-                  <AlertDescription>
-                    <p className="text-sm text-red-600">Error: {modelsFetchError}</p>
-                    <Button onClick={fetchModels} variant="secondary" className="mt-2">
-                      Retry
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : models.length > 0 ? (
-                <>
-                  <Select
-                    id="gemini-model-select"
-                    label="Model"
-                    value={llmModel || ''}
-                    onChange={(e) => onLlmModelChange(e.target.value)}
-                    options={models.map(m => ({
-                      value: m.id,
-                      label: `${m.name}${m.contextWindow ? ` (${(m.contextWindow / 1024).toFixed(0)}K context)` : ''}`
-                    }))}
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Select the Gemini model to use for generating DOM changes.
-                  </p>
-                </>
-              ) : null}
+              <ModelSelectionSection />
+              <CustomEndpointSection />
             </div>
           )}
         </div>

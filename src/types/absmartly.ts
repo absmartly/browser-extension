@@ -139,6 +139,9 @@ export interface ABsmartlyConfig {
   providerModels?: {
     [key: string]: string // Map of provider -> selected model
   }
+  providerEndpoints?: {
+    [key: string]: string // Map of provider -> custom endpoint URL
+  }
   sdkApiKey?: string
   sdkApplicationName?: string
   sdkWindowProperty?: string

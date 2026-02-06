@@ -45,6 +45,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setLlmModel,
     providerModels,
     setProviderModels,
+    customEndpoint,
+    setCustomEndpoint,
+    providerEndpoints,
+    setProviderEndpoints,
     errors,
     setErrors,
     loading,
@@ -249,10 +253,14 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         aiApiKey={aiApiKey}
         llmModel={llmModel}
         providerModels={providerModels}
+        customEndpoint={customEndpoint}
+        providerEndpoints={providerEndpoints}
         onAiProviderChange={setAiProvider}
         onAiApiKeyChange={setAiApiKey}
         onLlmModelChange={setLlmModel}
         onProviderModelsChange={setProviderModels}
+        onCustomEndpointChange={setCustomEndpoint}
+        onProviderEndpointsChange={setProviderEndpoints}
       />
 
       <SystemPromptSection />

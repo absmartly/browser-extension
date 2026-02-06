@@ -9,6 +9,7 @@ export interface AIProviderConfig {
   useOAuth?: boolean
   oauthToken?: string
   llmModel?: string  // Model for LLM provider (e.g., 'sonnet', 'opus', 'haiku' for Claude)
+  customEndpoint?: string  // Custom API endpoint URL
 }
 
 export interface GenerateOptions {
