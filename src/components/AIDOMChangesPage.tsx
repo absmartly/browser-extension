@@ -208,10 +208,19 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const handlePreviewToggle = () => {
     const newState = !isPreviewEnabled
     setIsPreviewEnabled(newState)
-    if (onPreviewToggle) {
-      onPreviewToggle(newState)
-      if (newState) {
+
+    if (newState) {
+      // When turning ON, reapply the latest changes
+      console.log('[AIDOMChangesPage] Preview toggled ON - reapplying changes:', latestDomChanges.length)
+      if (onPreviewWithChanges) {
+        onPreviewWithChanges(true, latestDomChanges)
         setPreviewEnabledOnce(true)
+      }
+    } else {
+      // When turning OFF, remove preview
+      console.log('[AIDOMChangesPage] Preview toggled OFF - removing changes')
+      if (onPreviewToggle) {
+        onPreviewToggle(false)
       }
     }
   }
