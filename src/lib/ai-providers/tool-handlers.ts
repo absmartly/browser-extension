@@ -1,5 +1,6 @@
 import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
 import { validateXPath } from '~src/utils/xpath-validator'
+import { validateSelector } from '~src/utils/selector-validator'
 
 export interface ToolCallResult {
   toolName: string
@@ -9,6 +10,15 @@ export interface ToolCallResult {
 
 export async function handleCssQuery(selectors: string[]): Promise<ToolCallResult> {
   console.log(`[ToolHandler] 📄 CSS query for ${selectors.length} selector(s):`, selectors)
+
+  for (const selector of selectors) {
+    if (!validateSelector(selector)) {
+      return {
+        toolName: 'css_query',
+        error: `Invalid CSS selector: "${selector}". Selector must use safe patterns only.`
+      }
+    }
+  }
 
   const chunkResults = await captureHTMLChunks(selectors)
 

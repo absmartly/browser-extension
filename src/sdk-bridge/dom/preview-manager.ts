@@ -80,7 +80,7 @@ export class PreviewManager {
         const elements = document.querySelectorAll(change.selector)
         const filtered = Array.from(elements).filter(el => !this.isExtensionElement(el))
 
-        filtered.forEach(element => {
+        for (const element of filtered) {
           if (!this.previewStateMap.has(element) ||
               this.previewStateMap.get(element)!.experimentName !== experimentName) {
             const originalState = ElementStateManager.captureElementState(element)
@@ -91,7 +91,7 @@ export class PreviewManager {
               changeType: change.type
             })
           }
-        })
+        }
       } catch (err) {
         // Selector might be invalid or elements don't exist yet - that's okay
       }
@@ -107,10 +107,10 @@ export class PreviewManager {
         const elements = document.querySelectorAll(change.selector)
         const filtered = Array.from(elements).filter(el => !this.isExtensionElement(el))
 
-        filtered.forEach(element => {
+        for (const element of filtered) {
           element.setAttribute('data-absmartly-experiment', experimentName)
           element.setAttribute('data-absmartly-modified', 'true')
-        })
+        }
       } catch (err) {
         // Ignore - elements might appear later via waitForElement
       }
@@ -130,25 +130,24 @@ export class PreviewManager {
     const elementsToRemove: Element[] = []
 
     // First, restore elements we tracked in previewStateMap
-    this.previewStateMap.forEach((data, element) => {
+    for (const [element, data] of this.previewStateMap) {
       if (data.experimentName === experimentName) {
-        // Restore element to original state
         ElementStateManager.restoreElementState(element, data.originalState)
         elementsToRemove.push(element)
         restoredCount++
       }
-    })
+    }
 
-    // Clean up the map
-    elementsToRemove.forEach((element) => this.previewStateMap.delete(element))
+    for (const element of elementsToRemove) {
+      this.previewStateMap.delete(element)
+    }
 
     // Also remove markers from any elements with this experiment (e.g., from visual editor)
     // Try both the actual experiment name and __preview__ (visual editor default)
     const markedElements = document.querySelectorAll(
       `[data-absmartly-experiment="${experimentName}"], [data-absmartly-experiment="__preview__"]`
     )
-    markedElements.forEach((element) => {
-      // If element has data-absmartly-original, restore from it (VE-modified elements)
+    for (const element of markedElements) {
       if (element.hasAttribute('data-absmartly-original')) {
         try {
           const originalData = JSON.parse(
@@ -175,21 +174,21 @@ export class PreviewManager {
           // Restore styles
           if (originalData.styles) {
             const htmlElement = element as HTMLElement
-            Object.keys(originalData.styles).forEach((prop) => {
+            for (const prop of Object.keys(originalData.styles)) {
               htmlElement.style[prop as any] = originalData.styles[prop]
-            })
+            }
             Logger.log('Restored styles from VE original')
           }
 
           // Restore attributes
           if (originalData.attributes) {
-            Object.keys(originalData.attributes).forEach((attr) => {
+            for (const attr of Object.keys(originalData.attributes)) {
               if (originalData.attributes[attr] !== null) {
                 element.setAttribute(attr, originalData.attributes[attr])
               } else {
                 element.removeAttribute(attr)
               }
-            })
+            }
             Logger.log('Restored attributes from VE original')
           }
         } catch (e) {
@@ -231,13 +230,13 @@ export class PreviewManager {
    */
   clearAll(): void {
     const experimentNames = new Set<string>()
-    this.previewStateMap.forEach((data) => {
+    for (const data of this.previewStateMap.values()) {
       experimentNames.add(data.experimentName)
-    })
+    }
 
-    experimentNames.forEach((name) => {
+    for (const name of experimentNames) {
       this.removePreviewChanges(name)
-    })
+    }
   }
 
   /**

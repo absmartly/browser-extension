@@ -38,7 +38,8 @@ export async function getConfig(
       const secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
       config.apiKey = secureApiKey || config.apiKey || ''
     } catch (error) {
-      debugLog('[Config] Failed to get API key from secure storage:', error)
+      console.error('[Config] CRITICAL: Failed to access secure storage for API key:', error)
+      console.error('[Config] This may indicate browser storage corruption or permission issues')
       config.apiKey = config.apiKey || ''
     }
 
@@ -47,7 +48,8 @@ export async function getConfig(
       config.aiApiKey = secureAiApiKey || config.aiApiKey || ''
       debugLog('[Config] Loaded AI API key from secure storage:', secureAiApiKey ? 'present' : 'missing')
     } catch (error) {
-      debugLog('[Config] Failed to get AI API key from secure storage:', error)
+      console.error('[Config] CRITICAL: Failed to access secure storage for AI API key:', error)
+      console.error('[Config] This may indicate browser storage corruption or permission issues')
       config.aiApiKey = config.aiApiKey || ''
     }
 
@@ -88,7 +90,8 @@ export async function initializeConfig(
   try {
     secureApiKey = await secureStorage.get("absmartly-apikey") as string | null
   } catch (error) {
-    debugLog('[Config] Failed to get API key from secure storage during init:', error)
+    console.error('[Config] CRITICAL: Failed to access secure storage during initialization:', error)
+    console.error('[Config] API key may not be available - check browser storage settings')
   }
 
   let secureAiApiKey: string | null = null

@@ -23,7 +23,8 @@ export async function getConversations(
     }
     request.onerror = () => {
       console.error('[IndexedDB] Error getting conversations:', request.error)
-      resolve([])
+      console.error('[IndexedDB] This may indicate database corruption or quota issues')
+      reject(new Error(`Database error: ${request.error?.message || 'Unknown error'}`))
     }
   })
 }
@@ -88,7 +89,8 @@ export async function loadConversation(
     }
     request.onerror = () => {
       console.error('[IndexedDB] Error loading conversation:', request.error)
-      resolve(null)
+      console.error('[IndexedDB] This may indicate database corruption or access issues')
+      reject(new Error(`Database error loading conversation: ${request.error?.message || 'Unknown error'}`))
     }
   })
 }
@@ -159,7 +161,8 @@ export async function getConversationList(
 
     request.onerror = () => {
       console.error('[IndexedDB] Error getting conversation list:', request.error)
-      resolve([])
+      console.error('[IndexedDB] This may indicate database corruption or quota issues')
+      reject(new Error(`Database error getting conversation list: ${request.error?.message || 'Unknown error'}`))
     }
   })
 }

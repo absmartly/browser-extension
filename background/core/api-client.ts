@@ -32,6 +32,7 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
         origins: ['https://*.absmartly.com/*']
       })
       if (!hasPermission) {
+        console.warn('[Auth] Cookie permission not granted for ABsmartly domain')
         return null
       }
     }
@@ -44,8 +45,16 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
     const cookies = await chrome.cookies.getAll({ domain: `.${baseDomain}` })
     const jwtCookie = cookies.find(c => c.name === 'jwt')
 
+    if (!jwtCookie) {
+      console.warn(`[Auth] No JWT cookie found for domain ${domain}`)
+    }
+
     return jwtCookie?.value || null
   } catch (error) {
+    console.error('[Auth] Failed to get JWT cookie:', error)
+    if (error instanceof TypeError) {
+      console.error('[Auth] Invalid domain format:', domain)
+    }
     return null
   }
 }

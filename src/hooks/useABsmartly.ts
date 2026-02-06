@@ -45,6 +45,7 @@ export function useABsmartly() {
       }
     } catch (err) {
       debugLog('[useABsmartly] ❌ Auth check failed:', err)
+      console.error('[useABsmartly] Unable to verify authentication:', err instanceof Error ? err.message : String(err))
       setUser(null)
       setIsAuthenticated(false)
     }
@@ -85,8 +86,12 @@ export function useABsmartly() {
         setConfig(savedConfig)
       }
     } catch (err) {
-      setError('Failed to load configuration')
-      console.error('Failed to load config:', err)
+      const errorMessage = err instanceof Error
+        ? `Configuration error: ${err.message}`
+        : 'Failed to load configuration from storage'
+      setError(errorMessage)
+      console.error('[useABsmartly] Configuration load failed:', err)
+      console.error('[useABsmartly] User will see:', errorMessage)
     } finally {
       setLoading(false)
     }
