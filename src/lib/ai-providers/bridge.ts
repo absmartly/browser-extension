@@ -6,6 +6,7 @@ import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { BRIDGE_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { validateAIDOMGenerationResult, type ValidationError } from './validation'
+import { debugLog } from '~src/utils/debug'
 
 export class BridgeProvider implements AIProvider {
   private bridgeClient: ClaudeCodeBridgeClient
@@ -29,18 +30,18 @@ export class BridgeProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[Bridge] generateWithBridge() called')
+    debugLog('[Bridge] generateWithBridge() called')
 
     try {
-      console.log('[Bridge] About to call bridgeClient.connect()...')
+      debugLog('[Bridge] About to call bridgeClient.connect()...')
       await this.bridgeClient.connect()
-      console.log('[Bridge] ✅ connect() completed successfully')
-      console.log('[Bridge] Connection:', this.bridgeClient.getConnection())
+      debugLog('[Bridge] ✅ connect() completed successfully')
+      debugLog('[Bridge] Connection:', this.bridgeClient.getConnection())
 
-      console.log('[Bridge] Input session:', JSON.stringify(options.conversationSession))
-      console.log('[Bridge] Input HTML:', html ? `${html.length} chars` : 'undefined')
-      console.log('[Bridge] Input pageUrl:', options.pageUrl)
-      console.log('[Bridge] Input domStructure:', options.domStructure ? `${options.domStructure.length} chars` : 'not provided')
+      debugLog('[Bridge] Input session:', JSON.stringify(options.conversationSession))
+      debugLog('[Bridge] Input HTML:', html ? `${html.length} chars` : 'undefined')
+      debugLog('[Bridge] Input pageUrl:', options.pageUrl)
+      debugLog('[Bridge] Input domStructure:', options.domStructure ? `${options.domStructure.length} chars` : 'not provided')
 
       let session = options.conversationSession
       const pageUrl = options.pageUrl || session?.pageUrl
@@ -48,9 +49,9 @@ export class BridgeProvider implements AIProvider {
       let systemPromptToSend = await getSystemPrompt(this.getChunkRetrievalPrompt())
 
       if (!session || !session.conversationId) {
-        console.log('[Bridge] No session or no conversationId, creating new conversation')
-        console.log('[Bridge] session:', session)
-        console.log('[Bridge] session.conversationId:', session?.conversationId)
+        debugLog('[Bridge] No session or no conversationId, creating new conversation')
+        debugLog('[Bridge] session:', session)
+        debugLog('[Bridge] session.conversationId:', session?.conversationId)
         const sessionId = crypto.randomUUID()
 
         if (!html) {
@@ -59,10 +60,10 @@ export class BridgeProvider implements AIProvider {
 
         const connection = this.bridgeClient.getConnection()
         const bridgeUrl = connection?.url || 'http://localhost:3000'
-        console.log('[Bridge] Using bridge URL for CLI commands:', bridgeUrl)
+        debugLog('[Bridge] Using bridge URL for CLI commands:', bridgeUrl)
 
         const structureText = options.domStructure || '(DOM structure not available)'
-        console.log('[Bridge] Using pre-generated DOM structure:', structureText.substring(0, 100) + '...')
+        debugLog('[Bridge] Using pre-generated DOM structure:', structureText.substring(0, 100) + '...')
 
         // Add page URL and DOM structure to system prompt
         // Include --bridge-url parameter so CLI connects to correct port
@@ -99,19 +100,19 @@ curl -s "${bridgeUrl}/conversations/${sessionId}/chunk?selectors=header,%23main-
 
 The response will contain the HTML for each selector. Use this to inspect elements before generating DOM changes.
 `
-        console.log('[Bridge] Including DOM structure in system prompt (not full HTML)')
-        console.log(`[Bridge] DOM structure: ${structureText.length} chars`)
+        debugLog('[Bridge] Including DOM structure in system prompt (not full HTML)')
+        debugLog(`[Bridge] DOM structure: ${structureText.length} chars`)
 
-        console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log('[Bridge] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
-        console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log(systemPromptToSend)
-        console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log(`[Bridge] 📊 System prompt length: ${systemPromptToSend.length} characters`)
-        console.log('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+        debugLog('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        debugLog('[Bridge] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
+        debugLog('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        debugLog(systemPromptToSend)
+        debugLog('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        debugLog(`[Bridge] 📊 System prompt length: ${systemPromptToSend.length} characters`)
+        debugLog('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
-        console.log('[Bridge] About to create conversation with sessionId:', sessionId)
-        console.log('[Bridge] Model:', this.config.llmModel || 'sonnet (default)')
+        debugLog('[Bridge] About to create conversation with sessionId:', sessionId)
+        debugLog('[Bridge] Model:', this.config.llmModel || 'sonnet (default)')
         // Pass HTML to bridge for storage (used by get-chunk CLI)
         const result = await this.bridgeClient.createConversation(
           sessionId,
@@ -122,7 +123,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           this.config.llmModel || 'sonnet' // Pass model selection (default to sonnet)
         )
         conversationId = result.conversationId
-        console.log('[Bridge] ✅ Conversation created with JSON schema and HTML stored on bridge')
+        debugLog('[Bridge] ✅ Conversation created with JSON schema and HTML stored on bridge')
 
         session = {
           id: sessionId,
@@ -131,10 +132,10 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           messages: [],
           conversationId
         }
-        console.log('[Bridge] ✅ Created new conversation:', conversationId)
+        debugLog('[Bridge] ✅ Created new conversation:', conversationId)
       } else {
         conversationId = session.conversationId
-        console.log('[Bridge] Reusing existing conversation:', conversationId)
+        debugLog('[Bridge] Reusing existing conversation:', conversationId)
       }
 
       const userMessage = buildUserMessage(prompt, currentChanges)
@@ -147,12 +148,12 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         let fullResponse = ''
         let finalToolResult: any = null
 
-        console.log('[Bridge] Starting stream for conversation:', conversationId)
-        console.log('[Bridge] Bridge connection URL:', this.bridgeClient.getConnection()?.url)
+        debugLog('[Bridge] Starting stream for conversation:', conversationId)
+        debugLog('[Bridge] Bridge connection URL:', this.bridgeClient.getConnection()?.url)
         const eventSource = this.bridgeClient.streamResponses(
           conversationId,
           (event) => {
-            console.log(`[Bridge] 📦 Event: ${event.type}`)
+            debugLog(`[Bridge] 📦 Event: ${event.type}`)
 
             if (event.type === 'tool_use') {
               let toolInput = event.data
@@ -173,24 +174,24 @@ The response will contain the HTML for each selector. Use this to inspect elemen
 
               // Check if this is the FINAL result (dom_changes_generator)
               if (toolInput && (toolInput.domChanges !== undefined || toolInput.response !== undefined || toolInput.action !== undefined)) {
-                console.log('[Bridge] 📦 Received final dom_changes_generator result')
+                debugLog('[Bridge] 📦 Received final dom_changes_generator result')
                 finalToolResult = toolInput
                 // Don't close yet - wait for 'done' event
               } else {
                 // Intermediate tool call (css_query, xpath_query) - Claude Code handles these via CLI
-                console.log('[Bridge] ℹ️ Intermediate tool call (handled by Claude Code internally)')
+                debugLog('[Bridge] ℹ️ Intermediate tool call (handled by Claude Code internally)')
               }
             } else if (event.type === 'text') {
               fullResponse += event.data
             } else if (event.type === 'done') {
-              console.log('[Bridge] ✅ Stream done')
+              debugLog('[Bridge] ✅ Stream done')
               eventSource.close()
 
               // If we got a final tool result, validate and return it
               if (finalToolResult) {
                 const validation = validateAIDOMGenerationResult(JSON.stringify(finalToolResult))
                 if (validation.isValid) {
-                  console.log('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes')
+                  debugLog('[Bridge] ✅ Generated', validation.result.domChanges.length, 'DOM changes')
                   resolve(validation.result)
                 } else {
                   reject(new Error(`Validation failed: ${(validation as ValidationError).errors.join(', ')}`))
@@ -243,7 +244,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         setTimeout(async () => {
           try {
             await this.bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend, SHARED_TOOL_SCHEMA)
-            console.log('[Bridge] Message sent')
+            debugLog('[Bridge] Message sent')
           } catch (error) {
             eventSource.close()
             reject(error)

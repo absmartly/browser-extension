@@ -2,6 +2,7 @@ import type { DOMChange } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import { getSystemPromptOverride } from '~src/components/SystemPromptEditor'
 import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
+import { debugLog } from '~src/utils/debug'
 
 // Shared HTML sanitization - removes invalid Unicode characters
 export function sanitizeHtml(htmlStr: string): string {
@@ -47,7 +48,7 @@ export function compressHtml(html: string): string {
   }
 
   let compressed = html
-  console.log('[Compress] Starting compression, original length:', html.length)
+  debugLog('[Compress] Starting compression, original length:', html.length)
 
   const plasmoLoadingStart = compressed.indexOf('<div id="__plasmo-loading__"')
   if (plasmoLoadingStart !== -1) {
@@ -81,7 +82,7 @@ export function compressHtml(html: string): string {
     }
 
     if (plasmoEnd !== -1) {
-      console.log('[Compress] Removing Plasmo loading div:', plasmoEnd - plasmoLoadingStart, 'characters')
+      debugLog('[Compress] Removing Plasmo loading div:', plasmoEnd - plasmoLoadingStart, 'characters')
       compressed = compressed.substring(0, plasmoLoadingStart) + compressed.substring(plasmoEnd)
     }
   }
@@ -93,7 +94,7 @@ export function compressHtml(html: string): string {
     .replace(/<div[^>]*data-plasmo[^>]*>[\s\S]*?<\/div>/gi, '')
     .replace(/<div[^>]*id="absmartly-debug-[^"]*"[^>]*>.*?<\/div>/gi, '')
 
-  console.log('[Compress] After other Plasmo removal:', compressed.length, 'Removed:', beforeOtherPlasmo - compressed.length)
+  debugLog('[Compress] After other Plasmo removal:', compressed.length, 'Removed:', beforeOtherPlasmo - compressed.length)
 
   compressed = compressed
     .replace(/<iframe[^>]*id="absmartly-sidebar-iframe"[^>]*>[\s\S]*?<\/iframe>/gi, '')
@@ -137,10 +138,10 @@ export function compressHtml(html: string): string {
         return content.length > 0 && !content.match(/^\/\*[\s\S]*\*\/$/)
       })
 
-    console.log('[Compress] Found', styleTags.length, 'essential style tags in head')
+    debugLog('[Compress] Found', styleTags.length, 'essential style tags in head')
     return styleTags.length > 0 ? `<head>${styleTags.join('')}</head>` : '<head></head>'
   })
-  console.log('[Compress] After head strip:', compressed.length, 'Removed:', beforeHeadStrip - compressed.length)
+  debugLog('[Compress] After head strip:', compressed.length, 'Removed:', beforeHeadStrip - compressed.length)
 
   return compressed
     .replace(/<div[^>]*id="__framer-editorbar-container"[^>]*>[\s\S]*?<\/div>/gi, '')
@@ -198,7 +199,7 @@ export function buildSystemPromptWithDOMStructure(
   if (!domStructure) return basePrompt
 
   const structureText = domStructure || '(DOM structure not available)'
-  console.log(`[${providerName}] Using pre-generated DOM structure:`, structureText.substring(0, 100) + '...')
+  debugLog(`[${providerName}] Using pre-generated DOM structure:`, structureText.substring(0, 100) + '...')
 
   const fullPrompt = basePrompt + `\n\n## Page DOM Structure
 
@@ -214,7 +215,7 @@ To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
 IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
 `
 
-  console.log(`[${providerName}] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
+  debugLog(`[${providerName}] 📄 Including DOM structure in system prompt (${structureText.length} chars)`)
 
   return fullPrompt
 }

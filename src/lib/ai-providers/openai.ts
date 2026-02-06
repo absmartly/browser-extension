@@ -8,6 +8,7 @@ import { validateAIDOMGenerationResult, type ValidationResult, type ValidationEr
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { debugLog } from '~src/utils/debug'
 
 export class OpenAIProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
@@ -79,7 +80,7 @@ export class OpenAIProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[OpenAI] generateWithOpenAI() called with agentic loop')
+    debugLog('[OpenAI] generateWithOpenAI() called with agentic loop')
 
     const openai = new OpenAI({
       apiKey: this.config.apiKey,
@@ -103,13 +104,13 @@ export class OpenAIProvider implements AIProvider {
       session.htmlSent = true
     }
 
-    console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('[OpenAI] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO OPENAI:')
-    console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(systemPrompt)
-    console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(`[OpenAI] 📊 System prompt length: ${systemPrompt.length} characters`)
-    console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog('[OpenAI] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO OPENAI:')
+    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog(systemPrompt)
+    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog(`[OpenAI] 📊 System prompt length: ${systemPrompt.length} characters`)
+    debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
@@ -124,7 +125,7 @@ export class OpenAIProvider implements AIProvider {
     ]
 
     if (images && images.length > 0) {
-      console.log('[OpenAI] ⚠️ Note: Image support not yet implemented for OpenAI')
+      debugLog('[OpenAI] ⚠️ Note: Image support not yet implemented for OpenAI')
     }
 
     session.messages.push({ role: 'user', content: userMessageText })
@@ -133,7 +134,7 @@ export class OpenAIProvider implements AIProvider {
 
     // Agentic loop - process tool calls until we get the final result
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      console.log(`[OpenAI] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
+      debugLog(`[OpenAI] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       let timeoutId: ReturnType<typeof setTimeout> | undefined
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -168,7 +169,7 @@ export class OpenAIProvider implements AIProvider {
         clearTimeout(timeoutId)
       }
 
-      console.log('[OpenAI] Received response from OpenAI')
+      debugLog('[OpenAI] Received response from OpenAI')
       const message = completion.choices[0]?.message
 
       if (!message) {
@@ -178,7 +179,7 @@ export class OpenAIProvider implements AIProvider {
       // Check if we have tool calls
       if (!message.tool_calls || message.tool_calls.length === 0) {
         // No tool calls - this is a conversational response
-        console.log('[OpenAI] ℹ️ No tool calls - conversational response')
+        debugLog('[OpenAI] ℹ️ No tool calls - conversational response')
 
         const responseText = message.content || ''
         session.messages.push({ role: 'assistant', content: responseText })
@@ -204,19 +205,19 @@ export class OpenAIProvider implements AIProvider {
       for (const toolCall of message.tool_calls) {
         // Type guard for function tool calls
         if (toolCall.type !== 'function') {
-          console.log(`[OpenAI] ⚠️ Skipping non-function tool call type: ${toolCall.type}`)
+          debugLog(`[OpenAI] ⚠️ Skipping non-function tool call type: ${toolCall.type}`)
           continue
         }
 
         const fn = toolCall.function
-        console.log(`[OpenAI] 🔧 Tool call: ${fn.name}`)
+        debugLog(`[OpenAI] 🔧 Tool call: ${fn.name}`)
 
         if (fn.name === 'dom_changes_generator') {
           // This is the final result tool - validate and return
-          console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          console.log('[OpenAI] 📦 RAW STRUCTURED OUTPUT FROM OPENAI (tool call arguments):')
-          console.log(fn.arguments)
-          console.log('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[OpenAI] 📦 RAW STRUCTURED OUTPUT FROM OPENAI (tool call arguments):')
+          debugLog(fn.arguments)
+          debugLog('[OpenAI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
           const toolInput = JSON.parse(fn.arguments)
           const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
@@ -227,7 +228,7 @@ export class OpenAIProvider implements AIProvider {
             throw new Error(`Tool call validation failed: ${errorValidation.errors.join(', ')}`)
           }
 
-          console.log('[OpenAI] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+          debugLog('[OpenAI] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
           session.messages.push({ role: 'assistant', content: validation.result.response })
 
           return {
@@ -268,7 +269,7 @@ export class OpenAIProvider implements AIProvider {
       // If we processed get_html_chunk calls, add the tool results
       if (toolResultMessages.length > 0) {
         messages.push(...toolResultMessages)
-        console.log(`[OpenAI] ✅ Processed ${toolResultMessages.length} tool results, continuing loop...`)
+        debugLog(`[OpenAI] ✅ Processed ${toolResultMessages.length} tool results, continuing loop...`)
       }
     }
 

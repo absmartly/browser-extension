@@ -14,6 +14,7 @@ import { validateAIDOMGenerationResult, type ValidationResult, type ValidationEr
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { debugLog } from '~src/utils/debug'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 export class GeminiProvider implements AIProvider {
@@ -77,7 +78,7 @@ export class GeminiProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[Gemini] generateWithGemini() called with agentic loop')
+    debugLog('[Gemini] generateWithGemini() called with agentic loop')
 
     if (!this.config.llmModel) {
       throw new Error('Model is required for Gemini provider')
@@ -100,13 +101,13 @@ export class GeminiProvider implements AIProvider {
       session.htmlSent = true
     }
 
-    console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('[Gemini] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO GEMINI:')
-    console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(systemPrompt)
-    console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(`[Gemini] 📊 System prompt length: ${systemPrompt.length} characters`)
-    console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog('[Gemini] 🔍 COMPLETE SYSTEM PROMPT BEING SENT TO GEMINI:')
+    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog(systemPrompt)
+    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog(`[Gemini] 📊 System prompt length: ${systemPrompt.length} characters`)
+    debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
@@ -145,7 +146,7 @@ export class GeminiProvider implements AIProvider {
     }
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      console.log(`[Gemini] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
+      debugLog(`[Gemini] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       const requestBody: GeminiGenerateContentRequest = {
         contents: contents,
@@ -207,7 +208,7 @@ export class GeminiProvider implements AIProvider {
       }
 
       const result: GeminiGenerateContentResponse = await response.json()
-      console.log('[Gemini] Received response from Gemini')
+      debugLog('[Gemini] Received response from Gemini')
 
       if (!result.candidates || result.candidates.length === 0) {
         throw new Error('No candidates in Gemini response')
@@ -220,7 +221,7 @@ export class GeminiProvider implements AIProvider {
       const textParts = parts.filter(p => p.text)
 
       if (functionCalls.length === 0) {
-        console.log('[Gemini] ℹ️ No function calls - conversational response')
+        debugLog('[Gemini] ℹ️ No function calls - conversational response')
 
         const responseText = textParts.map(p => p.text).join('\n').trim()
         session.messages.push({ role: 'assistant', content: responseText })
@@ -242,13 +243,13 @@ export class GeminiProvider implements AIProvider {
 
       for (const part of functionCalls) {
         const functionCall = part.functionCall!
-        console.log(`[Gemini] 🔧 Function call: ${functionCall.name}`)
+        debugLog(`[Gemini] 🔧 Function call: ${functionCall.name}`)
 
         if (functionCall.name === 'dom_changes_generator') {
-          console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          console.log('[Gemini] 📦 RAW STRUCTURED OUTPUT FROM GEMINI (function call args):')
-          console.log(JSON.stringify(functionCall.args, null, 2))
-          console.log('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[Gemini] 📦 RAW STRUCTURED OUTPUT FROM GEMINI (function call args):')
+          debugLog(JSON.stringify(functionCall.args, null, 2))
+          debugLog('[Gemini] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
           const validation = validateAIDOMGenerationResult(JSON.stringify(functionCall.args))
 
@@ -258,7 +259,7 @@ export class GeminiProvider implements AIProvider {
             throw new Error(`Function call validation failed: ${errorValidation.errors.join(', ')}`)
           }
 
-          console.log('[Gemini] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+          debugLog('[Gemini] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
           session.messages.push({ role: 'assistant', content: validation.result.response })
 
           return {
@@ -303,7 +304,7 @@ export class GeminiProvider implements AIProvider {
           role: 'user',
           parts: functionResponses
         })
-        console.log(`[Gemini] ✅ Processed ${functionResponses.length} function results, continuing loop...`)
+        debugLog(`[Gemini] ✅ Processed ${functionResponses.length} function results, continuing loop...`)
       }
     }
 

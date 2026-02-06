@@ -1,6 +1,7 @@
 import { captureHTMLChunks, queryXPath } from '~src/utils/html-capture'
 import { validateXPath } from '~src/utils/xpath-validator'
 import { validateSelector } from '~src/utils/selector-validator'
+import { debugLog } from '~src/utils/debug'
 
 export interface ToolCallResult {
   toolName: string
@@ -9,7 +10,7 @@ export interface ToolCallResult {
 }
 
 export async function handleCssQuery(selectors: string[]): Promise<ToolCallResult> {
-  console.log(`[ToolHandler] 📄 CSS query for ${selectors.length} selector(s):`, selectors)
+  debugLog(`[ToolHandler] 📄 CSS query for ${selectors.length} selector(s):`, selectors)
 
   for (const selector of selectors) {
     if (!validateSelector(selector)) {
@@ -48,7 +49,7 @@ export async function handleXPathQuery(
     }
   }
 
-  console.log(`[ToolHandler] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
+  debugLog(`[ToolHandler] 🔍 Executing XPath: "${xpath}" (max ${maxResults} results)`)
 
   const xpathResult = await queryXPath(xpath, maxResults)
 

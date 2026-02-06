@@ -8,6 +8,7 @@ import { validateAIDOMGenerationResult, type ValidationResult, type ValidationEr
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { debugLog } from '~src/utils/debug'
 import emojiRegex from 'emoji-regex'
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
@@ -100,7 +101,7 @@ export class OpenRouterProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[OpenRouter] generateWithOpenRouter() called with agentic loop')
+    debugLog('[OpenRouter] generateWithOpenRouter() called with agentic loop')
 
     if (!this.config.llmModel) {
       throw new Error('Model is required for OpenRouter provider')
@@ -123,13 +124,13 @@ export class OpenRouterProvider implements AIProvider {
       session.htmlSent = true
     }
 
-    console.log('[OpenRouter] System prompt BEFORE stripping, length:', systemPrompt.length)
-    console.log('[OpenRouter] Char at position 75:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
+    debugLog('[OpenRouter] System prompt BEFORE stripping, length:', systemPrompt.length)
+    debugLog('[OpenRouter] Char at position 75:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
 
     // Strip emojis AFTER building complete system prompt
     systemPrompt = stripEmojis(systemPrompt)
 
-    console.log('[OpenRouter] System prompt AFTER stripping, length:', systemPrompt.length)
+    debugLog('[OpenRouter] System prompt AFTER stripping, length:', systemPrompt.length)
 
     // Check for any remaining surrogates
     const surrogateTest = /[\uD800-\uDFFF]/
@@ -143,14 +144,14 @@ export class OpenRouterProvider implements AIProvider {
       }
     }
 
-    console.log('[OpenRouter] Char at position 75 after strip:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
-    console.log('[OpenRouter] System prompt length:', systemPrompt.length, 'characters')
+    debugLog('[OpenRouter] Char at position 75 after strip:', systemPrompt.charCodeAt(75), systemPrompt.charAt(75))
+    debugLog('[OpenRouter] System prompt length:', systemPrompt.length, 'characters')
 
-    console.log('================================================================')
-    console.log('COMPLETE SYSTEM PROMPT:')
-    console.log('================================================================')
-    console.log(systemPrompt)
-    console.log('================================================================')
+    debugLog('================================================================')
+    debugLog('COMPLETE SYSTEM PROMPT:')
+    debugLog('================================================================')
+    debugLog(systemPrompt)
+    debugLog('================================================================')
 
     const userMessageText = stripEmojis(buildUserMessage(prompt, currentChanges))
 
@@ -164,7 +165,7 @@ export class OpenRouterProvider implements AIProvider {
     ]
 
     if (images && images.length > 0) {
-      console.log('[OpenRouter] ⚠️ Note: Image support depends on the selected model')
+      debugLog('[OpenRouter] ⚠️ Note: Image support depends on the selected model')
     }
 
     session.messages.push({ role: 'user', content: userMessageText })
@@ -172,7 +173,7 @@ export class OpenRouterProvider implements AIProvider {
     const tools = [this.getToolDefinition(), this.getCssQueryTool(), this.getXPathQueryTool()]
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      console.log(`[OpenRouter] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
+      debugLog(`[OpenRouter] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       const requestBody: OpenRouterChatCompletionRequest = {
         model: this.config.llmModel,
@@ -181,7 +182,7 @@ export class OpenRouterProvider implements AIProvider {
         max_tokens: 4096
       }
 
-      console.log('[OpenRouter] Request includes', tools.length, 'tools:', tools.map(t => t.function?.name || t.name))
+      debugLog('[OpenRouter] Request includes', tools.length, 'tools:', tools.map(t => t.function?.name || t.name))
 
       // Verify no surrogates in request body
       const bodyStr = JSON.stringify(requestBody)
@@ -273,7 +274,7 @@ export class OpenRouterProvider implements AIProvider {
       }
 
       const completion = await response.json()
-      console.log('[OpenRouter] Received response from OpenRouter')
+      debugLog('[OpenRouter] Received response from OpenRouter')
       const message = completion.choices[0]?.message
 
       if (!message) {
@@ -281,7 +282,7 @@ export class OpenRouterProvider implements AIProvider {
       }
 
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        console.log('[OpenRouter] ℹ️ No tool calls - conversational response')
+        debugLog('[OpenRouter] ℹ️ No tool calls - conversational response')
 
         const responseText = message.content || ''
         session.messages.push({ role: 'assistant', content: responseText })
@@ -304,18 +305,18 @@ export class OpenRouterProvider implements AIProvider {
 
       for (const toolCall of message.tool_calls) {
         if (toolCall.type !== 'function') {
-          console.log(`[OpenRouter] ⚠️ Skipping non-function tool call type: ${toolCall.type}`)
+          debugLog(`[OpenRouter] ⚠️ Skipping non-function tool call type: ${toolCall.type}`)
           continue
         }
 
         const fn = toolCall.function
-        console.log(`[OpenRouter] 🔧 Tool call: ${fn.name}`)
+        debugLog(`[OpenRouter] 🔧 Tool call: ${fn.name}`)
 
         if (fn.name === 'dom_changes_generator') {
-          console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          console.log('[OpenRouter] 📦 RAW STRUCTURED OUTPUT FROM OPENROUTER (tool call arguments):')
-          console.log(fn.arguments)
-          console.log('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('[OpenRouter] 📦 RAW STRUCTURED OUTPUT FROM OPENROUTER (tool call arguments):')
+          debugLog(fn.arguments)
+          debugLog('[OpenRouter] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
           const toolInput = JSON.parse(fn.arguments)
           const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
@@ -326,7 +327,7 @@ export class OpenRouterProvider implements AIProvider {
             throw new Error(`Tool call validation failed: ${errorValidation.errors.join(', ')}`)
           }
 
-          console.log('[OpenRouter] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+          debugLog('[OpenRouter] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
           session.messages.push({ role: 'assistant', content: validation.result.response })
 
           return {
@@ -365,7 +366,7 @@ export class OpenRouterProvider implements AIProvider {
 
       if (toolResultMessages.length > 0) {
         messages.push(...toolResultMessages)
-        console.log(`[OpenRouter] ✅ Processed ${toolResultMessages.length} tool results, continuing loop...`)
+        debugLog(`[OpenRouter] ✅ Processed ${toolResultMessages.length} tool results, continuing loop...`)
       }
     }
 

@@ -8,6 +8,7 @@ import { validateAIDOMGenerationResult, type ValidationResult, type ValidationEr
 import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, AI_REQUEST_TIMEOUT_MS, AI_REQUEST_TIMEOUT_ERROR } from './constants'
+import { debugLog } from '~src/utils/debug'
 
 export class AnthropicProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
@@ -70,17 +71,17 @@ export class AnthropicProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    console.log('[Anthropic] Using Anthropic API with agentic loop')
+    debugLog('[Anthropic] Using Anthropic API with agentic loop')
     let authConfig: any = { dangerouslyAllowBrowser: true }
 
     if (this.config.useOAuth && this.config.oauthToken) {
-      console.log('🔐 Using OAuth token for authentication')
+      debugLog('🔐 Using OAuth token for authentication')
       authConfig.apiKey = this.config.oauthToken
       authConfig.defaultHeaders = {
         'Authorization': `Bearer ${this.config.oauthToken}`
       }
     } else if (this.config.apiKey) {
-      console.log('🔑 Using API key for authentication')
+      debugLog('🔑 Using API key for authentication')
       authConfig.apiKey = this.config.apiKey
     } else {
       throw new Error('Either API key or OAuth token is required')
@@ -91,7 +92,7 @@ export class AnthropicProvider implements AIProvider {
     let session = createSession(options.conversationSession)
 
     let systemPrompt = sanitizeHtml(await getSystemPrompt(this.getChunkRetrievalPrompt()))
-    console.log('[Anthropic] Base system prompt length:', systemPrompt.length)
+    debugLog('[Anthropic] Base system prompt length:', systemPrompt.length)
 
     if (!session.htmlSent) {
       if (!html && !options.domStructure) {
@@ -107,15 +108,15 @@ export class AnthropicProvider implements AIProvider {
     }
 
     systemPrompt = sanitizeHtml(systemPrompt)
-    console.log('[Anthropic] Final system prompt length after sanitization:', systemPrompt.length)
+    debugLog('[Anthropic] Final system prompt length after sanitization:', systemPrompt.length)
 
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(systemPrompt)
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(`📊 System prompt length: ${systemPrompt.length} characters`)
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog('🔍 COMPLETE SYSTEM PROMPT BEING SENT TO CLAUDE:')
+    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog(systemPrompt)
+    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    debugLog(`📊 System prompt length: ${systemPrompt.length} characters`)
+    debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
     const userMessageText = buildUserMessage(prompt, currentChanges)
 
@@ -164,7 +165,7 @@ export class AnthropicProvider implements AIProvider {
 
     // Agentic loop - process tool calls until we get the final result
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      console.log(`[Anthropic] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
+      debugLog(`[Anthropic] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       const requestBody = {
         model: this.config.llmModel || 'claude-sonnet-4-5-20250929',
@@ -176,7 +177,7 @@ export class AnthropicProvider implements AIProvider {
 
       try {
         JSON.stringify(requestBody)
-        console.log('[Anthropic] ✅ Request body is valid JSON')
+        debugLog('[Anthropic] ✅ Request body is valid JSON')
       } catch (jsonError) {
         console.error('[Anthropic] ❌ Request body contains invalid JSON:', jsonError)
         throw new Error(`Invalid JSON in request body: ${jsonError.message}`)
@@ -226,7 +227,7 @@ export class AnthropicProvider implements AIProvider {
 
       if (toolUseBlocks.length === 0) {
         // No tool calls - this is a conversational response
-        console.log('[Anthropic] ℹ️ No tool calls - conversational response')
+        debugLog('[Anthropic] ℹ️ No tool calls - conversational response')
 
         const responseText = textBlocks.map(block => (block as any).text).join('\n').trim()
         session.messages.push({ role: 'assistant', content: responseText })
@@ -244,14 +245,14 @@ export class AnthropicProvider implements AIProvider {
 
       for (const toolBlock of toolUseBlocks) {
         const tool = toolBlock as any
-        console.log(`[Anthropic] 🔧 Tool call: ${tool.name}`)
+        debugLog(`[Anthropic] 🔧 Tool call: ${tool.name}`)
 
         if (tool.name === 'dom_changes_generator') {
           // This is the final result tool - validate and return
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          console.log('📦 RAW STRUCTURED OUTPUT FROM ANTHROPIC (tool call arguments):')
-          console.log(JSON.stringify(tool.input, null, 2))
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+          debugLog('📦 RAW STRUCTURED OUTPUT FROM ANTHROPIC (tool call arguments):')
+          debugLog(JSON.stringify(tool.input, null, 2))
+          debugLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
           const validation = validateAIDOMGenerationResult(JSON.stringify(tool.input))
 
@@ -261,7 +262,7 @@ export class AnthropicProvider implements AIProvider {
             throw new Error(`Tool use validation failed: ${errorValidation.errors.join(', ')}`)
           }
 
-          console.log('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+          debugLog('✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
 
           session.messages.push({ role: 'assistant', content: validation.result.response })
 
@@ -312,7 +313,7 @@ export class AnthropicProvider implements AIProvider {
           content: toolResults
         })
 
-        console.log(`[Anthropic] ✅ Processed ${toolResults.length} tool results, continuing loop...`)
+        debugLog(`[Anthropic] ✅ Processed ${toolResults.length} tool results, continuing loop...`)
       }
     }
 
