@@ -76,11 +76,9 @@ test.describe('AI Chat Simple Diagnostic', () => {
     console.log('\n🚨 CLICKING "Generate with AI" BUTTON NOW...')
     await aiButton.click()
 
-    // Wait a bit for console messages to accumulate
-    await testPage.waitForTimeout(500)
+    // Wait for any potential state change by checking if plasmo is still visible
+    await sidebar.locator('#__plasmo').waitFor({ state: 'attached', timeout: 1000 }).catch(() => {})
 
-    // IMMEDIATELY check state (100ms after click)
-    await testPage.waitForTimeout(100)
     console.log('\n📊 STATE 100ms AFTER CLICK:')
 
     const rootExists100 = await testPage.evaluate(() => {
@@ -109,8 +107,8 @@ test.describe('AI Chat Simple Diagnostic', () => {
 
     await testPage.screenshot({ path: 'test-results/simple-04-100ms-after-click.png', fullPage: true })
 
-    // Check state 500ms after click
-    await testPage.waitForTimeout(400)
+    // Check state 500ms after click - wait for any AI component to potentially appear
+    await sidebar.locator('[data-ai-dom-changes-page]').waitFor({ state: 'attached', timeout: 1000 }).catch(() => {})
     console.log('\n📊 STATE 500ms AFTER CLICK:')
 
     const iframeExists500 = await testPage.evaluate(() => {
@@ -132,8 +130,13 @@ test.describe('AI Chat Simple Diagnostic', () => {
 
     await testPage.screenshot({ path: 'test-results/simple-05-500ms-after-click.png', fullPage: true })
 
-    // Check final state 2 seconds after click
-    await testPage.waitForTimeout(1500)
+    // Check final state 2 seconds after click - wait for component rendering to settle
+    await testPage.waitForFunction(() => {
+      const iframe = document.getElementById('absmartly-sidebar-iframe') as HTMLIFrameElement
+      if (!iframe || !iframe.contentDocument) return true
+      const plasmo = iframe.contentDocument.getElementById('__plasmo')
+      return plasmo !== null && plasmo.children.length > 0
+    }, { timeout: 2000 }).catch(() => {})
     console.log('\n📊 FINAL STATE (2 seconds after click):')
 
     const rootExistsFinal = await testPage.evaluate(() => {

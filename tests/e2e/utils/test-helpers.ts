@@ -91,15 +91,7 @@ export async function injectSidebarMinimal(page: Page, extensionUrl: (path: stri
   return sidebar
 }
 
-/**
- * Debug wait function - only waits in slow mode
- * @param ms - Milliseconds to wait (default 300)
- */
-export async function debugWait(ms: number = 300): Promise<void> {
-  const SLOW_MODE = process.env.SLOW === '1'
-  if (SLOW_MODE) {
-    await new Promise(resolve => setTimeout(resolve, ms))
-  }
+export async function debugWait(_ms: number = 300): Promise<void> {
 }
 
 /**

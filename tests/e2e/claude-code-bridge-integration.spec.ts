@@ -49,8 +49,6 @@ test.describe('Claude Code Bridge Integration', () => {
     console.log('Starting Claude Code Bridge server...')
     await startBridge()
     console.log('Bridge server started successfully')
-
-    await new Promise(resolve => setTimeout(resolve, 1000))
   })
 
   test.afterAll(async () => {
@@ -95,27 +93,19 @@ test.describe('Claude Code Bridge Integration', () => {
     await apiEndpointInput.clear()
     await apiEndpointInput.fill('http://demo.absmartly.io:8090/v1')
 
-    await page.waitForTimeout(500)
-
     const applicationInput = page.locator('input[placeholder*="website"]').first()
     await applicationInput.waitFor({ state: 'visible', timeout: 5000 })
     await applicationInput.clear()
     await applicationInput.fill('e2e-test-app')
-
-    await page.waitForTimeout(500)
 
     const environmentInput = page.locator('input[placeholder*="production"]').first()
     await environmentInput.waitFor({ state: 'visible', timeout: 5000 })
     await environmentInput.clear()
     await environmentInput.fill('development')
 
-    await page.waitForTimeout(500)
-
     const saveButton = page.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
-
-    await page.waitForTimeout(1000)
 
     const notification = page.locator('text=/Settings saved|Configuration saved/i')
     await notification.waitFor({ state: 'visible', timeout: 5000 })
@@ -128,25 +118,19 @@ test.describe('Claude Code Bridge Integration', () => {
     await page.waitForSelector('#experiments-nav-button', { state: 'visible', timeout: 10000 })
     await page.click('#experiments-nav-button')
 
-    await page.waitForTimeout(1000)
-
     const createButton = page.locator('#create-experiment-button')
     await createButton.first().waitFor({ state: 'visible', timeout: 5000 })
     await createButton.first().click()
-
-    await page.waitForTimeout(500)
 
     const nameInput = page.locator('input[placeholder*="name" i], input[name="name"]').first()
     await nameInput.waitFor({ state: 'visible', timeout: 5000 })
     await nameInput.fill('Bridge Test Experiment')
 
-    await page.waitForTimeout(500)
-
     const saveExperimentButton = page.locator('#save-experiment-button, #create-experiment-draft-button')
     await saveExperimentButton.first().waitFor({ state: 'visible', timeout: 5000 })
     await saveExperimentButton.first().click()
 
-    await page.waitForTimeout(2000)
+    await page.locator('[data-test-id="experiment-row"]').first().waitFor({ state: 'visible', timeout: 5000 })
 
     console.log('✓ Experiment created')
 
