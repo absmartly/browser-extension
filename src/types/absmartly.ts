@@ -1,146 +1,144 @@
 import type { DOMChange } from './dom-changes'
 
 export interface Experiment {
-  id: number
-  name: string
-  display_name?: string
-  state: 'created' | 'ready' | 'running' | 'development' | 'full_on' | 'stopped' | 'archived' | 'scheduled'
-  status?: 'draft' | 'running' | 'stopped' | 'archived'
-  created_at: string
-  updated_at?: string
-  full_on_variant?: number
-  percentage_of_traffic?: number
-  traffic_split?: number
-  nr_variants?: number
-  percentages?: string
-  audience?: string
-  audience_strict?: boolean
-  variants: Variant[]
-  applications?: Application[]
-  unit_type?: { unit_type_id: number; name?: string }
-  unit_type_id?: number
-  primary_metric?: { metric_id: number; name?: string; id?: number }
-  experiment_tags?: ExperimentTag[]
-  context_ids?: string[]
-  owner?: ExperimentOwner
-  owners?: ExperimentUser[]
-  teams?: ExperimentTeam[]
-  created_by?: ExperimentUser
-  updated_by?: ExperimentUser
-  exposures?: number
-  started_at?: string
-  stopped_at?: string
-  type?: 'group_sequential' | 'fixed_horizon' | 'test'
-  favorite?: boolean
-  custom_section_field_values?: ExperimentCustomSectionFieldValue[] | Record<string, unknown>
+  readonly id: number
+  readonly name: string
+  readonly display_name?: string
+  readonly state: 'created' | 'ready' | 'running' | 'development' | 'full_on' | 'stopped' | 'archived' | 'scheduled'
+  readonly status?: 'draft' | 'running' | 'stopped' | 'archived'
+  readonly created_at: string
+  readonly updated_at?: string
+  readonly full_on_variant?: number
+  readonly percentage_of_traffic?: number
+  readonly traffic_split?: number
+  readonly nr_variants?: number
+  readonly percentages?: string
+  readonly audience?: string
+  readonly audience_strict?: boolean
+  readonly variants: readonly Variant[]
+  readonly applications?: readonly Application[]
+  readonly unit_type?: { readonly unit_type_id: number; readonly name?: string }
+  readonly unit_type_id?: number
+  readonly primary_metric?: { readonly metric_id: number; readonly name?: string; readonly id?: number }
+  readonly experiment_tags?: readonly ExperimentTag[]
+  readonly context_ids?: readonly string[]
+  readonly owner?: ExperimentOwner
+  readonly owners?: readonly ExperimentUser[]
+  readonly teams?: readonly ExperimentTeam[]
+  readonly created_by?: ExperimentUser
+  readonly updated_by?: ExperimentUser
+  readonly exposures?: number
+  readonly started_at?: string
+  readonly stopped_at?: string
+  readonly type?: 'group_sequential' | 'fixed_horizon' | 'test'
+  readonly favorite?: boolean
+  readonly custom_section_field_values?: readonly ExperimentCustomSectionFieldValue[] | Readonly<Record<string, unknown>>
 }
 
 export interface Variant {
-  id?: number
-  variant?: number
-  name: string
-  is_control?: boolean
-  config: string
+  readonly id?: number
+  readonly variant?: number
+  readonly name: string
+  readonly is_control?: boolean
+  readonly config: string
 }
 
 export interface Application {
-  id?: number
-  application_id?: number
-  name: string
-  application_version?: string
-  icon_url?: string
+  readonly id?: number
+  readonly application_id?: number
+  readonly name: string
+  readonly application_version?: string
+  readonly icon_url?: string
 }
 
 export interface UnitType {
-  unit_type_id: number
-  name: string
+  readonly unit_type_id: number
+  readonly name: string
 }
 
 export interface Metric {
-  metric_id: number
-  name: string
-  description?: string
+  readonly metric_id: number
+  readonly name: string
+  readonly description?: string
 }
 
 export interface ExperimentTag {
-  experiment_tag_id: number
-  name: string
+  readonly experiment_tag_id: number
+  readonly name: string
 }
 
 export interface ExperimentOwner {
-  user_id: number
-  email: string
-  first_name?: string
-  last_name?: string
-  avatar?: {
-    base_url?: string
+  readonly user_id: number
+  readonly email: string
+  readonly first_name?: string
+  readonly last_name?: string
+  readonly avatar?: {
+    readonly base_url?: string
   }
 }
 
 export interface ExperimentUser {
-  user_id: number
-  email: string
-  first_name?: string
-  last_name?: string
-  avatar?: {
-    base_url?: string
+  readonly user_id: number
+  readonly email: string
+  readonly first_name?: string
+  readonly last_name?: string
+  readonly avatar?: {
+    readonly base_url?: string
   }
 }
 
 export interface ExperimentTeam {
-  team_id: number
-  name: string
+  readonly team_id: number
+  readonly name: string
 }
 
 export interface ExperimentCustomSectionFieldValue {
-  id?: number
-  experiment_id?: number
-  custom_section_field_id?: number
-  experiment_custom_section_field_id?: number
-  type?: string
-  value: unknown
-  updated_at?: string
+  readonly id?: number
+  readonly experiment_id?: number
+  readonly custom_section_field_id?: number
+  readonly experiment_custom_section_field_id?: number
+  readonly type?: string
+  readonly value: unknown
+  readonly updated_at?: string
 }
 
 export interface ExperimentCustomSectionField {
-  id: number
-  custom_section_field_id: number
-  name: string
-  title?: string
-  type: 'text' | 'select' | 'multiselect' | 'string' | 'json' | 'boolean' | 'number'
-  required: boolean
-  options?: string[]
-  default_value?: string
-  section_id?: number
-  help_text?: string
-  placeholder?: string
-  archived?: boolean
-  order_index?: number
+  readonly id: number
+  readonly custom_section_field_id: number
+  readonly name: string
+  readonly title?: string
+  readonly type: 'text' | 'select' | 'multiselect' | 'string' | 'json' | 'boolean' | 'number'
+  readonly required: boolean
+  readonly options?: readonly string[]
+  readonly default_value?: string
+  readonly section_id?: number
+  readonly help_text?: string
+  readonly placeholder?: string
+  readonly archived?: boolean
+  readonly order_index?: number
 }
 
 export interface Environment {
-  environment_id: number
-  name: string
+  readonly environment_id: number
+  readonly name: string
 }
 
 import type { AIProviderType } from '~src/lib/ai-providers'
 
-export interface ABsmartlyConfig {
+type ABsmartlyConfigBase = {
   apiEndpoint: string
-  apiKey?: string
   environment?: number
-  authMethod?: 'jwt' | 'apikey'
   applicationId?: number
   applicationName?: string
   aiProvider?: AIProviderType
   aiModel?: string
   aiApiKey?: string
-  llmModel?: string // DEPRECATED: Use providerModels instead
+  llmModel?: string
   providerModels?: {
-    [key: string]: string // Map of provider -> selected model
+    [key: string]: string
   }
   providerEndpoints?: {
-    [key: string]: string // Map of provider -> custom endpoint URL
+    [key: string]: string
   }
   sdkApiKey?: string
   sdkApplicationName?: string
@@ -150,31 +148,38 @@ export interface ABsmartlyConfig {
   persistQueryToCookie?: boolean
 }
 
+export type ABsmartlyConfig = ABsmartlyConfigBase &
+  (
+    | { authMethod: 'jwt'; apiKey?: never }
+    | { authMethod: 'apikey'; apiKey: string }
+    | { authMethod?: never; apiKey?: string }
+  )
+
 export interface ABsmartlyUser {
-  id: number
-  email?: string
-  first_name?: string
-  last_name?: string
-  name?: string
-  picture?: string
-  avatar?: {
-    base_url?: string
-    file_name?: string
+  readonly id: number
+  readonly email?: string
+  readonly first_name?: string
+  readonly last_name?: string
+  readonly name?: string
+  readonly picture?: string
+  readonly avatar?: {
+    readonly base_url?: string
+    readonly file_name?: string
   }
-  avatarUrl?: string
+  readonly avatarUrl?: string
 }
 
 export interface Template {
-  id: number
-  name: string
-  created_at: string
-  updated_at: string
-  created_by?: {
-    first_name?: string
-    last_name?: string
-    email?: string
-    avatar?: {
-      base_url?: string
+  readonly id: number
+  readonly name: string
+  readonly created_at: string
+  readonly updated_at: string
+  readonly created_by?: {
+    readonly first_name?: string
+    readonly last_name?: string
+    readonly email?: string
+    readonly avatar?: {
+      readonly base_url?: string
     }
   }
 }

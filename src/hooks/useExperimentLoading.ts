@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { setExperimentsCache, getExperimentsCache } from '~src/utils/storage'
 import type { Experiment } from '~src/types/absmartly'
@@ -121,6 +121,10 @@ export function useExperimentLoading({
     loadCachedExperiments()
   }, [loadCachedExperiments])
 
+  const experimentMap = useMemo(() => {
+    return new Map(experiments.map(exp => [exp.id, exp]))
+  }, [experiments])
+
   return {
     experiments,
     filteredExperiments,
@@ -134,6 +138,7 @@ export function useExperimentLoading({
     handlePageChange,
     handlePageSizeChange,
     setCurrentPage,
-    setPageSize
+    setPageSize,
+    experimentMap
   }
 }

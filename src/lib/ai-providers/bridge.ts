@@ -19,8 +19,8 @@ export class BridgeProvider implements AIProvider {
     return BRIDGE_CHUNK_RETRIEVAL_PROMPT
   }
 
-  getToolDefinition(): any {
-    return SHARED_TOOL_SCHEMA as any
+  getToolDefinition() {
+    return SHARED_TOOL_SCHEMA
   }
 
   async generate(

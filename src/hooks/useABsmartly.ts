@@ -19,11 +19,14 @@ interface ExperimentParams {
   [key: string]: unknown
 }
 
+type AuthErrorType = 'not-authenticated' | 'auth-check-failed' | 'token-expired' | null
+
 export function useABsmartly() {
   const [client] = useState(() => new BackgroundAPIClient())
   const [config, setConfig] = useState<ABsmartlyConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [authErrorType, setAuthErrorType] = useState<AuthErrorType>(null)
   const [user, setUser] = useState<ExperimentUser | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
@@ -38,16 +41,29 @@ export function useABsmartly() {
         debugLog('[useABsmartly] ✅ Authenticated as:', result.data.user.email)
         setUser(result.data.user)
         setIsAuthenticated(true)
+        setAuthErrorType(null)
+      } else if (result?.error === 'AUTH_EXPIRED') {
+        debugLog('[useABsmartly] ❌ Token expired')
+        setUser(null)
+        setIsAuthenticated(false)
+        setAuthErrorType('token-expired')
       } else {
         debugLog('[useABsmartly] ❌ Not authenticated:', result?.error)
         setUser(null)
         setIsAuthenticated(false)
+        setAuthErrorType('not-authenticated')
       }
     } catch (err) {
       debugLog('[useABsmartly] ❌ Auth check failed:', err)
-      console.error('[useABsmartly] Unable to verify authentication:', err instanceof Error ? err.message : String(err))
+      console.error('[useABsmartly] Authentication check error - extension may be in invalid state:', {
+        error: err instanceof Error ? err.message : String(err),
+        errorType: 'auth-check-failed',
+        suggestion: 'Try reloading the extension or checking Chrome extension permissions'
+      })
       setUser(null)
       setIsAuthenticated(false)
+      setAuthErrorType('auth-check-failed')
+      setError('Unable to verify authentication. Please reload the extension.')
     }
   }, [config])
 
@@ -166,6 +182,7 @@ export function useABsmartly() {
     config,
     loading,
     error,
+    authErrorType,
     user,
     isAuthenticated,
     updateConfig,

@@ -138,6 +138,40 @@ export async function refreshOAuthToken(
   }
 }
 
+export async function refreshAccessToken(refreshToken: string): Promise<OAuthToken> {
+  try {
+    debugLog('Refreshing Anthropic access token...')
+
+    const response = await axios({
+      method: 'POST',
+      url: 'https://api.anthropic.com/oauth/token',
+      data: {
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const { access_token, refresh_token, expires_in, token_type } = response.data
+
+    const token: OAuthToken = {
+      accessToken: access_token,
+      refreshToken: refresh_token || refreshToken,
+      expiresIn: expires_in,
+      expiresAt: Date.now() + expires_in * 1000,
+      tokenType: token_type || 'Bearer'
+    }
+
+    debugLog('Successfully refreshed Anthropic access token')
+    return token
+  } catch (error) {
+    debugError('Failed to refresh Anthropic access token:', error)
+    throw error
+  }
+}
+
 export async function revokeOAuthToken(
   token: string,
   revokeEndpoint: string,

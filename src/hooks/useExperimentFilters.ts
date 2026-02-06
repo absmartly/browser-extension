@@ -80,7 +80,15 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
   }
 }
 
+const filterParamsCache = new Map<string, Record<string, unknown>>()
+
 export function buildFilterParams(filterState: ExperimentFilters | null, page: number, size: number) {
+  const cacheKey = JSON.stringify({ filterState, page, size })
+  const cached = filterParamsCache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
   const params: Record<string, unknown> = {
     page,
     items: size,
@@ -89,7 +97,10 @@ export function buildFilterParams(filterState: ExperimentFilters | null, page: n
     type: 'test'
   }
 
-  if (!filterState) return params
+  if (!filterState) {
+    filterParamsCache.set(cacheKey, params)
+    return params
+  }
 
   if (filterState.search?.trim()) {
     params.search = filterState.search.trim()
@@ -120,6 +131,12 @@ export function buildFilterParams(filterState: ExperimentFilters | null, page: n
   if (filterState.sample_size_reached === true) params.sample_size_reached = true
   if (filterState.experiments_interact === true) params.experiments_interact = true
   if (filterState.assignment_conflict === true) params.assignment_conflict = true
+
+  filterParamsCache.set(cacheKey, params)
+  if (filterParamsCache.size > 50) {
+    const firstKey = filterParamsCache.keys().next().value
+    filterParamsCache.delete(firstKey)
+  }
 
   return params
 }

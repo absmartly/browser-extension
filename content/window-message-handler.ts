@@ -9,6 +9,12 @@ export function setupWindowMessageListener(
     const isFileProtocol =
       window.location.protocol === "file:" || event.origin === "null"
     if (!isFileProtocol && event.origin !== window.location.origin) {
+      debugLog('[Security] Message rejected from origin:', {
+        receivedOrigin: event.origin,
+        expectedOrigin: window.location.origin,
+        messageType: event.data?.type,
+        source: event.data?.source
+      })
       return
     }
 

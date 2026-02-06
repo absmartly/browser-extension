@@ -163,10 +163,26 @@ export function compressHtml(html: string): string {
     .trim()
 }
 
+const systemPromptCache = new Map<string, string>()
+
 export async function getSystemPrompt(chunkRetrievalPrompt: string): Promise<string> {
+  const cacheKey = chunkRetrievalPrompt
+  const cached = systemPromptCache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
   const override = await getSystemPromptOverride()
   const basePrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
-  return basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
+  const result = basePrompt.replace('{{CHUNK_RETRIEVAL_DOCUMENTATION}}', chunkRetrievalPrompt)
+
+  systemPromptCache.set(cacheKey, result)
+  if (systemPromptCache.size > 10) {
+    const firstKey = systemPromptCache.keys().next().value
+    systemPromptCache.delete(firstKey)
+  }
+
+  return result
 }
 
 export function createSession(conversationSession?: ConversationSession): ConversationSession {

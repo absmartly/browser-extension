@@ -77,8 +77,9 @@ export function initializeBackgroundScript() {
     }
 
     const senderId = sender.tab?.id?.toString() || sender.id || 'unknown'
-    if (!checkRateLimit(senderId)) {
-      debugWarn(`[Background] Rate limit exceeded for sender: ${senderId}`)
+    const messageType = message.type || (message as any).action || 'unknown'
+    if (!checkRateLimit(senderId, {}, messageType)) {
+      debugWarn(`[Background] Rate limit exceeded for sender: ${senderId}, message type: ${messageType}`)
       sendResponse({
         success: false,
         error: 'Rate limit exceeded. Please slow down your requests.'

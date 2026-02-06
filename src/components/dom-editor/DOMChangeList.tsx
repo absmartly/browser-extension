@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import type { DOMChange, DOMChangeType, DOMChangeStyleRules } from '~src/types/dom-changes'
 import { Checkbox } from '../ui/Checkbox'
@@ -216,17 +216,16 @@ export function DOMChangeList({
     )
   }
 
-  return (
-    <div className="space-y-2">
-      {changes.map((change, index) => {
-        if (editingIndex === index) {
-          return null
-        }
+  const renderedChanges = useMemo(() => {
+    return changes.map((change, index) => {
+      if (editingIndex === index) {
+        return null
+      }
 
-        const Icon = getChangeIcon(change.type)
-        const isDisabled = change.disabled === true
+      const Icon = getChangeIcon(change.type)
+      const isDisabled = change.disabled === true
 
-        return (
+      return (
           <div
             key={index}
             draggable={true}
@@ -369,7 +368,12 @@ export function DOMChangeList({
             </div>
           </div>
         )
-      })}
+      })
+  }, [changes, editingIndex, draggedIndex, dragOverIndex, onEdit, onDelete, onToggle, onReorder])
+
+  return (
+    <div className="space-y-2">
+      {renderedChanges}
     </div>
   )
 }

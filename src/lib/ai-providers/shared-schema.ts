@@ -1,6 +1,6 @@
-// Shared JSON schema for all AI providers
-// This is the single source of truth for the response structure
-export const SHARED_TOOL_SCHEMA = {
+import type { JSONSchema } from './tool-types'
+
+export const SHARED_TOOL_SCHEMA: JSONSchema = {
   type: 'object',
   properties: {
     domChanges: {
@@ -47,7 +47,7 @@ export const SHARED_TOOL_SCHEMA = {
   required: ['domChanges', 'response', 'action']
 } as const
 
-export const CSS_QUERY_SCHEMA = {
+export const CSS_QUERY_SCHEMA: JSONSchema = {
   type: 'object',
   properties: {
     selectors: {
@@ -61,7 +61,7 @@ export const CSS_QUERY_SCHEMA = {
 
 export const CSS_QUERY_DESCRIPTION = 'Retrieves the HTML content of page sections by CSS selector(s). Use this to inspect elements before making changes. You can request multiple selectors at once for efficiency.'
 
-export const XPATH_QUERY_SCHEMA = {
+export const XPATH_QUERY_SCHEMA: JSONSchema = {
   type: 'object',
   properties: {
     xpath: {

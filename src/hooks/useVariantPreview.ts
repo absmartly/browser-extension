@@ -1,8 +1,10 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { sendToContent } from '~src/lib/messaging'
 import type { DOMChange } from '~src/types/dom-changes'
 import { getDOMChangesFromConfig, getChangesArray, type VariantConfig } from './useVariantConfig'
+
+const PREVIEW_DEBOUNCE_MS = 300
 
 interface UseVariantPreviewOptions {
   variants: Array<{ name: string; config: VariantConfig }>
@@ -19,6 +21,22 @@ export function useVariantPreview({
 }: UseVariantPreviewOptions) {
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [activePreviewVariant, setActivePreviewVariant] = useState<number | null>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const debouncedSendPreview = useCallback((action: 'apply' | 'remove' | 'update', payload: any) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        await sendToContent(payload)
+        debugLog(`[useVariantPreview] Preview ${action} successful`)
+      } catch (error) {
+        debugError(`[useVariantPreview] Error sending ABSMARTLY_PREVIEW (${action}):`, error)
+      }
+    }, PREVIEW_DEBOUNCE_MS)
+  }, [])
 
   const handlePreviewToggle = useCallback(async (enabled: boolean, variantIndex: number) => {
     try {
@@ -41,38 +59,28 @@ export function useVariantPreview({
           changes: enabledChanges
         })
 
-        try {
-          await sendToContent({
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'apply',
-            changes: enabledChanges,
-            experimentName: experimentName,
-            variantName: variantName
-          })
-          debugLog('[useVariantPreview] Preview apply successful')
-        } catch (error) {
-          debugError('[useVariantPreview] Error sending ABSMARTLY_PREVIEW (apply):', error)
-        }
+        debouncedSendPreview('apply', {
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'apply',
+          changes: enabledChanges,
+          experimentName: experimentName,
+          variantName: variantName
+        })
       } else {
         debugLog('[useVariantPreview] Sending ABSMARTLY_PREVIEW (remove):', { experimentName })
 
-        try {
-          await sendToContent({
-            type: 'ABSMARTLY_PREVIEW',
-            action: 'remove',
-            experimentName: experimentName
-          })
-          debugLog('[useVariantPreview] Preview remove successful')
-        } catch (error) {
-          debugError('[useVariantPreview] Error sending ABSMARTLY_PREVIEW (remove):', error)
-        }
+        debouncedSendPreview('remove', {
+          type: 'ABSMARTLY_PREVIEW',
+          action: 'remove',
+          experimentName: experimentName
+        })
       }
 
       debugLog('[useVariantPreview] handlePreviewToggle completed successfully')
     } catch (error) {
       debugError('[useVariantPreview] Unexpected error in handlePreviewToggle:', error)
     }
-  }, [variants, experimentName, domFieldName, activeVEVariant])
+  }, [variants, experimentName, domFieldName, activeVEVariant, debouncedSendPreview])
 
   const handlePreviewWithChanges = useCallback(async (enabled: boolean, variantIndex: number, changes: DOMChange[]) => {
     try {
@@ -175,6 +183,9 @@ export function useVariantPreview({
 
   useEffect(() => {
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
       try {
         sendToContent({
           type: 'ABSMARTLY_PREVIEW',

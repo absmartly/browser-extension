@@ -36,7 +36,17 @@ export function useExperimentHandlers({
   const [experimentDetailLoading, setExperimentDetailLoading] = useState(false)
 
   const handleExperimentClick = useCallback(async (experiment: Experiment) => {
-    await clearAllExperimentStorage(experiment.id)
+    try {
+      await clearAllExperimentStorage(experiment.id)
+    } catch (storageErr) {
+      debugError('[Storage] Failed to clear experiment storage:', storageErr)
+      console.error('[Storage] Storage clear failed - extension may have stale data:', {
+        experimentId: experiment.id,
+        error: storageErr instanceof Error ? storageErr.message : String(storageErr),
+        suggestion: 'Extension may show outdated information. Consider reloading the extension.'
+      })
+      onError('Failed to clear storage. Extension may show outdated information.')
+    }
 
     setView('detail')
     setExperimentDetailLoading(true)
@@ -62,7 +72,7 @@ export function useExperimentHandlers({
     } finally {
       setExperimentDetailLoading(false)
     }
-  }, [getExperiment, setView, onAuthExpired])
+  }, [getExperiment, setView, onAuthExpired, onError, setSelectedExperiment, setExperimentDetailLoading])
 
   const handleStartExperiment = useCallback(async (id: number) => {
     try {
@@ -97,14 +107,27 @@ export function useExperimentHandlers({
   }, [stopExperiment, onAuthExpired, onError])
 
   const handleCreateExperiment = useCallback(async () => {
-    await clearAllExperimentStorage(0)
+    try {
+      await clearAllExperimentStorage(0)
+    } catch (storageErr) {
+      debugError('[Storage] Failed to clear storage for new experiment:', storageErr)
+      console.error('[Storage] Storage clear failed:', storageErr)
+      onError('Failed to clear storage. New experiment may have stale data.')
+    }
     setSelectedExperiment(null)
     setView('create')
-  }, [setView])
+  }, [setView, onError])
 
   const handleCreateFromTemplate = useCallback(async (templateId: number) => {
     try {
       await clearAllExperimentStorage(0)
+    } catch (storageErr) {
+      debugError('[Storage] Failed to clear storage for template:', storageErr)
+      console.error('[Storage] Storage clear failed:', storageErr)
+      onError('Failed to clear storage. Template may have stale data.')
+    }
+
+    try {
       const template = await getExperiment(templateId)
       setSelectedExperiment({
         ...template,
@@ -122,10 +145,16 @@ export function useExperimentHandlers({
   }, [getExperiment, setView, onError])
 
   const handleEditExperiment = useCallback(async (experiment: Experiment) => {
-    await clearAllExperimentStorage(experiment.id)
+    try {
+      await clearAllExperimentStorage(experiment.id)
+    } catch (storageErr) {
+      debugError('[Storage] Failed to clear storage for edit:', storageErr)
+      console.error('[Storage] Storage clear failed:', storageErr)
+      onError('Failed to clear storage. Edited experiment may have stale data.')
+    }
     setSelectedExperiment(experiment)
     setView('edit')
-  }, [setView])
+  }, [setView, onError])
 
   const handleSaveExperiment = useCallback(async (experiment: Partial<Experiment>) => {
     try {

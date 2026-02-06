@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios'
 import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { getConfig as getConfigWithStorages } from './config-manager'
+import { withRetry, withNetworkRetry } from '~src/lib/api-retry'
 
 const storage = new Storage()
 const secureStorage = new Storage({
@@ -134,13 +135,18 @@ export async function makeAPIRequest(
   }
 
   try {
-    const response = await axios({
-      method,
-      url,
-      data: requestData,
-      headers,
-      withCredentials: true
-    })
+    const response = await withNetworkRetry(
+      async () => {
+        return await axios({
+          method,
+          url,
+          data: requestData,
+          headers,
+          withCredentials: true
+        })
+      },
+      3
+    )
 
     const responseData = response.data
 

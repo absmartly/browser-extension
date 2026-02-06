@@ -19,7 +19,8 @@ const VIOLATION_BLOCK_MS = 300000
 
 export function checkRateLimit(
   senderId: string,
-  config: Partial<RateLimitConfig> = {}
+  config: Partial<RateLimitConfig> = {},
+  messageType?: string
 ): boolean {
   const { maxRequests, windowMs } = { ...DEFAULT_CONFIG, ...config }
 
@@ -35,13 +36,15 @@ export function checkRateLimit(
     violationCount.set(senderKey, violations + 1)
 
     debugWarn(
-      `[RateLimiter] Rate limit exceeded for ${senderId}: ${recentTimes.length}/${maxRequests} requests in ${windowMs}ms window (violation #${violations + 1})`
+      `[RateLimiter] Rate limit exceeded for ${senderId}: ${recentTimes.length}/${maxRequests} requests in ${windowMs}ms window (violation #${violations + 1})`,
+      messageType ? { messageType } : undefined
     )
 
     if (violations + 1 >= VIOLATION_THRESHOLD) {
       const blockUntil = now + VIOLATION_BLOCK_MS
       debugWarn(
-        `[RateLimiter] BLOCKED ${senderId} for ${VIOLATION_BLOCK_MS}ms after ${VIOLATION_THRESHOLD} violations`
+        `[RateLimiter] BLOCKED ${senderId} for ${VIOLATION_BLOCK_MS}ms after ${VIOLATION_THRESHOLD} violations`,
+        messageType ? { messageType } : undefined
       )
       requestTimestamps.set(senderKey, [blockUntil])
       return false
@@ -55,7 +58,8 @@ export function checkRateLimit(
 
   if (recentTimes.length % 50 === 0 && recentTimes.length > 0) {
     debugLog(
-      `[RateLimiter] ${senderId}: ${recentTimes.length}/${maxRequests} requests in window`
+      `[RateLimiter] ${senderId}: ${recentTimes.length}/${maxRequests} requests in window`,
+      messageType ? { messageType } : undefined
     )
   }
 

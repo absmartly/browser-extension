@@ -17,6 +17,14 @@ import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, withTimeout, parseAPIError } from './constants'
 import { debugLog } from '~src/utils/debug'
 
+function isTextBlock(block: Anthropic.ContentBlock): block is Anthropic.TextBlock {
+  return block.type === 'text'
+}
+
+function isToolUseBlock(block: Anthropic.ContentBlock): block is Anthropic.ToolUseBlock {
+  return block.type === 'tool_use'
+}
+
 export class AnthropicProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
@@ -28,7 +36,7 @@ export class AnthropicProvider implements AIProvider {
     return {
       name: 'dom_changes_generator',
       description: DOM_CHANGES_TOOL_DESCRIPTION,
-      input_schema: SHARED_TOOL_SCHEMA as any
+      input_schema: SHARED_TOOL_SCHEMA as Anthropic.Tool.InputSchema
     }
   }
 
@@ -36,7 +44,7 @@ export class AnthropicProvider implements AIProvider {
     return {
       name: 'css_query',
       description: CSS_QUERY_DESCRIPTION,
-      input_schema: CSS_QUERY_SCHEMA as any
+      input_schema: CSS_QUERY_SCHEMA as Anthropic.Tool.InputSchema
     }
   }
 
@@ -44,7 +52,7 @@ export class AnthropicProvider implements AIProvider {
     return {
       name: 'xpath_query',
       description: XPATH_QUERY_DESCRIPTION,
-      input_schema: XPATH_QUERY_SCHEMA as any
+      input_schema: XPATH_QUERY_SCHEMA as Anthropic.Tool.InputSchema
     }
   }
 
@@ -155,20 +163,18 @@ export class AnthropicProvider implements AIProvider {
 
       let message: Anthropic.Message
       try {
-        message = await withTimeout(anthropic.messages.create(requestBody as any))
-      } catch (error: any) {
+        message = await withTimeout(anthropic.messages.create(requestBody))
+      } catch (error: unknown) {
         throw new Error(parseAPIError(error, 'Anthropic API error'))
       }
 
-      // Check if we got tool use or final response
-      const toolUseBlocks = message.content.filter(block => block.type === 'tool_use')
-      const textBlocks = message.content.filter(block => block.type === 'text')
+      const toolUseBlocks = message.content.filter(isToolUseBlock)
+      const textBlocks = message.content.filter(isTextBlock)
 
       if (toolUseBlocks.length === 0) {
-        // No tool calls - this is a conversational response
         debugLog('[Anthropic] ℹ️ No tool calls - conversational response')
 
-        const responseText = textBlocks.map(block => (block as any).text).join('\n').trim()
+        const responseText = textBlocks.map(block => block.text).join('\n').trim()
         session.messages.push({ role: 'assistant', content: responseText })
 
         return {
@@ -179,11 +185,9 @@ export class AnthropicProvider implements AIProvider {
         }
       }
 
-      // Process tool calls
-      const toolResults: Anthropic.MessageParam['content'] = []
+      const toolResults: Anthropic.ToolResultBlockParam[] = []
 
-      for (const toolBlock of toolUseBlocks) {
-        const tool = toolBlock as any
+      for (const tool of toolUseBlocks) {
         debugLog(`[Anthropic] 🔧 Tool call: ${tool.name}`)
 
         if (tool.name === 'dom_changes_generator') {
@@ -213,7 +217,7 @@ export class AnthropicProvider implements AIProvider {
             type: 'tool_result',
             tool_use_id: tool.id,
             content: result.error || result.result || ''
-          } as any)
+          })
         } else if (tool.name === 'xpath_query') {
           const xpath = tool.input.xpath as string
           const maxResults = (tool.input.maxResults as number) || 10
@@ -223,14 +227,13 @@ export class AnthropicProvider implements AIProvider {
             type: 'tool_result',
             tool_use_id: tool.id,
             content: result.error || result.result || ''
-          } as any)
+          })
         } else {
-          // Unknown tool
           toolResults.push({
             type: 'tool_result',
             tool_use_id: tool.id,
             content: `Error: Unknown tool "${tool.name}"`
-          } as any)
+          })
         }
       }
 

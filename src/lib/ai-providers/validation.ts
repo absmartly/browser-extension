@@ -19,6 +19,12 @@ export function validateAIDOMGenerationResult(responseText: string): ValidationR
   try {
     parsedResult = JSON.parse(responseText)
   } catch (error) {
+    const parseError = error instanceof Error ? error.message : String(error)
+    console.error('[Validation] JSON parse failed:', {
+      error: parseError,
+      received: responseText.substring(0, 200) + (responseText.length > 200 ? '...' : ''),
+      suggestion: 'Ensure the AI response is pure JSON without markdown code blocks or extra text'
+    })
     return {
       isValid: false,
       errors: ['Response is not valid JSON. Your response must be pure JSON starting with { and ending with }.']
@@ -49,6 +55,22 @@ export function validateAIDOMGenerationResult(responseText: string): ValidationR
   }
 
   if (errors.length > 0) {
+    console.error('[Validation] AI DOM Generation validation failed:', {
+      errors,
+      received: {
+        domChanges: parsedResult?.domChanges ? `array[${parsedResult.domChanges.length}]` : typeof parsedResult?.domChanges,
+        response: parsedResult?.response ? `string[${parsedResult.response.length}]` : typeof parsedResult?.response,
+        action: parsedResult?.action || 'missing',
+        targetSelectors: parsedResult?.targetSelectors ? `array[${parsedResult.targetSelectors.length}]` : undefined
+      },
+      expected: {
+        domChanges: 'array of DOMChange objects',
+        response: 'string (conversational message)',
+        action: 'one of: append, replace_all, replace_specific, remove_specific, none',
+        targetSelectors: 'array (required for replace_specific/remove_specific actions)'
+      },
+      suggestion: 'Fix the AI response to match the expected schema'
+    })
     return { isValid: false, errors }
   }
 
