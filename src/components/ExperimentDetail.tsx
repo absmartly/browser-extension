@@ -36,7 +36,9 @@ interface ExperimentDetailProps {
     onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
-    onPreviewToggle: (enabled: boolean) => void
+    onPreviewToggle: (enabled: boolean) => void,
+    onPreviewRefresh: () => void,
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => void
   autoNavigateToAI?: string | null
   onError?: (message: string) => void

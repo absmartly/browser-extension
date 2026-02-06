@@ -15,10 +15,25 @@ export interface VisualEditorMessage {
   type: 'VISUAL_EDITOR_CHANGES'
   changes: unknown[]
   variantName: string
-  experimentId: number
+  experimentId?: number
 }
 
-export type ChromeMessage = ElementSelectedMessage | DragDropCompleteMessage | VisualEditorMessage
+export interface VisualEditorCompleteMessage {
+  type: 'VISUAL_EDITOR_CHANGES_COMPLETE'
+  changes: unknown[]
+  variantName: string
+}
+
+export interface VisualEditorStoppedMessage {
+  type: 'VISUAL_EDITOR_STOPPED'
+}
+
+export type ChromeMessage =
+  | ElementSelectedMessage
+  | DragDropCompleteMessage
+  | VisualEditorMessage
+  | VisualEditorCompleteMessage
+  | VisualEditorStoppedMessage
 
 export function isElementSelectedMessage(msg: ChromeMessage): msg is ElementSelectedMessage {
   return msg.type === 'ELEMENT_SELECTED'

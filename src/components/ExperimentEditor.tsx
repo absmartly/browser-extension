@@ -220,11 +220,11 @@ export function ExperimentEditor({
           <div className="flex items-start">
             <div className="flex-1 space-y-3" style={{ paddingRight: '24px' }}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label id="display-name-label" className="block text-sm font-medium text-gray-700 mb-1">
                   Display Name
                 </label>
                 <Input
-                  id="experiment-name-input"
+                  id="display-name-input"
                   value={formData.display_name}
                   onChange={(e) => handleDisplayNameChange(e.target.value)}
                   placeholder="My Experiment"
@@ -232,10 +232,11 @@ export function ExperimentEditor({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label id="experiment-name-label" className="block text-sm font-medium text-gray-700 mb-1">
                   Experiment Name
                 </label>
                 <Input
+                  id="experiment-name-input"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="my_experiment_name"

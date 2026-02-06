@@ -96,7 +96,7 @@ export function useSettingsForm() {
 
       const hasStoredConfig = (config?.apiKey || config?.apiEndpoint)
       if (!hasStoredConfig && envApiKey && envApiEndpoint) {
-        const autoConfig: ABsmartlyConfig = {
+        const autoConfig = {
           apiKey: loadedApiKey.trim() || undefined,
           apiEndpoint: loadedApiEndpoint,
           applicationName: loadedApplicationName.trim() || undefined,
@@ -109,7 +109,7 @@ export function useSettingsForm() {
           aiApiKey: loadedAiApiKey.trim() || undefined,
           providerModels: loadedProviderModels,
           providerEndpoints: loadedProviderEndpoints
-        }
+        } as ABsmartlyConfig
         await setConfig(autoConfig)
         console.log('[useSettingsForm] Auto-saved config from environment variables')
       }
@@ -259,7 +259,7 @@ export function useSettingsForm() {
       aiApiKey: aiApiKey.trim() || undefined,
       providerModels: updatedProviderModels,
       providerEndpoints: updatedProviderEndpoints
-    }
+    } as ABsmartlyConfig
   }
 
   const requestMissingPermissions = async (): Promise<boolean> => {

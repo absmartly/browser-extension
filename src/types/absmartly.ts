@@ -131,6 +131,8 @@ export interface ExperimentInjectionCode {
   bodyEnd?: string
 }
 
+export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'
+
 import type { AIProviderType } from '~src/lib/ai-providers'
 
 type ABsmartlyConfigBase = {

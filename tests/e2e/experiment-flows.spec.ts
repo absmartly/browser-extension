@@ -40,14 +40,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
     if (testPage) await testPage.close()
   })
 
-  test.skip('Create new experiment from scratch with Header component', async ({ extensionId, extensionUrl }) => {
-    // TODO: Fix page crash when clicking Create Experiment Draft button
-    // Root cause: Clicking the Create button causes "Target page, context or browser has been closed" error
-    // This is a systemic issue affecting multiple tests related to experiment creation/save
-    // Likely causes: (1) Form submission handler error that crashes page, (2) API call error, (3) Navigation handler issue
-    // Need to: Add error boundaries, better error handling in ExperimentEditor submit handler
-    // Also: Form field selectors return NOT_FOUND, suggesting the test may be checking wrong selectors
-    test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
+  test('Create new experiment from scratch with Header component', async ({ extensionId, extensionUrl }) => {
+    test.setTimeout(process.env.SLOW === '1' ? 30000 : 15000)
 
     let sidebar: any
 
@@ -177,8 +171,10 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Verify button text shows "Create Experiment Draft"', async () => {
       console.log('\n🔍 Verifying create button text')
 
-      const createButton = sidebar.locator('#create-experiment-draft-button')
+      const createButton = sidebar.locator('#create-experiment-button')
       await expect(createButton).toBeVisible()
+      const buttonText = await createButton.textContent()
+      expect(buttonText).toContain('Create Experiment Draft')
       console.log('  ✓ Button shows "Create Experiment Draft" (not "Update Experiment")')
 
       await debugWait()
@@ -191,23 +187,22 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const lockButton = sidebar.locator('button').filter({ has: sidebar.locator('svg.h-4.w-4') }).first()
 
       // Type in experiment name
-      const nameInput = sidebar.locator('input[placeholder*="experiment_name"]')
+      const nameInput = sidebar.locator('#experiment-name-input')
+      await nameInput.waitFor({ state: 'visible', timeout: 5000 })
       await nameInput.fill('test_sync_name')
-      await debugWait()
 
       // Display name should auto-update to "Test Sync Name"
-      const displayNameInput = sidebar.locator('#display-name-label').locator('..').locator('input')
+      const displayNameInput = sidebar.locator('#display-name-input')
+      await displayNameInput.waitFor({ state: 'visible', timeout: 5000 })
       const displayNameValue = await displayNameInput.inputValue()
       expect(displayNameValue).toBe('Test Sync Name')
       console.log('  ✓ Display name synced: "Test Sync Name"')
 
       // Click lock to unsync
       await lockButton.click()
-      await debugWait()
 
       // Now change experiment name again
       await nameInput.fill('another_test')
-      await debugWait()
 
       // Display name should NOT change
       const displayNameAfter = await displayNameInput.inputValue()
@@ -216,7 +211,6 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
       // Restore experiment name
       await nameInput.fill(experimentName)
-      await debugWait()
     })
 
     await test.step('Verify variants section with useExperimentVariants hook', async () => {
@@ -260,7 +254,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       }
 
       // Check form state before clicking
-      const nameValue = await sidebar.locator('input[name="name"]').inputValue().catch(() => 'NOT_FOUND')
+      const nameValue = await sidebar.locator('#experiment-name-input').inputValue().catch(() => 'NOT_FOUND')
       const unitTypeText = await sidebar.locator('#unit-type-select-trigger').textContent().catch(() => 'NOT_FOUND')
       const appsText = await sidebar.locator('#applications-select-trigger').textContent().catch(() => 'NOT_FOUND')
 
@@ -305,8 +299,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
         // Log form state for debugging
         const formState = await sidebar.evaluate(() => {
-          const nameInput = document.querySelector('input[name="name"]') as HTMLInputElement
-          const unitTypeValue = document.querySelector('[id*="unit-type"]')?.textContent
+          const nameInput = document.querySelector('#experiment-name-input') as HTMLInputElement
+          const unitTypeValue = document.querySelector('#unit-type-select-trigger')?.textContent
           return {
             name: nameInput?.value,
             unitType: unitTypeValue
@@ -337,13 +331,14 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log(`  [DEBUG] Sidebar contains "Create": ${sidebarText.includes('Create')}`)
 
       // Wait for either success (redirects to list) or error message
+      // API calls can take time, so use a longer timeout
       const listHeading = sidebar.locator('text=Experiments')
       const errorMessage = sidebar.locator('text=/error|failed|invalid/i')
 
       try {
         await Promise.race([
-          listHeading.waitFor({ timeout: 10000 }),
-          errorMessage.waitFor({ timeout: 10000 })
+          listHeading.waitFor({ timeout: 30000 }),
+          errorMessage.waitFor({ timeout: 30000 })
         ])
 
         const hasError = await errorMessage.isVisible().catch(() => false)
@@ -795,8 +790,10 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Verify button shows "Create Experiment Draft"', async () => {
       console.log('\n🔍 Verifying button text')
 
-      const createButton = sidebar.locator('#create-experiment-draft-button')
+      const createButton = sidebar.locator('#create-experiment-button')
       await expect(createButton).toBeVisible()
+      const buttonText = await createButton.textContent()
+      expect(buttonText).toContain('Create Experiment Draft')
       console.log('  ✓ Button correctly shows "Create Experiment Draft" (not "Update Experiment")')
 
       await debugWait()

@@ -28,7 +28,11 @@ export function useViewNavigation() {
     onPreviewRefresh: () => void,
     onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => {
-    setAiDomContext({
+    console.log('[useViewNavigation] handleNavigateToAI called for variant:', variantName)
+    console.log('[useViewNavigation] Current view:', view)
+    console.log('[useViewNavigation] Setting aiDomContext and navigating to ai-dom-changes view')
+
+    const context = {
       variantName,
       onGenerate,
       currentChanges,
@@ -37,9 +41,13 @@ export function useViewNavigation() {
       onPreviewRefresh,
       onPreviewWithChanges,
       previousView: view
-    })
+    }
+
+    setAiDomContext(context)
     setView('ai-dom-changes')
     setAutoNavigateToAI(null)
+
+    console.log('[useViewNavigation] Navigation complete. New view should be: ai-dom-changes')
   }, [view])
 
   const handleBackFromAI = useCallback(() => {

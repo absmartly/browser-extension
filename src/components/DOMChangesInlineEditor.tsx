@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
@@ -34,7 +34,8 @@ interface DOMChangesInlineEditorProps {
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
-    onPreviewRefresh: () => void
+    onPreviewRefresh: () => void,
+    onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => void
 }
 
@@ -109,6 +110,11 @@ export function DOMChangesInlineEditor({
   const [isDragOver, setIsDragOver] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
+  const handlePreviewWithChanges = useCallback((enabled: boolean, domChanges: DOMChange[]) => {
+    onPreviewToggle(enabled)
+    onChange(domChanges)
+  }, [onPreviewToggle, onChange])
+
   const aiGenerateCallbackIdRef = useRef(Date.now())
   useEffect(() => {
     const newId = Date.now()
@@ -136,9 +142,9 @@ export function DOMChangesInlineEditor({
     ) {
       hasAutoNavigatedRef.current = true
       console.log(`[DOMChangesInlineEditor:${variantName}] Auto-navigating to AI page`)
-      onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh)
+      onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges)
     }
-  }, [autoNavigateToAI, variantName, onNavigateToAI, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh])
+  }, [autoNavigateToAI, variantName, onNavigateToAI, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges])
 
   return (
     <div
@@ -343,7 +349,7 @@ export function DOMChangesInlineEditor({
             type="button"
             onClick={() => {
               if (onNavigateToAI && onPreviewRefresh) {
-                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh)
+                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges)
               } else {
                 setAiDialogOpen(true)
               }
@@ -379,7 +385,7 @@ export function DOMChangesInlineEditor({
       <AIDOMChangesDialog
         isOpen={aiDialogOpen}
         onClose={() => setAiDialogOpen(false)}
-        onGenerate={handleAIGenerate}
+        onGenerate={async (prompt) => { await handleAIGenerate(prompt) }}
         variantName={variantName}
       />
     </div>

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
-import { log, initializeTestLogging, debugWait } from './utils/test-helpers'
+import { log, initializeTestLogging } from './utils/test-helpers'
 import { spawn, ChildProcess } from 'child_process'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
@@ -164,28 +164,19 @@ test.describe('AI Page Persistence and HTML Capture', () => {
     if (testPage && !process.env.SLOW) await testPage.close()
   })
 
-  // TODO: SKIPPED - AI page heading never appears after clicking "Generate with AI"
-  // Test loads sidebar.html directly (not as iframe) and clicks Generate with AI button
-  // Button click succeeds and bridge spawns, but #ai-dom-generator-heading never becomes visible
-  // Possible causes: (1) React state not triggering re-render (2) Direct sidebar navigation breaks state flow
-  // (3) Missing wait for view transition to complete (4) Component mount timing issue
-  // To fix: Debug why view='ai-dom-changes' doesn't render AIDOMChangesPage after button click
-  // Consider using iframe injection pattern like other tests instead of direct sidebar navigation
-  test.skip('should persist AI page state after reload and capture HTML successfully', async ({ context, extensionUrl }) => {
+  test('should persist AI page state after reload and capture HTML successfully', async ({ context, extensionUrl }) => {
     // Open a test page in a separate tab (for HTML capture)
     const contentPage = await context.newPage()
     await contentPage.goto(`http://localhost:3456${TEST_PAGE_URL}`, { waitUntil: 'load' })
 
     // Wait for content script to be injected (content scripts run at document_idle)
-    await debugWait(500)
     log('✓ Content page loaded for HTML capture')
 
     await test.step('Load sidebar in extension context', async () => {
       log('Loading sidebar in extension context...')
       const sidebarUrl = extensionUrl('tabs/sidebar.html')
       await testPage.goto(sidebarUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
-      await debugWait(500)
-
+  
       await testPage.screenshot({ path: 'test-results/ai-persistence-0-sidebar-injected.png', fullPage: true })
       log('Screenshot saved: ai-persistence-0-sidebar-injected.png')
     })
@@ -198,8 +189,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await createButton.click()
       log('✓ Create button clicked')
 
-      await debugWait(500)
-
+  
       await testPage.screenshot({ path: 'test-results/ai-persistence-1-dropdown.png', fullPage: true })
       log('Screenshot saved: ai-persistence-1-dropdown.png')
 
@@ -208,14 +198,12 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await fromScratchButton.click()
       log('✓ From Scratch clicked')
 
-      await debugWait(1000)
 
       const loadingText = testPage.locator('text=Loading templates')
       await loadingText.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {
         log('⚠️ Loading templates text still visible or never appeared')
       })
 
-      await debugWait(1000)
       await testPage.screenshot({ path: 'test-results/ai-persistence-1.5-after-loading.png', fullPage: true })
       log('Screenshot saved: ai-persistence-1.5-after-loading.png')
 
@@ -225,8 +213,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await testPage.screenshot({ path: 'test-results/ai-persistence-2-editor.png', fullPage: true })
       log('Screenshot saved: ai-persistence-2-editor.png')
 
-      await debugWait(500)
-    })
+      })
 
     let variantName: string
 
@@ -236,13 +223,11 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await loadingText.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {
         log('⚠️ Loading text still visible or never appeared')
       })
-      await debugWait(1000)
       log('✓ Form loaded')
 
       log('Scrolling to DOM Changes section...')
       await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
-      await debugWait(500)
-
+  
       await testPage.screenshot({ path: 'test-results/ai-persistence-2.5-dom-changes.png', fullPage: true })
       log('Screenshot saved: ai-persistence-2.5-dom-changes.png')
 
@@ -252,8 +237,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       log('✓ Generate with AI button found')
 
       await generateWithAIButton.scrollIntoViewIfNeeded()
-      await debugWait(300)
-
+  
       await testPage.screenshot({ path: 'test-results/ai-persistence-2.6-before-click.png', fullPage: true })
       log('Screenshot saved: ai-persistence-2.6-before-click.png')
 
@@ -281,8 +265,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await promptInput.fill('Make all buttons have an orange background')
       log('✓ Prompt entered: "Make all buttons have an orange background"')
 
-      await debugWait(300)
-
+  
       await testPage.screenshot({ path: 'test-results/ai-persistence-4-prompt-entered.png', fullPage: true })
       log('Screenshot saved: ai-persistence-4-prompt-entered.png')
 
@@ -296,8 +279,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await generateButton.click()
       log('✓ Generate button clicked')
 
-      await debugWait(500)
-
+  
       log('Console messages after clicking Generate:')
       allConsoleMessages.slice(-10).forEach(msg => {
         log(`  [${msg.type}] ${msg.text}`)
@@ -311,7 +293,6 @@ test.describe('AI Page Persistence and HTML Capture', () => {
         log('⚠️ Generation still in progress or button state did not change')
       })
 
-      await debugWait(1000)
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-5-after-generate.png', fullPage: true })
       log('Screenshot saved: ai-persistence-5-after-generate.png')
@@ -359,7 +340,6 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await testPage.reload({ waitUntil: 'domcontentloaded' })
       log('✓ Page reloaded')
 
-      await debugWait(1000)
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-7-after-reload.png', fullPage: true })
       log('Screenshot saved: ai-persistence-7-after-reload.png')

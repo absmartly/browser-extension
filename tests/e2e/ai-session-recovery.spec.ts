@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { Page } from '@playwright/test'
-import { setupTestPage, click, debugWait } from './utils/test-helpers'
+import { setupTestPage, click } from './utils/test-helpers'
 import { createExperiment } from './helpers/ve-experiment-setup'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
@@ -26,15 +26,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
     if (testPage && !process.env.SLOW) await testPage.close()
   })
 
-  // TODO: SKIPPED - Multiple issues requiring significant refactoring:
-  // 1. Uses forbidden text selector: '#ai-dom-generator-heading' (should use #ai-dom-generator-heading)
-  // 2. Uses forbidden debugWait() pattern instead of explicit waits
-  // 3. AI page heading never becomes visible (same issue affecting other AI tests)
-  // 4. Tests console message capture infrastructure which is complex to debug
-  // 5. Would need to: (a) Replace all text selectors with ID selectors, (b) Replace debugWait with proper waits,
-  //    (c) Debug AI page navigation issue, (d) Verify console message capture works
-  // Decision: Skip for now - requires 2+ hours of work to fix all issues
-  test.skip('should persist session and conversation across page reload', async ({ extensionId, extensionUrl, context }) => {
+  test('should persist session and conversation across page reload', async ({ extensionId, extensionUrl, context }) => {
     test.setTimeout(SLOW_MODE ? 180000 : 120000)
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -53,12 +45,10 @@ test.describe('AI Session Recovery After Page Reload', () => {
       const generateButton = sidebar.locator('#generate-with-ai-button').first()
       await generateButton.waitFor({ state: 'visible' })
       await generateButton.click()
-      await debugWait(500)
 
       await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page loaded')
 
-      await debugWait(1000)
 
       const sessionInitMessages = allConsoleMessages.filter(msg =>
         msg.text.includes('[AIDOMChangesPage] Session initialized:') ||
@@ -88,7 +78,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
       const generateButton = sidebar.locator('#ai-generate-button')
       await generateButton.click()
 
-      await debugWait(2000)
 
       const messageCountBefore = await sidebar.locator('.chat-message').count()
       console.log(`Message count before waiting: ${messageCountBefore}`)
@@ -126,7 +115,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
 
       expect(hasMessage).toBe(true)
 
-      await debugWait(1000)
 
       const storage = await testPage.evaluate(async () => {
         const result = await chrome.storage.local.get('ai-conversations-A')
@@ -154,7 +142,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
       await testPage.screenshot({ path: 'test-results/session-recovery-2-after-reload.png', fullPage: true })
       console.log('Screenshot saved: session-recovery-2-after-reload.png')
 
-      await debugWait(1000)
     })
 
     await test.step('Navigate back to AI page and verify conversation restored', async () => {
@@ -164,12 +151,10 @@ test.describe('AI Session Recovery After Page Reload', () => {
       const generateButton = freshSidebar.locator(`button:has-text("Generate with AI")`).first()
       await generateButton.waitFor({ state: 'visible', timeout: 10000 })
       await generateButton.click()
-      await debugWait(500)
 
       await freshSidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page reopened')
 
-      await debugWait(1000)
 
       const messages = await freshSidebar.locator('.chat-message').count()
       console.log(`✅ Found ${messages} messages after reload`)
@@ -199,7 +184,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
       await freshSidebar.locator('.chat-message').last().waitFor({ state: 'visible', timeout: 60000 })
       console.log('✅ Second message response received')
 
-      await debugWait(1000)
 
       const messageCount = await freshSidebar.locator('.chat-message').count()
       console.log(`✅ Total messages now: ${messageCount}`)
@@ -239,8 +223,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
     console.log('\n✅ Session recovery test completed successfully!')
   })
 
-  // TODO: SKIPPED - Same issues as previous test. See detailed TODO above.
-  test.skip('should show reinitialization error after reload without navigation', async ({ extensionUrl }) => {
+  test('should show reinitialization error after reload without navigation', async ({ extensionUrl }) => {
     test.setTimeout(SLOW_MODE ? 60000 : 30000)
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -254,7 +237,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
       const generateButton = sidebar.locator('#generate-with-ai-button').first()
       await generateButton.waitFor({ state: 'visible' })
       await generateButton.click()
-      await debugWait(500)
 
       await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       console.log('✅ AI page loaded')
@@ -266,7 +248,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
       await testPage.reload({ waitUntil: 'networkidle' })
       console.log('✅ Page reloaded')
 
-      await debugWait(1000)
 
       await testPage.screenshot({ path: 'test-results/session-recovery-error-1-after-reload.png', fullPage: true })
       console.log('Screenshot saved: session-recovery-error-1-after-reload.png')
@@ -297,7 +278,6 @@ test.describe('AI Session Recovery After Page Reload', () => {
       const returnButton = freshSidebar.locator('#return-to-variant-editor-button')
       await expect(returnButton).toBeVisible()
       await returnButton.click()
-      await debugWait(500)
 
       const editorTitle = freshSidebar.locator('text=DOM Changes')
       await editorTitle.waitFor({ state: 'visible', timeout: 5000 })

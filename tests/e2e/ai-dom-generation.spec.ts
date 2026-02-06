@@ -67,13 +67,8 @@ test.describe('AI DOM Changes Generation', () => {
     if (testPage) await testPage.close()
   })
 
-  // TODO: SKIPPED - Page crashes when clicking Generate button (Target page closed)
-  // Test times out at 90s (violates <10s rule)
-  // Uses forbidden debugWait() pattern
-  // Uses force:true clicks which bypass validations
-  // To fix: Debug page crash on Generate button, remove force clicks, use proper waits, reduce timeout
-  test.skip('Generate DOM changes using AI prompts', async ({ extensionId, extensionUrl, context }) => {
-    test.setTimeout(SLOW_MODE ? 180000 : 90000)
+  test('Generate DOM changes using AI prompts', async ({ extensionId, extensionUrl, context }) => {
+    test.setTimeout(SLOW_MODE ? 60000 : 30000)
 
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
@@ -132,8 +127,6 @@ test.describe('AI DOM Changes Generation', () => {
           }
         })
       }
-
-      await debugWait()
     })
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -146,7 +139,6 @@ test.describe('AI DOM Changes Generation', () => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
       console.log('  Dispatched click event to Create New Experiment button')
-      await debugWait()
 
       console.log('  Selecting "From Scratch" option...')
       const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
@@ -155,12 +147,10 @@ test.describe('AI DOM Changes Generation', () => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       })
       console.log('  ✓ Selected "From Scratch" option')
-      await debugWait()
 
       experimentName = `AI DOM Test ${Date.now()}`
       await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
       console.log(`  Filled experiment name: ${experimentName}`)
-      await debugWait()
 
       console.log('  Selecting Unit Type...')
       const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
@@ -175,7 +165,6 @@ test.describe('AI DOM Changes Generation', () => {
       await firstUnitTypeOption.waitFor({ state: 'visible', timeout: 15000 })
       await firstUnitTypeOption.click()
       console.log('  ✓ Selected unit type')
-      await debugWait()
 
       console.log('  Selecting Applications...')
       const appsContainer = sidebar.locator('label:has-text("Applications")').locator('..')
@@ -206,7 +195,6 @@ test.describe('AI DOM Changes Generation', () => {
       await appsDropdownClosed.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
 
       console.log('✅ Experiment form filled with required fields')
-      await debugWait()
     })
 
     // Note: Anthropic API key is auto-loaded from PLASMO_PUBLIC_ANTHROPIC_API_KEY environment variable
@@ -235,12 +223,14 @@ test.describe('AI DOM Changes Generation', () => {
         const aiButtonFresh = sidebar.locator('#generate-with-ai-button').first()
         await aiButtonFresh.waitFor({ state: 'visible', timeout: 5000 })
 
-        // Try clicking with JavaScript to bypass any event issues
+        // Click to open AI dialog
         await aiButtonFresh.evaluate((button) => {
           button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
         console.log('  ✓ Clicked Generate with AI button')
-        await debugWait(1000)
+
+        // Wait for dialog to appear
+        await sidebar.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5000 })
 
         // Check if dialog appeared
         const dialogVisible = await sidebar.locator('[role="dialog"]').isVisible({ timeout: 2000 }).catch(() => false)
@@ -260,7 +250,6 @@ test.describe('AI DOM Changes Generation', () => {
         await expect(promptTextarea).toBeVisible({ timeout: 5000 })
 
         await promptTextarea.fill(prompts[i])
-        await debugWait(300)
 
         // Debug: Verify the prompt was filled correctly
         const filledValue = await promptTextarea.inputValue()
@@ -278,19 +267,16 @@ test.describe('AI DOM Changes Generation', () => {
           console.log(`  Generate button text: "${buttonText}"`)
         }
 
-        // Debug: Check if loading state appears
+        // Click Generate button (no force:true - let validation work)
         console.log('  🖱️  Clicking Generate button...')
-        await generateButton.click({ force: true })
+        await generateButton.click()
         console.log('  ✓ Generate button clicked')
 
-        await debugWait(500)
-
-        // Debug: Check if "Generating" text appears (indicates loading state)
+        // Wait for loading state to appear (indicates API call started)
         const generatingText = sidebar.locator('text=Generating').first()
-        const isGenerating = await generatingText.isVisible({ timeout: 2000 }).catch(() => false)
-        console.log(`  "Generating" text visible: ${isGenerating}`)
-
-        await debugWait(500)
+        await generatingText.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {
+          console.log('  ℹ️  "Generating" text did not appear (might be too fast)')
+        })
 
         // Debug: Check for any error messages
         const errorMessage = sidebar.locator('[class*="error"], [class*="alert"]')
@@ -318,7 +304,7 @@ test.describe('AI DOM Changes Generation', () => {
         const closeButton = sidebar.locator('button[aria-label="Close"]')
         if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
           await closeButton.click()
-          await debugWait(300)
+          await closeButton.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
         }
       }
 
@@ -327,8 +313,6 @@ test.describe('AI DOM Changes Generation', () => {
 
     await test.step('Verify generated changes', async () => {
       console.log('\n📝 STEP 4: Verifying generated changes in sidebar')
-
-      await debugWait(1000)
 
       // Debug: Check sidebar HTML structure
       const sidebarHTML = await sidebar.locator('body').innerHTML()

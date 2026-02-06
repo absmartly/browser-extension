@@ -249,7 +249,7 @@ function SidebarContent() {
   }, [isAuthenticated, error, config, view, pageSize, loadExperiments])
 
   const handleSettingsSave = (newConfig: Partial<ABsmartlyConfig>) => {
-    updateConfig(newConfig)
+    updateConfig({ ...config, ...newConfig } as ABsmartlyConfig)
     setView('list')
   }
 
