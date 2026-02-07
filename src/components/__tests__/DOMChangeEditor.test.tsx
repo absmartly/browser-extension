@@ -65,7 +65,7 @@ describe('DOMChangeEditor', () => {
     it('should render selector input', () => {
       const editingChange = createEmptyChange()
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -75,13 +75,13 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Element Selector/i)).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-selector-0-new')).toBeInTheDocument()
     })
 
     it('should render change type selector', () => {
       const editingChange = createEmptyChange()
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -91,7 +91,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Change Type/i)).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-type-0-new')).toBeInTheDocument()
     })
 
     it('should render save and cancel buttons', () => {
@@ -217,7 +217,7 @@ describe('DOMChangeEditor', () => {
       const typeSelect = document.querySelector('#dom-change-type-0-new') as HTMLSelectElement
       fireEvent.change(typeSelect, { target: { value: 'text' } })
 
-      expect(screen.getByLabelText(/Text Content/i)).toBeInTheDocument()
+      expect(document.querySelector('#dom-change-text-0-new')).toBeInTheDocument()
     })
   })
 
@@ -225,7 +225,7 @@ describe('DOMChangeEditor', () => {
     it('should render text input for text type', () => {
       const editingChange = { ...createEmptyChange(), type: 'text' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -235,13 +235,13 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Text Content/i)).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-text-0-new')).toBeInTheDocument()
     })
 
     it('should update text value', () => {
       const editingChange = { ...createEmptyChange(), type: 'text' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -251,7 +251,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      const textInput = screen.getByLabelText(/Text Content/i) as HTMLInputElement
+      const textInput = container.querySelector('#dom-change-text-0-new') as HTMLInputElement
       fireEvent.change(textInput, { target: { value: 'New text' } })
 
       expect(textInput.value).toBe('New text')
@@ -278,7 +278,7 @@ describe('DOMChangeEditor', () => {
     it('should show merge mode checkbox', () => {
       const editingChange = { ...createEmptyChange(), type: 'style' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -288,7 +288,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Merge with existing styles/i)).toBeInTheDocument()
+      expect(container.querySelector('#merge-mode')).toBeInTheDocument()
     })
   })
 
@@ -344,7 +344,8 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByText(/Attributes/i)).toBeInTheDocument()
+      expect(screen.getByText('Attributes')).toBeInTheDocument()
+      expect(screen.getByText('Merge with existing attributes')).toBeInTheDocument()
     })
   })
 
@@ -352,7 +353,7 @@ describe('DOMChangeEditor', () => {
     it('should render HTML textarea for html type', () => {
       const editingChange = { ...createEmptyChange(), type: 'html' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -362,13 +363,13 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/HTML Content/i)).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-html-0-new')).toBeInTheDocument()
     })
 
     it('should update HTML value', () => {
       const editingChange = { ...createEmptyChange(), type: 'html' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -378,7 +379,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      const htmlTextarea = screen.getByLabelText(/HTML Content/i) as HTMLTextAreaElement
+      const htmlTextarea = container.querySelector('#dom-change-html-0-new') as HTMLTextAreaElement
       fireEvent.change(htmlTextarea, { target: { value: '<div>Test</div>' } })
 
       expect(htmlTextarea.value).toBe('<div>Test</div>')
@@ -389,7 +390,7 @@ describe('DOMChangeEditor', () => {
     it('should render JavaScript editor for javascript type', () => {
       const editingChange = { ...createEmptyChange(), type: 'javascript' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -399,7 +400,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/JavaScript Code/i)).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-js-0-new')).toBeInTheDocument()
     })
 
     it('should show fullscreen editor button', () => {
@@ -421,7 +422,7 @@ describe('DOMChangeEditor', () => {
     it('should update JavaScript value', () => {
       const editingChange = { ...createEmptyChange(), type: 'javascript' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -431,7 +432,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      const jsTextarea = screen.getByLabelText(/JavaScript Code/i) as HTMLTextAreaElement
+      const jsTextarea = container.querySelector('#dom-change-js-0-new') as HTMLTextAreaElement
       fireEvent.change(jsTextarea, { target: { value: 'console.log("test")' } })
 
       expect(jsTextarea.value).toBe('console.log("test")')
@@ -442,7 +443,7 @@ describe('DOMChangeEditor', () => {
     it('should render target selector and position for move type', () => {
       const editingChange = { ...createEmptyChange(), type: 'move' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -452,14 +453,14 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Target Selector/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/Position/i)).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-target-0-new')).toBeInTheDocument()
+      expect(container.querySelector('#dom-change-position-0-new')).toBeInTheDocument()
     })
 
     it('should render position options', () => {
       const editingChange = { ...createEmptyChange(), type: 'move' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -469,7 +470,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      const positionSelect = screen.getByLabelText(/Position/i) as HTMLSelectElement
+      const positionSelect = container.querySelector('#dom-change-position-0-new') as HTMLSelectElement
       const options = Array.from(positionSelect.options).map(opt => opt.value)
 
       expect(options).toContain('before')
@@ -553,7 +554,7 @@ describe('DOMChangeEditor', () => {
     it('should not render options for styleRules type', () => {
       const editingChange = { ...createEmptyChange(), type: 'styleRules' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -563,13 +564,13 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.queryByText(/Wait for element/i)).not.toBeInTheDocument()
+      expect(container.querySelector('#options-new-wait')).not.toBeInTheDocument()
     })
 
     it('should render options for other types', () => {
       const editingChange = { ...createEmptyChange(), type: 'style' as DOMChangeType }
 
-      render(
+      const { container } = render(
         <DOMChangeEditor
           editingChange={editingChange}
           variantIndex={0}
@@ -579,7 +580,7 @@ describe('DOMChangeEditor', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Wait for element/i)).toBeInTheDocument()
+      expect(container.querySelector('#options-new-wait')).toBeInTheDocument()
     })
   })
 })

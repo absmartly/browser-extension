@@ -18,7 +18,97 @@ jest.mock('~src/utils/storage', () => ({
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined)
+  },
+  sessionStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
   }
+}))
+
+jest.mock('~src/hooks/useEditorStateRestoration', () => ({
+  useEditorStateRestoration: jest.fn(() => ({
+    isRestoring: false,
+    restoredVariant: null,
+    restoredChange: null,
+    clearRestoration: jest.fn()
+  }))
+}))
+
+jest.mock('~src/components/ExperimentMetadata', () => ({
+  ExperimentMetadata: ({ onChange, data }: any) => {
+    return (
+      <div data-testid="experiment-metadata">
+        <select
+          data-testid="unit-type-select"
+          value={data.unit_type_id || ''}
+          onChange={(e) => onChange({ unit_type_id: e.target.value ? parseInt(e.target.value) : null })}
+        >
+          <option value="">Select unit type</option>
+          <option value="1">user_id</option>
+        </select>
+      </div>
+    )
+  }
+}))
+
+jest.mock('~src/components/VariantList', () => ({
+  VariantList: ({ initialVariants = [] }: any) => {
+    return (
+      <div data-testid="variant-list">
+        {initialVariants.map((v: any, i: number) => (
+          <div key={i} data-testid={`variant-${i}`}>{v.name}</div>
+        ))}
+      </div>
+    )
+  }
+}))
+
+jest.mock('~src/components/ExperimentCodeInjection', () => ({
+  ExperimentCodeInjection: () => <div data-testid="code-injection">Code Injection</div>
+}))
+
+jest.mock('~src/hooks/useVisualEditorCoordination', () => ({
+  useVisualEditorCoordination: jest.fn(() => ({
+    handleStartVisualEditor: jest.fn(),
+    handleStopVisualEditor: jest.fn(),
+    cleanup: jest.fn()
+  }))
+}))
+
+const mockHandleVariantsChange = jest.fn()
+const mockSetCurrentVariants = jest.fn()
+
+jest.mock('~src/hooks/useExperimentVariants', () => ({
+  useExperimentVariants: jest.fn(() => ({
+    initialVariants: [
+      { name: 'Control', config: '{}', domChanges: [] },
+      { name: 'Variant A', config: '{}', domChanges: [] }
+    ],
+    currentVariants: [
+      { name: 'Control', config: '{}', domChanges: [] },
+      { name: 'Variant A', config: '{}', domChanges: [] }
+    ],
+    setCurrentVariants: mockSetCurrentVariants,
+    handleVariantsChange: mockHandleVariantsChange
+  }))
+}))
+
+jest.mock('~src/hooks/useExperimentSave', () => ({
+  useExperimentSave: jest.fn(() => ({
+    save: jest.fn(async (formData, currentVariants, onUpdate, onSave) => {
+      if (onSave) {
+        try {
+          await onSave({
+            ...formData,
+            variants: currentVariants
+          })
+        } catch (error) {
+          // Swallow error - component should handle it
+        }
+      }
+    })
+  }))
 }))
 
 global.chrome = {
@@ -34,6 +124,12 @@ global.chrome = {
       removeListener: jest.fn()
     },
     sendMessage: jest.fn().mockResolvedValue({ success: true })
+  },
+  tabs: {
+    query: jest.fn((queryInfo, callback) => {
+      callback([{ url: 'https://example.com/test-page' }])
+      return Promise.resolve([{ url: 'https://example.com/test-page' }])
+    })
   }
 } as any
 
@@ -88,35 +184,35 @@ describe('ExperimentEditor', () => {
     })
 
     it('should have empty form fields', () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const nameInput = screen.getByLabelText(/experiment name/i) as HTMLInputElement
+      const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
       expect(nameInput.value).toBe('')
     })
 
     it('should sync display name and experiment name when locked', async () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const displayNameInput = screen.getByLabelText(/display name/i) as HTMLInputElement
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'My Test' } })
 
       await waitFor(() => {
-        const nameInput = screen.getByLabelText(/experiment name/i) as HTMLInputElement
+        const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
         expect(nameInput.value).toBe('my_test')
       })
     })
 
     it('should not sync names when unlocked', async () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
       const lockButton = screen.getByRole('button', { name: /lock/i })
       fireEvent.click(lockButton)
 
-      const displayNameInput = screen.getByLabelText(/display name/i) as HTMLInputElement
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'My Test' } })
 
       await waitFor(() => {
-        const nameInput = screen.getByLabelText(/experiment name/i) as HTMLInputElement
+        const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
         expect(nameInput.value).toBe('')
       })
     })
@@ -139,7 +235,7 @@ describe('ExperimentEditor', () => {
     it('should start with names unsynced in edit mode', () => {
       render(<ExperimentEditor {...defaultProps} experiment={mockExperiment} />)
 
-      const lockButton = screen.getByRole('button', { name: /unlock/i })
+      const lockButton = screen.getByTitle(/not synced.*lock/i)
       expect(lockButton).toBeInTheDocument()
     })
   })
@@ -148,10 +244,12 @@ describe('ExperimentEditor', () => {
     it('should require unit type selection', async () => {
       window.alert = jest.fn()
 
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const submitButton = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(submitButton)
+      const form = container.querySelector('form')
+      if (form) {
+        fireEvent.submit(form)
+      }
 
       await waitFor(() => {
         expect(window.alert).toHaveBeenCalledWith('Please select a unit type')
@@ -159,9 +257,9 @@ describe('ExperimentEditor', () => {
     })
 
     it('should require experiment name', async () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const nameInput = screen.getByLabelText(/experiment name/i)
+      const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
       fireEvent.change(nameInput, { target: { value: '' } })
 
       const form = nameInput.closest('form')
@@ -175,25 +273,30 @@ describe('ExperimentEditor', () => {
     })
 
     it('should validate name format (snake_case)', () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const displayNameInput = screen.getByLabelText(/display name/i) as HTMLInputElement
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'My Test 123!' } })
 
-      const nameInput = screen.getByLabelText(/experiment name/i) as HTMLInputElement
+      const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
       expect(nameInput.value).toMatch(/^[a-z0-9_]*$/)
     })
   })
 
   describe('Save Functionality', () => {
     it('should save experiment with all form data', async () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const displayNameInput = screen.getByLabelText(/display name/i)
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'New Experiment' } })
 
-      const submitButton = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(submitButton)
+      const unitTypeSelect = screen.getByTestId('unit-type-select')
+      fireEvent.change(unitTypeSelect, { target: { value: '1' } })
+
+      const form = container.querySelector('form')
+      if (form) {
+        fireEvent.submit(form)
+      }
 
       await waitFor(() => {
         expect(defaultProps.onSave).toHaveBeenCalledWith(
@@ -206,10 +309,10 @@ describe('ExperimentEditor', () => {
     })
 
     it('should update percentages when variants change', async () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/display name/i)).toBeInTheDocument()
+        expect(container.querySelector('#display-name-input')).toBeInTheDocument()
       })
     })
 
@@ -234,8 +337,8 @@ describe('ExperimentEditor', () => {
     it('should cleanup visual editor on cancel', async () => {
       render(<ExperimentEditor {...defaultProps} />)
 
-      const cancelButton = screen.getByRole('button', { name: /cancel/i })
-      fireEvent.click(cancelButton)
+      const backButton = screen.getByLabelText(/go back/i)
+      fireEvent.click(backButton)
 
       await waitFor(() => {
         expect(messaging.sendToContent).toHaveBeenCalledWith(
@@ -249,8 +352,8 @@ describe('ExperimentEditor', () => {
     it('should cleanup preview on cancel', async () => {
       render(<ExperimentEditor {...defaultProps} experiment={mockExperiment} />)
 
-      const cancelButton = screen.getByRole('button', { name: /cancel/i })
-      fireEvent.click(cancelButton)
+      const backButton = screen.getByLabelText(/go back/i)
+      fireEvent.click(backButton)
 
       await waitFor(() => {
         expect(messaging.sendToContent).toHaveBeenCalledWith(
@@ -383,36 +486,36 @@ describe('ExperimentEditor', () => {
 
   describe('Name Conversion', () => {
     it('should convert display name to snake_case', () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const displayNameInput = screen.getByLabelText(/display name/i)
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'My Cool Experiment' } })
 
-      const nameInput = screen.getByLabelText(/experiment name/i) as HTMLInputElement
+      const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
       expect(nameInput.value).toBe('my_cool_experiment')
     })
 
     it('should convert snake_case to Title Case', () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
       const lockButton = screen.getByRole('button', { name: /lock/i })
       fireEvent.click(lockButton)
       fireEvent.click(lockButton)
 
-      const nameInput = screen.getByLabelText(/experiment name/i)
+      const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
       fireEvent.change(nameInput, { target: { value: 'my_cool_experiment' } })
 
-      const displayNameInput = screen.getByLabelText(/display name/i) as HTMLInputElement
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       expect(displayNameInput.value).toBe('My Cool Experiment')
     })
 
     it('should remove special characters from name', () => {
-      render(<ExperimentEditor {...defaultProps} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} />)
 
-      const displayNameInput = screen.getByLabelText(/display name/i)
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'Test@#$%123' } })
 
-      const nameInput = screen.getByLabelText(/experiment name/i) as HTMLInputElement
+      const nameInput = container.querySelector('#experiment-name-input') as HTMLInputElement
       expect(nameInput.value).toBe('test123')
     })
   })
@@ -421,13 +524,18 @@ describe('ExperimentEditor', () => {
     it('should handle save errors', async () => {
       const mockOnSave = jest.fn().mockRejectedValue(new Error('Save failed'))
 
-      render(<ExperimentEditor {...defaultProps} onSave={mockOnSave} />)
+      const { container } = render(<ExperimentEditor {...defaultProps} onSave={mockOnSave} />)
 
-      const displayNameInput = screen.getByLabelText(/display name/i)
+      const displayNameInput = container.querySelector('#display-name-input') as HTMLInputElement
       fireEvent.change(displayNameInput, { target: { value: 'New Experiment' } })
 
-      const submitButton = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(submitButton)
+      const unitTypeSelect = screen.getByTestId('unit-type-select')
+      fireEvent.change(unitTypeSelect, { target: { value: '1' } })
+
+      const form = container.querySelector('form')
+      if (form) {
+        fireEvent.submit(form)
+      }
 
       await waitFor(() => {
         expect(mockOnSave).toHaveBeenCalled()

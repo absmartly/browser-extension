@@ -1,15 +1,28 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { CreateExperimentDropdown } from '../CreateExperimentDropdown'
 
+const mockGetTemplates = jest.fn().mockResolvedValue([])
+
+const mockUseABsmartlyReturn = {
+  getTemplates: mockGetTemplates,
+  config: {
+    apiEndpoint: 'https://api.absmartly.com',
+    domChangesFieldName: '__dom_changes'
+  },
+  loading: false,
+  error: null,
+  authErrorType: null,
+  user: null,
+  isAuthenticated: true,
+  updateConfig: jest.fn(),
+  checkAuth: jest.fn(),
+  getExperiments: jest.fn().mockResolvedValue([])
+}
+
 jest.mock('~src/hooks/useABsmartly', () => ({
-  useABsmartly: jest.fn(() => ({
-    getTemplates: jest.fn().mockResolvedValue([]),
-    config: {
-      apiEndpoint: 'https://api.absmartly.com'
-    }
-  }))
+  useABsmartly: jest.fn(() => mockUseABsmartlyReturn)
 }))
 
 jest.mock('~src/utils/auth', () => ({
@@ -39,11 +52,14 @@ describe('CreateExperimentDropdown', () => {
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
-        expect(screen.getByText(/from scratch/i)).toBeInTheDocument()
-      })
+        expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
+      }, { timeout: 3000 })
     })
 
     it('should close dropdown when clicking outside', async () => {
@@ -58,14 +74,14 @@ describe('CreateExperimentDropdown', () => {
       fireEvent.click(button)
 
       await waitFor(() => {
-        expect(screen.getByText(/from scratch/i)).toBeInTheDocument()
+        expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
       })
 
       const outside = screen.getByTestId('outside')
       fireEvent.mouseDown(outside)
 
       await waitFor(() => {
-        expect(screen.queryByText(/from scratch/i)).not.toBeInTheDocument()
+        expect(screen.queryByText(/create from scratch/i)).not.toBeInTheDocument()
       })
     })
   })
@@ -78,11 +94,13 @@ describe('CreateExperimentDropdown', () => {
       fireEvent.click(button)
 
       await waitFor(() => {
-        const scratchButton = screen.getByRole('button', { name: /from scratch/i })
-        fireEvent.click(scratchButton)
-
-        expect(defaultProps.onCreateFromScratch).toHaveBeenCalled()
+        expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
       })
+
+      const scratchButton = screen.getByRole('menuitem', { name: /create from scratch/i })
+      fireEvent.click(scratchButton)
+
+      expect(defaultProps.onCreateFromScratch).toHaveBeenCalled()
     })
 
     it('should close dropdown after creating from scratch', async () => {
@@ -92,19 +110,21 @@ describe('CreateExperimentDropdown', () => {
       fireEvent.click(button)
 
       await waitFor(() => {
-        const scratchButton = screen.getByRole('button', { name: /from scratch/i })
-        fireEvent.click(scratchButton)
+        expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
       })
 
+      const scratchButton = screen.getByRole('menuitem', { name: /create from scratch/i })
+      fireEvent.click(scratchButton)
+
       await waitFor(() => {
-        expect(screen.queryByText(/from scratch/i)).not.toBeInTheDocument()
+        expect(screen.queryByText(/create from scratch/i)).not.toBeInTheDocument()
       })
     })
   })
 
   describe('Template Loading', () => {
     it('should load templates when dropdown opens', async () => {
-      const mockGetTemplates = jest.fn().mockResolvedValue([
+      const mockGetTemplatesLocal = jest.fn().mockResolvedValue([
         {
           id: 1,
           name: 'Template 1',
@@ -115,19 +135,20 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplatesLocal
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
-        expect(mockGetTemplates).toHaveBeenCalledWith('test_template')
+        expect(mockGetTemplatesLocal).toHaveBeenCalledWith('test_template')
       })
     })
 
@@ -136,16 +157,17 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(screen.getByText(/loading templates/i)).toBeInTheDocument()
@@ -172,16 +194,17 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Template 1')).toBeInTheDocument()
@@ -194,16 +217,17 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(screen.getByText(/no templates found/i)).toBeInTheDocument()
@@ -215,10 +239,8 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
@@ -226,7 +248,10 @@ describe('CreateExperimentDropdown', () => {
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalled()
@@ -251,23 +276,26 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
-        const loadButton = screen.getByText('Load')
-        fireEvent.click(loadButton)
-
-        expect(defaultProps.onCreateFromTemplate).toHaveBeenCalledWith(123)
+        expect(screen.getByText('Test Template')).toBeInTheDocument()
       })
+
+      const loadButton = screen.getByText('Load')
+      fireEvent.click(loadButton)
+
+      expect(defaultProps.onCreateFromTemplate).toHaveBeenCalledWith(123)
     })
 
     it('should close dropdown after selecting template', async () => {
@@ -284,21 +312,24 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
-        const loadButton = screen.getByText('Load')
-        fireEvent.click(loadButton)
+        expect(screen.getByText('Test Template')).toBeInTheDocument()
       })
+
+      const loadButton = screen.getByText('Load')
+      fireEvent.click(loadButton)
 
       await waitFor(() => {
         expect(screen.queryByText('Test Template')).not.toBeInTheDocument()
@@ -326,16 +357,17 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(screen.getByText('JD')).toBeInTheDocument()
@@ -356,16 +388,17 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(screen.getByText(/ago/i)).toBeInTheDocument()
@@ -394,16 +427,17 @@ describe('CreateExperimentDropdown', () => {
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
       useABsmartly.mockReturnValue({
-        getTemplates: mockGetTemplates,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        ...mockUseABsmartlyReturn,
+        getTemplates: mockGetTemplates
       })
 
       render(<CreateExperimentDropdown {...defaultProps} />)
 
       const button = screen.getByRole('button', { name: /create experiment/i })
-      fireEvent.click(button)
+
+      await act(async () => {
+        fireEvent.click(button)
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Template 1')).toBeInTheDocument()
@@ -428,7 +462,7 @@ describe('CreateExperimentDropdown', () => {
     it('should respect external isOpen prop', () => {
       render(<CreateExperimentDropdown {...defaultProps} isOpen={true} onOpenChange={jest.fn()} />)
 
-      expect(screen.getByText(/from scratch/i)).toBeInTheDocument()
+      expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
     })
 
     it('should call onOpenChange when toggling', async () => {

@@ -24,57 +24,59 @@ jest.mock('~src/utils/storage', () => ({
   })
 }))
 
-jest.mock('~src/hooks/useSettingsForm', () => ({
-  useSettingsForm: jest.fn(() => ({
-    apiKey: '',
-    setApiKey: jest.fn(),
+const mockUseSettingsFormReturn = {
+  apiKey: '',
+  setApiKey: jest.fn(),
+  apiEndpoint: 'https://api.absmartly.com',
+  setApiEndpoint: jest.fn(),
+  applicationName: 'test-app',
+  setApplicationName: jest.fn(),
+  domChangesFieldName: '__dom_changes',
+  setDomChangesFieldName: jest.fn(),
+  authMethod: 'jwt' as const,
+  setAuthMethod: jest.fn(),
+  sdkWindowProperty: 'absmartly',
+  setSdkWindowProperty: jest.fn(),
+  queryPrefix: 'absmartly_',
+  setQueryPrefix: jest.fn(),
+  persistQueryToCookie: false,
+  setPersistQueryToCookie: jest.fn(),
+  aiProvider: 'anthropic-api' as const,
+  setAiProvider: jest.fn(),
+  aiApiKey: '',
+  setAiApiKey: jest.fn(),
+  llmModel: 'claude-sonnet-4-5-20250929',
+  setLlmModel: jest.fn(),
+  providerModels: {},
+  setProviderModels: jest.fn(),
+  customEndpoint: '',
+  setCustomEndpoint: jest.fn(),
+  providerEndpoints: {},
+  setProviderEndpoints: jest.fn(),
+  errors: {},
+  setErrors: jest.fn(),
+  loading: false,
+  user: null,
+  checkingAuth: false,
+  avatarUrl: null,
+  cookiePermissionGranted: true,
+  showCookieConsentModal: false,
+  setShowCookieConsentModal: jest.fn(),
+  loadConfig: jest.fn(),
+  checkAuthStatus: jest.fn(),
+  normalizeEndpoint: jest.fn((endpoint: string) => endpoint),
+  validateForm: jest.fn().mockResolvedValue(true),
+  buildConfig: jest.fn().mockReturnValue({
     apiEndpoint: 'https://api.absmartly.com',
-    setApiEndpoint: jest.fn(),
-    applicationName: 'test-app',
-    setApplicationName: jest.fn(),
-    domChangesFieldName: '__dom_changes',
-    setDomChangesFieldName: jest.fn(),
-    authMethod: 'jwt' as const,
-    setAuthMethod: jest.fn(),
-    sdkWindowProperty: 'absmartly',
-    setSdkWindowProperty: jest.fn(),
-    queryPrefix: 'absmartly_',
-    setQueryPrefix: jest.fn(),
-    persistQueryToCookie: false,
-    setPersistQueryToCookie: jest.fn(),
-    aiProvider: 'anthropic-api' as const,
-    setAiProvider: jest.fn(),
-    aiApiKey: '',
-    setAiApiKey: jest.fn(),
-    llmModel: 'claude-sonnet-4-5-20250929',
-    setLlmModel: jest.fn(),
-    providerModels: {},
-    setProviderModels: jest.fn(),
-    customEndpoint: '',
-    setCustomEndpoint: jest.fn(),
-    providerEndpoints: {},
-    setProviderEndpoints: jest.fn(),
-    errors: {},
-    setErrors: jest.fn(),
-    loading: false,
-    user: null,
-    checkingAuth: false,
-    avatarUrl: null,
-    cookiePermissionGranted: true,
-    showCookieConsentModal: false,
-    setShowCookieConsentModal: jest.fn(),
-    loadConfig: jest.fn(),
-    checkAuthStatus: jest.fn(),
-    normalizeEndpoint: jest.fn((endpoint: string) => endpoint),
-    validateForm: jest.fn().mockResolvedValue(true),
-    buildConfig: jest.fn().mockReturnValue({
-      apiEndpoint: 'https://api.absmartly.com',
-      apiKey: '',
-      authMethod: 'jwt',
-      applicationName: 'test-app'
-    }),
-    requestCookiePermission: jest.fn().mockResolvedValue(true)
-  }))
+    apiKey: '',
+    authMethod: 'jwt',
+    applicationName: 'test-app'
+  }),
+  requestCookiePermission: jest.fn().mockResolvedValue(true)
+}
+
+jest.mock('~src/hooks/useSettingsForm', () => ({
+  useSettingsForm: jest.fn(() => mockUseSettingsFormReturn)
 }))
 
 global.chrome = {
@@ -114,8 +116,8 @@ describe('SettingsView', () => {
 
     it('should show loading state initially', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         loading: true
       })
 
@@ -126,8 +128,8 @@ describe('SettingsView', () => {
 
     it('should display error message when present', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         errors: { general: 'Failed to save settings' }
       })
 
@@ -141,8 +143,8 @@ describe('SettingsView', () => {
     it('should render endpoint input with correct value', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
       const mockSetApiEndpoint = jest.fn()
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         apiEndpoint: 'https://custom.api.com',
         setApiEndpoint: mockSetApiEndpoint
       })
@@ -155,8 +157,8 @@ describe('SettingsView', () => {
 
     it('should show endpoint validation error', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         errors: { apiEndpoint: 'Invalid URL format' }
       })
 
@@ -168,10 +170,10 @@ describe('SettingsView', () => {
 
   describe('Authentication Method', () => {
     it('should render JWT and API Key radio buttons', () => {
-      render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+      const { container } = render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
 
-      const jwtRadio = screen.getByLabelText(/JWT from Browser Cookie/i)
-      const apiKeyRadio = screen.getByLabelText(/API Key/i)
+      const jwtRadio = container.querySelector('#auth-method-jwt')
+      const apiKeyRadio = container.querySelector('#auth-method-apikey')
 
       expect(jwtRadio).toBeInTheDocument()
       expect(apiKeyRadio).toBeInTheDocument()
@@ -187,8 +189,8 @@ describe('SettingsView', () => {
     it('should switch to API Key method when selected', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
       const mockSetAuthMethod = jest.fn()
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         authMethod: 'jwt',
         setAuthMethod: mockSetAuthMethod
       })
@@ -203,8 +205,8 @@ describe('SettingsView', () => {
 
     it('should show correct helper text for JWT auth', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         authMethod: 'jwt'
       })
 
@@ -215,8 +217,8 @@ describe('SettingsView', () => {
 
     it('should show correct helper text for API Key auth', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         authMethod: 'apikey'
       })
 
@@ -237,8 +239,8 @@ describe('SettingsView', () => {
 
     it('should show API Key as optional when JWT is selected', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         authMethod: 'jwt'
       })
 
@@ -249,8 +251,8 @@ describe('SettingsView', () => {
 
     it('should show API Key as required when API Key auth is selected', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         authMethod: 'apikey'
       })
 
@@ -261,8 +263,8 @@ describe('SettingsView', () => {
 
     it('should show API Key validation error', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         errors: { apiKey: 'API Key is required' }
       })
 
@@ -290,8 +292,8 @@ describe('SettingsView', () => {
         authMethod: 'jwt'
       })
 
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         validateForm: mockValidateForm,
         buildConfig: mockBuildConfig,
         apiEndpoint: 'https://api.absmartly.com'
@@ -314,8 +316,8 @@ describe('SettingsView', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
       const mockValidateForm = jest.fn().mockResolvedValue(false)
 
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         validateForm: mockValidateForm
       })
 
@@ -336,8 +338,8 @@ describe('SettingsView', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
       const mockNormalizeEndpoint = jest.fn((endpoint) => `${endpoint}/v1`)
 
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         apiEndpoint: 'https://api.absmartly.com',
         normalizeEndpoint: mockNormalizeEndpoint
       })
@@ -357,8 +359,8 @@ describe('SettingsView', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
       const mockSetErrors = jest.fn()
 
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         setErrors: mockSetErrors
       })
 
@@ -388,40 +390,44 @@ describe('SettingsView', () => {
   })
 
   describe('Test Connection', () => {
-    it('should check auth status when test connection is clicked', async () => {
+    it('should check auth status when refresh button is clicked', async () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
       const mockCheckAuthStatus = jest.fn()
 
       useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+        ...mockUseSettingsFormReturn,
         checkAuthStatus: mockCheckAuthStatus,
-        apiEndpoint: 'https://api.absmartly.com'
+        apiEndpoint: 'https://api.absmartly.com',
+        apiKey: 'test-key',
+        authMethod: 'apikey' as const
       })
 
       render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
 
-      const checkAuthButtons = screen.getAllByRole('button', { name: /Test Connection/i })
-      if (checkAuthButtons.length > 0) {
-        fireEvent.click(checkAuthButtons[0])
+      const refreshButton = screen.getByRole('button', { name: /Refresh/i })
+      fireEvent.click(refreshButton)
 
-        await waitFor(() => {
-          expect(mockCheckAuthStatus).toHaveBeenCalled()
-        })
-      }
+      await waitFor(() => {
+        expect(mockCheckAuthStatus).toHaveBeenCalledWith(
+          'https://api.absmartly.com',
+          { apiKey: 'test-key', authMethod: 'apikey' }
+        )
+      })
     })
   })
 
   describe('Cookie Consent', () => {
     it('should show cookie consent modal when needed', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         showCookieConsentModal: true
       })
 
       render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
 
-      expect(screen.getByText(/Cookie Consent/i)).toBeInTheDocument()
+      expect(screen.getByText(/ABsmartly Access Required/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Grant Access/i })).toBeInTheDocument()
     })
 
     it('should request cookie permission on consent grant', async () => {
@@ -430,8 +436,8 @@ describe('SettingsView', () => {
       const mockSetShowCookieConsentModal = jest.fn()
       const mockCheckAuthStatus = jest.fn()
 
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         showCookieConsentModal: true,
         requestCookiePermission: mockRequestCookiePermission,
         setShowCookieConsentModal: mockSetShowCookieConsentModal,
@@ -455,8 +461,8 @@ describe('SettingsView', () => {
       const mockRequestCookiePermission = jest.fn().mockResolvedValue(false)
       const mockSetErrors = jest.fn()
 
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         showCookieConsentModal: true,
         requestCookiePermission: mockRequestCookiePermission,
         setErrors: mockSetErrors
@@ -480,8 +486,8 @@ describe('SettingsView', () => {
   describe('Authenticate', () => {
     it('should open ABsmartly login page in new tab', () => {
       const { useSettingsForm } = require('~src/hooks/useSettingsForm')
-      useSettingsForm.mockReturnValue({
-        ...useSettingsForm(),
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
         apiEndpoint: 'https://api.absmartly.com/v1'
       })
 

@@ -18,7 +18,7 @@ module.exports = {
         strict: false,
       }
     }],
-    '^.+\\.(js|jsx)$': 'babel-jest',
+    '^.+\\.(js|jsx|mjs)$': 'babel-jest',
   },
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
@@ -32,17 +32,16 @@ module.exports = {
     '<rootDir>/src/__tests__/setup.ts',
     '<rootDir>/tests/setup/jest.setup.ts'
   ],
-  moduleNameMapper: {
-    '^~src/(.*)$': '<rootDir>/src/$1',
-  },
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
     '<rootDir>/tests/', // Ignore Playwright tests
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!(@plasmohq/storage|pify))',
+    'node_modules/(?!(@plasmohq/storage|pify|marked))',
   ],
   moduleNameMapper: {
+    '\\.(css|less|scss|sass)$': '<rootDir>/tests/mocks/styleMock.js',
+    '^~src/(.*)$': '<rootDir>/src/$1',
     '^~(.*)$': '<rootDir>/$1',
   },
   verbose: true,

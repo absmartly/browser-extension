@@ -39,10 +39,11 @@ export async function handleAvatarFetch(
       return new Response('No endpoint configured', { status: 500 })
     }
 
-    const avatarConfig: ABsmartlyConfig = {
-      ...config,
-      authMethod: authMethod as 'jwt' | 'apikey'
-    }
+    const normalizedAuthMethod = authMethod as 'jwt' | 'apikey'
+    const { apiKey: _, ...configWithoutApiKey } = config
+    const avatarConfig: ABsmartlyConfig = normalizedAuthMethod === 'jwt'
+      ? { ...configWithoutApiKey, authMethod: 'jwt' }
+      : { ...config, authMethod: 'apikey', apiKey: config.apiKey || '' }
 
     let jwtToken: string | null = null
     if (avatarConfig.authMethod === 'jwt') {

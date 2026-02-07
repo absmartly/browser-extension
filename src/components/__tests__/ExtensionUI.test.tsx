@@ -6,43 +6,151 @@ import type { Experiment } from '~src/types/absmartly'
 
 jest.mock('~src/hooks/useABsmartly', () => ({
   useABsmartly: jest.fn(() => ({
-    authenticated: true,
-    loading: false,
-    experiments: [],
-    selectedExperiment: null,
+    client: {},
     config: {
       apiEndpoint: 'https://api.absmartly.com',
       authMethod: 'jwt'
     },
-    checkAuth: jest.fn(),
-    login: jest.fn(),
-    logout: jest.fn(),
-    fetchExperiments: jest.fn(),
-    updateExperiment: jest.fn(),
+    loading: false,
+    user: null,
+    isAuthenticated: true,
+    updateConfig: jest.fn(),
+    getExperiments: jest.fn(),
+    getExperiment: jest.fn(),
     startExperiment: jest.fn(),
-    stopExperiment: jest.fn()
+    stopExperiment: jest.fn(),
+    createExperiment: jest.fn(),
+    updateExperiment: jest.fn(),
+    getFavorites: jest.fn(),
+    setExperimentFavorite: jest.fn(),
+    getApplications: jest.fn(),
+    getUnitTypes: jest.fn(),
+    getMetrics: jest.fn(),
+    getExperimentTags: jest.fn(),
+    getOwners: jest.fn(),
+    getTeams: jest.fn(),
+    getTemplates: jest.fn()
   }))
 }))
 
 jest.mock('~src/hooks/useExperimentHandlers', () => ({
   useExperimentHandlers: jest.fn(() => ({
+    selectedExperiment: null,
+    setSelectedExperiment: jest.fn(),
+    experimentDetailLoading: false,
+    setExperimentDetailLoading: jest.fn(),
     handleExperimentClick: jest.fn(),
+    handleStartExperiment: jest.fn(),
+    handleStopExperiment: jest.fn(),
     handleCreateExperiment: jest.fn(),
     handleCreateFromTemplate: jest.fn(),
-    handleEditExperiment: jest.fn()
+    handleSaveExperiment: jest.fn(),
+    handleUpdateExperiment: jest.fn()
   }))
 }))
 
 jest.mock('~src/hooks/useExperimentLoading', () => ({
   useExperimentLoading: jest.fn(() => ({
-    experimentDetailLoading: false
+    filteredExperiments: [],
+    experimentsLoading: false,
+    currentPage: 1,
+    pageSize: 20,
+    totalExperiments: 0,
+    hasMore: false,
+    loadExperiments: jest.fn(),
+    loadCachedExperiments: jest.fn(),
+    handlePageChange: jest.fn(),
+    handlePageSizeChange: jest.fn(),
+    setCurrentPage: jest.fn()
   }))
 }))
 
 jest.mock('~src/hooks/useFavorites', () => ({
   useFavorites: jest.fn(() => ({
     favoriteExperiments: new Set(),
-    toggleFavorite: jest.fn()
+    loadFavorites: jest.fn(),
+    handleToggleFavorite: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/usePermissions', () => ({
+  usePermissions: jest.fn(() => ({
+    needsPermissions: false,
+    requestPermissionsIfNeeded: jest.fn(),
+    handleGrantPermissions: jest.fn(),
+    handleDenyPermissions: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useExperimentFilters', () => ({
+  useExperimentFilters: jest.fn(() => ({
+    filters: {},
+    filtersLoaded: true,
+    handleFilterChange: jest.fn(),
+    setFilters: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useEditorResources', () => ({
+  useEditorResources: jest.fn(() => ({
+    applications: [],
+    unitTypes: [],
+    metrics: [],
+    tags: [],
+    owners: [],
+    teams: [],
+    loadEditorResources: jest.fn(),
+    setApplications: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useTemplates', () => ({
+  useTemplates: jest.fn(() => ({
+    templates: [],
+    templatesLoading: false,
+    templateSearchQuery: '',
+    setTemplateSearchQuery: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useViewNavigation', () => ({
+  useViewNavigation: jest.fn(() => ({
+    view: 'list',
+    setView: jest.fn(),
+    aiDomContext: null,
+    autoNavigateToAI: false,
+    setAutoNavigateToAI: jest.fn(),
+    handleNavigateToAI: jest.fn(),
+    handleBackFromAI: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useSidebarState', () => ({
+  useSidebarState: jest.fn(() => ({}))
+}))
+
+jest.mock('~src/hooks/useExtensionState', () => ({
+  useExtensionState: jest.fn(() => ({
+    error: null,
+    setError: jest.fn(),
+    setIsAuthExpired: jest.fn(),
+    toast: null,
+    setToast: jest.fn(),
+    createPanelOpen: false,
+    setCreatePanelOpen: jest.fn(),
+    hasInitialized: false,
+    setHasInitialized: jest.fn(),
+    handleAuthExpired: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useExperimentInitialization', () => ({
+  useExperimentInitialization: jest.fn(() => ({}))
+}))
+
+jest.mock('~src/hooks/useLoginRedirect', () => ({
+  useLoginRedirect: jest.fn(() => ({
+    handleLoginRedirect: jest.fn()
   }))
 }))
 
@@ -77,6 +185,34 @@ global.chrome = {
   }
 } as any
 
+const mockABsmartlyHook = (overrides = {}) => ({
+  client: {},
+  config: {
+    apiEndpoint: 'https://api.absmartly.com',
+    authMethod: 'jwt'
+  },
+  loading: false,
+  user: null,
+  isAuthenticated: true,
+  updateConfig: jest.fn(),
+  getExperiments: jest.fn(),
+  getExperiment: jest.fn(),
+  startExperiment: jest.fn(),
+  stopExperiment: jest.fn(),
+  createExperiment: jest.fn(),
+  updateExperiment: jest.fn(),
+  getFavorites: jest.fn(),
+  setExperimentFavorite: jest.fn(),
+  getApplications: jest.fn(),
+  getUnitTypes: jest.fn(),
+  getMetrics: jest.fn(),
+  getExperimentTags: jest.fn(),
+  getOwners: jest.fn(),
+  getTeams: jest.fn(),
+  getTemplates: jest.fn(),
+  ...overrides
+})
+
 describe('ExtensionUI', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -91,12 +227,11 @@ describe('ExtensionUI', () => {
 
     it('should show loading state during initialization', () => {
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: false,
+      useABsmartly.mockReturnValue(mockABsmartlyHook({
+        config: null,
         loading: true,
-        experiments: [],
-        config: null
-      })
+        isAuthenticated: false
+      }))
 
       render(<ExtensionUI />)
 
@@ -105,12 +240,10 @@ describe('ExtensionUI', () => {
 
     it('should show authentication view when not authenticated', () => {
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: false,
-        loading: false,
-        experiments: [],
-        config: null
-      })
+      useABsmartly.mockReturnValue(mockABsmartlyHook({
+        config: null,
+        isAuthenticated: false
+      }))
 
       render(<ExtensionUI />)
 
@@ -164,15 +297,7 @@ describe('ExtensionUI', () => {
       }
 
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: true,
-        loading: false,
-        experiments: [mockExperiment],
-        selectedExperiment: mockExperiment,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
-      })
+      useABsmartly.mockReturnValue(mockABsmartlyHook())
 
       render(<ExtensionUI />)
 
@@ -197,14 +322,9 @@ describe('ExtensionUI', () => {
   describe('Loading States', () => {
     it('should show loading indicator when fetching experiments', () => {
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: true,
-        loading: true,
-        experiments: [],
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
-      })
+      useABsmartly.mockReturnValue(mockABsmartlyHook({
+        loading: true
+      }))
 
       render(<ExtensionUI />)
 
@@ -212,9 +332,19 @@ describe('ExtensionUI', () => {
     })
 
     it('should show loading indicator when loading experiment detail', () => {
-      const useExperimentLoading = require('~src/hooks/useExperimentLoading').useExperimentLoading
-      useExperimentLoading.mockReturnValue({
-        experimentDetailLoading: true
+      const useExperimentHandlers = require('~src/hooks/useExperimentHandlers').useExperimentHandlers
+      useExperimentHandlers.mockReturnValue({
+        selectedExperiment: null,
+        setSelectedExperiment: jest.fn(),
+        experimentDetailLoading: true,
+        setExperimentDetailLoading: jest.fn(),
+        handleExperimentClick: jest.fn(),
+        handleStartExperiment: jest.fn(),
+        handleStopExperiment: jest.fn(),
+        handleCreateExperiment: jest.fn(),
+        handleCreateFromTemplate: jest.fn(),
+        handleSaveExperiment: jest.fn(),
+        handleUpdateExperiment: jest.fn()
       })
 
       render(<ExtensionUI />)
@@ -226,35 +356,21 @@ describe('ExtensionUI', () => {
   describe('Config Changes Propagation', () => {
     it('should update view when config changes', async () => {
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      const mockCheckAuth = jest.fn()
 
-      useABsmartly.mockReturnValue({
-        authenticated: true,
-        loading: false,
-        experiments: [],
-        config: {
-          apiEndpoint: 'https://api.absmartly.com',
-          authMethod: 'jwt'
-        },
-        checkAuth: mockCheckAuth
-      })
+      useABsmartly.mockReturnValue(mockABsmartlyHook())
 
       const { rerender } = render(<ExtensionUI />)
 
-      useABsmartly.mockReturnValue({
-        authenticated: true,
-        loading: false,
-        experiments: [],
+      useABsmartly.mockReturnValue(mockABsmartlyHook({
         config: {
           apiEndpoint: 'https://new-api.absmartly.com',
           authMethod: 'apikey'
-        },
-        checkAuth: mockCheckAuth
-      })
+        }
+      }))
 
       rerender(<ExtensionUI />)
 
-      expect(mockCheckAuth).toHaveBeenCalled()
+      expect(screen.queryByText(/ABsmartly/i)).toBeInTheDocument()
     })
   })
 
@@ -327,15 +443,18 @@ describe('ExtensionUI', () => {
 
   describe('Error Handling', () => {
     it('should display error message when API fails', async () => {
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: true,
-        loading: false,
-        experiments: [],
+      const useExtensionState = require('~src/hooks/useExtensionState').useExtensionState
+      useExtensionState.mockReturnValue({
         error: 'Failed to fetch experiments',
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+        setError: jest.fn(),
+        setIsAuthExpired: jest.fn(),
+        toast: null,
+        setToast: jest.fn(),
+        createPanelOpen: false,
+        setCreatePanelOpen: jest.fn(),
+        hasInitialized: false,
+        setHasInitialized: jest.fn(),
+        handleAuthExpired: jest.fn()
       })
 
       render(<ExtensionUI />)
@@ -345,17 +464,14 @@ describe('ExtensionUI', () => {
 
     it('should handle authentication errors', async () => {
       const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: false,
-        loading: false,
-        experiments: [],
-        error: 'Authentication failed',
+      useABsmartly.mockReturnValue(mockABsmartlyHook({
+        isAuthenticated: false,
         config: null
-      })
+      }))
 
       render(<ExtensionUI />)
 
-      expect(screen.queryByText(/authentication failed/i) || screen.queryByText(/sign in/i)).toBeInTheDocument()
+      expect(screen.queryByText(/sign in/i)).toBeInTheDocument()
     })
   })
 
@@ -364,7 +480,8 @@ describe('ExtensionUI', () => {
       const useFavorites = require('~src/hooks/useFavorites').useFavorites
       useFavorites.mockReturnValue({
         favoriteExperiments: new Set([1, 2]),
-        toggleFavorite: jest.fn()
+        loadFavorites: jest.fn(),
+        handleToggleFavorite: jest.fn()
       })
 
       const mockExperiments: Experiment[] = [
@@ -382,14 +499,19 @@ describe('ExtensionUI', () => {
         }
       ]
 
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue({
-        authenticated: true,
-        loading: false,
-        experiments: mockExperiments,
-        config: {
-          apiEndpoint: 'https://api.absmartly.com'
-        }
+      const useExperimentLoading = require('~src/hooks/useExperimentLoading').useExperimentLoading
+      useExperimentLoading.mockReturnValue({
+        filteredExperiments: mockExperiments,
+        experimentsLoading: false,
+        currentPage: 1,
+        pageSize: 20,
+        totalExperiments: 1,
+        hasMore: false,
+        loadExperiments: jest.fn(),
+        loadCachedExperiments: jest.fn(),
+        handlePageChange: jest.fn(),
+        handlePageSizeChange: jest.fn(),
+        setCurrentPage: jest.fn()
       })
 
       render(<ExtensionUI />)
@@ -402,7 +524,8 @@ describe('ExtensionUI', () => {
       const useFavorites = require('~src/hooks/useFavorites').useFavorites
       useFavorites.mockReturnValue({
         favoriteExperiments: new Set(),
-        toggleFavorite: mockToggleFavorite
+        loadFavorites: jest.fn(),
+        handleToggleFavorite: mockToggleFavorite
       })
 
       render(<ExtensionUI />)

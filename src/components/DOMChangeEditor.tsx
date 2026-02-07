@@ -244,10 +244,11 @@ export const DOMChangeEditor = ({
       {/* Dynamic value fields based on type */}
       {localChange.type === 'text' && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor={`dom-change-text-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
             Text Content
           </label>
           <Input
+            id={`dom-change-text-${idSuffix}`}
             value={localChange.textValue || ''}
             onChange={(e) => setLocalChange({ ...localChange, textValue: e.target.value })}
             placeholder="New text content"
@@ -395,10 +396,11 @@ export const DOMChangeEditor = ({
 
       {localChange.type === 'html' && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor={`dom-change-html-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
             HTML Content
           </label>
           <textarea
+            id={`dom-change-html-${idSuffix}`}
             value={localChange.htmlValue || ''}
             onChange={(e) => setLocalChange({ ...localChange, htmlValue: e.target.value })}
             placeholder="<div>New HTML content</div>"
@@ -412,7 +414,7 @@ export const DOMChangeEditor = ({
         <div className="space-y-3">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gray-700">
+              <label htmlFor={`dom-change-js-${idSuffix}`} className="block text-sm font-medium text-gray-700">
                 JavaScript Code
               </label>
               <button
@@ -438,6 +440,7 @@ export const DOMChangeEditor = ({
               </button>
             </div>
             <textarea
+              id={`dom-change-js-${idSuffix}`}
               value={localChange.jsValue || ''}
               onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
               placeholder="// JavaScript code to execute
@@ -459,12 +462,13 @@ console.log('Hello from experiment:', experimentName);"
       {localChange.type === 'move' && (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={`dom-change-target-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
               Target Selector
             </label>
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <input
+                  id={`dom-change-target-${idSuffix}`}
                   value={localChange.targetSelector || ''}
                   onChange={(e) => setLocalChange({ ...localChange, targetSelector: e.target.value })}
                   placeholder=".target-container, #sidebar"
@@ -492,10 +496,11 @@ console.log('Hello from experiment:', experimentName);"
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={`dom-change-position-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
               Position
             </label>
             <select
+              id={`dom-change-position-${idSuffix}`}
               value={localChange.position || 'after'}
               onChange={(e) => setLocalChange({ ...localChange, position: e.target.value as any })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"

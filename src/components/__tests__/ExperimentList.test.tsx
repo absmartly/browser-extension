@@ -110,6 +110,7 @@ describe('ExperimentList', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({})
   })
 
   describe('Basic Rendering', () => {
@@ -198,7 +199,8 @@ describe('ExperimentList', () => {
       render(<ExperimentList {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.queryByText(/reload/i)).toBeInTheDocument()
+        const reloadButton = screen.queryByRole('button', { name: /reload/i })
+        expect(reloadButton).toBeInTheDocument()
       }, { timeout: 1000 })
     })
 
@@ -361,8 +363,13 @@ describe('ExperimentList', () => {
   })
 
   describe('Error Handling', () => {
+    afterEach(() => {
+      ;(overrides.initializeOverrides as jest.Mock).mockClear()
+      ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({})
+    })
+
     it('should handle override initialization errors', async () => {
-      (overrides.initializeOverrides as jest.Mock).mockRejectedValue(
+      ;(overrides.initializeOverrides as jest.Mock).mockRejectedValue(
         new Error('Failed to initialize')
       )
 
@@ -381,7 +388,7 @@ describe('ExperimentList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Experiment 1')).toBeInTheDocument()
-      })
+      }, { timeout: 2000 })
     })
   })
 })

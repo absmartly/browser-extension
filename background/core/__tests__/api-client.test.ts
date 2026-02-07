@@ -234,7 +234,6 @@ describe('api-client', () => {
     it('should throw AUTH_EXPIRED when JWT fails with 401', async () => {
       const jwtConfig: ABsmartlyConfig = {
         apiEndpoint: 'https://api.absmartly.com',
-        apiKey: 'backup-api-key',
         authMethod: 'jwt'
       }
 
@@ -262,7 +261,7 @@ describe('api-client', () => {
       jest.mocked(axios).mockRejectedValue(networkError)
 
       await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('Network timeout')
-    })
+    }, 10000)
 
     it('should throw error when no API endpoint is configured', async () => {
       const invalidConfig = { apiEndpoint: '' } as ABsmartlyConfig

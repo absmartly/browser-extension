@@ -19,11 +19,81 @@ jest.mock('~src/utils/storage', () => ({
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined)
+  },
+  sessionStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
   }
 }))
 
 jest.mock('~src/utils/storage-cleanup', () => ({
   clearAllExperimentStorage: jest.fn().mockResolvedValue(undefined)
+}))
+
+jest.mock('~src/hooks/useEditorStateRestoration', () => ({
+  useEditorStateRestoration: jest.fn(() => ({
+    isRestoring: false,
+    restoredVariant: null,
+    restoredChange: null,
+    clearRestoration: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useVisualEditorCoordination', () => ({
+  useVisualEditorCoordination: jest.fn(() => ({
+    handleStartVisualEditor: jest.fn(),
+    handleStopVisualEditor: jest.fn(),
+    cleanup: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useExperimentVariants', () => ({
+  useExperimentVariants: jest.fn(() => ({
+    initialVariants: [
+      { name: 'Control', config: JSON.stringify({ __dom_changes: [] }) },
+      { name: 'Variant A', config: JSON.stringify({ __dom_changes: [] }) }
+    ],
+    currentVariants: [
+      { name: 'Control', config: JSON.stringify({ __dom_changes: [] }) },
+      { name: 'Variant A', config: JSON.stringify({ __dom_changes: [] }) }
+    ],
+    hasUnsavedChanges: false,
+    setHasUnsavedChanges: jest.fn(),
+    handleVariantsChange: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useExperimentSave', () => ({
+  useExperimentSave: jest.fn(() => ({
+    save: jest.fn().mockResolvedValue(undefined),
+    saving: false,
+    saveError: null
+  }))
+}))
+
+jest.mock('~src/components/VariantList', () => ({
+  VariantList: ({ initialVariants = [] }: any) => {
+    return (
+      <div data-testid="variant-list">
+        {initialVariants.map((v: any, i: number) => (
+          <div key={i} data-testid={`variant-${i}`}>{v.name}</div>
+        ))}
+      </div>
+    )
+  }
+}))
+
+jest.mock('~src/components/ExperimentMetadata', () => ({
+  ExperimentMetadata: () => <div data-testid="experiment-metadata">Metadata</div>
+}))
+
+jest.mock('~src/components/ExperimentCodeInjection', () => ({
+  ExperimentCodeInjection: () => <div data-testid="code-injection">Code Injection</div>
+}))
+
+jest.mock('~src/components/ExperimentDetail/ExperimentActions', () => ({
+  ExperimentActions: () => <div data-testid="experiment-actions">Actions</div>
 }))
 
 global.chrome = {
@@ -103,7 +173,7 @@ describe('ExperimentDetail', () => {
     it('should render experiment with variants', () => {
       render(<ExperimentDetail {...defaultProps} />)
 
-      expect(screen.getByText('Test Experiment')).toBeInTheDocument()
+      expect(screen.getAllByText('Test Experiment')[0]).toBeInTheDocument()
       expect(screen.getByText('Control')).toBeInTheDocument()
       expect(screen.getByText('Variant A')).toBeInTheDocument()
     })
@@ -123,26 +193,33 @@ describe('ExperimentDetail', () => {
 
   describe('Edit Experiment Name', () => {
     it('should enter edit mode when clicking display name', () => {
-      render(<ExperimentDetail {...defaultProps} />)
+      const { container } = render(<ExperimentDetail {...defaultProps} />)
 
-      const displayName = screen.getByText('Test Experiment')
-      fireEvent.click(displayName)
+      const displayName = container.querySelector('h2')
+      if (displayName) {
+        fireEvent.click(displayName)
+      }
 
       const input = screen.getByDisplayValue('Test Experiment')
       expect(input).toBeInTheDocument()
     })
 
     it('should save display name on check icon click', async () => {
-      render(<ExperimentDetail {...defaultProps} />)
+      const { container } = render(<ExperimentDetail {...defaultProps} />)
 
-      const displayName = screen.getByText('Test Experiment')
-      fireEvent.click(displayName)
+      const displayName = container.querySelector('h2')
+      if (displayName) {
+        fireEvent.click(displayName)
+      }
 
       const input = screen.getByDisplayValue('Test Experiment')
       fireEvent.change(input, { target: { value: 'Updated Name' } })
 
-      const saveButton = screen.getByRole('button', { name: '' })
-      fireEvent.click(saveButton)
+      const buttons = screen.getAllByRole('button')
+      const saveButton = buttons.find(btn => btn.querySelector('svg'))
+      if (saveButton) {
+        fireEvent.click(saveButton)
+      }
 
       await waitFor(() => {
         expect(defaultProps.onUpdate).toHaveBeenCalledWith(123, {
@@ -152,10 +229,12 @@ describe('ExperimentDetail', () => {
     })
 
     it('should cancel edit on X icon click', () => {
-      render(<ExperimentDetail {...defaultProps} />)
+      const { container } = render(<ExperimentDetail {...defaultProps} />)
 
-      const displayName = screen.getByText('Test Experiment')
-      fireEvent.click(displayName)
+      const displayName = container.querySelector('h2')
+      if (displayName) {
+        fireEvent.click(displayName)
+      }
 
       const input = screen.getByDisplayValue('Test Experiment')
       fireEvent.change(input, { target: { value: 'Updated Name' } })

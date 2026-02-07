@@ -1,5 +1,5 @@
 import { createAIProvider, compressHtml, sanitizeHtml } from '~src/lib/ai-providers'
-import type { AIProviderType } from '~src/lib/ai-providers'
+import type { AIProviderType, AIProviderConfig } from '~src/lib/ai-providers'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import { debugLog, debugError } from '~src/utils/debug'
@@ -42,14 +42,37 @@ export async function generateDOMChanges(
     debugLog('[AI Gen] HTML compression:', html.length, '->', compressedHtml.length, '->', cleanHtml.length)
   }
 
-  const provider = createAIProvider({
-    apiKey,
-    aiProvider: providerName,
-    useOAuth: options?.useOAuth,
-    oauthToken: options?.oauthToken,
-    llmModel: options?.llmModel,
-    customEndpoint: options?.customEndpoint
-  })
+  let config: AIProviderConfig
+  if (providerName === 'claude-subscription' && options?.useOAuth) {
+    config = {
+      aiProvider: 'claude-subscription',
+      useOAuth: true,
+      oauthToken: options.oauthToken || '',
+      llmModel: options?.llmModel
+    }
+  } else if (providerName === 'claude-code-bridge') {
+    config = {
+      aiProvider: 'claude-code-bridge',
+      customEndpoint: options?.customEndpoint,
+      llmModel: options?.llmModel
+    }
+  } else if (providerName === 'openrouter-api') {
+    config = {
+      aiProvider: 'openrouter-api',
+      apiKey,
+      llmModel: options?.llmModel || 'openai/gpt-4o',
+      customEndpoint: options?.customEndpoint
+    }
+  } else {
+    config = {
+      aiProvider: providerName as 'anthropic-api' | 'openai-api' | 'gemini-api',
+      apiKey,
+      llmModel: options?.llmModel,
+      customEndpoint: options?.customEndpoint
+    }
+  }
+
+  const provider = createAIProvider(config)
 
   const result = await provider.generate(
     cleanHtml,

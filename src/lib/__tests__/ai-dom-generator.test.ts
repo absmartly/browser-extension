@@ -96,10 +96,10 @@ describe('AI DOM Generator', () => {
       })
 
       expect(createAIProvider).toHaveBeenCalledWith({
-        apiKey: '',
         aiProvider: 'claude-subscription',
         useOAuth: true,
-        oauthToken: mockOAuthToken
+        oauthToken: mockOAuthToken,
+        llmModel: undefined
       })
     })
 

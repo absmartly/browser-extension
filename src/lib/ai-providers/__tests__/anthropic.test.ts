@@ -18,10 +18,15 @@ jest.mock('../utils', () => ({
   })
 }))
 
-const createConfig = (overrides?: Partial<AIProviderConfig>): AIProviderConfig => ({
-  apiKey: 'sk-ant-test-key',
+const createConfig = (overrides?: {
+  apiKey?: string
+  llmModel?: string
+  customEndpoint?: string
+}): AIProviderConfig => ({
+  apiKey: overrides?.apiKey ?? 'sk-ant-test-key',
   aiProvider: 'anthropic-api',
-  ...overrides
+  llmModel: overrides?.llmModel,
+  customEndpoint: overrides?.customEndpoint
 })
 
 describe('AnthropicProvider', () => {
@@ -60,11 +65,9 @@ describe('AnthropicProvider', () => {
       expect(provider).toBeInstanceOf(AnthropicProvider)
     })
 
-    it('should initialize with OAuth settings', () => {
+    it('should initialize with custom endpoint', () => {
       const config = createConfig({
-        apiKey: '',
-        useOAuth: true,
-        oauthToken: 'oauth-token-123'
+        customEndpoint: 'https://custom.anthropic.com/v1'
       })
 
       const provider = new AnthropicProvider(config)
@@ -141,8 +144,11 @@ describe('AnthropicProvider', () => {
       )
     })
 
-    it('should create Anthropic client with OAuth token when useOAuth is true', async () => {
-      const provider = new AnthropicProvider(createConfig({ apiKey: '', useOAuth: true, oauthToken: 'oauth-token-123' }))
+    it('should use custom endpoint when provided', async () => {
+      const provider = new AnthropicProvider(createConfig({
+        apiKey: 'sk-ant-test-key',
+        customEndpoint: 'https://custom.anthropic.com/v1'
+      }))
 
       mockMessages.create.mockResolvedValue({
         content: [{
@@ -160,16 +166,14 @@ describe('AnthropicProvider', () => {
 
       expect(Anthropic).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKey: 'oauth-placeholder',
-          defaultHeaders: {
-            'Authorization': 'Bearer oauth-token-123'
-          }
+          apiKey: 'sk-ant-test-key',
+          baseURL: 'https://custom.anthropic.com/v1'
         })
       )
     })
 
-    it('should throw error when neither API key nor OAuth token is provided', async () => {
-      const provider = new AnthropicProvider(createConfig({ apiKey: '', useOAuth: false }))
+    it('should throw error when API key is not provided', async () => {
+      const provider = new AnthropicProvider(createConfig({ apiKey: '' }))
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})

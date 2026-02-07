@@ -15,7 +15,59 @@ jest.mock('~src/utils/storage', () => ({
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined)
+  },
+  sessionStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
   }
+}))
+
+jest.mock('~src/hooks/useEditorStateRestoration', () => ({
+  useEditorStateRestoration: jest.fn(() => ({
+    isRestoring: false,
+    restoredVariant: null,
+    restoredChange: null,
+    clearRestoration: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useVisualEditorCoordination', () => ({
+  useVisualEditorCoordination: jest.fn(() => ({
+    handleStartVisualEditor: jest.fn(),
+    handleStopVisualEditor: jest.fn(),
+    cleanup: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useVariantPreview', () => ({
+  useVariantPreview: jest.fn(() => ({
+    previewVariant: null,
+    setPreviewVariant: jest.fn(),
+    isPreviewActive: false,
+    handlePreviewToggle: jest.fn(),
+    handlePreviewRefresh: jest.fn(),
+    applyPreview: jest.fn(),
+    removePreview: jest.fn()
+  }))
+}))
+
+jest.mock('~src/hooks/useVariantConfig', () => ({
+  parseVariantConfig: jest.fn((config) => {
+    if (typeof config === 'string') {
+      try {
+        return JSON.parse(config)
+      } catch {
+        return {}
+      }
+    }
+    return config || {}
+  }),
+  stringifyVariantConfig: jest.fn((config) => JSON.stringify(config)),
+  getConfigValue: jest.fn((config, key) => {
+    const parsed = typeof config === 'string' ? JSON.parse(config) : config
+    return parsed?.[key]
+  })
 }))
 
 global.chrome = {

@@ -34,8 +34,9 @@ describe('AI Error Handling - End-to-End Flow', () => {
 
   it('should propagate invalid model error to UI with clear message', async () => {
     const provider = new BridgeProvider({
-      apiKey: '',
       aiProvider: 'claude-subscription',
+      useOAuth: true,
+      oauthToken: 'test-token',
       llmModel: 'invalid-model'
     })
 
@@ -94,8 +95,9 @@ describe('AI Error Handling - End-to-End Flow', () => {
 
   it('should handle API authentication errors clearly', async () => {
     const provider = new BridgeProvider({
-      apiKey: '',
-      aiProvider: 'claude-subscription'
+      aiProvider: 'claude-subscription',
+      useOAuth: true,
+      oauthToken: 'test-token'
     })
 
     mockBridgeClient.createConversation.mockResolvedValue({
@@ -138,8 +140,9 @@ describe('AI Error Handling - End-to-End Flow', () => {
 
   it('should handle rate limit errors with helpful information', async () => {
     const provider = new BridgeProvider({
-      apiKey: '',
-      aiProvider: 'claude-subscription'
+      aiProvider: 'claude-subscription',
+      useOAuth: true,
+      oauthToken: 'test-token'
     })
 
     mockBridgeClient.createConversation.mockResolvedValue({
@@ -182,8 +185,9 @@ describe('AI Error Handling - End-to-End Flow', () => {
 
   it('should preserve all error context when displaying to user', async () => {
     const provider = new BridgeProvider({
-      apiKey: '',
-      aiProvider: 'claude-subscription'
+      aiProvider: 'claude-subscription',
+      useOAuth: true,
+      oauthToken: 'test-token'
     })
 
     mockBridgeClient.createConversation.mockResolvedValue({

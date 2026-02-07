@@ -21,6 +21,24 @@ jest.mock('~src/utils/markdown', () => ({
   renderMarkdown: jest.fn((md: string) => md)
 }))
 
+jest.mock('~src/hooks/useConversationHistory', () => ({
+  useConversationHistory: jest.fn(() => ({
+    conversationList: [],
+    conversationSession: {
+      messages: [],
+      timestamp: Date.now()
+    },
+    currentConversationId: null,
+    loadingConversation: false,
+    switchConversation: jest.fn(),
+    createNewConversation: jest.fn(),
+    deleteConversation: jest.fn(),
+    addMessage: jest.fn(),
+    saveConversation: jest.fn(),
+    initializeSessionHTML: jest.fn()
+  }))
+}))
+
 global.chrome = {
   storage: {
     local: {

@@ -60,12 +60,14 @@ const envPath = path.join(__dirname, '../../../.env.dev.local')
 loadEnvFile(envPath)
 
 // Get config from environment
+const authMethod = (process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD as 'jwt' | 'apikey') || 'apikey'
 const testConfig: ABsmartlyConfig = {
-  apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
   apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
   applicationId: process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID ?
     parseInt(process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID) : undefined,
-  authMethod: (process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD as 'jwt' | 'apikey') || 'apikey'
+  ...(authMethod === 'apikey'
+    ? { authMethod: 'apikey', apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '' }
+    : { authMethod: 'jwt' })
 }
 
 describe('API Client Integration Tests', () => {
@@ -115,7 +117,9 @@ describe('API Client Integration Tests', () => {
       }
 
       const invalidConfig: ABsmartlyConfig = {
-        ...testConfig,
+        apiEndpoint: testConfig.apiEndpoint,
+        applicationId: testConfig.applicationId,
+        authMethod: 'apikey',
         apiKey: 'invalid-key-123'
       }
 

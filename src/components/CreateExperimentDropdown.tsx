@@ -306,25 +306,37 @@ export function CreateExperimentDropdown({
   }
 
   return (
-    <button
-      onClick={() => setIsOpen(!isOpen)}
-      className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-      aria-label="Create Experiment"
-      title="Create New Experiment"
-    >
-      <svg
-        className="h-5 w-5 text-gray-600"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
+    <div ref={dropdownRef} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+        aria-label="Create Experiment"
+        title="Create New Experiment"
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M12 4v16m8-8H4"
-        />
-      </svg>
-    </button>
+        <svg
+          className="h-5 w-5 text-gray-600"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4v16m8-8H4"
+          />
+        </svg>
+      </button>
+      <CreateExperimentDropdownPanel
+        isOpen={isOpen}
+        templates={templates}
+        loading={loading}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onCreateFromScratch={handleCreateFromScratch}
+        onTemplateSelect={handleTemplateSelect}
+        config={config}
+      />
+    </div>
   )
 }
