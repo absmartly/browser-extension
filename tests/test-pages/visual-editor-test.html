@@ -25,6 +25,19 @@
       margin: 20px 0;
       border-radius: 8px;
     }
+    .test-img {
+      width: 200px;
+      height: 150px;
+      margin: 20px 5px;
+      display: inline-block;
+    }
+    .test-bg {
+      width: 300px;
+      height: 200px;
+      margin: 20px 0;
+      background-size: cover;
+      background-position: center;
+    }
   </style>
 </head>
 <body>
@@ -42,6 +55,13 @@
     <div id="test-container" class="test-container">
       <h2 id="section-title">Section Title</h2>
       <p id="section-text">Section content that can be modified.</p>
+    </div>
+
+    <div style="margin: 20px 0;">
+      <h3>Image Elements (for testing "Change image source")</h3>
+      <img id="product-image" class="test-img" src="https://via.placeholder.com/200x150/FF6B6B/FFFFFF?text=Original" alt="Product" />
+      <div id="hero-banner" class="test-bg" style="background-image: url('https://via.placeholder.com/300x200/4ECDC4/FFFFFF?text=Hero+BG');">
+      </div>
     </div>
 
     <ul id="test-list" class="test-list">

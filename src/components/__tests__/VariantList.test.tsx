@@ -32,24 +32,22 @@ jest.mock('~src/hooks/useEditorStateRestoration', () => ({
   }))
 }))
 
+const mockHandleLaunchVisualEditor = jest.fn(async () => {
+  const messaging = require('~src/lib/messaging')
+  await messaging.sendToContent({
+    type: 'START_VISUAL_EDITOR',
+    experimentName: 'test_experiment',
+    variantIndex: 0,
+    variantName: 'Control',
+    domChanges: []
+  })
+})
+
 jest.mock('~src/hooks/useVisualEditorCoordination', () => ({
   useVisualEditorCoordination: jest.fn(() => ({
-    handleStartVisualEditor: jest.fn(async (experimentName, variantIndex, variantName, domChanges) => {
-      const messaging = require('~src/lib/messaging')
-      await messaging.sendToContent({
-        type: 'START_VISUAL_EDITOR',
-        experimentName,
-        variantIndex,
-        variantName,
-        domChanges
-      })
-    }),
-    handleStopVisualEditor: jest.fn(async () => {
-      const messaging = require('~src/lib/messaging')
-      await messaging.sendToContent({
-        type: 'STOP_VISUAL_EDITOR'
-      })
-    }),
+    handleLaunchVisualEditor: mockHandleLaunchVisualEditor,
+    handleStartVisualEditor: jest.fn(),
+    handleStopVisualEditor: jest.fn(),
     cleanup: jest.fn()
   }))
 }))
@@ -324,25 +322,38 @@ describe('VariantList', () => {
       })
     })
 
-    it.skip('should delete variant', async () => {
+    it('should delete variant', async () => {
       const onVariantsChange = jest.fn()
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {})
 
-      render(<VariantList {...defaultProps} onVariantsChange={onVariantsChange} />)
+      const threeVariants: Variant[] = [
+        ...mockVariants,
+        {
+          name: 'Variant B',
+          config: { __dom_changes: [] }
+        }
+      ]
 
-      const deleteButtons = screen.getAllByRole('button', { name: /delete/i })
-      expect(deleteButtons.length).toBeGreaterThan(0)
+      const { rerender, unmount } = render(<VariantList {...defaultProps} initialVariants={threeVariants} onVariantsChange={onVariantsChange} />)
 
-      fireEvent.click(deleteButtons[deleteButtons.length - 1])
+      const deleteButtons = screen.getAllByTitle(/delete variant/i)
+      expect(deleteButtons.length).toBe(3)
+
+      await act(async () => {
+        fireEvent.click(deleteButtons[2])
+        await Promise.resolve()
+      })
 
       await waitFor(() => {
-        expect(onVariantsChange).toHaveBeenCalledWith(
-          [mockVariants[0]],
-          true
-        )
-      }, { timeout: 100 })
+        expect(onVariantsChange).toHaveBeenCalled()
+      }, { timeout: 1000 })
+
+      const lastCall = onVariantsChange.mock.calls[onVariantsChange.mock.calls.length - 1]
+      expect(lastCall[0]).toHaveLength(2)
+      expect(lastCall[1]).toBe(true)
 
       consoleError.mockRestore()
+      unmount()
     })
 
     it('should not allow delete when canAddRemove is false', () => {
@@ -532,7 +543,7 @@ describe('VariantList', () => {
   })
 
   describe('Visual Editor Integration', () => {
-    it.skip('should open visual editor for variant', async () => {
+    it('should open visual editor for variant', async () => {
       render(<VariantList {...defaultProps} />)
 
       const veButtons = screen.queryAllByTitle(/visual editor/i)

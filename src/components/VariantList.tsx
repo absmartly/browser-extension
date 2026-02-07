@@ -374,7 +374,7 @@ export function VariantList({
 
           return (
             <VariantCard
-              key={index}
+              key={`${variant.name}-${index}`}
               variant={variant}
               index={index}
               isExpanded={isExpanded}
