@@ -160,13 +160,13 @@ describe('CodeExecutor', () => {
     // Conclusion: This is an accepted architectural limitation. The validate()
     // method provides warnings, and the preview-only execution context limits
     // the security impact.
-    it.skip('should prevent direct access to eval', () => {
-      const code = `
-        eval('console.log("should not work")');
-      `
-      const success = CodeExecutor.execute(code)
-      expect(success).toBe(false)
-    })
+    //
+    // NOTE: We cannot test preventing eval access because JavaScript cannot intercept
+    // direct eval calls. This is an ES5 language limitation. Instead, we rely on:
+    // 1. validate() method to warn users about eval usage
+    // 2. Preview-only execution context
+    // 3. User review before saving code
+    // Test intentionally removed as it's technically impossible to implement.
 
     it('should be able to modify element styles', () => {
       const code = `
