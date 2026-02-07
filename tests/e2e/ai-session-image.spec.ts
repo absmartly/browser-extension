@@ -2,7 +2,8 @@ import { test, expect } from '../fixtures/extension'
 import { Page } from '@playwright/test'
 import path from 'path'
 import { TEST_IMAGES } from '../../src/lib/__tests__/test-images'
-import { injectSidebar, debugWait } from './utils/test-helpers'
+import { injectSidebar, debugWait, click } from './utils/test-helpers'
+import { createExperiment } from './helpers/ve-experiment-setup'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -66,12 +67,7 @@ test.describe('AI Session & Image Handling', () => {
     if (testPage) await testPage.close()
   })
 
-  test.skip('Session initialization, image upload, and persistence', async ({ extensionId, extensionUrl, context }) => {
-    // TODO: Rewrite this test to use proper experiment creation helpers
-    // Current issue: Uses incorrect selectors (#create-experiment-button, #experiment-name-input, #save-experiment-button)
-    // These IDs don't exist in the actual components
-    // Should use: createExperiment() and activateVisualEditor() helpers from ve-experiment-setup.ts
-    // Also depends on fix-102 (AI page navigation) to be resolved first
+  test('Session initialization, image upload, and persistence', async ({ extensionId, extensionUrl, context }) => {
     test.setTimeout(SLOW_MODE ? 180000 : 120000)
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -91,17 +87,18 @@ test.describe('AI Session & Image Handling', () => {
     await test.step('Create test experiment', async () => {
       console.log('\n📝 STEP 2: Creating test experiment')
 
-      experimentName = `E2E Session Test ${Date.now()}`
-      await sidebar.locator('#create-experiment-button').click()
+      experimentName = await createExperiment(sidebar)
       await debugWait()
 
-      const nameInput = sidebar.locator('#experiment-name-input')
-      await nameInput.waitFor({ state: 'visible' })
-      await nameInput.fill(experimentName)
+      const saveButton = sidebar.locator('#create-experiment-button')
+      await saveButton.scrollIntoViewIfNeeded()
+      await saveButton.waitFor({ state: 'visible', timeout: 5000 })
 
-      await sidebar.locator('#save-experiment-button').click()
-      await debugWait(500)
+      const form = sidebar.locator('form')
+      await form.evaluate((f) => f.requestSubmit())
+      await debugWait()
 
+      await sidebar.locator('text="Experiments"').first().waitFor({ state: 'visible', timeout: 5000 })
       console.log(`✅ Created experiment: ${experimentName}`)
     })
 
@@ -109,8 +106,14 @@ test.describe('AI Session & Image Handling', () => {
     await test.step('Navigate to AI DOM changes page for variant 0', async () => {
       console.log('\n🤖 STEP 3: Navigating to AI DOM changes page')
 
+      const experimentCard = sidebar.locator(`text="${experimentName}"`).first()
+      await experimentCard.waitFor({ state: 'visible', timeout: 5000 })
+      await click(sidebar, `text="${experimentName}"`)
+      await debugWait()
+
       const generateButton = sidebar.locator('#generate-with-ai-button').first()
-      await generateButton.waitFor({ state: 'visible' })
+      await generateButton.waitFor({ state: 'visible', timeout: 10000 })
+      await generateButton.scrollIntoViewIfNeeded()
       await generateButton.click()
       await debugWait(500)
 

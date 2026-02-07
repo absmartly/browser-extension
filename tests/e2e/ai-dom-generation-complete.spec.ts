@@ -65,12 +65,29 @@ test.describe('AI DOM Changes Generation - Complete Workflow', () => {
     if (testPage) await testPage.close()
   })
 
-  // TODO: SKIPPED - AI-generated changes not appearing in variant editor after navigation back
-  // Test successfully generates 3 changes via AI, but they don't appear in DOM change cards
-  // Possible causes: (1) Changes not saved when navigating back (2) Wrong selector (.dom-change-card)
-  // (3) Timing issue (uses forbidden debugWait) (4) Feature not fully implemented
-  // To fix: Debug AI→Variant navigation flow, verify changes persist, use proper waits
   test.skip('Complete AI workflow: create experiment → generate changes → preview → visual editor → save', async ({ extensionId, extensionUrl, context }) => {
+    // SKIP REASON: Blocked by product bug in AI → Variant navigation flow
+    //
+    // ISSUE: After generating DOM changes via AI and navigating back to variant editor,
+    // the generated changes do not appear in the UI. Test generates 3 changes successfully
+    // but .dom-change-card elements are not rendered.
+    //
+    // ROOT CAUSES TO INVESTIGATE:
+    // 1. Changes may not be persisting when navigating back from AI page
+    // 2. Selector '.dom-change-card' may be incorrect or component not implemented
+    // 3. State synchronization bug between AI page and variant editor
+    // 4. DOM changes feature may not be fully integrated into variant UI
+    //
+    // REQUIRED FIXES:
+    // 1. Verify DOM changes are saved to experiment/variant state after AI generation
+    // 2. Confirm correct selector for DOM change display elements in variant editor
+    // 3. Add proper state persistence and reload when navigating between pages
+    // 4. Replace debugWait() calls with proper element state waits
+    //
+    // EVIDENCE: Test reaches step 4, generates changes successfully (verified in console),
+    // but times out waiting for '.dom-change-card' selector after back navigation
+    //
+    // TO RE-ENABLE: Fix the navigation/persistence bug, update selectors, run full test
     test.setTimeout(SLOW_MODE ? 180000 : 120000)
 
     const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
@@ -541,8 +558,25 @@ test.describe('AI DOM Changes Generation - Complete Workflow', () => {
   })
 
   test.skip('AI generation with message bridge relay', async ({ extensionUrl, context }) => {
-    // TODO: Message bridge test requires chrome.runtime access in page context which is not available
-    // Need to refactor this test to use content script or sidebar iframe context instead
+    // SKIP REASON: Architectural limitation - chrome.runtime not available in page context
+    //
+    // ISSUE: This test attempts to access chrome.runtime.sendMessage() from the main page
+    // context (via page.evaluate()), but chrome.runtime is only available in:
+    // 1. Extension pages (popup, options, sidebar)
+    // 2. Content scripts
+    // 3. Background/service worker
+    //
+    // TEST IMPOSSIBILITY: Playwright's page.evaluate() runs in the isolated page context
+    // (same as website JavaScript), which never has access to chrome.runtime APIs.
+    // This is a fundamental security boundary in the Chrome extension architecture.
+    //
+    // ALTERNATIVE APPROACHES (if needed):
+    // 1. Test message bridge from sidebar iframe context (has chrome.runtime)
+    // 2. Test from injected content script using executeScript()
+    // 3. Move test logic to integration test that mocks the message layer
+    //
+    // VERDICT: This test is IMPOSSIBLE to run as-is in Playwright. The skip is justified.
+    // If message bridge testing is critical, refactor to test from sidebar/content script context.
     test.setTimeout(SLOW_MODE ? 120000 : 60000)
 
     await test.step('Verify message bridge is working', async () => {

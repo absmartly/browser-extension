@@ -1,81 +1,33 @@
-import { test, chromium } from '@playwright/test'
+import { test } from '../fixtures/extension'
+import { type Page, type FrameLocator } from '@playwright/test'
 import path from 'path'
-import fs from 'fs'
 
 test.describe('Simple Visual Editor Test', () => {
-  test('Visual editor with proper storage setup', async ({}) => {
-    test.setTimeout(60000) // 1 minute timeout
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+  let page: Page
+  let sidebarFrame: FrameLocator
 
-    if (!fs.existsSync(extensionPath)) {
-      throw new Error('Extension not built! Run "npm run build" first')
-    }
+  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
+    const mockExperiments = [
+      {
+        id: 1,
+        name: "simple_visual_editor_test",
+        display_name: "Simple Visual Editor Test",
+        state: "ready",
+        variants: [
+          { variant: 0, name: "control", config: "{}" },
+          { variant: 1, name: "treatment", config: "{}" }
+        ]
+      }
+    ]
 
-    console.log('\n🚀 Starting Simple Visual Editor Test')
+    await seedStorage({ experiments: mockExperiments })
 
-    // Launch browser with extension
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        '--enable-file-cookies',
-      ],
-      viewport: { width: 1920, height: 1080 },
-      slowMo: 100
-    })
-
-    // Get extension ID
-    let [sw] = context.serviceWorkers()
-    if (!sw) {
-      sw = await context.waitForEvent('serviceworker')
-    }
-    const extensionId = new URL(sw.url()).host
-    console.log('Extension ID:', extensionId)
-
-    // Step 1: Set storage BEFORE opening any pages
-    console.log('\n⚙️ Setting API credentials in storage...')
-    const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: 'domcontentloaded', timeout: 10000 })
-
-    // Clear any existing storage and set new credentials
-    const result = await setupPage.evaluate(async () => {
-      return new Promise((resolve) => {
-        chrome.storage.local.clear(() => {
-          const config = {
-            apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-            apiEndpoint: 'https://demo-2.absmartly.com/v1',
-            applicationId: null,
-            authMethod: 'apikey',
-            domChangesStorageType: null,
-            domChangesFieldName: null
-          }
-
-          chrome.storage.local.set({
-            'absmartly-config': config,
-            'plasmo:absmartly-config': config
-          }, () => {
-            chrome.storage.local.get(null, (items) => {
-              resolve(items)
-            })
-          })
-        })
-      })
-    })
-
-    console.log('✅ Storage set:', Object.keys(result))
-    await setupPage.close()
-
-    // Step 2: Open the test page
-    console.log('\n📄 Opening test page...')
-    const page = await context.newPage()
+    page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
     await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     await page.waitForLoadState('domcontentloaded')
 
-    // Step 3: Inject the sidebar
-    console.log('\n💉 Injecting sidebar into the page...')
-    await page.evaluate((extId) => {
+    await page.evaluate((url) => {
       const existing = document.getElementById('absmartly-sidebar-root')
       if (existing) {
         console.log('Sidebar already exists')
@@ -110,70 +62,46 @@ test.describe('Simple Visual Editor Test', () => {
         height: 100%;
         border: none;
       `
-      iframe.src = `chrome-extension://${extId}/tabs/sidebar.html`
+      iframe.src = url
 
       container.appendChild(iframe)
       document.body.appendChild(container)
       console.log('Sidebar injected successfully')
-    }, extensionId)
+    }, extensionUrl('tabs/sidebar.html'))
 
-    // Wait for sidebar to appear
     await page.waitForSelector('#absmartly-sidebar-root', { timeout: 5000 })
-    console.log('✅ Sidebar injected into page')
+    sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
+  })
 
-    // Access the sidebar iframe
-    const sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
+  test.afterEach(async () => {
+    if (page && !process.env.SLOW) await page.close()
+  })
 
-    // Give sidebar time to initialize and load
+  test('Visual editor with proper storage setup', async () => {
+    test.setTimeout(60000)
+    console.log('\n🚀 Starting Simple Visual Editor Test')
+
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
 
-    // Take screenshot to debug what's showing in sidebar
     await page.screenshot({
       path: 'test-results/sidebar-initial.png',
       fullPage: true
     })
 
-    // Wait for experiments to load using proper selectors
     console.log('⏳ Waiting for experiments to load...')
-    // Wait for either experiments to load or empty state to appear
-    await Promise.race([
-      sidebarFrame.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 20000 }),
-      sidebarFrame.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 20000 })
-    ]).catch(() => {
-      console.warn('⚠️ Neither experiments nor empty state appeared')
-    })
-
-    // Check if we have experiments
-    const hasExperiments = await sidebarFrame.locator('.experiment-item').first().isVisible().catch(() => false)
-    const hasEmptyState = await sidebarFrame.locator('text=/No experiments/i').isVisible().catch(() => false)
-
-    if (!hasExperiments) {
-      // Take screenshot to see what's in the sidebar
-      await page.screenshot({
-        path: 'test-results/sidebar-no-experiments.png',
-        fullPage: true
-      })
-      console.log('⚠️ No experiments found (has empty state:', hasEmptyState, ')')
-      console.log('📸 Screenshot saved to test-results/sidebar-no-experiments.png')
-
-      // Check if there's a loading spinner still visible
-      const hasLoadingSpinner = await sidebarFrame.locator('[role="status"][aria-label="Loading experiments"]').isVisible().catch(() => false)
-      console.log('⚠️ Loading spinner still visible:', hasLoadingSpinner)
-
-      await context.close()
-      test.skip()
-      return
-    }
+    await sidebarFrame.locator('[role="status"][aria-label="Loading experiments"]')
+      .waitFor({ state: 'hidden', timeout: 30000 })
+      .catch(() => {})
 
     const experimentCards = sidebarFrame.locator('.experiment-item')
+    await experimentCards.first().waitFor({ state: 'visible', timeout: 5000 })
+
     const experimentCount = await experimentCards.count()
     console.log(`✅ ${experimentCount} experiments loaded`)
 
-    // Click first experiment
     console.log('\n🔍 Clicking first experiment...')
     await experimentCards.first().click()
 
-    // Wait for detail view to load - look for Visual Editor button
     console.log('Waiting for experiment detail view...')
     await sidebarFrame.locator('#visual-editor-button').first().waitFor({ state: 'visible', timeout: 5000 })
 
@@ -181,21 +109,16 @@ test.describe('Simple Visual Editor Test', () => {
     const btnCount = await visualEditorBtns.count()
     console.log(`Found ${btnCount} Visual Editor button(s)`)
 
-    // Click Visual Editor button
     console.log('\n🚀 Launching Visual Editor...')
     await visualEditorBtns.first().click()
 
-    // Give it a moment to initialize
-    // TODO: Replace timeout with specific element wait
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
 
-    // Take screenshot to see state
     await page.screenshot({
       path: 'test-results/after-visual-editor-click.png',
       fullPage: true
     })
 
-    // Check if visual editor header appears
     const hasVisualEditor = await page.locator('text=/Visual Editor/').count() > 0
     if (hasVisualEditor) {
       console.log('✅ Visual Editor launched successfully!')
@@ -203,42 +126,35 @@ test.describe('Simple Visual Editor Test', () => {
       console.log('⚠️ Visual Editor may not have fully launched, continuing anyway...')
     }
 
-    // Test context menu
     console.log('\n🧪 Testing context menu...')
     const heading = page.locator('#hero-title').first()
     await heading.scrollIntoViewIfNeeded()
     await heading.click()
 
-    // Wait for context menu to appear - it should show up quickly
     try {
       await page.locator('text="Edit Element"').waitFor({ state: 'visible', timeout: 2000 })
       console.log('✅ Context menu appeared!')
 
-      // Take screenshot with context menu
       await page.screenshot({
         path: 'test-results/visual-editor-with-context-menu.png',
         fullPage: true
       })
       console.log('📸 Screenshot saved showing context menu')
 
-      // Click Edit Element
       await page.locator('text="Edit Element"').click()
       await page.keyboard.type('Modified Title')
       await page.keyboard.press('Enter')
       console.log('✅ Modified element text')
 
-      // Test Hide on another element
       const card = page.locator('#card-2').first()
       await card.click()
       await page.locator('text="Hide"').waitFor({ state: 'visible', timeout: 2000 })
       await page.locator('text="Hide"').click()
       console.log('✅ Hidden element')
 
-      // Check changes counter
       const changesText = await page.locator('text=/\\d+ changes/').textContent()
       console.log(`📊 Changes made: ${changesText}`)
 
-      // Save changes
       console.log('\n💾 Saving changes...')
       const saveBtn = page.locator('#save-button').first()
       if (await saveBtn.isVisible()) {
@@ -251,18 +167,14 @@ test.describe('Simple Visual Editor Test', () => {
       console.log('Error:', e.message)
     }
 
-    // Final screenshot
     await page.screenshot({
       path: 'test-results/visual-editor-final.png',
       fullPage: true
     })
 
-    // Keep browser open for manual inspection
     console.log('\n⏸️  Waiting 10 seconds before closing...')
-    // TODO: Replace timeout with specific element wait
     await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => {})
 
-    await context.close()
     console.log('\n✨ Test complete!')
   })
 })

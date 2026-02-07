@@ -1,51 +1,32 @@
-import { test, chromium, expect } from '@playwright/test'
+import { test, expect } from '../fixtures/extension'
 import path from 'path'
-import fs from 'fs'
 
 test.describe('Visual Editor Summary', () => {
-  test('Verify visual editor launches and context menu appears', async ({}) => {
+  test('Verify visual editor launches and context menu appears', async ({ context, extensionId, seedStorage }) => {
     test.setTimeout(45000)
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
-
-    if (!fs.existsSync(extensionPath)) {
-      throw new Error('Extension not built! Run "npm run build" first')
-    }
 
     console.log('\n🚀 Visual Editor Test Summary')
     console.log('================================')
 
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        '--enable-file-cookies',
-      ],
-      viewport: { width: 1920, height: 1080 },
-      slowMo: 100
+    await seedStorage({
+      'absmartly-config': {
+        apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
+        apiEndpoint: 'https://demo-2.absmartly.com/v1',
+        authMethod: 'apikey'
+      },
+      experiments: [
+        {
+          id: 1,
+          name: "test_visual_editor_summary",
+          display_name: "Test Visual Editor Summary",
+          state: "ready",
+          variants: [
+            { variant: 0, name: "control", config: "{}" },
+            { variant: 1, name: "treatment", config: "{}" }
+          ]
+        }
+      ]
     })
-
-    let [sw] = context.serviceWorkers()
-    if (!sw) sw = await context.waitForEvent('serviceworker')
-    const extensionId = new URL(sw.url()).host
-
-    // Setup
-    const setupPage = await context.newPage()
-    await setupPage.goto(`chrome-extension://${extensionId}/tabs/sidebar.html`, { waitUntil: 'domcontentloaded', timeout: 10000 })
-    await setupPage.evaluate(async () => {
-      return new Promise((resolve) => {
-        chrome.storage.local.clear(() => {
-          chrome.storage.local.set({
-            'absmartly-config': {
-              apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-              apiEndpoint: 'https://demo-2.absmartly.com/v1',
-              authMethod: 'apikey'
-            }
-          }, () => resolve(true))
-        })
-      })
-    })
-    await setupPage.close()
 
     // Open test page
     const page = await context.newPage()
@@ -77,24 +58,9 @@ test.describe('Visual Editor Summary', () => {
       console.log('   Loading spinner not found or did not disappear - continuing anyway')
     })
 
-    // Verify experiments loaded successfully
-    console.log('✅ Step 2: Verifying experiments loaded from API')
-
-    // Wait for either experiments OR empty state
-    await Promise.race([
-      sidebarFrame.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 15000 }),
-      sidebarFrame.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 15000 })
-    ]).catch(() => {
-      console.warn('   ⚠️ Neither experiments nor empty state appeared')
-    })
-
-    // Check if we have experiments
-    const hasExperiments = await sidebarFrame.locator('.experiment-item').first().isVisible().catch(() => false)
-    if (!hasExperiments) {
-      console.log('   ⚠️ No experiments found - test cannot continue')
-      test.skip()
-      return
-    }
+    // Verify experiments loaded successfully (seeded data should be available)
+    console.log('✅ Step 2: Verifying experiments loaded from storage')
+    await sidebarFrame.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 5000 })
 
     const experimentCount = await sidebarFrame.locator('.experiment-item').count()
     const experimentItem = sidebarFrame.locator('.experiment-item').first()

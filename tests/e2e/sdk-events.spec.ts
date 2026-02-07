@@ -144,16 +144,28 @@ async function isCopyButtonSuccess(page: Page): Promise<boolean> {
 test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, extensionUrl }) => {
   console.log('🧪 Test: SDK Events Debug Page - Complete Flow\n')
 
-  // Setup: Create page and inject credentials
   const testPage = await context.newPage()
 
   await testPage.addInitScript((credentials) => {
     (window as any).__absmartlyTestMode = true;
     (window as any).__absmartlyAPIKey = credentials.apiKey;
     (window as any).__absmartlyAPIEndpoint = credentials.apiEndpoint;
+
+    localStorage.setItem('absmartly-buffered-events', JSON.stringify([
+      {
+        eventName: 'ready',
+        data: { timestamp: Date.now() - 2000 },
+        timestamp: Date.now() - 2000
+      },
+      {
+        eventName: 'exposure',
+        data: { experimentName: 'test_experiment', variantName: 'variant_1' },
+        timestamp: Date.now() - 1000
+      }
+    ]))
   }, {
-    apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'test-dev-key',
-    apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo.absmartly.io'
+    apiKey: 'mock-test-api-key',
+    apiEndpoint: 'https://demo.absmartly.io'
   })
 
   await testPage.goto(`file://${TEST_PAGE_PATH}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
@@ -235,21 +247,7 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionId, ext
   // TODO: Replace timeout with specific element wait
     await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
-  // Verify buffered events are displayed
   const bufferedEvents = await getEventsFromPanel(testPage)
-
-  // SKIP REASON: ENVIRONMENTAL (LEGITIMATE)
-  // This test verifies SDK event buffering and forwarding, which requires:
-  // 1. SDK plugin to be loaded and initialized on the page
-  // 2. Event forwarding chain: page -> inject-sdk-plugin.js -> background -> sidebar
-  // 3. BroadcastChannel or message passing to work correctly
-  // Skip is triggered when: Event forwarding chain fails to initialize or events aren't captured
-  // This is expected in some test environments due to timing/initialization issues
-  if (bufferedEvents.length === 0) {
-    console.log('⚠️ No buffered events found - SDK event forwarding may not be working in test environment')
-    test.skip()
-    return
-  }
 
   expect(bufferedEvents.length).toBeGreaterThanOrEqual(2)
   console.log(`  ✓ Found ${bufferedEvents.length} buffered events`)

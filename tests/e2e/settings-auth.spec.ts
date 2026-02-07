@@ -50,15 +50,31 @@ test.describe('Settings Authentication Tests', () => {
     if (testPage) await testPage.close()
   })
 
-  test('should show authenticated user data with API Key authentication', async ({ extensionId, extensionUrl }) => {
+  test('should show authenticated user data with API Key authentication', async ({ extensionId, extensionUrl, context }) => {
     let sidebar: any
+
+    await test.step('Mock API authentication endpoint', async () => {
+      await context.route('**/auth/current-user', route => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            user: {
+              id: 'test-user-123',
+              email: 'test@example.com',
+              first_name: 'Test',
+              last_name: 'User'
+            }
+          })
+        })
+      })
+    })
 
     await test.step('Inject sidebar', async () => {
       sidebar = await injectSidebar(testPage, extensionUrl)
     })
 
     await test.step('Navigate to Settings', async () => {
-      // Check if we need to configure first (welcome screen)
       const configureButton = sidebar.locator('#configure-settings-button')
       const hasWelcomeScreen = await configureButton.isVisible().catch(() => false)
 
@@ -67,14 +83,12 @@ test.describe('Settings Authentication Tests', () => {
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
       } else {
-        // Click settings icon from main screen
         const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
         await settingsButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
       }
 
-      // Verify Settings page loaded
       await expect(sidebar.locator('text=ABsmartly Endpoint')).toBeVisible({ timeout: 3000 })
     })
 
@@ -85,7 +99,6 @@ test.describe('Settings Authentication Tests', () => {
         radio.dispatchEvent(new Event('change', { bubbles: true }))
       })
 
-      // Wait for permission modal if it appears
       const permissionModal = sidebar.locator('text=grant permission').first()
       const hasPermissionModal = await Promise.race([
         permissionModal.waitFor({ state: 'visible', timeout: 2000 }).then(() => true),
@@ -97,7 +110,6 @@ test.describe('Settings Authentication Tests', () => {
         await grantButton.evaluate((btn: HTMLElement) => {
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         })
-        // Wait for modal to close
         await permissionModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
       }
 
@@ -105,15 +117,9 @@ test.describe('Settings Authentication Tests', () => {
       await endpointInput.fill('https://demo-2.absmartly.com/v1')
 
       const apiKeyInput = sidebar.locator('#api-key-input')
-      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
-      if (!testApiKey) {
-        console.log('API Key not found in environment - skipping test')
-        test.skip()
-        return
-      }
+      const testApiKey = 'mock-test-api-key-12345'
       await apiKeyInput.fill(testApiKey)
 
-      // Ensure inputs have valid values before testing
       await expect(endpointInput).toHaveValue('https://demo-2.absmartly.com/v1')
       await expect(apiKeyInput).toHaveValue(testApiKey)
 
@@ -123,42 +129,15 @@ test.describe('Settings Authentication Tests', () => {
       })
 
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
-      const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
 
-      // Wait for either authenticated or not-authenticated state
-      const hasResponse = await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 15000 }).then(() => true),
-        notAuthSection.waitFor({ state: 'visible', timeout: 15000 }).then(() => false)
-      ]).catch(() => null)
-
-      if (hasResponse === null) {
-        console.log('⚠️ No auth response after 15s - skipping test')
-        test.skip()
-        return
-      }
-
-      const hasUserInfoBeforeSave = hasResponse
-
-      // NOTE: In test environment, the refresh might not always return user info
-      // This could be due to network issues, API availability, or test credentials
-      // We log the result but don't fail the test
-      if (!hasUserInfoBeforeSave) {
-        console.log('⚠️ Refresh button did not return user info')
-        console.log('   This may be expected in test environment')
-        console.log('   Continuing to test save functionality...')
-      } else {
-        console.log('✅ User info displayed before save')
-      }
+      await authUserInfo.waitFor({ state: 'visible', timeout: 5000 })
 
       const saveButton = sidebar.locator('#save-settings-button')
       await saveButton.evaluate((btn: HTMLElement) =>
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       )
 
-      await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 15000 }),
-        notAuthSection.waitFor({ state: 'visible', timeout: 15000 })
-      ])
+      await authUserInfo.waitFor({ state: 'visible', timeout: 5000 })
     })
 
     await test.step('Verify authenticated user data displays', async () => {
@@ -175,27 +154,11 @@ test.describe('Settings Authentication Tests', () => {
       await expect(authStatusSection).toBeVisible({ timeout: 3000 })
 
       const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
-      const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
 
-      // Wait for either authenticated or not-authenticated state
-      const hasAuth = await Promise.race([
-        authUserInfo.waitFor({ state: 'visible', timeout: 15000 }).then(() => true),
-        notAuthSection.waitFor({ state: 'visible', timeout: 15000 }).then(() => false)
-      ]).catch(() => null)
+      await authUserInfo.waitFor({ state: 'visible', timeout: 5000 })
 
-      // NOTE: API key authentication may not work in test environment
-      // This could be due to network issues, API availability, or test credentials
-      // We verify the UI components are present but don't require successful auth
-      if (!hasAuth) {
-        console.log('⚠️ API key authentication did not succeed in test environment')
-        console.log('   UI components verified - test passes with warning')
-        console.log('   Manual testing recommended for auth verification')
-      } else {
-        console.log('✅ API key authentication successful!')
-      }
-
-      // Verify that auth status section is displayed (even if not authenticated)
       expect(await authStatusSection.isVisible()).toBeTruthy()
+      expect(await authUserInfo.isVisible()).toBeTruthy()
     })
   })
 

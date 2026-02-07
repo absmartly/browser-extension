@@ -20,10 +20,24 @@ test.describe('Experiment Creation and Editing Flows', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, seedStorage }) => {
+    const mockExperiments = [
+      {
+        id: 1,
+        name: "test_experiment",
+        display_name: "Test Experiment",
+        state: "ready",
+        variants: [
+          { variant: 0, name: "control", config: "{}" },
+          { variant: 1, name: "treatment", config: "{}" }
+        ]
+      }
+    ]
+
+    await seedStorage({ experiments: mockExperiments })
+
     testPage = await context.newPage()
 
-    // Set up console listener using helper
     allConsoleMessages = setupConsoleLogging(
       testPage,
       (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]')
@@ -480,16 +494,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Open first experiment', async () => {
       console.log('\n📖 Opening first experiment')
 
-      // Wait for experiments to load using helper
-      const hasExperiments = await waitForExperiments(sidebar)
+      await waitForExperiments(sidebar)
 
-      if (!hasExperiments) {
-        console.log('  ℹ️  No experiments available - skipping detail view tests')
-        test.skip()
-        return
-      }
-
-      // Use .experiment-item and then click the inner .cursor-pointer div
       const experimentRow = sidebar.locator('.experiment-item').first()
       await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
 
@@ -498,7 +504,6 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await clickableArea.click()
       console.log('  ✓ Clicked first experiment')
 
-      // Wait for detail view to load
       await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 5000 })
       await debugWait()
     })

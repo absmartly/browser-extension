@@ -67,7 +67,22 @@ test.describe('Visual Editor Unified Tests', () => {
   let testPage: Page
   let sidebar: FrameLocator
 
-  test.beforeEach(async ({ context, extensionUrl }) => {
+  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
+    const mockExperiments = [
+      {
+        id: 1,
+        name: "test_visual_editor",
+        display_name: "Test Visual Editor",
+        state: "ready",
+        variants: [
+          { variant: 0, name: "control", config: "{}" },
+          { variant: 1, name: "treatment", config: "{}" }
+        ]
+      }
+    ]
+
+    await seedStorage({ experiments: mockExperiments })
+
     testPage = await context.newPage()
     const result = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
     sidebar = result.sidebar
@@ -83,17 +98,9 @@ test.describe('Visual Editor Unified Tests', () => {
       .waitFor({ state: 'hidden', timeout: 30000 })
       .catch(() => {})
 
-    // Step 2: Check if experiments are available and click on first experiment
+    // Step 2: Click on first experiment (seeded in beforeEach)
     const experimentItems = sidebar.locator('.experiment-item')
-    const count = await experimentItems.count()
-
-    if (count === 0) {
-      console.log('No experiments found, skipping test')
-      test.skip()
-      return
-    }
-
-    console.log(`Found ${count} experiments`)
+    await experimentItems.first().waitFor({ state: 'visible', timeout: 5000 })
     await experimentItems.first().click()
 
     // Step 3: Click visual editor button to start visual editor

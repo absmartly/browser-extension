@@ -16,9 +16,9 @@ export async function createExperiment(
   await click(sidebar, 'button[title="Create New Experiment"]', 5000)
   await debugWait()
 
-  const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+  const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")').first()
   await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
-  await click(sidebar, 'button:has-text("From Scratch"), button:has-text("from scratch")', 5000)
+  await fromScratchButton.click()
   await debugWait()
 
   const experimentName = `E2E Test Experiment ${Date.now()}`
