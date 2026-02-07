@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { debugError, debugLog } from '~src/utils/debug'
 import { getConfig } from '~src/utils/storage'
 import type { Experiment, ExperimentCustomSectionField } from '~src/types/absmartly'
@@ -21,6 +22,8 @@ interface UseExperimentSaveOptions {
 }
 
 export function useExperimentSave({ experiment, domFieldName, onError }: UseExperimentSaveOptions) {
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
 
   const save = async (
     formData: ExperimentFormData,
@@ -28,31 +31,40 @@ export function useExperimentSave({ experiment, domFieldName, onError }: UseExpe
     onUpdate?: (id: number, updates: Partial<Experiment>) => void,
     onSave?: (experiment: Partial<Experiment>) => Promise<void>
   ) => {
-    const config = await getConfig()
-    const fieldName = config?.domChangesFieldName || '__dom_changes'
+    if (savingRef.current) return
 
-    if (experiment?.id && onUpdate) {
-      return await saveExistingExperiment(
-        experiment,
-        formData,
-        currentVariants,
-        fieldName,
-        onUpdate,
-        onError
-      )
-    }
+    try {
+      savingRef.current = true
+      setSaving(true)
+      const config = await getConfig()
+      const fieldName = config?.domChangesFieldName || '__dom_changes'
 
-    if (onSave) {
-      return await createNewExperiment(
-        formData,
-        currentVariants,
-        fieldName,
-        onSave
-      )
+      if (experiment?.id && onUpdate) {
+        return await saveExistingExperiment(
+          experiment,
+          formData,
+          currentVariants,
+          fieldName,
+          onUpdate,
+          onError
+        )
+      }
+
+      if (onSave) {
+        return await createNewExperiment(
+          formData,
+          currentVariants,
+          fieldName,
+          onSave
+        )
+      }
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
   }
 
-  return { save }
+  return { save, saving }
 }
 
 async function createNewExperiment(

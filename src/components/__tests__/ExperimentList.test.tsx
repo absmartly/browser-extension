@@ -363,13 +363,18 @@ describe('ExperimentList', () => {
   })
 
   describe('Error Handling', () => {
+    beforeEach(() => {
+      ;(overrides.initializeOverrides as jest.Mock).mockReset()
+      ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({})
+    })
+
     afterEach(() => {
-      ;(overrides.initializeOverrides as jest.Mock).mockClear()
+      ;(overrides.initializeOverrides as jest.Mock).mockReset()
       ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({})
     })
 
     it('should handle override initialization errors', async () => {
-      ;(overrides.initializeOverrides as jest.Mock).mockRejectedValue(
+      ;(overrides.initializeOverrides as jest.Mock).mockRejectedValueOnce(
         new Error('Failed to initialize')
       )
 

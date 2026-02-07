@@ -34,12 +34,16 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
 
   useEffect(() => {
     const init = async () => {
-      const config = await getConfig()
-      const fieldName = config?.domChangesFieldName || '__dom_changes'
-      setDomFieldName(fieldName)
+      try {
+        const config = await getConfig()
+        const fieldName = config?.domChangesFieldName || '__dom_changes'
+        setDomFieldName(fieldName)
 
-      const loadedOverrides = await initializeOverrides()
-      setOverrides(loadedOverrides)
+        const loadedOverrides = await initializeOverrides()
+        setOverrides(loadedOverrides)
+      } catch (error) {
+        debugError('Failed to initialize overrides:', error)
+      }
 
       let devEnv = await getDevelopmentEnvironment()
       if (!devEnv) {

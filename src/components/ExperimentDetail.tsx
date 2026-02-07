@@ -73,7 +73,13 @@ export function ExperimentDetail({
     experiment,
     domFieldName
   })
-  const { save } = useExperimentSave({ experiment, domFieldName, onError })
+
+  useEffect(() => {
+    if (displayName !== (experiment.display_name || experiment.name)) {
+      setHasUnsavedChanges(true)
+    }
+  }, [displayName, experiment.display_name, experiment.name, setHasUnsavedChanges])
+  const { save, saving } = useExperimentSave({ experiment, domFieldName, onError })
   const [metadata, setMetadata] = useState({
     percentage_of_traffic: experiment.percentage_of_traffic || 100,
     unit_type_id: experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
@@ -369,17 +375,19 @@ export function ExperimentDetail({
             onClick={handleSaveChanges}
             variant="primary"
             size="sm"
-            disabled={loading || experiment.state === 'running' || experiment.state === 'development'}
+            disabled={loading || saving || experiment.state === 'running' || experiment.state === 'development'}
             className={hasUnsavedChanges ? 'ring-2 ring-yellow-400' : ''}
             title={
               experiment.state === 'running' || experiment.state === 'development'
                 ? 'Stop the experiment to save changes'
+                : saving
+                ? 'Saving...'
                 : hasUnsavedChanges
                 ? 'Save your changes'
                 : 'No changes to save'
             }
           >
-            {hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
+            {saving ? 'Saving...' : hasUnsavedChanges ? '• Save Changes' : 'Save Changes'}
           </Button>
         </div>
       </div>
