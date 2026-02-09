@@ -1,6 +1,7 @@
 import { Storage } from '@plasmohq/storage'
 import { parseCookieValue, serializeOverrides, generateCookieParserScript } from './cookie-serialization'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export const OVERRIDES_COOKIE_NAME = 'absmartly_overrides'
 export const OVERRIDES_STORAGE_KEY = 'experiment_overrides'
 export const DEV_ENV_STORAGE_KEY = 'development_environment'
@@ -33,7 +34,7 @@ export function parseCookieFormat(cookieValue: string): { overrides: ExperimentO
   try {
     return parseCookieValue(cookieValue)
   } catch (error) {
-    console.warn('Failed to parse override cookie:', error)
+    debugWarn('Failed to parse override cookie:', error)
     return { overrides: {} }
   }
 }
@@ -78,7 +79,7 @@ export async function loadOverridesFromStorage(): Promise<ExperimentOverrides> {
     const overrides = await storage.get(OVERRIDES_STORAGE_KEY) as ExperimentOverrides
     return overrides || {}
   } catch (error) {
-    console.warn('Failed to load overrides from storage:', error)
+    debugWarn('Failed to load overrides from storage:', error)
     return {}
   }
 }
@@ -88,7 +89,7 @@ export async function loadOverridesFromStorage(): Promise<ExperimentOverrides> {
  */
 export async function saveOverrides(overrides: ExperimentOverrides): Promise<void> {
   try {
-    console.log('[ABsmartly] saveOverrides called with:', overrides)
+    debugLog('[ABsmartly] saveOverrides called with:', overrides)
     // Clean up: remove experiments with variant -1 (off) and handle undefined/null values
     const cleanedOverrides = Object.entries(overrides)
       .filter(([_, value]) => {
@@ -98,7 +99,7 @@ export async function saveOverrides(overrides: ExperimentOverrides): Promise<voi
       })
       .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {})
 
-    console.log('[ABsmartly] Cleaned overrides:', cleanedOverrides)
+    debugLog('[ABsmartly] Cleaned overrides:', cleanedOverrides)
     // Save to chrome.storage.local (primary)
     await storage.set(OVERRIDES_STORAGE_KEY, cleanedOverrides)
 
@@ -144,7 +145,7 @@ export async function getDevelopmentEnvironment(): Promise<string | null> {
     const envName = await storage.get(DEV_ENV_STORAGE_KEY) as string
     return envName || null
   } catch (error) {
-    console.warn('Failed to get development environment:', error)
+    debugWarn('Failed to get development environment:', error)
     return null
   }
 }
@@ -157,7 +158,7 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
   try {
     // Get the development environment if any
     const devEnv = await getDevelopmentEnvironment()
-    console.log('[ABsmartly] Syncing to cookie - overrides:', overrides, 'devEnv:', devEnv)
+    debugLog('[ABsmartly] Syncing to cookie - overrides:', overrides, 'devEnv:', devEnv)
 
     // Check if we're in extension sidebar/background (have access to chrome.tabs)
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
@@ -176,7 +177,6 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
             // Clear cookie if no overrides and no dev environment
             document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
           } else {
-            console.log('[ABsmartly] Setting cookie value:', cookieValue)
             const expires = new Date()
             expires.setDate(expires.getDate() + 30)
             document.cookie = `${cookieName}=${cookieValue}; expires=${expires.toUTCString()}; path=/;`
@@ -196,7 +196,7 @@ async function syncOverridesToCookie(overrides: ExperimentOverrides): Promise<vo
       }
     }
   } catch (error) {
-    console.warn('Failed to sync overrides to cookie:', error)
+    debugWarn('Failed to sync overrides to cookie:', error)
     // Don't throw - cookie sync is best effort for SSR
   }
 }
@@ -287,7 +287,7 @@ export async function loadOverridesFromCookie(): Promise<ExperimentOverrides> {
       return cookieValue ? parseCookieFormat(cookieValue).overrides : {}
     }
   } catch (error) {
-    console.warn('Failed to load overrides from cookie:', error)
+    debugWarn('Failed to load overrides from cookie:', error)
     return {}
   }
 }
