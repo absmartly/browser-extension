@@ -49,7 +49,7 @@ export async function registerFileUrlContentScript(): Promise<void> {
         allFrames: false
       }])
 
-      console.log('[InjectionHandler] Test mode: Registered content script for file:// URLs')
+      debugLog('[InjectionHandler] Test mode: Registered content script for file:// URLs')
     }
   } catch (error) {
     try {
@@ -65,7 +65,7 @@ export async function registerFileUrlContentScript(): Promise<void> {
           runAt: 'document_idle',
           allFrames: false
         }])
-        console.log('[InjectionHandler] Test mode: Re-registered content script for file:// URLs')
+        debugLog('[InjectionHandler] Test mode: Re-registered content script for file:// URLs')
       }
     } catch (retryError) {
       console.error('[InjectionHandler] Test mode: Failed to register file:// content script:', retryError)
@@ -111,11 +111,19 @@ export async function injectOrToggleSidebar(tabId: number, tabUrl: string): Prom
  * This function is injected into the page and runs in the page's context
  */
 function toggleSidebarFunc(): void {
+  const log = (...args: any[]) => {
+    try {
+      console.log(...args)
+    } catch {
+      // no-op
+    }
+  }
+
   const existingSidebar = document.getElementById('absmartly-sidebar-root') as HTMLElement
   if (existingSidebar) {
-    console.log('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
+    log('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
     const currentTransform = existingSidebar.style.transform
-    console.log('Current transform:', currentTransform)
+    log('Current transform:', currentTransform)
 
     const isCurrentlyVisible = !currentTransform
       || currentTransform === 'translateX(0px)'
@@ -123,7 +131,7 @@ function toggleSidebarFunc(): void {
       || currentTransform === 'translateX(0)'
 
     if (isCurrentlyVisible) {
-      console.log('Hiding sidebar')
+      log('Hiding sidebar')
       existingSidebar.style.transform = 'translateX(100%)'
 
       const originalPadding = document.body.getAttribute('data-absmartly-original-padding-right')
@@ -136,7 +144,7 @@ function toggleSidebarFunc(): void {
         }, 350)
       }
     } else {
-      console.log('Showing sidebar')
+      log('Showing sidebar')
       existingSidebar.style.transform = 'translateX(0)'
 
       if (!document.body.hasAttribute('data-absmartly-original-padding-right')) {
@@ -150,7 +158,7 @@ function toggleSidebarFunc(): void {
     return
   }
 
-  console.log('🔵 ABSmartly Extension: Injecting sidebar')
+  log('🔵 ABSmartly Extension: Injecting sidebar')
 
   const originalPadding = document.body.style.paddingRight || '0px'
   document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
@@ -263,7 +271,7 @@ function toggleSidebarFunc(): void {
 
     const finalWidth = container.style.width
     localStorage.setItem('absmartly-sidebar-width', finalWidth)
-    console.log('🔵 ABSmartly Extension: Saved sidebar width:', finalWidth)
+    log('🔵 ABSmartly Extension: Saved sidebar width:', finalWidth)
 
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
@@ -309,7 +317,7 @@ function toggleSidebarFunc(): void {
   container.appendChild(iframe)
   document.body.appendChild(container)
 
-  console.log('🔵 ABSmartly Extension: Sidebar injected successfully')
+  log('🔵 ABSmartly Extension: Sidebar injected successfully')
 }
 
 /**

@@ -6,6 +6,7 @@ import {
 } from '../config-manager'
 import { validateAPIEndpoint } from '../../utils/security'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
+import { unsafeAPIEndpoint, unsafeApplicationId } from '~src/types/branded'
 
 jest.mock('~src/utils/debug', () => ({
   debugLog: jest.fn(),
@@ -60,8 +61,8 @@ describe('config-manager', () => {
     it('should validate config with all optional fields', () => {
       const config: ABsmartlyConfig = {
         apiKey: 'test-key',
-        apiEndpoint: 'https://api.absmartly.com',
-        applicationId: 123,
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com'),
+        applicationId: unsafeApplicationId(123),
         authMethod: 'apikey' as const,
         domChangesFieldName: 'customField',
         queryPrefix: '_exp_',
@@ -148,7 +149,7 @@ describe('config-manager', () => {
 
     it('should return stored config with API key from secure storage', async () => {
       const storedConfig: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com'),
         authMethod: 'apikey',
         apiKey: ''
       }
@@ -166,7 +167,7 @@ describe('config-manager', () => {
     it('should use apiKey from config if secure storage is empty', async () => {
       const storedConfig: ABsmartlyConfig = {
         apiKey: 'fallback-key',
-        apiEndpoint: 'https://api.absmartly.com',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com'),
         authMethod: 'apikey'
       }
 
@@ -179,7 +180,7 @@ describe('config-manager', () => {
 
     it('should throw error for invalid API endpoint domain', async () => {
       const storedConfig: ABsmartlyConfig = {
-        apiEndpoint: 'https://evil.com',
+        apiEndpoint: unsafeAPIEndpoint('https://evil.com'),
         authMethod: 'jwt'
       }
 
@@ -237,7 +238,7 @@ describe('config-manager', () => {
 
       const existingConfig: ABsmartlyConfig = {
         apiKey: 'existing-key',
-        apiEndpoint: 'https://existing.absmartly.com',
+        apiEndpoint: unsafeAPIEndpoint('https://existing.absmartly.com'),
         authMethod: 'apikey'
       }
 

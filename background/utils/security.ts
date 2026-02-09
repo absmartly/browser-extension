@@ -11,10 +11,31 @@ try {
 
 export const ALLOWED_API_DOMAINS = ['absmartly.com', 'absmartly.io']
 
+/**
+ * BLOCKED_HOSTS - List of hosts to block for SSRF protection
+ *
+ * IPv4 Addresses:
+ * - localhost, 127.0.0.1: Loopback addresses
+ * - 0.0.0.0: Wildcard/unspecified address
+ * - 169.254.x.x: Link-local addresses (APIPA)
+ * - 192.168.x.x: Private network (Class C)
+ * - 10.x.x.x: Private network (Class A)
+ * - 172.16-31.x.x: Private network (Class B)
+ *
+ * IPv6 Addresses:
+ * - ::1: IPv6 loopback (equivalent to 127.0.0.1)
+ * - [::1]: Bracketed notation for IPv6 loopback (used in URLs)
+ * - fc00::/7: Unique Local Addresses (ULA) - private IPv6 addresses
+ *   - fc: Prefix for fc00::/8 to fdff::/8 range (all ULAs start with fc or fd)
+ *   - fd: Prefix for fd00::/8 (most common ULA range)
+ * - fe80::/10: Link-local addresses (similar to 169.254.x.x in IPv4)
+ */
 export const BLOCKED_HOSTS = [
   'localhost',
   '127.0.0.1',
   '0.0.0.0',
+  '::1',
+  '[::1]',
   '169.254.',
   '192.168.',
   '10.',
@@ -33,11 +54,14 @@ export const BLOCKED_HOSTS = [
   '172.28.',
   '172.29.',
   '172.30.',
-  '172.31.'
+  '172.31.',
+  'fc',
+  'fd',
+  'fe80:'
 ]
 
-const EXACT_BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
-const PREFIX_BLOCKED_HOSTS = ['169.254.', '192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.']
+const EXACT_BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1'])
+const PREFIX_BLOCKED_HOSTS = ['169.254.', '192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.', 'fc', 'fd', 'fe80:']
 
 export function validateAPIEndpoint(endpoint: string): boolean {
   try {
@@ -63,7 +87,11 @@ export function validateAPIEndpoint(endpoint: string): boolean {
 export function isSSRFSafe(url: string): boolean {
   try {
     const parsedUrl = new URL(url)
-    const hostname = parsedUrl.hostname
+    let hostname = parsedUrl.hostname
+
+    if (hostname.startsWith('[') && hostname.endsWith(']')) {
+      hostname = hostname.slice(1, -1)
+    }
 
     if (EXACT_BLOCKED_HOSTS.has(hostname)) {
       debugError(`[Security] SSRF attempt blocked: ${url}`)

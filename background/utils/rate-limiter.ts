@@ -29,6 +29,14 @@ export function checkRateLimit(
 
   const times = requestTimestamps.get(senderKey) || []
 
+  if (times.length === 1 && times[0] > now) {
+    debugWarn(
+      `[RateLimiter] BLOCKED request from ${senderId} (blocked until ${new Date(times[0]).toISOString()})`,
+      messageType ? { messageType } : undefined
+    )
+    return false
+  }
+
   const recentTimes = times.filter(timestamp => now - timestamp < windowMs)
 
   if (recentTimes.length >= maxRequests) {

@@ -4,6 +4,7 @@ import type { ABsmartlyConfig } from '~src/types/absmartly'
 import type { AIProviderType } from '~src/lib/ai-providers'
 import { debugLog } from '~src/utils/debug'
 import { validateAPIEndpoint } from '../utils/security'
+import { unsafeAPIEndpoint, unsafeApplicationId } from '~src/types/branded'
 
 const ConfigSchema = z.object({
   apiKey: z.string().optional(),
@@ -79,7 +80,12 @@ export async function initializeConfig(
   debugLog('[Config] Initializing config...')
 
   const storedConfig = await storage.get("absmartly-config") as ABsmartlyConfig | null
-  debugLog('[Config] Stored config:', storedConfig)
+  // SECURITY: Never log API keys, even partially - redact sensitive fields
+  debugLog('[Config] Stored config:', storedConfig ? {
+    ...storedConfig,
+    apiKey: storedConfig.apiKey ? '[REDACTED]' : undefined,
+    aiApiKey: storedConfig.aiApiKey ? '[REDACTED]' : undefined
+  } : null)
 
   const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
   const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
@@ -139,14 +145,14 @@ export async function initializeConfig(
     if (!validateAPIEndpoint(envApiEndpoint)) {
       debugLog('[Config] Invalid API endpoint from environment, skipping:', envApiEndpoint)
     } else {
-      newConfig.apiEndpoint = envApiEndpoint
+      newConfig.apiEndpoint = unsafeAPIEndpoint(envApiEndpoint)
       updated = true
       debugLog('[Config] Using API endpoint from environment')
     }
   }
 
   if (!storedConfig?.applicationId && envApplicationId) {
-    newConfig.applicationId = parseInt(envApplicationId)
+    newConfig.applicationId = unsafeApplicationId(parseInt(envApplicationId))
     updated = true
     debugLog('[Config] Using application ID from environment')
   }

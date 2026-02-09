@@ -1,16 +1,10 @@
-import { debugError } from '~src/utils/debug'
+import { debugError, debugLog, debugWarn } from '~src/utils/debug'
 import { buildAuthFetchOptions } from '~src/utils/auth'
-import { Storage } from '@plasmohq/storage'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { getConfig as getConfigFromManager } from '../core/config-manager'
 import { getJWTCookie } from '../core/api-client'
 import { isSSRFSafe } from '../utils/security'
-
-const storage = new Storage()
-const secureStorage = new Storage({
-  area: "local",
-  secretKeyring: true
-} as any)
+import { storage, secureStorage } from '~src/lib/storage-instances'
 
 async function getConfig(): Promise<ABsmartlyConfig | null> {
   return getConfigFromManager(storage, secureStorage)
@@ -48,7 +42,7 @@ export async function handleAvatarFetch(
     let jwtToken: string | null = null
     if (avatarConfig.authMethod === 'jwt') {
       jwtToken = await getJWTCookie(config.apiEndpoint)
-      console.log('[AvatarProxy] JWT token for avatar:', jwtToken ? 'found' : 'NOT FOUND', 'endpoint:', config.apiEndpoint)
+      debugLog('[AvatarProxy] JWT token for avatar:', jwtToken ? 'found' : 'NOT FOUND', 'endpoint:', config.apiEndpoint)
     }
 
     const useAuthHeader = avatarConfig.authMethod === 'apikey'
@@ -59,17 +53,17 @@ export async function handleAvatarFetch(
       'Accept': 'image/*'
     }
 
-    console.log('[AvatarProxy] Fetching avatar with options:', {
+    // SECURITY: Never log API keys, tokens, or auth headers, even partially
+    debugLog('[AvatarProxy] Fetching avatar with options:', {
       url: avatarUrl,
       authMethod: avatarConfig.authMethod,
-      authHeader: fetchOptions.headers?.['Authorization'] ?
-        `${fetchOptions.headers['Authorization'].substring(0, 20)}...` : 'MISSING',
+      authHeader: fetchOptions.headers?.['Authorization'] ? 'present' : 'MISSING',
       credentials: fetchOptions.credentials
     })
 
     const response = await fetch(avatarUrl, fetchOptions)
 
-    console.log('[AvatarProxy] Avatar fetch response:', response.status, response.statusText)
+    debugLog('[AvatarProxy] Avatar fetch response:', response.status, response.statusText)
 
     if (!response.ok) {
       console.error('[AvatarProxy] Avatar fetch failed with status:', response.status)

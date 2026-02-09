@@ -12,6 +12,7 @@ jest.resetModules()
 
 import { makeAPIRequest, isAuthError } from '../api-client'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
+import { unsafeAPIEndpoint, unsafeApplicationId } from '~src/types/branded'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -62,9 +63,9 @@ loadEnvFile(envPath)
 // Get config from environment
 const authMethod = (process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD as 'jwt' | 'apikey') || 'apikey'
 const testConfig: ABsmartlyConfig = {
-  apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
+  apiEndpoint: unsafeAPIEndpoint(process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || ''),
   applicationId: process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID ?
-    parseInt(process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID) : undefined,
+    unsafeApplicationId(parseInt(process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_ID)) : undefined,
   ...(authMethod === 'apikey'
     ? { authMethod: 'apikey', apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '' }
     : { authMethod: 'jwt' })

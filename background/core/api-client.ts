@@ -1,16 +1,12 @@
-import { Storage } from "@plasmohq/storage"
 import axios, { AxiosError } from 'axios'
 import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { getConfig as getConfigWithStorages } from './config-manager'
 import { withRetry, withNetworkRetry } from '~src/lib/api-retry'
+import { safeParseExperiments, parseExperiment } from '~src/lib/validation-schemas'
+import { storage, secureStorage } from '~src/lib/storage-instances'
 
-const storage = new Storage()
-const secureStorage = new Storage({
-  area: "local",
-  secretKeyring: true
-} as any)
-
+import { debugWarn } from '~src/utils/debug'
 async function getConfig(): Promise<ABsmartlyConfig | null> {
   return getConfigWithStorages(storage, secureStorage)
 }
@@ -33,7 +29,7 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
         origins: ['https://*.absmartly.com/*']
       })
       if (!hasPermission) {
-        console.warn('[Auth] Cookie permission not granted for ABsmartly domain')
+        debugWarn('[Auth] Cookie permission not granted for ABsmartly domain')
         return null
       }
     }
@@ -47,7 +43,7 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
     const jwtCookie = cookies.find(c => c.name === 'jwt')
 
     if (!jwtCookie) {
-      console.warn(`[Auth] No JWT cookie found for domain ${domain}`)
+      debugWarn(`[Auth] No JWT cookie found for domain ${domain}`)
     }
 
     return jwtCookie?.value || null
@@ -161,6 +157,13 @@ export async function makeAPIRequest(
       throw error
     }
 
+    if (path.includes('/experiments') || path.includes('/experiment/')) {
+      const isValid = validateExperimentsResponse(responseData)
+      if (!isValid) {
+        debugWarn('[API] Response validation failed for experiments endpoint')
+      }
+    }
+
     return responseData
   } catch (error) {
     if (isAuthError(error)) {
@@ -180,4 +183,40 @@ export function validateAPIRequest(method: string, path: string, data?: any): { 
     }
     return { valid: false, error: String(error) }
   }
+}
+
+export function validateExperimentsResponse(data: unknown): boolean {
+  if (!data || typeof data !== 'object') {
+    return true
+  }
+
+  if ('experiments' in data && Array.isArray((data as any).experiments)) {
+    const result = safeParseExperiments((data as any).experiments)
+    if (result.success) {
+      return true
+    }
+    debugWarn('[API] Experiments validation failed:', (result as { success: false; error: string }).error)
+    return false
+  }
+
+  if (Array.isArray(data)) {
+    const result = safeParseExperiments(data)
+    if (result.success) {
+      return true
+    }
+    debugWarn('[API] Experiments array validation failed:', (result as { success: false; error: string }).error)
+    return false
+  }
+
+  if ('id' in data && 'name' in data && 'variants' in data) {
+    try {
+      parseExperiment(data)
+      return true
+    } catch (error) {
+      debugWarn('[API] Experiment validation failed:', error)
+      return false
+    }
+  }
+
+  return true
 }

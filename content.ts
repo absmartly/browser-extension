@@ -312,7 +312,7 @@ document.documentElement.appendChild(debugDiv)
 
 window.postMessage(
   { type: "ABSMARTLY_CONTENT_READY", timestamp: Date.now() },
-  "*"
+  window.location.origin
 )
 
 window.addEventListener("message", (event) => {
@@ -337,7 +337,7 @@ window.addEventListener("message", (event) => {
           success: true,
           message: "Sidebar open message received"
         },
-        "*"
+        window.location.origin
       )
       return
     }
@@ -351,7 +351,7 @@ window.addEventListener("message", (event) => {
           success: true,
           message: "Sidebar close message received"
         },
-        "*"
+        window.location.origin
       )
       return
     }
@@ -379,7 +379,7 @@ window.addEventListener("message", (event) => {
               ? "Visual editor started"
               : `Failed: ${result.error}`
           },
-          "*"
+          window.location.origin
         )
       })
       return
@@ -395,7 +395,7 @@ window.addEventListener("message", (event) => {
           active: isVisualEditorActive,
           changes: currentEditor?.getChanges() || []
         },
-        "*"
+        window.location.origin
       )
       return
     }

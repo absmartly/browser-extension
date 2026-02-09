@@ -41,6 +41,60 @@ describe('message-router', () => {
       expect(validateSender(sender)).toBe(true)
     })
 
+    it('should accept sender from localhost', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        url: 'http://localhost:3000'
+      }
+
+      expect(validateSender(sender)).toBe(true)
+    })
+
+    it('should accept sender from 127.0.0.1', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        url: 'http://127.0.0.1:8080'
+      }
+
+      expect(validateSender(sender)).toBe(true)
+    })
+
+    it('should accept sender from absmartly.com domain', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        url: 'https://app.absmartly.com'
+      }
+
+      expect(validateSender(sender)).toBe(true)
+    })
+
+    it('should accept sender from absmartly.io domain', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        url: 'https://api.absmartly.io'
+      }
+
+      expect(validateSender(sender)).toBe(true)
+    })
+
+    it('should reject sender with invalid URL format', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        url: 'not-a-valid-url'
+      }
+
+      expect(validateSender(sender)).toBe(false)
+    })
+
+    it('should reject sender from unauthorized domain', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        url: 'https://malicious-site.com'
+      }
+
+      expect(validateSender(sender)).toBe(false)
+    })
+
     it('should reject sender with different extension ID', () => {
       const sender: chrome.runtime.MessageSender = {
         id: 'different-extension-id',
@@ -56,6 +110,44 @@ describe('message-router', () => {
       }
 
       expect(validateSender(sender)).toBe(false)
+    })
+
+    it('should reject iframe from unauthorized origin', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        frameId: 1,
+        url: 'https://malicious-site.com'
+      }
+
+      expect(validateSender(sender)).toBe(false)
+    })
+
+    it('should reject iframe without URL', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        frameId: 1
+      }
+
+      expect(validateSender(sender)).toBe(false)
+    })
+
+    it('should accept iframe from authorized origin', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        frameId: 1,
+        url: 'https://app.absmartly.com'
+      }
+
+      expect(validateSender(sender)).toBe(true)
+    })
+
+    it('should accept main frame (frameId = 0) without URL validation', () => {
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        frameId: 0
+      }
+
+      expect(validateSender(sender)).toBe(true)
     })
   })
 
@@ -309,6 +401,229 @@ describe('message-router', () => {
       mockChrome.runtime.sendMessage.mockRejectedValue(new Error('Any error'))
 
       await expect(broadcastToExtension(message)).resolves.toBeUndefined()
+    })
+  })
+
+  describe('concurrent message handling', () => {
+    const validSender: chrome.runtime.MessageSender = {
+      id: 'test-extension-id'
+    }
+
+    beforeEach(() => {
+      const mockTab = { id: 123 }
+      mockChrome.tabs.query.mockResolvedValue([mockTab])
+    })
+
+    it('should handle multiple messages in parallel', async () => {
+      const messages: ExtensionMessage[] = [
+        { type: 'MESSAGE_1', from: 'sidebar', to: 'content' },
+        { type: 'MESSAGE_2', from: 'sidebar', to: 'content' },
+        { type: 'MESSAGE_3', from: 'sidebar', to: 'content' }
+      ]
+
+      mockChrome.tabs.sendMessage.mockImplementation((tabId, msg) =>
+        Promise.resolve({ success: true, type: msg.type })
+      )
+
+      const responses: any[] = []
+      const sendResponses = messages.map(() => jest.fn((response) => responses.push(response)))
+
+      messages.forEach((msg, index) => {
+        routeMessage(msg, validSender, sendResponses[index])
+      })
+
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledTimes(3)
+      expect(responses).toHaveLength(3)
+      responses.forEach((response, index) => {
+        expect(response).toEqual({ success: true, type: messages[index].type })
+      })
+    })
+
+    it('should not lose messages under concurrent load', async () => {
+      const messageCount = 10
+      const messages: ExtensionMessage[] = Array.from({ length: messageCount }, (_, i) => ({
+        type: `MESSAGE_${i}`,
+        from: 'sidebar',
+        to: 'content'
+      }))
+
+      let resolveCount = 0
+      mockChrome.tabs.sendMessage.mockImplementation((tabId, msg) => {
+        resolveCount++
+        return Promise.resolve({ success: true, type: msg.type, order: resolveCount })
+      })
+
+      const responses: any[] = []
+      const sendResponses = messages.map(() => jest.fn((response) => responses.push(response)))
+
+      messages.forEach((msg, index) => {
+        routeMessage(msg, validSender, sendResponses[index])
+      })
+
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledTimes(messageCount)
+      expect(responses).toHaveLength(messageCount)
+      expect(resolveCount).toBe(messageCount)
+    })
+
+    it('should handle mixed success and failure in parallel', async () => {
+      const messages: ExtensionMessage[] = [
+        { type: 'SUCCESS_MSG', from: 'sidebar', to: 'content' },
+        { type: 'FAIL_MSG', from: 'sidebar', to: 'content' },
+        { type: 'SUCCESS_MSG_2', from: 'sidebar', to: 'content' }
+      ]
+
+      mockChrome.tabs.sendMessage.mockImplementation((tabId, msg) => {
+        if (msg.type === 'FAIL_MSG') {
+          return Promise.reject(new Error('Message failed'))
+        }
+        return Promise.resolve({ success: true, type: msg.type })
+      })
+
+      const responsesByType: Record<string, any> = {}
+      const sendResponses = messages.map((msg) =>
+        jest.fn((response) => {
+          responsesByType[msg.type] = response
+        })
+      )
+
+      messages.forEach((msg, index) => {
+        routeMessage(msg, validSender, sendResponses[index])
+      })
+
+      await new Promise(resolve => setTimeout(resolve, 250))
+
+      expect(Object.keys(responsesByType)).toHaveLength(3)
+      expect(responsesByType['SUCCESS_MSG']).toEqual({ success: true, type: 'SUCCESS_MSG' })
+      expect(responsesByType['FAIL_MSG']).toEqual({ error: 'Message failed' })
+      expect(responsesByType['SUCCESS_MSG_2']).toEqual({ success: true, type: 'SUCCESS_MSG_2' })
+    })
+
+    it('should handle errors from tabs.query', async () => {
+      mockChrome.tabs.query.mockRejectedValue(new Error('Query failed'))
+
+      const message: ExtensionMessage = {
+        type: 'TEST',
+        from: 'sidebar',
+        to: 'content'
+      }
+
+      const sendResponse = jest.fn()
+      const result = routeMessage(message, validSender, sendResponse)
+
+      expect(result.handled).toBe(true)
+      expect(result.async).toBe(true)
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(sendResponse).toHaveBeenCalledWith({ error: 'Query failed' })
+    })
+  })
+
+  describe('message routing for different message types', () => {
+    const validSender: chrome.runtime.MessageSender = {
+      id: 'test-extension-id'
+    }
+
+    const sendResponse = jest.fn()
+
+    beforeEach(() => {
+      const mockTab = { id: 123 }
+      mockChrome.tabs.query.mockResolvedValue([mockTab])
+      mockChrome.tabs.sendMessage.mockResolvedValue({ success: true })
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true })
+    })
+
+    it('should route TOGGLE_VISUAL_EDITOR message', async () => {
+      const message: ExtensionMessage = {
+        type: 'TOGGLE_VISUAL_EDITOR',
+        from: 'sidebar',
+        to: 'content'
+      }
+
+      const result = routeMessage(message, validSender, sendResponse)
+
+      expect(result.handled).toBe(true)
+      expect(result.async).toBe(true)
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(123, message)
+    })
+
+    it('should route SDK_STATUS message', async () => {
+      const message: ExtensionMessage = {
+        type: 'SDK_STATUS',
+        from: 'content',
+        to: 'sidebar',
+        payload: { ready: true }
+      }
+
+      const result = routeMessage(message, validSender, sendResponse)
+
+      expect(result.handled).toBe(true)
+      expect(result.async).toBe(true)
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(message)
+    })
+
+    it('should route UPDATE_STATE message', async () => {
+      const message: ExtensionMessage = {
+        type: 'UPDATE_STATE',
+        from: 'content',
+        to: 'sidebar',
+        payload: { active: true }
+      }
+
+      const result = routeMessage(message, validSender, sendResponse)
+
+      expect(result.handled).toBe(true)
+      expect(result.async).toBe(true)
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(message)
+    })
+
+    it('should route GET_CONFIG message', async () => {
+      const message: ExtensionMessage = {
+        type: 'GET_CONFIG',
+        from: 'content',
+        to: 'sidebar',
+        requestId: 'req-123'
+      }
+
+      const result = routeMessage(message, validSender, sendResponse)
+
+      expect(result.handled).toBe(true)
+      expect(result.async).toBe(true)
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(message)
+    })
+
+    it('should route API_REQUEST message', async () => {
+      const message: ExtensionMessage = {
+        type: 'API_REQUEST',
+        from: 'sidebar',
+        to: 'content',
+        payload: { method: 'GET', path: '/api/test' }
+      }
+
+      const result = routeMessage(message, validSender, sendResponse)
+
+      expect(result.handled).toBe(true)
+      expect(result.async).toBe(true)
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(123, message)
     })
   })
 })

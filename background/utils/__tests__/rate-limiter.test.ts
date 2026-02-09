@@ -521,4 +521,124 @@ describe('Rate Limiter', () => {
       expect(stats.requestCount).toBe(75)
     })
   })
+
+  describe('block detection', () => {
+    it('should block user after exceeding violation threshold', () => {
+      const senderId = 'block-test-1'
+
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit(senderId)
+      }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId)
+      }
+
+      const stats = getRateLimitStats(senderId)
+      expect(stats.isBlocked).toBe(true)
+    })
+
+    it('should prevent blocked user from making any requests', () => {
+      const senderId = 'block-test-2'
+
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit(senderId)
+      }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId)
+      }
+
+      const result1 = checkRateLimit(senderId)
+      const result2 = checkRateLimit(senderId)
+      const result3 = checkRateLimit(senderId)
+
+      expect(result1).toBe(false)
+      expect(result2).toBe(false)
+      expect(result3).toBe(false)
+    })
+
+    it('should check blocked state BEFORE processing request', () => {
+      const senderId = 'block-test-3'
+
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit(senderId)
+      }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId)
+      }
+
+      const statsBefore = getRateLimitStats(senderId)
+      expect(statsBefore.isBlocked).toBe(true)
+      expect(statsBefore.requestCount).toBe(0)
+
+      checkRateLimit(senderId)
+
+      const statsAfter = getRateLimitStats(senderId)
+      expect(statsAfter.isBlocked).toBe(true)
+      expect(statsAfter.requestCount).toBe(0)
+    })
+
+    it('should not increment violation count for blocked users', () => {
+      const senderId = 'block-test-4'
+
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit(senderId)
+      }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId)
+      }
+
+      const violationsBefore = getRateLimitStats(senderId).violations
+
+      for (let i = 0; i < 10; i++) {
+        checkRateLimit(senderId)
+      }
+
+      const violationsAfter = getRateLimitStats(senderId).violations
+
+      expect(violationsAfter).toBe(violationsBefore)
+    })
+
+    it('should allow requests after block expires', () => {
+      const senderId = 'block-test-5'
+      const config = { maxRequests: 5, windowMs: 100 }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId, config)
+      }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId, config)
+      }
+
+      const stats = getRateLimitStats(senderId)
+      expect(stats.isBlocked).toBe(true)
+
+      expect(checkRateLimit(senderId, config)).toBe(false)
+    })
+
+    it('should reset violation count after successful reset', () => {
+      const senderId = 'block-test-6'
+
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit(senderId)
+      }
+
+      for (let i = 0; i < 5; i++) {
+        checkRateLimit(senderId)
+      }
+
+      expect(getRateLimitStats(senderId).isBlocked).toBe(true)
+
+      resetRateLimit(senderId)
+
+      expect(checkRateLimit(senderId)).toBe(true)
+      const stats = getRateLimitStats(senderId)
+      expect(stats.isBlocked).toBe(false)
+      expect(stats.violations).toBe(0)
+    })
+  })
 })

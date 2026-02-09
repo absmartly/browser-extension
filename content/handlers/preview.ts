@@ -59,7 +59,7 @@ export function handlePreviewMessage(
               experimentId: experimentId
             }
           },
-          "*"
+          window.location.origin
         )
       } else if (action === "update") {
         window.postMessage(
@@ -74,7 +74,7 @@ export function handlePreviewMessage(
               updateMode: "replace"
             }
           },
-          "*"
+          window.location.origin
         )
       } else if (action === "remove") {
         if (!isVisualEditorActive) {
@@ -89,7 +89,7 @@ export function handlePreviewMessage(
               experimentName: experimentName
             }
           },
-          "*"
+          window.location.origin
         )
       }
     } catch (error) {

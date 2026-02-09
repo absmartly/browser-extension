@@ -344,6 +344,11 @@ describe('Security Utilities', () => {
       expect(BLOCKED_HOSTS).toContain('0.0.0.0')
       expect(BLOCKED_HOSTS).toContain('192.168.')
       expect(BLOCKED_HOSTS).toContain('10.')
+      expect(BLOCKED_HOSTS).toContain('::1')
+      expect(BLOCKED_HOSTS).toContain('[::1]')
+      expect(BLOCKED_HOSTS).toContain('fc')
+      expect(BLOCKED_HOSTS).toContain('fd')
+      expect(BLOCKED_HOSTS).toContain('fe80:')
     })
 
     it('should include all 172.16-31 subnets in BLOCKED_HOSTS', () => {
@@ -389,14 +394,44 @@ describe('Security Utilities', () => {
     })
 
     describe('IPv6 addresses', () => {
-      it('should handle IPv6 localhost', () => {
-        const result = isSSRFSafe('http://[::1]')
-        expect(typeof result).toBe('boolean')
+      it('should block IPv6 localhost (::1)', () => {
+        expect(isSSRFSafe('http://[::1]')).toBe(false)
       })
 
-      it('should handle IPv6 address', () => {
-        const result = isSSRFSafe('http://[2001:db8::1]')
-        expect(typeof result).toBe('boolean')
+      it('should block IPv6 localhost with port', () => {
+        expect(isSSRFSafe('http://[::1]:8080')).toBe(false)
+      })
+
+      it('should block IPv6 localhost in HTTPS', () => {
+        expect(isSSRFSafe('https://[::1]')).toBe(false)
+      })
+
+      it('should block IPv6 unique local addresses (fc00::/7)', () => {
+        expect(isSSRFSafe('http://[fc00::1]')).toBe(false)
+        expect(isSSRFSafe('http://[fc00:1234:5678::1]')).toBe(false)
+        expect(isSSRFSafe('http://[fcff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]')).toBe(false)
+      })
+
+      it('should block IPv6 unique local addresses (fd00::/8)', () => {
+        expect(isSSRFSafe('http://[fd00::1]')).toBe(false)
+        expect(isSSRFSafe('http://[fd12:3456:789a::1]')).toBe(false)
+        expect(isSSRFSafe('http://[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]')).toBe(false)
+      })
+
+      it('should block IPv6 link-local addresses (fe80::/10)', () => {
+        expect(isSSRFSafe('http://[fe80::1]')).toBe(false)
+        expect(isSSRFSafe('http://[fe80::1%eth0]')).toBe(false)
+        expect(isSSRFSafe('http://[fe80:0:0:0:1:2:3:4]')).toBe(false)
+      })
+
+      it('should allow public IPv6 addresses', () => {
+        expect(isSSRFSafe('http://[2001:db8::1]')).toBe(true)
+        expect(isSSRFSafe('http://[2606:2800:220:1:248:1893:25c8:1946]')).toBe(true)
+      })
+
+      it('should allow IPv6 addresses outside private ranges', () => {
+        expect(isSSRFSafe('https://[2001:4860:4860::8888]')).toBe(true)
+        expect(isSSRFSafe('https://[2a00:1450:4001:809::200e]')).toBe(true)
       })
     })
 

@@ -7,6 +7,7 @@ import {
   openLoginPage
 } from '../api-client'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
+import { unsafeAPIEndpoint } from '~src/types/branded'
 
 jest.mock('axios')
 jest.mock('~src/utils/debug', () => ({
@@ -160,7 +161,7 @@ describe('api-client', () => {
 
   describe('makeAPIRequest', () => {
     const mockConfig: ABsmartlyConfig = {
-      apiEndpoint: 'https://api.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com/v1'),
       apiKey: 'test-api-key',
       authMethod: 'apikey'
     }
@@ -233,7 +234,7 @@ describe('api-client', () => {
 
     it('should throw AUTH_EXPIRED when JWT fails with 401', async () => {
       const jwtConfig: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com'),
         authMethod: 'jwt'
       }
 
@@ -264,14 +265,14 @@ describe('api-client', () => {
     }, 10000)
 
     it('should throw error when no API endpoint is configured', async () => {
-      const invalidConfig = { apiEndpoint: '' } as ABsmartlyConfig
+      const invalidConfig = { apiEndpoint: unsafeAPIEndpoint('') } as ABsmartlyConfig
 
       await expect(makeAPIRequest('GET', '/experiments', undefined, true, invalidConfig)).rejects.toThrow('No API endpoint configured')
     })
 
     it('should clean up API endpoint with trailing slashes', async () => {
       const configWithSlash: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com///',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com///'),
         apiKey: 'test-key',
         authMethod: 'apikey'
       }
@@ -287,7 +288,7 @@ describe('api-client', () => {
 
     it('should add /v1 to endpoint if not present', async () => {
       const configNoV1: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com'),
         apiKey: 'test-key',
         authMethod: 'apikey'
       }
@@ -332,7 +333,7 @@ describe('api-client', () => {
   describe('openLoginPage', () => {
     it('should open login page when config is valid', async () => {
       const config: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com/v1',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com/v1'),
         authMethod: 'jwt'
       }
 
@@ -347,7 +348,7 @@ describe('api-client', () => {
 
     it('should not open login page when user is authenticated', async () => {
       const config: ABsmartlyConfig = {
-        apiEndpoint: 'https://api.absmartly.com/v1',
+        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com/v1'),
         authMethod: 'jwt'
       }
 
@@ -371,7 +372,7 @@ describe('api-client', () => {
 
     it('should strip /v1 from endpoint URL', async () => {
       const config: ABsmartlyConfig = {
-        apiEndpoint: 'https://subdomain.api.absmartly.com/v1',
+        apiEndpoint: unsafeAPIEndpoint('https://subdomain.api.absmartly.com/v1'),
         authMethod: 'jwt'
       }
 

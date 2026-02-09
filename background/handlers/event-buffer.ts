@@ -39,7 +39,12 @@ export async function bufferSDKEvent(payload: {
     chrome.runtime.sendMessage({
       type: "SDK_EVENT_BROADCAST",
       payload: { eventName, data, timestamp }
-    }).catch(() => {})
+    }).catch((error) => {
+      if (!error?.message?.includes('Receiving end does not exist') &&
+          !error?.message?.includes('message port closed')) {
+        console.error('[Event Buffer] Unexpected error broadcasting SDK event:', error)
+      }
+    })
   } catch (error) {
     console.error("[Background] ❌ Failed to buffer event:", error)
     debugError("[Background] Failed to buffer event:", error)
