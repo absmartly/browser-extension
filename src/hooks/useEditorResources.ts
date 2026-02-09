@@ -70,10 +70,10 @@ export function useEditorResources({
     } catch (err: unknown) {
       const error = APIError.fromError(err)
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
-        console.log('[loadEditorResources] AUTH_EXPIRED error detected')
+        debugLog('[loadEditorResources] AUTH_EXPIRED error detected')
         const permissionsGranted = await requestPermissionsIfNeeded(true)
         if (permissionsGranted) {
-          console.log('[loadEditorResources] Retrying after permissions granted...')
+          debugLog('[loadEditorResources] Retrying after permissions granted...')
           setTimeout(() => loadEditorResources(), 500)
         }
       }

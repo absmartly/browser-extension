@@ -54,15 +54,12 @@ export function useSettingsForm() {
       let loadedProviderModels = config?.providerModels || {}
       let loadedProviderEndpoints = config?.providerEndpoints || {}
 
-      // Migrate from old llmModel to new providerModels structure
       if (config?.llmModel && !loadedProviderModels[loadedAiProvider]) {
         loadedProviderModels[loadedAiProvider] = config.llmModel
       }
 
-      // Get model for current provider, with defaults
       let loadedLlmModel = loadedProviderModels[loadedAiProvider] || 'sonnet'
 
-      // Get custom endpoint for current provider
       let loadedCustomEndpoint = loadedProviderEndpoints[loadedAiProvider] || ''
 
       const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
@@ -111,7 +108,7 @@ export function useSettingsForm() {
           providerEndpoints: loadedProviderEndpoints
         } as ABsmartlyConfig
         await setConfig(autoConfig)
-        console.log('[useSettingsForm] Auto-saved config from environment variables')
+        debugLog('[useSettingsForm] Auto-saved config from environment variables')
       }
 
       if (loadedApiEndpoint) {
@@ -230,13 +227,11 @@ export function useSettingsForm() {
   }
 
   const buildConfig = (): ABsmartlyConfig => {
-    // Update providerModels with current provider's model
     const updatedProviderModels = {
       ...providerModels,
       [aiProvider]: llmModel
     }
 
-    // Update providerEndpoints with current provider's endpoint
     const updatedProviderEndpoints = {
       ...providerEndpoints
     }

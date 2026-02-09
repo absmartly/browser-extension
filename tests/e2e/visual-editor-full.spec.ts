@@ -81,7 +81,7 @@ test.describe('Visual Editor Full Test with Context Menu', () => {
       await sidebar.locator('body').waitFor({ state: 'visible', timeout: 1000 }).catch(() => {})
 
       // Look for Visual Editor button
-      const visualEditorBtn = sidebar.locator('#visual-editor-button, button:has-text("Visual Editor")').first()
+      const visualEditorBtn = sidebar.locator('#visual-editor-button, #visual-editor-button').first()
       if (await visualEditorBtn.isVisible().catch(() => false)) {
         console.log('✅ Found Visual Editor button, clicking...')
         await visualEditorBtn.click()

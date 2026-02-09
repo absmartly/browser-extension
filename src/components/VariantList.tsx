@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { debugLog, debugError } from '~src/utils/debug'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { sendToContent } from '~src/lib/messaging'
 import { Button } from './ui/Button'
 import { PlusIcon } from '@heroicons/react/24/outline'
@@ -305,7 +305,7 @@ export function VariantList({
     onPreviewToggle: (enabled: boolean) => void,
     _onPreviewRefresh: () => void
   ) => {
-    console.log('[VariantList] handleNavigateToAIWithPreview called for variant:', variantName)
+    debugLog('[VariantList] handleNavigateToAIWithPreview called for variant:', variantName)
     debugLog('[VariantList] handleNavigateToAIWithPreview called with params:', {
       variantName,
       currentChangesLength: currentChanges?.length,
@@ -335,10 +335,10 @@ export function VariantList({
     }
 
     if (onNavigateToAI) {
-      console.log('[VariantList] Calling parent onNavigateToAI with all 7 parameters')
+      debugLog('[VariantList] Calling parent onNavigateToAI with all 7 parameters')
       onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, wrappedPreviewToggle, wrappedPreviewRefresh, wrappedPreviewWithChanges)
     } else {
-      console.warn('[VariantList] onNavigateToAI is not defined!')
+      debugWarn('[VariantList] onNavigateToAI is not defined!')
     }
   }, [variants, onNavigateToAI, handlePreviewToggle, handlePreviewRefresh, handlePreviewWithChanges])
 
@@ -418,7 +418,7 @@ export function VariantList({
               onNewVariableNameChange={setNewVariableName}
               onNewVariableValueChange={setNewVariableValue}
               onPreviewToggle={(enabled) => {
-                console.log('[VariantList] onPreviewToggle inline callback called:', { enabled, index })
+                debugLog('[VariantList] onPreviewToggle inline callback called:', { enabled, index })
                 if (activeVEVariant && activeVEVariant !== variant.name) {
                   alert(`Visual Editor is active for variant "${activeVEVariant}". Please close it first.`)
                   return

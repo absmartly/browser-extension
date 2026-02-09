@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import path from 'path'
 import { TEST_IMAGES } from '../../src/lib/__tests__/test-images'
 import { injectSidebar, debugWait } from './utils/test-helpers'

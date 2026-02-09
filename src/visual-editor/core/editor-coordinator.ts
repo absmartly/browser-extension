@@ -18,6 +18,7 @@ import ImageSourceDialog from '../ui/image-source-dialog'
 import type { DOMChange } from '../types/visual-editor'
 import DOMPurify from 'dompurify'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export interface EditorCoordinatorCallbacks {
   onChangesUpdate: (changes: DOMChange[]) => void
   removeStyles: () => void
@@ -52,7 +53,6 @@ export class EditorCoordinator {
   private imageSourceDialog: ImageSourceDialog
   private callbacks: EditorCoordinatorCallbacks
 
-  // State for event handling
   private selectedElement: HTMLElement | null = null
   private hoveredElement: HTMLElement | null = null
   private changes: DOMChange[] = []
@@ -138,9 +138,9 @@ export class EditorCoordinator {
           undoCount !== previousUndoStackLength ||
           redoCount !== previousRedoStackLength) {
 
-        console.log('[EditorCoordinator] Changes/Undo/Redo updated - total changes:', changesLength)
-        console.log('[EditorCoordinator] Session changes (undo count):', undoCount)
-        console.log('[EditorCoordinator] Redo count:', redoCount)
+        debugLog('[EditorCoordinator] Changes/Undo/Redo updated - total changes:', changesLength)
+        debugLog('[EditorCoordinator] Session changes (undo count):', undoCount)
+        debugLog('[EditorCoordinator] Redo count:', redoCount)
 
         // Update banner - changes counter shows session changes (undo count)
         this.uiComponents.updateBanner({
@@ -260,6 +260,16 @@ export class EditorCoordinator {
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== window) return
 
+      const isFileProtocol =
+        window.location.protocol === 'file:' || event.origin === 'null'
+      if (!isFileProtocol && event.origin !== window.location.origin) {
+        return
+      }
+
+      if (event.data?.source !== 'absmartly-visual-editor') {
+        return
+      }
+
       switch (event.data.type) {
         case 'ABSMARTLY_VISUAL_EDITOR_EXIT':
           this.callbacks.stop()
@@ -274,11 +284,11 @@ export class EditorCoordinator {
   }
 
   handleMenuAction(action: string, element: Element): void {
-    console.log('[handleMenuAction] START - action:', action)
-    console.log('[handleMenuAction] Received element:', element)
-    console.log('[handleMenuAction] Element details - tagName:', element.tagName, 'id:', element.id, 'className:', element.className)
-    console.log('[handleMenuAction] Coordinator selectedElement:', this.selectedElement)
-    console.log('[handleMenuAction] State selectedElement:', this.stateManager.getState().selectedElement)
+    debugLog('[handleMenuAction] START - action:', action)
+    debugLog('[handleMenuAction] Received element:', element)
+    debugLog('[handleMenuAction] Element details - tagName:', element.tagName, 'id:', element.id, 'className:', element.className)
+    debugLog('[handleMenuAction] Coordinator selectedElement:', this.selectedElement)
+    debugLog('[handleMenuAction] State selectedElement:', this.stateManager.getState().selectedElement)
 
     const originalState = {
       html: element.outerHTML,
@@ -291,7 +301,7 @@ export class EditorCoordinator {
     switch (action) {
       case 'edit':
       case 'edit-element':
-        console.log('[handleMenuAction] Handling edit action for:', element)
+        debugLog('[handleMenuAction] Handling edit action for:', element)
         this.handleEditAction(element, originalState)
         break
 
@@ -334,14 +344,14 @@ export class EditorCoordinator {
         break
 
       case 'insert-block':
-        console.log('[EditorCoordinator] insert-block action triggered')
+        debugLog('[EditorCoordinator] insert-block action triggered')
         this.callbacks.insertNewBlock()
-        console.log('[EditorCoordinator] insertNewBlock callback called')
+        debugLog('[EditorCoordinator] insertNewBlock callback called')
         break
 
       case 'select-relative':
       case 'selectRelative':
-        console.log('[handleMenuAction] Handling select-relative for element:', element)
+        debugLog('[handleMenuAction] Handling select-relative for element:', element)
         this.handleSelectRelativeElement(element)
         break
 
@@ -350,17 +360,16 @@ export class EditorCoordinator {
         break
 
       default:
-        console.log('[ABSmartly] Action not yet implemented:', action)
+        debugLog('[ABSmartly] Action not yet implemented:', action)
         this.notifications.show(`${action}: Coming soon!`, '', 'info')
     }
   }
 
   handleEditAction(element: Element, originalState: any): void {
-    console.log('[handleEditAction] START for element:', element)
-    console.log('[handleEditAction] Element details:', element.tagName, element.id, element.className)
+    debugLog('[handleEditAction] START for element:', element)
+    debugLog('[handleEditAction] Element details:', element.tagName, element.id, element.className)
     this.removeContextMenu()
 
-    // Set editing mode to prevent selection while editing text
     this.eventHandlers.setEditing(true)
 
     ;(element as HTMLElement).dataset.absmartlyModified = 'true'
@@ -458,9 +467,7 @@ export class EditorCoordinator {
       return
     }
 
-    // Set editing mode to prevent selection while HTML editor is open
     this.eventHandlers.setEditing(true)
-    // Disable hover tooltips while editor is open
     this.eventHandlers.setHoverEnabled(false)
 
     const currentHtml = element.innerHTML
@@ -489,12 +496,12 @@ export class EditorCoordinator {
   }
 
   handleSelectRelativeElement(element: Element): void {
-    console.log('[handleSelectRelativeElement] Called with element:', element)
-    console.log('[handleSelectRelativeElement] Element details:', element.tagName, element.id, element.className)
+    debugLog('[handleSelectRelativeElement] Called with element:', element)
+    debugLog('[handleSelectRelativeElement] Element details:', element.tagName, element.id, element.className)
 
     // Check if we already have a selector open to prevent recursion
     if (document.getElementById('absmartly-relative-selector-host')) {
-      console.log('[handleSelectRelativeElement] Selector already exists, returning')
+      debugLog('[handleSelectRelativeElement] Selector already exists, returning')
       return
     }
 
@@ -503,8 +510,8 @@ export class EditorCoordinator {
   }
 
   async handleChangeImageSource(element: Element): Promise<void> {
-    console.log('[handleChangeImageSource] Called with element:', element)
-    console.log('[handleChangeImageSource] Element details:', element.tagName, element.id, element.className)
+    debugLog('[handleChangeImageSource] Called with element:', element)
+    debugLog('[handleChangeImageSource] Element details:', element.tagName, element.id, element.className)
 
     this.removeContextMenu()
 
@@ -513,11 +520,11 @@ export class EditorCoordinator {
 
     const newSrc = await this.imageSourceDialog.show(element, currentSrc)
     if (!newSrc) {
-      console.log('[handleChangeImageSource] User cancelled')
+      debugLog('[handleChangeImageSource] User cancelled')
       return
     }
 
-    console.log('[handleChangeImageSource] New source:', newSrc)
+    debugLog('[handleChangeImageSource] New source:', newSrc)
 
     const selector = this.callbacks.getSelector(element as HTMLElement)
 
@@ -535,7 +542,7 @@ export class EditorCoordinator {
         { src: oldSrc }
       )
 
-      console.log('[handleChangeImageSource] Created attribute change for img element')
+      debugLog('[handleChangeImageSource] Created attribute change for img element')
     } else {
       const htmlElement = element as HTMLElement
       const oldBgImage = htmlElement.style.backgroundImage ||
@@ -553,7 +560,7 @@ export class EditorCoordinator {
         { 'background-image': oldBgImage }
       )
 
-      console.log('[handleChangeImageSource] Created style change for background-image')
+      debugLog('[handleChangeImageSource] Created style change for background-image')
     }
 
     this.notifications.show('Image source updated', '', 'success')
@@ -1010,7 +1017,7 @@ export class EditorCoordinator {
 
   // Setup all integrations and handlers
   setupAll(): void {
-    console.log('[EditorCoordinator] setupAll called')
+    debugLog('[EditorCoordinator] setupAll called')
     this.setupModuleIntegrations()
     this.setupStateListeners()
     this.setupEventListeners()
@@ -1020,12 +1027,12 @@ export class EditorCoordinator {
     this.makeElementsEditable()
 
     // Banner is created in visual-editor.ts start() method
-    console.log('[EditorCoordinator] setupAll completed')
+    debugLog('[EditorCoordinator] setupAll completed')
   }
 
   // Teardown all integrations and handlers
   teardownAll(restoreOriginalValues: boolean = true): void {
-    console.log('[EditorCoordinator] Starting teardownAll', { restoreOriginalValues })
+    debugLog('[EditorCoordinator] Starting teardownAll', { restoreOriginalValues })
 
     // Call all registered cleanup handlers (includes removeBanner)
     this.cleanup.cleanupVisualEditor(restoreOriginalValues)
@@ -1038,6 +1045,6 @@ export class EditorCoordinator {
     // Explicitly remove banner in case it wasn't registered
     this.uiComponents.removeBanner()
 
-    console.log('[EditorCoordinator] teardownAll completed')
+    debugLog('[EditorCoordinator] teardownAll completed')
   }
 }

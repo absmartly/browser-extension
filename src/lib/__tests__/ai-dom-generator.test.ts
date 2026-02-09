@@ -4,6 +4,7 @@ import { jest } from '@jest/globals'
 import type { AIProvider } from '~src/lib/ai-providers/base'
 import type { AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
+import { unsafeSessionId } from '~src/types/branded'
 
 jest.mock('~src/lib/ai-providers', () => ({
   createAIProvider: jest.fn(),
@@ -49,7 +50,7 @@ describe('AI DOM Generator', () => {
         response: 'Changed the text',
         action: 'append',
         session: {
-          id: 'test-session',
+          id: unsafeSessionId('test-session'),
           htmlSent: true,
           messages: []
         }
@@ -82,7 +83,7 @@ describe('AI DOM Generator', () => {
         response: 'Done',
         action: 'none',
         session: {
-          id: 'test-session',
+          id: unsafeSessionId('test-session'),
           htmlSent: true,
           messages: []
         }
@@ -109,7 +110,7 @@ describe('AI DOM Generator', () => {
         response: 'Done',
         action: 'none',
         session: {
-          id: 'test-session',
+          id: unsafeSessionId('test-session'),
           htmlSent: true,
           messages: []
         }
@@ -137,7 +138,7 @@ describe('AI DOM Generator', () => {
 
     it('should allow empty HTML when session has htmlSent=true', async () => {
       const mockSession: ConversationSession = {
-        id: 'existing-session',
+        id: unsafeSessionId('existing-session'),
         htmlSent: true,
         messages: []
       }
@@ -175,7 +176,7 @@ describe('AI DOM Generator', () => {
         response: 'Done',
         action: 'append',
         session: {
-          id: 'test-session',
+          id: unsafeSessionId('test-session'),
           htmlSent: true,
           messages: []
         }
@@ -231,7 +232,7 @@ describe('AI DOM Generator', () => {
         response: 'Applied multiple changes',
         action: 'append',
         session: {
-          id: 'test-session',
+          id: unsafeSessionId('test-session'),
           htmlSent: true,
           messages: []
         }

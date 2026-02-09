@@ -7,6 +7,7 @@ import BlockInserter from '../ui/block-inserter'
 import type { DOMChange } from '../types/visual-editor'
 import DOMPurify from 'dompurify'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export interface ElementActionsOptions {
   onChangesUpdate: (changes: DOMChange[]) => void
   setHoverEnabled?: (enabled: boolean) => void
@@ -116,7 +117,7 @@ export class ElementActions {
         const computedStyle = window.getComputedStyle(htmlElement)
         originalData.styles.display = htmlElement.style.display || computedStyle.display || ''
         htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-        console.log('[ElementActions] Stored original display value:', originalData.styles.display)
+        debugLog('[ElementActions] Stored original display value:', originalData.styles.display)
       }
 
       const selector = this.getSelector(htmlElement)
@@ -379,7 +380,7 @@ export class ElementActions {
 
   // Helper to revert a DOM change
   private revertDOMChange(change: DOMChange): void {
-    console.log('[ElementActions] Reverting DOM change:', change)
+    debugLog('[ElementActions] Reverting DOM change:', change)
 
     try {
       const elements = document.querySelectorAll(change.selector)
@@ -392,7 +393,7 @@ export class ElementActions {
             // Revert move by moving element back to original position
             // Note: for simple up/down moves, we don't have original position stored
             // This would need enhancement to store original parent/sibling info
-            console.log('[ElementActions] Move revert not fully implemented')
+            debugLog('[ElementActions] Move revert not fully implemented')
             break
 
           case 'text':
@@ -406,7 +407,7 @@ export class ElementActions {
             }
             if (originalData?.text !== undefined) {
               htmlElement.textContent = originalData.text
-              console.log('[ElementActions] Reverted text content')
+              debugLog('[ElementActions] Reverted text content')
             }
             break
 
@@ -429,13 +430,13 @@ export class ElementActions {
                   (htmlElement.style as any)[prop] = ''
                 }
               }
-              console.log('[ElementActions] Reverted style changes to original values')
+              debugLog('[ElementActions] Reverted style changes to original values')
             } else if (change.value && typeof change.value === 'object') {
               // Fallback: just remove the styles if no original data
               for (const prop in change.value) {
                 (htmlElement.style as any)[prop] = ''
               }
-              console.log('[ElementActions] Removed style changes (no original data)')
+              debugLog('[ElementActions] Removed style changes (no original data)')
             }
             break
 
@@ -450,7 +451,7 @@ export class ElementActions {
             }
             if (origData?.html !== undefined) {
               htmlElement.innerHTML = DOMPurify.sanitize(origData.html)
-              console.log('[ElementActions] Reverted HTML content')
+              debugLog('[ElementActions] Reverted HTML content')
             }
             break
 
@@ -464,7 +465,7 @@ export class ElementActions {
       // Special handling for remove - would need to restore the element
       // Note: We don't currently store the HTML for removed elements in undo data
       if (change.type === 'remove') {
-        console.log('[ElementActions] Remove revert not fully implemented - element cannot be restored')
+        debugLog('[ElementActions] Remove revert not fully implemented - element cannot be restored')
       }
     } catch (error) {
       console.error('[ElementActions] Error reverting DOM change:', error)
@@ -473,20 +474,20 @@ export class ElementActions {
 
   // Change management methods
   public undoLastChange(): void {
-    console.log('[ElementActions] undoLastChange called')
+    debugLog('[ElementActions] undoLastChange called')
 
     // Get the current changes from state manager (source of truth)
     const currentChanges = [...this.stateManager.getState().changes || []]
     const undoItem = this.stateManager.popUndo()
 
     if (!undoItem) {
-      console.log('[ElementActions] No undo items available')
+      debugLog('[ElementActions] No undo items available')
       this.notifications.show('Nothing to undo', '', 'info')
       return
     }
 
-    console.log('[ElementActions] Performing undo:', undoItem)
-    console.log('[ElementActions] Current changes before undo:', currentChanges.length)
+    debugLog('[ElementActions] Performing undo:', undoItem)
+    debugLog('[ElementActions] Current changes before undo:', currentChanges.length)
 
     if (undoItem.type === 'add') {
       // Revert the DOM change that was added
@@ -511,7 +512,7 @@ export class ElementActions {
       this.stateManager.pushRedo(undoItem)
     }
 
-    console.log('[ElementActions] Changes after undo:', currentChanges.length)
+    debugLog('[ElementActions] Changes after undo:', currentChanges.length)
 
     // Update state manager changes
     this.stateManager.setChanges(currentChanges)
@@ -524,7 +525,7 @@ export class ElementActions {
 
   // Helper to apply a DOM change
   private applyDOMChange(change: DOMChange): void {
-    console.log('[ElementActions] Applying DOM change:', change)
+    debugLog('[ElementActions] Applying DOM change:', change)
 
     try {
       const elements = document.querySelectorAll(change.selector)
@@ -560,7 +561,7 @@ export class ElementActions {
                   } else if (change.position === 'lastChild') {
                     target.appendChild(htmlElement)
                   }
-                  console.log('[ElementActions] Moved element to target position')
+                  debugLog('[ElementActions] Moved element to target position')
                 }
               }
             }
@@ -572,10 +573,10 @@ export class ElementActions {
               if (!originalData.textContent) {
                 originalData.textContent = htmlElement.textContent
                 htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-                console.log('[ElementActions] Stored original textContent:', originalData.textContent)
+                debugLog('[ElementActions] Stored original textContent:', originalData.textContent)
               }
               htmlElement.textContent = change.value
-              console.log('[ElementActions] Applied text content')
+              debugLog('[ElementActions] Applied text content')
             }
             break
 
@@ -589,12 +590,12 @@ export class ElementActions {
               for (const prop in change.value) {
                 if (!originalData.styles[prop]) {
                   originalData.styles[prop] = (htmlElement.style as any)[prop] || ''
-                  console.log(`[ElementActions] Stored original style.${prop}:`, originalData.styles[prop])
+                  debugLog(`[ElementActions] Stored original style.${prop}:`, originalData.styles[prop])
                 }
                 (htmlElement.style as any)[prop] = change.value[prop]
               }
               htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-              console.log('[ElementActions] Applied style changes')
+              debugLog('[ElementActions] Applied style changes')
             }
             break
 
@@ -604,17 +605,17 @@ export class ElementActions {
               if (!originalData.innerHTML) {
                 originalData.innerHTML = htmlElement.innerHTML
                 htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-                console.log('[ElementActions] Stored original innerHTML')
+                debugLog('[ElementActions] Stored original innerHTML')
               }
               htmlElement.innerHTML = DOMPurify.sanitize(change.value)
-              console.log('[ElementActions] Applied HTML content')
+              debugLog('[ElementActions] Applied HTML content')
             }
             break
 
           case 'remove':
             // Remove the element
             htmlElement.remove()
-            console.log('[ElementActions] Removed element')
+            debugLog('[ElementActions] Removed element')
             break
 
         }
@@ -625,20 +626,20 @@ export class ElementActions {
   }
 
   public redoChange(): void {
-    console.log('[ElementActions] redoChange called')
+    debugLog('[ElementActions] redoChange called')
 
     // Get the current changes from state manager (source of truth)
     const currentChanges = [...this.stateManager.getState().changes || []]
     const redoItem = this.stateManager.popRedo()
 
     if (!redoItem) {
-      console.log('[ElementActions] No redo items available')
+      debugLog('[ElementActions] No redo items available')
       this.notifications.show('Nothing to redo', '', 'info')
       return
     }
 
-    console.log('[ElementActions] Performing redo:', redoItem)
-    console.log('[ElementActions] Current changes before redo:', currentChanges.length)
+    debugLog('[ElementActions] Performing redo:', redoItem)
+    debugLog('[ElementActions] Current changes before redo:', currentChanges.length)
 
     if (redoItem.type === 'add') {
       // Re-apply the DOM change
@@ -662,7 +663,7 @@ export class ElementActions {
       this.stateManager.pushUndo(redoItem)
     }
 
-    console.log('[ElementActions] Changes after redo:', currentChanges.length)
+    debugLog('[ElementActions] Changes after redo:', currentChanges.length)
 
     // Update state manager changes
     this.stateManager.setChanges(currentChanges)

@@ -6,6 +6,7 @@
 import { generateRobustSelector } from '../utils/selector-generator'
 import StateManager from './state-manager'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class EventHandlers {
   private stateManager: StateManager
   private isEditing = false
@@ -111,7 +112,7 @@ export class EventHandlers {
 
     // Prevent selecting body or html elements to avoid page corruption
     if (target === document.body || target === document.documentElement) {
-      console.warn('[ABSmartly] Cannot select body or html element - this could corrupt the page')
+      debugWarn('[ABSmartly] Cannot select body or html element - this could corrupt the page')
       return
     }
 
@@ -146,7 +147,7 @@ export class EventHandlers {
 
     // IMPORTANT: Don't show menu if we're currently editing text
     if (this.isEditing || (target as HTMLElement).contentEditable === 'true') {
-      console.log('[ABSmartly] Ignoring click - currently editing')
+      debugLog('[ABSmartly] Ignoring click - currently editing')
       return
     }
 
@@ -193,7 +194,7 @@ export class EventHandlers {
 
   // This will be set by the main visual editor to connect to context menu
   showContextMenu: (x: number, y: number, element: Element) => void = (x, y, element) => {
-    console.log('[ABSmartly] Context menu requested at', x, y, 'for element', element)
+    debugLog('[ABSmartly] Context menu requested at', x, y, 'for element', element)
   }
 
   attachEventListeners(): void {

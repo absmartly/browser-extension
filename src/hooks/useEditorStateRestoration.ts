@@ -124,11 +124,11 @@ export function useEditorStateRestoration({
 
   useEffect(() => {
     const handleElementSelected = (message: ChromeMessage, sender: any, sendResponse: any) => {
-      console.log('[useEditorStateRestoration] RECEIVED ELEMENT_SELECTED, pickingForField:', pickingForField)
+      debugLog('[useEditorStateRestoration] RECEIVED ELEMENT_SELECTED, pickingForField:', pickingForField)
       debugLog('DOMChangesInlineEditor received message:', message)
       if (message.type === 'ELEMENT_SELECTED' && 'selector' in message && message.selector) {
         const storage = sessionStorage
-        console.log('[useEditorStateRestoration] Using pickingForField as fieldId:', pickingForField)
+        debugLog('[useEditorStateRestoration] Using pickingForField as fieldId:', pickingForField)
 
         const pickerResult = {
           variantName,
@@ -137,11 +137,11 @@ export function useEditorStateRestoration({
         }
 
         storage.set('elementPickerResult', pickerResult)
-        console.log('[useEditorStateRestoration] Stored to sessionStorage:', pickerResult)
+        debugLog('[useEditorStateRestoration] Stored to sessionStorage:', pickerResult)
 
         // Also apply immediately
         if (pickingForField && editingChange) {
-          console.log('[useEditorStateRestoration] Applying picker result immediately to field:', pickingForField)
+          debugLog('[useEditorStateRestoration] Applying picker result immediately to field:', pickingForField)
           if (pickingForField === 'selector') {
             setEditingChange({ ...editingChange, selector: message.selector })
           } else if (pickingForField === 'targetSelector') {

@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import path from 'path'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
@@ -155,7 +155,7 @@ test.describe('AI DOM Changes Generation - Complete Workflow', () => {
       console.log('  ✓ Clicked "Create New Experiment"')
       await debugWait()
 
-      const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = sidebar.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await fromScratchButton.evaluate((button) => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -625,7 +625,7 @@ test.describe('AI DOM Changes Generation - Complete Workflow', () => {
 
       // Create experiment
       await sidebar.locator('button[title="Create New Experiment"]').click()
-      await sidebar.locator('button:has-text("From Scratch")').click()
+      await sidebar.locator('#from-scratch-button').click()
 
       const experimentName = `Bridge Test ${Date.now()}`
       await sidebar.locator('input[placeholder*="xperiment"]').first().fill(experimentName)

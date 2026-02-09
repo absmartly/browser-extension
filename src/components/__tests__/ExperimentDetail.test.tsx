@@ -6,6 +6,7 @@ import type { Experiment, ExperimentInjectionCode } from '~src/types/absmartly'
 import * as messaging from '~src/lib/messaging'
 import * as storage from '~src/utils/storage'
 import * as storageCleanup from '~src/utils/storage-cleanup'
+import { unsafeExperimentId, unsafeVariantName } from '~src/types/branded'
 
 jest.mock('~src/lib/messaging', () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
@@ -112,7 +113,7 @@ global.chrome = {
 } as any
 
 const mockExperiment: Experiment = {
-  id: 123,
+  id: unsafeExperimentId(123),
   name: 'test_experiment',
   display_name: 'Test Experiment',
   state: 'created',
@@ -124,13 +125,13 @@ const mockExperiment: Experiment = {
   updated_at: '2024-01-01T00:00:00Z',
   variants: [
     {
-      name: 'Control',
+      name: unsafeVariantName('Control'),
       config: JSON.stringify({
         __dom_changes: []
       })
     },
     {
-      name: 'Variant A',
+      name: unsafeVariantName('Variant A'),
       config: JSON.stringify({
         __dom_changes: [
           {
@@ -345,7 +346,15 @@ describe('ExperimentDetail', () => {
     })
 
     it('should clear storage after successful save', async () => {
-      const mockSendMessage = jest.fn().mockResolvedValue({ success: true })
+      const mockSendMessage = jest.fn().mockImplementation((message) => {
+        if (message?.type === 'API_REQUEST' && message?.method === 'GET') {
+          return Promise.resolve({
+            success: true,
+            data: { experiment: mockExperiment }
+          })
+        }
+        return Promise.resolve({ success: true })
+      })
       global.chrome.runtime.sendMessage = mockSendMessage
 
       const { container } = render(<ExperimentDetail {...defaultProps} />)
@@ -512,7 +521,7 @@ describe('ExperimentDetail', () => {
         ...mockExperiment,
         variants: [
           {
-            name: 'Control',
+            name: unsafeVariantName('Control'),
             config: '{}'
           }
         ]

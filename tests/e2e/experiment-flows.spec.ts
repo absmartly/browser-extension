@@ -725,7 +725,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Should return to experiment list - check for either heading or create button
-      const experimentList = sidebar.locator('#experiments-header, h2:has-text("Experiments")')
+      const experimentList = sidebar.locator('#experiments-header, #experiments-heading')
       const createButton = sidebar.locator('button[title="Create New Experiment"]')
 
       const listVisible = await experimentList.isVisible({ timeout: 2000 }).catch(() => false)
@@ -814,7 +814,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Check for either heading or create button
-      const experimentList = sidebar.locator('#experiments-header, h2:has-text("Experiments")')
+      const experimentList = sidebar.locator('#experiments-header, #experiments-heading')
       const createButton = sidebar.locator('button[title="Create New Experiment"]')
 
       const listVisible = await experimentList.isVisible({ timeout: 2000 }).catch(() => false)
@@ -846,7 +846,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
 
       // Verify Header in Settings
-      const headerTitle = sidebar.locator('h2:has-text("Settings")')
+      const headerTitle = sidebar.locator('h2:#nav-settings')
       await expect(headerTitle).toBeVisible()
       console.log('  ✓ Header shows "Settings" title')
 
@@ -870,7 +870,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
 
       // Should return to experiment list
-      const settingsGone = sidebar.locator('h2:has-text("Settings")')
+      const settingsGone = sidebar.locator('h2:#nav-settings')
       await expect(settingsGone).not.toBeVisible({ timeout: 2000 })
       console.log('  ✓ Settings view closed')
 

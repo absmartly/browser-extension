@@ -315,6 +315,17 @@ export interface AIDOMGenerationResult {
   session?: import('./absmartly').ConversationSession;
 }
 
+export interface AIDOMContext {
+  variantName: string
+  onGenerate: (prompt: string, images?: string[], conversationSession?: import('./absmartly').ConversationSession | null) => Promise<AIDOMGenerationResult>
+  currentChanges: DOMChange[]
+  onRestoreChanges: (changes: DOMChange[]) => void
+  onPreviewToggle: (enabled: boolean) => void
+  onPreviewRefresh: () => void
+  onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
+  previousView: string
+}
+
 export type { ChatMessage } from './absmartly'
 
 export const DOM_CHANGE_TEMPLATES: DOMChangeTemplate[] = [

@@ -4,6 +4,7 @@ import { getConfig } from '~src/utils/storage'
 import type { Experiment, ExperimentCustomSectionField } from '~src/types/absmartly'
 import type { VariantData } from './useExperimentVariants'
 import { BackgroundAPIClient } from '~src/lib/background-api-client'
+import { notifyError, notifyWarning, notifySuccess } from '~src/utils/notifications'
 
 export interface ExperimentFormData {
   display_name?: string
@@ -21,9 +22,15 @@ interface UseExperimentSaveOptions {
   onError?: (message: string) => void
 }
 
+export interface SaveStatus {
+  step: 'idle' | 'validating' | 'saving' | 'updating-cache' | 'complete' | 'error'
+  message?: string
+}
+
 export function useExperimentSave({ experiment, domFieldName, onError }: UseExperimentSaveOptions) {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ step: 'idle' })
 
   const save = async (
     formData: ExperimentFormData,
@@ -36,6 +43,8 @@ export function useExperimentSave({ experiment, domFieldName, onError }: UseExpe
     try {
       savingRef.current = true
       setSaving(true)
+      setSaveStatus({ step: 'validating', message: 'Validating experiment data...' })
+
       const config = await getConfig()
       const fieldName = config?.domChangesFieldName || '__dom_changes'
 
@@ -46,7 +55,8 @@ export function useExperimentSave({ experiment, domFieldName, onError }: UseExpe
           currentVariants,
           fieldName,
           onUpdate,
-          onError
+          onError,
+          setSaveStatus
         )
       }
 
@@ -55,33 +65,43 @@ export function useExperimentSave({ experiment, domFieldName, onError }: UseExpe
           formData,
           currentVariants,
           fieldName,
-          onSave
+          onSave,
+          setSaveStatus
         )
       }
+
+      setSaveStatus({ step: 'complete' })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setSaveStatus({ step: 'error', message: errorMessage })
+      throw error
     } finally {
       savingRef.current = false
       setSaving(false)
     }
   }
 
-  return { save, saving }
+  return { save, saving, saveStatus }
 }
 
 async function createNewExperiment(
   formData: ExperimentFormData,
   currentVariants: VariantData[],
   domFieldName: string,
-  onSave: (experiment: Partial<Experiment>) => Promise<void>
+  onSave: (experiment: Partial<Experiment>) => Promise<void>,
+  setSaveStatus?: (status: SaveStatus) => void
 ) {
   const client = new BackgroundAPIClient()
   let customFields: ExperimentCustomSectionField[] = []
 
   try {
+    setSaveStatus?.({ step: 'validating', message: 'Fetching custom fields...' })
     debugLog('[createNewExperiment] Fetching custom section fields...')
     customFields = await client.getCustomSectionFields()
     debugLog('[createNewExperiment] Fetched custom section fields:', customFields)
   } catch (error) {
     debugError('[createNewExperiment] Failed to fetch custom fields:', error)
+    await notifyWarning('Failed to fetch custom fields. Using defaults.')
   }
 
   const custom_section_field_values: Record<string, {
@@ -164,7 +184,19 @@ async function createNewExperiment(
   }
 
   debugLog('[createNewExperiment] Experiment data with custom fields:', experimentData)
-  await onSave(experimentData as unknown as Partial<Experiment>)
+
+  try {
+    setSaveStatus?.({ step: 'saving', message: 'Creating experiment in ABsmartly...' })
+    await onSave(experimentData as unknown as Partial<Experiment>)
+    setSaveStatus?.({ step: 'complete', message: 'Experiment created successfully' })
+    await notifySuccess('Experiment created successfully')
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    debugError('[createNewExperiment] Failed to create experiment:', error)
+    setSaveStatus?.({ step: 'error', message: `Failed to create experiment: ${errorMessage}` })
+    await notifyError(`Failed to create experiment: ${errorMessage}`)
+    throw error
+  }
 }
 
 interface FullExperiment extends Omit<Experiment, 'type'> {
@@ -214,9 +246,11 @@ async function saveExistingExperiment(
   currentVariants: VariantData[],
   fieldName: string,
   onUpdate: (id: number, updates: Partial<Experiment>) => void,
-  onError?: (message: string) => void
+  onError?: (message: string) => void,
+  setSaveStatus?: (status: SaveStatus) => void
 ) {
   try {
+    setSaveStatus?.({ step: 'validating', message: 'Fetching full experiment data...' })
     const fullExperimentResponse = await chrome.runtime.sendMessage({
       type: 'API_REQUEST',
       method: 'GET',
@@ -226,6 +260,8 @@ async function saveExistingExperiment(
     if (!fullExperimentResponse.success) {
       const errorMessage = 'Failed to fetch experiment data: ' + fullExperimentResponse.error
       debugError(errorMessage)
+      setSaveStatus?.({ step: 'error', message: errorMessage })
+      await notifyError(`Failed to load experiment: ${fullExperimentResponse.error}`)
       if (onError) {
         onError(errorMessage)
       }
@@ -234,6 +270,7 @@ async function saveExistingExperiment(
 
     const fullExperiment: FullExperiment = fullExperimentResponse.data.experiment || fullExperimentResponse.data
 
+    setSaveStatus?.({ step: 'validating', message: 'Validating variant data...' })
     const updatedVariants = currentVariants.map((variant, index) => {
       const existingVariant = fullExperiment.variants?.find((v) => {
         const expVariantKey = v.name || `Variant ${v.variant}`
@@ -350,13 +387,30 @@ async function saveExistingExperiment(
       putPayload.data.custom_section_field_values = customFieldsObj
     }
 
-    await onUpdate(experiment.id, putPayload)
+    try {
+      setSaveStatus?.({ step: 'saving', message: 'Saving to ABsmartly...' })
+      await onUpdate(experiment.id, putPayload)
+      setSaveStatus?.({ step: 'complete', message: 'Experiment saved successfully' })
+      await notifySuccess('Experiment saved successfully')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      debugError('[saveExistingExperiment] Failed to save to ABsmartly:', error)
+      setSaveStatus?.({ step: 'error', message: `Failed to save to ABsmartly: ${errorMessage}` })
+      await notifyError(`Failed to save to ABsmartly: ${errorMessage}`)
+      if (onError) {
+        onError(`Failed to save to ABsmartly: ${errorMessage}`)
+      }
+      throw error
+    }
 
   } catch (error) {
     const errorMessage = 'Failed to save changes: ' + (error as Error).message
     debugError(errorMessage, error)
+    setSaveStatus?.({ step: 'error', message: errorMessage })
+    await notifyError(errorMessage)
     if (onError) {
       onError(errorMessage)
     }
+    throw error
   }
 }

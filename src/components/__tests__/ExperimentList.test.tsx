@@ -6,6 +6,7 @@ import type { Experiment } from '~src/types/absmartly'
 import * as storage from '~src/utils/storage'
 import * as overrides from '~src/utils/overrides'
 import * as sdkBridge from '~src/utils/sdk-bridge'
+import { unsafeExperimentId, unsafeVariantName } from '~src/types/branded'
 
 jest.mock('~src/utils/storage', () => ({
   getConfig: jest.fn().mockResolvedValue({
@@ -62,7 +63,7 @@ global.chrome = {
 
 const mockExperiments: Experiment[] = [
   {
-    id: 1,
+    id: unsafeExperimentId(1),
     name: 'experiment_1',
     display_name: 'Experiment 1',
     state: 'running',
@@ -71,8 +72,8 @@ const mockExperiments: Experiment[] = [
     percentage_of_traffic: 100,
     unit_type_id: 1,
     variants: [
-      { name: 'Control', config: '{}' },
-      { name: 'Variant A', config: '{}' }
+      { name: unsafeVariantName('Control'), config: '{}' },
+      { name: unsafeVariantName('Variant A'), config: '{}' }
     ],
     applications: [],
     owners: [],
@@ -80,7 +81,7 @@ const mockExperiments: Experiment[] = [
     experiment_tags: []
   },
   {
-    id: 2,
+    id: unsafeExperimentId(2),
     name: 'experiment_2',
     display_name: 'Experiment 2',
     state: 'created',
@@ -89,8 +90,8 @@ const mockExperiments: Experiment[] = [
     percentage_of_traffic: 50,
     unit_type_id: 1,
     variants: [
-      { name: 'Control', config: '{}' },
-      { name: 'Variant B', config: '{}' }
+      { name: unsafeVariantName('Control'), config: '{}' },
+      { name: unsafeVariantName('Variant B'), config: '{}' }
     ],
     applications: [],
     owners: [],
@@ -299,7 +300,7 @@ describe('ExperimentList', () => {
       const newExperiments: Experiment[] = [
         ...mockExperiments,
         {
-          id: 3,
+          id: unsafeExperimentId(3),
           name: 'experiment_3',
           display_name: 'Experiment 3',
           state: 'created',

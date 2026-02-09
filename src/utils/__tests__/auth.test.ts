@@ -2,6 +2,7 @@ import { checkAuthentication, buildAuthFetchOptions } from '../auth'
 import { getJWTCookie } from '../cookies'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { setupAuthMocks, mockAuthResponse, mockJWTToken, resetAuthMocks } from '../../../tests/mocks/auth-mocks'
+import { unsafeAPIEndpoint } from '~src/types/branded'
 
 jest.mock('../cookies')
 
@@ -17,7 +18,7 @@ describe('Authentication Utils - API Key', () => {
   it('should authenticate with valid API Key', async () => {
     const config: ABsmartlyConfig = {
       apiKey: 'test-api-key-12345',
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'apikey'
     }
 
@@ -39,7 +40,7 @@ describe('Authentication Utils - API Key', () => {
 
     const config: ABsmartlyConfig = {
       apiKey: 'invalid-api-key-12345',
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'apikey'
     }
 
@@ -52,7 +53,7 @@ describe('Authentication Utils - API Key', () => {
   it('should fail with no authentication', async () => {
     const config: ABsmartlyConfig = {
       apiKey: '',
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'apikey'
     }
 
@@ -64,11 +65,11 @@ describe('Authentication Utils - API Key', () => {
   })
 
   it('should handle missing endpoint', async () => {
-    const config: ABsmartlyConfig = {
+    const config: Partial<ABsmartlyConfig> = {
       apiKey: 'test-api-key',
-      apiEndpoint: '',
+      apiEndpoint: '' as any,
       authMethod: 'apikey'
-    }
+    } as ABsmartlyConfig
 
     const result = await checkAuthentication(config)
 
@@ -82,7 +83,7 @@ describe('Authentication Utils - API Key', () => {
 
     const config: ABsmartlyConfig = {
       apiKey: 'test-api-key',
-      apiEndpoint: 'https://invalid-domain-that-does-not-exist-12345.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://invalid-domain-that-does-not-exist-12345.com/v1'),
       authMethod: 'apikey'
     }
 
@@ -105,7 +106,7 @@ describe('Authentication Utils - JWT', () => {
 
   it('should authenticate with JWT cookie', async () => {
     const config: ABsmartlyConfig = {
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'jwt'
     }
 
@@ -121,7 +122,7 @@ describe('Authentication Utils - JWT', () => {
     ;(getJWTCookie as jest.Mock).mockResolvedValue(null)
 
     const config: ABsmartlyConfig = {
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'jwt'
     }
 
@@ -144,7 +145,7 @@ describe('buildAuthFetchOptions', () => {
   it('should build options for API key auth', () => {
     const config: ABsmartlyConfig = {
       apiKey: 'test-api-key',
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'apikey'
     }
 
@@ -157,7 +158,7 @@ describe('buildAuthFetchOptions', () => {
 
   it('should build options for JWT auth with cookie', () => {
     const config: ABsmartlyConfig = {
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'jwt'
     }
 
@@ -168,7 +169,7 @@ describe('buildAuthFetchOptions', () => {
 
   it('should build options for JWT auth with header', () => {
     const config: ABsmartlyConfig = {
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
+      apiEndpoint: unsafeAPIEndpoint('https://demo-2.absmartly.com/v1'),
       authMethod: 'jwt'
     }
 

@@ -616,7 +616,8 @@ it('should handle placeholder events without errors', () => {
       const messageHandler = addEventListenerSpy.mock.calls[0][1]
       const event = new MessageEvent('message', {
         source: window,
-        data: { type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' }
+        origin: window.location.origin,
+        data: { source: 'absmartly-visual-editor', type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' }
       })
 
       messageHandler(event)
@@ -630,7 +631,8 @@ it('should handle placeholder events without errors', () => {
       const messageHandler = addEventListenerSpy.mock.calls[0][1]
       const event = new MessageEvent('message', {
         source: null,
-        data: { type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' }
+        origin: window.location.origin,
+        data: { source: 'absmartly-visual-editor', type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' }
       })
 
       messageHandler(event)
@@ -1263,8 +1265,9 @@ it('should handle placeholder events without errors', () => {
       coordinator.setupMessageHandlers()
 
       const messageEvent = new MessageEvent('message', {
-        data: { type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' },
-        source: window
+        data: { source: 'absmartly-visual-editor', type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' },
+        source: window,
+        origin: window.location.origin
       })
 
       window.dispatchEvent(messageEvent)

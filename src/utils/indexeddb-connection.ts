@@ -1,3 +1,4 @@
+import { debugLog, debugWarn } from '~src/utils/debug'
 import {
   DB_NAME,
   DB_VERSION,
@@ -22,10 +23,10 @@ export async function openDatabase(): Promise<IDBDatabase> {
     }
 
     request.onsuccess = () => {
-      console.log('[IndexedDB] Database opened successfully')
+      debugLog('[IndexedDB] Database opened successfully')
       const db = request.result
       db.onclose = () => {
-        console.warn('[IndexedDB] Database connection closed by browser')
+        debugWarn('[IndexedDB] Database connection closed by browser')
         dbPromise = null
       }
       resolve(db)
@@ -33,7 +34,7 @@ export async function openDatabase(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
-      console.log(`[IndexedDB] Upgrading database to version ${db.version}`)
+      debugLog(`[IndexedDB] Upgrading database to version ${db.version}`)
 
       if (!db.objectStoreNames.contains(STORE_CONVERSATIONS)) {
         const convStore = db.createObjectStore(STORE_CONVERSATIONS, {
@@ -53,12 +54,12 @@ export async function openDatabase(): Promise<IDBDatabase> {
           { unique: false }
         )
 
-        console.log('[IndexedDB] Created conversations store with indexes')
+        debugLog('[IndexedDB] Created conversations store with indexes')
       }
 
       if (!db.objectStoreNames.contains(STORE_METADATA)) {
         db.createObjectStore(STORE_METADATA, { keyPath: 'key' })
-        console.log('[IndexedDB] Created metadata store')
+        debugLog('[IndexedDB] Created metadata store')
       }
     }
   })

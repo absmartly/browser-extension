@@ -48,7 +48,7 @@ test.describe('AI DOM Changes Persistence', () => {
       await testPage.screenshot({ path: 'test-results/ai-persistence-1-dropdown.png', fullPage: true })
       log('Screenshot saved: ai-persistence-1-dropdown.png')
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await fromScratchButton.click()
       log('✓ From Scratch clicked')

@@ -23,11 +23,11 @@ export interface GeminiPart {
   }
   functionCall?: {
     name: string
-    args: Record<string, any>
+    args: Record<string, unknown>
   }
   functionResponse?: {
     name: string
-    response: Record<string, any>
+    response: Record<string, unknown>
   }
 }
 
@@ -41,7 +41,7 @@ export interface GeminiFunctionDeclaration {
   description: string
   parameters: {
     type: 'object'
-    properties: Record<string, any>
+    properties: Record<string, unknown>
     required?: string[]
   }
 }

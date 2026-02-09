@@ -83,10 +83,10 @@ export function cleanSelector(selector: string): string {
 
 export function detectTemporaryClasses(selector: string): string[] {
   const temporaryFound: string[] = []
-  
+
   // Extract all classes from the selector
-  const classMatches = selector.match(/\.[\w-]+/g) || []
-  
+  const classMatches: string[] = selector.match(/\.[\w-]+/g) || []
+
   classMatches.forEach(classWithDot => {
     const className = classWithDot.substring(1) // Remove the dot
     

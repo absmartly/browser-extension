@@ -105,7 +105,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     } else {
       const status = experiment.state || experiment.status || 'created'
       let overrideValue: number | OverrideValue = variantIndex
-      console.log('[ABsmartly] handleOverrideChange - experiment:', experimentName, 'status:', status, 'variantIndex:', variantIndex)
+      debugLog('[ABsmartly] handleOverrideChange - experiment:', experimentName, 'status:', status, 'variantIndex:', variantIndex)
 
       if (status === 'development') {
         overrideValue = {
@@ -113,19 +113,19 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
           env: ENV_TYPE.DEVELOPMENT,
           id: experiment.id
         }
-        console.log('[ABsmartly] Setting development override:', overrideValue)
+        debugLog('[ABsmartly] Setting development override:', overrideValue)
       } else if (status !== 'running' && status !== 'full_on') {
         overrideValue = {
           variant: variantIndex,
           env: ENV_TYPE.API_FETCH,
           id: experiment.id
         }
-        console.log('[ABsmartly] Setting non-running override:', overrideValue)
+        debugLog('[ABsmartly] Setting non-running override:', overrideValue)
       }
 
       newOverrides[experimentName] = overrideValue
     }
-    console.log('[ABsmartly] New overrides to save:', newOverrides)
+    debugLog('[ABsmartly] New overrides to save:', newOverrides)
     setOverrides(newOverrides)
 
     await saveOverrides(newOverrides)

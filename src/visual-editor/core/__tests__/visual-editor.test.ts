@@ -958,11 +958,13 @@ describe('initVisualEditor', () => {
     const testChanges: DOMChange[] = [{ selector: '.test', type: 'text', value: 'Updated content' }]
     callbacks.onChangesUpdate(testChanges)
 
+    const targetOrigin = window.location.origin === 'null' ? 'null' : window.location.origin
     expect(window.postMessage).toHaveBeenCalledWith({
+      source: 'absmartly-visual-editor',
       type: 'ABSMARTLY_VISUAL_EDITOR_SAVE',
       changes: testChanges,
       experimentName: 'test-experiment',
       variantName: 'test-variant'
-    }, '*')
+    }, targetOrigin)
   })
 })

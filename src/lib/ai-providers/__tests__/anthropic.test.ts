@@ -2,6 +2,7 @@ import { AnthropicProvider } from '../anthropic'
 import Anthropic from '@anthropic-ai/sdk'
 import type { AIProviderConfig } from '../base'
 import * as utils from '../utils'
+import { unsafeSessionId } from '~src/types/branded'
 
 jest.mock('@anthropic-ai/sdk')
 jest.mock('../utils', () => ({
@@ -11,10 +12,13 @@ jest.mock('../utils', () => ({
   buildSystemPromptWithDOMStructure: jest.fn((prompt, domStructure) =>
     domStructure ? prompt + '\n\n## Page DOM Structure\n' + domStructure : prompt
   ),
-  createSession: jest.fn((session) => session || {
-    id: 'test-session-id',
-    htmlSent: false,
-    messages: []
+  createSession: jest.fn((session) => {
+    const { unsafeSessionId } = require('~src/types/branded')
+    return session || {
+      id: unsafeSessionId('test-session-id'),
+      htmlSent: false,
+      messages: []
+    }
   })
 }))
 
@@ -228,7 +232,7 @@ describe('AnthropicProvider', () => {
         undefined,
         {
           conversationSession: {
-            id: 'session-123',
+            id: unsafeSessionId('session-123'),
             htmlSent: true,
             messages: []
           }
@@ -429,7 +433,7 @@ describe('AnthropicProvider', () => {
       })
 
       const existingSession = {
-        id: 'session-123',
+        id: unsafeSessionId('session-123'),
         htmlSent: true,
         messages: [
           { role: 'user' as const, content: 'First message' },

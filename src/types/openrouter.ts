@@ -29,9 +29,18 @@ export interface OpenRouterModelsResponse {
   data: OpenRouterModel[]
 }
 
+export interface OpenRouterContentPart {
+  type: 'text' | 'image_url'
+  text?: string
+  image_url?: {
+    url: string
+    detail?: 'low' | 'high' | 'auto'
+  }
+}
+
 export interface OpenRouterChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | any[]
+  content: string | OpenRouterContentPart[]
   name?: string
   tool_call_id?: string
   tool_calls?: Array<{
@@ -44,6 +53,13 @@ export interface OpenRouterChatMessage {
   }>
 }
 
+export interface JSONSchemaObject {
+  type: string
+  properties?: Record<string, unknown>
+  required?: string[]
+  [key: string]: unknown
+}
+
 export interface OpenRouterChatCompletionRequest {
   model: string
   messages: OpenRouterChatMessage[]
@@ -52,7 +68,7 @@ export interface OpenRouterChatCompletionRequest {
     function: {
       name: string
       description: string
-      parameters: any
+      parameters: JSONSchemaObject
     }
   }>
   max_tokens?: number

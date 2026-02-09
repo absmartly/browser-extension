@@ -13,6 +13,7 @@ import { formatConversationTimestamp } from '~src/utils/time-format'
 import { compressImagesForLLM } from '~src/utils/image-compression'
 import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface AIDOMChangesPageProps {
   variantName: string
   currentChanges: DOMChange[]
@@ -94,21 +95,21 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   }, [showHistory])
 
   const handleGenerate = async () => {
-    console.log('[AIDOMChangesPage] handleGenerate called, prompt:', prompt, 'images:', attachedImages.length)
-    console.log('[AIDOMChangesPage] Current session:', conversationSession?.id)
+    debugLog('[AIDOMChangesPage] handleGenerate called, prompt:', prompt, 'images:', attachedImages.length)
+    debugLog('[AIDOMChangesPage] Current session:', conversationSession?.id)
 
     if (!prompt.trim() && attachedImages.length === 0) {
-      console.log('[AIDOMChangesPage] Empty prompt and no images')
+      debugLog('[AIDOMChangesPage] Empty prompt and no images')
       setError('Please enter a prompt or attach an image')
       return
     }
 
-    console.log('[AIDOMChangesPage] Setting loading to true')
+    debugLog('[AIDOMChangesPage] Setting loading to true')
     setLoading(true)
     setError(null)
 
     const llmImages = attachedImages.length > 0 ? await compressImagesForLLM(attachedImages) : undefined
-    console.log('[AIDOMChangesPage] LLM images:', llmImages?.length || 0)
+    debugLog('[AIDOMChangesPage] LLM images:', llmImages?.length || 0)
 
     const timestamp = Date.now()
     const userMessage: ChatMessage = {
@@ -125,7 +126,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
       if (result.session) {
         setConversationSession(result.session)
-        console.log('[AIDOMChangesPage] Session updated:', result.session.id)
+        debugLog('[AIDOMChangesPage] Session updated:', result.session.id)
       }
 
       const assistantTimestamp = Date.now()
@@ -143,7 +144,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       try {
         await saveCurrentConversation(newHistory, result.session || conversationSession!)
       } catch (storageError) {
-        console.warn('[AIDOMChangesPage] Failed to save conversation:', storageError)
+        debugWarn('[AIDOMChangesPage] Failed to save conversation:', storageError)
         const warningMessage = storageError instanceof Error
           ? storageError.message
           : 'Failed to save conversation history. Your changes are still applied, but may not be saved.'
@@ -157,12 +158,12 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
       if (result.domChanges && result.domChanges.length > 0) {
         const finalChanges = applyDOMChangeAction(currentChanges, result)
-        console.log('[AIDOMChangesPage] Applied action:', result.action, 'Final changes count:', finalChanges.length)
+        debugLog('[AIDOMChangesPage] Applied action:', result.action, 'Final changes count:', finalChanges.length)
 
         setLatestDomChanges(finalChanges)
 
         if (!previewEnabledOnce) {
-          console.log('[AIDOMChangesPage] First message with DOM changes - enabling preview directly')
+          debugLog('[AIDOMChangesPage] First message with DOM changes - enabling preview directly')
           if (onPreviewWithChanges) {
             onPreviewWithChanges(true, finalChanges)
             setPreviewEnabledOnce(true)
@@ -172,10 +173,10 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
             onRestoreChanges(finalChanges)
           }
         } else {
-          console.log('[AIDOMChangesPage] Subsequent message - clearing old changes then applying new ones')
+          debugLog('[AIDOMChangesPage] Subsequent message - clearing old changes then applying new ones')
 
           if (result.action === 'replace_all' || result.action === 'replace_specific') {
-            console.log('[AIDOMChangesPage] Clearing old changes before applying new ones')
+            debugLog('[AIDOMChangesPage] Clearing old changes before applying new ones')
             if (onPreviewToggleRef.current) {
               onPreviewToggleRef.current(false)
             }
@@ -198,7 +199,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       setError(errorMessage)
       setChatHistory(prev => prev.slice(0, -1))
     } finally {
-      console.log('[AIDOMChangesPage] Clearing prompt and images, then setting loading to false')
+      debugLog('[AIDOMChangesPage] Clearing prompt and images, then setting loading to false')
       setPrompt('')
       setAttachedImages([])
       setLoading(false)
@@ -211,14 +212,14 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
     if (newState) {
       // When turning ON, reapply the latest changes
-      console.log('[AIDOMChangesPage] Preview toggled ON - reapplying changes:', latestDomChanges.length)
+      debugLog('[AIDOMChangesPage] Preview toggled ON - reapplying changes:', latestDomChanges.length)
       if (onPreviewWithChanges) {
         onPreviewWithChanges(true, latestDomChanges)
         setPreviewEnabledOnce(true)
       }
     } else {
       // When turning OFF, remove preview
-      console.log('[AIDOMChangesPage] Preview toggled OFF - removing changes')
+      debugLog('[AIDOMChangesPage] Preview toggled OFF - removing changes')
       if (onPreviewToggle) {
         onPreviewToggle(false)
       }

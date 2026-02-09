@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page, FrameLocator } from '@playwright/test'
+import type { Page, FrameLocator } from '@playwright/test'
 import { injectSidebar, setupTestPage } from './utils/test-helpers'
 import * as fs from 'fs'
 import * as path from 'path'

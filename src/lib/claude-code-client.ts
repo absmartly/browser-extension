@@ -38,42 +38,82 @@ export class ClaudeCodeBridgeClient {
   }
 
   async findBridgePort(): Promise<number> {
-    console.log('[Bridge] Finding bridge port...')
+    debugLog('[Bridge] Finding bridge port...')
+    const failedAttempts: Array<{ port: number; error: string }> = []
     const customPort = await this.storage.get<number>(STORAGE_KEY_BRIDGE_PORT)
-    console.log(`[Bridge] Storage returned custom port: ${customPort || 'null'}`)
+    debugLog(`[Bridge] Storage returned custom port: ${customPort || 'null'}`)
 
     if (customPort) {
-      console.log(`[Bridge] Trying saved custom port: ${customPort}`)
+      debugLog(`[Bridge] Trying saved custom port: ${customPort}`)
       try {
         await this.tryConnect(customPort)
-        console.log(`[Bridge] Custom port ${customPort} connected successfully`)
+        debugLog(`[Bridge] Custom port ${customPort} connected successfully`)
         return customPort
       } catch (error) {
-        console.log(`[Bridge] Custom port ${customPort} failed:`, error.message)
-        console.log(`[Bridge] Trying default ports...`)
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        debugLog(`[Bridge] Custom port ${customPort} failed:`, errorMsg)
+        debugLog(`[Bridge] Trying default ports...`)
+        failedAttempts.push({
+          port: customPort,
+          error: errorMsg
+        })
       }
     }
 
     for (const port of DEFAULT_PORTS) {
-      console.log(`[Bridge] Trying port ${port}...`)
+      debugLog(`[Bridge] Trying port ${port}...`)
       try {
         await this.tryConnect(port)
         await this.storage.set(STORAGE_KEY_BRIDGE_PORT, port)
-        console.log(`[Bridge] ✅ Found bridge on port ${port}`)
+        debugLog(`[Bridge] ✅ Found bridge on port ${port}`)
         return port
       } catch (error) {
-        console.log(`[Bridge] Port ${port} failed: ${error.message}`)
-        continue
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        debugLog(`[Bridge] Port ${port} failed: ${errorMsg}`)
+        failedAttempts.push({
+          port,
+          error: errorMsg
+        })
       }
     }
 
-    console.log(`[Bridge] ❌ Could not find Claude Code Bridge on any port`)
-    throw new Error('Could not find Claude Code Bridge on any port (3000-3004)')
+    debugLog(`[Bridge] ❌ Could not find Claude Code Bridge on any port`)
+
+    const attemptedPorts = failedAttempts.map(a => a.port).join(', ')
+    const errorSummary = failedAttempts
+      .map(a => {
+        let errorDetail = a.error
+        if (errorDetail.includes('timeout')) {
+          errorDetail += ' (connection timeout - server not responding)'
+        } else if (errorDetail.includes('Failed to fetch') || errorDetail.includes('ECONNREFUSED')) {
+          errorDetail += ' (connection refused - server not running)'
+        } else if (errorDetail.includes('NetworkError') || errorDetail.includes('network')) {
+          errorDetail += ' (network error - check firewall/permissions)'
+        }
+        return `  Port ${a.port}: ${errorDetail}`
+      })
+      .join('\n')
+
+    throw new Error(`Could not connect to Claude Code Bridge on any port (${attemptedPorts}).
+
+Failed attempts:
+${errorSummary}
+
+Please ensure Claude Code Bridge is running:
+  npx @absmartly/claude-code-bridge
+
+Or configure a custom port in extension settings if running on a different port.
+
+Common issues:
+  - Bridge server not running (most common)
+  - Firewall blocking localhost connections
+  - Bridge running on a different port than expected
+  - Insufficient permissions to access network`)
   }
 
   private async tryConnect(port: number): Promise<BridgeHealthResponse> {
     const url = `http://localhost:${port}/health`
-    console.log(`[Bridge] Fetching ${url}...`)
+    debugLog(`[Bridge] Fetching ${url}...`)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT)
 
@@ -84,14 +124,14 @@ export class ClaudeCodeBridgeClient {
       })
 
       clearTimeout(timeout)
-      console.log(`[Bridge] Fetch response status: ${response.status}`)
+      debugLog(`[Bridge] Fetch response status: ${response.status}`)
 
       if (!response.ok) {
         throw new Error(`Health check failed: ${response.status}`)
       }
 
       const data = await response.json() as BridgeHealthResponse
-      console.log(`[Bridge] Health check data:`, data)
+      debugLog(`[Bridge] Health check data:`, data)
 
       if (!data.ok) {
         throw new Error('Bridge health check returned not ok')
@@ -100,7 +140,7 @@ export class ClaudeCodeBridgeClient {
       return data
     } catch (error) {
       clearTimeout(timeout)
-      console.log(`[Bridge] Fetch failed: ${error.name} - ${error.message}`)
+      debugLog(`[Bridge] Fetch failed: ${error.name} - ${error.message}`)
       if (error.name === 'AbortError') {
         throw new Error(`Connection timeout to port ${port}`)
       }
@@ -109,13 +149,13 @@ export class ClaudeCodeBridgeClient {
   }
 
   async connect(): Promise<BridgeConnection> {
-    console.log('[Bridge] connect() called')
+    debugLog('[Bridge] connect() called')
     this.connectionState = ConnectionState.CONNECTING
 
     try {
       const port = await this.findBridgePort()
       const url = `http://localhost:${port}`
-      console.log(`[Bridge] Found port ${port}, full URL: ${url}`)
+      debugLog(`[Bridge] Found port ${port}, full URL: ${url}`)
 
       const healthResponse = await this.tryConnect(port)
 
@@ -127,7 +167,7 @@ export class ClaudeCodeBridgeClient {
       }
 
       this.connectionState = ConnectionState.CONNECTED
-      console.log(`[Bridge] ✅ Connected to ${url}`, this.connection)
+      debugLog(`[Bridge] ✅ Connected to ${url}`, this.connection)
 
       return this.connection
     } catch (error) {
@@ -264,7 +304,7 @@ export class ClaudeCodeBridgeClient {
     }
 
     const streamUrl = `${this.connection.url}/conversations/${conversationId}/stream`
-    console.log('[Bridge] Creating EventSource for:', streamUrl)
+    debugLog('[Bridge] Creating EventSource for:', streamUrl)
     const eventSource = new EventSource(streamUrl)
     let reconnectAttempts = 0
     const MAX_RECONNECT_ATTEMPTS = 3
@@ -292,7 +332,7 @@ export class ClaudeCodeBridgeClient {
           reconnectAttempts++
           if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             errorMessage = `Connection lost, attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
-            console.log('[Bridge] Allowing reconnection attempt:', reconnectAttempts)
+            debugLog('[Bridge] Allowing reconnection attempt:', reconnectAttempts)
             return
           } else {
             errorMessage = `Connection failed after ${MAX_RECONNECT_ATTEMPTS} reconnection attempts`

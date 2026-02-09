@@ -5,6 +5,7 @@
 
 import StateManager from '../core/state-manager'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class Toolbar {
   private stateManager: StateManager
   private toolbar: HTMLElement | null = null
@@ -13,11 +14,11 @@ export class Toolbar {
   private redoButton: HTMLElement | null = null
 
   // Callback functions to be set by the main visual editor
-  onUndo: () => void = () => console.log('[Toolbar] Undo callback not set')
-  onRedo: () => void = () => console.log('[Toolbar] Redo callback not set')
-  onClear: () => void = () => console.log('[Toolbar] Clear callback not set')
-  onSave: () => void = () => console.log('[Toolbar] Save callback not set')
-  onExit: () => void = () => console.log('[Toolbar] Exit callback not set')
+  onUndo: () => void = () => debugLog('[Toolbar] Undo callback not set')
+  onRedo: () => void = () => debugLog('[Toolbar] Redo callback not set')
+  onClear: () => void = () => debugLog('[Toolbar] Clear callback not set')
+  onSave: () => void = () => debugLog('[Toolbar] Save callback not set')
+  onExit: () => void = () => debugLog('[Toolbar] Exit callback not set')
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
@@ -27,7 +28,7 @@ export class Toolbar {
   private shadowRoot: ShadowRoot | null = null
 
   create(): void {
-    console.log('[Toolbar] Creating toolbar')
+    debugLog('[Toolbar] Creating toolbar')
     console.error('[Toolbar] Create called - this should appear in console')
     console.trace('[Toolbar] Create called from:')
 
@@ -39,7 +40,7 @@ export class Toolbar {
     document.body.appendChild(debugMarker)
 
     if (this.toolbar) {
-      console.log('[Toolbar] Toolbar already exists, removing old one')
+      debugLog('[Toolbar] Toolbar already exists, removing old one')
       this.remove()
     }
 
@@ -191,24 +192,24 @@ export class Toolbar {
 
     // Append shadow host to document body
     document.body.appendChild(this.shadowHost!)
-    console.log('[Toolbar] Toolbar added to Shadow DOM')
+    debugLog('[Toolbar] Toolbar added to Shadow DOM')
 
     // Verify shadow host is in DOM
     const verifyShadowHost = document.getElementById('absmartly-visual-editor-toolbar-host')
     if (verifyShadowHost) {
-      console.log('[Toolbar] Verified: Shadow host found in DOM')
-      console.log('[Toolbar] Toolbar is now isolated in Shadow DOM, protected from page styles')
+      debugLog('[Toolbar] Verified: Shadow host found in DOM')
+      debugLog('[Toolbar] Toolbar is now isolated in Shadow DOM, protected from page styles')
     } else {
       console.error('[Toolbar] ERROR: Shadow host not found in DOM after appendChild!')
     }
 
     // Add event listeners
     this.toolbar.addEventListener('click', this.handleToolbarClick)
-    console.log('[Toolbar] Event listeners attached')
+    debugLog('[Toolbar] Event listeners attached')
   }
 
   remove(): void {
-    console.log('[Toolbar] Remove called')
+    debugLog('[Toolbar] Remove called')
     console.trace('[Toolbar] Remove stack trace:')
 
     if (this.shadowHost) {
@@ -242,14 +243,14 @@ export class Toolbar {
   }
 
   private handleToolbarClick = (e: MouseEvent) => {
-    console.log('[Toolbar] Click detected on:', e.target)
+    debugLog('[Toolbar] Click detected on:', e.target)
     e.preventDefault()
     e.stopPropagation()
     e.stopImmediatePropagation()
 
     const target = e.target as HTMLElement
     const action = target.getAttribute('data-action')
-    console.log('[Toolbar] Action:', action)
+    debugLog('[Toolbar] Action:', action)
 
     switch (action) {
       case 'undo':

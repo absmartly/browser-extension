@@ -1,6 +1,7 @@
 import { needsMigration, migrateConversation } from '../ai-conversation-migration'
 import { getConversations, saveConversation } from '../ai-conversation-storage'
 import type { ChatMessage } from '~src/types/absmartly'
+import { unsafeVariantName } from '~src/types/branded'
 
 jest.mock('@plasmohq/storage', () => {
   const mockGet = jest.fn()
@@ -47,7 +48,7 @@ describe('ai-conversation-migration', () => {
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
       ;(getConversations as jest.Mock).mockResolvedValue([])
 
-      const result = await needsMigration('variant-a')
+      const result = await needsMigration(unsafeVariantName('variant-a'))
 
       expect(result).toBe(true)
       expect(mockStorage.get).toHaveBeenCalledWith('ai-chat-variant-a')
@@ -57,7 +58,7 @@ describe('ai-conversation-migration', () => {
       mockStorage.get.mockResolvedValue(null)
       ;(getConversations as jest.Mock).mockResolvedValue([])
 
-      const result = await needsMigration('variant-a')
+      const result = await needsMigration(unsafeVariantName('variant-a'))
 
       expect(result).toBe(false)
     })
@@ -69,7 +70,7 @@ describe('ai-conversation-migration', () => {
         { id: 'conv-1', variantName: 'variant-a' }
       ])
 
-      const result = await needsMigration('variant-a')
+      const result = await needsMigration(unsafeVariantName('variant-a'))
 
       expect(result).toBe(false)
     })
@@ -78,7 +79,7 @@ describe('ai-conversation-migration', () => {
       mockStorage.get.mockResolvedValue('')
       ;(getConversations as jest.Mock).mockResolvedValue([])
 
-      const result = await needsMigration('variant-a')
+      const result = await needsMigration(unsafeVariantName('variant-a'))
 
       expect(result).toBe(false)
     })
@@ -86,7 +87,7 @@ describe('ai-conversation-migration', () => {
     it('should handle errors gracefully and return false', async () => {
       mockStorage.get.mockRejectedValue(new Error('Storage error'))
 
-      const result = await needsMigration('variant-a')
+      const result = await needsMigration(unsafeVariantName('variant-a'))
 
       expect(result).toBe(false)
     })
@@ -101,7 +102,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       expect(saveConversation).toHaveBeenCalledTimes(1)
 
@@ -124,7 +125,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
       expect(savedConversation.firstUserMessage).toBe('This is a very long message that should be truncat')
@@ -137,7 +138,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
       expect(savedConversation.firstUserMessage).toBe('Migrated conversation')
@@ -146,7 +147,7 @@ describe('ai-conversation-migration', () => {
     it('should skip migration when no old data exists', async () => {
       mockStorage.get.mockResolvedValue(null)
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       expect(saveConversation).not.toHaveBeenCalled()
       expect(mockStorage.remove).not.toHaveBeenCalled()
@@ -155,7 +156,7 @@ describe('ai-conversation-migration', () => {
     it('should skip migration and cleanup when old data is empty array', async () => {
       mockStorage.get.mockResolvedValue(JSON.stringify([]))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       expect(saveConversation).not.toHaveBeenCalled()
       expect(mockStorage.remove).toHaveBeenCalledWith('ai-chat-variant-a')
@@ -164,7 +165,7 @@ describe('ai-conversation-migration', () => {
     it('should skip migration and cleanup when old data is invalid JSON', async () => {
       mockStorage.get.mockResolvedValue('invalid-json')
 
-      await expect(migrateConversation('variant-a')).rejects.toThrow()
+      await expect(migrateConversation(unsafeVariantName('variant-a'))).rejects.toThrow()
       expect(saveConversation).not.toHaveBeenCalled()
       expect(mockStorage.remove).not.toHaveBeenCalled()
     })
@@ -172,7 +173,7 @@ describe('ai-conversation-migration', () => {
     it('should skip migration and cleanup when old data is not an array', async () => {
       mockStorage.get.mockResolvedValue(JSON.stringify({ invalid: 'structure' }))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       expect(saveConversation).not.toHaveBeenCalled()
       expect(mockStorage.remove).toHaveBeenCalledWith('ai-chat-variant-a')
@@ -184,7 +185,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
       expect(savedConversation.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
@@ -198,7 +199,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
       expect(savedConversation.conversationSession.htmlSent).toBe(false)
@@ -212,7 +213,7 @@ describe('ai-conversation-migration', () => {
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
       const beforeTime = Date.now()
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
       const afterTime = Date.now()
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
@@ -240,7 +241,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
       expect(savedConversation.messages).toEqual(oldMessages)
@@ -258,7 +259,7 @@ describe('ai-conversation-migration', () => {
       ]
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
 
-      await migrateConversation('variant-a')
+      await migrateConversation(unsafeVariantName('variant-a'))
 
       const savedConversation = (saveConversation as jest.Mock).mock.calls[0][0]
       expect(savedConversation.firstUserMessage).toBe('First question')
@@ -272,7 +273,7 @@ describe('ai-conversation-migration', () => {
       mockStorage.get.mockResolvedValue(JSON.stringify(oldMessages))
       ;(saveConversation as jest.Mock).mockRejectedValue(new Error('Save failed'))
 
-      await expect(migrateConversation('variant-a')).rejects.toThrow('Save failed')
+      await expect(migrateConversation(unsafeVariantName('variant-a'))).rejects.toThrow('Save failed')
 
       expect(mockStorage.remove).not.toHaveBeenCalled()
     })

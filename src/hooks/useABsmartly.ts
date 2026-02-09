@@ -94,7 +94,7 @@ export function useABsmartly() {
             authMethod: 'apikey',
             domChangesFieldName: '__dom_changes'
           } as ABsmartlyConfig
-          console.log('[useABsmartly] Using config from environment variables (not saved to storage)')
+          debugLog('[useABsmartly] Using config from environment variables (not saved to storage)')
         }
       }
 

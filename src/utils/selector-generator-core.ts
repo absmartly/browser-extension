@@ -47,7 +47,7 @@ function generateUniqueSelector(element) {
     }
 
     // ID should be unique, but some sites have duplicates
-    console.log('[Selector] WARNING: Duplicate ID found:', element.id);
+    debugLog('[Selector] WARNING: Duplicate ID found:', element.id);
   }
 
   // 2. Try data attributes (testing-friendly)

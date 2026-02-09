@@ -12,7 +12,7 @@ test.describe('Claude API Key Authentication', () => {
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Navigate to settings
-    const settingsButton = sidebar.locator('button:has-text("Settings"), a:has-text("Settings")').first()
+    const settingsButton = sidebar.locator('#nav-settings, a:#nav-settings').first()
     await settingsButton.click()
 
     // Verify Claude API Configuration section exists
@@ -36,7 +36,7 @@ test.describe('Claude API Key Authentication', () => {
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Navigate to settings
-    const settingsButton = sidebar.locator('button:has-text("Settings"), a:has-text("Settings")').first()
+    const settingsButton = sidebar.locator('#nav-settings, a:#nav-settings').first()
     await settingsButton.click()
 
     // Enter an API key
@@ -65,7 +65,7 @@ test.describe('Claude API Key Authentication', () => {
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     // Navigate to settings
-    const settingsButton = sidebar.locator('button:has-text("Settings"), a:has-text("Settings")').first()
+    const settingsButton = sidebar.locator('#nav-settings, a:#nav-settings').first()
     await settingsButton.click()
 
     // Enter an API key
@@ -81,7 +81,7 @@ test.describe('Claude API Key Authentication', () => {
 
     // Navigate to settings again
     const reloadedSidebar = page.frameLocator('#absmartly-sidebar-iframe')
-    const reloadedSettingsButton = reloadedSidebar.locator('button:has-text("Settings"), a:has-text("Settings")').first()
+    const reloadedSettingsButton = reloadedSidebar.locator('#nav-settings, a:#nav-settings').first()
     await reloadedSettingsButton.click()
 
     // Verify API key is still populated

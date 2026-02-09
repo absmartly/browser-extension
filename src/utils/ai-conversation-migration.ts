@@ -1,14 +1,16 @@
 import { Storage } from '@plasmohq/storage'
 import type { ChatMessage, ConversationSession, StoredConversation } from '~src/types/absmartly'
 import { saveConversation, getConversations } from './ai-conversation-storage'
+import { unsafeSessionId, unsafeConversationId, unsafeVariantName, type VariantName } from '~src/types/branded'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 const storage = new Storage()
 
-function getOldStorageKey(variantName: string): string {
+function getOldStorageKey(variantName: VariantName): string {
   return `ai-chat-${variantName}`
 }
 
-export async function needsMigration(variantName: string): Promise<boolean> {
+export async function needsMigration(variantName: VariantName): Promise<boolean> {
   try {
     const oldKey = getOldStorageKey(variantName)
     const oldData = await storage.get<string>(oldKey)
@@ -22,20 +24,20 @@ export async function needsMigration(variantName: string): Promise<boolean> {
   }
 }
 
-export async function migrateConversation(variantName: string): Promise<void> {
+export async function migrateConversation(variantName: VariantName): Promise<void> {
   try {
     const oldKey = getOldStorageKey(variantName)
     const oldDataStr = await storage.get<string>(oldKey)
 
     if (!oldDataStr) {
-      console.log('[ConversationMigration] No old data found to migrate')
+      debugLog('[ConversationMigration] No old data found to migrate')
       return
     }
 
     const oldMessages: ChatMessage[] = JSON.parse(oldDataStr)
 
     if (!Array.isArray(oldMessages) || oldMessages.length === 0) {
-      console.log('[ConversationMigration] Old data is empty or invalid, skipping migration')
+      debugLog('[ConversationMigration] Old data is empty or invalid, skipping migration')
       await storage.remove(oldKey)
       return
     }
@@ -44,13 +46,13 @@ export async function migrateConversation(variantName: string): Promise<void> {
     const truncatedMessage = firstUserMessage.substring(0, 50)
 
     const newSession: ConversationSession = {
-      id: crypto.randomUUID(),
+      id: unsafeSessionId(crypto.randomUUID()),
       htmlSent: false,
       messages: []
     }
 
     const migratedConversation: StoredConversation = {
-      id: crypto.randomUUID(),
+      id: unsafeConversationId(crypto.randomUUID()),
       variantName,
       messages: oldMessages,
       conversationSession: newSession,
@@ -65,8 +67,8 @@ export async function migrateConversation(variantName: string): Promise<void> {
 
     await storage.remove(oldKey)
 
-    console.log(`[ConversationMigration] Successfully migrated conversation for ${variantName}`)
-    console.log(`[ConversationMigration] Migrated ${oldMessages.length} messages`)
+    debugLog(`[ConversationMigration] Successfully migrated conversation for ${variantName}`)
+    debugLog(`[ConversationMigration] Migrated ${oldMessages.length} messages`)
   } catch (error) {
     console.error('[ConversationMigration] Error during migration:', error)
     throw error

@@ -246,7 +246,7 @@ export async function rightClickElement(
   await locator.waitFor({ state: 'visible', timeout: 5000 })
   await locator.click({ button: 'right' })
   // Wait for context menu to appear
-  await (target instanceof Page
+  await ('url' in target
     ? target.locator('#absmartly-menu-container')
     : (target as FrameLocator).locator('#absmartly-menu-container')
   ).waitFor({ state: 'attached', timeout: 2000 }).catch(() => {})

@@ -14,7 +14,7 @@ export interface IDBConversationRecord {
 
 export interface IDBMetadataRecord {
   key: string
-  value: any
+  value: unknown
   updatedAt: number
 }
 

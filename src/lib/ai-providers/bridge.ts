@@ -6,7 +6,8 @@ import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import { BRIDGE_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { validateAIDOMGenerationResult, type ValidationError } from './validation'
-import { debugLog } from '~src/utils/debug'
+import { debugLog, debugWarn } from '~src/utils/debug'
+import { unsafeSessionId, unsafeConversationId } from '~src/types/branded'
 
 export class BridgeProvider implements AIProvider {
   private bridgeClient: ClaudeCodeBridgeClient
@@ -135,11 +136,11 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         debugLog('[Bridge] ✅ Conversation created with JSON schema and HTML stored on bridge')
 
         session = {
-          id: sessionId,
+          id: unsafeSessionId(sessionId),
           htmlSent: true,
           pageUrl,
           messages: [],
-          conversationId
+          conversationId: unsafeConversationId(conversationId)
         }
         debugLog('[Bridge] ✅ Created new conversation:', conversationId)
       } else {
@@ -251,7 +252,63 @@ The response will contain the HTML for each selector. Use this to inspect elemen
               console.error('[Bridge] ❌ Error:', event.data)
               cleanup()
               eventSource.close()
-              reject(new Error(event.data || 'Unknown error'))
+
+              let errorData = event.data
+              if (typeof errorData === 'string') {
+                try {
+                  const parsed = JSON.parse(errorData)
+                  if (parsed.error) errorData = parsed.error
+                } catch (parseError) {
+                  debugWarn('[Bridge] Failed to parse SSE error data as JSON, using raw string:', errorData.substring(0, 100))
+                }
+              }
+
+              const formatBridgeError = (value: unknown): string => {
+                if (typeof value === 'string') return value
+                if (value && typeof value === 'object') {
+                  const obj = value as { type?: string; message?: string; code?: string }
+                  if (obj.type || obj.code || obj.message) {
+                    const prefix = [obj.type, obj.code].filter(Boolean).join(' ')
+                    return prefix && obj.message ? `${prefix}: ${obj.message}` : prefix || obj.message || String(value)
+                  }
+                  try {
+                    return JSON.stringify(value)
+                  } catch {
+                    return String(value)
+                  }
+                }
+                return String(value)
+              }
+
+              let userMessage = 'Claude Code Bridge error: '
+              const formattedError = formatBridgeError(errorData)
+              const errorStr = formattedError
+
+              if (errorStr.includes('ECONNREFUSED') || errorStr.includes('Failed to fetch')) {
+                userMessage = 'Cannot connect to Claude Code Bridge. Make sure it\'s running:\n\nnpx @absmartly/claude-code-bridge'
+              } else if (errorStr.includes('401') || errorStr.includes('Unauthorized') || errorStr.includes('unauthorized')) {
+                userMessage = 'Authentication failed. Check your Claude API credentials in Settings.'
+              } else if (errorStr.includes('403') || errorStr.includes('Forbidden')) {
+                userMessage = 'Access forbidden. Your API key may not have the required permissions.'
+              } else if (errorStr.includes('429') || errorStr.includes('rate limit')) {
+                userMessage = 'Rate limit exceeded. Please wait a moment and try again.'
+              } else if (
+                errorStr.includes('model') &&
+                (errorStr.includes('not found') || errorStr.includes('unavailable')) &&
+                !errorStr.toLowerCase().includes('invalid model')
+              ) {
+                userMessage = `Model error: ${formattedError}\n\nCheck that the selected model is available with your API key.`
+              } else if (errorStr.includes('token') || errorStr.includes('context') || errorStr.includes('limit')) {
+                userMessage = `Token limit exceeded: ${formattedError}\n\nTry simplifying your request or reducing the HTML size.`
+              } else if (errorStr.includes('timeout') || errorStr.includes('timed out')) {
+                userMessage = 'Request timed out. Try again or simplify your request.'
+              } else if (errorStr.includes('network') || errorStr.includes('NetworkError')) {
+                userMessage = 'Network error. Check your internet connection and try again.'
+              } else {
+                userMessage += formattedError
+              }
+
+              reject(new Error(userMessage))
             }
           },
           (error) => {
@@ -292,7 +349,33 @@ The response will contain the HTML for each selector. Use this to inspect elemen
       }
     } catch (error) {
       console.error('❌ Bridge generation failed:', error)
-      throw new Error(`Claude Code Bridge error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+
+      const errorMessage = error instanceof Error ? error.message : String(error)
+
+      if (errorMessage.includes('Claude Code Bridge error:')) {
+        throw error
+      }
+
+      let userMessage = 'Claude Code Bridge error: '
+      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Failed to fetch')) {
+        userMessage = 'Cannot connect to Claude Code Bridge. Make sure it\'s running:\n\nnpx @absmartly/claude-code-bridge'
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        userMessage = 'Authentication failed. Check your Claude API credentials in Settings.'
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        userMessage = 'Access forbidden. Your API key may not have the required permissions.'
+      } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+        userMessage = 'Rate limit exceeded. Please wait a moment and try again.'
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        userMessage = 'Request timed out after 5 minutes. Try again or simplify your request.'
+      } else if (errorMessage.includes('network') || errorMessage.includes('NetworkError')) {
+        userMessage = 'Network error. Check your internet connection and try again.'
+      } else if (errorMessage.includes('HTML is required')) {
+        userMessage = 'HTML is required for creating new bridge conversation'
+      } else {
+        userMessage += errorMessage
+      }
+
+      throw new Error(userMessage)
     } finally {
       this.bridgeClient.disconnect()
     }

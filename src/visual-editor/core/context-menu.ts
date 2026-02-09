@@ -6,6 +6,7 @@
 import { generateRobustSelector } from '../utils/selector-generator'
 import StateManager from './state-manager'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export interface MenuAction {
   icon: string
   label: string
@@ -88,11 +89,11 @@ export class ContextMenu {
     `
 
     // Check if we should use shadow DOM
-    console.log('🔍 Context Menu - Use Shadow DOM:', this.useShadowDOM)
+    debugLog('🔍 Context Menu - Use Shadow DOM:', this.useShadowDOM)
 
     // Attach shadow root with open mode for testability (unless disabled)
     const shadow = this.useShadowDOM ? menuHost.attachShadow({ mode: 'open' }) : menuHost
-    console.log('🔍 Shadow container:', this.useShadowDOM ? 'Using shadow DOM' : 'Using menuHost directly')
+    debugLog('🔍 Shadow container:', this.useShadowDOM ? 'Using shadow DOM' : 'Using menuHost directly')
 
     // Create styles for shadow DOM
     const style = document.createElement('style')
@@ -315,12 +316,12 @@ export class ContextMenu {
 
   // This will be set by the main visual editor to handle actions
   handleAction: (action: string, element: Element) => void = (action, element) => {
-    console.log('[ABSmartly] Menu action:', action, 'for element:', element)
+    debugLog('[ABSmartly] Menu action:', action, 'for element:', element)
   }
 
   private showNotification(message: string): void {
     // This will be implemented by ui-components module
-    console.log('[ABSmartly] Notification:', message)
+    debugLog('[ABSmartly] Notification:', message)
   }
 }
 

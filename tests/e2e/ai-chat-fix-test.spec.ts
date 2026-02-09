@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page, FrameLocator } from '@playwright/test'
+import type { Page, FrameLocator } from '@playwright/test'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -192,7 +192,7 @@ test.describe('AI Chat Fix Verification', () => {
     log(JSON.stringify(baselineMetrics, null, 2))
 
     log('Looking for "Generate with AI" button')
-    const generateButton = sidebar.locator('button:has-text("Generate with AI")').first()
+    const generateButton = sidebar.locator('#generate-with-ai-button').first()
 
     await generateButton.waitFor({ state: 'visible', timeout: 10000 })
     log('Found "Generate with AI" button')
@@ -358,7 +358,7 @@ test.describe('AI Chat Fix Verification', () => {
     await experimentRow.click()
     await sidebar.locator('text=Experiment Details').waitFor({ state: 'visible', timeout: 5000 })
 
-    const generateButton = sidebar.locator('button:has-text("Generate with AI")').first()
+    const generateButton = sidebar.locator('#generate-with-ai-button').first()
     await generateButton.waitFor({ state: 'visible', timeout: 10000 })
 
     let mountEvents = 0

@@ -1,3 +1,4 @@
+import { debugLog, debugWarn } from '~src/utils/debug'
 import type {
   StoredConversation,
   ConversationListItem
@@ -57,7 +58,7 @@ export async function saveConversation(
   return new Promise((resolve, reject) => {
     const request = store.put(conversation)
     request.onsuccess = () => {
-      console.log(`[IndexedDB] Saved conversation ${conversation.id}`)
+      debugLog(`[IndexedDB] Saved conversation ${conversation.id}`)
       resolve()
     }
     request.onerror = () => {
@@ -80,10 +81,10 @@ export async function loadConversation(
     request.onsuccess = () => {
       const result = request.result
       if (result && result.variantName === variantName) {
-        console.log(`[IndexedDB] Loaded conversation ${conversationId}`)
+        debugLog(`[IndexedDB] Loaded conversation ${conversationId}`)
         resolve(result)
       } else {
-        console.warn(`[IndexedDB] Conversation ${conversationId} not found`)
+        debugWarn(`[IndexedDB] Conversation ${conversationId} not found`)
         resolve(null)
       }
     }
@@ -106,7 +107,7 @@ export async function deleteConversation(
   return new Promise((resolve, reject) => {
     const request = store.delete(conversationId)
     request.onsuccess = () => {
-      console.log(`[IndexedDB] Deleted conversation ${conversationId}`)
+      debugLog(`[IndexedDB] Deleted conversation ${conversationId}`)
       resolve()
     }
     request.onerror = () => {
@@ -187,7 +188,7 @@ export async function setActiveConversation(
   })
 
   await Promise.all(updates)
-  console.log(`[IndexedDB] Set active conversation to ${conversationId}`)
+  debugLog(`[IndexedDB] Set active conversation to ${conversationId}`)
 }
 
 async function batchDeleteConversations(ids: string[]): Promise<void> {

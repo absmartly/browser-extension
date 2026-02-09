@@ -11,6 +11,7 @@
 
 import { Orchestrator } from './core/orchestrator'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 // Version
 export const SDK_BRIDGE_VERSION = '1.1.0'
 
@@ -44,5 +45,5 @@ function initializeBridge() {
   orchestrator.start()
 
   // Log that we're loaded
-  console.log('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)
+  debugLog('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)
 }

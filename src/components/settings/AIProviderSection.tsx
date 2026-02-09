@@ -7,6 +7,7 @@ import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } fr
 import { ModelFetcher, type ModelInfo, type GroupedModels } from '~src/lib/model-fetcher'
 import type { AIProviderType } from '~src/lib/ai-providers'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface AIProviderSectionProps {
   aiProvider: AIProviderType
   aiApiKey: string
@@ -205,19 +206,19 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   }
 
   const checkBridgeConnection = async () => {
-    console.log('[AIProviderSection] Starting bridge connection check...')
+    debugLog('[AIProviderSection] Starting bridge connection check...')
     setConnectionState(ConnectionState.CONNECTING)
     try {
       await bridgeClient.connect()
       const connection = bridgeClient.getConnection()
-      console.log('[AIProviderSection] Bridge connection result:', connection)
+      debugLog('[AIProviderSection] Bridge connection result:', connection)
       if (connection) {
         setBridgePort(connection.port)
         setSubscriptionType(connection.subscriptionType)
         setConnectionState(ConnectionState.CONNECTED)
-        console.log('[AIProviderSection] Bridge connected successfully on port', connection.port)
+        debugLog('[AIProviderSection] Bridge connected successfully on port', connection.port)
       } else {
-        console.warn('[AIProviderSection] Bridge connect succeeded but no connection object returned')
+        debugWarn('[AIProviderSection] Bridge connect succeeded but no connection object returned')
         setConnectionState(ConnectionState.SERVER_NOT_FOUND)
       }
     } catch (error) {

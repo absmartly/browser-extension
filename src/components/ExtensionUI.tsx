@@ -6,10 +6,10 @@ import { ExperimentEditor } from "~src/components/ExperimentEditor"
 import { SettingsView } from "~src/components/SettingsView"
 import EventsDebugPage from "~src/components/EventsDebugPage"
 import { Button } from "~src/components/ui/Button"
-import { Toast } from "~src/components/Toast"
 import { CookieConsentModal } from "~src/components/CookieConsentModal"
 import { ListView } from "~src/components/views/ListView"
 import { AIDOMChangesView } from "~src/components/views/AIDOMChangesView"
+import { NotificationProvider } from "~src/contexts/NotificationContext"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import { usePermissions } from "~src/hooks/usePermissions"
 import { useExperimentFilters } from "~src/hooks/useExperimentFilters"
@@ -23,10 +23,12 @@ import { useSidebarState } from "~src/hooks/useSidebarState"
 import { useExtensionState } from "~src/hooks/useExtensionState"
 import { useExperimentInitialization } from "~src/hooks/useExperimentInitialization"
 import { useLoginRedirect } from "~src/hooks/useLoginRedirect"
+import { useNotifications } from "~src/contexts/NotificationContext"
 import type { ABsmartlyConfig } from "~src/types/absmartly"
 import "~style.css"
 
 function SidebarContent() {
+  const { showError, showSuccess } = useNotifications()
   const {
     client,
     config,
@@ -79,8 +81,6 @@ function SidebarContent() {
     error,
     setError,
     setIsAuthExpired,
-    toast,
-    setToast,
     createPanelOpen,
     setCreatePanelOpen,
     hasInitialized,
@@ -129,8 +129,8 @@ function SidebarContent() {
     updateExperiment,
     loadExperiments,
     onAuthExpired: handleAuthExpired,
-    onError: (message) => setToast({ message, type: 'error' }),
-    onSuccess: (message) => setToast({ message, type: 'success' }),
+    onError: showError,
+    onSuccess: showSuccess,
     setView,
     pageSize
   })
@@ -164,7 +164,7 @@ function SidebarContent() {
     getFavorites,
     setExperimentFavorite,
     requestPermissionsIfNeeded,
-    onError: (message) => setToast({ message, type: 'error' })
+    onError: showError
   })
 
   const {
@@ -218,7 +218,7 @@ function SidebarContent() {
 
   const prevViewRef = useRef<string>('list')
   useEffect(() => {
-    console.log(JSON.stringify({
+    debugLog(JSON.stringify({
       type: 'STATE_CHANGE',
       component: 'ExtensionUI',
       event: 'VIEW_CHANGED',
@@ -337,7 +337,7 @@ function SidebarContent() {
             autoNavigateToAI={autoNavigateToAI}
             onUpdate={handleUpdateExperiment}
             loading={experimentDetailLoading}
-            onError={(message) => setToast({ message, type: 'error' })}
+            onError={showError}
           />
         ) : (
           <div className="flex items-center justify-center h-64">
@@ -382,19 +382,11 @@ function SidebarContent() {
         />
       )}
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
       <CookieConsentModal
         isOpen={needsPermissions}
         onGrant={() => handleGrantPermissions(
           () => {
-            setToast({ message: 'Permissions granted. Reloading...', type: 'success' })
+            showSuccess('Permissions granted. Reloading...')
             setTimeout(() => {
               setIsAuthExpired(false)
               setError(null)
@@ -403,7 +395,7 @@ function SidebarContent() {
           },
           (message) => {
             setError(message)
-            setToast({ message, type: 'error' })
+            showError(message)
           }
         )}
         onDeny={handleDenyPermissions}
@@ -413,5 +405,9 @@ function SidebarContent() {
 }
 
 export default function ExtensionSidebar() {
-  return <SidebarContent />
+  return (
+    <NotificationProvider>
+      <SidebarContent />
+    </NotificationProvider>
+  )
 }

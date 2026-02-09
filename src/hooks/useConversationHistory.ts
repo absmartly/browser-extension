@@ -4,8 +4,12 @@ import { getConversationList, saveConversation, loadConversation, deleteConversa
 import { needsMigration, migrateConversation } from '~src/utils/ai-conversation-migration'
 import { capturePageHTML } from '~src/utils/html-capture'
 import { sendToBackground } from '~src/lib/messaging'
+import type { ConversationId, VariantName } from '~src/types/branded'
+import { unsafeConversationId, unsafeVariantName, unsafeSessionId } from '~src/types/branded'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export function useConversationHistory(variantName: string) {
+  const safeVariantName = unsafeVariantName(variantName)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [conversationSession, setConversationSession] = useState<ConversationSession | null>(null)
   const [conversationList, setConversationList] = useState<ConversationListItem[]>([])
@@ -14,11 +18,11 @@ export function useConversationHistory(variantName: string) {
   const [error, setError] = useState<string | null>(null)
 
   const initializeSessionHTML = useCallback(async (session: ConversationSession, conversationId: string) => {
-    console.log('[initializeSessionHTML] Starting background HTML capture...')
+    debugLog('[initializeSessionHTML] Starting background HTML capture...')
 
     try {
       const captureResult = await capturePageHTML()
-      console.log('[initializeSessionHTML] HTML captured, length:', captureResult.html.length, 'URL:', captureResult.url, 'structure lines:', captureResult.domStructure?.split('\n').length)
+      debugLog('[initializeSessionHTML] HTML captured, length:', captureResult.html.length, 'URL:', captureResult.url, 'structure lines:', captureResult.domStructure?.split('\n').length)
 
       const response = await sendToBackground({
         type: 'AI_INITIALIZE_SESSION',
@@ -31,7 +35,7 @@ export function useConversationHistory(variantName: string) {
       if (response.success && response.session) {
         const initializedSession = response.session as ConversationSession
         setConversationSession(initializedSession)
-        console.log('[initializeSessionHTML] ✅ HTML context initialized successfully')
+        debugLog('[initializeSessionHTML] ✅ HTML context initialized successfully')
       } else {
         throw new Error(response.error || 'Failed to initialize session')
       }
@@ -41,37 +45,37 @@ export function useConversationHistory(variantName: string) {
   }, [])
 
   useEffect(() => {
-    console.log('[useConversationHistory] ========== INITIALIZATION START ==========')
-    console.log('[useConversationHistory] variantName:', variantName)
+    debugLog('[useConversationHistory] ========== INITIALIZATION START ==========')
+    debugLog('[useConversationHistory] variantName:', variantName)
 
     ;(async () => {
       try {
         setIsLoadingHistory(true)
 
-        if (await needsMigration(variantName)) {
-          console.log('[useConversationHistory] Migrating old conversation format')
-          await migrateConversation(variantName)
+        if (await needsMigration(safeVariantName)) {
+          debugLog('[useConversationHistory] Migrating old conversation format')
+          await migrateConversation(safeVariantName)
         }
 
-        const list = await getConversationList(variantName)
-        console.log('[useConversationHistory] Loaded conversation list:', list.length, 'conversations for variant:', variantName)
+        const list = await getConversationList(safeVariantName)
+        debugLog('[useConversationHistory] Loaded conversation list:', list.length, 'conversations for variant:', variantName)
         setConversationList(list)
         setIsLoadingHistory(false)
 
         const activeConv = list.find(c => c.isActive)
 
         if (activeConv) {
-          const loaded = await loadConversation(variantName, activeConv.id)
+          const loaded = await loadConversation(safeVariantName, activeConv.id)
           if (loaded) {
             setChatHistory(loaded.messages)
             setConversationSession(loaded.conversationSession)
             setCurrentConversationId(loaded.id)
-            console.log('[useConversationHistory] Loaded active conversation:', loaded.id)
+            debugLog('[useConversationHistory] Loaded active conversation:', loaded.id)
 
             if (!loaded.conversationSession.htmlSent) {
               initializeSessionHTML(loaded.conversationSession, loaded.id)
                 .catch(err => {
-                  console.warn('[useConversationHistory] HTML initialization failed (non-blocking):', err)
+                  debugWarn('[useConversationHistory] HTML initialization failed (non-blocking):', err)
                 })
             }
             return
@@ -79,19 +83,19 @@ export function useConversationHistory(variantName: string) {
         }
 
         const newSession: ConversationSession = {
-          id: crypto.randomUUID(),
+          id: unsafeSessionId(crypto.randomUUID()),
           htmlSent: false,
           messages: [],
         }
-        const newConvId = crypto.randomUUID()
+        const newConvId = unsafeConversationId(crypto.randomUUID())
 
         setConversationSession(newSession)
         setCurrentConversationId(newConvId)
-        console.log('[useConversationHistory] Created new conversation:', newConvId)
+        debugLog('[useConversationHistory] Created new conversation:', newConvId)
 
         initializeSessionHTML(newSession, newConvId)
           .catch(err => {
-            console.warn('[useConversationHistory] HTML initialization failed (non-blocking):', err)
+            debugWarn('[useConversationHistory] HTML initialization failed (non-blocking):', err)
           })
 
       } catch (error) {
@@ -107,8 +111,8 @@ export function useConversationHistory(variantName: string) {
 
     if (chatHistory.length > 0 && currentConversationId) {
       const currentConv: StoredConversation = {
-        id: currentConversationId,
-        variantName,
+        id: unsafeConversationId(currentConversationId),
+        variantName: unsafeVariantName(variantName),
         messages: chatHistory,
         conversationSession,
         createdAt: Date.now(),
@@ -121,28 +125,28 @@ export function useConversationHistory(variantName: string) {
       try {
         await saveConversation(currentConv)
       } catch (storageError) {
-        console.warn('[useConversationHistory] Failed to save conversation before creating new chat:', storageError)
+        debugWarn('[useConversationHistory] Failed to save conversation before creating new chat:', storageError)
       }
     }
 
     const newSession: ConversationSession = {
-      id: crypto.randomUUID(),
+      id: unsafeSessionId(crypto.randomUUID()),
       htmlSent: false,
       messages: [],
     }
     setConversationSession(newSession)
 
-    const newConvId = crypto.randomUUID()
+    const newConvId = unsafeConversationId(crypto.randomUUID())
     setCurrentConversationId(newConvId)
-    await setActiveConversation(variantName, newConvId)
+    await setActiveConversation(safeVariantName, newConvId)
 
     setChatHistory([])
     setError(null)
 
-    const list = await getConversationList(variantName)
+    const list = await getConversationList(safeVariantName)
     setConversationList(list)
 
-    console.log('[useConversationHistory] New chat session:', newConvId)
+    debugLog('[useConversationHistory] New chat session:', newConvId)
   }, [chatHistory, currentConversationId, conversationSession, variantName])
 
   const switchConversation = useCallback(async (conv: ConversationListItem) => {
@@ -150,8 +154,8 @@ export function useConversationHistory(variantName: string) {
 
     if (chatHistory.length > 0 && currentConversationId !== conv.id) {
       const currentConv: StoredConversation = {
-        id: currentConversationId,
-        variantName,
+        id: unsafeConversationId(currentConversationId),
+        variantName: unsafeVariantName(variantName),
         messages: chatHistory,
         conversationSession,
         createdAt: Date.now(),
@@ -164,48 +168,48 @@ export function useConversationHistory(variantName: string) {
       try {
         await saveConversation(currentConv)
       } catch (storageError) {
-        console.warn('[useConversationHistory] Failed to save conversation before switching:', storageError)
+        debugWarn('[useConversationHistory] Failed to save conversation before switching:', storageError)
       }
     }
 
-    const loaded = await loadConversation(variantName, conv.id)
+    const loaded = await loadConversation(safeVariantName, conv.id)
     if (loaded) {
       setChatHistory(loaded.messages)
       setConversationSession(loaded.conversationSession)
       setCurrentConversationId(loaded.id)
-      await setActiveConversation(variantName, loaded.id)
+      await setActiveConversation(safeVariantName, loaded.id)
 
-      const list = await getConversationList(variantName)
+      const list = await getConversationList(safeVariantName)
       setConversationList(list)
 
-      console.log('[useConversationHistory] Loaded conversation:', loaded.id)
+      debugLog('[useConversationHistory] Loaded conversation:', loaded.id)
     }
   }, [chatHistory, currentConversationId, conversationSession, variantName])
 
   const handleDeleteConversation = useCallback(async (convId: string) => {
-    await deleteConversation(variantName, convId)
+    await deleteConversation(safeVariantName, unsafeConversationId(convId))
 
     const isActive = currentConversationId === convId
     if (isActive) {
       const newSession: ConversationSession = {
-        id: crypto.randomUUID(),
+        id: unsafeSessionId(crypto.randomUUID()),
         htmlSent: false,
         messages: [],
       }
       setConversationSession(newSession)
 
-      const newConvId = crypto.randomUUID()
+      const newConvId = unsafeConversationId(crypto.randomUUID())
       setCurrentConversationId(newConvId)
-      await setActiveConversation(variantName, newConvId)
+      await setActiveConversation(safeVariantName, newConvId)
 
       setChatHistory([])
       setError(null)
     }
 
-    const list = await getConversationList(variantName)
+    const list = await getConversationList(safeVariantName)
     setConversationList(list)
 
-    console.log('[useConversationHistory] Deleted conversation:', convId)
+    debugLog('[useConversationHistory] Deleted conversation:', convId)
   }, [variantName, currentConversationId])
 
   const refreshHTML = useCallback(async () => {
@@ -215,9 +219,9 @@ export function useConversationHistory(variantName: string) {
     }
 
     try {
-      console.log('[useConversationHistory] Refreshing HTML context...')
+      debugLog('[useConversationHistory] Refreshing HTML context...')
       const captureResult = await capturePageHTML()
-      console.log('[useConversationHistory] HTML captured, length:', captureResult.html.length, 'URL:', captureResult.url, 'structure lines:', captureResult.domStructure?.split('\n').length)
+      debugLog('[useConversationHistory] HTML captured, length:', captureResult.html.length, 'URL:', captureResult.url, 'structure lines:', captureResult.domStructure?.split('\n').length)
 
       const response = await sendToBackground({
         type: 'AI_REFRESH_HTML',
@@ -229,7 +233,7 @@ export function useConversationHistory(variantName: string) {
 
       if (response.success && response.session) {
         setConversationSession(response.session as ConversationSession)
-        console.log('[useConversationHistory] ✅ HTML context refreshed successfully')
+        debugLog('[useConversationHistory] ✅ HTML context refreshed successfully')
         return true
       } else {
         throw new Error(response.error || 'Failed to refresh HTML')
@@ -243,8 +247,8 @@ export function useConversationHistory(variantName: string) {
 
   const saveCurrentConversation = useCallback(async (messages: ChatMessage[], session: ConversationSession) => {
     const updatedConversation: StoredConversation = {
-      id: currentConversationId,
-      variantName,
+      id: unsafeConversationId(currentConversationId),
+      variantName: unsafeVariantName(variantName),
       messages,
       conversationSession: session,
       createdAt: Date.now(),
@@ -258,10 +262,10 @@ export function useConversationHistory(variantName: string) {
       await saveConversation(updatedConversation)
       await setActiveConversation(variantName, currentConversationId)
 
-      const list = await getConversationList(variantName)
+      const list = await getConversationList(safeVariantName)
       setConversationList(list)
     } catch (storageError) {
-      console.warn('[useConversationHistory] Failed to save conversation:', storageError)
+      debugWarn('[useConversationHistory] Failed to save conversation:', storageError)
       throw storageError
     }
   }, [currentConversationId, variantName])

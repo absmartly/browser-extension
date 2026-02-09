@@ -3,6 +3,7 @@ import type { ConversationSession } from '~src/types/absmartly'
 import { getSystemPromptOverride } from '~src/components/SystemPromptEditor'
 import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
 import { debugLog } from '~src/utils/debug'
+import { unsafeSessionId } from '~src/types/branded'
 
 // Shared HTML sanitization - removes invalid Unicode characters
 export function sanitizeHtml(htmlStr: string): string {
@@ -187,7 +188,7 @@ export async function getSystemPrompt(chunkRetrievalPrompt: string): Promise<str
 
 export function createSession(conversationSession?: ConversationSession): ConversationSession {
   return conversationSession || {
-    id: crypto.randomUUID(),
+    id: unsafeSessionId(crypto.randomUUID()),
     htmlSent: false,
     messages: []
   }

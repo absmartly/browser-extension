@@ -11,7 +11,7 @@ export const VariantSchema = z.object({
 export const ApplicationSchema = z.object({
   id: z.number().optional(),
   application_id: z.number().optional(),
-  name: z.string(),
+  name: z.string().optional(),
   application_version: z.string().optional(),
   icon_url: z.string().optional()
 })
@@ -22,7 +22,7 @@ export const ExperimentTagSchema = z.object({
 })
 
 export const ExperimentUserSchema = z.object({
-  user_id: z.number(),
+  user_id: z.number().optional(),
   name: z.string().optional(),
   email: z.string().optional(),
   avatar_url: z.string().optional()
@@ -34,12 +34,12 @@ export const ExperimentTeamSchema = z.object({
 })
 
 export const UnitTypeSchema = z.object({
-  unit_type_id: z.number(),
+  unit_type_id: z.number().optional(),
   name: z.string().optional()
 })
 
 export const MetricSchema = z.object({
-  metric_id: z.number(),
+  metric_id: z.number().optional(),
   id: z.number().optional(),
   name: z.string().optional()
 })
@@ -47,12 +47,12 @@ export const MetricSchema = z.object({
 export const ExperimentSchema = z.object({
   id: z.number(),
   name: z.string(),
-  display_name: z.string().optional(),
+  display_name: z.string().nullish(),
   state: z.enum(['created', 'ready', 'running', 'development', 'full_on', 'stopped', 'archived', 'scheduled']),
   status: z.enum(['draft', 'running', 'stopped', 'archived']).optional(),
   created_at: z.string(),
-  updated_at: z.string().optional(),
-  full_on_variant: z.number().optional(),
+  updated_at: z.string().nullish(),
+  full_on_variant: z.number().nullish(),
   percentage_of_traffic: z.number().optional(),
   traffic_split: z.number().optional(),
   nr_variants: z.number().optional(),
@@ -63,14 +63,14 @@ export const ExperimentSchema = z.object({
   applications: z.array(ApplicationSchema).optional(),
   unit_type: UnitTypeSchema.optional(),
   unit_type_id: z.number().optional(),
-  primary_metric: MetricSchema.optional(),
+  primary_metric: MetricSchema.nullish(),
   experiment_tags: z.array(ExperimentTagSchema).optional(),
   context_ids: z.array(z.string()).optional(),
   owner: ExperimentUserSchema.optional(),
   owners: z.array(ExperimentUserSchema).optional(),
   teams: z.array(ExperimentTeamSchema).optional(),
-  created_by: ExperimentUserSchema.optional(),
-  updated_by: ExperimentUserSchema.optional(),
+  created_by: ExperimentUserSchema.nullish(),
+  updated_by: ExperimentUserSchema.nullish(),
   exposures: z.number().optional(),
   started_at: z.string().optional(),
   stopped_at: z.string().optional(),

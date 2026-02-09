@@ -5,6 +5,7 @@
 
 import StateManager from './state-manager'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class Cleanup {
   private stateManager: StateManager
   private eventHandlers: any[] = []
@@ -18,7 +19,7 @@ export class Cleanup {
   }
 
   cleanupVisualEditor(restoreOriginalValues: boolean = true): void {
-    console.log('[ABSmartly] Starting visual editor cleanup...', { restoreOriginalValues })
+    debugLog('[ABSmartly] Starting visual editor cleanup...', { restoreOriginalValues })
 
     // 1. Remove visual editor CSS classes from all elements
     this.removeVisualEditorClasses()
@@ -47,7 +48,7 @@ export class Cleanup {
     // 7. Clear global markers
     this.clearGlobalMarkers()
 
-    console.log('[ABSmartly] Visual editor cleanup complete')
+    debugLog('[ABSmartly] Visual editor cleanup complete')
   }
 
   private removeVisualEditorClasses(): void {
@@ -103,7 +104,7 @@ export class Cleanup {
     // - data-absmartly-experiment: identifies which experiment modified the element
     //
     // We only remove VE UI elements and classes, but leave all data attributes intact.
-    console.log('[Cleanup] Preview mode active - preserving all data attributes for SDK plugin')
+    debugLog('[Cleanup] Preview mode active - preserving all data attributes for SDK plugin')
   }
 
   private restoreOriginalValues(): void {
@@ -143,7 +144,7 @@ export class Cleanup {
         delete (element as HTMLElement).dataset.absmartlyModified
         delete (element as HTMLElement).dataset.absmartlyExperiment
       } catch (e) {
-        console.warn('[ABSmartly] Failed to restore original values for element:', element, e)
+        debugWarn('[ABSmartly] Failed to restore original values for element:', element, e)
       }
     })
   }
@@ -154,7 +155,7 @@ export class Cleanup {
       try {
         handler()
       } catch (e) {
-        console.warn('[ABSmartly] Failed to remove event handler:', e)
+        debugWarn('[ABSmartly] Failed to remove event handler:', e)
       }
     })
     this.eventHandlers = []
@@ -223,7 +224,7 @@ export class Cleanup {
       delete (element as HTMLElement).dataset.absmartlyModified
       delete (element as HTMLElement).dataset.absmartlyExperiment
     } catch (e) {
-      console.warn('[ABSmartly] Failed to restore element:', element, e)
+      debugWarn('[ABSmartly] Failed to restore element:', element, e)
     }
   }
 
@@ -246,7 +247,7 @@ export class Cleanup {
           }
         })
       } catch (e) {
-        console.warn('[ABSmartly] Failed to save element state:', element, e)
+        debugWarn('[ABSmartly] Failed to save element state:', element, e)
       }
     })
 

@@ -17,6 +17,7 @@ import { EditorCoordinator } from './editor-coordinator'
 import type { EditorCoordinatorCallbacks } from './editor-coordinator'
 import type { DOMChange } from '../types/visual-editor'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export interface VisualEditorOptions {
   variantName: string
   experimentName: string
@@ -48,15 +49,13 @@ export class VisualEditor {
   private options: VisualEditorOptions
 
   constructor(options: VisualEditorOptions) {
-    console.log('[VisualEditor] Constructor called with options:', options)
-    console.log('[VisualEditor] Experiment name from options:', options.experimentName)
+    debugLog('[VisualEditor] Constructor called with options:', options)
+    debugLog('[VisualEditor] Experiment name from options:', options.experimentName)
     this.options = options
 
-    // Set initial saved state
     this.lastSavedChangesCount = options.initialChanges?.length || 0
-    this.hasUnsavedChanges = false  // No unsaved changes on start
+    this.hasUnsavedChanges = false
 
-    // Initialize state manager with converted config
     const config: VisualEditorConfig = {
       variantName: options.variantName,
       experimentName: options.experimentName,
@@ -65,23 +64,18 @@ export class VisualEditor {
     }
     this.stateManager = new StateManager(config)
 
-    // Initialize all core modules (required by EditorCoordinator)
     this.eventHandlers = new EventHandlers(this.stateManager)
     this.contextMenu = new ContextMenu(this.stateManager, options.useShadowDOM)
     this.undoRedoManager = new UndoRedoManager()
 
-    // Set callback to mark unsaved changes when any change is added
     this.undoRedoManager.setOnChangeAdded(() => {
       this.hasUnsavedChanges = true
     })
 
-    // Add initial changes to undoRedoManager if provided
-    // These are pre-loaded changes, so don't mark as unsaved
     if (options.initialChanges && options.initialChanges.length > 0) {
       options.initialChanges.forEach(change => {
         this.undoRedoManager.addChange(change, null)
       })
-      // Reset unsaved flag since these are pre-existing changes
       this.hasUnsavedChanges = false
     }
 
@@ -90,11 +84,9 @@ export class VisualEditor {
     this.cleanup = new Cleanup(this.stateManager)
     this.notifications = new Notifications()
 
-    // Set the addChange callback for EditModes to track move/resize changes
     this.editModes.setAddChangeCallback((change) => {
-      console.log('[VisualEditor] EditModes addChange callback triggered with:', change)
+      debugLog('[VisualEditor] EditModes addChange callback triggered with:', change)
       this.undoRedoManager.addChange(change, null)
-      // hasUnsavedChanges is automatically set by undoRedoManager callback
     })
 
     // Initialize element actions
@@ -134,7 +126,6 @@ export class VisualEditor {
       stop: () => this.stop()
     }
 
-    // Initialize coordinator with all required modules
     this.coordinator = new EditorCoordinator(
       this.stateManager,
       this.eventHandlers,
@@ -150,16 +141,16 @@ export class VisualEditor {
   }
 
   start(): { success: boolean; already?: boolean } {
-    console.log('[ABSmartly] Starting unified visual editor - Version:', this.VERSION)
-    console.log('[ABSmartly] Build timestamp:', new Date().toISOString())
+    debugLog('[ABSmartly] Starting unified visual editor - Version:', this.VERSION)
+    debugLog('[ABSmartly] Build timestamp:', new Date().toISOString())
 
     // Check if already active (single source of truth: this._isActive)
     if (this._isActive) {
-      console.log('[ABSmartly] Already active, returning')
+      debugLog('[ABSmartly] Already active, returning')
       return { success: true, already: true }
     }
 
-    console.log('[ABSmartly] Starting visual editor')
+    debugLog('[ABSmartly] Starting visual editor')
 
     // Mark as active
     this._isActive = true
@@ -168,7 +159,7 @@ export class VisualEditor {
     // Users should see both the preview header and visual editor UI
     const previewHeader = document.getElementById('absmartly-preview-header')
     if (previewHeader) {
-      console.log('[ABSmartly] Preview header found, keeping it visible')
+      debugLog('[ABSmartly] Preview header found, keeping it visible')
     }
 
     // Create UI and setup everything
@@ -180,11 +171,11 @@ export class VisualEditor {
 
     // Create the visual editor banner/header
     this.uiComponents.createBanner()
-    console.log('[ABSmartly] Visual editor banner created')
+    debugLog('[ABSmartly] Visual editor banner created')
 
     // Show notification
     this.notifications.show('Visual Editor Active', 'Click any element to edit', 'success')
-    console.log('[ABSmartly] Visual editor is now active!')
+    debugLog('[ABSmartly] Visual editor is now active!')
 
     return { success: true }
   }
@@ -199,45 +190,47 @@ export class VisualEditor {
         'Click "Cancel" to go back and save your changes.'
       )
       if (!confirmExit) {
-        console.log('[ABSmartly] User cancelled exit due to unsaved changes')
+        debugLog('[ABSmartly] User cancelled exit due to unsaved changes')
         return
       }
     }
 
-    console.log('[ABSmartly] Stopping unified visual editor')
+    debugLog('[ABSmartly] Stopping unified visual editor')
     console.trace('[ABSmartly] Stop called from:')
 
     this._isActive = false
 
     // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []
-    console.log('[ABSmartly] Final changes on exit:', finalChanges.length)
+    debugLog('[ABSmartly] Final changes on exit:', finalChanges.length)
 
     // Only send changes if we have unsaved changes (user chose to discard)
     // If changes were saved, they've already been sent
     if (this.hasUnsavedChanges) {
-      console.log('[ABSmartly] Discarding unsaved changes on exit')
+      debugLog('[ABSmartly] Discarding unsaved changes on exit')
       // Don't send the unsaved changes - user chose to discard them
     } else {
       // Changes were already saved and sent
-      console.log('[ABSmartly] Changes were already saved')
+      debugLog('[ABSmartly] Changes were already saved')
     }
 
     // Use coordinator to teardown all modules
     // If changes were saved, DON'T restore original values (preview mode will re-apply with markers)
     // If changes were discarded, DO restore original values
     const shouldRestoreOriginalValues = this.hasUnsavedChanges
-    console.log('[ABSmartly] Teardown with restoreOriginalValues:', shouldRestoreOriginalValues)
+    debugLog('[ABSmartly] Teardown with restoreOriginalValues:', shouldRestoreOriginalValues)
     this.coordinator.teardownAll(shouldRestoreOriginalValues)
 
     // Remove styles
     this.removeStyles()
 
     // Send message to content script to stop visual editor
+    const targetOrigin = window.location.origin === 'null' ? 'null' : window.location.origin
     window.postMessage({
+      source: 'absmartly-visual-editor',
       type: 'ABSMARTLY_VISUAL_EDITOR_EXIT',
       changes: finalChanges
-    }, '*')
+    }, targetOrigin)
   }
 
   destroy(): void {
@@ -346,7 +339,7 @@ export class VisualEditor {
 
   // Change management methods
   private squashChanges(changes: DOMChange[]): DOMChange[] {
-    console.log('[ABSmartly] Squashing changes from', changes.length, 'to consolidated list')
+    debugLog('[ABSmartly] Squashing changes from', changes.length, 'to consolidated list')
 
     // Group changes by selector and type
     const changeMap = new Map<string, DOMChange>()
@@ -376,12 +369,12 @@ export class VisualEditor {
     }
 
     const squashed = Array.from(changeMap.values())
-    console.log('[ABSmartly] Squashed to', squashed.length, 'changes')
+    debugLog('[ABSmartly] Squashed to', squashed.length, 'changes')
 
     // Log move changes to debug missing targetSelector
     squashed.forEach(change => {
       if (change.type === 'move') {
-        console.log('[ABSmartly] Move change after squashing:', {
+        debugLog('[ABSmartly] Move change after squashing:', {
           selector: change.selector,
           targetSelector: change.targetSelector,
           position: change.position
@@ -393,7 +386,7 @@ export class VisualEditor {
   }
 
   private storeOriginalValuesInDOM(changes: DOMChange[]): void {
-    console.log('[ABSmartly] Storing original values in DOM for', changes.length, 'changes')
+    debugLog('[ABSmartly] Storing original values in DOM for', changes.length, 'changes')
 
     for (const change of changes) {
       try {
@@ -458,7 +451,7 @@ export class VisualEditor {
           htmlElement.dataset.absmartlyExperiment = this.options.experimentName || '__preview__'
           htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
 
-          console.log('[ABSmartly] Stored original data for', change.selector, ':', originalData)
+          debugLog('[ABSmartly] Stored original data for', change.selector, ':', originalData)
         })
       } catch (error) {
         console.error('[ABSmartly] Error storing original values for', change.selector, error)
@@ -469,20 +462,20 @@ export class VisualEditor {
   private saveChanges(): void {
     // Get the latest changes from undo/redo manager
     const currentChanges = this.undoRedoManager.squashChanges()
-    console.log('[ABSmartly] Saving changes - raw count:', currentChanges.length)
+    debugLog('[ABSmartly] Saving changes - raw count:', currentChanges.length)
 
     // Squash changes to consolidate multiple operations on same elements
     const squashedChanges = this.squashChanges(currentChanges)
-    console.log('[ABSmartly] Squashed changes count:', squashedChanges.length)
+    debugLog('[ABSmartly] Squashed changes count:', squashedChanges.length)
 
     // Store original values in DOM for preview toggle functionality
     this.storeOriginalValuesInDOM(squashedChanges)
 
     // Log what we're sending to sidebar
-    console.log('[ABSmartly] Sending squashed changes to sidebar:')
+    debugLog('[ABSmartly] Sending squashed changes to sidebar:')
     squashedChanges.forEach((change, index) => {
       if (change.type === 'move') {
-        console.log(`[ABSmartly] Move change ${index}:`, JSON.stringify(change, null, 2))
+        debugLog(`[ABSmartly] Move change ${index}:`, JSON.stringify(change, null, 2))
       }
     })
 
@@ -675,13 +668,13 @@ export class VisualEditor {
   }
 
   public disable(): void {
-    console.log('[VisualEditor] Disabling visual editor')
+    debugLog('[VisualEditor] Disabling visual editor')
     this._isActive = false
     this.eventHandlers.setHoverEnabled(false)
   }
 
   public enable(): void {
-    console.log('[VisualEditor] Enabling visual editor')
+    debugLog('[VisualEditor] Enabling visual editor')
     this._isActive = true
     this.eventHandlers.setHoverEnabled(true)
   }
@@ -698,7 +691,7 @@ export function initVisualEditor(
   logoUrl: string,
   initialChanges: any[]
 ): { success: boolean; already?: boolean } {
-  console.log('[ABSmartly] Initializing unified visual editor')
+  debugLog('[ABSmartly] Initializing unified visual editor')
 
   const options: VisualEditorOptions = {
     variantName,
@@ -707,12 +700,14 @@ export function initVisualEditor(
     initialChanges,
     onChangesUpdate: (changes) => {
       // Send changes to extension background
+      const targetOrigin = window.location.origin === 'null' ? 'null' : window.location.origin
       window.postMessage({
+        source: 'absmartly-visual-editor',
         type: 'ABSMARTLY_VISUAL_EDITOR_SAVE',
         changes,
         experimentName,
         variantName
-      }, '*')
+      }, targetOrigin)
     }
   }
 

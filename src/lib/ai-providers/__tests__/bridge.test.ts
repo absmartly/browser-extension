@@ -2,6 +2,7 @@ import { BridgeProvider } from '../bridge'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
 import type { AIProviderConfig } from '../base'
 import * as utils from '../utils'
+import { unsafeSessionId, unsafeConversationId } from '~src/types/branded'
 
 jest.mock('~src/lib/claude-code-client')
 jest.mock('../utils', () => ({
@@ -151,10 +152,10 @@ describe('BridgeProvider', () => {
         undefined,
         {
           conversationSession: {
-            id: 'session-123',
+            id: unsafeSessionId('session-123'),
             htmlSent: true,
             messages: [],
-            conversationId: 'existing-conv-123'
+            conversationId: unsafeConversationId('existing-conv-123')
           }
         }
       )
@@ -588,13 +589,13 @@ describe('BridgeProvider', () => {
       })
 
       const existingSession = {
-        id: 'session-123',
+        id: unsafeSessionId('session-123'),
         htmlSent: true,
         messages: [
           { role: 'user' as const, content: 'First message' },
           { role: 'assistant' as const, content: 'First response' }
         ],
-        conversationId: 'existing-conv-123'
+        conversationId: unsafeConversationId('existing-conv-123')
       }
 
       const result = await provider.generate('', 'Second message', [], undefined, {

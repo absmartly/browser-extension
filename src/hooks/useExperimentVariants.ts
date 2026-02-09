@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { debugError } from '~src/utils/debug'
 import type { Experiment } from '~src/types/absmartly'
+import { safeParseVariantConfig } from '~src/lib/validation-schemas'
 
 export interface VariantConfig {
   [key: string]: unknown
@@ -31,10 +32,14 @@ export function useExperimentVariants({
       return experiment.variants.map(v => {
         let config: VariantConfig = {}
 
-        try {
-          config = JSON.parse(v.config || '{}')
-        } catch (e) {
-          debugError('Failed to parse variant config:', e)
+        const configStr = v.config || '{}'
+        const parseResult = safeParseVariantConfig(configStr)
+
+        if (parseResult.success) {
+          config = parseResult.data as VariantConfig
+        } else {
+          debugError('Failed to parse variant config:', (parseResult as { success: false; error: string }).error)
+          config = {}
         }
 
         return {

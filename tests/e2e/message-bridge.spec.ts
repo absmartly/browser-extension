@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import path from 'path'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')

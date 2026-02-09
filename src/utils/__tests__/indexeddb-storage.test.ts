@@ -3,6 +3,7 @@ import type { StoredConversation } from '~src/types/absmartly'
 import { DB_NAME } from '~src/types/indexeddb'
 import * as idbStorage from '~src/utils/indexeddb-storage'
 import { openDatabase, closeDatabase } from '~src/utils/indexeddb-connection'
+import { unsafeSessionId, unsafeConversationId, unsafeVariantName } from '~src/types/branded'
 
 describe('IndexedDB Storage Operations', () => {
   beforeEach(async () => {
@@ -42,7 +43,7 @@ describe('IndexedDB Storage Operations', () => {
       const conversation = createTestConversation('test-variant', 'conv-1')
 
       await idbStorage.saveConversation(conversation)
-      const loaded = await idbStorage.loadConversation('test-variant', 'conv-1')
+      const loaded = await idbStorage.loadConversation(unsafeVariantName('test-variant'), unsafeConversationId('conv-1'))
 
       expect(loaded).toBeTruthy()
       expect(loaded?.id).toBe('conv-1')
@@ -64,7 +65,7 @@ describe('IndexedDB Storage Operations', () => {
       conversation.messageCount = 3
 
       await idbStorage.saveConversation(conversation)
-      const loaded = await idbStorage.loadConversation('test-variant', 'conv-1')
+      const loaded = await idbStorage.loadConversation(unsafeVariantName('test-variant'), unsafeConversationId('conv-1'))
 
       expect(loaded?.messages.length).toBe(3)
       expect(loaded?.messageCount).toBe(3)
@@ -74,9 +75,9 @@ describe('IndexedDB Storage Operations', () => {
       const conversation = createTestConversation('test-variant', 'conv-1')
 
       await idbStorage.saveConversation(conversation)
-      await idbStorage.deleteConversation('test-variant', 'conv-1')
+      await idbStorage.deleteConversation(unsafeVariantName('test-variant'), unsafeConversationId('conv-1'))
 
-      const loaded = await idbStorage.loadConversation('test-variant', 'conv-1')
+      const loaded = await idbStorage.loadConversation(unsafeVariantName('test-variant'), unsafeConversationId('conv-1'))
       expect(loaded).toBeNull()
     })
 
@@ -85,7 +86,7 @@ describe('IndexedDB Storage Operations', () => {
       await idbStorage.saveConversation(createTestConversation('variant-a', 'conv-2'))
       await idbStorage.saveConversation(createTestConversation('variant-b', 'conv-3'))
 
-      const conversations = await idbStorage.getConversations('variant-a')
+      const conversations = await idbStorage.getConversations(unsafeVariantName('variant-a'))
 
       expect(conversations.length).toBe(2)
       expect(conversations.every(c => c.variantName === 'variant-a')).toBe(true)
@@ -97,7 +98,7 @@ describe('IndexedDB Storage Operations', () => {
       await idbStorage.saveConversation(createTestConversation('variant-a', 'conv-1'))
       await idbStorage.saveConversation(createTestConversation('variant-a', 'conv-2'))
 
-      const list = await idbStorage.getConversationList('variant-a')
+      const list = await idbStorage.getConversationList(unsafeVariantName('variant-a'))
 
       expect(list.length).toBe(2)
       expect(list[0]).toHaveProperty('id')
@@ -127,7 +128,7 @@ describe('IndexedDB Storage Operations', () => {
       await idbStorage.saveConversation(conv2)
       await idbStorage.saveConversation(conv3)
 
-      const list = await idbStorage.getConversationList('variant-a')
+      const list = await idbStorage.getConversationList(unsafeVariantName('variant-a'))
 
       expect(list[0].id).toBe('conv-3')
       expect(list[1].id).toBe('conv-2')
@@ -140,10 +141,10 @@ describe('IndexedDB Storage Operations', () => {
       await idbStorage.saveConversation(createTestConversation('variant-a', 'conv-1'))
       await idbStorage.saveConversation(createTestConversation('variant-a', 'conv-2'))
 
-      await idbStorage.setActiveConversation('variant-a', 'conv-2')
+      await idbStorage.setActiveConversation(unsafeVariantName('variant-a'), unsafeConversationId('conv-2'))
 
-      const conv1 = await idbStorage.loadConversation('variant-a', 'conv-1')
-      const conv2 = await idbStorage.loadConversation('variant-a', 'conv-2')
+      const conv1 = await idbStorage.loadConversation(unsafeVariantName('variant-a'), unsafeConversationId('conv-1'))
+      const conv2 = await idbStorage.loadConversation(unsafeVariantName('variant-a'), unsafeConversationId('conv-2'))
 
       expect(conv1?.isActive).toBe(false)
       expect(conv2?.isActive).toBe(true)
@@ -159,10 +160,10 @@ describe('IndexedDB Storage Operations', () => {
       await idbStorage.saveConversation(conv1)
       await idbStorage.saveConversation(conv2)
 
-      await idbStorage.setActiveConversation('variant-a', 'conv-2')
+      await idbStorage.setActiveConversation(unsafeVariantName('variant-a'), unsafeConversationId('conv-2'))
 
-      const updated1 = await idbStorage.loadConversation('variant-a', 'conv-1')
-      const updated2 = await idbStorage.loadConversation('variant-a', 'conv-2')
+      const updated1 = await idbStorage.loadConversation(unsafeVariantName('variant-a'), unsafeConversationId('conv-1'))
+      const updated2 = await idbStorage.loadConversation(unsafeVariantName('variant-a'), unsafeConversationId('conv-2'))
 
       expect(updated1?.isActive).toBe(false)
       expect(updated2?.isActive).toBe(true)
@@ -177,7 +178,7 @@ describe('IndexedDB Storage Operations', () => {
         await idbStorage.saveConversation(conv)
       }
 
-      const conversations = await idbStorage.getConversations('variant-a')
+      const conversations = await idbStorage.getConversations(unsafeVariantName('variant-a'))
 
       expect(conversations.length).toBe(10)
     })
@@ -191,7 +192,7 @@ describe('IndexedDB Storage Operations', () => {
         await idbStorage.saveConversation(conv)
       }
 
-      const conversations = await idbStorage.getConversations('variant-a')
+      const conversations = await idbStorage.getConversations(unsafeVariantName('variant-a'))
 
       const oldestId = conversations.reduce((oldest, conv) =>
         conv.createdAt < oldest.createdAt ? conv : oldest
@@ -225,17 +226,17 @@ describe('IndexedDB Storage Operations', () => {
 
   describe('Error Handling', () => {
     it('should handle loading non-existent conversation gracefully', async () => {
-      const conversation = await idbStorage.loadConversation('variant-a', 'non-existent')
+      const conversation = await idbStorage.loadConversation(unsafeVariantName('variant-a'), unsafeConversationId('non-existent'))
       expect(conversation).toBeNull()
     })
 
     it('should handle getting conversations from non-existent variant', async () => {
-      const conversations = await idbStorage.getConversations('non-existent-variant')
+      const conversations = await idbStorage.getConversations(unsafeVariantName('non-existent-variant'))
       expect(conversations).toEqual([])
     })
 
     it('should handle getting list from empty variant', async () => {
-      const list = await idbStorage.getConversationList('empty-variant')
+      const list = await idbStorage.getConversationList(unsafeVariantName('empty-variant'))
       expect(list).toEqual([])
     })
   })
@@ -243,8 +244,8 @@ describe('IndexedDB Storage Operations', () => {
 
 function createTestConversation(variantName: string, id: string): StoredConversation {
   return {
-    id,
-    variantName,
+    id: unsafeConversationId(id),
+    variantName: unsafeVariantName(variantName),
     messages: [
       {
         role: 'user',
@@ -260,7 +261,7 @@ function createTestConversation(variantName: string, id: string): StoredConversa
       }
     ],
     conversationSession: {
-      id: `session-${id}`,
+      id: unsafeSessionId(`session-${id}`),
       htmlSent: false,
       messages: []
     },

@@ -140,12 +140,23 @@ export function useVisualEditorCoordination({
       }
     }
 
-    console.log('[DOMChangesInlineEditor] Setting up message listeners for variant:', variantName)
+    debugLog('[DOMChangesInlineEditor] Setting up message listeners for variant:', variantName)
 
     chrome.runtime.onMessage.addListener(handleVisualEditorChanges)
 
     const handleWindowMessage = (event: MessageEvent) => {
-      if (event.data && event.data.source === 'absmartly-visual-editor') {
+      if (event.source !== window) {
+        return
+      }
+
+      const isFileProtocol =
+        window.location.protocol === 'file:' || event.origin === 'null'
+      if (!isFileProtocol && event.origin !== window.location.origin) {
+        debugLog('[Security] Ignoring Visual Editor message from origin:', event.origin)
+        return
+      }
+
+      if (event.data?.source === 'absmartly-visual-editor') {
         handleVisualEditorChanges(event.data as ChromeMessage, {} as chrome.runtime.MessageSender, () => {})
       }
     }
@@ -164,11 +175,11 @@ export function useVisualEditorCoordination({
       }
     }
 
-    console.log('[DOMChangesInlineEditor] Adding storage change listener')
+    debugLog('[DOMChangesInlineEditor] Adding storage change listener')
     chrome.storage.session.onChanged.addListener(handleStorageChange)
 
     return () => {
-      console.log('[DOMChangesInlineEditor] Cleaning up message listeners for variant:', variantName)
+      debugLog('[DOMChangesInlineEditor] Cleaning up message listeners for variant:', variantName)
       chrome.runtime.onMessage.removeListener(handleVisualEditorChanges)
       window.removeEventListener('message', handleWindowMessage)
       chrome.storage.session.onChanged.removeListener(handleStorageChange)
@@ -177,16 +188,16 @@ export function useVisualEditorCoordination({
 
   const handleLaunchVisualEditor = useCallback(async () => {
     try {
-      console.log('[DOMChanges] 🎯 HANDLER CALLED: handleLaunchVisualEditor')
-      console.log('[DOMChanges] 🎯 variantName:', variantName)
-      console.log('[DOMChanges] 🎯 variantIndex:', variantIndex)
-      console.log('[DOMChangesInlineEditor] 🎨 Launch requested for variant:', variantName)
-      console.log('[DOMChangesInlineEditor] 🎨 activeVEVariant state:', activeVEVariant)
-      console.log('[DOMChangesInlineEditor] 🎨 isLaunchingVisualEditor flag:', isLaunchingVisualEditor)
+      debugLog('[DOMChanges] 🎯 HANDLER CALLED: handleLaunchVisualEditor')
+      debugLog('[DOMChanges] 🎯 variantName:', variantName)
+      debugLog('[DOMChanges] 🎯 variantIndex:', variantIndex)
+      debugLog('[DOMChangesInlineEditor] 🎨 Launch requested for variant:', variantName)
+      debugLog('[DOMChangesInlineEditor] 🎨 activeVEVariant state:', activeVEVariant)
+      debugLog('[DOMChangesInlineEditor] 🎨 isLaunchingVisualEditor flag:', isLaunchingVisualEditor)
 
       if (activeVEVariant) {
         if (activeVEVariant === variantName) {
-          console.log('[DOMChangesInlineEditor] Visual Editor already active for this variant, ignoring click')
+          debugLog('[DOMChangesInlineEditor] Visual Editor already active for this variant, ignoring click')
           return
         } else {
           alert(`Visual Editor is already active for variant "${activeVEVariant}". Please close it first.`)
@@ -201,26 +212,26 @@ export function useVisualEditorCoordination({
       isLaunchingVisualEditor = true
 
       let tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-      console.log('[DOMChanges] Initial tabs query result:', tabs.length, 'tabs')
+      debugLog('[DOMChanges] Initial tabs query result:', tabs.length, 'tabs')
 
       if (!tabs || tabs.length === 0) {
-        console.log('[DOMChanges] ⚠️ No active tab found, querying all tabs as fallback')
+        debugLog('[DOMChanges] ⚠️ No active tab found, querying all tabs as fallback')
         tabs = await chrome.tabs.query({})
-        console.log('[DOMChanges] Found tabs (fallback):', tabs.length)
+        debugLog('[DOMChanges] Found tabs (fallback):', tabs.length)
       }
 
-      console.log('[DOMChanges] Using tab ID:', tabs[0]?.id)
+      debugLog('[DOMChanges] Using tab ID:', tabs[0]?.id)
 
       try {
-        console.log('[DOMChangesInlineEditor] 🎨 Launching Visual Editor for variant:', variantName)
-        console.log('[DOMChangesInlineEditor] Current preview state:', previewEnabled)
-        console.log('[DOMChangesInlineEditor] Existing changes:', changes.length)
+        debugLog('[DOMChangesInlineEditor] 🎨 Launching Visual Editor for variant:', variantName)
+        debugLog('[DOMChangesInlineEditor] Current preview state:', previewEnabled)
+        debugLog('[DOMChangesInlineEditor] Existing changes:', changes.length)
 
-        console.log('[DOMChangesInlineEditor] About to call onVEStart()...')
-        console.log('[DOMChangesInlineEditor] onVEStart type:', typeof onVEStart)
-        console.log('[DOMChangesInlineEditor] onVEStart function:', onVEStart.toString())
+        debugLog('[DOMChangesInlineEditor] About to call onVEStart()...')
+        debugLog('[DOMChangesInlineEditor] onVEStart type:', typeof onVEStart)
+        debugLog('[DOMChangesInlineEditor] onVEStart function:', onVEStart.toString())
         onVEStart()
-        console.log('[DOMChangesInlineEditor] Called onVEStart() successfully')
+        debugLog('[DOMChangesInlineEditor] Called onVEStart() successfully')
 
         if (tabs[0]?.id) {
           try {
@@ -228,7 +239,7 @@ export function useVisualEditorCoordination({
               type: 'SET_VISUAL_EDITOR_STARTING',
               starting: true
             })
-            console.log('[DOMChangesInlineEditor] ✅ SET_VISUAL_EDITOR_STARTING sent successfully')
+            debugLog('[DOMChangesInlineEditor] ✅ SET_VISUAL_EDITOR_STARTING sent successfully')
           } catch (e) {
             const error = e as Error
             console.error('[DOMChangesInlineEditor] ⚠️ SET_VISUAL_EDITOR_STARTING failed (content script may not be ready yet):', error?.message)
@@ -255,16 +266,16 @@ export function useVisualEditorCoordination({
       debugLog('Experiment name:', experimentName)
       debugLog('Changes:', changes)
 
-      console.log('[DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id:', tabs[0]?.id)
+      debugLog('[DOMChanges] About to send START_VISUAL_EDITOR, tabs[0]?.id:', tabs[0]?.id)
       if (tabs[0]?.id) {
-        console.log('[DOMChanges] ✅ SENDING START_VISUAL_EDITOR')
-        console.log('[DOMChanges] Variant:', variantName)
-        console.log('[DOMChanges] Experiment:', experimentName)
-        console.log('[DOMChanges] Changes count:', changes.length)
+        debugLog('[DOMChanges] ✅ SENDING START_VISUAL_EDITOR')
+        debugLog('[DOMChanges] Variant:', variantName)
+        debugLog('[DOMChanges] Experiment:', experimentName)
+        debugLog('[DOMChanges] Changes count:', changes.length)
 
         try {
-          console.log('[DOMChanges] 📤 Sending START_VISUAL_EDITOR to content script')
-          console.log('[DOMChanges] Variant:', variantName)
+          debugLog('[DOMChanges] 📤 Sending START_VISUAL_EDITOR to content script')
+          debugLog('[DOMChanges] Variant:', variantName)
 
           const response = await sendToContent({
             type: 'START_VISUAL_EDITOR',
@@ -273,17 +284,17 @@ export function useVisualEditorCoordination({
             changes
           })
 
-          console.log('[DOMChanges] 🔔 RESPONSE from content script:', JSON.stringify(response))
+          debugLog('[DOMChanges] 🔔 RESPONSE from content script:', JSON.stringify(response))
 
           if (response?.error) {
             console.error('[DOMChanges] ❌ Error from content script:', response.error)
             debugError('❌ Error from content script:', response.error)
             alert('Failed to start visual editor: ' + response.error)
           } else if (response?.success) {
-            console.log('[DOMChanges] ✅ Visual editor started successfully')
+            debugLog('[DOMChanges] ✅ Visual editor started successfully')
             debugLog('✅ Visual editor started successfully:', response)
           } else {
-            console.log('[DOMChanges] 📨 Response:', JSON.stringify(response))
+            debugLog('[DOMChanges] 📨 Response:', JSON.stringify(response))
           }
           isLaunchingVisualEditor = false
         } catch (e) {

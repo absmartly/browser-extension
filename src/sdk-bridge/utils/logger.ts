@@ -6,6 +6,8 @@
  * @module Logger
  */
 
+import { debugLog, debugWarn } from '~src/utils/debug'
+
 export class Logger {
   private static DEBUG = false
 
@@ -14,7 +16,7 @@ export class Logger {
    */
   static log(...args: any[]): void {
     if (this.DEBUG) {
-      console.log('[ABsmartly Extension]', ...args)
+      debugLog('[ABsmartly Extension]', ...args)
     }
   }
 
@@ -32,7 +34,7 @@ export class Logger {
    */
   static warn(...args: any[]): void {
     if (this.DEBUG) {
-      console.warn('[ABsmartly Extension]', ...args)
+      debugWarn('[ABsmartly Extension]', ...args)
     }
   }
 

@@ -5,6 +5,7 @@ import { ExperimentEditor } from '../ExperimentEditor'
 import type { Experiment } from '~src/types/absmartly'
 import * as messaging from '~src/lib/messaging'
 import * as storage from '~src/utils/storage'
+import { unsafeExperimentId, unsafeVariantName } from '~src/types/branded'
 
 jest.mock('~src/lib/messaging', () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
@@ -134,7 +135,7 @@ global.chrome = {
 } as any
 
 const mockExperiment: Experiment = {
-  id: 123,
+  id: unsafeExperimentId(123),
   name: 'test_experiment',
   display_name: 'Test Experiment',
   state: 'created',
@@ -144,11 +145,11 @@ const mockExperiment: Experiment = {
   unit_type: { unit_type_id: 1, name: 'user_id' },
   variants: [
     {
-      name: 'Control',
+      name: unsafeVariantName('Control'),
       config: '{}'
     },
     {
-      name: 'Variant A',
+      name: unsafeVariantName('Variant A'),
       config: '{}'
     }
   ],

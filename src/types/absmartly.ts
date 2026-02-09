@@ -1,7 +1,8 @@
-import type { DOMChange } from './dom-changes'
+import type { DOMChange, URLFilter } from './dom-changes'
+import type { ExperimentId, ApplicationId, VariantName, APIEndpoint, ConversationId, SessionId } from './branded'
 
 export interface Experiment {
-  readonly id: number
+  readonly id: ExperimentId
   readonly name: string
   readonly display_name?: string
   readonly state: 'created' | 'ready' | 'running' | 'development' | 'full_on' | 'stopped' | 'archived' | 'scheduled'
@@ -38,14 +39,14 @@ export interface Experiment {
 export interface Variant {
   readonly id?: number
   readonly variant?: number
-  readonly name: string
+  readonly name: VariantName
   readonly is_control?: boolean
   readonly config: string
 }
 
 export interface Application {
   readonly id?: number
-  readonly application_id?: number
+  readonly application_id?: ApplicationId
   readonly name: string
   readonly application_version?: string
   readonly icon_url?: string
@@ -136,9 +137,9 @@ export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd
 import type { AIProviderType } from '~src/lib/ai-providers'
 
 type ABsmartlyConfigBase = {
-  apiEndpoint: string
+  apiEndpoint: APIEndpoint
   environment?: number
-  applicationId?: number
+  applicationId?: ApplicationId
   applicationName?: string
   aiProvider?: AIProviderType
   aiModel?: string
@@ -195,8 +196,8 @@ export interface Template {
 }
 
 export interface ConversationSession {
-  id?: string
-  conversationId?: string
+  id?: SessionId
+  conversationId?: ConversationId
   htmlSent?: boolean
   pageUrl?: string
   anthropicSystemParameter?: string[]
@@ -219,9 +220,9 @@ export interface ChatMessage {
 }
 
 export interface AIDOMGenerationConversation {
-  id: string
-  experimentId: number
-  variantName: string
+  id: ConversationId
+  experimentId: ExperimentId
+  variantName: VariantName
   messages: ChatMessage[]
   conversationSession: ConversationSession
   createdAt: number
@@ -232,9 +233,9 @@ export interface AIDOMGenerationConversation {
 }
 
 export interface StoredConversation {
-  id: string
-  experimentId?: number
-  variantName: string
+  id: ConversationId
+  experimentId?: ExperimentId
+  variantName: VariantName
   messages: ChatMessage[]
   conversationSession: ConversationSession
   createdAt: number
@@ -245,7 +246,7 @@ export interface StoredConversation {
 }
 
 export interface ConversationListItem {
-  id: string
+  id: ConversationId
   createdAt: number
   updatedAt: number
   messageCount: number

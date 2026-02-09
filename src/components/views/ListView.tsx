@@ -85,10 +85,11 @@ export function ListView({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Logo config={config} />
-            <h1 className="text-lg font-semibold">Experiments</h1>
+            <h1 id="experiments-heading" className="text-lg font-semibold">Experiments</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
+              id="refresh-experiments-button"
               onClick={onRefresh}
               className={`p-2 hover:bg-gray-100 rounded-md transition-colors ${experimentsLoading ? 'animate-spin' : ''}`}
               aria-label="Refresh experiments"
@@ -103,6 +104,7 @@ export function ListView({
               onOpenChange={setCreatePanelOpen}
             />
             <button
+              id="nav-events"
               onClick={() => setView('events')}
               className="p-2 hover:bg-gray-100 rounded-md transition-colors"
               aria-label="Events Debug"
@@ -111,6 +113,7 @@ export function ListView({
               <BoltIcon className="h-5 w-5 text-gray-600" />
             </button>
             <button
+              id="nav-settings"
               onClick={() => setView('settings')}
               className="p-2 hover:bg-gray-100 rounded-md transition-colors"
               aria-label="Settings"

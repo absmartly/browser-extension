@@ -3,6 +3,7 @@ import { localAreaStorage } from "~src/utils/storage"
 import type { DOMChange, AIDOMGenerationResult } from "~src/types/dom-changes"
 import type { View } from "~src/types/view"
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface AIDOMContext {
   variantName: string
   onGenerate: (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null) => Promise<AIDOMGenerationResult>
@@ -28,9 +29,9 @@ export function useViewNavigation() {
     onPreviewRefresh: () => void,
     onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
   ) => {
-    console.log('[useViewNavigation] handleNavigateToAI called for variant:', variantName)
-    console.log('[useViewNavigation] Current view:', view)
-    console.log('[useViewNavigation] Setting aiDomContext and navigating to ai-dom-changes view')
+    debugLog('[useViewNavigation] handleNavigateToAI called for variant:', variantName)
+    debugLog('[useViewNavigation] Current view:', view)
+    debugLog('[useViewNavigation] Setting aiDomContext and navigating to ai-dom-changes view')
 
     const context = {
       variantName,
@@ -47,7 +48,7 @@ export function useViewNavigation() {
     setView('ai-dom-changes')
     setAutoNavigateToAI(null)
 
-    console.log('[useViewNavigation] Navigation complete. New view should be: ai-dom-changes')
+    debugLog('[useViewNavigation] Navigation complete. New view should be: ai-dom-changes')
   }, [view])
 
   const handleBackFromAI = useCallback(() => {

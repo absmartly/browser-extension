@@ -16,6 +16,7 @@ import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-ha
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, withTimeout } from './constants'
 import { debugLog } from '~src/utils/debug'
+import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
 
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
@@ -155,7 +156,9 @@ export class OpenRouterProvider implements AIProvider {
           })
         )
       } catch (fetchError: any) {
-        throw new Error(`Network error: ${fetchError?.message || 'Failed to fetch'}`)
+        const baseError = new Error(`Network error: ${fetchError?.message || 'Failed to fetch'}`)
+        const classified = classifyAIError(baseError)
+        throw new Error(formatClassifiedError(classified))
       }
 
       if (!response.ok) {
@@ -186,7 +189,9 @@ export class OpenRouterProvider implements AIProvider {
           errorMessage = errorText
         }
 
-        throw new Error(errorMessage)
+        const baseError = new Error(errorMessage)
+        const classified = classifyAIError(baseError)
+        throw new Error(formatClassifiedError(classified))
       }
 
       const completion = await response.json()

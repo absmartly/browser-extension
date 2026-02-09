@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import path from 'path'
 import { injectSidebar } from './utils/test-helpers'
 
@@ -141,7 +141,7 @@ test.describe('AI DOM Changes Generation', () => {
       console.log('  Dispatched click event to Create New Experiment button')
 
       console.log('  Selecting "From Scratch" option...')
-      const fromScratchButton = sidebar.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = sidebar.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await fromScratchButton.evaluate((button) => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -392,7 +392,7 @@ test.describe('AI DOM Changes Generation', () => {
     })
     log('✅ Clicked Create New Experiment')
 
-    const fromScratchButton = sidebar.locator('button:has-text("From Scratch")')
+    const fromScratchButton = sidebar.locator('#from-scratch-button')
     await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
     await fromScratchButton.evaluate((btn) => {
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -531,7 +531,7 @@ test.describe('AI DOM Changes Generation', () => {
     })
     log('✅ Clicked Create New Experiment')
 
-    const fromScratchButton = sidebar.locator('button:has-text("From Scratch")')
+    const fromScratchButton = sidebar.locator('#from-scratch-button')
     await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
     await fromScratchButton.evaluate((btn) => {
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))

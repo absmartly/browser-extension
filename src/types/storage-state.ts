@@ -3,7 +3,7 @@
  */
 
 import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
-import type { DOMChange } from '~src/types/dom-changes'
+import type { DOMChange, AIDOMContext } from '~src/types/dom-changes'
 
 export interface DOMChangesInlineState {
   variantName: string
@@ -35,7 +35,7 @@ export interface SidebarState {
   view: string
   selectedExperiment: number | null
   aiVariantName?: string
-  aiDomContext?: any
+  aiDomContext?: AIDOMContext | null
   timestamp?: number
 }
 

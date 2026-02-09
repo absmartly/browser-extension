@@ -1,5 +1,6 @@
 import { generateRobustSelector } from '~src/utils/selector-generator'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class ElementPicker {
   private overlay: HTMLDivElement | null = null
   private notification: HTMLDivElement | null = null
@@ -11,11 +12,11 @@ export class ElementPicker {
 
   start(callback: (selector: string) => void) {
     if (this.isActive) {
-      console.log('ElementPicker already active')
+      debugLog('ElementPicker already active')
       return
     }
     
-    console.log('ElementPicker starting...')
+    debugLog('ElementPicker starting...')
     this.isActive = true
     this.callback = callback
     this.createOverlay()
@@ -25,12 +26,12 @@ export class ElementPicker {
     // Listen for cancel message
     this.messageListener = (message: any) => {
       if (message.type === 'CANCEL_ELEMENT_PICKER') {
-        console.log('ElementPicker received cancel message')
+        debugLog('ElementPicker received cancel message')
         this.stop()
       }
     }
     chrome.runtime.onMessage.addListener(this.messageListener)
-    console.log('ElementPicker started successfully')
+    debugLog('ElementPicker started successfully')
   }
 
   stop() {
@@ -296,25 +297,25 @@ export class ElementPicker {
   }
 
   private handleClick = (e: MouseEvent) => {
-    console.log('[ElementPicker] handleClick called, isActive:', this.isActive)
+    debugLog('[ElementPicker] handleClick called, isActive:', this.isActive)
     if (!this.isActive) {
-      console.log('[ElementPicker] handleClick: picker not active, returning')
+      debugLog('[ElementPicker] handleClick: picker not active, returning')
       return
     }
 
-    console.log('[ElementPicker] handleClick: processing click at', e.clientX, e.clientY)
+    debugLog('[ElementPicker] handleClick: processing click at', e.clientX, e.clientY)
     e.preventDefault()
     e.stopPropagation()
 
     const element = document.elementFromPoint(e.clientX, e.clientY)
-    console.log('[ElementPicker] Element at click point:', element?.tagName, element?.className)
+    debugLog('[ElementPicker] Element at click point:', element?.tagName, element?.className)
     if (element) {
       const selector = this.generateSelector(element, true) // Enable debug logging on click
       this.selectedElement = element
 
       // Validate the final selector
       const matches = document.querySelectorAll(selector)
-      console.log(`[ElementPicker] Final selector matches ${matches.length} element(s):`, selector)
+      debugLog(`[ElementPicker] Final selector matches ${matches.length} element(s):`, selector)
       if (matches.length !== 1) {
         console.error('[ElementPicker] ⚠️ WARNING: Selector is not unique!')
       }

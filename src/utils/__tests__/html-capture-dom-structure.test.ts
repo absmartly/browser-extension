@@ -1,4 +1,4 @@
-import { capturePageHTML, PageCaptureResult } from '../html-capture'
+import { capturePageHTML, type PageCaptureResult } from '../html-capture'
 
 // Mock chrome.tabs and chrome.scripting APIs
 const mockChrome = {

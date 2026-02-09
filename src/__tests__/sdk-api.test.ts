@@ -19,7 +19,8 @@ describe('ABsmartly SDK API Connection', () => {
     console.log('API Endpoint (raw):', rawEndpoint)
     console.log('API Endpoint (normalized):', apiEndpoint)
     console.log('SDK Endpoint (with /v1):', `${apiEndpoint}/v1`)
-    console.log('API Key:', apiKey.substring(0, 10) + '...')
+    // SECURITY: Never log API keys, even partially
+    console.log('API Key present:', !!apiKey)
   })
 
   afterEach(async () => {

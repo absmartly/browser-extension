@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import path from 'path'
 import { TEST_IMAGES } from '../../src/lib/__tests__/test-images'
 import { injectSidebar, debugWait, click } from './utils/test-helpers'
@@ -98,7 +98,7 @@ test.describe('AI Session & Image Handling', () => {
       await form.evaluate((f) => f.requestSubmit())
       await debugWait()
 
-      await sidebar.locator('text="Experiments"').first().waitFor({ state: 'visible', timeout: 5000 })
+      await sidebar.locator('#experiments-heading').first().waitFor({ state: 'visible', timeout: 5000 })
       console.log(`✅ Created experiment: ${experimentName}`)
     })
 

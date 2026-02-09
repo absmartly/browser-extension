@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { setupTestPage, click } from './utils/test-helpers'
 import { createExperiment } from './helpers/ve-experiment-setup'
 
@@ -148,7 +148,7 @@ test.describe('AI Session Recovery After Page Reload', () => {
       console.log('\n🤖 STEP 5: Navigating back to AI page')
 
       const freshSidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-      const generateButton = freshSidebar.locator(`button:has-text("Generate with AI")`).first()
+      const generateButton = freshSidebar.locator(`#generate-with-ai-button`).first()
       await generateButton.waitFor({ state: 'visible', timeout: 10000 })
       await generateButton.click()
 

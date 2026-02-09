@@ -5,6 +5,7 @@
 import { Storage } from '@plasmohq/storage'
 import { getConfig } from './storage'
 
+import { debugWarn } from '~src/utils/debug'
 // Augment Window interface with SDK-specific properties
 declare global {
   interface Window {
@@ -61,7 +62,7 @@ export async function getCurrentVariantAssignments(experimentNames: string[]): P
   } catch (error) {
     // Silently return empty for permission errors
     if (!error.message?.includes('Cannot access contents')) {
-      console.warn('Failed to get variant assignments from SDK:', error)
+      debugWarn('Failed to get variant assignments from SDK:', error)
     }
     return { assignments: {}, experimentsInContext: [] }
   }
@@ -110,7 +111,7 @@ export async function isSDKAvailable(): Promise<boolean> {
     // Silently return false for permission errors (restricted pages)
     // Only log if it's not a "Cannot access contents" error
     if (!error.message?.includes('Cannot access contents')) {
-      console.warn('Failed to check plugin availability:', error)
+      debugWarn('Failed to check plugin availability:', error)
     }
     return false
   }
@@ -151,7 +152,7 @@ export async function getSDKContextPath(): Promise<{ found: boolean; path: strin
   } catch (error) {
     // Silently return false for permission errors
     if (!error.message?.includes('Cannot access contents')) {
-      console.warn('Failed to get SDK context path:', error)
+      debugWarn('Failed to get SDK context path:', error)
     }
     return { found: false, path: null }
   }

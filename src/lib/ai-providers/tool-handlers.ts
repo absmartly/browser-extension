@@ -42,10 +42,11 @@ export async function handleXPathQuery(
   xpath: string,
   maxResults: number = 10
 ): Promise<ToolCallResult> {
-  if (!validateXPath(xpath)) {
+  const validation = validateXPath(xpath)
+  if (!validation.valid) {
     return {
       toolName: 'xpath_query',
-      error: `Invalid XPath expression: "${xpath}". XPath must use safe patterns only.`
+      error: `Invalid XPath expression: "${xpath}". ${validation.error || 'XPath must use safe patterns only.'}`
     }
   }
 

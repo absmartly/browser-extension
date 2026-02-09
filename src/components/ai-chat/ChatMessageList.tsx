@@ -3,6 +3,7 @@ import { SparklesIcon, EyeIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/o
 import { renderMarkdown } from '~src/utils/markdown'
 import type { ChatMessage, DOMChange } from '~src/types/dom-changes'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface ChatMessageListProps {
   messages: ChatMessage[]
   onViewChanges: (changes: DOMChange[], response: string, timestamp: number) => void
@@ -117,7 +118,7 @@ export function ChatMessageList({
                       onRestoreChanges(message.domChangesSnapshot)
 
                       if (!previewEnabledOnce) {
-                        console.log('[ChatMessageList] Enabling preview after restoring changes from history')
+                        debugLog('[ChatMessageList] Enabling preview after restoring changes from history')
                         if (onPreviewWithChanges) {
                           onPreviewWithChanges(true, message.domChangesSnapshot)
                         }
@@ -125,7 +126,7 @@ export function ChatMessageList({
                           onRestoreChangesCallback(message.domChangesSnapshot)
                         }
                       } else {
-                        console.log('[ChatMessageList] Refreshing preview after restoring changes from history')
+                        debugLog('[ChatMessageList] Refreshing preview after restoring changes from history')
                         if (onRestoreChangesCallback) {
                           onRestoreChangesCallback(message.domChangesSnapshot)
                         }

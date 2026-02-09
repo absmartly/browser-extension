@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { setupTestPage, log, initializeTestLogging, debugWait } from './utils/test-helpers'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 

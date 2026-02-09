@@ -16,6 +16,7 @@ import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-ha
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, withTimeout } from './constants'
 import { debugLog } from '~src/utils/debug'
+import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
 
 export class OpenAIProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
@@ -126,7 +127,9 @@ export class OpenAIProvider implements AIProvider {
         )
       } catch (error: any) {
         const errorMessage = error.message || error.error?.message || 'OpenAI API error'
-        throw new Error(errorMessage)
+        const baseError = new Error(errorMessage)
+        const classified = classifyAIError(baseError)
+        throw new Error(formatClassifiedError(classified))
       }
 
       debugLog('[OpenAI] Received response from OpenAI')

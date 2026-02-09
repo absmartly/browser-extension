@@ -26,8 +26,17 @@ export async function sendMessage(message: any, callback?: MessageCallback): Pro
 
 export function sendMessageNoResponse(message: any): void {
   try {
-    chrome.runtime.sendMessage(message).catch(() => {})
-  } catch {
-    // ignore
+    chrome.runtime.sendMessage(message).catch((error) => {
+      if (!error?.message?.includes('Receiving end does not exist') &&
+          !error?.message?.includes('message port closed')) {
+        debugError(`Unexpected error sending message ${message.type}:`, error)
+      }
+    })
+  } catch (error) {
+    if (error instanceof Error &&
+        !error.message.includes('Extension context invalidated') &&
+        !error.message.includes('message port closed')) {
+      debugError(`Exception in sendMessageNoResponse for ${message.type}:`, error)
+    }
   }
 }

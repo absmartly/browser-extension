@@ -124,6 +124,7 @@ export interface VisualEditorAPI {
 
 // Message types for communication
 export interface VisualEditorMessage {
+  source?: 'absmartly-visual-editor'
   type: 'ABSMARTLY_VISUAL_EDITOR_SAVE' | 'ABSMARTLY_VISUAL_EDITOR_EXIT' | 'ABSMARTLY_VISUAL_EDITOR_READY'
   changes?: DOMChange[]
   experimentName?: string

@@ -1,6 +1,8 @@
 import type { OpenRouterModel, OpenRouterModelsResponse } from '~src/types/openrouter'
 import type { GeminiModelsResponse } from '~src/types/gemini'
+import { notifyUser } from '~src/utils/notifications'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export interface ModelInfo {
   id: string
   name: string
@@ -25,12 +27,12 @@ class ModelFetcherClass {
     const cacheKey = 'openai'
 
     if (this.cache.has(cacheKey)) {
-      console.log('[ModelFetcher] Returning cached OpenAI models')
+      debugLog('[ModelFetcher] Returning cached OpenAI models')
       return this.cache.get(cacheKey)!
     }
 
     if (this.fetchingPromises.has(cacheKey)) {
-      console.log('[ModelFetcher] Already fetching OpenAI models, returning existing promise')
+      debugLog('[ModelFetcher] Already fetching OpenAI models, returning existing promise')
       return this.fetchingPromises.get(cacheKey)!
     }
 
@@ -48,7 +50,7 @@ class ModelFetcherClass {
 
   private async doFetchOpenAIModels(apiKey: string): Promise<ModelInfo[]> {
     try {
-      console.log('[ModelFetcher] Fetching OpenAI models...')
+      debugLog('[ModelFetcher] Fetching OpenAI models...')
       const response = await fetch('https://api.openai.com/v1/models', {
         headers: {
           'Authorization': `Bearer ${apiKey}`
@@ -69,10 +71,24 @@ class ModelFetcherClass {
         }))
         .sort((a: ModelInfo, b: ModelInfo) => b.id.localeCompare(a.id))
 
-      console.log(`[ModelFetcher] Fetched ${chatModels.length} OpenAI models`)
+      debugLog(`[ModelFetcher] Fetched ${chatModels.length} OpenAI models`)
       return chatModels
     } catch (error) {
       console.error('[ModelFetcher] Error fetching OpenAI models:', error)
+
+      let userMessage = 'Failed to fetch latest models from OpenAI. '
+      if (error?.message?.includes('401') || error?.message?.includes('403') || error?.message?.includes('unauthorized')) {
+        userMessage += 'Please check your API key in settings.'
+      } else if (error?.message?.includes('429')) {
+        userMessage += 'Rate limit exceeded. Try again in a moment.'
+      } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        userMessage += 'Network connection failed.'
+      } else {
+        userMessage += 'Using cached model list.'
+      }
+
+      notifyUser(userMessage, 'warning')
+
       return this.getStaticOpenAIModels()
     }
   }
@@ -101,12 +117,12 @@ class ModelFetcherClass {
     const cacheKey = 'gemini'
 
     if (this.cache.has(cacheKey)) {
-      console.log('[ModelFetcher] Returning cached Gemini models')
+      debugLog('[ModelFetcher] Returning cached Gemini models')
       return this.cache.get(cacheKey)!
     }
 
     if (this.fetchingPromises.has(cacheKey)) {
-      console.log('[ModelFetcher] Already fetching Gemini models, returning existing promise')
+      debugLog('[ModelFetcher] Already fetching Gemini models, returning existing promise')
       return this.fetchingPromises.get(cacheKey)!
     }
 
@@ -124,7 +140,7 @@ class ModelFetcherClass {
 
   private async doFetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
     try {
-      console.log('[ModelFetcher] Fetching Gemini models...')
+      debugLog('[ModelFetcher] Fetching Gemini models...')
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
       )
@@ -144,10 +160,24 @@ class ModelFetcherClass {
           description: m.description
         }))
 
-      console.log(`[ModelFetcher] Fetched ${chatModels.length} Gemini models`)
+      debugLog(`[ModelFetcher] Fetched ${chatModels.length} Gemini models`)
       return chatModels
     } catch (error) {
       console.error('[ModelFetcher] Error fetching Gemini models:', error)
+
+      let userMessage = 'Failed to fetch latest models from Google Gemini. '
+      if (error?.message?.includes('401') || error?.message?.includes('403') || error?.message?.includes('unauthorized') || error?.message?.includes('API_KEY')) {
+        userMessage += 'Please check your API key in settings.'
+      } else if (error?.message?.includes('429')) {
+        userMessage += 'Rate limit exceeded. Try again in a moment.'
+      } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        userMessage += 'Network connection failed.'
+      } else {
+        userMessage += 'Using cached model list.'
+      }
+
+      notifyUser(userMessage, 'warning')
+
       return this.getStaticGeminiModels()
     }
   }
@@ -164,12 +194,12 @@ class ModelFetcherClass {
     const cacheKey = 'openrouter'
 
     if (this.cache.has(cacheKey)) {
-      console.log('[ModelFetcher] Returning cached OpenRouter models')
+      debugLog('[ModelFetcher] Returning cached OpenRouter models')
       return this.groupModelsByProvider(this.cache.get(cacheKey)!)
     }
 
     if (this.fetchingPromises.has(cacheKey)) {
-      console.log('[ModelFetcher] Already fetching OpenRouter models, returning existing promise')
+      debugLog('[ModelFetcher] Already fetching OpenRouter models, returning existing promise')
       const models = await this.fetchingPromises.get(cacheKey)!
       return this.groupModelsByProvider(models)
     }
@@ -188,7 +218,7 @@ class ModelFetcherClass {
 
   private async doFetchOpenRouterModels(apiKey: string): Promise<ModelInfo[]> {
     try {
-      console.log('[ModelFetcher] Fetching OpenRouter models...')
+      debugLog('[ModelFetcher] Fetching OpenRouter models...')
       const response = await fetch('https://openrouter.ai/api/v1/models', {
         headers: {
           'Authorization': `Bearer ${apiKey}`
@@ -212,10 +242,24 @@ class ModelFetcherClass {
         description: m.description
       }))
 
-      console.log(`[ModelFetcher] Fetched ${models.length} OpenRouter models`)
+      debugLog(`[ModelFetcher] Fetched ${models.length} OpenRouter models`)
       return models
     } catch (error) {
       console.error('[ModelFetcher] Error fetching OpenRouter models:', error)
+
+      let userMessage = 'Failed to fetch latest models from OpenRouter. '
+      if (error?.message?.includes('401') || error?.message?.includes('403') || error?.message?.includes('unauthorized')) {
+        userMessage += 'Please check your API key in settings.'
+      } else if (error?.message?.includes('429')) {
+        userMessage += 'Rate limit exceeded. Try again in a moment.'
+      } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        userMessage += 'Network connection failed.'
+      } else {
+        userMessage += 'Using cached model list.'
+      }
+
+      notifyUser(userMessage, 'warning')
+
       return this.getStaticOpenRouterModels()
     }
   }
@@ -264,10 +308,10 @@ class ModelFetcherClass {
   clearCache(provider?: string): void {
     if (provider) {
       this.cache.delete(provider)
-      console.log(`[ModelFetcher] Cleared cache for ${provider}`)
+      debugLog(`[ModelFetcher] Cleared cache for ${provider}`)
     } else {
       this.cache.clear()
-      console.log('[ModelFetcher] Cleared all model cache')
+      debugLog('[ModelFetcher] Cleared all model cache')
     }
   }
 }

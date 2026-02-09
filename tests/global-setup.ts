@@ -3,6 +3,24 @@ import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
 
+const getLatestMtimeMs = (targetPath: string): number => {
+  if (!fs.existsSync(targetPath)) return 0
+  const stats = fs.statSync(targetPath)
+  if (!stats.isDirectory()) {
+    return stats.mtimeMs
+  }
+
+  const entries = fs.readdirSync(targetPath)
+  let latest = stats.mtimeMs
+  for (const entry of entries) {
+    const entryPath = path.join(targetPath, entry)
+    const entryMtime = getLatestMtimeMs(entryPath)
+    if (entryMtime > latest) latest = entryMtime
+  }
+
+  return latest
+}
+
 async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...')
 
@@ -13,7 +31,23 @@ async function globalSetup(config: FullConfig) {
   // 1. Check if extension needs to be built
   // Always rebuild the visual editor bundle with test flag for accurate testing
   const visualEditorBundle = path.join(rootDir, '..', 'absmartly-visual-editor-bundles', 'visual-editor-injection.bundle')
-  const needsRebuild = !fs.existsSync(manifestPath) || !fs.existsSync(visualEditorBundle)
+  const sourcePaths = [
+    path.join(rootDir, 'src'),
+    path.join(rootDir, 'content'),
+    path.join(rootDir, 'background'),
+    path.join(rootDir, 'public'),
+    path.join(rootDir, 'assets'),
+    path.join(rootDir, 'index.tsx'),
+    path.join(rootDir, 'content.ts'),
+    path.join(rootDir, 'background.ts')
+  ]
+
+  const buildMtime = fs.existsSync(manifestPath) ? fs.statSync(manifestPath).mtimeMs : 0
+  const latestSourceMtime = Math.max(...sourcePaths.map(getLatestMtimeMs))
+  const needsRebuild =
+    !fs.existsSync(manifestPath) ||
+    !fs.existsSync(visualEditorBundle) ||
+    latestSourceMtime > buildMtime
 
   if (needsRebuild) {
     console.log('📦 Extension not built. Building now...')

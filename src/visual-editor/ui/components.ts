@@ -6,6 +6,7 @@
 import StateManager from '../core/state-manager'
 import HtmlEditor from './html-editor'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class UIComponents {
   private stateManager: StateManager
   private htmlEditor: HtmlEditor
@@ -24,7 +25,7 @@ export class UIComponents {
     const canUndo = sessionChangesCount > 0
     const canRedo = state.redoStack?.length > 0
 
-    console.log('[UIComponents] Creating banner with initial state:', {
+    debugLog('[UIComponents] Creating banner with initial state:', {
       sessionChangesCount,
       canUndo,
       canRedo
@@ -56,13 +57,13 @@ export class UIComponents {
       // Store reference to shadow root for updates
       this.bannerShadowRoot = bannerShadow
       bannerContainer = bannerShadow
-      console.log('🔍 Banner - Using Shadow DOM')
+      debugLog('🔍 Banner - Using Shadow DOM')
     } else {
       // For testing, append directly without shadow DOM
       // Store reference to banner host for updates
       this.bannerShadowRoot = bannerHost as any
       bannerContainer = bannerHost
-      console.log('🔍 Banner - NOT using Shadow DOM (test mode)')
+      debugLog('🔍 Banner - NOT using Shadow DOM (test mode)')
     }
 
     const bannerStyle = document.createElement('style')
@@ -350,11 +351,11 @@ export class UIComponents {
   }
 
   // These will be set by the main visual editor
-  onUndo: () => void = () => console.log('[ABSmartly] Undo callback not set')
-  onRedo: () => void = () => console.log('[ABSmartly] Redo callback not set')
-  onClear: () => void = () => console.log('[ABSmartly] Clear callback not set')
-  onSave: () => void = () => console.log('[ABSmartly] Save callback not set')
-  onExit: () => void = () => console.log('[ABSmartly] Exit callback not set')
+  onUndo: () => void = () => debugLog('[ABSmartly] Undo callback not set')
+  onRedo: () => void = () => debugLog('[ABSmartly] Redo callback not set')
+  onClear: () => void = () => debugLog('[ABSmartly] Clear callback not set')
+  onSave: () => void = () => debugLog('[ABSmartly] Save callback not set')
+  onExit: () => void = () => debugLog('[ABSmartly] Exit callback not set')
 
   private handleBannerAction(action: string): void {
     switch (action) {
@@ -377,11 +378,11 @@ export class UIComponents {
   }
 
   updateBanner(options: { changesCount?: number; canUndo?: boolean; canRedo?: boolean }): void {
-    console.log('[UIComponents] updateBanner called with:', options)
+    debugLog('[UIComponents] updateBanner called with:', options)
 
     // Use stored shadow root reference
     if (!this.bannerShadowRoot) {
-      console.log('[UIComponents] Banner shadow root reference not found')
+      debugLog('[UIComponents] Banner shadow root reference not found')
       return
     }
 
@@ -391,9 +392,9 @@ export class UIComponents {
       const counter = shadowRoot.querySelector('.changes-counter')
       if (counter) {
         counter.textContent = `${options.changesCount} changes`
-        console.log('[UIComponents] Updated changes counter to:', options.changesCount)
+        debugLog('[UIComponents] Updated changes counter to:', options.changesCount)
       } else {
-        console.log('[UIComponents] Changes counter element not found')
+        debugLog('[UIComponents] Changes counter element not found')
       }
     }
 
@@ -401,9 +402,9 @@ export class UIComponents {
       const undoBtn = shadowRoot.querySelector('[data-action="undo"]') as HTMLButtonElement
       if (undoBtn) {
         undoBtn.disabled = !options.canUndo
-        console.log('[UIComponents] Updated undo button disabled to:', !options.canUndo)
+        debugLog('[UIComponents] Updated undo button disabled to:', !options.canUndo)
       } else {
-        console.log('[UIComponents] Undo button not found')
+        debugLog('[UIComponents] Undo button not found')
       }
     }
 
@@ -411,9 +412,9 @@ export class UIComponents {
       const redoBtn = shadowRoot.querySelector('[data-action="redo"]') as HTMLButtonElement
       if (redoBtn) {
         redoBtn.disabled = !options.canRedo
-        console.log('[UIComponents] Updated redo button disabled to:', !options.canRedo)
+        debugLog('[UIComponents] Updated redo button disabled to:', !options.canRedo)
       } else {
-        console.log('[UIComponents] Redo button not found')
+        debugLog('[UIComponents] Redo button not found')
       }
     }
   }

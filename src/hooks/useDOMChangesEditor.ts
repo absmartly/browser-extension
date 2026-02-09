@@ -287,7 +287,7 @@ export function useDOMChangesEditor({
         type: 'START_ELEMENT_PICKER',
         fieldId: field
       }
-      console.log('[useDOMChangesEditor] SENDING START_ELEMENT_PICKER with fieldId:', msg)
+      debugLog('[useDOMChangesEditor] SENDING START_ELEMENT_PICKER with fieldId:', msg)
       await sendToContent(msg)
     } catch (error) {
       debugError('Error starting element picker:', error)
@@ -302,13 +302,14 @@ export function useDOMChangesEditor({
     conversationSession?: import('~src/types/absmartly').ConversationSession | null
   ): Promise<AIDOMGenerationResult> => {
     try {
-      console.log('[AI Generate] 🤖 Starting generation, prompt:', prompt, 'images count:', images?.length || 0)
+      debugLog('[AI Generate] 🤖 Starting generation, prompt:', prompt, 'images count:', images?.length || 0)
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
 
-      console.log('[AI Generate] Using API key from environment...')
+      debugLog('[AI Generate] Using API key from environment...')
       const apiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
 
-      console.log('[AI Generate] Has API key:', !!apiKey, 'API key length:', apiKey?.length)
+      // SECURITY: Never log API keys, even partially
+      debugLog('[AI Generate] API key present:', !!apiKey)
       if (!apiKey) {
         console.error('[AI Generate] No API key found!')
         throw new Error('Anthropic API key not configured. Please add it in Settings.')
@@ -319,29 +320,29 @@ export function useDOMChangesEditor({
       let domStructure: string | undefined
 
       if (conversationSession?.htmlSent) {
-        console.log('[AI Generate] Session already has HTML sent, skipping capture')
+        debugLog('[AI Generate] Session already has HTML sent, skipping capture')
         html = undefined
         pageUrl = conversationSession.pageUrl
         domStructure = undefined
       } else {
-        console.log('[AI Generate] ===== About to call capturePageHTML =====')
+        debugLog('[AI Generate] ===== About to call capturePageHTML =====')
 
         try {
-          console.log('[AI Generate] Calling capturePageHTML()...')
+          debugLog('[AI Generate] Calling capturePageHTML()...')
           const captureResult = await capturePageHTML()
           html = captureResult.html
           pageUrl = captureResult.url
           domStructure = captureResult.domStructure
-          console.log('[AI Generate] capturePageHTML completed, HTML length:', html?.length, 'url:', pageUrl, 'structure lines:', domStructure?.split('\n').length)
+          debugLog('[AI Generate] capturePageHTML completed, HTML length:', html?.length, 'url:', pageUrl, 'structure lines:', domStructure?.split('\n').length)
         } catch (callError) {
           console.error('[AI Generate] capturePageHTML() call threw:', callError)
           throw callError
         }
       }
 
-      console.log('[AI Generate] Sending message to background script...')
-      console.log('[AI Generate] Session:', conversationSession?.id || 'null')
-      console.log('[AI Generate] Page URL:', pageUrl)
+      debugLog('[AI Generate] Sending message to background script...')
+      debugLog('[AI Generate] Session:', conversationSession?.id || 'null')
+      debugLog('[AI Generate] Page URL:', pageUrl)
       const response = await sendToBackground({
         type: 'AI_GENERATE_DOM_CHANGES',
         html,
@@ -354,11 +355,11 @@ export function useDOMChangesEditor({
         domStructure
       })
 
-      console.log('[AI Generate] Response received:', JSON.stringify(response, null, 2))
-      console.log('[AI Generate] Response keys:', Object.keys(response || {}))
-      console.log('[AI Generate] Response.success:', response?.success)
-      console.log('[AI Generate] Response.result:', response?.result ? 'present' : 'MISSING')
-      console.log('[AI Generate] Response.error:', response?.error)
+      debugLog('[AI Generate] Response received:', JSON.stringify(response, null, 2))
+      debugLog('[AI Generate] Response keys:', Object.keys(response || {}))
+      debugLog('[AI Generate] Response.success:', response?.success)
+      debugLog('[AI Generate] Response.result:', response?.result ? 'present' : 'MISSING')
+      debugLog('[AI Generate] Response.error:', response?.error)
 
       if (!response) {
         console.error('[AI Generate] ❌ No response received from background!')
@@ -416,20 +417,20 @@ export function useDOMChangesEditor({
         throw new Error(`Invalid result: domChanges must be an array, got ${typeof result.domChanges}`)
       }
 
-      console.log('[AI Generate] ✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
+      debugLog('[AI Generate] ✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
       debugLog('✅ Result received with action:', result.action, 'changes:', result.domChanges.length)
 
-      console.log('[AI Generate] Current changes count:', changes.length)
+      debugLog('[AI Generate] Current changes count:', changes.length)
       const updatedChanges = applyDOMChangeAction(changes, result)
-      console.log('[AI Generate] Updated changes count after', result.action, ':', updatedChanges.length)
-      console.log('[AI Generate] Calling onChange...')
+      debugLog('[AI Generate] Updated changes count after', result.action, ':', updatedChanges.length)
+      debugLog('[AI Generate] Calling onChange...')
       onChange(updatedChanges)
 
-      console.log('[AI Generate] ✅ AI-generated changes applied successfully')
+      debugLog('[AI Generate] ✅ AI-generated changes applied successfully')
       debugLog('✅ AI-generated changes applied successfully')
 
       if (response.session) {
-        console.log('[AI Generate] Session returned from background:', response.session.id)
+        debugLog('[AI Generate] Session returned from background:', response.session.id)
         return { ...result, session: response.session }
       }
 

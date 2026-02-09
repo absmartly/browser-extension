@@ -3,6 +3,7 @@ import { PlusCircleIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from "@h
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import { fetchAuthenticatedImage } from "~src/utils/auth"
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface CreateExperimentDropdownProps {
   onCreateFromScratch: () => void
   onCreateFromTemplate?: (templateId: number) => void
@@ -265,7 +266,7 @@ export function CreateExperimentDropdown({
     setLoading(true)
     try {
       const data = await getTemplates('test_template')
-      console.log('Templates loaded:', data)
+      debugLog('Templates loaded:', data)
       setTemplates(data)
     } catch (error) {
       console.error('Failed to load templates:', error)

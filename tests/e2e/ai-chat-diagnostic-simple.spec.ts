@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/extension'
-import { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { injectSidebar, initializeTestLogging, setupTestPage } from './utils/test-helpers'
 import { createExperiment } from './helpers/ve-experiment-setup'
 
@@ -65,7 +65,7 @@ test.describe('AI Chat Simple Diagnostic', () => {
     console.log(`  Plasmo children count: ${plasmoChildrenBefore}`)
 
     // Find Generate with AI button
-    const aiButton = sidebar.locator('button:has-text("Generate with AI")').first()
+    const aiButton = sidebar.locator('#generate-with-ai-button').first()
     await aiButton.waitFor({ state: 'visible', timeout: 10000 })
     console.log('✅ Found "Generate with AI" button')
 

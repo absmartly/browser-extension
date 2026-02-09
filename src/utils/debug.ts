@@ -33,5 +33,5 @@ export const debugError = function(...args: any[]) {
  * Always log - bypasses debug flag (use for important messages)
  */
 export const alwaysLog = function(...args: any[]) {
-  console.log(...args)
+  debugLog(...args)
 }

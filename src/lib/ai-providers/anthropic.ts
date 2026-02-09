@@ -16,6 +16,7 @@ import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-ha
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, withTimeout, parseAPIError } from './constants'
 import { debugLog } from '~src/utils/debug'
+import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
 
 function isTextBlock(block: Anthropic.ContentBlock): block is Anthropic.TextBlock {
   return block.type === 'text'
@@ -165,7 +166,9 @@ export class AnthropicProvider implements AIProvider {
       try {
         message = await withTimeout(anthropic.messages.create(requestBody))
       } catch (error: unknown) {
-        throw new Error(parseAPIError(error, 'Anthropic API error'))
+        const baseError = new Error(parseAPIError(error, 'Anthropic API error'))
+        const classified = classifyAIError(baseError)
+        throw new Error(formatClassifiedError(classified))
       }
 
       const toolUseBlocks = message.content.filter(isToolUseBlock)

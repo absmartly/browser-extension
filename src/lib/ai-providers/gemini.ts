@@ -22,6 +22,7 @@ import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-ha
 import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
 import { MAX_TOOL_ITERATIONS, withTimeout, parseAPIError } from './constants'
 import { debugLog } from '~src/utils/debug'
+import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 export class GeminiProvider implements AIProvider {
@@ -149,7 +150,9 @@ export class GeminiProvider implements AIProvider {
 
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(parseAPIError({ message: errorText }, `Gemini API error (${response.status})`))
+        const baseError = new Error(parseAPIError({ message: errorText }, `Gemini API error (${response.status})`))
+        const classified = classifyAIError(baseError)
+        throw new Error(formatClassifiedError(classified))
       }
 
       const result: GeminiGenerateContentResponse = await response.json()

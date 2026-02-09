@@ -87,6 +87,16 @@ export class WindowMessageAdapter implements MessageAdapter {
   constructor() {
     // Listen for test messages
     window.addEventListener('message', (event) => {
+      if (event.source !== window) {
+        return
+      }
+
+      const isFileProtocol =
+        window.location.protocol === 'file:' || event.origin === 'null'
+      if (!isFileProtocol && event.origin !== window.location.origin) {
+        return
+      }
+
       if (event.data?.source === 'absmartly-test-to-background') {
         const message = event.data.message
         const sender: MessageSender = {
@@ -106,7 +116,7 @@ export class WindowMessageAdapter implements MessageAdapter {
       source: 'absmartly-background-to-tab',
       tabId,
       message
-    }, '*')
+    }, this.getTargetOrigin())
   }
 
   async sendToAllTabs(message: Message): Promise<void> {
@@ -114,7 +124,7 @@ export class WindowMessageAdapter implements MessageAdapter {
     window.postMessage({
       source: 'absmartly-background-to-tab',
       message
-    }, '*')
+    }, this.getTargetOrigin())
   }
 
   onMessage(handler: (message: Message, sender: MessageSender) => void | Promise<void>): () => void {
@@ -122,5 +132,9 @@ export class WindowMessageAdapter implements MessageAdapter {
     return () => {
       this.listeners.delete(handler)
     }
+  }
+
+  private getTargetOrigin(): string {
+    return window.location.origin === 'null' ? 'null' : window.location.origin
   }
 }

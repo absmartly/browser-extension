@@ -1,3 +1,4 @@
+import { debugLog, debugWarn } from '~src/utils/debug'
 import type {
   StoredConversation,
   ConversationListItem
@@ -37,7 +38,7 @@ export async function saveConversation(conversation: StoredConversation): Promis
     const sanitized = await sanitizeConversationForStorage(conversation)
     await idbStorage.saveConversation(sanitized)
 
-    console.log(`[ConversationStorage] Saved conversation ${conversation.id} for ${conversation.variantName}`)
+    debugLog(`[ConversationStorage] Saved conversation ${conversation.id} for ${conversation.variantName}`)
   } catch (error) {
     console.error('[ConversationStorage] Error saving conversation:', error)
 
@@ -57,9 +58,9 @@ export async function loadConversation(
     const conversation = await idbStorage.loadConversation(variantName, conversationId)
 
     if (conversation) {
-      console.log(`[ConversationStorage] Loaded conversation ${conversationId}`)
+      debugLog(`[ConversationStorage] Loaded conversation ${conversationId}`)
     } else {
-      console.warn(`[ConversationStorage] Conversation ${conversationId} not found`)
+      debugWarn(`[ConversationStorage] Conversation ${conversationId} not found`)
     }
 
     return conversation
@@ -75,7 +76,7 @@ export async function deleteConversation(
 ): Promise<void> {
   try {
     await idbStorage.deleteConversation(variantName, conversationId)
-    console.log(`[ConversationStorage] Deleted conversation ${conversationId}`)
+    debugLog(`[ConversationStorage] Deleted conversation ${conversationId}`)
   } catch (error) {
     console.error('[ConversationStorage] Error deleting conversation:', error)
     throw error
@@ -97,7 +98,7 @@ export async function setActiveConversation(
 ): Promise<void> {
   try {
     await idbStorage.setActiveConversation(variantName, conversationId)
-    console.log(`[ConversationStorage] Set active conversation to ${conversationId}`)
+    debugLog(`[ConversationStorage] Set active conversation to ${conversationId}`)
   } catch (error) {
     console.error('[ConversationStorage] Error setting active conversation:', error)
     throw error

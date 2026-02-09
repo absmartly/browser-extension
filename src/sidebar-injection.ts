@@ -5,15 +5,12 @@ let sidebarVisible = false
 let sidebarMinimized = false
 
 export const injectSidebar = () => {
-  // Check if sidebar is already injected
   const existingContainer = document.getElementById('absmartly-sidebar-root')
   if (existingContainer) {
     debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
-    // Get current transform to determine actual visibility
     const currentTransform = existingContainer.style.transform
     const isCurrentlyVisible = currentTransform === 'translateX(0)' || currentTransform === ''
-    
-    // Toggle based on actual current state
+
     if (isCurrentlyVisible) {
       existingContainer.style.transform = 'translateX(100%)'
       sidebarVisible = false
@@ -26,7 +23,6 @@ export const injectSidebar = () => {
 
   debugLog('🔵 ABSmartly Extension: Injecting sidebar')
 
-  // Create the sidebar container
   const container = document.createElement('div')
   container.id = 'absmartly-sidebar-root'
   container.style.cssText = `
@@ -41,10 +37,8 @@ export const injectSidebar = () => {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   `
 
-  // Create shadow DOM for style isolation
   const shadowRoot = container.attachShadow({ mode: 'open' })
-  
-  // Create styles for the shadow DOM
+
   const shadowStyles = document.createElement('style')
   shadowStyles.textContent = `
     :host {
@@ -149,12 +143,10 @@ export const injectSidebar = () => {
     }
   `
   shadowRoot.appendChild(shadowStyles)
-  
-  // Create the sidebar structure
+
   const sidebarContainer = document.createElement('div')
   sidebarContainer.className = 'sidebar-container'
-  
-  // Create header
+
   const header = document.createElement('div')
   header.className = 'sidebar-header'
   
@@ -228,35 +220,29 @@ export const injectSidebar = () => {
       header.appendChild(buttonsContainer)
     }
   }
-  
-  // Create body for React content
+
   const body = document.createElement('div')
   body.className = 'sidebar-body'
   body.id = 'extension-ui-root'
-  
+
   sidebarContainer.appendChild(header)
   sidebarContainer.appendChild(body)
   shadowRoot.appendChild(sidebarContainer)
-  
-  // Load saved minimized state
+
   chrome.storage.local.get(['sidebarMinimized'], (result) => {
     if (result.sidebarMinimized !== undefined) {
       sidebarMinimized = result.sidebarMinimized
     }
     updateSidebar()
   })
-  
+
   document.body.appendChild(container)
-  
-  // Show the sidebar immediately
+
   sidebarVisible = true
-  // Use requestAnimationFrame for smooth initial animation
   requestAnimationFrame(() => {
     container.style.transform = 'translateX(0)'
   })
-  
-  // Load and mount the React component
-  // We'll use dynamic import to load the component
+
   import('~src/components/ExtensionUI').then(({ default: ExtensionUI }) => {
     import('react').then(({ default: React }) => {
       import('react-dom/client').then(({ createRoot }) => {
@@ -265,8 +251,7 @@ export const injectSidebar = () => {
       })
     })
   })
-  
-  // Set up message relay for visual editor changes
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE') {
       debugLog('🔵 ABSmartly Extension: Relaying visual editor changes to sidebar')

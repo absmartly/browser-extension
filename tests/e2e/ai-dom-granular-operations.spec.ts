@@ -175,7 +175,7 @@ test.describe('AI DOM Granular Operations', () => {
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await fromScratchButton.click()
       await debugWait(1000)
@@ -265,7 +265,7 @@ test.describe('AI DOM Granular Operations', () => {
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.click()
       await debugWait(1000)
 
@@ -335,7 +335,7 @@ test.describe('AI DOM Granular Operations', () => {
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.click()
       await debugWait(1000)
 
@@ -408,7 +408,7 @@ test.describe('AI DOM Granular Operations', () => {
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.click()
       await debugWait(1000)
 
@@ -481,7 +481,7 @@ test.describe('AI DOM Granular Operations', () => {
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.click()
       await debugWait(1000)
 
@@ -554,7 +554,7 @@ test.describe('AI DOM Granular Operations', () => {
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('button:has-text("From Scratch"), button:has-text("from scratch")')
+      const fromScratchButton = testPage.locator('#from-scratch-button')
       await fromScratchButton.click()
       await debugWait(1000)
 

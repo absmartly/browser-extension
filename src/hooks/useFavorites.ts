@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { debugError } from '~src/utils/debug'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface UseFavoritesParams {
   getFavorites: () => Promise<number[]>
   setExperimentFavorite: (experimentId: number, isFavorite: boolean) => Promise<void>
@@ -23,10 +24,10 @@ export function useFavorites({
     } catch (err: unknown) {
       const error = err as { isAuthError?: boolean; message?: string }
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
-        console.log('[loadFavorites] AUTH_EXPIRED error detected')
+        debugLog('[loadFavorites] AUTH_EXPIRED error detected')
         const permissionsGranted = await requestPermissionsIfNeeded(true)
         if (permissionsGranted) {
-          console.log('[loadFavorites] Retrying after permissions granted...')
+          debugLog('[loadFavorites] Retrying after permissions granted...')
           setTimeout(() => loadFavorites(), 500)
         }
       }

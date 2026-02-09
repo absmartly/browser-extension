@@ -68,13 +68,13 @@ export function useExperimentLoading({
     } catch (err: unknown) {
       const error = err as { isAuthError?: boolean; message?: string }
       if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
-        console.log('[loadExperiments] AUTH_EXPIRED error detected')
+        debugLog('[loadExperiments] AUTH_EXPIRED error detected')
         onAuthExpired(true)
 
         const permissionsGranted = await requestPermissionsIfNeeded(true)
 
         if (permissionsGranted) {
-          console.log('[loadExperiments] Retrying after permissions granted...')
+          debugLog('[loadExperiments] Retrying after permissions granted...')
           setTimeout(() => loadExperiments(true, page, size, customFilters), 500)
         } else {
           onError('Your session has expired. Please log in again.')

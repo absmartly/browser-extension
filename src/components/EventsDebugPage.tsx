@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react"
+import { debugLog, debugWarn } from '~src/utils/debug'
 import {
   TrashIcon,
   PauseIcon,
@@ -31,18 +32,18 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   }, [isPaused])
 
   useEffect(() => {
-    console.log('[EventsDebugPage] Component mounted, fetching buffered events...')
+    debugLog('[EventsDebugPage] Component mounted, fetching buffered events...')
 
     // Fetch buffered events on mount
     const fetchBufferedEvents = async () => {
       try {
         const response = await sendToBackground({ type: 'GET_BUFFERED_EVENTS' })
-        console.log('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
+        debugLog('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
         if (response?.success && response.events) {
-          console.log('[EventsDebugPage] Loaded', response.events.length, 'buffered events')
+          debugLog('[EventsDebugPage] Loaded', response.events.length, 'buffered events')
           setEvents(response.events)
         } else {
-          console.log('[EventsDebugPage] No buffered events found')
+          debugLog('[EventsDebugPage] No buffered events found')
         }
       } catch (error) {
         console.error('[EventsDebugPage] Error fetching buffered events:', error)
@@ -57,10 +58,10 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       sender?: chrome.runtime.MessageSender,
       sendResponse?: (response?: any) => void
     ) => {
-      console.log('[EventsDebugPage] Received runtime message:', message.type, message)
+      debugLog('[EventsDebugPage] Received runtime message:', message.type, message)
       if (message.type === 'SDK_EVENT_BROADCAST') {
         if (!isPausedRef.current) {
-          console.log('[EventsDebugPage] SDK_EVENT_BROADCAST received, adding event:', message.payload)
+          debugLog('[EventsDebugPage] SDK_EVENT_BROADCAST received, adding event:', message.payload)
           const sdkEvent: SDKEvent = {
             id: `${Date.now()}-${Math.random()}`,
             eventName: message.payload.eventName,
@@ -69,20 +70,20 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
           }
           // Events are now stored newest-last, so append to end
           setEvents((prev) => {
-            console.log('[EventsDebugPage] Adding event to list. Current count:', prev.length, 'New count:', prev.length + 1)
+            debugLog('[EventsDebugPage] Adding event to list. Current count:', prev.length, 'New count:', prev.length + 1)
             return [...prev, sdkEvent]
           })
         } else {
-          console.log('[EventsDebugPage] SDK_EVENT_BROADCAST received but capture is paused')
+          debugLog('[EventsDebugPage] SDK_EVENT_BROADCAST received but capture is paused')
         }
       }
     }
 
-    console.log('[EventsDebugPage] Registered message listeners')
+    debugLog('[EventsDebugPage] Registered message listeners')
     chrome.runtime.onMessage.addListener(handleRuntimeMessage)
 
     return () => {
-      console.log('[EventsDebugPage] Removing message listeners')
+      debugLog('[EventsDebugPage] Removing message listeners')
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
     }
   }, [])

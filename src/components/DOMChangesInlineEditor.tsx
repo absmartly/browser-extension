@@ -118,7 +118,7 @@ export function DOMChangesInlineEditor({
   const aiGenerateCallbackIdRef = useRef(Date.now())
   useEffect(() => {
     const newId = Date.now()
-    console.log(JSON.stringify({
+    debugLog(JSON.stringify({
       type: 'CALLBACK_CHANGE',
       component: 'DOMChangesInlineEditor',
       event: 'HANDLE_AI_GENERATE_RECREATED',
@@ -141,7 +141,7 @@ export function DOMChangesInlineEditor({
       !hasAutoNavigatedRef.current
     ) {
       hasAutoNavigatedRef.current = true
-      console.log(`[DOMChangesInlineEditor:${variantName}] Auto-navigating to AI page`)
+      debugLog(`[DOMChangesInlineEditor:${variantName}] Auto-navigating to AI page`)
       onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges)
     }
   }, [autoNavigateToAI, variantName, onNavigateToAI, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges])
@@ -265,7 +265,7 @@ export function DOMChangesInlineEditor({
               data-variant-index={variantIndex}
               data-testid={`preview-toggle-variant-${variantIndex}`}
               onClick={() => {
-                console.log('[DOMChangesInlineEditor] Preview toggle clicked:', { previewEnabled, variantIndex })
+                debugLog('[DOMChangesInlineEditor] Preview toggle clicked:', { previewEnabled, variantIndex })
                 onPreviewToggle(!previewEnabled)
               }}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${

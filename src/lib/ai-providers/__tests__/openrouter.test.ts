@@ -331,7 +331,7 @@ describe('OpenRouterProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Invalid API key')
+      ).rejects.toThrow('Authentication failed. Check your API key in Settings')
     })
 
     it('should throw error when no message in response', async () => {

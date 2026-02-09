@@ -7,6 +7,7 @@ import StateManager from './state-manager'
 import { generateRobustSelector } from '../utils/selector-generator'
 import type { DOMChange } from '../types/visual-editor'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class EditModes {
   private stateManager: StateManager
   private addChange: ((change: DOMChange) => void) | null = null
@@ -20,7 +21,7 @@ export class EditModes {
   }
 
   enableRearrangeMode(element: Element): void {
-    console.log('[ABSmartly] Enabling rearrange mode for element:', element)
+    debugLog('[ABSmartly] Enabling rearrange mode for element:', element)
 
     const smartElement = this.getSmartDraggableElement(element)
     if (!smartElement) return
@@ -47,21 +48,21 @@ export class EditModes {
 
     if (existingMoveChange && (existingMoveChange as any).value?.originalTargetSelector) {
       // This element was already moved, preserve its TRUE original position
-      console.log('[ABSmartly] Element already has move change, preserving original position')
+      debugLog('[ABSmartly] Element already has move change, preserving original position')
       originalParent = null // Will be handled by trackMoveChange
       originalNextSibling = null // Will be handled by trackMoveChange
     } else {
       // First time moving this element, capture current position as original
       originalParent = smartElement.parentElement
       originalNextSibling = smartElement.nextElementSibling
-      console.log('[ABSmartly] First move of element, capturing original position')
+      debugLog('[ABSmartly] First move of element, capturing original position')
     }
 
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true
 
     const handleDragStart = (e: DragEvent) => {
-      console.log('[ABSmartly] Drag start')
+      debugLog('[ABSmartly] Drag start')
       this.stateManager.setDraggedElement(smartElement)
       smartElement.classList.add('absmartly-dragging')
 
@@ -114,15 +115,15 @@ export class EditModes {
 
           // Track the change
           this.trackMoveChange(smartElement, originalParent, originalNextSibling)
-          console.log('[ABSmartly] Element moved successfully')
+          debugLog('[ABSmartly] Element moved successfully')
         } catch (error) {
-          console.warn('[ABSmartly] Move failed:', error)
+          debugWarn('[ABSmartly] Move failed:', error)
         }
       }
     }
 
     const handleDragEnd = (e: DragEvent) => {
-      console.log('[ABSmartly] Drag end')
+      debugLog('[ABSmartly] Drag end')
 
       // Clean up drag state
       smartElement.classList.remove('absmartly-dragging')
@@ -161,11 +162,11 @@ export class EditModes {
   }
 
   enableResizeMode(element: Element): void {
-    console.log('[ABSmartly] Enabling resize mode for element:', element)
+    debugLog('[ABSmartly] Enabling resize mode for element:', element)
     const htmlElement = element as HTMLElement
 
     // Debug: Check current styles
-    console.log('[ABSmartly] Current element styles:', {
+    debugLog('[ABSmartly] Current element styles:', {
       width: htmlElement.style.width,
       height: htmlElement.style.height,
       computedWidth: window.getComputedStyle(htmlElement).width,
@@ -177,7 +178,7 @@ export class EditModes {
 
     // Set global flag to prevent DOM changes from being reapplied during resize
     ;(window as any).__absmartlyVisualEditorModifying = true
-    console.log('[ABSmartly] Set visual editor modifying flag to prevent DOM changes reapplication')
+    debugLog('[ABSmartly] Set visual editor modifying flag to prevent DOM changes reapplication')
 
     // Store original styles locally for tracking
     const originalStyles = {
@@ -202,20 +203,20 @@ export class EditModes {
         height: htmlElement.style.height || computedStyle.height || ''
       }
       htmlElement.dataset.absmartlyOriginal = JSON.stringify(existingData)
-      console.log('[ABSmartly] Stored original dimensions in DOM:', existingData.styles)
+      debugLog('[ABSmartly] Stored original dimensions in DOM:', existingData.styles)
     }
 
     // Create resize handles
     const handles = this.createResizeHandles(element as HTMLElement)
 
     const handleMouseDown = (e: MouseEvent, direction: string) => {
-      console.log('[ABSmartly] Resize handle mousedown:', direction)
+      debugLog('[ABSmartly] Resize handle mousedown:', direction)
       e.preventDefault()
       e.stopPropagation()
 
       // Set global flag to prevent DOM changes from being reapplied during resize
       ;(window as any).__absmartlyVisualEditorModifying = true
-      console.log('[ABSmartly] MOUSEDOWN: Set visual editor modifying flag to prevent DOM changes reapplication', {
+      debugLog('[ABSmartly] MOUSEDOWN: Set visual editor modifying flag to prevent DOM changes reapplication', {
         flagValue: (window as any).__absmartlyVisualEditorModifying,
         timestamp: Date.now(),
         direction
@@ -224,7 +225,7 @@ export class EditModes {
       const startX = e.clientX
       const startY = e.clientY
       const startRect = element.getBoundingClientRect()
-      console.log('[ABSmartly] Start rect:', startRect)
+      debugLog('[ABSmartly] Start rect:', startRect)
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         const deltaX = moveEvent.clientX - startX
@@ -239,7 +240,7 @@ export class EditModes {
 
         // Clear global flag to allow DOM changes to be reapplied again
         ;(window as any).__absmartlyVisualEditorModifying = false
-        console.log('[ABSmartly] MOUSEUP: Cleared visual editor modifying flag, DOM changes can be reapplied', {
+        debugLog('[ABSmartly] MOUSEUP: Cleared visual editor modifying flag, DOM changes can be reapplied', {
           flagValue: (window as any).__absmartlyVisualEditorModifying,
           timestamp: Date.now()
         })
@@ -255,13 +256,13 @@ export class EditModes {
     // Attach handlers to resize handles
     handles.forEach(handle => {
       const direction = handle.dataset.direction!
-      console.log('[ABSmartly] Attaching mousedown handler to handle:', direction)
+      debugLog('[ABSmartly] Attaching mousedown handler to handle:', direction)
       handle.addEventListener('mousedown', (e) => {
-        console.log('[ABSmartly] Handle clicked:', direction)
+        debugLog('[ABSmartly] Handle clicked:', direction)
         handleMouseDown(e, direction)
       })
     })
-    console.log('[ABSmartly] Created', handles.length, 'resize handles')
+    debugLog('[ABSmartly] Created', handles.length, 'resize handles')
 
     // Exit resize mode on Escape or click outside
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -383,7 +384,7 @@ export class EditModes {
   }
 
   private applyResize(element: HTMLElement, direction: string, deltaX: number, deltaY: number, startRect: DOMRect): void {
-    console.log('[ABSmartly] RESIZE: Applying resize', {
+    debugLog('[ABSmartly] RESIZE: Applying resize', {
       direction,
       deltaX,
       deltaY,
@@ -441,7 +442,7 @@ export class EditModes {
 
     // Clear global flag to allow DOM changes to be reapplied again
     ;(window as any).__absmartlyVisualEditorModifying = false
-    console.log('[ABSmartly] Cleared visual editor modifying flag, DOM changes can be reapplied')
+    debugLog('[ABSmartly] Cleared visual editor modifying flag, DOM changes can be reapplied')
 
     // Remove handles
     handles.forEach(handle => handle.remove())
@@ -454,10 +455,10 @@ export class EditModes {
   }
 
   private trackMoveChange(element: Element, originalParent: Element | null, originalNextSibling: Element | null): void {
-    console.log('[ABSmartly] Tracking move change for element:', element)
+    debugLog('[ABSmartly] Tracking move change for element:', element)
 
     if (!this.addChange) {
-      console.warn('[ABSmartly] No addChange callback set for EditModes')
+      debugWarn('[ABSmartly] No addChange callback set for EditModes')
       return
     }
 
@@ -481,7 +482,7 @@ export class EditModes {
 
     if (existingMoveChange && (existingMoveChange as any).value?.originalTargetSelector) {
       // Preserve the TRUE original position from the first move
-      console.log('[ABSmartly] Preserving original position from existing move change')
+      debugLog('[ABSmartly] Preserving original position from existing move change')
       originalTargetSelector = (existingMoveChange as any).value.originalTargetSelector
       originalPosition = (existingMoveChange as any).value.originalPosition
     } else if (originalNextSibling) {
@@ -553,7 +554,7 @@ export class EditModes {
       })
       position = currentParent.firstElementChild === element ? 'firstChild' : 'lastChild'
     } else {
-      console.warn('[ABSmartly] Could not determine move target')
+      debugWarn('[ABSmartly] Could not determine move target')
       return
     }
 
@@ -565,15 +566,15 @@ export class EditModes {
       position
     }
 
-    console.log('[ABSmartly] Creating move change with original position:', moveChange)
+    debugLog('[ABSmartly] Creating move change with original position:', moveChange)
     this.addChange(moveChange)
   }
 
   private trackResizeChange(element: Element, originalStyles: any): void {
-    console.log('[ABSmartly] Tracking resize change for element:', element)
+    debugLog('[ABSmartly] Tracking resize change for element:', element)
 
     if (!this.addChange) {
-      console.warn('[ABSmartly] No addChange callback set for EditModes')
+      debugWarn('[ABSmartly] No addChange callback set for EditModes')
       return
     }
 
@@ -598,7 +599,7 @@ export class EditModes {
         value: currentStyles
       }
 
-      console.log('[ABSmartly] Creating resize/style change:', styleChange)
+      debugLog('[ABSmartly] Creating resize/style change:', styleChange)
       this.addChange(styleChange)
     }
   }

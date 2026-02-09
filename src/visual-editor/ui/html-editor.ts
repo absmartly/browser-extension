@@ -11,6 +11,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { basicSetup } from 'codemirror'
 import DOMPurify from 'dompurify'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export class HtmlEditor {
   private stateManager: StateManager
   private editorHost: HTMLElement | null = null
@@ -172,7 +173,7 @@ export class HtmlEditor {
 
       // Handle button clicks
       formatBtn.addEventListener('click', (e) => {
-        console.log('[HtmlEditor] Format button clicked')
+        debugLog('[HtmlEditor] Format button clicked')
         e.stopPropagation()
         if (this.editorView) {
           const currentValue = this.editorView.state.doc.toString()
@@ -197,13 +198,13 @@ export class HtmlEditor {
       })
 
       saveBtn.addEventListener('click', (e) => {
-        console.log('[HtmlEditor] Save button clicked!')
+        debugLog('[HtmlEditor] Save button clicked!')
         e.stopPropagation()
         e.preventDefault()
         const newHtml = this.editorView?.state.doc.toString() || ''
-        console.log('[HtmlEditor] New HTML:', newHtml)
+        debugLog('[HtmlEditor] New HTML:', newHtml)
         this.cleanup()
-        console.log('[HtmlEditor] Cleanup done, resolving...')
+        debugLog('[HtmlEditor] Cleanup done, resolving...')
         resolve(newHtml)
       })
 

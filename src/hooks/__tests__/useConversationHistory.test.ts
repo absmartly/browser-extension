@@ -5,6 +5,7 @@ import * as aiConversationMigration from '~src/utils/ai-conversation-migration'
 import * as htmlCapture from '~src/utils/html-capture'
 import * as messaging from '~src/lib/messaging'
 import type { ChatMessage, ConversationSession, StoredConversation } from '~src/types/absmartly'
+import { unsafeSessionId, unsafeConversationId, unsafeVariantName } from '~src/types/branded'
 
 jest.mock('~src/utils/ai-conversation-storage')
 jest.mock('~src/utils/ai-conversation-migration')
@@ -56,7 +57,7 @@ describe('useConversationHistory', () => {
     mockSendToBackground.mockResolvedValue({
       success: true,
       session: {
-        id: 'session-id',
+        id: unsafeSessionId('session-id'),
         htmlSent: true,
         messages: []
       }
@@ -89,7 +90,7 @@ describe('useConversationHistory', () => {
 
     it('should load active conversation if one exists', async () => {
       const mockSession: ConversationSession = {
-        id: 'session-1',
+        id: unsafeSessionId('session-1'),
         htmlSent: true,
         messages: []
       }
@@ -98,8 +99,8 @@ describe('useConversationHistory', () => {
         { role: 'assistant', content: 'Hi there!', timestamp: Date.now() }
       ]
       const mockConversation: StoredConversation = {
-        id: 'conv-1',
-        variantName: mockVariantName,
+        id: unsafeConversationId('conv-1'),
+        variantName: unsafeVariantName(mockVariantName),
         messages: mockMessages,
         conversationSession: mockSession,
         createdAt: Date.now(),
@@ -110,7 +111,7 @@ describe('useConversationHistory', () => {
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: 'conv-1', firstUserMessage: 'Hello', messageCount: 2, createdAt: Date.now(), isActive: true }
+        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Hello', messageCount: 2, createdAt: Date.now(), isActive: true }
       ])
       mockLoadConversation.mockResolvedValue(mockConversation)
 
@@ -170,13 +171,13 @@ describe('useConversationHistory', () => {
 
     it('should initialize HTML for loaded conversation if not sent', async () => {
       const mockSession: ConversationSession = {
-        id: 'session-1',
+        id: unsafeSessionId('session-1'),
         htmlSent: false,
         messages: []
       }
       const mockConversation: StoredConversation = {
-        id: 'conv-1',
-        variantName: mockVariantName,
+        id: unsafeConversationId('conv-1'),
+        variantName: unsafeVariantName(mockVariantName),
         messages: [],
         conversationSession: mockSession,
         createdAt: Date.now(),
@@ -187,7 +188,7 @@ describe('useConversationHistory', () => {
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: 'conv-1', firstUserMessage: 'Test', messageCount: 0, createdAt: Date.now(), isActive: true }
+        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Test', messageCount: 0, createdAt: Date.now(), isActive: true }
       ])
       mockLoadConversation.mockResolvedValue(mockConversation)
 
@@ -285,14 +286,14 @@ describe('useConversationHistory', () => {
   describe('switchConversation', () => {
     it('should save current conversation before switching', async () => {
       const mockSession: ConversationSession = {
-        id: 'session-1',
+        id: unsafeSessionId('session-1'),
         htmlSent: true,
         messages: []
       }
       const targetMessage = { role: 'user' as const, content: 'Previous conversation', timestamp: Date.now() }
       const targetConversation: StoredConversation = {
-        id: 'conv-2',
-        variantName: mockVariantName,
+        id: unsafeConversationId('conv-2'),
+        variantName: unsafeVariantName(mockVariantName),
         messages: [targetMessage],
         conversationSession: mockSession,
         createdAt: Date.now(),
@@ -303,8 +304,8 @@ describe('useConversationHistory', () => {
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: 'conv-1', firstUserMessage: 'Current', messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(), isActive: true },
-        { id: 'conv-2', firstUserMessage: 'Previous', messageCount: 1, createdAt: Date.now(), updatedAt: Date.now(), isActive: false }
+        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Current', messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(), isActive: true },
+        { id: unsafeConversationId('conv-2'), firstUserMessage: 'Previous', messageCount: 1, createdAt: Date.now(), updatedAt: Date.now(), isActive: false }
       ])
       mockLoadConversation.mockResolvedValue(targetConversation)
 
@@ -320,7 +321,7 @@ describe('useConversationHistory', () => {
 
       await act(async () => {
         await result.current.switchConversation({
-          id: 'conv-2',
+          id: unsafeConversationId('conv-2'),
           firstUserMessage: 'Previous',
           messageCount: 1,
           createdAt: Date.now(),
@@ -343,12 +344,12 @@ describe('useConversationHistory', () => {
 
     it('should handle parallel conversation switches', async () => {
       const mockSession1: ConversationSession = {
-        id: 'session-1',
+        id: unsafeSessionId('session-1'),
         htmlSent: true,
         messages: []
       }
       const mockSession2: ConversationSession = {
-        id: 'session-2',
+        id: unsafeSessionId('session-2'),
         htmlSent: true,
         messages: []
       }
@@ -356,8 +357,8 @@ describe('useConversationHistory', () => {
       mockGetConversationList.mockResolvedValue([])
       mockLoadConversation
         .mockResolvedValueOnce({
-          id: 'conv-1',
-          variantName: mockVariantName,
+          id: unsafeConversationId('conv-1'),
+          variantName: unsafeVariantName(mockVariantName),
           messages: [{ role: 'user', content: 'Conv 1', timestamp: Date.now() }],
           conversationSession: mockSession1,
           createdAt: Date.now(),
@@ -367,8 +368,8 @@ describe('useConversationHistory', () => {
           isActive: false
         })
         .mockResolvedValueOnce({
-          id: 'conv-2',
-          variantName: mockVariantName,
+          id: unsafeConversationId('conv-2'),
+          variantName: unsafeVariantName(mockVariantName),
           messages: [{ role: 'user', content: 'Conv 2', timestamp: Date.now() }],
           conversationSession: mockSession2,
           createdAt: Date.now(),
@@ -386,7 +387,7 @@ describe('useConversationHistory', () => {
 
       await act(async () => {
         const switch1 = result.current.switchConversation({
-          id: 'conv-1',
+          id: unsafeConversationId('conv-1'),
           firstUserMessage: 'Conv 1',
           messageCount: 1,
           createdAt: Date.now(),
@@ -394,7 +395,7 @@ describe('useConversationHistory', () => {
           isActive: false
         })
         const switch2 = result.current.switchConversation({
-          id: 'conv-2',
+          id: unsafeConversationId('conv-2'),
           firstUserMessage: 'Conv 2',
           messageCount: 1,
           createdAt: Date.now(),
@@ -411,10 +412,10 @@ describe('useConversationHistory', () => {
   describe('handleDeleteConversation', () => {
     it('should delete conversation and create new session if deleting active', async () => {
       const mockConversation: StoredConversation = {
-        id: 'conv-1',
-        variantName: mockVariantName,
+        id: unsafeConversationId('conv-1'),
+        variantName: unsafeVariantName(mockVariantName),
         messages: [{ role: 'user', content: 'Test', timestamp: Date.now() }],
-        conversationSession: { id: 'session-1', htmlSent: true, messages: [] },
+        conversationSession: { id: unsafeSessionId('session-1'), htmlSent: true, messages: [] },
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 1,
@@ -423,7 +424,7 @@ describe('useConversationHistory', () => {
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: 'conv-1', firstUserMessage: 'Test', messageCount: 1, createdAt: Date.now(), updatedAt: Date.now(), isActive: true }
+        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Test', messageCount: 1, createdAt: Date.now(), updatedAt: Date.now(), isActive: true }
       ])
       mockLoadConversation.mockResolvedValue(mockConversation)
 
@@ -569,7 +570,7 @@ describe('useConversationHistory', () => {
         { role: 'assistant', content: 'Hi!', timestamp: Date.now() }
       ]
       const session: ConversationSession = {
-        id: 'session-1',
+        id: unsafeSessionId('session-1'),
         htmlSent: true,
         messages: []
       }
@@ -603,7 +604,7 @@ describe('useConversationHistory', () => {
 
       const messages: ChatMessage[] = [{ role: 'user', content: 'Test', timestamp: Date.now() }]
       const session: ConversationSession = {
-        id: 'session-1',
+        id: unsafeSessionId('session-1'),
         htmlSent: true,
         messages: []
       }

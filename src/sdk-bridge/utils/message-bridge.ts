@@ -15,7 +15,8 @@ export class MessageBridge {
    */
   static sendToExtension(message: ExtensionMessage): void {
     Logger.log('Sending message to extension:', message)
-    window.postMessage(message, '*')
+    // SECURITY: Use same-origin only, not wildcard
+    window.postMessage(message, window.location.origin)
   }
 
   /**
@@ -23,6 +24,18 @@ export class MessageBridge {
    */
   static onMessage(type: string, handler: (payload: any) => void): void {
     window.addEventListener('message', (event) => {
+      if (event.source !== window) {
+        return
+      }
+
+      // SECURITY: Validate origin to prevent malicious iframes from intercepting
+      const isFileProtocol =
+        window.location.protocol === 'file:' || event.origin === 'null'
+      if (!isFileProtocol && event.origin !== window.location.origin) {
+        Logger.warn('[Security] Rejected message from invalid origin:', event.origin)
+        return
+      }
+
       if (
         event.data?.source === 'absmartly-extension' &&
         event.data?.type === type
@@ -38,6 +51,18 @@ export class MessageBridge {
    */
   static onAnyMessage(handler: (message: ExtensionMessage) => void): void {
     window.addEventListener('message', (event) => {
+      if (event.source !== window) {
+        return
+      }
+
+      // SECURITY: Validate origin to prevent malicious iframes from intercepting
+      const isFileProtocol =
+        window.location.protocol === 'file:' || event.origin === 'null'
+      if (!isFileProtocol && event.origin !== window.location.origin) {
+        Logger.warn('[Security] Rejected message from invalid origin:', event.origin)
+        return
+      }
+
       if (event.data?.source === 'absmartly-extension') {
         handler(event.data)
       }

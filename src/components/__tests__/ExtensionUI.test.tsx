@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import ExtensionUI from '../ExtensionUI'
 import type { Experiment } from '~src/types/absmartly'
+import { unsafeExperimentId } from '~src/types/branded'
 
 jest.mock('../views/ListView', () => ({
   ListView: () => <div data-testid="mock-list-view">Experiments List View</div>
@@ -342,7 +343,7 @@ describe('ExtensionUI', () => {
       const useExperimentHandlers = require('~src/hooks/useExperimentHandlers').useExperimentHandlers
 
       const mockExperiment: Experiment = {
-        id: 1,
+        id: unsafeExperimentId(1),
         name: 'test_exp',
         display_name: 'Test Experiment',
         state: 'created',
@@ -607,7 +608,7 @@ describe('ExtensionUI', () => {
 
       const mockExperiments: Experiment[] = [
         {
-          id: 1,
+          id: unsafeExperimentId(1),
           name: 'favorite_exp',
           display_name: 'Favorite Experiment',
           state: 'created',

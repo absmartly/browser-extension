@@ -4,6 +4,7 @@ import { clearAllExperimentStorage } from "~src/utils/storage-cleanup"
 import { APIError } from "~src/types/errors"
 import type { Experiment } from "~src/types/absmartly"
 import type { View } from "~src/types/view"
+import { unsafeExperimentId } from "~src/types/branded"
 
 interface UseExperimentHandlersProps {
   getExperiment: (id: number) => Promise<Experiment>
@@ -131,7 +132,7 @@ export function useExperimentHandlers({
       const template = await getExperiment(templateId)
       setSelectedExperiment({
         ...template,
-        id: 0,
+        id: unsafeExperimentId(0),
         name: '',
         display_name: ''
       })

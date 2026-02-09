@@ -2,19 +2,9 @@ import React from "react"
 import { ErrorBoundary } from "~src/components/ErrorBoundary"
 import { AIDOMChangesPage } from "~src/components/AIDOMChangesPage"
 import { Button } from "~src/components/ui/Button"
-import type { DOMChange, AIDOMGenerationResult } from "~src/types/dom-changes"
+import type { AIDOMContext } from "~src/types/dom-changes"
 
-interface AIDOMContext {
-  variantName: string
-  onGenerate: (prompt: string, images?: string[], conversationSession?: import('~src/types/absmartly').ConversationSession | null) => Promise<AIDOMGenerationResult>
-  currentChanges: DOMChange[]
-  onRestoreChanges: (changes: DOMChange[]) => void
-  onPreviewToggle: (enabled: boolean) => void
-  onPreviewRefresh: () => void
-  onPreviewWithChanges: (enabled: boolean, changes: DOMChange[]) => void
-  previousView: string
-}
-
+import { debugLog, debugWarn } from '~src/utils/debug'
 interface AIDOMChangesViewProps {
   aiDomContext: AIDOMContext | null
   onBackFromAI: () => void
@@ -40,7 +30,7 @@ export function AIDOMChangesView({ aiDomContext, onBackFromAI }: AIDOMChangesVie
     )
   }
 
-  console.log('[AIDOMChangesView] Rendering with context for variant:', aiDomContext.variantName)
+  debugLog('[AIDOMChangesView] Rendering with context for variant:', aiDomContext.variantName)
 
   return (
     <div id="ai-dom-changes-view">

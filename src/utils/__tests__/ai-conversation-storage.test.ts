@@ -8,6 +8,7 @@ import {
 } from '../ai-conversation-storage'
 import type { StoredConversation, ConversationSession, ChatMessage } from '~src/types/absmartly'
 import * as idbStorage from '../indexeddb-storage'
+import { unsafeSessionId, unsafeConversationId, unsafeVariantName } from '~src/types/branded'
 
 jest.mock('../indexeddb-storage')
 
@@ -20,7 +21,7 @@ describe('ai-conversation-storage', () => {
 
   const createMockConversation = (overrides?: Partial<StoredConversation>): StoredConversation => {
     const defaultSession: ConversationSession = {
-      id: 'session-123',
+      id: unsafeSessionId('session-123'),
       htmlSent: false,
       messages: []
     }
@@ -33,8 +34,8 @@ describe('ai-conversation-storage', () => {
     }
 
     return {
-      id: 'conv-123',
-      variantName: 'variant-a',
+      id: unsafeConversationId('conv-123'),
+      variantName: unsafeVariantName('variant-a'),
       messages: [defaultMessage],
       conversationSession: defaultSession,
       createdAt: Date.now(),
@@ -51,16 +52,16 @@ describe('ai-conversation-storage', () => {
       const mockConversations = [createMockConversation()]
       mockIdbStorage.getConversations.mockResolvedValue(mockConversations)
 
-      const result = await getConversations('variant-a')
+      const result = await getConversations(unsafeVariantName('variant-a'))
 
-      expect(mockIdbStorage.getConversations).toHaveBeenCalledWith('variant-a')
+      expect(mockIdbStorage.getConversations).toHaveBeenCalledWith(unsafeVariantName('variant-a'))
       expect(result).toEqual(mockConversations)
     })
 
     it('should return empty array on error', async () => {
       mockIdbStorage.getConversations.mockRejectedValue(new Error('DB error'))
 
-      const result = await getConversations('variant-a')
+      const result = await getConversations(unsafeVariantName('variant-a'))
 
       expect(result).toEqual([])
     })
@@ -142,23 +143,23 @@ describe('ai-conversation-storage', () => {
   describe('getConversationList', () => {
     it('should delegate to idbStorage.getConversationList', async () => {
       const mockListItems = [
-        { id: 'conv-1', createdAt: Date.now(), updatedAt: Date.now(), messageCount: 1, firstUserMessage: 'Test', isActive: false },
-        { id: 'conv-2', createdAt: Date.now(), updatedAt: Date.now(), messageCount: 2, firstUserMessage: 'Test 2', isActive: true }
+        { id: unsafeConversationId('conv-1'), createdAt: Date.now(), updatedAt: Date.now(), messageCount: 1, firstUserMessage: 'Test', isActive: false },
+        { id: unsafeConversationId('conv-2'), createdAt: Date.now(), updatedAt: Date.now(), messageCount: 2, firstUserMessage: 'Test 2', isActive: true }
       ]
       mockIdbStorage.getConversationList.mockResolvedValue(mockListItems)
 
-      const result = await getConversationList('variant-a')
+      const result = await getConversationList(unsafeVariantName('variant-a'))
 
-      expect(mockIdbStorage.getConversationList).toHaveBeenCalledWith('variant-a')
+      expect(mockIdbStorage.getConversationList).toHaveBeenCalledWith(unsafeVariantName('variant-a'))
       expect(result).toHaveLength(2)
-      expect(result[0].id).toBe('conv-1')
-      expect(result[1].id).toBe('conv-2')
+      expect(result[0].id).toBe(unsafeConversationId('conv-1'))
+      expect(result[1].id).toBe(unsafeConversationId('conv-2'))
     })
 
     it('should return empty array on error', async () => {
       mockIdbStorage.getConversationList.mockRejectedValue(new Error('DB error'))
 
-      const result = await getConversationList('variant-a')
+      const result = await getConversationList(unsafeVariantName('variant-a'))
 
       expect(result).toEqual([])
     })
