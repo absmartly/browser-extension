@@ -2,22 +2,29 @@ import { Orchestrator } from '../orchestrator'
 import { Logger } from '../../utils/logger'
 
 jest.mock('../../sdk/sdk-detector')
-jest.mock('../../sdk/plugin-detector')
 jest.mock('../../sdk/sdk-interceptor')
 jest.mock('../../experiment/override-manager')
 jest.mock('../../dom/preview-manager')
 jest.mock('../../utils/logger')
 
 import { SDKDetector } from '../../sdk/sdk-detector'
-import { PluginDetector } from '../../sdk/plugin-detector'
 import { SDKInterceptor } from '../../sdk/sdk-interceptor'
 import { OverrideManager } from '../../experiment/override-manager'
 import { PreviewManager } from '../../dom/preview-manager'
 
+const dispatchMessageEvent = (init: MessageEventInit) => {
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      ...init,
+      source: window,
+      origin: window.location.origin
+    })
+  )
+}
+
 describe('Orchestrator Integration Tests', () => {
   let orchestrator: Orchestrator
   let mockSDKDetector: jest.Mocked<SDKDetector>
-  let mockPluginDetector: jest.Mocked<PluginDetector>
   let mockSDKInterceptor: jest.Mocked<SDKInterceptor>
   let mockOverrideManager: jest.Mocked<OverrideManager>
   let mockPreviewManager: jest.Mocked<PreviewManager>
@@ -37,7 +44,6 @@ describe('Orchestrator Integration Tests', () => {
     })
 
     mockSDKDetector = (orchestrator as any).sdkDetector
-    mockPluginDetector = (orchestrator as any).pluginDetector
     mockSDKInterceptor = (orchestrator as any).sdkInterceptor
     mockOverrideManager = (orchestrator as any).overrideManager
     mockPreviewManager = (orchestrator as any).previewManager
@@ -63,7 +69,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -71,13 +76,7 @@ describe('Orchestrator Integration Tests', () => {
       const state = orchestrator.getState()
       expect(state.cachedContext).toBe(mockContext)
       expect(state.contextPropertyPath).toBe('window.absmartly')
-      expect(mockWindow.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: 'absmartly-page',
-          type: 'SDK_CONTEXT_READY'
-        }),
-        '*'
-      )
+      expect(mockWindow.postMessage).not.toHaveBeenCalled()
     })
 
     it('should handle SDK detection race condition - SDK loads after timeout', () => {
@@ -112,7 +111,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -178,7 +176,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -190,142 +187,7 @@ describe('Orchestrator Integration Tests', () => {
     })
   })
 
-  describe('2. Plugin Detector', () => {
-    it('should detect existing plugin and skip initialization', () => {
-      const mockContext = {
-        treatment: jest.fn(),
-        peek: jest.fn(),
-        data: jest.fn()
-      }
-
-      const mockPlugin = { initialized: true, version: '1.0.0' }
-
-      mockSDKDetector.detectSDK = jest.fn().mockReturnValue({
-        sdk: null,
-        context: mockContext,
-        contextPath: 'window.absmartly'
-      })
-
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(mockPlugin)
-
-      orchestrator.start()
-      jest.advanceTimersByTime(100)
-
-      expect(Logger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Plugin already loaded')
-      )
-      expect(mockWindow.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'REQUEST_CUSTOM_CODE'
-        }),
-        '*'
-      )
-    })
-
-    it('should detect inaccessible plugin and stop', () => {
-      const mockContext = {
-        treatment: jest.fn(),
-        peek: jest.fn()
-      }
-
-      mockSDKDetector.detectSDK = jest.fn().mockReturnValue({
-        sdk: null,
-        context: mockContext,
-        contextPath: 'window.absmartly'
-      })
-
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue('active-but-inaccessible')
-
-      orchestrator.start()
-      jest.advanceTimersByTime(100)
-
-      expect(Logger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Plugin is active but we cannot access it')
-      )
-    })
-
-    it('should request plugin initialization when no plugin found', () => {
-      const mockContext = {
-        treatment: jest.fn(),
-        peek: jest.fn(),
-        data: jest.fn()
-      }
-
-      mockSDKDetector.detectSDK = jest.fn().mockReturnValue({
-        sdk: null,
-        context: mockContext,
-        contextPath: 'window.absmartly'
-      })
-
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
-
-      orchestrator.start()
-      jest.advanceTimersByTime(100)
-
-      expect(mockWindow.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'SDK_CONTEXT_READY'
-        }),
-        '*'
-      )
-    })
-
-    it('should validate plugin version if available', () => {
-      const mockContext = {
-        treatment: jest.fn(),
-        peek: jest.fn()
-      }
-
-      const mockPlugin = {
-        initialized: true,
-        version: '2.0.0',
-        capabilities: ['dom-changes', 'overrides']
-      }
-
-      mockSDKDetector.detectSDK = jest.fn().mockReturnValue({
-        sdk: null,
-        context: mockContext,
-        contextPath: 'window.absmartly'
-      })
-
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(mockPlugin)
-
-      orchestrator.start()
-      jest.advanceTimersByTime(100)
-
-      expect(Logger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Plugin already loaded')
-      )
-    })
-
-    it('should detect plugin features - DOMManipulator', () => {
-      const mockContext = {
-        treatment: jest.fn(),
-        peek: jest.fn()
-      }
-
-      const mockPlugin = {
-        initialized: true,
-        version: '1.0.0',
-        domManipulator: { applyChange: jest.fn() }
-      }
-
-      mockSDKDetector.detectSDK = jest.fn().mockReturnValue({
-        sdk: null,
-        context: mockContext,
-        contextPath: 'window.absmartly'
-      })
-
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(mockPlugin)
-
-      orchestrator.start()
-      jest.advanceTimersByTime(100)
-
-      expect(mockPluginDetector.detectPlugin).toHaveBeenCalledWith(mockContext)
-    })
-  })
-
-  describe('3. Context Caching', () => {
+  describe('2. Context Caching', () => {
     it('should cache context after first detection', () => {
       const mockContext = {
         treatment: jest.fn(),
@@ -338,7 +200,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -362,7 +223,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -386,7 +246,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -412,7 +271,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -432,7 +290,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -445,7 +302,7 @@ describe('Orchestrator Integration Tests', () => {
     })
   })
 
-  describe('4. Preview Manager Coordination', () => {
+  describe('3. Preview Manager Coordination', () => {
     beforeEach(() => {
       orchestrator.setupMessageListener()
     })
@@ -457,7 +314,7 @@ describe('Orchestrator Integration Tests', () => {
 
       mockPreviewManager.applyPreviewChange = jest.fn().mockReturnValue(true)
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
@@ -467,7 +324,7 @@ describe('Orchestrator Integration Tests', () => {
             changes: mockChanges
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalledWith(
         mockChanges[0],
@@ -478,7 +335,7 @@ describe('Orchestrator Integration Tests', () => {
     it('should remove preview changes via PreviewManager', () => {
       mockPreviewManager.removePreviewChanges = jest.fn().mockReturnValue(true)
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'REMOVE_PREVIEW',
@@ -486,7 +343,7 @@ describe('Orchestrator Integration Tests', () => {
             experimentName: 'test-exp'
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.removePreviewChanges).toHaveBeenCalledWith('test-exp')
     })
@@ -499,7 +356,7 @@ describe('Orchestrator Integration Tests', () => {
       mockPreviewManager.applyPreviewChange = jest.fn().mockReturnValue(true)
       mockOverrideManager.checkOverridesCookie = jest.fn()
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
@@ -508,7 +365,7 @@ describe('Orchestrator Integration Tests', () => {
             changes: mockChanges
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalled()
     })
@@ -519,21 +376,21 @@ describe('Orchestrator Integration Tests', () => {
       const changes1 = [{ selector: '.test', type: 'text', value: 'Exp1' }]
       const changes2 = [{ selector: '.test', type: 'style', css: { color: 'red' } }]
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
           payload: { experimentName: 'exp1', changes: changes1 }
         }
-      }))
+})
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
           payload: { experimentName: 'exp2', changes: changes2 }
         }
-      }))
+})
 
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalledTimes(2)
     })
@@ -541,13 +398,13 @@ describe('Orchestrator Integration Tests', () => {
     it('should cleanup preview on navigation', () => {
       mockPreviewManager.clearAll = jest.fn()
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'REMOVE_PREVIEW',
           payload: { experimentName: '__preview__' }
         }
-      }))
+})
 
       expect(mockPreviewManager.removePreviewChanges).toHaveBeenCalled()
     })
@@ -560,7 +417,7 @@ describe('Orchestrator Integration Tests', () => {
         { selector: '.test', type: 'text', value: 'New Text' }
       ]
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
@@ -570,7 +427,7 @@ describe('Orchestrator Integration Tests', () => {
             changes: mockChanges
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.removePreviewChanges).toHaveBeenCalledWith('test-exp')
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalledWith(
@@ -586,7 +443,7 @@ describe('Orchestrator Integration Tests', () => {
         { selector: '.test', type: 'text', value: 'Test' }
       ]
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'ABSMARTLY_PREVIEW',
@@ -596,7 +453,7 @@ describe('Orchestrator Integration Tests', () => {
             experimentName: 'test-exp'
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalled()
     })
@@ -604,7 +461,7 @@ describe('Orchestrator Integration Tests', () => {
     it('should handle ABSMARTLY_PREVIEW remove action', () => {
       mockPreviewManager.removePreviewChanges = jest.fn().mockReturnValue(true)
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'ABSMARTLY_PREVIEW',
@@ -613,13 +470,13 @@ describe('Orchestrator Integration Tests', () => {
             experimentName: 'test-exp'
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.removePreviewChanges).toHaveBeenCalledWith('test-exp')
     })
   })
 
-  describe('5. Override Manager Integration', () => {
+  describe('4. Override Manager Integration', () => {
     beforeEach(() => {
       orchestrator.setupMessageListener()
     })
@@ -627,7 +484,7 @@ describe('Orchestrator Integration Tests', () => {
     it('should apply overrides via OverrideManager', () => {
       mockOverrideManager.checkOverridesCookie = jest.fn()
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'APPLY_OVERRIDES',
@@ -635,7 +492,7 @@ describe('Orchestrator Integration Tests', () => {
             overrides: { 'test-exp': 1 }
           }
         }
-      }))
+})
 
       expect(mockOverrideManager.checkOverridesCookie).toHaveBeenCalled()
     })
@@ -654,7 +511,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -666,15 +522,15 @@ describe('Orchestrator Integration Tests', () => {
       mockOverrideManager.checkOverridesCookie = jest.fn()
       mockPreviewManager.applyPreviewChange = jest.fn().mockReturnValue(true)
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'APPLY_OVERRIDES',
           payload: { overrides: { 'test-exp': 1 } }
         }
-      }))
+})
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
@@ -683,7 +539,7 @@ describe('Orchestrator Integration Tests', () => {
             changes: [{ selector: '.test', type: 'text', value: 'Test' }]
           }
         }
-      }))
+})
 
       expect(mockOverrideManager.checkOverridesCookie).toHaveBeenCalled()
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalled()
@@ -692,7 +548,7 @@ describe('Orchestrator Integration Tests', () => {
     it('should handle multiple override scenarios', () => {
       mockOverrideManager.checkOverridesCookie = jest.fn()
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'APPLY_OVERRIDES',
@@ -704,13 +560,13 @@ describe('Orchestrator Integration Tests', () => {
             }
           }
         }
-      }))
+})
 
       expect(mockOverrideManager.checkOverridesCookie).toHaveBeenCalled()
     })
   })
 
-  describe('6. Message Passing', () => {
+  describe('5. Message Passing', () => {
     beforeEach(() => {
       orchestrator.setupMessageListener()
     })
@@ -727,24 +583,17 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
 
-      expect(mockWindow.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: 'absmartly-page',
-          type: 'SDK_CONTEXT_READY'
-        }),
-        '*'
-      )
+      expect(mockWindow.postMessage).not.toHaveBeenCalled()
     })
 
     it('should queue messages during initialization', () => {
       mockPreviewManager.applyPreviewChange = jest.fn().mockReturnValue(true)
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
@@ -753,7 +602,7 @@ describe('Orchestrator Integration Tests', () => {
             experimentName: 'test-exp'
           }
         }
-      }))
+})
 
       expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalled()
     })
@@ -763,7 +612,7 @@ describe('Orchestrator Integration Tests', () => {
         throw new Error('Preview failed')
       })
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'PREVIEW_CHANGES',
@@ -772,7 +621,7 @@ describe('Orchestrator Integration Tests', () => {
             experimentName: 'test-exp'
           }
         }
-      }))
+})
 
       expect(Logger.error).toHaveBeenCalledWith(
         expect.stringContaining('Error applying preview changes'),
@@ -792,7 +641,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -804,25 +652,25 @@ describe('Orchestrator Integration Tests', () => {
     it('should ignore messages from wrong source', () => {
       mockPreviewManager.applyPreviewChange = jest.fn()
 
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'other-extension',
           type: 'PREVIEW_CHANGES',
           payload: {}
         }
-      }))
+})
 
       expect(mockPreviewManager.applyPreviewChange).not.toHaveBeenCalled()
     })
 
     it('should handle unknown message types', () => {
-      window.dispatchEvent(new MessageEvent('message', {
+      dispatchMessageEvent({
         data: {
           source: 'absmartly-extension',
           type: 'UNKNOWN_TYPE',
           payload: {}
         }
-      }))
+})
 
       expect(Logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Unknown message type'),
@@ -831,7 +679,7 @@ describe('Orchestrator Integration Tests', () => {
     })
   })
 
-  describe('7. Event Buffering', () => {
+  describe('6. Event Buffering', () => {
     it('should buffer SDK events before initialization', () => {
       const mockContext = {
         treatment: jest.fn(),
@@ -845,7 +693,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -867,7 +714,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -888,7 +734,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -908,7 +753,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -941,17 +785,11 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
 
-      expect(mockWindow.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'SDK_CONTEXT_READY'
-        }),
-        '*'
-      )
+      expect(mockWindow.postMessage).not.toHaveBeenCalled()
     })
 
     it('should handle context detection timeout', () => {
@@ -988,7 +826,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       expect(() => {
         orchestrator.start()
@@ -1008,14 +845,12 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
 
       const state = orchestrator.getState()
       expect(state.cachedContext).toBe(mockContext)
-      expect(state.isInitializing).toBe(false)
     })
 
     it('should handle context ready() promise rejection', () => {
@@ -1033,7 +868,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -1041,29 +875,6 @@ describe('Orchestrator Integration Tests', () => {
       expect(mockContext.ready).toHaveBeenCalled()
     })
 
-    it('should handle multiple initialization attempts', () => {
-      orchestrator.setupMessageListener()
-
-      window.dispatchEvent(new MessageEvent('message', {
-        data: {
-          source: 'absmartly-extension',
-          type: 'INITIALIZE_PLUGIN',
-          payload: { config: {} }
-        }
-      }))
-
-      window.dispatchEvent(new MessageEvent('message', {
-        data: {
-          source: 'absmartly-extension',
-          type: 'INITIALIZE_PLUGIN',
-          payload: { config: {} }
-        }
-      }))
-
-      expect(Logger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Already initialized or initializing')
-      )
-    })
   })
 
   describe('9. Exposed APIs', () => {
@@ -1104,7 +915,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -1134,7 +944,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)
@@ -1172,7 +981,6 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-      mockPluginDetector.detectPlugin = jest.fn().mockReturnValue(null)
 
       orchestrator.start()
       jest.advanceTimersByTime(100)

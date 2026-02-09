@@ -26,7 +26,6 @@ A comprehensive security audit of the ABsmartly Browser Extension has identified
 **Impact**: Attackers can inject malicious scripts that execute in user context
 
 **Vulnerable Files**:
-- `public/inject-sdk-plugin.js:94, 401, 557`
 - `src/visual-editor/core/element-actions.ts:519`
 - `src/visual-editor/core/editor-coordinator.ts:470`
 - `src/content/sdk-bridge.ts:68`
@@ -58,7 +57,6 @@ element.innerHTML = DOMPurify.sanitize(change.value);
 **Impact**: Complete compromise of extension and user data
 
 **Vulnerable Files**:
-- `public/inject-sdk-plugin.js:773`
 - `src/content/sdk-bridge.ts:93`
 
 **Attack Vector**:

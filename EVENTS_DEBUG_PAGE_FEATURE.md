@@ -82,7 +82,6 @@ This feature provides a comprehensive event debugging interface that:
        │ SDK events fire
        ↓
 ┌─────────────────────┐
-│  inject-sdk-plugin  │
 │  (intercepts events)│
 └──────┬──────────────┘
        │ window.postMessage

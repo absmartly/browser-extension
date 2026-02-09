@@ -10,7 +10,6 @@ The Events Debug Page is a real-time monitoring tool for ABsmartly SDK events. I
 
 The feature uses a three-layer architecture for event capture and display:
 
-1. **Page Context Layer** (`public/inject-sdk-plugin.js`)
    - Intercepts the ABsmartly SDK's `eventLogger` when the context is detected
    - Wraps the original eventLogger to capture all events
    - Forwards events via `window.postMessage` to the content script
@@ -108,7 +107,6 @@ Events are color-coded for quick identification:
 
 ### Modified Files
 
-1. **`public/inject-sdk-plugin.js`**
    - Added `interceptEventLogger()` function (lines 662-700)
    - Modified `detectABsmartlySDK()` to call interceptor (line 778)
    - Captures all SDK events and forwards to extension

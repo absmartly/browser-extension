@@ -223,7 +223,6 @@ const endpointInput = sidebar.locator('input[placeholder="https://api.absmartly.
 - **src/types/** - TypeScript type definitions
 - **src/utils/** - Helper functions and utilities
 - **public/** - Static assets and injected scripts
-  - `inject-sdk-plugin.js` - Script injected to integrate with SDK
   - `absmartly-dom-changes.min.js` - DOM changes plugin
 
 ### Build Process

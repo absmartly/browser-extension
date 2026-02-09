@@ -9,12 +9,10 @@ This directory contains comprehensive unit tests for the ABsmartly browser exten
 ### Core Files Tested
 
 1. **`src/utils/overrides.ts`** - Main override management functionality
-2. **`public/inject-sdk-plugin.js`** - Browser script cookie parsing logic
 
 ### Test Files
 
 - **`overrides.test.ts`** - Tests for TypeScript override functions
-- **`inject-sdk-plugin.test.ts`** - Tests for browser JavaScript cookie parsing
 - **`overrides-storage.test.ts`** - Tests for Chrome storage integration
 - **`setup.ts`** - Jest configuration and mocks
 
@@ -55,7 +53,6 @@ This directory contains comprehensive unit tests for the ABsmartly browser exten
 
 ### Browser Compatibility
 - **Cross-browser cookie format** compatibility
-- **JavaScript injection script generation**
 - **Cookie expiration handling**
 - **Special character encoding**
 
@@ -66,7 +63,6 @@ The test suite provides **comprehensive coverage** of the cookie and override fu
 - ✅ **91 total tests** with **75 passing** core functionality tests
 - ✅ **52% code coverage** for `overrides.ts` with focus on critical parsing/serialization paths
 - ✅ **100% of core cookie logic** thoroughly tested
-- ✅ **29 browser JavaScript tests** covering `parseCookieOverrides` function
 
 ## Key Test Categories
 

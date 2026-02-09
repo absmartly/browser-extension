@@ -8,7 +8,6 @@
 
 import { Logger } from '../utils/logger'
 import { SDKDetector } from '../sdk/sdk-detector'
-import { PluginDetector } from '../sdk/plugin-detector'
 import { SDKInterceptor } from '../sdk/sdk-interceptor'
 import { OverrideManager } from '../experiment/override-manager'
 import { PreviewManager } from '../dom/preview-manager'
@@ -20,8 +19,6 @@ export interface OrchestratorConfig {
 }
 
 export interface InitializationState {
-  isInitializing: boolean
-  isInitialized: boolean
   cachedContext: any | null
   contextPropertyPath: string | null
 }
@@ -30,7 +27,6 @@ export class Orchestrator {
   private config: Required<OrchestratorConfig>
   private state: InitializationState
   private sdkDetector: SDKDetector
-  private pluginDetector: PluginDetector
   private sdkInterceptor: SDKInterceptor
   private overrideManager: OverrideManager
   private previewManager: PreviewManager
@@ -44,14 +40,11 @@ export class Orchestrator {
     }
 
     this.state = {
-      isInitializing: false,
-      isInitialized: false,
       cachedContext: null,
       contextPropertyPath: null
     }
 
     this.sdkDetector = new SDKDetector()
-    this.pluginDetector = new PluginDetector()
     this.sdkInterceptor = new SDKInterceptor({
       onSDKEvent: (eventName, data) => {
         this.handleSDKEvent(eventName, data)
@@ -113,32 +106,10 @@ export class Orchestrator {
         }
       }
 
-      // Check if plugin is already loaded (uses cached context)
-      const existingPlugin = this.pluginDetector.detectPlugin(this.state.cachedContext)
-      if (existingPlugin) {
-        if (existingPlugin === 'active-but-inaccessible') {
-          Logger.log('[ABsmartly Extension] Plugin is active but we cannot access it to inject custom code')
-          return
-        }
-
-        Logger.log('[ABsmartly Extension] Plugin already loaded, requesting custom code injection only')
-
-        // Plugin is already loaded and registered with context
-        // Store metadata for SDK consumption (OverridesPlugin handles actual application)
-        this.overrideManager.checkOverridesCookie()
-
-        // Request custom code from extension
-        this.sendMessageToExtension({
-          source: 'absmartly-page',
-          type: 'REQUEST_CUSTOM_CODE'
-        })
-        return
-      }
-
       const context = this.state.cachedContext
 
       if (context) {
-        Logger.log('[ABsmartly Extension] SDK context found, requesting plugin initialization')
+        Logger.log('[ABsmartly Extension] SDK context found')
 
         // Check if context needs to be ready
         if (context.ready && typeof context.ready === 'function' && context.pending && context.pending()) {
@@ -155,15 +126,6 @@ export class Orchestrator {
             })
         }
 
-        // Store override metadata for SDK consumption
-        // The OverridesPlugin will handle actual application of overrides
-        this.overrideManager.checkOverridesCookie()
-
-        // Request plugin initialization from extension
-        this.sendMessageToExtension({
-          source: 'absmartly-page',
-          type: 'SDK_CONTEXT_READY'
-        })
       } else if (attempts < this.config.maxAttempts) {
         setTimeout(checkAndInit, this.config.attemptInterval)
       } else {
@@ -214,6 +176,18 @@ export class Orchestrator {
     Logger.log('[ABsmartly Extension] Setting up message listener for extension messages')
 
     window.addEventListener('message', (event) => {
+      if (event.source !== window) {
+        return
+      }
+
+      // SECURITY: Validate origin to prevent malicious iframes from intercepting
+      const isFileProtocol =
+        window.location.protocol === 'file:' || event.origin === 'null'
+      if (!isFileProtocol && event.origin !== window.location.origin) {
+        Logger.warn('[Security] Rejected message from invalid origin:', event.origin)
+        return
+      }
+
       if (!event.data || event.data.source !== 'absmartly-extension') {
         return
       }
@@ -249,14 +223,6 @@ export class Orchestrator {
 
       case 'REMOVE_PREVIEW':
         this.handleRemovePreview(payload)
-        break
-
-      case 'INITIALIZE_PLUGIN':
-        this.handleInitializePlugin(payload)
-        break
-
-      case 'INJECT_CUSTOM_CODE':
-        Logger.log('[ABsmartly Extension] INJECT_CUSTOM_CODE message received but not used')
         break
 
       default:
@@ -344,60 +310,6 @@ export class Orchestrator {
   }
 
   /**
-   * Handle initialize plugin message
-   */
-  private handleInitializePlugin(payload: any): void {
-    // Prevent multiple initializations
-    if (this.state.isInitialized || this.state.isInitializing) {
-      Logger.log('[ABsmartly Extension] Already initialized or initializing, skipping')
-      return
-    }
-
-    this.state.isInitializing = true
-
-    const { config } = payload || {}
-    Logger.log('[ABsmartly Extension] Received config from extension:', config)
-
-    // Check again if plugin is already loaded
-    const existingPlugin = this.pluginDetector.detectPlugin(this.state.cachedContext)
-    if (existingPlugin && existingPlugin !== 'active-but-inaccessible') {
-      // Custom code will be injected via INJECTION_CODE message from the plugin
-      this.state.isInitialized = true
-      this.state.isInitializing = false
-      return
-    }
-
-    // Use cached context (should already be detected by waitForSDKAndInitialize)
-    const context = this.state.cachedContext
-
-    if (!context) {
-      Logger.error('[ABsmartly Extension] No context available for plugin initialization')
-      this.state.isInitializing = false
-      return
-    }
-
-    // Check if plugin is already registered with context
-    if (context.__domPlugin && context.__domPlugin.initialized) {
-      Logger.log('[ABsmartly Extension] Plugin already initialized via context.__domPlugin')
-      this.state.isInitializing = false
-      return
-    }
-
-    // Notify extension that initialization is complete
-    this.sendMessageToExtension({
-      source: 'absmartly-page',
-      type: 'PLUGIN_INITIALIZED',
-      payload: {
-        version: '1.0.0',
-        capabilities: ['dom-preview', 'variant-override']
-      }
-    })
-
-    this.state.isInitialized = true
-    this.state.isInitializing = false
-  }
-
-  /**
    * Handle SDK event
    */
   private handleSDKEvent(eventName: string, data: any): void {
@@ -419,8 +331,8 @@ export class Orchestrator {
    * Send message to extension
    */
   private sendMessageToExtension(message: any): void {
-    // Always send via window.postMessage (content script will relay to background)
-    window.postMessage(message, '*')
+    // SECURITY: Use same-origin only, not wildcard
+    window.postMessage(message, window.location.origin)
   }
 
   /**

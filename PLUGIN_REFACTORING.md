@@ -120,7 +120,6 @@ src/plugin-extensions/
 └── index.ts                  # Public exports
 
 public/
-├── inject-sdk-plugin.js      # Page injection script (updated)
 ├── absmartly-extension-plugin.dev.js       # Built extension plugin (dev)
 ├── absmartly-extension-plugin.dev.js.map   # Source map
 └── absmartly-extension-plugin.min.js       # Built extension plugin (prod)
@@ -190,7 +189,6 @@ plugin.injectCode({
 ### For Developers
 
 No changes needed! The refactoring maintains backward compatibility:
-- Same initialization process in `inject-sdk-plugin.js`
 - Same API surface
 - Same behavior
 

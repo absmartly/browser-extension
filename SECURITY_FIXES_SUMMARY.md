@@ -32,7 +32,6 @@ Attackers could inject malicious scripts via DOM changes:
 - Installed **DOMPurify** library
 - Sanitized all innerHTML assignments in:
   - `src/content/sdk-bridge.ts` (lines 69, 175)
-  - `public/inject-sdk-plugin.js` (lines 102, 214, 270, 409, 565, 758)
 
 ### Code Changes
 ```typescript
@@ -71,7 +70,6 @@ Arbitrary code execution via javascript DOM change type:
 - Removed all `new Function()` usage
 - Files modified:
   - `src/content/sdk-bridge.ts` (lines 93-96 commented out)
-  - `public/inject-sdk-plugin.js` (lines 778-785 disabled)
 
 ### Code Changes
 ```typescript

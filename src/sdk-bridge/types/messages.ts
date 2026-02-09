@@ -6,10 +6,6 @@ export interface SDKEventPayload {
   timestamp: string
 }
 
-export interface PluginInitializedPayload {
-  version: string
-  capabilities: string[]
-}
 
 export interface PreviewChangesPayload {
   changes: unknown[]
@@ -24,15 +20,6 @@ export interface ApplyOverridesPayload {
   overrides: Record<string, unknown>
 }
 
-export interface InitializePluginPayload {
-  config: {
-    sdkEndpoint?: string
-    apiEndpoint?: string
-    queryPrefix?: string
-    persistQueryToCookie?: boolean
-  }
-}
-
 export type ExtensionMessage =
   | {
       source: MessageSource
@@ -42,26 +29,6 @@ export type ExtensionMessage =
       source: MessageSource
       type: 'SDK_EVENT'
       payload: SDKEventPayload
-    }
-  | {
-      source: MessageSource
-      type: 'PLUGIN_INITIALIZED'
-      payload: PluginInitializedPayload
-    }
-  | {
-      source: MessageSource
-      type: 'REQUEST_CUSTOM_CODE'
-      payload?: { experimentName: string }
-    }
-  | {
-      source: MessageSource
-      type: 'INITIALIZE_PLUGIN'
-      payload: InitializePluginPayload
-    }
-  | {
-      source: MessageSource
-      type: 'INJECT_CUSTOM_CODE'
-      payload: { code: string; experimentName: string }
     }
   | {
       source: MessageSource
@@ -87,10 +54,6 @@ export function isExtensionMessage(msg: unknown): msg is ExtensionMessage {
   const validTypes = [
     'SDK_CONTEXT_READY',
     'SDK_EVENT',
-    'PLUGIN_INITIALIZED',
-    'REQUEST_CUSTOM_CODE',
-    'INITIALIZE_PLUGIN',
-    'INJECT_CUSTOM_CODE',
     'PREVIEW_CHANGES',
     'REMOVE_PREVIEW',
     'APPLY_OVERRIDES'
@@ -100,12 +63,6 @@ export function isExtensionMessage(msg: unknown): msg is ExtensionMessage {
 
 export function isSDKEventMessage(msg: ExtensionMessage): msg is Extract<ExtensionMessage, { type: 'SDK_EVENT' }> {
   return msg.type === 'SDK_EVENT'
-}
-
-export function isPluginInitializedMessage(
-  msg: ExtensionMessage
-): msg is Extract<ExtensionMessage, { type: 'PLUGIN_INITIALIZED' }> {
-  return msg.type === 'PLUGIN_INITIALIZED'
 }
 
 export function isPreviewChangesMessage(
@@ -124,10 +81,4 @@ export function isApplyOverridesMessage(
   msg: ExtensionMessage
 ): msg is Extract<ExtensionMessage, { type: 'APPLY_OVERRIDES' }> {
   return msg.type === 'APPLY_OVERRIDES'
-}
-
-export function isInitializePluginMessage(
-  msg: ExtensionMessage
-): msg is Extract<ExtensionMessage, { type: 'INITIALIZE_PLUGIN' }> {
-  return msg.type === 'INITIALIZE_PLUGIN'
 }

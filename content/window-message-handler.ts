@@ -51,46 +51,6 @@ export function setupWindowMessageListener(
               err
             )
           })
-      } else if (
-        event.data.type === "REQUEST_CUSTOM_CODE" ||
-        event.data.type === "SDK_CONTEXT_READY"
-      ) {
-        const response = await chrome.runtime.sendMessage({
-          type: "REQUEST_INJECTION_CODE",
-          source: "content-script"
-        })
-
-        const config = response?.config || null
-
-        window.postMessage(
-          {
-            source: "absmartly-extension",
-            type: "INITIALIZE_PLUGIN",
-            payload: { config }
-          },
-          window.location.origin
-        )
-      } else if (event.data.type === "REQUEST_SDK_INJECTION_CONFIG") {
-        const response = await chrome.runtime.sendMessage({
-          type: "REQUEST_INJECTION_CODE",
-          source: "content-script"
-        })
-
-        const config = response?.config || null
-
-        window.postMessage(
-          {
-            source: "absmartly-extension",
-            type: "SDK_INJECTION_CONFIG",
-            payload: { config }
-          },
-          window.location.origin
-        )
-      } else if (event.data.type === "PLUGIN_INITIALIZED") {
-        chrome.runtime.sendMessage({
-          type: "PLUGIN_INITIALIZED",
-          source: "content-script"
-        })
       }
     }
   })

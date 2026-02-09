@@ -160,7 +160,6 @@ DOM changes are stored as JSON in experiment variant variables:
 - **Sidebar (Injected UI)**: Main extension UI built with React and Tailwind CSS, injected into pages by the content script (`src/contents/sidebar.tsx`)
 - **Content Script**: Injected into web pages for visual editing, SDK plugin initialization, and message relay (`content.ts`)
 - **Background Script**: Handles messaging between the sidebar/content scripts and browser actions (`background.ts`)
-- **SDK Plugin**: Injected helper to apply DOM changes on target websites (built artifact at `public/inject-sdk-plugin.js` and loader code under `src/injection/`)
 
 ## Development
 
@@ -182,7 +181,6 @@ absmartly-browser-extension/
 │   ├── types/             # TypeScript types
 │   └── utils/             # Helper functions
 ├── public/
-│   └── inject-sdk-plugin.js  # Injected DOM changes plugin bundle
 └── style.css             # Global styles
 ```
 
