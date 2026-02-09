@@ -15,7 +15,6 @@ export function useSDKStatus() {
   useEffect(() => {
     let isInitialCheck = true
     let isMounted = true
-
     const checkSDK = async () => {
       try {
         if (isInitialCheck) {
@@ -45,11 +44,8 @@ export function useSDKStatus() {
 
     checkSDK()
 
-    const intervalId = setInterval(checkSDK, 5000)
-
     return () => {
       isMounted = false
-      clearInterval(intervalId)
     }
   }, [])
 
