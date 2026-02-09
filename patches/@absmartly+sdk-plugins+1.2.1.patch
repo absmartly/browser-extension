@@ -1,0 +1,56 @@
+diff --git a/node_modules/@absmartly/sdk-plugins/es/core/DOMManipulatorLite.js b/node_modules/@absmartly/sdk-plugins/es/core/DOMManipulatorLite.js
+index 22057d4..a6e1424 100644
+--- a/node_modules/@absmartly/sdk-plugins/es/core/DOMManipulatorLite.js
++++ b/node_modules/@absmartly/sdk-plugins/es/core/DOMManipulatorLite.js
+@@ -164,7 +164,10 @@ var DOMManipulatorLite = /** @class */ (function () {
+                                     code: String(change.value).substring(0, 100) + '...',
+                                 });
+                             }
+-                            var fn = new Function('element', String(change.value));
++                            var sourceTag = "absmartly-experiment-".concat(experimentName || "unknown", ".js");
++                            var prelude = "var _debug = (typeof _debug !== 'undefined' ? _debug : { debugLog: console.log.bind(console), debugWarn: console.warn.bind(console), debugError: console.error.bind(console) });\n";
++                            var code = prelude + String(change.value) + "\n//# sourceURL=" + sourceTag;
++                            var fn = new Function('element', code);
+                             fn(element);
+                             appliedElements_1.push(element);
+                             if (_this.debug) {
+@@ -434,7 +437,10 @@ var DOMManipulatorLite = /** @class */ (function () {
+                             code: String(change.value).substring(0, 100) + '...',
+                         });
+                     }
+-                    var fn = new Function('element', String(change.value));
++                    var sourceTag = "absmartly-experiment-".concat(experimentName || "unknown", ".js");
++                    var prelude = "var _debug = (typeof _debug !== 'undefined' ? _debug : { debugLog: console.log.bind(console), debugWarn: console.warn.bind(console), debugError: console.error.bind(console) });\n";
++                    var code = prelude + String(change.value) + "\n//# sourceURL=" + sourceTag;
++                    var fn = new Function('element', code);
+                     fn(element);
+                     if (this.debug) {
+                         logDebug("[JAVASCRIPT] [".concat(experimentName, "] \u2713 JavaScript executed successfully"), {
+diff --git a/node_modules/@absmartly/sdk-plugins/lib/core/DOMManipulatorLite.js b/node_modules/@absmartly/sdk-plugins/lib/core/DOMManipulatorLite.js
+index 5153bcd..a2435a5 100644
+--- a/node_modules/@absmartly/sdk-plugins/lib/core/DOMManipulatorLite.js
++++ b/node_modules/@absmartly/sdk-plugins/lib/core/DOMManipulatorLite.js
+@@ -167,7 +167,10 @@ var DOMManipulatorLite = /** @class */ (function () {
+                                     code: String(change.value).substring(0, 100) + '...',
+                                 });
+                             }
+-                            var fn = new Function('element', String(change.value));
++                            var sourceTag = "absmartly-experiment-".concat(experimentName || "unknown", ".js");
++                            var prelude = "var _debug = (typeof _debug !== 'undefined' ? _debug : { debugLog: console.log.bind(console), debugWarn: console.warn.bind(console), debugError: console.error.bind(console) });\n";
++                            var code = prelude + String(change.value) + "\n//# sourceURL=" + sourceTag;
++                            var fn = new Function('element', code);
+                             fn(element);
+                             appliedElements_1.push(element);
+                             if (_this.debug) {
+@@ -437,7 +440,10 @@ var DOMManipulatorLite = /** @class */ (function () {
+                             code: String(change.value).substring(0, 100) + '...',
+                         });
+                     }
+-                    var fn = new Function('element', String(change.value));
++                    var sourceTag = "absmartly-experiment-".concat(experimentName || "unknown", ".js");
++                    var prelude = "var _debug = (typeof _debug !== 'undefined' ? _debug : { debugLog: console.log.bind(console), debugWarn: console.warn.bind(console), debugError: console.error.bind(console) });\n";
++                    var code = prelude + String(change.value) + "\n//# sourceURL=" + sourceTag;
++                    var fn = new Function('element', code);
+                     fn(element);
+                     if (this.debug) {
+                         (0, debug_1.logDebug)("[JAVASCRIPT] [".concat(experimentName, "] \u2713 JavaScript executed successfully"), {

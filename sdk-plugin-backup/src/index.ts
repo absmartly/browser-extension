@@ -196,7 +196,11 @@ export class ABSmartlyDOMChangesPlugin {
           if (change.script) {
             try {
               // Create a function with the element in scope
-              const func = new Function('element', change.script);
+              const sourceTag = `absmartly-experiment-${change.selector || 'unknown'}.js`;
+              const prelude =
+                "var _debug = (typeof _debug !== 'undefined' ? _debug : { debugLog: console.log.bind(console), debugWarn: console.warn.bind(console), debugError: console.error.bind(console) });\\n";
+              const code = `${prelude}${change.script}\n//# sourceURL=${sourceTag}`;
+              const func = new Function('element', code);
               func.call(window, element);
             } catch (error) {
               this.error(`Error executing JavaScript for ${change.selector}:`, error);
