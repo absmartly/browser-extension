@@ -14,47 +14,11 @@ export function handleCheckPluginStatus(sendResponse: (response: any) => void) {
 
   pluginStatusCheckInProgress = true
   debugLog(
-    "[Content Script] Forwarding CHECK_PLUGIN_STATUS to page script"
+    "[Content Script] Checking plugin status via background (MAIN world)"
   )
 
-  window.postMessage(
-    {
-      source: "absmartly-extension",
-      type: "CHECK_PLUGIN_STATUS"
-    },
-    "*"
-  )
-
-  const handleResponse = (event: MessageEvent) => {
-    if (
-      event.data &&
-      event.data.source === "absmartly-page" &&
-      event.data.type === "PLUGIN_STATUS_RESPONSE"
-    ) {
-      debugLog(
-        "[Content Script] Received plugin status response:",
-        event.data.payload
-      )
-      window.removeEventListener("message", handleResponse)
-
-      const result = event.data.payload
-
-      sendResponse(result)
-
-      pluginStatusCheckQueue.forEach((queuedResponse) =>
-        queuedResponse(result)
-      )
-      pluginStatusCheckQueue = []
-
-      pluginStatusCheckInProgress = false
-    }
-  }
-
-  window.addEventListener("message", handleResponse)
-
-  setTimeout(() => {
+  const timeoutId = setTimeout(() => {
     if (pluginStatusCheckInProgress) {
-      window.removeEventListener("message", handleResponse)
       const timeoutResult = { pluginDetected: false, timeout: true }
       sendResponse(timeoutResult)
       pluginStatusCheckQueue.forEach((queuedResponse) =>
@@ -64,6 +28,30 @@ export function handleCheckPluginStatus(sendResponse: (response: any) => void) {
       pluginStatusCheckInProgress = false
     }
   }, 2000)
+
+  chrome.runtime
+    .sendMessage({ type: "CHECK_PLUGIN_STATUS_MAIN" })
+    .then((result) => {
+      if (!pluginStatusCheckInProgress) return
+      clearTimeout(timeoutId)
+      sendResponse(result)
+      pluginStatusCheckQueue.forEach((queuedResponse) =>
+        queuedResponse(result)
+      )
+      pluginStatusCheckQueue = []
+      pluginStatusCheckInProgress = false
+    })
+    .catch((error) => {
+      if (!pluginStatusCheckInProgress) return
+      clearTimeout(timeoutId)
+      const errorResult = { pluginDetected: false, error: error?.message || String(error) }
+      sendResponse(errorResult)
+      pluginStatusCheckQueue.forEach((queuedResponse) =>
+        queuedResponse(errorResult)
+      )
+      pluginStatusCheckQueue = []
+      pluginStatusCheckInProgress = false
+    })
 
   return true
 }

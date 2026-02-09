@@ -175,6 +175,50 @@ export function initializeBackgroundScript() {
           sendResponse({ success: false, error: error.message })
         })
       return true
+    } else if (message.type === 'CHECK_PLUGIN_STATUS_MAIN') {
+      if (!sender.tab?.id) {
+        sendResponse({ pluginDetected: false, error: 'No tab context for status check' })
+        return false
+      }
+
+      chrome.scripting.executeScript({
+        target: { tabId: sender.tab.id },
+        world: 'MAIN',
+        func: () => {
+          const registry = (window as any).__ABSMARTLY_PLUGINS__ || null
+          const domInitialized = !!registry?.dom?.initialized
+          const overridesInitialized = !!registry?.overrides?.initialized
+          const hasWindowPlugin = !!(window as any).__absmartlyPlugin
+          const hasWindowDomPlugin = !!(window as any).__absmartlyDOMChangesPlugin
+          const hasDomArtifacts = !!document.querySelector(
+            '[data-absmartly-modified], [data-absmartly-created], [data-absmartly-injected]'
+          )
+
+          const pluginDetected =
+            domInitialized ||
+            overridesInitialized ||
+            hasWindowPlugin ||
+            hasWindowDomPlugin ||
+            hasDomArtifacts
+
+          return {
+            pluginDetected,
+            registry,
+            domInitialized,
+            overridesInitialized,
+            hasWindowPlugin,
+            hasWindowDomPlugin,
+            hasDomArtifacts
+          }
+        }
+      }).then((results) => {
+        const result = results?.[0]?.result
+        sendResponse(result || { pluginDetected: false })
+      }).catch((error) => {
+        debugError('[Background] CHECK_PLUGIN_STATUS_MAIN error:', error)
+        sendResponse({ pluginDetected: false, error: error.message })
+      })
+      return true
     } else if (message.type === 'ENSURE_SDK_PLUGIN_INJECTED') {
       debugLog('[Background] ENSURE_SDK_PLUGIN_INJECTED requested, forwarding to active tab')
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
