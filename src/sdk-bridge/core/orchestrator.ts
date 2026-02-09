@@ -8,6 +8,7 @@
 
 import { Logger } from '../utils/logger'
 import { SDKDetector } from '../sdk/sdk-detector'
+import { PluginDetector } from '../sdk/plugin-detector'
 import { SDKInterceptor } from '../sdk/sdk-interceptor'
 import { OverrideManager } from '../experiment/override-manager'
 import { PreviewManager } from '../dom/preview-manager'
@@ -27,6 +28,7 @@ export class Orchestrator {
   private config: Required<OrchestratorConfig>
   private state: InitializationState
   private sdkDetector: SDKDetector
+  private pluginDetector: PluginDetector
   private sdkInterceptor: SDKInterceptor
   private overrideManager: OverrideManager
   private previewManager: PreviewManager
@@ -45,6 +47,7 @@ export class Orchestrator {
     }
 
     this.sdkDetector = new SDKDetector()
+    this.pluginDetector = new PluginDetector()
     this.sdkInterceptor = new SDKInterceptor({
       onSDKEvent: (eventName, data) => {
         this.handleSDKEvent(eventName, data)
@@ -225,6 +228,10 @@ export class Orchestrator {
         this.handleRemovePreview(payload)
         break
 
+      case 'CHECK_PLUGIN_STATUS':
+        this.handleCheckPluginStatus()
+        break
+
       default:
         Logger.warn('[ABsmartly Extension] Unknown message type:', type)
     }
@@ -307,6 +314,33 @@ export class Orchestrator {
     } catch (error) {
       Logger.error('[ABsmartly Page] Error removing preview changes:', error)
     }
+  }
+
+  /**
+   * Handle plugin status check from extension
+   */
+  private handleCheckPluginStatus(): void {
+    const context = this.state.cachedContext || this.sdkDetector.detectSDK().context
+    const detection = this.pluginDetector.detectPlugin(context)
+    const registry = (window as any).__ABSMARTLY_PLUGINS__
+    const registryDetected = !!(
+      registry && (
+        (registry.dom && registry.dom.initialized) ||
+        (registry.overrides && registry.overrides.initialized)
+      )
+    )
+    const pluginDetected = this.pluginDetector.isPluginActive(detection) || registryDetected
+
+    this.sendMessageToExtension({
+      source: 'absmartly-page',
+      type: 'PLUGIN_STATUS_RESPONSE',
+      payload: {
+        pluginDetected,
+        registry: registry || {},
+        detection: detection === 'active-but-inaccessible' ? 'active-but-inaccessible' : detection ? 'instance' : null,
+        timestamp: Date.now()
+      }
+    })
   }
 
   /**

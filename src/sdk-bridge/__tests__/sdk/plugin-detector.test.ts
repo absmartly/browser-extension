@@ -17,6 +17,7 @@ describe('PluginDetector', () => {
     // Clear window properties
     delete mockWindow.__absmartlyPlugin
     delete mockWindow.__absmartlyDOMChangesPlugin
+    delete mockWindow.__ABSMARTLY_PLUGINS__
     // Clear any DOM elements
     document.body.innerHTML = ''
     jest.clearAllMocks()
@@ -89,6 +90,46 @@ describe('PluginDetector', () => {
       expect(Logger.log).toHaveBeenCalledWith(
         '[ABsmartly Extension] Site plugin instance found at window.__absmartlyDOMChangesPlugin'
       )
+    })
+
+    it('should detect plugin via global registry initialized flags', () => {
+      mockWindow.__ABSMARTLY_PLUGINS__ = {
+        dom: { initialized: true }
+      }
+
+      const result = detector.detectPlugin()
+
+      expect(result).toBe('active-but-inaccessible')
+      expect(Logger.log).toHaveBeenCalledWith(
+        '[ABsmartly Extension] Plugin detected via global registry:',
+        {
+          domInitialized: true,
+          overridesInitialized: false
+        }
+      )
+    })
+
+    it('should return registry instance if available', () => {
+      const mockPlugin = { apply: jest.fn() }
+      mockWindow.__ABSMARTLY_PLUGINS__ = {
+        dom: { initialized: true, instance: mockPlugin }
+      }
+
+      const result = detector.detectPlugin()
+
+      expect(result).toBe(mockPlugin)
+    })
+
+    it('should prioritize window plugin over registry without instance', () => {
+      const windowPlugin = { apply: jest.fn() }
+      mockWindow.__absmartlyPlugin = windowPlugin
+      mockWindow.__ABSMARTLY_PLUGINS__ = {
+        dom: { initialized: true }
+      }
+
+      const result = detector.detectPlugin()
+
+      expect(result).toBe(windowPlugin)
     })
 
     it('should prioritize context.__domPlugin over window properties', () => {

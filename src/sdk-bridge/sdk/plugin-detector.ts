@@ -35,6 +35,25 @@ export class PluginDetector {
       return (window as any).__absmartlyDOMChangesPlugin
     }
 
+    // Check global plugin registry (window.__ABSMARTLY_PLUGINS__)
+    const registry = (window as any).__ABSMARTLY_PLUGINS__
+    if (registry) {
+      const domPlugin = registry.dom
+      const overridesPlugin = registry.overrides
+      const domInitialized = !!domPlugin?.initialized
+      const overridesInitialized = !!overridesPlugin?.initialized
+
+      if (domInitialized || overridesInitialized) {
+        Logger.log('[ABsmartly Extension] Plugin detected via global registry:', {
+          domInitialized,
+          overridesInitialized
+        })
+        if (domPlugin?.instance) return domPlugin.instance
+        if (overridesPlugin?.instance) return overridesPlugin.instance
+        return 'active-but-inaccessible'
+      }
+    }
+
     // Check for plugin data attributes in the DOM (indicates plugin is active)
     const pluginElements = document.querySelectorAll(
       '[data-absmartly-modified], [data-absmartly-created], [data-absmartly-injected]'
