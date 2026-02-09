@@ -1,6 +1,9 @@
 import { Storage } from '@plasmohq/storage'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
+import { notifyUser } from '~src/utils/notifications'
+import { safeParseJSON, parseExperimentsCache, ExperimentsCacheSchema } from '~src/lib/validation-schemas'
 
+import { debugLog, debugWarn } from '~src/utils/debug'
 export const storage = new Storage()
 
 export const secureStorage = new Storage({ area: "local" })
@@ -17,6 +20,7 @@ export const STORAGE_KEYS = {
 const CHUNK_SIZE = 5000
 const MAX_CACHE_CHUNKS = 20
 const CHUNK_CLEANUP_LIMIT = 10
+const EXPERIMENTS_CACHE_VERSION = 1
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
   try {
@@ -62,6 +66,7 @@ export async function addRecentExperiment(experimentId: number): Promise<void> {
 }
 
 export interface ExperimentsCache {
+  version: number
   experiments: any[]
   timestamp: number
 }
@@ -71,16 +76,34 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
     const metadata = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta')
     if (!metadata) {
       const data = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE)
-      console.log('Cache retrieved (non-chunked):', data ? 'exists' : 'null')
-      return data as unknown as ExperimentsCache | null
+      debugLog('Cache retrieved (non-chunked):', data ? 'exists' : 'null')
+      if (!data) {
+        return null
+      }
+
+      const validation = ExperimentsCacheSchema.safeParse(data)
+      if (!validation.success) {
+        console.error('[Storage] Cache validation failed:', validation.error.issues)
+        throw new Error(`Cache validation failed: ${validation.error.issues[0].path.join('.')}: ${validation.error.issues[0].message}`)
+      }
+
+      if ((validation.data as ExperimentsCache).version !== EXPERIMENTS_CACHE_VERSION) {
+        throw new Error('Cache version mismatch')
+      }
+
+      return validation.data as unknown as ExperimentsCache
     }
 
     if ((metadata as any).chunked) {
+      if ((metadata as any).version !== EXPERIMENTS_CACHE_VERSION) {
+        throw new Error('Cache version mismatch')
+      }
+
       const chunks: string[] = []
       for (let i = 0; i < (metadata as any).chunks; i++) {
         const chunk = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_' + i)
         if (!chunk) {
-          console.warn(`Missing chunk ${i}, cache is corrupted`)
+          debugWarn(`Missing chunk ${i}, cache is corrupted`)
           throw new Error('Cache corrupted - missing chunks')
         }
         chunks.push(chunk)
@@ -91,17 +114,37 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
         throw new Error('Empty cache data')
       }
 
-      const cacheData = JSON.parse(fullData)
-      console.log('Cache retrieved (chunked):', cacheData.experiments?.length || 0, 'experiments')
+      const parseResult = safeParseJSON(fullData, ExperimentsCacheSchema)
+      if (parseResult.success) {
+        const { data } = parseResult
+        if ((data as ExperimentsCache).version !== EXPERIMENTS_CACHE_VERSION) {
+          throw new Error('Cache version mismatch')
+        }
+        debugLog('Cache retrieved (chunked):', data.experiments?.length || 0, 'experiments')
+        return data as unknown as ExperimentsCache
+      }
 
-      return cacheData
+      console.error('[Storage] Cache validation failed:', (parseResult as { success: false; error: string }).error)
+      throw new Error(`Cache validation failed: ${(parseResult as { success: false; error: string }).error}`)
     } else {
       const data = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE)
       return data as unknown as ExperimentsCache | null
     }
   } catch (error) {
     console.error('Error getting experiments cache:', error)
+
+    let errorType = 'corruption'
+    let userMessage = 'Experiment cache was corrupted and has been cleared. '
+
+    if (error.message?.includes('quota')) {
+      errorType = 'quota'
+      userMessage = 'Storage quota exceeded. Consider clearing old data. '
+    }
+
     await clearExperimentsCache()
+
+    notifyUser(userMessage + 'Data will be refreshed from server.', 'warning')
+
     return null
   }
 }
@@ -131,31 +174,35 @@ export async function setExperimentsCache(experiments: any[]): Promise<void> {
     }))
 
     const data = {
+      version: EXPERIMENTS_CACHE_VERSION,
       experiments: minimalExperiments,
       timestamp: Date.now()
     }
 
     const dataStr = JSON.stringify(data)
-    console.log(`Cache size: ${dataStr.length} characters`)
+    debugLog(`Cache size: ${dataStr.length} characters`)
 
     try {
       await storage.set(STORAGE_KEYS.EXPERIMENTS_CACHE, data)
-      console.log('Cached experiments successfully (non-chunked)')
+      debugLog('Cached experiments successfully (non-chunked)')
       return
     } catch (directError: any) {
-      console.log('Direct storage failed, trying chunked approach:', directError.message)
+      debugLog('Direct storage failed, trying chunked approach:', directError.message)
 
       const chunks = Math.ceil(dataStr.length / CHUNK_SIZE)
 
       if (chunks > MAX_CACHE_CHUNKS) {
-        console.warn('Data too large even for chunking, skipping cache')
+        const message = `Cache data too large (${dataStr.length} bytes). Caching disabled.`
+        debugWarn('[Storage]', message)
+        notifyUser(message + ' Consider deleting old conversations.', 'warning')
         return
       }
 
       await storage.set(STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta', {
         timestamp: Date.now(),
         chunked: true,
-        chunks: chunks
+        chunks: chunks,
+        version: EXPERIMENTS_CACHE_VERSION
       })
 
       for (let i = 0; i < chunks; i++) {
@@ -165,11 +212,18 @@ export async function setExperimentsCache(experiments: any[]): Promise<void> {
         await storage.set(STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_' + i, chunk)
       }
 
-      console.log(`Cached experiments successfully (${chunks} chunks)`)
+      debugLog(`Cached experiments successfully (${chunks} chunks)`)
     }
   } catch (error) {
     console.error('Error setting experiments cache:', error)
+
+    let userMessage = 'Failed to cache experiments. '
+    if (error.message?.includes('quota')) {
+      userMessage = 'Storage quota exceeded while caching experiments. '
+    }
+
     await clearExperimentsCache()
+    notifyUser(userMessage + 'Data will be fetched fresh from server.', 'warning')
   }
 }
 

@@ -8,13 +8,13 @@
  * the code modular and testable.
  */
 
-import { Storage } from "@plasmohq/storage"
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import type { DOMChangesInlineState, ElementPickerResult } from '~src/types/storage-state'
 import type { ExtensionMessage } from '~src/lib/messaging'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { checkAuthentication } from '~src/utils/auth'
 import { generateDOMChanges } from '~src/lib/ai-dom-generator'
+import { storage, secureStorage, sessionStorage } from '~src/lib/storage-instances'
 
 import { routeMessage, validateSender } from './core/message-router'
 import { makeAPIRequest, openLoginPage } from './core/api-client'
@@ -42,14 +42,6 @@ import {
 
 import { safeValidateAPIRequest, ConfigSchema } from './utils/validation'
 import { checkRateLimit } from './utils/rate-limiter'
-
-const storage = new Storage()
-const secureStorage = new Storage({
-  area: "local",
-  secretKeyring: true
-} as any)
-
-const sessionStorage = new Storage({ area: "session" })
 
 /**
  * Initialize the background script
@@ -127,13 +119,13 @@ export function initializeBackgroundScript() {
         })
       return true
     } else if (message.type === 'GET_CONFIG') {
-      console.log('[Background] GET_CONFIG message received from:', sender.tab?.id, sender.url)
+      debugLog('[Background] GET_CONFIG message received from:', sender.tab?.id, sender.url)
       getConfig(storage, secureStorage)
         .then(config => {
-          console.log('[Background] GET_CONFIG config retrieved:', !!config)
+          debugLog('[Background] GET_CONFIG config retrieved:', !!config)
           debugLog('[Background] GET_CONFIG returning config')
           sendResponse({ success: true, config })
-          console.log('[Background] GET_CONFIG response sent')
+          debugLog('[Background] GET_CONFIG response sent')
         })
         .catch(error => {
           console.error('[Background] GET_CONFIG error:', error)
@@ -147,8 +139,11 @@ export function initializeBackgroundScript() {
           chrome.runtime.sendMessage({
             type: 'SDK_EVENT_BROADCAST',
             payload: message.payload
-          }).catch(() => {
-            // Ignore - no listeners if sidebar not open
+          }).catch((error) => {
+            if (!error?.message?.includes('Receiving end does not exist') &&
+                !error?.message?.includes('message port closed')) {
+              debugError('[Background] Unexpected error broadcasting SDK event:', error)
+            }
           })
           sendResponse({ success: true })
         })
@@ -181,15 +176,15 @@ export function initializeBackgroundScript() {
         })
       return true
     } else if (message.type === 'ENSURE_SDK_PLUGIN_INJECTED') {
-      console.log('[Background] ENSURE_SDK_PLUGIN_INJECTED requested, forwarding to active tab')
+      debugLog('[Background] ENSURE_SDK_PLUGIN_INJECTED requested, forwarding to active tab')
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, { type: 'INJECT_SDK_PLUGIN' }, (response) => {
-            console.log('[Background] Content script injection response:', response)
+            debugLog('[Background] Content script injection response:', response)
             sendResponse(response || { success: true })
           })
         } else {
-          console.warn('[Background] No active tab found for SDK plugin injection')
+          debugWarn('[Background] No active tab found for SDK plugin injection')
           sendResponse({ success: false, error: 'No active tab' })
         }
       })
@@ -215,8 +210,13 @@ export function initializeBackgroundScript() {
             variantName: state.variantName,
             fieldId: state.pickingForField,
             selector: message.selector
-          }).catch(() => {
-            debugLog("[Background] No sidebar listening for ELEMENT_PICKER_RESULT - this is expected if sidebar is closed")
+          }).catch((error) => {
+            if (error?.message?.includes('Receiving end does not exist') ||
+                error?.message?.includes('message port closed')) {
+              debugLog("[Background] No sidebar listening for ELEMENT_PICKER_RESULT - this is expected if sidebar is closed")
+            } else {
+              debugError("[Background] Unexpected error sending ELEMENT_PICKER_RESULT:", error)
+            }
           })
         }
       })
@@ -231,6 +231,8 @@ export function initializeBackgroundScript() {
           chrome.tabs.sendMessage(tabs[0].id, { type: "GET_DOM_CHANGES" }, (response) => {
             sendResponse(response)
           })
+        } else {
+          sendResponse({ success: false, error: 'No active tab' })
         }
       })
       return true
@@ -287,8 +289,13 @@ export function initializeBackgroundScript() {
         })
       return true
     } else if (message.type === 'PREVIEW_STATE_CHANGED') {
-      chrome.runtime.sendMessage(message).catch(() => {
-        debugLog("[Background] No extension pages listening for PREVIEW_STATE_CHANGED - this is expected if sidebar is closed")
+      chrome.runtime.sendMessage(message).catch((error) => {
+        if (error?.message?.includes('Receiving end does not exist') ||
+            error?.message?.includes('message port closed')) {
+          debugLog("[Background] No extension pages listening for PREVIEW_STATE_CHANGED - this is expected if sidebar is closed")
+        } else {
+          debugError("[Background] Unexpected error broadcasting PREVIEW_STATE_CHANGED:", error)
+        }
       })
       sendResponse({ success: true })
     } else if (message.type === 'CHECK_AUTH') {
@@ -355,22 +362,23 @@ export function initializeBackgroundScript() {
 
       ;(async () => {
         try {
-          console.log('[Background] AI_GENERATE_DOM_CHANGES - Starting generation...')
+          debugLog('[Background] AI_GENERATE_DOM_CHANGES - Starting generation...')
           const config = await getConfig(storage, secureStorage)
           const { html, prompt, currentChanges, images, conversationSession, pageUrl, domStructure } = message
-          console.log('[Background] Message keys:', Object.keys(message))
-          console.log('[Background] HTML defined:', !!html, 'type:', typeof html)
-          console.log('[Background] Prompt:', prompt, 'HTML length:', html?.length, 'Current changes:', currentChanges?.length || 0, 'Images:', images?.length || 0)
-          console.log('[Background] Session:', conversationSession?.id || 'null')
-          console.log('[Background] Page URL:', pageUrl)
-          console.log('[Background] DOM Structure:', domStructure ? `${domStructure.substring(0, 100)}...` : 'not provided')
-          console.log('[Background] AI Provider:', config?.aiProvider)
-          console.log('[Background] LLM Model from config:', config?.llmModel || 'not set')
+          debugLog('[Background] Message keys:', Object.keys(message))
+          debugLog('[Background] HTML defined:', !!html, 'type:', typeof html)
+          debugLog('[Background] Prompt:', prompt, 'HTML length:', html?.length, 'Current changes:', currentChanges?.length || 0, 'Images:', images?.length || 0)
+          debugLog('[Background] Session:', conversationSession?.id || 'null')
+          debugLog('[Background] Page URL:', pageUrl)
+          debugLog('[Background] DOM Structure:', domStructure ? `${domStructure.substring(0, 100)}...` : 'not provided')
+          debugLog('[Background] AI Provider:', config?.aiProvider)
+          debugLog('[Background] LLM Model from config:', config?.llmModel || 'not set')
 
           const apiKeyToUse = config?.aiApiKey || ''
 
-          console.log('[Background] Config aiApiKey:', config?.aiApiKey ? `present (${config?.aiApiKey.substring(0, 10)}...)` : 'missing')
-          console.log('[Background] Using API key for AI:', apiKeyToUse ? `present (${apiKeyToUse.substring(0, 10)}...)` : 'missing (OK for Claude subscription)')
+          // SECURITY: Never log API keys, even partially
+          debugLog('[Background] Config aiApiKey:', config?.aiApiKey ? 'present' : 'missing')
+          debugLog('[Background] Using API key for AI:', apiKeyToUse ? 'present' : 'missing (OK for Claude subscription)')
 
           const currentProvider = config?.aiProvider || ''
           const currentModel = config?.providerModels?.[currentProvider] || config?.llmModel
@@ -386,23 +394,23 @@ export function initializeBackgroundScript() {
 
           if (conversationSession) {
             options.conversationSession = conversationSession
-            console.log('[Background] Passing session to generateDOMChanges:', conversationSession.id)
+            debugLog('[Background] Passing session to generateDOMChanges:', conversationSession.id)
           }
-          console.log('[Background] Passing pageUrl to generateDOMChanges:', pageUrl)
+          debugLog('[Background] Passing pageUrl to generateDOMChanges:', pageUrl)
 
           if (!html && !conversationSession?.htmlSent) {
             throw new Error('HTML is required for the first message in a conversation')
           }
 
-          console.error('🚀 [Background] Calling generateDOMChanges with aiProvider:', config?.aiProvider)
-          console.log('[Background] Passing HTML:', html ? `${html.length} chars` : 'undefined (using session)')
+          debugLog('[Background] Calling generateDOMChanges with aiProvider:', config?.aiProvider)
+          debugLog('[Background] Passing HTML:', html ? `${html.length} chars` : 'undefined (using session)')
           const result = await generateDOMChanges(html || '', prompt, apiKeyToUse || '', currentChanges || [], images, options)
 
-          console.log('[Background] Generated result:', JSON.stringify(result, null, 2))
-          console.log('[Background] Result keys:', Object.keys(result))
-          console.log('[Background] Result.domChanges:', result.domChanges)
-          console.log('[Background] Result.action:', result.action)
-          console.log('[Background] Result.response:', result.response?.substring(0, 100))
+          debugLog('[Background] Generated result:', JSON.stringify(result, null, 2))
+          debugLog('[Background] Result keys:', Object.keys(result))
+          debugLog('[Background] Result.domChanges:', result.domChanges)
+          debugLog('[Background] Result.action:', result.action)
+          debugLog('[Background] Result.response:', result.response?.substring(0, 100))
 
           if (!result.domChanges) {
             console.error('[Background] ⚠️ Result missing domChanges property!', result)
@@ -421,15 +429,15 @@ export function initializeBackgroundScript() {
             targetSelectors: result.targetSelectors
           }
 
-          console.log('[Background] Normalized result:', normalizedResult)
+          debugLog('[Background] Normalized result:', normalizedResult)
 
           if (result.session) {
-            console.log('[Background] Returning session:', result.session.id)
+            debugLog('[Background] Returning session:', result.session.id)
             sendResponse({ success: true, result: normalizedResult, session: result.session })
           } else {
             sendResponse({ success: true, result: normalizedResult })
           }
-          console.log('[Background] Response sent successfully')
+          debugLog('[Background] Response sent successfully')
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           const errorStack = error instanceof Error ? error.stack : 'No stack trace'
@@ -451,7 +459,7 @@ export function initializeBackgroundScript() {
 
       ;(async () => {
         try {
-          console.log('[Background] AI_INITIALIZE_SESSION - Preparing session (no LLM call)...')
+          debugLog('[Background] AI_INITIALIZE_SESSION - Preparing session (no LLM call)...')
           const { conversationSession } = message
 
           const initializedSession = {
@@ -459,9 +467,9 @@ export function initializeBackgroundScript() {
             htmlSent: false
           }
 
-          console.log('[Background] Session prepared:', initializedSession.id, 'htmlSent:', initializedSession.htmlSent)
+          debugLog('[Background] Session prepared:', initializedSession.id, 'htmlSent:', initializedSession.htmlSent)
           sendResponse({ success: true, session: initializedSession })
-          console.log('[Background] Initialization response sent successfully')
+          debugLog('[Background] Initialization response sent successfully')
         } catch (error) {
           console.error('[Background] Session initialization error:', error)
           debugError('[Background] Session initialization error:', error)
@@ -477,10 +485,10 @@ export function initializeBackgroundScript() {
 
       ;(async () => {
         try {
-          console.log('[Background] AI_REFRESH_HTML - Refreshing HTML context...')
+          debugLog('[Background] AI_REFRESH_HTML - Refreshing HTML context...')
           const config = await getConfig(storage, secureStorage)
           const { html, conversationSession } = message
-          console.log('[Background] New HTML length:', html?.length, 'Session:', conversationSession?.id)
+          debugLog('[Background] New HTML length:', html?.length, 'Session:', conversationSession?.id)
 
           if (!conversationSession) {
             throw new Error('No conversation session provided')
@@ -491,7 +499,7 @@ export function initializeBackgroundScript() {
           }
 
           if (config?.aiProvider === 'anthropic-api' || config?.aiProvider === 'openai-api') {
-            console.log('[Background] Resetting htmlSent flag for API provider')
+            debugLog('[Background] Resetting htmlSent flag for API provider')
             const updatedSession = {
               ...conversationSession,
               htmlSent: false
@@ -501,7 +509,7 @@ export function initializeBackgroundScript() {
           }
 
           if (config?.aiProvider === 'claude-subscription') {
-            console.log('[Background] Refreshing HTML on Bridge server')
+            debugLog('[Background] Refreshing HTML on Bridge server')
             const { ClaudeCodeBridgeClient } = await import('~src/lib/claude-code-client')
             const bridgeClient = new ClaudeCodeBridgeClient()
 
@@ -509,7 +517,7 @@ export function initializeBackgroundScript() {
               await bridgeClient.connect()
               if (conversationSession.conversationId) {
                 await bridgeClient.refreshHtml(conversationSession.conversationId, html)
-                console.log('[Background] ✅ HTML refreshed on Bridge')
+                debugLog('[Background] HTML refreshed on Bridge')
               }
               bridgeClient.disconnect()
             } catch (bridgeError) {
@@ -526,7 +534,7 @@ export function initializeBackgroundScript() {
             return
           }
 
-          console.log('[Background] Unknown provider, resetting htmlSent flag')
+          debugLog('[Background] Unknown provider, resetting htmlSent flag')
           const updatedSession = {
             ...conversationSession,
             htmlSent: false
