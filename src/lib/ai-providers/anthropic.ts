@@ -67,17 +67,10 @@ export class AnthropicProvider implements AIProvider {
     debugLog('[Anthropic] Using Anthropic API with agentic loop')
     let authConfig: any = { dangerouslyAllowBrowser: true }
 
-    if (this.config.useOAuth && this.config.oauthToken) {
-      debugLog('🔐 Using OAuth token for authentication')
-      authConfig.apiKey = 'oauth-placeholder'
-      authConfig.defaultHeaders = {
-        'Authorization': `Bearer ${this.config.oauthToken}`
-      }
-    } else if (this.config.apiKey) {
-      debugLog('🔑 Using API key for authentication')
+    if (this.config.apiKey) {
       authConfig.apiKey = this.config.apiKey
     } else {
-      throw new Error('Either API key or OAuth token is required')
+      throw new Error('API key is required')
     }
 
     if (this.config.customEndpoint) {

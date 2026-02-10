@@ -11,8 +11,6 @@ export async function generateDOMChanges(
   currentChanges: DOMChange[] = [],
   images?: string[],
   options?: {
-    useOAuth?: boolean
-    oauthToken?: string
     aiProvider?: AIProviderType
     conversationSession?: ConversationSession
     pageUrl?: string
@@ -43,22 +41,9 @@ export async function generateDOMChanges(
   }
 
   let config: AIProviderConfig
-  if (providerName === 'claude-subscription' && options?.useOAuth) {
+  if (providerName === 'claude-subscription' || providerName === 'codex') {
     config = {
-      aiProvider: 'claude-subscription',
-      useOAuth: true,
-      oauthToken: options.oauthToken || '',
-      llmModel: options?.llmModel
-    }
-  } else if (providerName === 'claude-code-bridge') {
-    config = {
-      aiProvider: 'claude-code-bridge',
-      customEndpoint: options?.customEndpoint,
-      llmModel: options?.llmModel
-    }
-  } else if (providerName === 'codex') {
-    config = {
-      aiProvider: 'codex',
+      aiProvider: providerName,
       customEndpoint: options?.customEndpoint,
       llmModel: options?.llmModel
     }

@@ -40,23 +40,23 @@ interface ProviderConfig {
 
 const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
   'claude-subscription': {
-    label: 'Claude Subscription (Default)',
+    label: 'Claude Code CLI',
     apiKeyPlaceholder: '',
     apiKeyHelpLink: '',
     apiKeyHelpText: '',
     endpointPlaceholder: 'Leave blank to use default Claude API',
     endpointDescription: 'Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).',
-    defaultModel: 'sonnet',
+    defaultModel: '',
     modelDisplayType: 'static'
   },
-  'claude-code-bridge': {
-    label: 'AI CLI Bridge (Claude)',
+  'codex': {
+    label: 'Codex CLI',
     apiKeyPlaceholder: '',
     apiKeyHelpLink: '',
     apiKeyHelpText: '',
     endpointPlaceholder: 'http://localhost:9000',
-    endpointDescription: 'Optional: Specify a custom port for the AI CLI bridge server.',
-    defaultModel: 'sonnet',
+    endpointDescription: 'Optional: Specify a custom port for the bridge server.',
+    defaultModel: '',
     modelDisplayType: 'static'
   },
   'anthropic-api': {
@@ -106,15 +106,6 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     modelDisplayType: 'simple',
     modelLabel: 'Model',
     modelHelpText: 'Select the Gemini model to use for generating DOM changes.'
-  },
-  'codex': {
-    label: 'Codex CLI',
-    apiKeyPlaceholder: '',
-    apiKeyHelpLink: '',
-    apiKeyHelpText: '',
-    endpointPlaceholder: 'http://localhost:9000',
-    endpointDescription: 'Optional: Specify a custom port for the bridge server.',
-    modelDisplayType: 'static'
   }
 }
 
@@ -442,30 +433,39 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                 label="Claude Model"
                 value={llmModel}
                 onChange={(e) => onLlmModelChange(e.target.value)}
+                placeholder=""
                 options={[
-                  { value: 'sonnet', label: 'Claude Sonnet (Recommended)' },
-                  { value: 'opus', label: 'Claude Opus (Most Capable)' },
-                  { value: 'haiku', label: 'Claude Haiku (Fastest)' }
+                  { value: '', label: 'Default (Let CLI choose)' },
+                  { value: 'sonnet', label: 'Claude Sonnet' },
+                  { value: 'opus', label: 'Claude Opus' },
+                  { value: 'haiku', label: 'Claude Haiku' }
                 ]}
               />
               <p className="text-xs text-gray-500">
-                Sonnet is recommended for best balance of speed and capability.
+                Default lets the CLI choose the best model. Select a specific model to override.
               </p>
             </>
           )}
 
           {aiProvider === 'codex' && (
             <>
-              <Input
-                id="codex-model-input"
-                label="Model (optional)"
-                type="text"
+              <Select
+                id="codex-model-select"
+                label="Codex Model"
                 value={llmModel}
                 onChange={(e) => onLlmModelChange(e.target.value)}
-                placeholder="Leave blank for default"
+                placeholder=""
+                options={[
+                  { value: '', label: 'Default (Let CLI choose)' },
+                  { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+                  { value: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
+                  { value: 'gpt-5.1-codex-mini', label: 'GPT-5.1 Codex Mini' },
+                  { value: 'gpt-5.1-codex-max', label: 'GPT-5.1 Codex Max' },
+                  { value: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
+                ]}
               />
               <p className="text-xs text-gray-500">
-                Specify a model name or leave blank to use the Codex default.
+                Default lets the CLI choose the best model. Select a specific model to override.
               </p>
             </>
           )}

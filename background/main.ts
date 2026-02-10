@@ -43,6 +43,101 @@ import {
 import { safeValidateAPIRequest, ConfigSchema } from './utils/validation'
 import { checkRateLimit } from './utils/rate-limiter'
 
+export function detectPluginStatusInPage() {
+  const registry = (window as any).__ABSMARTLY_PLUGINS__ || null
+  const domInitialized = !!registry?.dom?.initialized
+  const overridesInitialized = !!registry?.overrides?.initialized
+  const hasWindowPlugin = !!(window as any).__absmartlyPlugin
+  const hasWindowDomPlugin = !!(window as any).__absmartlyDOMChangesPlugin
+
+  const possibleLocations = [
+    (window as any).ABsmartlyContext,
+    (window as any).absmartly,
+    (window as any).ABsmartly,
+    (window as any).__absmartly,
+    (window as any).sdk,
+    (window as any).abSmartly,
+    (window as any).context,
+    (window as any).absmartlyContext,
+    (window as any).__context
+  ]
+
+  let context: any = null
+  let contextPath: string | null = null
+
+  for (const location of possibleLocations) {
+    if (location && typeof location.treatment === 'function') {
+      context = location
+      break
+    }
+  }
+
+  if (!context) {
+    for (const location of possibleLocations) {
+      if (location && location.context && typeof location.context.treatment === 'function') {
+        context = location.context
+        break
+      }
+    }
+  }
+
+  if (!context) {
+    for (const location of possibleLocations) {
+      if (location && Array.isArray(location.contexts) && location.contexts.length > 0) {
+        for (const ctx of location.contexts) {
+          if (ctx && typeof ctx.treatment === 'function') {
+            context = ctx
+            break
+          }
+        }
+        if (context) break
+      }
+    }
+  }
+
+  if (context) {
+    if ((window as any).ABsmartlyContext === context) {
+      contextPath = 'ABsmartlyContext'
+    } else if ((window as any).absmartly === context) {
+      contextPath = 'absmartly'
+    } else if ((window as any).sdk && (window as any).sdk.context === context) {
+      contextPath = 'sdk.context'
+    } else {
+      contextPath = 'unknown'
+    }
+  }
+
+  const contextDomPlugin = context?.__domPlugin || null
+  const hasContextDomPlugin = !!(
+    contextDomPlugin &&
+    (contextDomPlugin.initialized || contextDomPlugin.instance || contextDomPlugin.version)
+  )
+
+  const hasDomArtifacts = !!document.querySelector(
+    '[data-absmartly-modified], [data-absmartly-created], [data-absmartly-injected]'
+  )
+
+  const pluginDetected =
+    hasContextDomPlugin ||
+    domInitialized ||
+    overridesInitialized ||
+    hasWindowPlugin ||
+    hasWindowDomPlugin ||
+    hasDomArtifacts
+
+  return {
+    pluginDetected,
+    registry,
+    domInitialized,
+    overridesInitialized,
+    hasWindowPlugin,
+    hasWindowDomPlugin,
+    hasDomArtifacts,
+    hasContextDomPlugin,
+    contextPath
+  }
+}
+
 /**
  * Initialize the background script
  * Sets up all Chrome event listeners and initializes modules
@@ -184,33 +279,7 @@ export function initializeBackgroundScript() {
       chrome.scripting.executeScript({
         target: { tabId: sender.tab.id },
         world: 'MAIN',
-        func: () => {
-          const registry = (window as any).__ABSMARTLY_PLUGINS__ || null
-          const domInitialized = !!registry?.dom?.initialized
-          const overridesInitialized = !!registry?.overrides?.initialized
-          const hasWindowPlugin = !!(window as any).__absmartlyPlugin
-          const hasWindowDomPlugin = !!(window as any).__absmartlyDOMChangesPlugin
-          const hasDomArtifacts = !!document.querySelector(
-            '[data-absmartly-modified], [data-absmartly-created], [data-absmartly-injected]'
-          )
-
-          const pluginDetected =
-            domInitialized ||
-            overridesInitialized ||
-            hasWindowPlugin ||
-            hasWindowDomPlugin ||
-            hasDomArtifacts
-
-          return {
-            pluginDetected,
-            registry,
-            domInitialized,
-            overridesInitialized,
-            hasWindowPlugin,
-            hasWindowDomPlugin,
-            hasDomArtifacts
-          }
-        }
+        func: detectPluginStatusInPage
       }).then((results) => {
         const result = results?.[0]?.result
         sendResponse(result || { pluginDetected: false })

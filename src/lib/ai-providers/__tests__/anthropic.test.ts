@@ -79,7 +79,7 @@ describe('AnthropicProvider', () => {
       expect(provider).toBeInstanceOf(AnthropicProvider)
     })
 
-    it('should default useOAuth to false when not provided', () => {
+    it('should initialize with default config', () => {
       const config = createConfig()
       const provider = new AnthropicProvider(config)
 
@@ -181,7 +181,7 @@ describe('AnthropicProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Either API key or OAuth token is required')
+      ).rejects.toThrow('API key is required')
     })
 
     it('should include DOM structure in system prompt for new session', async () => {

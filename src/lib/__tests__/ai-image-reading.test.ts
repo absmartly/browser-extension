@@ -200,7 +200,7 @@ describe('AI Image Reading', () => {
         '',
         [],
         undefined,
-        { aiProvider: 'claude-code-bridge' }
+        { aiProvider: 'claude-subscription' }
       )
 
       expect(result).toBeDefined()
@@ -223,7 +223,7 @@ describe('AI Image Reading', () => {
         '',
         [],
         [imageDataUrl],
-        { aiProvider: 'claude-code-bridge' }
+        { aiProvider: 'claude-subscription' }
       )
 
       expect(result).toBeDefined()

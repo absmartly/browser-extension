@@ -207,6 +207,7 @@ export interface ConversationSession {
     content: string
   }>
   model?: string
+  provider?: string
 }
 
 export interface ChatMessage {

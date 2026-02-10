@@ -13,7 +13,7 @@ const ConfigSchema = z.object({
   applicationName: z.string().optional(),
   authMethod: z.enum(['jwt', 'apikey']).optional(),
   environment: z.number().int().optional(),
-  aiProvider: z.enum(['claude-subscription', 'anthropic-api', 'openai-api', 'openrouter-api', 'gemini-api', 'claude-code-bridge', 'codex']).optional(),
+  aiProvider: z.enum(['claude-subscription', 'codex', 'anthropic-api', 'openai-api', 'openrouter-api', 'gemini-api']).optional(),
   aiModel: z.string().optional(),
   aiApiKey: z.string().optional(),
   llmModel: z.string().optional(),

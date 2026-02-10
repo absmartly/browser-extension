@@ -35,8 +35,6 @@ describe('AI Error Handling - End-to-End Flow', () => {
   it('should propagate invalid model error to UI with clear message', async () => {
     const provider = new BridgeProvider({
       aiProvider: 'claude-subscription',
-      useOAuth: true,
-      oauthToken: 'test-token',
       llmModel: 'invalid-model'
     })
 
@@ -96,8 +94,6 @@ describe('AI Error Handling - End-to-End Flow', () => {
   it('should handle API authentication errors clearly', async () => {
     const provider = new BridgeProvider({
       aiProvider: 'claude-subscription',
-      useOAuth: true,
-      oauthToken: 'test-token'
     })
 
     mockBridgeClient.createConversation.mockResolvedValue({
@@ -141,8 +137,6 @@ describe('AI Error Handling - End-to-End Flow', () => {
   it('should handle rate limit errors with helpful information', async () => {
     const provider = new BridgeProvider({
       aiProvider: 'claude-subscription',
-      useOAuth: true,
-      oauthToken: 'test-token'
     })
 
     mockBridgeClient.createConversation.mockResolvedValue({
@@ -186,8 +180,6 @@ describe('AI Error Handling - End-to-End Flow', () => {
   it('should preserve all error context when displaying to user', async () => {
     const provider = new BridgeProvider({
       aiProvider: 'claude-subscription',
-      useOAuth: true,
-      oauthToken: 'test-token'
     })
 
     mockBridgeClient.createConversation.mockResolvedValue({
@@ -222,11 +214,11 @@ describe('AI Error Handling - End-to-End Flow', () => {
 
       // Verify error is properly formatted for display
       const lines = errorMessage.split('\n')
-      const hasPrefix = errorMessage.startsWith('Claude Code Bridge error:')
+      const hasPrefix = errorMessage.startsWith('AI CLI Bridge error:')
       expect(hasPrefix).toBe(true)
 
       // Verify the original message is intact after the prefix
-      const withoutPrefix = errorMessage.replace('Claude Code Bridge error: ', '')
+      const withoutPrefix = errorMessage.replace('AI CLI Bridge error: ', '')
       expect(withoutPrefix).toBe(complexError)
 
       console.log('\n📋 Complex Error Display:')

@@ -52,9 +52,7 @@ describe('AI Provider Factory', () => {
 
     it('should create BridgeProvider for claude-subscription', () => {
       const config: AIProviderConfig = {
-        aiProvider: 'claude-subscription',
-        useOAuth: true,
-        oauthToken: 'test-oauth-token'
+        aiProvider: 'claude-subscription'
       }
 
       createAIProvider(config)
@@ -66,88 +64,18 @@ describe('AI Provider Factory', () => {
       expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'claude-subscription')
     })
 
-    it('should pass config with OAuth settings to claude-subscription provider', () => {
+    it('should create BridgeProvider for codex', () => {
       const config: AIProviderConfig = {
-        aiProvider: 'claude-subscription',
-        useOAuth: true,
-        oauthToken: 'oauth-token-123'
-      }
-
-      createAIProvider(config)
-
-      expect(BridgeProvider).toHaveBeenCalledWith(config)
-      expect(BridgeProvider).toHaveBeenCalledWith(
-        expect.objectContaining({
-          aiProvider: 'claude-subscription',
-          useOAuth: true,
-          oauthToken: 'oauth-token-123'
-        })
-      )
-    })
-
-    it('should default to BridgeProvider for unknown provider type', () => {
-      const config: AIProviderConfig = {
-        apiKey: 'test-key',
-        aiProvider: 'unknown-provider' as any
+        aiProvider: 'codex'
       }
 
       createAIProvider(config)
 
       expect(BridgeProvider).toHaveBeenCalledWith(config)
       expect(BridgeProvider).toHaveBeenCalledTimes(1)
-      expect(console.log).toHaveBeenCalledWith(
-        '[Factory] Unknown provider, defaulting to BridgeProvider:',
-        'unknown-provider'
-      )
-    })
-
-    it('should default to BridgeProvider for null provider type', () => {
-      const config: AIProviderConfig = {
-        apiKey: 'test-key',
-        aiProvider: null as any
-      }
-
-      createAIProvider(config)
-
-      expect(BridgeProvider).toHaveBeenCalledWith(config)
-      expect(console.log).toHaveBeenCalledWith(
-        '[Factory] Unknown provider, defaulting to BridgeProvider:',
-        null
-      )
-    })
-
-    it('should default to BridgeProvider for undefined provider type', () => {
-      const config: AIProviderConfig = {
-        apiKey: 'test-key',
-        aiProvider: undefined as any
-      }
-
-      createAIProvider(config)
-
-      expect(BridgeProvider).toHaveBeenCalledWith(config)
-      expect(console.log).toHaveBeenCalledWith(
-        '[Factory] Unknown provider, defaulting to BridgeProvider:',
-        undefined
-      )
-    })
-
-    it('should handle claude-subscription provider with OAuth token', () => {
-      const config: AIProviderConfig = {
-        aiProvider: 'claude-subscription',
-        useOAuth: true,
-        oauthToken: 'test-token'
-      }
-
-      createAIProvider(config)
-
-      expect(BridgeProvider).toHaveBeenCalledWith(config)
-      expect(BridgeProvider).toHaveBeenCalledWith(
-        expect.objectContaining({
-          aiProvider: 'claude-subscription',
-          useOAuth: true,
-          oauthToken: 'test-token'
-        })
-      )
+      expect(AnthropicProvider).not.toHaveBeenCalled()
+      expect(OpenAIProvider).not.toHaveBeenCalled()
+      expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'codex')
     })
 
     it('should preserve all config properties when creating provider', () => {

@@ -62,10 +62,9 @@ describe('AI DOM Generator', () => {
 
       expect(result).toEqual(mockResult)
       expect(createAIProvider).toHaveBeenCalledWith({
-        apiKey: mockApiKey,
         aiProvider: 'claude-subscription',
-        useOAuth: undefined,
-        oauthToken: undefined
+        customEndpoint: undefined,
+        llmModel: undefined
       })
       expect(mockProvider.generate).toHaveBeenCalledWith(
         mockHtml,
@@ -74,34 +73,6 @@ describe('AI DOM Generator', () => {
         undefined,
         { conversationSession: undefined }
       )
-    })
-
-    it('should use OAuth token when provided', async () => {
-      const mockOAuthToken = 'oauth-token-xyz'
-      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
-        domChanges: [],
-        response: 'Done',
-        action: 'none',
-        session: {
-          id: unsafeSessionId('test-session'),
-          htmlSent: true,
-          messages: []
-        }
-      }
-
-      mockProvider.generate.mockResolvedValue(mockResult)
-
-      await generateDOMChanges(mockHtml, mockPrompt, '', [], undefined, {
-        useOAuth: true,
-        oauthToken: mockOAuthToken
-      })
-
-      expect(createAIProvider).toHaveBeenCalledWith({
-        aiProvider: 'claude-subscription',
-        useOAuth: true,
-        oauthToken: mockOAuthToken,
-        llmModel: undefined
-      })
     })
 
     it('should use specified AI provider', async () => {
@@ -125,8 +96,8 @@ describe('AI DOM Generator', () => {
       expect(createAIProvider).toHaveBeenCalledWith({
         apiKey: mockApiKey,
         aiProvider: 'openai-api',
-        useOAuth: undefined,
-        oauthToken: undefined
+        llmModel: undefined,
+        customEndpoint: undefined
       })
     })
 

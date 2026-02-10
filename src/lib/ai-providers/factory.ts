@@ -25,10 +25,6 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
     case 'claude-subscription':
     case 'codex':
       return new BridgeProvider(config)
-
-    default:
-      debugLog('[Factory] Unknown provider, defaulting to BridgeProvider:', config.aiProvider)
-      return new BridgeProvider(config)
   }
 }
 

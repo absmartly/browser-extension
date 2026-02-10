@@ -49,8 +49,14 @@ export class BridgeProvider implements AIProvider {
       const pageUrl = options.pageUrl || session?.pageUrl
       let conversationId: string
       let systemPromptToSend = await getSystemPrompt(this.getChunkRetrievalPrompt())
+      const bridgeProvider = getBridgeProviderName(this.config.aiProvider)
 
-      if (!session || !session.conversationId) {
+      const providerChanged = session?.provider && session.provider !== bridgeProvider
+      if (providerChanged) {
+        debugLog('[Bridge] Provider changed from', session!.provider, 'to', bridgeProvider, '- creating new conversation')
+      }
+
+      if (!session || !session.conversationId || providerChanged) {
         debugLog('[Bridge] No session or no conversationId, creating new conversation')
         debugLog('[Bridge] session:', session)
         debugLog('[Bridge] session.conversationId:', session?.conversationId)
@@ -122,9 +128,9 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         debugLog(`[Bridge] 📊 System prompt length: ${systemPromptToSend.length} characters`)
         debugLog('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
-        const bridgeProvider = getBridgeProviderName(this.config.aiProvider)
         debugLog('[Bridge] About to create conversation with sessionId:', sessionId)
-        debugLog('[Bridge] Model:', this.config.llmModel || 'sonnet (default)')
+        const model = this.config.llmModel && this.config.llmModel !== 'default' ? this.config.llmModel : undefined
+        debugLog('[Bridge] Model:', model || '(CLI default)')
         debugLog('[Bridge] Provider:', bridgeProvider)
         const result = await this.bridgeClient.createConversation(
           sessionId,
@@ -132,7 +138,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           'allow',
           SHARED_TOOL_SCHEMA,
           html,
-          this.config.llmModel || 'sonnet',
+          model,
           bridgeProvider
         )
         conversationId = result.conversationId
@@ -143,7 +149,8 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           htmlSent: true,
           pageUrl,
           messages: [],
-          conversationId: unsafeConversationId(conversationId)
+          conversationId: unsafeConversationId(conversationId),
+          provider: bridgeProvider
         }
         debugLog('[Bridge] ✅ Created new conversation:', conversationId)
       } else {
@@ -267,20 +274,30 @@ The response will contain the HTML for each selector. Use this to inspect elemen
               }
 
               const formatBridgeError = (value: unknown): string => {
-                if (typeof value === 'string') return value
-                if (value && typeof value === 'object') {
+                let raw: string
+                if (typeof value === 'string') {
+                  raw = value
+                } else if (value && typeof value === 'object') {
                   const obj = value as { type?: string; message?: string; code?: string }
                   if (obj.type || obj.code || obj.message) {
                     const prefix = [obj.type, obj.code].filter(Boolean).join(' ')
-                    return prefix && obj.message ? `${prefix}: ${obj.message}` : prefix || obj.message || String(value)
+                    raw = prefix && obj.message ? `${prefix}: ${obj.message}` : prefix || obj.message || String(value)
+                  } else {
+                    try {
+                      raw = JSON.stringify(value)
+                    } catch {
+                      raw = String(value)
+                    }
                   }
-                  try {
-                    return JSON.stringify(value)
-                  } catch {
-                    return String(value)
-                  }
+                } else {
+                  raw = String(value)
                 }
-                return String(value)
+
+                const separator = raw.indexOf(' -------- ')
+                if (separator !== -1) {
+                  raw = raw.substring(0, separator)
+                }
+                return raw
               }
 
               let userMessage = 'AI CLI Bridge error: '

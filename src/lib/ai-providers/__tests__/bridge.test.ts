@@ -12,7 +12,7 @@ jest.mock('../utils', () => ({
 }))
 
 const defaultConfig: AIProviderConfig = {
-  aiProvider: 'claude-code-bridge'
+  aiProvider: 'codex'
 }
 
 describe('BridgeProvider', () => {
@@ -126,7 +126,8 @@ describe('BridgeProvider', () => {
         'allow',
         expect.any(Object),
         expect.any(String),
-        expect.any(String)
+        undefined,
+        'codex'
       )
     })
 
@@ -318,12 +319,12 @@ describe('BridgeProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Claude Code Bridge error: Connection failed')
+      ).rejects.toThrow('AI CLI Bridge error: Connection failed')
     })
 
     it('should handle invalid model error with user-friendly message', async () => {
       const provider = new BridgeProvider({
-        aiProvider: 'claude-code-bridge',
+        aiProvider: 'codex',
         llmModel: 'invalid-model-name'
       })
 
@@ -352,7 +353,7 @@ describe('BridgeProvider', () => {
         const errorMessage = (error as Error).message
 
         // Verify error is wrapped with our prefix
-        expect(errorMessage).toContain('Claude Code Bridge error')
+        expect(errorMessage).toContain('AI CLI Bridge error')
 
         // Verify original error message is preserved
         expect(errorMessage).toContain('invalid-model-name')
@@ -398,7 +399,7 @@ describe('BridgeProvider', () => {
         const errorMessage = (error as Error).message
 
         // Verify error contains the API error message
-        expect(errorMessage).toContain('Claude Code Bridge error')
+        expect(errorMessage).toContain('AI CLI Bridge error')
         expect(errorMessage).toContain('invalid_request_error')
 
         // User should be able to understand what went wrong
@@ -435,7 +436,7 @@ describe('BridgeProvider', () => {
         const errorMessage = (error as Error).message
 
         // After fix: Clean error message without double prefixes
-        expect(errorMessage).toBe('Claude Code Bridge error: Invalid model "gpt-5" - model not found')
+        expect(errorMessage).toBe('AI CLI Bridge error: Invalid model "gpt-5" - model not found')
 
         // Verify the core error message is preserved
         expect(errorMessage).toContain('Invalid model "gpt-5"')
@@ -481,7 +482,7 @@ describe('BridgeProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Claude Code Bridge error: Connection failed')
+      ).rejects.toThrow('AI CLI Bridge error: Connection failed')
 
       expect(mockBridgeClient.disconnect).toHaveBeenCalledTimes(1)
     })
@@ -571,6 +572,168 @@ describe('BridgeProvider', () => {
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
       ).rejects.toThrow('Validation failed')
+    })
+
+    it('should set provider on new session', async () => {
+      const provider = new BridgeProvider(defaultConfig)
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'conv-123'
+      })
+
+      const mockEventSource = { close: jest.fn() }
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent) => {
+        setTimeout(() => {
+          onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
+          onEvent({ type: 'done', data: null })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.session.provider).toBe('codex')
+    })
+
+    it('should set provider as claude for claude-subscription config', async () => {
+      const provider = new BridgeProvider({ aiProvider: 'claude-subscription' })
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'conv-456'
+      })
+
+      const mockEventSource = { close: jest.fn() }
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent) => {
+        setTimeout(() => {
+          onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
+          onEvent({ type: 'done', data: null })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {})
+
+      expect(result.session.provider).toBe('claude')
+      expect(mockBridgeClient.createConversation).toHaveBeenCalledWith(
+        expect.any(String), '/', 'allow', expect.any(Object), expect.any(String), undefined, 'claude'
+      )
+    })
+
+    it('should create new conversation when provider changes from claude to codex', async () => {
+      const provider = new BridgeProvider(defaultConfig)
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'new-codex-conv'
+      })
+
+      const mockEventSource = { close: jest.fn() }
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent) => {
+        setTimeout(() => {
+          onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Codex response', action: 'none' } })
+          onEvent({ type: 'done', data: null })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {
+        conversationSession: {
+          id: unsafeSessionId('session-old'),
+          htmlSent: true,
+          messages: [],
+          conversationId: unsafeConversationId('old-claude-conv'),
+          provider: 'claude'
+        }
+      })
+
+      expect(mockBridgeClient.createConversation).toHaveBeenCalled()
+      expect(result.session.conversationId).toBe('new-codex-conv')
+      expect(result.session.provider).toBe('codex')
+    })
+
+    it('should create new conversation when provider changes from codex to claude', async () => {
+      const provider = new BridgeProvider({ aiProvider: 'claude-subscription' })
+
+      mockBridgeClient.createConversation.mockResolvedValue({
+        conversationId: 'new-claude-conv'
+      })
+
+      const mockEventSource = { close: jest.fn() }
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent) => {
+        setTimeout(() => {
+          onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Claude response', action: 'none' } })
+          onEvent({ type: 'done', data: null })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      const result = await provider.generate('<html></html>', 'test prompt', [], undefined, {
+        conversationSession: {
+          id: unsafeSessionId('session-old'),
+          htmlSent: true,
+          messages: [],
+          conversationId: unsafeConversationId('old-codex-conv'),
+          provider: 'codex'
+        }
+      })
+
+      expect(mockBridgeClient.createConversation).toHaveBeenCalled()
+      expect(result.session.conversationId).toBe('new-claude-conv')
+      expect(result.session.provider).toBe('claude')
+    })
+
+    it('should reuse conversation when provider matches', async () => {
+      const provider = new BridgeProvider(defaultConfig)
+
+      const mockEventSource = { close: jest.fn() }
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent) => {
+        setTimeout(() => {
+          onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
+          onEvent({ type: 'done', data: null })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      await provider.generate('', 'test prompt', [], undefined, {
+        conversationSession: {
+          id: unsafeSessionId('session-123'),
+          htmlSent: true,
+          messages: [],
+          conversationId: unsafeConversationId('existing-conv'),
+          provider: 'codex'
+        }
+      })
+
+      expect(mockBridgeClient.createConversation).not.toHaveBeenCalled()
+    })
+
+    it('should reuse conversation when session has no provider field (backwards compat)', async () => {
+      const provider = new BridgeProvider(defaultConfig)
+
+      const mockEventSource = { close: jest.fn() }
+
+      mockBridgeClient.streamResponses.mockImplementation((conversationId, onEvent) => {
+        setTimeout(() => {
+          onEvent({ type: 'tool_use', data: { domChanges: [], response: 'Test', action: 'none' } })
+          onEvent({ type: 'done', data: null })
+        }, 150)
+        return mockEventSource as any
+      })
+
+      await provider.generate('', 'test prompt', [], undefined, {
+        conversationSession: {
+          id: unsafeSessionId('session-123'),
+          htmlSent: true,
+          messages: [],
+          conversationId: unsafeConversationId('legacy-conv')
+        }
+      })
+
+      expect(mockBridgeClient.createConversation).not.toHaveBeenCalled()
     })
 
     it('should preserve existing session messages', async () => {
