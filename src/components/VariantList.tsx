@@ -392,14 +392,6 @@ export function VariantList({
     }
   }, [variants, onNavigateToAI, handlePreviewToggle, handlePreviewRefresh, handlePreviewWithChanges])
 
-  React.useEffect(() => {
-    debugLog('[VariantList] Rendering with state:', {
-      variantsCount: variants.length,
-      previewEnabled,
-      activePreviewVariant
-    })
-  })
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

@@ -115,7 +115,6 @@ export function DOMChangesInlineEditor({
     onChange(domChanges)
   }, [onPreviewToggle, onChange])
 
-  const aiGenerateCallbackIdRef = useRef(Date.now())
   useEffect(() => {
     const map = ((window as any).__absmartlyAIContextMap ||= {})
     map[variantName] = {
@@ -133,22 +132,6 @@ export function DOMChangesInlineEditor({
       }
     }
   }, [variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges])
-
-  useEffect(() => {
-    const newId = Date.now()
-    debugLog(JSON.stringify({
-      type: 'CALLBACK_CHANGE',
-      component: 'DOMChangesInlineEditor',
-      event: 'HANDLE_AI_GENERATE_RECREATED',
-      timestamp: newId,
-      previousId: aiGenerateCallbackIdRef.current,
-      dependencies: {
-        changesLength: changes?.length,
-        onChangeProvided: !!onChange
-      }
-    }))
-    aiGenerateCallbackIdRef.current = newId
-  }, [handleAIGenerate])
 
   const hasAutoNavigatedRef = useRef(false)
   useEffect(() => {

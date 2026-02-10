@@ -207,15 +207,6 @@ export function DOMChangeList({
     }
   }
 
-  if (changes.length === 0) {
-    return (
-      <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
-        <CursorArrowRaysIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-        <p className="text-sm text-gray-500">No DOM changes configured</p>
-      </div>
-    )
-  }
-
   const renderedChanges = useMemo(() => {
     return changes.map((change, index) => {
       if (editingIndex === index) {
@@ -370,6 +361,15 @@ export function DOMChangeList({
         )
       })
   }, [changes, editingIndex, draggedIndex, dragOverIndex, onEdit, onDelete, onToggle, onReorder])
+
+  if (changes.length === 0) {
+    return (
+      <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+        <CursorArrowRaysIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-sm text-gray-500">No DOM changes configured</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">
