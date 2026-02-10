@@ -56,6 +56,12 @@ export async function generateDOMChanges(
       customEndpoint: options?.customEndpoint,
       llmModel: options?.llmModel
     }
+  } else if (providerName === 'codex') {
+    config = {
+      aiProvider: 'codex',
+      customEndpoint: options?.customEndpoint,
+      llmModel: options?.llmModel
+    }
   } else if (providerName === 'openrouter-api') {
     config = {
       aiProvider: 'openrouter-api',

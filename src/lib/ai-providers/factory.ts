@@ -23,6 +23,7 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
       return new GeminiProvider(config)
 
     case 'claude-subscription':
+    case 'codex':
       return new BridgeProvider(config)
 
     default:

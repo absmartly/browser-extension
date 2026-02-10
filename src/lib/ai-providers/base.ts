@@ -8,6 +8,7 @@ export type AIProviderType =
   | 'openrouter-api'
   | 'gemini-api'
   | 'claude-code-bridge'
+  | 'codex'
 
 export type AIProviderConfig =
   | {
@@ -52,6 +53,14 @@ export type AIProviderConfig =
     }
   | {
       aiProvider: 'claude-code-bridge'
+      customEndpoint?: string
+      apiKey?: never
+      llmModel?: string
+      useOAuth?: never
+      oauthToken?: never
+    }
+  | {
+      aiProvider: 'codex'
       customEndpoint?: string
       apiKey?: never
       llmModel?: string
@@ -113,4 +122,17 @@ export function isClaudeCodeBridgeConfig(
   config: AIProviderConfig
 ): config is Extract<AIProviderConfig, { aiProvider: 'claude-code-bridge' }> {
   return config.aiProvider === 'claude-code-bridge'
+}
+
+export function isCodexConfig(
+  config: AIProviderConfig
+): config is Extract<AIProviderConfig, { aiProvider: 'codex' }> {
+  return config.aiProvider === 'codex'
+}
+
+export type BridgeProviderName = 'claude' | 'codex'
+
+export function getBridgeProviderName(aiProvider: AIProviderType): BridgeProviderName {
+  if (aiProvider === 'codex') return 'codex'
+  return 'claude'
 }

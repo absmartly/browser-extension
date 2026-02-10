@@ -50,12 +50,12 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     modelDisplayType: 'static'
   },
   'claude-code-bridge': {
-    label: 'Claude Code Bridge',
+    label: 'AI CLI Bridge (Claude)',
     apiKeyPlaceholder: '',
     apiKeyHelpLink: '',
     apiKeyHelpText: '',
     endpointPlaceholder: 'http://localhost:9000',
-    endpointDescription: 'Optional: Specify a custom port for the Claude Code bridge server.',
+    endpointDescription: 'Optional: Specify a custom port for the AI CLI bridge server.',
     defaultModel: 'sonnet',
     modelDisplayType: 'static'
   },
@@ -106,6 +106,15 @@ const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
     modelDisplayType: 'simple',
     modelLabel: 'Model',
     modelHelpText: 'Select the Gemini model to use for generating DOM changes.'
+  },
+  'codex': {
+    label: 'Codex CLI',
+    apiKeyPlaceholder: '',
+    apiKeyHelpLink: '',
+    apiKeyHelpText: '',
+    endpointPlaceholder: 'http://localhost:9000',
+    endpointDescription: 'Optional: Specify a custom port for the bridge server.',
+    modelDisplayType: 'static'
   }
 }
 
@@ -137,8 +146,10 @@ export const AIProviderSection = React.memo(function AIProviderSection({
 
   const config = PROVIDER_CONFIGS[aiProvider]
 
+  const isBridgeProvider = aiProvider === 'claude-subscription' || aiProvider === 'codex'
+
   useEffect(() => {
-    if (aiProvider === 'claude-subscription') {
+    if (isBridgeProvider) {
       checkBridgeConnection()
     }
   }, [aiProvider])
@@ -419,25 +430,45 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         }))}
       />
       <p className="mt-1 text-xs text-gray-500">
-        Choose how to generate AI-powered DOM changes. Claude Subscription uses your local Claude CLI. OpenRouter provides access to 100+ models.
+        Choose how to generate AI-powered DOM changes. Claude and Codex use a local bridge server. OpenRouter provides access to 100+ models.
       </p>
 
-      {aiProvider === 'claude-subscription' && (
+      {isBridgeProvider && (
         <div className="mt-4 space-y-3">
-          <Select
-            id="llm-model-select"
-            label="Claude Model"
-            value={llmModel}
-            onChange={(e) => onLlmModelChange(e.target.value)}
-            options={[
-              { value: 'sonnet', label: 'Claude Sonnet (Recommended)' },
-              { value: 'opus', label: 'Claude Opus (Most Capable)' },
-              { value: 'haiku', label: 'Claude Haiku (Fastest)' }
-            ]}
-          />
-          <p className="text-xs text-gray-500">
-            Sonnet is recommended for best balance of speed and capability.
-          </p>
+          {aiProvider === 'claude-subscription' && (
+            <>
+              <Select
+                id="llm-model-select"
+                label="Claude Model"
+                value={llmModel}
+                onChange={(e) => onLlmModelChange(e.target.value)}
+                options={[
+                  { value: 'sonnet', label: 'Claude Sonnet (Recommended)' },
+                  { value: 'opus', label: 'Claude Opus (Most Capable)' },
+                  { value: 'haiku', label: 'Claude Haiku (Fastest)' }
+                ]}
+              />
+              <p className="text-xs text-gray-500">
+                Sonnet is recommended for best balance of speed and capability.
+              </p>
+            </>
+          )}
+
+          {aiProvider === 'codex' && (
+            <>
+              <Input
+                id="codex-model-input"
+                label="Model (optional)"
+                type="text"
+                value={llmModel}
+                onChange={(e) => onLlmModelChange(e.target.value)}
+                placeholder="Leave blank for default"
+              />
+              <p className="text-xs text-gray-500">
+                Specify a model name or leave blank to use the Codex default.
+              </p>
+            </>
+          )}
 
           <CustomEndpointSection />
 
@@ -465,7 +496,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
             </Button>
           </div>
 
-          {connectionState !== ConnectionState.CONNECTED && (
+          {connectionState !== ConnectionState.CONNECTED && aiProvider === 'claude-subscription' && (
             <Alert className="mt-3">
               <AlertDescription>
                 <div className="space-y-2">
@@ -482,7 +513,37 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                     <div>
                       <p className="font-medium text-xs">2. Start the bridge server:</p>
                       <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
-                        npx @absmartly/claude-code-bridge
+                        npx @absmartly/ai-cli-bridge --claude
+                      </code>
+                    </div>
+                  </div>
+
+                  <p className="text-xs italic">
+                    Leave the terminal open while using the extension.
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {connectionState !== ConnectionState.CONNECTED && aiProvider === 'codex' && (
+            <Alert className="mt-3">
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p className="font-medium">Codex requires a local bridge server:</p>
+
+                  <div className="pl-4 space-y-2">
+                    <div>
+                      <p className="font-medium text-xs">1. Login to Codex (one-time setup):</p>
+                      <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                        codex login
+                      </code>
+                    </div>
+
+                    <div>
+                      <p className="font-medium text-xs">2. Start the bridge server with Codex provider:</p>
+                      <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                        npx @absmartly/ai-cli-bridge --codex
                       </code>
                     </div>
                   </div>
@@ -516,7 +577,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         </div>
       )}
 
-      {aiProvider !== 'claude-subscription' && (
+      {!isBridgeProvider && (
         <div className="mt-4 space-y-3">
           <ApiKeySection />
           {aiApiKey && (

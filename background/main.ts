@@ -695,7 +695,7 @@ export function initializeBackgroundScript() {
             return
           }
 
-          if (config?.aiProvider === 'claude-subscription') {
+          if (config?.aiProvider === 'claude-subscription' || config?.aiProvider === 'codex') {
             debugLog('[Background] Refreshing HTML on Bridge server')
             const { ClaudeCodeBridgeClient } = await import('~src/lib/claude-code-client')
             const bridgeClient = new ClaudeCodeBridgeClient()

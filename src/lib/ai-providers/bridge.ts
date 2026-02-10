@@ -1,6 +1,7 @@
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
+import { getBridgeProviderName } from './base'
 import { getSystemPrompt, buildUserMessage } from './utils'
 import { SHARED_TOOL_SCHEMA } from './shared-schema'
 import { ClaudeCodeBridgeClient } from '~src/lib/claude-code-client'
@@ -121,16 +122,18 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         debugLog(`[Bridge] 📊 System prompt length: ${systemPromptToSend.length} characters`)
         debugLog('[Bridge] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
+        const bridgeProvider = getBridgeProviderName(this.config.aiProvider)
         debugLog('[Bridge] About to create conversation with sessionId:', sessionId)
         debugLog('[Bridge] Model:', this.config.llmModel || 'sonnet (default)')
-        // Pass HTML to bridge for storage (used by get-chunk CLI)
+        debugLog('[Bridge] Provider:', bridgeProvider)
         const result = await this.bridgeClient.createConversation(
           sessionId,
           '/',
           'allow',
           SHARED_TOOL_SCHEMA,
-          html, // Store full HTML on bridge for chunk retrieval
-          this.config.llmModel || 'sonnet' // Pass model selection (default to sonnet)
+          html,
+          this.config.llmModel || 'sonnet',
+          bridgeProvider
         )
         conversationId = result.conversationId
         debugLog('[Bridge] ✅ Conversation created with JSON schema and HTML stored on bridge')
@@ -280,12 +283,12 @@ The response will contain the HTML for each selector. Use this to inspect elemen
                 return String(value)
               }
 
-              let userMessage = 'Claude Code Bridge error: '
+              let userMessage = 'AI CLI Bridge error: '
               const formattedError = formatBridgeError(errorData)
               const errorStr = formattedError
 
               if (errorStr.includes('ECONNREFUSED') || errorStr.includes('Failed to fetch')) {
-                userMessage = 'Cannot connect to Claude Code Bridge. Make sure it\'s running:\n\nnpx @absmartly/claude-code-bridge'
+                userMessage = 'Cannot connect to AI CLI Bridge. Make sure it\'s running:\n\nnpx @absmartly/ai-cli-bridge'
               } else if (errorStr.includes('401') || errorStr.includes('Unauthorized') || errorStr.includes('unauthorized')) {
                 userMessage = 'Authentication failed. Check your Claude API credentials in Settings.'
               } else if (errorStr.includes('403') || errorStr.includes('Forbidden')) {
@@ -352,13 +355,13 @@ The response will contain the HTML for each selector. Use this to inspect elemen
 
       const errorMessage = error instanceof Error ? error.message : String(error)
 
-      if (errorMessage.includes('Claude Code Bridge error:')) {
+      if (errorMessage.includes('AI CLI Bridge error:')) {
         throw error
       }
 
-      let userMessage = 'Claude Code Bridge error: '
+      let userMessage = 'AI CLI Bridge error: '
       if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Failed to fetch')) {
-        userMessage = 'Cannot connect to Claude Code Bridge. Make sure it\'s running:\n\nnpx @absmartly/claude-code-bridge'
+        userMessage = 'Cannot connect to AI CLI Bridge. Make sure it\'s running:\n\nnpx @absmartly/ai-cli-bridge'
       } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
         userMessage = 'Authentication failed. Check your Claude API credentials in Settings.'
       } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {

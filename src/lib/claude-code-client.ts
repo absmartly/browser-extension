@@ -77,7 +77,7 @@ export class ClaudeCodeBridgeClient {
       }
     }
 
-    debugLog(`[Bridge] ❌ Could not find Claude Code Bridge on any port`)
+    debugLog(`[Bridge] ❌ Could not find AI CLI Bridge on any port`)
 
     const attemptedPorts = failedAttempts.map(a => a.port).join(', ')
     const errorSummary = failedAttempts
@@ -94,13 +94,13 @@ export class ClaudeCodeBridgeClient {
       })
       .join('\n')
 
-    throw new Error(`Could not connect to Claude Code Bridge on any port (${attemptedPorts}).
+    throw new Error(`Could not connect to AI CLI Bridge on any port (${attemptedPorts}).
 
 Failed attempts:
 ${errorSummary}
 
-Please ensure Claude Code Bridge is running:
-  npx @absmartly/claude-code-bridge
+Please ensure AI CLI Bridge is running:
+  npx @absmartly/ai-cli-bridge
 
 Or configure a custom port in extension settings if running on a different port.
 
@@ -199,7 +199,8 @@ Common issues:
     permissionMode: 'ask' | 'allow' = 'ask',
     jsonSchema?: any,
     html?: string,
-    model?: string
+    model?: string,
+    provider?: string
   ): Promise<{ conversationId: string }> {
     if (!this.connection) {
       await this.connect()
@@ -213,8 +214,9 @@ Common issues:
         cwd,
         permissionMode,
         jsonSchema,
-        html, // Pass HTML to bridge for chunk retrieval
-        model // Pass model selection to bridge
+        html,
+        model,
+        provider
       })
     })
 
@@ -383,13 +385,13 @@ export const getConnectionStateMessage = (state: ConnectionState): string => {
     case ConnectionState.NOT_CONFIGURED:
       return 'AI features not configured. Select an AI provider to get started.'
     case ConnectionState.CONNECTING:
-      return 'Connecting to Claude Code Bridge...'
+      return 'Connecting to AI CLI Bridge...'
     case ConnectionState.CONNECTED:
-      return 'Connected to Claude Code Bridge'
+      return 'Connected to AI CLI Bridge'
     case ConnectionState.CONNECTION_FAILED:
       return 'Connection failed. Check if the bridge server is running.'
     case ConnectionState.SERVER_NOT_FOUND:
-      return 'Claude Code Bridge not found. Start it with: npx @absmartly/claude-code-bridge'
+      return 'AI CLI Bridge not found. Start it with: npx @absmartly/ai-cli-bridge'
     default:
       return ''
   }
