@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { debugLog, debugWarn } from '~src/utils/debug'
-import { sessionStorage } from '~src/utils/storage'
+import { sessionStorage, localAreaStorage } from '~src/utils/storage'
 import type { DOMChangesInlineState, ElementPickerResult, DragDropResult, VisualEditorChanges } from '~src/types/storage-state'
 import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
 import type { DOMChange } from '~src/types/dom-changes'
@@ -118,6 +118,21 @@ export function useEditorStateRestoration({
 
           storage.remove('visualEditorChanges')
         }
+      }
+
+      const aiDomChangesState = await storage.get<{ variantName: string; changes: DOMChange[]; timestamp?: number }>('aiDomChangesState')
+      const localAiDomChangesState = await localAreaStorage.get<{ variantName: string; changes: DOMChange[]; timestamp?: number }>('aiDomChangesState')
+      const effectiveAIState = aiDomChangesState || localAiDomChangesState
+
+      if (effectiveAIState && effectiveAIState.variantName === variantName) {
+        if (effectiveAIState.changes && effectiveAIState.changes.length > 0) {
+          debugLog('Restoring AI-generated DOM changes from storage')
+          onChange(effectiveAIState.changes)
+        }
+        await Promise.all([
+          storage.remove('aiDomChangesState'),
+          localAreaStorage.remove('aiDomChangesState')
+        ])
       }
     })
   }, [variantName])

@@ -77,7 +77,7 @@ export function ListView({
   setTemplateSearchQuery,
   loadExperiments
 }: ListViewProps) {
-  const { sdkDetected, checking } = useSDKStatus()
+  const { sdkDetected, checking, checked } = useSDKStatus()
 
   return (
     <>
@@ -102,6 +102,7 @@ export function ListView({
               onCreateFromScratch={onCreateFromScratch}
               isOpen={createPanelOpen}
               onOpenChange={setCreatePanelOpen}
+              renderPanel={false}
             />
             <button
               id="nav-events"
@@ -171,7 +172,7 @@ export function ListView({
           {error}
         </div>
       )}
-      {!checking && (
+      {!checking && checked && sdkDetected === false && (
         <div className="px-4 pt-4">
           <SDKStatusAlert sdkDetected={sdkDetected} />
         </div>

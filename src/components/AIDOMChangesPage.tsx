@@ -9,9 +9,11 @@ import { useConversationHistory } from '~src/hooks/useConversationHistory'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession, ChatMessage, StoredConversation } from '~src/types/absmartly'
 import { saveConversation, setActiveConversation, getConversationList, deleteConversation } from '~src/utils/ai-conversation-storage'
+import { sessionStorage, localAreaStorage } from '~src/utils/storage'
 import { formatConversationTimestamp } from '~src/utils/time-format'
 import { compressImagesForLLM } from '~src/utils/image-compression'
 import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
+import { getDOMChangesFromConfig, getChangesConfig, setDOMChangesInConfig } from '~src/hooks/useVariantConfig'
 
 import { debugLog, debugWarn } from '~src/utils/debug'
 interface AIDOMChangesPageProps {
@@ -46,8 +48,9 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   const [viewerModal, setViewerModal] = useState<{ changes: DOMChange[], response: string, timestamp: number } | null>(null)
   const [latestDomChanges, setLatestDomChanges] = useState<DOMChange[]>(currentChanges)
   const [previewEnabledOnce, setPreviewEnabledOnce] = useState(false)
-  const [isPreviewEnabled, setIsPreviewEnabled] = useState(false)
+  const [isPreviewEnabled, setIsPreviewEnabled] = useState(true)
   const [isRefreshingHTML, setIsRefreshingHTML] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const onPreviewToggleRef = useRef(onPreviewToggle)
@@ -71,14 +74,48 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
   } = useConversationHistory(variantName)
 
   useEffect(() => {
+    console.log(JSON.stringify({
+      type: 'COMPONENT_LIFECYCLE',
+      component: 'AIDOMChangesPage',
+      event: 'MOUNT',
+      timestamp: Date.now(),
+      mountId: mountId.current
+    }))
     return () => {
+      console.log(JSON.stringify({
+        type: 'COMPONENT_LIFECYCLE',
+        component: 'AIDOMChangesPage',
+        event: 'UNMOUNT',
+        timestamp: Date.now(),
+        mountId: mountId.current
+      }))
     }
   }, [])
+
+  // Intentionally avoid logging every render to prevent console noise on keystrokes.
 
   useEffect(() => {
     onPreviewToggleRef.current = onPreviewToggle
     onPreviewRefreshRef.current = onPreviewRefresh
   }, [onPreviewToggle, onPreviewRefresh])
+
+  useEffect(() => {
+    setLatestDomChanges(currentChanges)
+  }, [currentChanges])
+
+  useEffect(() => {
+    if (!isPreviewEnabled || previewEnabledOnce) {
+      return
+    }
+    if (latestDomChanges.length === 0) {
+      return
+    }
+    if (onPreviewWithChanges) {
+      debugLog('[AIDOMChangesPage] Auto-enabling preview on mount with existing changes:', latestDomChanges.length)
+      onPreviewWithChanges(true, latestDomChanges)
+      setPreviewEnabledOnce(true)
+    }
+  }, [isPreviewEnabled, previewEnabledOnce, latestDomChanges, onPreviewWithChanges])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -100,12 +137,15 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
     if (!prompt.trim() && attachedImages.length === 0) {
       debugLog('[AIDOMChangesPage] Empty prompt and no images')
-      setError('Please enter a prompt or attach an image')
+      const message = 'Please enter a prompt or attach an image'
+      setAiError(message)
+      setError(message)
       return
     }
 
     debugLog('[AIDOMChangesPage] Setting loading to true')
     setLoading(true)
+    setAiError(null)
     setError(null)
 
     const llmImages = attachedImages.length > 0 ? await compressImagesForLLM(attachedImages) : undefined
@@ -157,10 +197,57 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
       }
 
       if (result.domChanges && result.domChanges.length > 0) {
-        const finalChanges = applyDOMChangeAction(currentChanges, result)
+        const finalChanges = applyDOMChangeAction(latestDomChanges, result)
         debugLog('[AIDOMChangesPage] Applied action:', result.action, 'Final changes count:', finalChanges.length)
+        console.log('[AI Generate] AIDOMChangesPage final changes count:', finalChanges.length)
 
         setLatestDomChanges(finalChanges)
+        if (typeof window !== 'undefined') {
+          ;(window as any).__absmartlyLatestDomChanges = {
+            variantName,
+            changes: finalChanges,
+            timestamp: Date.now()
+          }
+        }
+        console.log('[AI Persist] Storing AI changes for', variantName, 'count:', finalChanges.length)
+        const storageResults = await Promise.allSettled([
+          sessionStorage.set('aiDomChangesState', {
+            variantName,
+            changes: finalChanges,
+            timestamp: Date.now()
+          }),
+          localAreaStorage.set('aiDomChangesState', {
+            variantName,
+            changes: finalChanges,
+            timestamp: Date.now()
+          })
+        ])
+        storageResults.forEach((result) => {
+          if (result.status === 'rejected') {
+            debugWarn('[AIDOMChangesPage] Failed to persist AI changes:', result.reason)
+          }
+        })
+        try {
+          const storageKey = 'experiment-new-variants'
+          const savedVariants = await localAreaStorage.get<any[]>(storageKey)
+          if (Array.isArray(savedVariants)) {
+            const targetIndex = savedVariants.findIndex(v => v?.name === variantName)
+            if (targetIndex !== -1) {
+              const currentConfig = savedVariants[targetIndex]?.config || {}
+              const domFieldName = Object.keys(currentConfig).find(k => k.includes('dom_changes')) || '__dom_changes'
+              const domChangesData = getDOMChangesFromConfig(currentConfig, domFieldName)
+              const baseConfig = getChangesConfig(domChangesData)
+              const updatedDOMChanges = { ...baseConfig, changes: finalChanges }
+              savedVariants[targetIndex] = {
+                ...savedVariants[targetIndex],
+                config: setDOMChangesInConfig(currentConfig, updatedDOMChanges, domFieldName)
+              }
+              await localAreaStorage.set(storageKey, savedVariants)
+            }
+          }
+        } catch (storageError) {
+          debugWarn('[AIDOMChangesPage] Failed to update stored variants with AI changes:', storageError)
+        }
 
         if (!previewEnabledOnce) {
           debugLog('[AIDOMChangesPage] First message with DOM changes - enabling preview directly')
@@ -196,6 +283,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     } catch (err) {
       console.error('[AIDOMChangesPage] Error in handleGenerate:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate DOM changes'
+      setAiError(errorMessage)
       setError(errorMessage)
       setChatHistory(prev => prev.slice(0, -1))
     } finally {
@@ -228,6 +316,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
   const handleRefreshHTML = async () => {
     setIsRefreshingHTML(true)
+    setAiError(null)
     setError(null)
 
     const success = await refreshHTML()
@@ -245,6 +334,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
   const handleConversationSwitch = useCallback(async (conv: any) => {
     await switchConversation(conv)
+    setAiError(null)
     setShowHistory(false)
   }, [switchConversation])
 
@@ -267,6 +357,18 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     }
   }, [])
 
+  const handleNewChatClick = useCallback(() => {
+    setAiError(null)
+    handleNewChat()
+  }, [handleNewChat])
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined') {
+      ;(window as any).__absmartlyReturnToDomChanges = true
+    }
+    onBack()
+  }
+
   return (
     <div className="flex flex-col h-full bg-white" data-ai-dom-changes-page="true">
       <div className="p-4">
@@ -280,7 +382,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
               </div>
             </div>
           }
-          onBack={onBack}
+          onBack={handleBack}
           actions={
             <div className="flex items-center gap-2 relative">
               <div>
@@ -376,7 +478,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                 )}
               </button>
               <button
-                onClick={handleNewChat}
+                onClick={handleNewChatClick}
                 className="p-2 hover:bg-gray-100 rounded-md transition-colors"
                 title="New Chat"
               >
@@ -406,7 +508,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         onSubmit={handleGenerate}
         images={attachedImages}
         onImagesChange={setAttachedImages}
-        error={error}
+        error={aiError ?? error}
         isPreviewEnabled={isPreviewEnabled}
         onPreviewToggle={handlePreviewToggle}
       />

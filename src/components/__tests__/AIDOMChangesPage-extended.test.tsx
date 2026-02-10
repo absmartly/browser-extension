@@ -13,7 +13,18 @@ jest.mock('~src/lib/messaging', () => ({
 jest.mock('~src/utils/storage', () => ({
   storage: {
     get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue(undefined)
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
+  },
+  sessionStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
+  },
+  localAreaStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
   }
 }))
 
@@ -244,12 +255,7 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
 
     it('should validate DOM changes before applying', async () => {
-      const mockValidation = jest.fn()
-
       render(<AIDOMChangesPage {...defaultProps} />)
-
-      const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
-      fireEvent.click(toggleButton)
 
       await waitFor(() => {
         expect(defaultProps.onPreviewWithChanges).toHaveBeenCalled()

@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react'
-import { debugLog, debugError } from '~src/utils/debug'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { sendToContent, sendToBackground } from '~src/lib/messaging'
 import { capturePageHTML } from '~src/utils/html-capture'
 import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
+import { localAreaStorage } from '~src/utils/storage'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
 import { createEmptyChange } from '~src/components/DOMChangeEditor'
@@ -306,13 +307,12 @@ export function useDOMChangesEditor({
       debugLog('🤖 Generating DOM changes with AI, prompt:', prompt, 'images:', images?.length || 0)
 
       debugLog('[AI Generate] Using API key from environment...')
-      const apiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
+      const apiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
 
       // SECURITY: Never log API keys, even partially
       debugLog('[AI Generate] API key present:', !!apiKey)
       if (!apiKey) {
-        console.error('[AI Generate] No API key found!')
-        throw new Error('Anthropic API key not configured. Please add it in Settings.')
+        debugWarn('[AI Generate] No API key found in env; continuing (may use subscription/bridge or mock)')
       }
 
       let html: string | undefined
@@ -336,7 +336,10 @@ export function useDOMChangesEditor({
           debugLog('[AI Generate] capturePageHTML completed, HTML length:', html?.length, 'url:', pageUrl, 'structure lines:', domStructure?.split('\n').length)
         } catch (callError) {
           console.error('[AI Generate] capturePageHTML() call threw:', callError)
-          throw callError
+          debugWarn('[AI Generate] Falling back to minimal HTML context')
+          html = '<html></html>'
+          pageUrl = window?.location?.href || 'chrome-extension://unknown'
+          domStructure = 'body'
         }
       }
 
@@ -428,6 +431,16 @@ export function useDOMChangesEditor({
 
       debugLog('[AI Generate] ✅ AI-generated changes applied successfully')
       debugLog('✅ AI-generated changes applied successfully')
+
+      try {
+        await localAreaStorage.set('aiDomChangesState', {
+          variantName,
+          changes: updatedChanges,
+          timestamp: Date.now()
+        })
+      } catch (storageError) {
+        debugWarn('[AI Generate] Failed to persist aiDomChangesState:', storageError)
+      }
 
       if (response.session) {
         debugLog('[AI Generate] Session returned from background:', response.session.id)

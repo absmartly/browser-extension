@@ -9,6 +9,7 @@ interface CreateExperimentDropdownProps {
   onCreateFromTemplate?: (templateId: number) => void
   isOpen?: boolean
   onOpenChange?: (open: boolean) => void
+  renderPanel?: boolean
 }
 
 interface Template {
@@ -143,7 +144,10 @@ export function CreateExperimentDropdownPanel({
   if (!isOpen) return null
 
   return (
-    <div className="absolute left-0 right-0 top-[60px] bg-white border border-gray-200 shadow-lg z-50">
+    <div
+      className="absolute left-0 right-0 top-[60px] bg-white border border-gray-200 shadow-lg z-50"
+      data-create-experiment-panel="true"
+    >
       {/* Warning message */}
       <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
         <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -153,6 +157,7 @@ export function CreateExperimentDropdownPanel({
       </div>
 
       <button
+        type="button"
         id="from-scratch-button"
         onClick={onCreateFromScratch}
         className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm font-medium text-blue-600 border-b border-gray-200"
@@ -205,6 +210,7 @@ export function CreateExperimentDropdownPanel({
                     </p>
                   </div>
                   <button
+                    type="button"
                     onClick={() => onTemplateSelect(template.id)}
                     className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                   >
@@ -224,7 +230,8 @@ export function CreateExperimentDropdown({
   onCreateFromScratch,
   onCreateFromTemplate,
   isOpen: externalIsOpen,
-  onOpenChange
+  onOpenChange,
+  renderPanel = true
 }: CreateExperimentDropdownProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false)
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen
@@ -243,7 +250,14 @@ export function CreateExperimentDropdown({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      if (target.closest('[data-create-experiment-panel]')) {
+        return
+      }
+
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsOpen(false)
       }
     }
@@ -257,10 +271,11 @@ export function CreateExperimentDropdown({
   }, [isOpen])
 
   useEffect(() => {
+    if (!renderPanel) return
     if (isOpen && templates.length === 0) {
       loadTemplates()
     }
-  }, [isOpen])
+  }, [isOpen, renderPanel])
 
   const loadTemplates = async () => {
     setLoading(true)
@@ -328,16 +343,18 @@ export function CreateExperimentDropdown({
           />
         </svg>
       </button>
-      <CreateExperimentDropdownPanel
-        isOpen={isOpen}
-        templates={templates}
-        loading={loading}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onCreateFromScratch={handleCreateFromScratch}
-        onTemplateSelect={handleTemplateSelect}
-        config={config}
-      />
+      {renderPanel && (
+        <CreateExperimentDropdownPanel
+          isOpen={isOpen}
+          templates={templates}
+          loading={loading}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onCreateFromScratch={handleCreateFromScratch}
+          onTemplateSelect={handleTemplateSelect}
+          config={config}
+        />
+      )}
     </div>
   )
 }

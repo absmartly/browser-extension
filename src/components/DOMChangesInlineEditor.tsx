@@ -117,6 +117,24 @@ export function DOMChangesInlineEditor({
 
   const aiGenerateCallbackIdRef = useRef(Date.now())
   useEffect(() => {
+    const map = ((window as any).__absmartlyAIContextMap ||= {})
+    map[variantName] = {
+      variantName,
+      onGenerate: handleAIGenerate,
+      currentChanges: changes,
+      onRestoreChanges: onChange,
+      onPreviewToggle,
+      onPreviewRefresh: onPreviewRefresh || (() => {}),
+      onPreviewWithChanges: handlePreviewWithChanges
+    }
+    return () => {
+      if ((window as any).__absmartlyAIContextMap) {
+        delete (window as any).__absmartlyAIContextMap[variantName]
+      }
+    }
+  }, [variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges])
+
+  useEffect(() => {
     const newId = Date.now()
     debugLog(JSON.stringify({
       type: 'CALLBACK_CHANGE',
@@ -137,17 +155,18 @@ export function DOMChangesInlineEditor({
     if (
       autoNavigateToAI === variantName &&
       onNavigateToAI &&
-      onPreviewRefresh &&
       !hasAutoNavigatedRef.current
     ) {
       hasAutoNavigatedRef.current = true
       debugLog(`[DOMChangesInlineEditor:${variantName}] Auto-navigating to AI page`)
-      onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges)
+      const previewRefresh = onPreviewRefresh || (() => {})
+      onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, previewRefresh, handlePreviewWithChanges)
     }
   }, [autoNavigateToAI, variantName, onNavigateToAI, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges])
 
   return (
     <div
+      data-dom-changes-section="true"
       className={`space-y-3 ${isDragOver ? 'ring-2 ring-blue-400 ring-opacity-50 bg-blue-50 rounded-lg p-2' : ''}`}
       onDragOver={(e) => {
         e.preventDefault()
@@ -347,12 +366,24 @@ export function DOMChangesInlineEditor({
           </Button>
           <Button id="generate-with-ai-button"
             type="button"
+            data-variant-name={variantName}
             onClick={() => {
-              if (onNavigateToAI && onPreviewRefresh) {
-                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, onPreviewRefresh, handlePreviewWithChanges)
+              const previewRefresh = onPreviewRefresh || (() => {})
+              if (onNavigateToAI) {
+                onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, previewRefresh, handlePreviewWithChanges)
               } else {
                 setAiDialogOpen(true)
               }
+              ;(window as any).__absmartlyAIContext = {
+                variantName,
+                onGenerate: handleAIGenerate,
+                currentChanges: changes,
+                onRestoreChanges: onChange,
+                onPreviewToggle,
+                onPreviewRefresh: previewRefresh,
+                onPreviewWithChanges: handlePreviewWithChanges
+              }
+              window.dispatchEvent(new CustomEvent('absmartly:navigate-ai'))
             }}
             size="sm"
             variant="secondary"

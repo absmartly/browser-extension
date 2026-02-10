@@ -14,7 +14,18 @@ jest.mock('~src/lib/messaging', () => ({
 jest.mock('~src/utils/storage', () => ({
   storage: {
     get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue(undefined)
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
+  },
+  sessionStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
+  },
+  localAreaStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
   }
 }))
 
@@ -73,7 +84,24 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
   it('should call onPreviewWithChanges when toggling preview ON', async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
-    const toggleButton = screen.getByRole('button', { name: /OFF/i })
+    await waitFor(() => {
+      expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
+        true,
+        mockChanges
+      )
+    })
+
+    jest.clearAllMocks()
+
+    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
+    fireEvent.click(toggleButton)
+
+    await waitFor(() => {
+      expect(defaultProps.onPreviewToggle).toHaveBeenCalledWith(false)
+    })
+
+    jest.clearAllMocks()
+
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
@@ -87,15 +115,17 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
   it('should call onPreviewToggle when toggling preview OFF', async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
-    // First toggle ON using the ID selector
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
-    fireEvent.click(toggleButton)
-
     await waitFor(() => {
-      expect(toggleButton.textContent).toContain('ON')
+      expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
+        true,
+        mockChanges
+      )
     })
 
-    // Then toggle OFF
+    jest.clearAllMocks()
+
+    // Toggle OFF
+    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
@@ -106,11 +136,6 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
   it('should reapply changes when toggling preview ON after being OFF', async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
-
-    // Toggle ON
-    fireEvent.click(toggleButton)
-
     await waitFor(() => {
       expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
         true,
@@ -119,6 +144,8 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     })
 
     jest.clearAllMocks()
+
+    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
 
     // Toggle OFF
     fireEvent.click(toggleButton)
@@ -161,6 +188,15 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
         onGenerate={onGenerateMock}
       />
     )
+
+    await waitFor(() => {
+      expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
+        true,
+        mockChanges
+      )
+    })
+
+    jest.clearAllMocks()
 
     // Generate new changes
     const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
@@ -210,21 +246,21 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
 
     const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
 
-    // Initially OFF
-    expect(toggleButton.textContent).toContain('OFF')
-
-    // Toggle ON
-    fireEvent.click(toggleButton)
-
-    await waitFor(() => {
-      expect(toggleButton.textContent).toContain('ON')
-    })
+    // Initially ON
+    expect(toggleButton.textContent).toContain('ON')
 
     // Toggle OFF
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
       expect(toggleButton.textContent).toContain('OFF')
+    })
+
+    // Toggle ON
+    fireEvent.click(toggleButton)
+
+    await waitFor(() => {
+      expect(toggleButton.textContent).toContain('ON')
     })
   })
 })

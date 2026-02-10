@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import type { Experiment } from '~src/types/absmartly'
@@ -9,12 +9,15 @@ import { Header } from './Header'
 import { VariantList } from './VariantList'
 import type { Variant } from './VariantList'
 import { ExperimentMetadata } from './ExperimentMetadata'
-import { getConfig } from '~src/utils/storage'
+import type { ExperimentMetadataData } from './ExperimentMetadata'
+import { getConfig, localAreaStorage } from '~src/utils/storage'
 import { useExperimentVariants } from '~src/hooks/useExperimentVariants'
 import { useExperimentSave } from '~src/hooks/useExperimentSave'
 import { ExperimentCodeInjection } from './ExperimentCodeInjection'
 import type { ExperimentInjectionCode, URLFilter, DOMChangesData } from '~src/types/absmartly'
 import { sendToContent } from '~src/lib/messaging'
+import { debugWarn } from '~src/utils/debug'
+import { getDOMChangesFromConfig, getChangesConfig, setDOMChangesInConfig } from '~src/hooks/useVariantConfig'
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -52,7 +55,21 @@ export function ExperimentEditor({
   onNavigateToAI
 }: ExperimentEditorProps) {
   const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string
+    display_name: string
+    state: Experiment['state']
+    percentage_of_traffic: number
+    nr_variants: number
+    percentages: string
+    audience_strict: boolean
+    audience: string
+    unit_type_id: number | null
+    application_ids: number[]
+    owner_ids: number[]
+    team_ids: number[]
+    tag_ids: number[]
+  }>({
     name: experiment?.name || '',
     display_name: experiment?.display_name || '',
     state: experiment?.state || 'created',
@@ -62,10 +79,10 @@ export function ExperimentEditor({
     audience_strict: experiment?.audience_strict ?? false,
     audience: experiment?.audience || '{"filter":[{"and":[]}]}',
     unit_type_id: experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
-    application_ids: experiment?.applications?.map(a => a.application_id) || [],
-    owner_ids: experiment?.owners?.map(o => o.user_id || (o as any).id) || [],
-    team_ids: experiment?.teams?.map(t => t.team_id || (t as any).id) || [],
-    tag_ids: experiment?.experiment_tags?.map(t => t.experiment_tag_id) || []
+    application_ids: experiment?.applications?.map(a => Number(a.application_id || a.id)) || [],
+    owner_ids: experiment?.owners?.map(o => Number(o.user_id || (o as any).id)) || [],
+    team_ids: experiment?.teams?.map(t => Number(t.team_id || (t as any).id)) || [],
+    tag_ids: experiment?.experiment_tags?.map(t => Number(t.experiment_tag_id)) || []
   })
 
   // Use hooks
@@ -76,6 +93,7 @@ export function ExperimentEditor({
   const { save: saveExperiment } = useExperimentSave({ experiment, domFieldName })
 
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
+  const aiChangesAppliedRef = useRef(false)
 
   // Load config on mount to get the DOM changes field name
   useEffect(() => {
@@ -87,8 +105,66 @@ export function ExperimentEditor({
     loadConfig()
   }, [])
 
+  useEffect(() => {
+    const applyAIDomChanges = async () => {
+      if (aiChangesAppliedRef.current) return
+
+      let aiDomChangesState: { variantName: string; changes: DOMChange[] } | null = null
+      try {
+        aiDomChangesState = await localAreaStorage.get<{ variantName: string; changes: DOMChange[] }>('aiDomChangesState')
+      } catch (error) {
+        debugWarn('[ExperimentEditor] Failed to read aiDomChangesState from storage:', error)
+      }
+      const windowState = (typeof window !== 'undefined')
+        ? (window as any).__absmartlyLatestDomChanges
+        : null
+      const effectiveState = aiDomChangesState || windowState
+      if (!effectiveState || !effectiveState.changes || effectiveState.changes.length === 0) return
+
+      const namedIndex = currentVariants.findIndex(v => v.name === effectiveState.variantName)
+      const targetIndex = namedIndex !== -1 ? namedIndex : (currentVariants.length > 1 ? 1 : 0)
+      if (!currentVariants[targetIndex]) return
+      console.log('[AI Generate] ExperimentEditor applying AI changes:', effectiveState.variantName, effectiveState.changes.length)
+
+      const domChangesData = getDOMChangesFromConfig(currentVariants[targetIndex].config, domFieldName)
+      const currentConfig = getChangesConfig(domChangesData)
+      const updatedDOMChanges: DOMChangesData = {
+        ...currentConfig,
+        changes: effectiveState.changes
+      }
+
+      const updatedVariants = [...currentVariants]
+      updatedVariants[targetIndex] = {
+        ...updatedVariants[targetIndex],
+        config: setDOMChangesInConfig(updatedVariants[targetIndex].config, updatedDOMChanges, domFieldName)
+      }
+
+      handleVariantsChange(updatedVariants, true)
+
+      const storageKey = experiment?.id
+        ? `experiment-${experiment.id}-variants`
+        : 'experiment-new-variants'
+      try {
+        await localAreaStorage.set(storageKey, updatedVariants)
+      } catch (error) {
+        debugWarn('[ExperimentEditor] Failed to persist AI changes to storage:', error)
+      }
+      aiChangesAppliedRef.current = true
+      try {
+        await localAreaStorage.remove('aiDomChangesState')
+      } catch (error) {
+        debugWarn('[ExperimentEditor] Failed to clear aiDomChangesState:', error)
+      }
+      if (windowState) {
+        delete (window as any).__absmartlyLatestDomChanges
+      }
+    }
+
+    applyAIDomChanges()
+  }, [currentVariants, domFieldName, experiment?.id, handleVariantsChange])
+
   // Stable onChange handler for ExperimentMetadata using functional state update
-  const handleMetadataChange = useCallback((metadata: Partial<typeof formData>) => {
+  const handleMetadataChange = useCallback((metadata: ExperimentMetadataData) => {
     setFormData(prev => ({ ...prev, ...metadata }))
   }, [])
 

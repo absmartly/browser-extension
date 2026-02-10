@@ -135,6 +135,8 @@ export class WindowMessageAdapter implements MessageAdapter {
   }
 
   private getTargetOrigin(): string {
-    return window.location.origin === 'null' ? 'null' : window.location.origin
+    return window.location.origin === 'null' || window.location.protocol === 'file:'
+      ? '*'
+      : window.location.origin
   }
 }

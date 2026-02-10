@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { debugLog, debugError } from '~src/utils/debug'
 import { localAreaStorage } from "~src/utils/storage"
 import type { Experiment } from "~src/types/absmartly"
@@ -12,6 +12,7 @@ interface UseSidebarStateProps {
   setView: (view: View) => void
   setAutoNavigateToAI: (variant: string | null) => void
   selectedExperiment: Experiment | null
+  currentView: View
 }
 
 export function useSidebarState({
@@ -20,12 +21,27 @@ export function useSidebarState({
   setExperimentDetailLoading,
   setView,
   setAutoNavigateToAI,
-  selectedExperiment
+  selectedExperiment,
+  currentView
 }: UseSidebarStateProps) {
+  const viewRef = useRef<View>(currentView)
+  const selectedExperimentRef = useRef<Experiment | null>(selectedExperiment)
+  const hasRestoredRef = useRef(false)
+
+  viewRef.current = currentView
+  selectedExperimentRef.current = selectedExperiment
+
   useEffect(() => {
+    if (hasRestoredRef.current) return
     const storage = localAreaStorage
 
     storage.get<SidebarState>('sidebarState').then(async (state) => {
+      if (hasRestoredRef.current) return
+      if (viewRef.current !== 'list' || selectedExperimentRef.current !== null) {
+        hasRestoredRef.current = true
+        return
+      }
+
       if (state) {
         debugLog('Restoring sidebar state:', state)
 
@@ -71,6 +87,8 @@ export function useSidebarState({
           }
         }
       }
+
+      hasRestoredRef.current = true
     })
   }, [getExperiment, setSelectedExperiment, setExperimentDetailLoading, setView, setAutoNavigateToAI])
 

@@ -826,10 +826,8 @@ describe('Orchestrator Integration Tests', () => {
         contextPath: 'window.absmartly'
       })
 
-
       expect(() => {
-        orchestrator.start()
-        jest.advanceTimersByTime(100)
+        ;(orchestrator as any).handleCheckPluginStatus()
       }).toThrow()
     })
 

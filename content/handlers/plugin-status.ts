@@ -2,8 +2,17 @@ import { debugLog } from "~src/utils/debug"
 
 let pluginStatusCheckInProgress = false
 let pluginStatusCheckQueue: Array<(result: any) => void> = []
+let lastPluginStatusResult: any | null = null
+let lastPluginStatusAt = 0
+const PLUGIN_STATUS_CACHE_MS = 2000
 
 export function handleCheckPluginStatus(sendResponse: (response: any) => void) {
+  const now = Date.now()
+  if (lastPluginStatusResult && now - lastPluginStatusAt < PLUGIN_STATUS_CACHE_MS) {
+    sendResponse(lastPluginStatusResult)
+    return true
+  }
+
   if (pluginStatusCheckInProgress) {
     debugLog(
       "[Content Script] Plugin status check already in progress, queuing request"
@@ -34,6 +43,8 @@ export function handleCheckPluginStatus(sendResponse: (response: any) => void) {
     .then((result) => {
       if (!pluginStatusCheckInProgress) return
       clearTimeout(timeoutId)
+      lastPluginStatusResult = result
+      lastPluginStatusAt = Date.now()
       sendResponse(result)
       pluginStatusCheckQueue.forEach((queuedResponse) =>
         queuedResponse(result)
@@ -45,6 +56,8 @@ export function handleCheckPluginStatus(sendResponse: (response: any) => void) {
       if (!pluginStatusCheckInProgress) return
       clearTimeout(timeoutId)
       const errorResult = { pluginDetected: false, error: error?.message || String(error) }
+      lastPluginStatusResult = errorResult
+      lastPluginStatusAt = Date.now()
       sendResponse(errorResult)
       pluginStatusCheckQueue.forEach((queuedResponse) =>
         queuedResponse(errorResult)

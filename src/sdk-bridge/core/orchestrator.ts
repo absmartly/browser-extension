@@ -162,6 +162,9 @@ export class Orchestrator {
 
       // Intercept eventLogger on this context
       this.sdkInterceptor.interceptEventLogger(detection.context)
+
+      // Check and apply any persisted overrides on initial context load
+      this.overrideManager.checkOverridesCookie()
     } else if (!detection.context) {
       Logger.warn('[ABsmartly Extension] \u26A0\uFE0F No context found after detection')
     }
@@ -366,7 +369,10 @@ export class Orchestrator {
    */
   private sendMessageToExtension(message: any): void {
     // SECURITY: Use same-origin only, not wildcard
-    window.postMessage(message, window.location.origin)
+    const origin = window.location.origin
+    const targetOrigin =
+      origin === 'null' || window.location.protocol === 'file:' ? '*' : origin
+    window.postMessage(message, targetOrigin)
   }
 
   /**

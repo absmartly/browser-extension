@@ -64,6 +64,7 @@ export function VariantList({
   const newVarNameInputRef = useRef<HTMLInputElement>(null)
   const newVarValueInputRef = useRef<HTMLInputElement>(null)
   const justUpdatedRef = useRef(false)
+  const aiChangesAppliedRef = useRef(false)
 
   const {
     previewEnabled,
@@ -203,6 +204,55 @@ export function VariantList({
       }
     }
   }
+
+  useEffect(() => {
+    const applyAIDomChanges = async () => {
+      const returnFlag = (typeof window !== 'undefined') ? (window as any).__absmartlyReturnToDomChanges : null
+      if (returnFlag) {
+        delete (window as any).__absmartlyReturnToDomChanges
+        setTimeout(() => {
+          const section = document.querySelector('[data-dom-changes-section="true"]')
+          if (section) {
+            section.scrollIntoView({ block: 'start' })
+          }
+        }, 0)
+      }
+
+      if (aiChangesAppliedRef.current) return
+
+      let aiDomChangesState: { variantName: string; changes: DOMChange[] } | null = null
+      try {
+        aiDomChangesState = await storage.get<{ variantName: string; changes: DOMChange[] }>('aiDomChangesState')
+      } catch (error) {
+        debugWarn('[VariantList] Failed to read aiDomChangesState from storage:', error)
+      }
+      const windowState = (typeof window !== 'undefined')
+        ? (window as any).__absmartlyLatestDomChanges
+        : null
+      const effectiveState = aiDomChangesState || windowState
+      if (!effectiveState || !effectiveState.variantName) return
+
+      const targetIndex = variants.findIndex(v => v.name === effectiveState.variantName)
+      if (targetIndex === -1) return
+
+      if (effectiveState.changes && effectiveState.changes.length > 0) {
+        updateVariantDOMChanges(targetIndex, effectiveState.changes)
+        aiChangesAppliedRef.current = true
+        await storage.remove('aiDomChangesState')
+        if (windowState) {
+          delete (window as any).__absmartlyLatestDomChanges
+        }
+        setTimeout(() => {
+          const section = document.querySelector('[data-dom-changes-section="true"]')
+          if (section) {
+            section.scrollIntoView({ block: 'start' })
+          }
+        }, 0)
+      }
+    }
+
+    applyAIDomChanges()
+  }, [variants, updateVariantDOMChanges])
 
   const updateVariantDOMConfig = (index: number, configUpdate: Partial<Omit<DOMChangesConfig, 'changes'>>) => {
     const newVariants = [...variants]

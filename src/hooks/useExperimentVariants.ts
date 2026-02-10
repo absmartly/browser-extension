@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { debugError } from '~src/utils/debug'
 import type { Experiment } from '~src/types/absmartly'
 import { safeParseVariantConfig } from '~src/lib/validation-schemas'
@@ -53,6 +53,11 @@ export function useExperimentVariants({
 
   const [currentVariants, setCurrentVariants] = useState<VariantData[]>(initialVariants)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  useEffect(() => {
+    setCurrentVariants(initialVariants)
+    setHasUnsavedChanges(false)
+  }, [initialVariants])
 
   const handleVariantsChange = (variants: VariantData[], hasChanges?: boolean) => {
     setCurrentVariants(variants)

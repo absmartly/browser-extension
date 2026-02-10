@@ -34,16 +34,10 @@ test.describe('AI Chat Simple Diagnostic', () => {
     await testPage.screenshot({ path: 'test-results/simple-01-baseline.png', fullPage: true })
     console.log('📸 Baseline screenshot saved')
 
-    // Find and click first experiment
-    const firstExperiment = sidebar.locator('[data-test-id="experiment-row"]').first()
-    await firstExperiment.waitFor({ state: 'visible', timeout: 10000 })
-    await firstExperiment.click()
-    console.log('✅ Clicked first experiment')
-
-    // Wait for experiment detail to load
-    await sidebar.locator('text=Variant').first().waitFor({ state: 'visible', timeout: 5000 })
-    await testPage.screenshot({ path: 'test-results/simple-02-experiment-detail.png', fullPage: true })
-    console.log('📸 Experiment detail screenshot saved')
+    // Scroll to DOM Changes section in the editor
+    await sidebar.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
+    await testPage.screenshot({ path: 'test-results/simple-02-experiment-editor.png', fullPage: true })
+    console.log('📸 Experiment editor screenshot saved')
 
     // Set up console message listener BEFORE clicking
     const consoleMessages: string[] = []
@@ -64,7 +58,7 @@ test.describe('AI Chat Simple Diagnostic', () => {
     const plasmoChildrenBefore = await sidebar.locator('#__plasmo > *').count()
     console.log(`  Plasmo children count: ${plasmoChildrenBefore}`)
 
-    // Find Generate with AI button
+    // Find Generate with AI button in editor
     const aiButton = sidebar.locator('#generate-with-ai-button').first()
     await aiButton.waitFor({ state: 'visible', timeout: 10000 })
     console.log('✅ Found "Generate with AI" button')

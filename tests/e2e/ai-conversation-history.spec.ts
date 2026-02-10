@@ -22,15 +22,26 @@ test.describe('AI Conversation History', () => {
 
   test('should display conversation history UI with correct behavior', async ({ context, extensionUrl }) => {
     const testPageUrl = '/visual-editor-test.html'
+    let sidebar: any
+    let extensionFrame: any
 
-    await test.step('Setup: Create conversations in IndexedDB before loading AI page', async () => {
-      log('Pre-populating IndexedDB with conversations...')
+    await test.step('Load sidebar and navigate to AI page', async () => {
+      log('Loading content page and injecting sidebar...')
+      const testPageUrl = '/visual-editor-test.html'
+      await testPage.goto(`http://localhost:3456${testPageUrl}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
+      await debugWait(500)
 
-      // Create a temporary setup page to initialize IndexedDB with the conversations
-      const setupPage = await context.newPage()
-      await setupPage.goto(`http://localhost:3456${testPageUrl}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
+      // Inject sidebar
+      sidebar = await injectSidebar(testPage, extensionUrl)
+      await debugWait(500)
 
-      await setupPage.evaluate(async () => {
+      log('Pre-populating IndexedDB in extension context...')
+      extensionFrame = testPage.frames().find(frame => frame.url().includes('chrome-extension://'))
+      if (!extensionFrame) {
+        throw new Error('Extension frame not found for IndexedDB setup')
+      }
+
+      await extensionFrame.evaluate(async () => {
         const DB_NAME = 'absmartly-conversations'
         const DB_VERSION = 1
 
@@ -100,34 +111,21 @@ test.describe('AI Conversation History', () => {
           tx.onerror = () => reject(tx.error)
         })
 
-        console.log('[TEST SETUP] Added 3 conversations to IndexedDB')
+        console.log('[TEST SETUP] Added 3 conversations to IndexedDB (extension)')
       })
-
-      await setupPage.close()
       await debugWait(500)
-      log('✓ IndexedDB pre-populated with 3 conversations')
-    })
-
-    await test.step('Load sidebar and navigate to AI page', async () => {
-      log('Loading content page and injecting sidebar...')
-      const testPageUrl = '/visual-editor-test.html'
-      await testPage.goto(`http://localhost:3456${testPageUrl}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
-      await debugWait(500)
-
-      // Inject sidebar
-      const sidebar = await injectSidebar(testPage, extensionUrl)
-      await debugWait(500)
+      log('✓ IndexedDB pre-populated with 3 conversations (extension)')
 
       await testPage.screenshot({ path: 'test-results/conv-history-0-sidebar.png', fullPage: true })
       log('Screenshot saved: conv-history-0-sidebar.png')
 
       log('Creating new experiment...')
-      const createButton = testPage.locator('button[title="Create New Experiment"]')
+      const createButton = sidebar.locator('button[title="Create New Experiment"]')
       await createButton.waitFor({ state: 'visible', timeout: 10000 })
       await createButton.click()
       await debugWait(500)
 
-      const fromScratchButton = testPage.locator('#from-scratch-button')
+      const fromScratchButton = sidebar.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await fromScratchButton.click()
       log('✓ From Scratch clicked')
@@ -140,20 +138,20 @@ test.describe('AI Conversation History', () => {
       })
 
       await debugWait(1000)
-      await testPage.locator('text=Display Name').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('text=Display Name').waitFor({ state: 'visible', timeout: 10000 })
       log('✓ Experiment editor opened')
 
       log('Navigating to AI page...')
-      const loadingFormText = testPage.locator('text=Loading...').first()
+      const loadingFormText = sidebar.locator('text=Loading...').first()
       await loadingFormText.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {
         log('⚠️ Form loading text still visible')
       })
       await debugWait(1000)
 
-      await testPage.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
+      await sidebar.locator('text=DOM Changes').first().scrollIntoViewIfNeeded()
       await debugWait(500)
 
-      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
+      const generateWithAIButton = sidebar.locator('#generate-with-ai-button').first()
       await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
       await generateWithAIButton.scrollIntoViewIfNeeded()
       await debugWait(300)
@@ -163,14 +161,14 @@ test.describe('AI Conversation History', () => {
 
       await debugWait(1000)
 
-      await testPage.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       log('✓ AI page opened')
 
       await testPage.screenshot({ path: 'test-results/conv-history-1-ai-page.png', fullPage: true })
       log('Screenshot saved: conv-history-1-ai-page.png')
 
       // Debug: Check IndexedDB from AI page context
-      const storageCheck = await testPage.evaluate(async () => {
+      const storageCheck = await extensionFrame.evaluate(async () => {
         const DB_NAME = 'absmartly-conversations'
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open(DB_NAME)
@@ -193,7 +191,7 @@ test.describe('AI Conversation History', () => {
       })
       log(`IndexedDB check from AI page context: ${storageCheck} conversations`)
 
-      const promptInput = testPage.locator('textarea[placeholder*="Example"]')
+      const promptInput = sidebar.locator('textarea[placeholder*="Example"]')
       await promptInput.waitFor({ state: 'visible', timeout: 5000 })
       log('✓ AI page ready')
     })
@@ -202,14 +200,11 @@ test.describe('AI Conversation History', () => {
       log('Checking history button state (should be enabled with pre-populated data)...')
 
       // Debug: Check what variant name the AI page is using
-      const variantDebug = await testPage.evaluate(() => {
-        const variantText = document.querySelector('p.text-xs.text-gray-600')?.textContent
-        return variantText
-      })
+      const variantDebug = await sidebar.locator('p.text-xs.text-gray-600').first().textContent()
       log(`AI page variant: ${variantDebug}`)
 
       // Wait for the button to finish loading (title changes from "Loading conversations..." to "Conversation History")
-      const historyButton = testPage.locator('button[title="Conversation History"]')
+      const historyButton = sidebar.locator('button[title="Conversation History"]')
       await historyButton.waitFor({ state: 'visible', timeout: 15000 })
       log('✓ History button found and loaded')
 
@@ -233,11 +228,11 @@ test.describe('AI Conversation History', () => {
     await test.step('Open conversation history dropdown', async () => {
       log('Clicking history button to open dropdown...')
 
-      const historyButton = testPage.locator('button[title="Conversation History"]')
+      const historyButton = sidebar.locator('button[title="Conversation History"]')
       await historyButton.click()
       await debugWait(500)
 
-      const conversationHistoryTitle = testPage.locator('text=Conversation History')
+      const conversationHistoryTitle = sidebar.locator('text=Conversation History')
       await conversationHistoryTitle.waitFor({ state: 'visible', timeout: 5000 })
       log('✓ Conversation history dropdown opened')
 
@@ -250,13 +245,13 @@ test.describe('AI Conversation History', () => {
     await test.step('Verify dropdown shows conversation list with metadata', async () => {
       log('Verifying conversation list content...')
 
-      const headerText = await testPage.locator('.border-b').first().textContent()
+      const headerText = await sidebar.locator('.border-b').first().textContent()
       log(`Header text: ${headerText}`)
       expect(headerText).toContain('Conversation History')
       expect(headerText).toContain('3 conversation')
       log('✅ Header shows correct count')
 
-      const conversationItems = testPage.locator('[id^="conversation-"]')
+      const conversationItems = sidebar.locator('[id^="conversation-"]')
       const itemCount = await conversationItems.count()
       log(`Conversation items found: ${itemCount}`)
 
@@ -283,7 +278,7 @@ test.describe('AI Conversation History', () => {
     await test.step('Verify delete buttons are present', async () => {
       log('Checking for delete buttons...')
 
-      const deleteButtons = testPage.locator('[id^="delete-conversation-"]')
+      const deleteButtons = sidebar.locator('[id^="delete-conversation-"]')
       const deleteButtonCount = await deleteButtons.count()
 
       expect(deleteButtonCount).toBe(3)
@@ -301,20 +296,20 @@ test.describe('AI Conversation History', () => {
         await dialog.accept()
       })
 
-      const deleteButtons = testPage.locator('[id^="delete-conversation-"]')
+      const deleteButtons = sidebar.locator('[id^="delete-conversation-"]')
       const secondDeleteButton = deleteButtons.nth(1)
       await secondDeleteButton.click()
       await debugWait(1000)
       log('✓ Delete button clicked and dialog accepted')
 
-      const remainingConversations = testPage.locator('[id^="conversation-"]')
+      const remainingConversations = sidebar.locator('[id^="conversation-"]')
       const remainingCount = await remainingConversations.count()
       log(`Remaining conversations: ${remainingCount}`)
 
       expect(remainingCount).toBe(2)
       log('✅ Conversation deleted successfully')
 
-      const headerText = await testPage.locator('.border-b').first().textContent()
+      const headerText = await sidebar.locator('.border-b').first().textContent()
       expect(headerText).toContain('2 conversation')
       log('✅ Header updated to show 2 conversations')
 
@@ -327,7 +322,7 @@ test.describe('AI Conversation History', () => {
       await testPage.keyboard.press('Escape')
       await debugWait(300)
 
-      const newChatButton = testPage.locator('button[title="New Chat"]')
+      const newChatButton = sidebar.locator('button[title="New Chat"]')
       const newChatExists = await newChatButton.count()
 
       expect(newChatExists).toBeGreaterThan(0)
@@ -340,12 +335,12 @@ test.describe('AI Conversation History', () => {
     await test.step('Test New Chat button functionality', async () => {
       log('Clicking New Chat button...')
 
-      const newChatButton = testPage.locator('button[title="New Chat"]')
+      const newChatButton = sidebar.locator('button[title="New Chat"]')
       await newChatButton.click()
       await debugWait(1000)
       log('✓ New Chat button clicked')
 
-      const promptInput = testPage.locator('textarea[placeholder*="Example"]')
+      const promptInput = sidebar.locator('textarea[placeholder*="Example"]')
       const inputValue = await promptInput.inputValue()
       expect(inputValue).toBe('')
       log('✅ Prompt input cleared (new chat started)')
@@ -357,7 +352,7 @@ test.describe('AI Conversation History', () => {
     await test.step('Verify conversation limit enforcement', async () => {
       log('Verifying 10 conversation limit in IndexedDB...')
 
-      const conversationCount = await testPage.evaluate(async () => {
+      const conversationCount = await extensionFrame.evaluate(async () => {
         const DB_NAME = 'absmartly-conversations'
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open(DB_NAME)

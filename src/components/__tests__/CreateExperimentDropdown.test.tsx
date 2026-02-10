@@ -62,6 +62,24 @@ describe('CreateExperimentDropdown', () => {
       }, { timeout: 3000 })
     })
 
+    it('should not close dropdown when clicking inside panel', async () => {
+      render(<CreateExperimentDropdown {...defaultProps} />)
+
+      const button = screen.getByRole('button', { name: /create experiment/i })
+      fireEvent.click(button)
+
+      await waitFor(() => {
+        expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
+      })
+
+      const scratchButton = screen.getByRole('menuitem', { name: /create from scratch/i })
+      fireEvent.mouseDown(scratchButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/create from scratch/i)).toBeInTheDocument()
+      })
+    })
+
     it('should close dropdown when clicking outside', async () => {
       render(
         <div>

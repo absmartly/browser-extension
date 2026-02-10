@@ -131,6 +131,11 @@ export async function makeAPIRequest(
   }
 
   try {
+    const sanitizedKeys =
+      requestData && typeof requestData === 'object'
+        ? Object.keys(requestData as Record<string, unknown>)
+        : []
+
     const response = await withNetworkRetry(
       async () => {
         return await axios({
@@ -166,6 +171,16 @@ export async function makeAPIRequest(
 
     return responseData
   } catch (error) {
+    const statusCode = (error as any).response?.status
+    if (statusCode === 500) {
+      debugWarn('[API] 500 from server', {
+        method,
+        url,
+        path,
+        hasData: Boolean(requestData),
+        dataKeys: sanitizedKeys
+      })
+    }
     if (isAuthError(error)) {
       throw new Error('AUTH_EXPIRED')
     }

@@ -30,7 +30,7 @@ const ExperimentUserSchema = z.object({
 
 const ExperimentTeamSchema = z.object({
   team_id: z.number().int().positive(),
-  name: z.string()
+  name: z.string().optional()
 })
 
 const ApplicationSchema = z.object({

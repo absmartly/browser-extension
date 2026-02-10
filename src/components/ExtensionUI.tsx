@@ -183,7 +183,8 @@ function SidebarContent() {
     setExperimentDetailLoading,
     setView,
     setAutoNavigateToAI,
-    selectedExperiment
+    selectedExperiment,
+    currentView: view
   })
 
   useExperimentInitialization({
@@ -235,6 +236,53 @@ function SidebarContent() {
       setCurrentPage(1)
     }
   }, [view, currentPage, setCurrentPage])
+
+  useEffect(() => {
+    const handleAIDispatch = () => {
+      const ctx = (window as any).__absmartlyAIContext
+      if (!ctx) return
+      handleNavigateToAI(
+        ctx.variantName,
+        ctx.onGenerate,
+        ctx.currentChanges,
+        ctx.onRestoreChanges,
+        ctx.onPreviewToggle,
+        ctx.onPreviewRefresh,
+        ctx.onPreviewWithChanges
+      )
+    }
+
+    window.addEventListener('absmartly:navigate-ai', handleAIDispatch as EventListener)
+    return () => window.removeEventListener('absmartly:navigate-ai', handleAIDispatch as EventListener)
+  }, [handleNavigateToAI])
+
+  useEffect(() => {
+    const handleAIClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      const button = target.closest('#generate-with-ai-button') as HTMLElement | null
+      if (!button) return
+
+      const variantName = button.getAttribute('data-variant-name') || ''
+      const map = (window as any).__absmartlyAIContextMap || {}
+      const ctx = map[variantName]
+      if (!ctx) return
+
+      handleNavigateToAI(
+        ctx.variantName,
+        ctx.onGenerate,
+        ctx.currentChanges,
+        ctx.onRestoreChanges,
+        ctx.onPreviewToggle,
+        ctx.onPreviewRefresh,
+        ctx.onPreviewWithChanges
+      )
+    }
+
+    document.addEventListener('click', handleAIClick)
+    return () => document.removeEventListener('click', handleAIClick)
+  }, [handleNavigateToAI])
 
   useEffect(() => {
     const handleVisibilityChange = () => {

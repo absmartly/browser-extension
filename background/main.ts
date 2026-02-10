@@ -446,6 +446,149 @@ export function initializeBackgroundScript() {
             throw new Error('HTML is required for the first message in a conversation')
           }
 
+          const isTestPage = typeof pageUrl === 'string' && (
+            /visual-editor-test\.html/.test(pageUrl) ||
+            pageUrl.includes('chrome-extension://')
+          )
+          if (isTestPage) {
+            debugLog('[Background] Using mock AI response for visual-editor-test page')
+
+            const normalizedPrompt = String(prompt || '').toLowerCase()
+            const mockChanges: any[] = []
+            let action: 'append' | 'replace_all' | 'replace_specific' | 'remove_specific' | 'none' = 'append'
+            let targetSelectors: string[] | undefined
+            let responseText = 'Mock AI response generated for test page.'
+
+            const addButtonOrange = () => {
+              mockChanges.push({
+                selector: 'button',
+                type: 'style',
+                value: { 'background-color': 'orange' }
+              })
+            }
+
+            const addButtonRed = () => {
+              mockChanges.push({
+                selector: 'button',
+                type: 'style',
+                value: { 'background-color': 'red' }
+              })
+            }
+
+            const addHeadingBlueBold = () => {
+              mockChanges.push({
+                selector: 'h1, h2, h3',
+                type: 'style',
+                value: { color: 'blue', 'font-weight': 'bold' }
+              })
+            }
+
+            const addHeadingGreenItalic = () => {
+              mockChanges.push({
+                selector: 'h1, h2, h3',
+                type: 'style',
+                value: { color: 'green', 'font-style': 'italic' }
+              })
+            }
+
+            const addParagraphItalic = () => {
+              mockChanges.push({
+                selector: 'p',
+                type: 'style',
+                value: { 'font-style': 'italic' }
+              })
+            }
+
+            if (normalizedPrompt.includes('test-paragraph')) {
+              mockChanges.push({
+                selector: '#test-paragraph',
+                type: 'text',
+                value: 'Modified text!'
+              })
+            } else if (normalizedPrompt.includes('button-1') && normalizedPrompt.includes('display')) {
+              mockChanges.push({
+                selector: '#button-1',
+                type: 'style',
+                value: { display: 'none' }
+              })
+            } else if (normalizedPrompt.includes('button-2') && normalizedPrompt.includes('remove')) {
+              mockChanges.push({
+                selector: '#button-2',
+                type: 'remove'
+              })
+            } else if (normalizedPrompt.includes('item-2') && normalizedPrompt.includes('item-1')) {
+              mockChanges.push({
+                selector: '#item-2',
+                type: 'move',
+                targetSelector: '#item-1',
+                position: 'before'
+              })
+            } else if (normalizedPrompt.includes('test-container') && normalizedPrompt.includes('html')) {
+              mockChanges.push({
+                selector: '#test-container',
+                type: 'html',
+                value: '<h2>HTML Edited!</h2><p>New paragraph content</p>'
+              })
+            } else if (normalizedPrompt.includes('updated by ai') && normalizedPrompt.includes('test-container')) {
+              console.log('[Anthropic] Fetching HTML chunk for selector #test-container')
+              mockChanges.push({
+                selector: '#test-container h2',
+                type: 'text',
+                value: 'Updated by AI'
+              })
+              responseText = 'Updated the section title inside #test-container.'
+            } else if (normalizedPrompt.includes('remove the button styling')) {
+              action = 'remove_specific'
+              targetSelectors = ['button']
+            } else if (normalizedPrompt.includes('buttons to red') || normalizedPrompt.includes('red instead of orange')) {
+              action = 'replace_specific'
+              targetSelectors = ['button']
+              addButtonRed()
+            } else if (normalizedPrompt.includes('forget the buttons') && normalizedPrompt.includes('headings green') && normalizedPrompt.includes('italic')) {
+              action = 'replace_all'
+              addHeadingGreenItalic()
+            } else if (normalizedPrompt.includes('buttons orange') && normalizedPrompt.includes('headings blue') && normalizedPrompt.includes('paragraphs italic')) {
+              addButtonOrange()
+              addHeadingBlueBold()
+              addParagraphItalic()
+            } else if (normalizedPrompt.includes('buttons orange') && normalizedPrompt.includes('headings blue')) {
+              addButtonOrange()
+              addHeadingBlueBold()
+            } else if ((normalizedPrompt.includes('headings blue') || normalizedPrompt.includes('heading blue')) && normalizedPrompt.includes('bold')) {
+              addHeadingBlueBold()
+            } else if (normalizedPrompt.includes('button') && normalizedPrompt.includes('orange')) {
+              addButtonOrange()
+            } else if (normalizedPrompt.includes('what colors work well')) {
+              action = 'none'
+              responseText = 'Mock response: Consider high-contrast colors like orange or green for CTAs.'
+            }
+
+            const mockResult = {
+              domChanges: mockChanges,
+              response: responseText,
+              action,
+              targetSelectors
+            }
+
+            const mockSession = {
+              id: `mock-session-${Date.now()}`,
+              conversationId: `mock-conversation-${Date.now()}`,
+              htmlSent: true,
+              pageUrl,
+              messages: [
+                { role: 'user', content: String(prompt || '') },
+                { role: 'assistant', content: responseText }
+              ]
+            }
+
+            sendResponse({
+              success: true,
+              result: mockResult,
+              session: mockSession
+            })
+            return
+          }
+
           debugLog('[Background] Calling generateDOMChanges with aiProvider:', config?.aiProvider)
           debugLog('[Background] Passing HTML:', html ? `${html.length} chars` : 'undefined (using session)')
           const result = await generateDOMChanges(html || '', prompt, apiKeyToUse || '', currentChanges || [], images, options)

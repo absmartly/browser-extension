@@ -31,6 +31,10 @@ export function useViewNavigation() {
   ) => {
     debugLog('[useViewNavigation] handleNavigateToAI called for variant:', variantName)
     debugLog('[useViewNavigation] Current view:', view)
+    if (view === 'ai-dom-changes') {
+      debugLog('[useViewNavigation] Already in AI view, skipping re-navigation')
+      return
+    }
     debugLog('[useViewNavigation] Setting aiDomContext and navigating to ai-dom-changes view')
 
     const context = {

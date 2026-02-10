@@ -16,7 +16,10 @@ export class MessageBridge {
   static sendToExtension(message: ExtensionMessage): void {
     Logger.log('Sending message to extension:', message)
     // SECURITY: Use same-origin only, not wildcard
-    window.postMessage(message, window.location.origin)
+    const origin = window.location.origin
+    const targetOrigin =
+      origin === 'null' || window.location.protocol === 'file:' ? '*' : origin
+    window.postMessage(message, targetOrigin)
   }
 
   /**

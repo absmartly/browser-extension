@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { BackgroundAPIClient } from '~src/lib/background-api-client'
 import { getConfig } from '~src/utils/storage'
 import { debugLog } from '~src/utils/debug'
@@ -29,9 +29,15 @@ export function useABsmartly() {
   const [authErrorType, setAuthErrorType] = useState<AuthErrorType>(null)
   const [user, setUser] = useState<ExperimentUser | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const authCheckInFlightRef = useRef(false)
+  const lastAuthCheckAtRef = useRef(0)
 
   const checkAuth = useCallback(async () => {
     if (!config) return
+    if (authCheckInFlightRef.current) return
+    const now = Date.now()
+    if (now - lastAuthCheckAtRef.current < 2000) return
+    authCheckInFlightRef.current = true
 
     try {
       debugLog('[useABsmartly] Checking authentication...')
@@ -64,6 +70,9 @@ export function useABsmartly() {
       setIsAuthenticated(false)
       setAuthErrorType('auth-check-failed')
       setError('Unable to verify authentication. Please reload the extension.')
+    } finally {
+      lastAuthCheckAtRef.current = Date.now()
+      authCheckInFlightRef.current = false
     }
   }, [config])
 
@@ -76,6 +85,28 @@ export function useABsmartly() {
       checkAuth()
     }
   }, [config, isAuthenticated, checkAuth])
+
+  useEffect(() => {
+    if (!config) return
+
+    const handleFocus = () => {
+      void checkAuth()
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void checkAuth()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [config, checkAuth])
 
   const loadConfig = async () => {
     try {

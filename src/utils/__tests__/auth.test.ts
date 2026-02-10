@@ -65,11 +65,11 @@ describe('Authentication Utils - API Key', () => {
   })
 
   it('should handle missing endpoint', async () => {
-    const config: Partial<ABsmartlyConfig> = {
+    const config: ABsmartlyConfig = {
       apiKey: 'test-api-key',
-      apiEndpoint: '' as any,
+      apiEndpoint: unsafeAPIEndpoint(''),
       authMethod: 'apikey'
-    } as ABsmartlyConfig
+    }
 
     const result = await checkAuthentication(config)
 

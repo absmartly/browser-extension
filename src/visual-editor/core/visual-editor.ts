@@ -225,7 +225,10 @@ export class VisualEditor {
     this.removeStyles()
 
     // Send message to content script to stop visual editor
-    const targetOrigin = window.location.origin === 'null' ? 'null' : window.location.origin
+    const targetOrigin =
+      window.location.origin === 'null' || window.location.protocol === 'file:'
+        ? '*'
+        : window.location.origin
     window.postMessage({
       source: 'absmartly-visual-editor',
       type: 'ABSMARTLY_VISUAL_EDITOR_EXIT',
@@ -700,7 +703,10 @@ export function initVisualEditor(
     initialChanges,
     onChangesUpdate: (changes) => {
       // Send changes to extension background
-      const targetOrigin = window.location.origin === 'null' ? 'null' : window.location.origin
+      const targetOrigin =
+        window.location.origin === 'null' || window.location.protocol === 'file:'
+          ? '*'
+          : window.location.origin
       window.postMessage({
         source: 'absmartly-visual-editor',
         type: 'ABSMARTLY_VISUAL_EDITOR_SAVE',

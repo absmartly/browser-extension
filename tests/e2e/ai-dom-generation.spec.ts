@@ -216,99 +216,38 @@ test.describe('AI DOM Changes Generation', () => {
         'Replace the HTML content inside the div with id "test-container" with this: <h2>HTML Edited!</h2><p>New paragraph content</p>'
       ]
 
+      // Navigate to AI page once
+      await aiButton.evaluate((button) => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      console.log('  ✓ Clicked Generate with AI button')
+
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 5000 })
+      const promptTextarea = sidebar.locator('#ai-prompt')
+      const generateButton = sidebar.locator('#ai-generate-button')
+
+      await expect(promptTextarea).toBeVisible({ timeout: 5000 })
+      await expect(generateButton).toBeVisible({ timeout: 5000 })
+
       for (let i = 0; i < prompts.length; i++) {
         console.log(`\n  ${i + 1}. Generating: ${prompts[i].substring(0, 60)}...`)
 
-        // Re-locate the button for each iteration in case the DOM changed
-        const aiButtonFresh = sidebar.locator('#generate-with-ai-button').first()
-        await aiButtonFresh.waitFor({ state: 'visible', timeout: 5000 })
-
-        // Click to open AI dialog
-        await aiButtonFresh.evaluate((button) => {
-          button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
-        console.log('  ✓ Clicked Generate with AI button')
-
-        // Wait for dialog to appear
-        await sidebar.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5000 })
-
-        // Check if dialog appeared
-        const dialogVisible = await sidebar.locator('[role="dialog"]').isVisible({ timeout: 2000 }).catch(() => false)
-        console.log(`  Dialog visible: ${dialogVisible}`)
-
-        const promptTextarea = sidebar.locator('textarea').first()
-        const textareaVisible = await promptTextarea.isVisible({ timeout: 2000 }).catch(() => false)
-        console.log(`  Textarea visible: ${textareaVisible}`)
-
-        if (!textareaVisible) {
-          // Debug: Check what's in the sidebar
-          const sidebarText = await sidebar.locator('body').textContent()
-          console.log(`  Sidebar text includes "prompt": ${sidebarText?.includes('prompt')}`)
-          console.log(`  Sidebar text includes "Generate": ${sidebarText?.includes('Generate')}`)
-        }
-
-        await expect(promptTextarea).toBeVisible({ timeout: 5000 })
-
         await promptTextarea.fill(prompts[i])
-
-        // Debug: Verify the prompt was filled correctly
         const filledValue = await promptTextarea.inputValue()
         console.log(`  📝 Prompt filled (${filledValue.length} chars): ${filledValue.substring(0, 80)}...`)
 
-        // Debug: Find and verify Generate button INSIDE dialog
-        // Use exact text match to avoid matching "Generate with AI" button
-        console.log('  🔍 Looking for Generate button inside dialog...')
-        const generateButton = sidebar.locator('button').filter({ hasText: /^Generate$/ })
-        const generateButtonVisible = await generateButton.isVisible({ timeout: 2000 }).catch(() => false)
-        console.log(`  Generate button visible: ${generateButtonVisible}`)
-
-        if (generateButtonVisible) {
-          const buttonText = await generateButton.textContent()
-          console.log(`  Generate button text: "${buttonText}"`)
-        }
-
-        // Click Generate button (no force:true - let validation work)
-        console.log('  🖱️  Clicking Generate button...')
         await generateButton.click()
         console.log('  ✓ Generate button clicked')
 
-        // Wait for loading state to appear (indicates API call started)
-        const generatingText = sidebar.locator('text=Generating').first()
-        await generatingText.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {
-          console.log('  ℹ️  "Generating" text did not appear (might be too fast)')
-        })
-
-        // Debug: Check for any error messages
-        const errorMessage = sidebar.locator('[class*="error"], [class*="alert"]')
-        const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false)
-        if (hasError) {
-          const errorText = await errorMessage.textContent()
-          console.log(`  ❌ Error message visible: ${errorText}`)
-        }
-
-        const loadingGone = sidebar.locator('text=Generating').first()
-        await expect(loadingGone).not.toBeVisible({ timeout: 30000 })
-        console.log(`  ✓ Generation ${i + 1} complete`)
-
-        // Check for errors in console
-        const errors = allConsoleMessages.filter(m => m.type === 'error').slice(-5)
-        if (errors.length > 0) {
-          console.log(`  ⚠️  Recent console errors:`)
-          errors.forEach(e => console.log(`    - ${e.text}`))
-        }
-
-        // Debug: Check if anything was added to the DOM changes
-        const domChangeCount = await sidebar.locator('.dom-change-card').count()
-        console.log(`  📊 Total DOM changes after generation ${i + 1}: ${domChangeCount}`)
-
-        const closeButton = sidebar.locator('button[aria-label="Close"]')
-        if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await closeButton.click()
-          await closeButton.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
-        }
+        await expect(generateButton).toContainText('Generate DOM Changes', { timeout: 30000 })
+        await debugWait(500)
       }
 
       console.log('\n✅ All 5 DOM changes generated with AI')
+
+      const backButton = sidebar.locator('button[aria-label="Go back"]').first()
+      await backButton.click()
+      await sidebar.locator('text=DOM Changes').first().waitFor({ state: 'visible', timeout: 5000 })
     })
 
     await test.step('Verify generated changes', async () => {
