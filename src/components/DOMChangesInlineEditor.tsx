@@ -338,17 +338,17 @@ export function DOMChangesInlineEditor({
                 onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, previewRefresh, handlePreviewWithChanges)
               } else {
                 setAiDialogOpen(true)
+                ;(window as any).__absmartlyAIContext = {
+                  variantName,
+                  onGenerate: handleAIGenerate,
+                  currentChanges: changes,
+                  onRestoreChanges: onChange,
+                  onPreviewToggle,
+                  onPreviewRefresh: previewRefresh,
+                  onPreviewWithChanges: handlePreviewWithChanges
+                }
+                window.dispatchEvent(new CustomEvent('absmartly:navigate-ai'))
               }
-              ;(window as any).__absmartlyAIContext = {
-                variantName,
-                onGenerate: handleAIGenerate,
-                currentChanges: changes,
-                onRestoreChanges: onChange,
-                onPreviewToggle,
-                onPreviewRefresh: previewRefresh,
-                onPreviewWithChanges: handlePreviewWithChanges
-              }
-              window.dispatchEvent(new CustomEvent('absmartly:navigate-ai'))
             }}
             size="sm"
             variant="secondary"

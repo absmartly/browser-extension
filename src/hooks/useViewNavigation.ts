@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { localAreaStorage } from "~src/utils/storage"
 import type { DOMChange, AIDOMGenerationResult } from "~src/types/dom-changes"
 import type { View } from "~src/types/view"
@@ -19,6 +19,13 @@ export function useViewNavigation() {
   const [view, setView] = useState<View>('list')
   const [aiDomContext, setAiDomContext] = useState<AIDOMContext | null>(null)
   const [autoNavigateToAI, setAutoNavigateToAI] = useState<string | null>(null)
+  const isNavigatingToAIRef = useRef(false)
+
+  useEffect(() => {
+    if (view !== 'ai-dom-changes') {
+      isNavigatingToAIRef.current = false
+    }
+  }, [view])
 
   const handleNavigateToAI = useCallback((
     variantName: string,
@@ -31,10 +38,11 @@ export function useViewNavigation() {
   ) => {
     debugLog('[useViewNavigation] handleNavigateToAI called for variant:', variantName)
     debugLog('[useViewNavigation] Current view:', view)
-    if (view === 'ai-dom-changes') {
-      debugLog('[useViewNavigation] Already in AI view, skipping re-navigation')
+    if (view === 'ai-dom-changes' || isNavigatingToAIRef.current) {
+      debugLog('[useViewNavigation] Already navigating or in AI view, skipping')
       return
     }
+    isNavigatingToAIRef.current = true
     debugLog('[useViewNavigation] Setting aiDomContext and navigating to ai-dom-changes view')
 
     const context = {
@@ -56,6 +64,7 @@ export function useViewNavigation() {
   }, [view])
 
   const handleBackFromAI = useCallback(() => {
+    isNavigatingToAIRef.current = false
     if (aiDomContext) {
       setView(aiDomContext.previousView)
     } else {
