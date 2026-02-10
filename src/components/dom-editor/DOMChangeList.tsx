@@ -24,6 +24,7 @@ interface DOMChangeListProps {
   onToggle: (index: number) => void
   onReorder: (changes: DOMChange[]) => void
   editingIndex: number | null
+  editorSlot?: React.ReactNode
 }
 
 export function DOMChangeList({
@@ -32,7 +33,8 @@ export function DOMChangeList({
   onDelete,
   onToggle,
   onReorder,
-  editingIndex
+  editingIndex,
+  editorSlot
 }: DOMChangeListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
@@ -92,7 +94,7 @@ export function DOMChangeList({
           </span>
         )
       case 'style':
-        const styleValue = (change as any).css || change.value || {}
+        const styleValue = change.value || {}
         const styles = Object.entries(styleValue)
         return (
           <div className="flex flex-wrap gap-1.5">
@@ -371,9 +373,18 @@ export function DOMChangeList({
     )
   }
 
+  const items: React.ReactNode[] = []
+  for (let i = 0; i < renderedChanges.length; i++) {
+    if (editingIndex === i && editorSlot) {
+      items.push(<React.Fragment key={`editor-${i}`}>{editorSlot}</React.Fragment>)
+    } else {
+      items.push(renderedChanges[i])
+    }
+  }
+
   return (
     <div className="space-y-2">
-      {renderedChanges}
+      {items}
     </div>
   )
 }

@@ -15,8 +15,7 @@ export const SHARED_TOOL_SCHEMA: JSONSchema = {
             enum: ['text', 'html', 'style', 'styleRules', 'class', 'attribute', 'javascript', 'move', 'create', 'delete'],
             description: 'Type of DOM change to apply'
           },
-          value: { description: 'Value for text/html/attribute changes, or CSS object for style changes' },
-          css: { type: 'object', description: 'CSS properties object for style type (alternative to value)' },
+          value: { description: 'Value for text/html/attribute changes, or CSS properties object for style changes' },
           states: { type: 'object', description: 'CSS states for styleRules type (normal, hover, active, focus)' },
           add: { type: 'array', items: { type: 'string' }, description: 'Classes to add (for class type)' },
           remove: { type: 'array', items: { type: 'string' }, description: 'Classes to remove (for class type)' },

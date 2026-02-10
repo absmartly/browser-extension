@@ -135,18 +135,17 @@ export const DOMChangeEditor = ({
     setLocalChange(initialChange)
   }, [initialChange])
 
-  // Listen for JavaScript editor save message
   useEffect(() => {
     const handleMessage = (message: any) => {
       if (message.type === 'JAVASCRIPT_EDITOR_SAVE') {
-        setLocalChange({ ...localChange, jsValue: message.value })
+        setLocalChange(prev => ({ ...prev, jsValue: message.value }))
       }
     }
     chrome.runtime.onMessage.addListener(handleMessage)
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
     }
-  }, [localChange])
+  }, [])
 
   const isEditMode = localChange.index !== null
   // Create unique ID suffix using variant index and change index

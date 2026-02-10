@@ -125,9 +125,11 @@ export function useEditorStateRestoration({
       const effectiveAIState = aiDomChangesState || localAiDomChangesState
 
       if (effectiveAIState && effectiveAIState.variantName === variantName) {
-        if (effectiveAIState.changes && effectiveAIState.changes.length > 0) {
-          debugLog('Restoring AI-generated DOM changes from storage')
+        if (effectiveAIState.changes && effectiveAIState.changes.length > 0 && changes.length === 0) {
+          debugLog('Restoring AI-generated DOM changes from storage (current changes empty)')
           onChange(effectiveAIState.changes)
+        } else {
+          debugLog('Skipping AI state restoration - changes already present:', changes.length)
         }
         await Promise.all([
           storage.remove('aiDomChangesState'),

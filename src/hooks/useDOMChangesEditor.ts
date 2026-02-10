@@ -3,7 +3,6 @@ import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { sendToContent, sendToBackground } from '~src/lib/messaging'
 import { capturePageHTML } from '~src/utils/html-capture'
 import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
-import { localAreaStorage } from '~src/utils/storage'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
 import { createEmptyChange } from '~src/components/DOMChangeEditor'
@@ -42,6 +41,10 @@ export function useDOMChangesEditor({
       classesWithStatus = [...addClasses, ...removeClasses]
     }
 
+    const styleValue = change.type === 'style'
+      ? (change.value || {}) as Record<string, string>
+      : {}
+
     const editing: EditingDOMChange = {
       index,
       selector: change.selector,
@@ -50,13 +53,13 @@ export function useDOMChangesEditor({
       htmlValue: change.type === 'html' ? change.value : change.type === 'insert' ? (change as any).html : '',
       jsValue: change.type === 'javascript' ? change.value : '',
       styleProperties: change.type === 'style'
-        ? Object.entries(change.value as Record<string, string>).map(([key, value]) => ({
+        ? Object.entries(styleValue).map(([key, value]) => ({
             key,
-            value: value.replace(/ !important$/i, '')
+            value: String(value).replace(/ !important$/i, '')
           }))
         : [{ key: '', value: '' }],
       styleImportant: change.type === 'style'
-        ? Object.values(change.value as Record<string, string>).some(v => v.includes('!important'))
+        ? Object.values(styleValue).some(v => String(v).includes('!important'))
         : false,
       styleRulesStates: change.type === 'styleRules' ? (change as any).states : undefined,
       styleRulesImportant: change.type === 'styleRules' ? (change as any).important : undefined,
@@ -431,16 +434,6 @@ export function useDOMChangesEditor({
 
       debugLog('[AI Generate] ✅ AI-generated changes applied successfully')
       debugLog('✅ AI-generated changes applied successfully')
-
-      try {
-        await localAreaStorage.set('aiDomChangesState', {
-          variantName,
-          changes: updatedChanges,
-          timestamp: Date.now()
-        })
-      } catch (storageError) {
-        debugWarn('[AI Generate] Failed to persist aiDomChangesState:', storageError)
-      }
 
       if (response.session) {
         debugLog('[AI Generate] Session returned from background:', response.session.id)

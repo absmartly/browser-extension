@@ -285,53 +285,35 @@ export function DOMChangesInlineEditor({
       </div>
 
       <div className="space-y-2">
-        {changes.length === 0 && !editingChange ? (
-          <DOMChangeList
-            changes={[]}
-            onEdit={handleEditChange}
-            onDelete={handleDeleteChange}
-            onToggle={handleToggleChange}
-            onReorder={(newChanges) => {
-              (onChange as any)(newChanges, { isReorder: true })
-            }}
-            editingIndex={editingChange?.index || null}
+        <DOMChangeList
+          changes={changes}
+          onEdit={handleEditChange}
+          onDelete={handleDeleteChange}
+          onToggle={handleToggleChange}
+          onReorder={(newChanges) => {
+            (onChange as any)(newChanges, { isReorder: true })
+          }}
+          editingIndex={editingChange?.index ?? null}
+          editorSlot={editingChange && editingChange.index !== null ? (
+            <DOMChangeEditor
+              key={`${editingChange.index}-${editingChange.type}`}
+              editingChange={editingChange}
+              variantIndex={variantIndex}
+              onSave={handleSaveChange}
+              onCancel={handleCancelEdit}
+              onStartPicker={handleStartElementPicker}
+            />
+          ) : undefined}
+        />
+        {editingChange && editingChange.index === null && (
+          <DOMChangeEditor
+            key={`new-${editingChange.type}`}
+            editingChange={editingChange}
+            variantIndex={variantIndex}
+            onSave={handleSaveChange}
+            onCancel={handleCancelEdit}
+            onStartPicker={handleStartElementPicker}
           />
-        ) : (
-          <>
-            {editingChange && editingChange.index !== null ? (
-              <DOMChangeList
-                changes={changes}
-                onEdit={handleEditChange}
-                onDelete={handleDeleteChange}
-                onToggle={handleToggleChange}
-                onReorder={(newChanges) => {
-                  (onChange as any)(newChanges, { isReorder: true })
-                }}
-                editingIndex={editingChange.index}
-              />
-            ) : (
-              <DOMChangeList
-                changes={changes}
-                onEdit={handleEditChange}
-                onDelete={handleDeleteChange}
-                onToggle={handleToggleChange}
-                onReorder={(newChanges) => {
-                  (onChange as any)(newChanges, { isReorder: true })
-                }}
-                editingIndex={null}
-              />
-            )}
-
-            {editingChange && (
-              <DOMChangeEditor
-                editingChange={editingChange}
-                variantIndex={variantIndex}
-                onSave={handleSaveChange}
-                onCancel={handleCancelEdit}
-                onStartPicker={handleStartElementPicker}
-              />
-            )}
-          </>
         )}
       </div>
 
