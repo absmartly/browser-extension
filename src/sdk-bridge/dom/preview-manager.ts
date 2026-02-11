@@ -6,7 +6,7 @@
  * @module PreviewManager
  */
 
-import type { DOMChange, DOMChangeStyleRules } from '../types/dom-changes'
+import type { DOMChange } from '~src/types/dom-changes'
 import { ElementStateManager, type ElementState } from './element-state'
 import { sanitizeHTML } from '../utils/html-sanitizer'
 import { Logger } from '../utils/logger'
