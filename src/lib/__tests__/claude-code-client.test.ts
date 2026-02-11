@@ -111,7 +111,7 @@ describe('ClaudeCodeBridgeClient', () => {
       mockFetch.mockRejectedValue(new Error('Connection refused'))
 
       await expect(client.findBridgePort()).rejects.toThrow(
-        'Could not connect to Claude Code Bridge on any port (3000, 3001, 3002, 3003, 3004)'
+        'Could not connect to AI CLI Bridge on any port (3000, 3001, 3002, 3003, 3004)'
       )
 
       expect(mockFetch).toHaveBeenCalledTimes(5)
@@ -146,7 +146,7 @@ describe('ClaudeCodeBridgeClient', () => {
 
       const promise = client.findBridgePort()
 
-      await expect(promise).rejects.toThrow('Could not connect to Claude Code Bridge on any port')
+      await expect(promise).rejects.toThrow('Could not connect to AI CLI Bridge on any port')
     })
 
     it('should handle network timeouts without hanging', async () => {
@@ -201,7 +201,7 @@ describe('ClaudeCodeBridgeClient', () => {
       abortError.name = 'AbortError'
       mockFetch.mockRejectedValue(abortError)
 
-      await expect(client.findBridgePort()).rejects.toThrow('Could not connect to Claude Code Bridge on any port')
+      await expect(client.findBridgePort()).rejects.toThrow('Could not connect to AI CLI Bridge on any port')
       expect(mockFetch).toHaveBeenCalledTimes(5)
     })
 
@@ -507,7 +507,7 @@ describe('ClaudeCodeBridgeClient', () => {
       mockFetch.mockRejectedValue(networkError)
 
       await expect(client.findBridgePort()).rejects.toThrow(
-        'Could not connect to Claude Code Bridge on any port'
+        'Could not connect to AI CLI Bridge on any port'
       )
     })
 

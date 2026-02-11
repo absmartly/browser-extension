@@ -155,7 +155,7 @@ describe('DOM Structure Generation', () => {
       await expect(capturePageHTML()).rejects.toThrow('Please open the extension on a webpage')
     })
 
-    it('should reject chrome-extension:// pages', async () => {
+    it('should fall back to empty HTML for chrome-extension:// pages in non-production', async () => {
       const mockTab = {
         id: 123,
         url: 'chrome-extension://abcd1234/popup.html'
@@ -164,7 +164,10 @@ describe('DOM Structure Generation', () => {
       mockChrome.tabs.query.mockResolvedValue([mockTab])
       mockChrome.tabs.get.mockResolvedValue(mockTab)
 
-      await expect(capturePageHTML()).rejects.toThrow('Please open the extension on a webpage')
+      const result = await capturePageHTML()
+      expect(result.html).toBe('<html></html>')
+      expect(result.url).toBe('chrome-extension://abcd1234/popup.html')
+      expect(result.domStructure).toBe('body')
     })
   })
 

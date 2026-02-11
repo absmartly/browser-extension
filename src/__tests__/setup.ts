@@ -28,6 +28,8 @@ const chrome = {
   },
   tabs: {
     query: jest.fn(),
+    onActivated: { addListener: jest.fn(), removeListener: jest.fn() },
+    onUpdated: { addListener: jest.fn(), removeListener: jest.fn() },
   },
   scripting: {
     executeScript: jest.fn(),

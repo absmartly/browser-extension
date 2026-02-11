@@ -130,12 +130,12 @@ export async function makeAPIRequest(
     requestData = data
   }
 
-  try {
-    const sanitizedKeys =
-      requestData && typeof requestData === 'object'
-        ? Object.keys(requestData as Record<string, unknown>)
-        : []
+  const sanitizedKeys =
+    requestData && typeof requestData === 'object'
+      ? Object.keys(requestData as Record<string, unknown>)
+      : []
 
+  try {
     const response = await withNetworkRetry(
       async () => {
         return await axios({
