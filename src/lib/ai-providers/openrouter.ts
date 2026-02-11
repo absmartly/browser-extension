@@ -2,7 +2,7 @@ import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import type { OpenRouterChatMessage, OpenRouterChatCompletionRequest } from '~src/types/openrouter'
-import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession, parseToolArguments } from './utils'
+import { parseToolArguments } from './utils'
 import {
   SHARED_TOOL_SCHEMA,
   CSS_QUERY_SCHEMA,
@@ -11,30 +11,26 @@ import {
   XPATH_QUERY_DESCRIPTION,
   DOM_CHANGES_TOOL_DESCRIPTION
 } from './shared-schema'
-import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
-import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
-import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { MAX_TOOL_ITERATIONS, withTimeout } from './constants'
+import {
+  processToolCalls,
+  prepareSession,
+  makeConversationalResponse,
+  makeFinalResponse,
+  MAX_TOOL_ITERATIONS,
+  type ToolCall
+} from './agentic-loop'
+import { withTimeout } from './constants'
 import { debugLog } from '~src/utils/debug'
 import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
 
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 
-/**
- * Remove emojis and other problematic Unicode characters that some providers can't handle
- * CRITICAL: Must remove ALL surrogates to prevent UTF-8 encoding errors
- */
 function stripEmojis(text: string): string {
   return text
-    // FIRST: Remove ALL surrogate pairs (emojis stored as 2-char sequences)
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
-    // SECOND: Remove any orphaned surrogates
     .replace(/[\uD800-\uDFFF]/g, '')
-    // Remove variation selectors
     .replace(/[\uFE00-\uFE0F]/g, '')
-    // Remove zero-width characters
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    // Clean up multiple spaces
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -43,7 +39,7 @@ export class OpenRouterProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {
-    return API_CHUNK_RETRIEVAL_PROMPT
+    return ''
   }
 
   getToolDefinition() {
@@ -92,27 +88,11 @@ export class OpenRouterProvider implements AIProvider {
       throw new Error('Model is required for OpenRouter provider')
     }
 
-    let session = createSession(options.conversationSession)
+    const { session, systemPrompt, userMessageText } = await prepareSession(
+      html, prompt, currentChanges, options, 'OpenRouter', stripEmojis
+    )
 
-    let systemPrompt = await getSystemPrompt(this.getChunkRetrievalPrompt())
-
-    if (!session.htmlSent) {
-      if (!html && !options.domStructure) {
-        throw new Error('HTML or DOM structure is required for first message in conversation')
-      }
-
-      systemPrompt = buildSystemPromptWithDOMStructure(
-        systemPrompt,
-        options.domStructure,
-        'OpenRouter'
-      )
-      session.htmlSent = true
-    }
-
-    systemPrompt = stripEmojis(systemPrompt)
     debugLog('[OpenRouter] System prompt length after emoji stripping:', systemPrompt.length)
-
-    const userMessageText = stripEmojis(buildUserMessage(prompt, currentChanges))
 
     const messages: OpenRouterChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -124,7 +104,7 @@ export class OpenRouterProvider implements AIProvider {
     ]
 
     if (images && images.length > 0) {
-      debugLog('[OpenRouter] ⚠️ Note: Image support depends on the selected model')
+      debugLog('[OpenRouter] Note: Image support depends on the selected model')
     }
 
     session.messages.push({ role: 'user', content: userMessageText })
@@ -132,12 +112,12 @@ export class OpenRouterProvider implements AIProvider {
     const tools = [this.getToolDefinition(), this.getCssQueryTool(), this.getXPathQueryTool()]
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      debugLog(`[OpenRouter] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
+      debugLog(`[OpenRouter] Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       const requestBody: OpenRouterChatCompletionRequest = {
         model: this.config.llmModel,
-        messages: messages,
-        tools: tools,
+        messages,
+        tools,
         max_tokens: 4096
       }
 
@@ -169,7 +149,6 @@ export class OpenRouterProvider implements AIProvider {
           const parsed = JSON.parse(errorText)
           if (parsed.error?.message) {
             errorMessage = parsed.error.message
-
             if (parsed.error.metadata?.raw) {
               try {
                 const nestedError = JSON.parse(parsed.error.metadata.raw)
@@ -177,7 +156,7 @@ export class OpenRouterProvider implements AIProvider {
                   errorMessage = `${parsed.error.metadata.provider_name || 'Provider'}: ${nestedError.error.message}`
                 }
               } catch {
-                // nested error not parseable, use outer error
+                // nested error not parseable
               }
             }
           } else if (parsed.message) {
@@ -203,20 +182,8 @@ export class OpenRouterProvider implements AIProvider {
       }
 
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        debugLog('[OpenRouter] ℹ️ No tool calls - conversational response')
-
-        const responseText = message.content || ''
-        session.messages.push({ role: 'assistant', content: responseText })
-
-        return {
-          domChanges: [],
-          response: responseText,
-          action: 'none' as const,
-          session
-        }
+        return makeConversationalResponse(message.content || '', session)
       }
-
-      const toolResultMessages: OpenRouterChatMessage[] = []
 
       messages.push({
         role: 'assistant',
@@ -224,68 +191,29 @@ export class OpenRouterProvider implements AIProvider {
         tool_calls: message.tool_calls
       })
 
-      for (const toolCall of message.tool_calls) {
-        if (toolCall.type !== 'function') {
-          debugLog(`[OpenRouter] ⚠️ Skipping non-function tool call type: ${toolCall.type}`)
-          continue
-        }
+      const toolCalls: ToolCall[] = message.tool_calls
+        .filter((tc: any) => tc.type === 'function')
+        .map((tc: any) => ({
+          name: tc.function.name,
+          id: tc.id,
+          input: tc.function.arguments
+        }))
 
-        const fn = toolCall.function
-        debugLog(`[OpenRouter] 🔧 Tool call: ${fn.name}`)
+      const outcome = await processToolCalls(
+        toolCalls,
+        'OpenRouter',
+        (raw) => parseToolArguments(raw, 'tool', 'OpenRouter')
+      )
 
-        if (fn.name === 'dom_changes_generator') {
-          debugLog('[OpenRouter] Received dom_changes_generator result')
-
-          const toolInput = parseToolArguments(fn.arguments, fn.name, 'OpenRouter')
-          const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
-
-          if (!validation.isValid) {
-            const errorValidation = validation as ValidationError
-            console.error('[OpenRouter] ❌ Tool call validation failed:', errorValidation.errors)
-            throw new Error(`Tool call validation failed: ${errorValidation.errors.join(', ')}`)
-          }
-
-          debugLog('[OpenRouter] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-          session.messages.push({ role: 'assistant', content: validation.result.response })
-
-          return {
-            ...validation.result,
-            session
-          }
-        } else if (fn.name === 'css_query') {
-          const args = parseToolArguments(fn.arguments, fn.name, 'OpenRouter')
-          const selectors = args.selectors as string[]
-          const result = await handleCssQuery(selectors)
-
-          toolResultMessages.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: result.error || result.result || ''
-          })
-        } else if (fn.name === 'xpath_query') {
-          const args = parseToolArguments(fn.arguments, fn.name, 'OpenRouter')
-          const xpath = args.xpath as string
-          const maxResults = (args.maxResults as number) || 10
-          const result = await handleXPathQuery(xpath, maxResults)
-
-          toolResultMessages.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: result.error || result.result || ''
-          })
-        } else {
-          toolResultMessages.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: `Error: Unknown tool "${fn.name}"`
-          })
-        }
+      if (outcome.type === 'final') {
+        return makeFinalResponse(outcome.result, session)
       }
 
-      if (toolResultMessages.length > 0) {
-        messages.push(...toolResultMessages)
-        debugLog(`[OpenRouter] ✅ Processed ${toolResultMessages.length} tool results, continuing loop...`)
+      for (const r of outcome.results) {
+        messages.push({ role: 'tool', tool_call_id: r.id, content: r.content })
       }
+
+      debugLog(`[OpenRouter] Processed ${outcome.results.length} tool results, continuing loop...`)
     }
 
     throw new Error(`Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`)

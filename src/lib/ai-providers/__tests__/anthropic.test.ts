@@ -518,7 +518,7 @@ describe('AnthropicProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Tool use validation failed')
+      ).rejects.toThrow('Tool call validation failed')
     })
 
     it('should include current changes in user message when provided', async () => {

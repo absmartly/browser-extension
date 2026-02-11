@@ -8,7 +8,6 @@ import type {
   GeminiFunctionDeclaration,
   GeminiTool
 } from '~src/types/gemini'
-import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
 import {
   SHARED_TOOL_SCHEMA,
   CSS_QUERY_SCHEMA,
@@ -17,19 +16,25 @@ import {
   XPATH_QUERY_DESCRIPTION,
   DOM_CHANGES_TOOL_DESCRIPTION
 } from './shared-schema'
-import { validateAIDOMGenerationResult, type ValidationResult, type ValidationError } from './validation'
-import { handleCssQuery, handleXPathQuery, type ToolCallResult } from './tool-handlers'
-import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { MAX_TOOL_ITERATIONS, withTimeout, parseAPIError } from './constants'
+import {
+  processToolCalls,
+  prepareSession,
+  makeConversationalResponse,
+  makeFinalResponse,
+  MAX_TOOL_ITERATIONS,
+  type ToolCall
+} from './agentic-loop'
+import { withTimeout, parseAPIError } from './constants'
 import { debugLog } from '~src/utils/debug'
 import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
+
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 export class GeminiProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {
-    return API_CHUNK_RETRIEVAL_PROMPT
+    return ''
   }
 
   getToolDefinition(): GeminiFunctionDeclaration {
@@ -69,38 +74,16 @@ export class GeminiProvider implements AIProvider {
       throw new Error('Model is required for Gemini provider')
     }
 
-    let session = createSession(options.conversationSession)
-
-    let systemPrompt = await getSystemPrompt(this.getChunkRetrievalPrompt())
-
-    if (!session.htmlSent) {
-      if (!html && !options.domStructure) {
-        throw new Error('HTML or DOM structure is required for first message in conversation')
-      }
-
-      systemPrompt = buildSystemPromptWithDOMStructure(
-        systemPrompt,
-        options.domStructure,
-        'Gemini'
-      )
-      session.htmlSent = true
-    }
+    const { session, systemPrompt, userMessageText } = await prepareSession(
+      html, prompt, currentChanges, options, 'Gemini'
+    )
 
     debugLog('[Gemini] System prompt length:', systemPrompt.length)
 
-    const userMessageText = buildUserMessage(prompt, currentChanges)
-
-    const contents: GeminiContent[] = []
-
-    contents.push({
-      role: 'user',
-      parts: [{ text: systemPrompt }]
-    })
-
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'I understand. I will help you generate DOM changes for your A/B test.' }]
-    })
+    const contents: GeminiContent[] = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      { role: 'model', parts: [{ text: 'I understand. I will help you generate DOM changes for your A/B test.' }] }
+    ]
 
     for (const msg of session.messages) {
       contents.push({
@@ -109,11 +92,7 @@ export class GeminiProvider implements AIProvider {
       })
     }
 
-    contents.push({
-      role: 'user',
-      parts: [{ text: userMessageText }]
-    })
-
+    contents.push({ role: 'user', parts: [{ text: userMessageText }] })
     session.messages.push({ role: 'user', content: userMessageText })
 
     const tools: GeminiTool = {
@@ -125,10 +104,10 @@ export class GeminiProvider implements AIProvider {
     }
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      debugLog(`[Gemini] 🔄 Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
+      debugLog(`[Gemini] Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       const requestBody: GeminiGenerateContentRequest = {
-        contents: contents,
+        contents,
         tools: [tools],
         generationConfig: {
           maxOutputTokens: 4096,
@@ -169,88 +148,34 @@ export class GeminiProvider implements AIProvider {
       const textParts = parts.filter(p => p.text)
 
       if (functionCalls.length === 0) {
-        debugLog('[Gemini] ℹ️ No function calls - conversational response')
-
         const responseText = textParts.map(p => p.text).join('\n').trim()
-        session.messages.push({ role: 'assistant', content: responseText })
-
-        return {
-          domChanges: [],
-          response: responseText,
-          action: 'none' as const,
-          session
-        }
+        return makeConversationalResponse(responseText, session)
       }
 
-      contents.push({
-        role: 'model',
-        parts: candidate.content.parts
+      contents.push({ role: 'model', parts: candidate.content.parts })
+
+      const toolCalls: ToolCall[] = functionCalls.map((part, idx) => ({
+        name: part.functionCall!.name,
+        id: `gemini-${iteration}-${idx}`,
+        input: part.functionCall!.args
+      }))
+
+      const outcome = await processToolCalls(toolCalls, 'Gemini')
+
+      if (outcome.type === 'final') {
+        return makeFinalResponse(outcome.result, session)
+      }
+
+      const functionResponses = outcome.results.map(r => {
+        const name = toolCalls.find(tc => tc.id === r.id)?.name || 'unknown'
+        const contentObj = r.content.startsWith('Error:')
+          ? { error: r.content }
+          : { result: r.content }
+        return { functionResponse: { name, response: contentObj } }
       })
 
-      const functionResponses: any[] = []
-
-      for (const part of functionCalls) {
-        const functionCall = part.functionCall!
-        debugLog(`[Gemini] 🔧 Function call: ${functionCall.name}`)
-
-        if (functionCall.name === 'dom_changes_generator') {
-          debugLog('[Gemini] Received dom_changes_generator result')
-
-          const validation = validateAIDOMGenerationResult(JSON.stringify(functionCall.args))
-
-          if (!validation.isValid) {
-            const errorValidation = validation as ValidationError
-            console.error('[Gemini] ❌ Function call validation failed:', errorValidation.errors)
-            throw new Error(`Function call validation failed: ${errorValidation.errors.join(', ')}`)
-          }
-
-          debugLog('[Gemini] ✅ Generated', validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
-          session.messages.push({ role: 'assistant', content: validation.result.response })
-
-          return {
-            ...validation.result,
-            session
-          }
-        } else if (functionCall.name === 'css_query') {
-          const selectors = functionCall.args.selectors as string[]
-          const result = await handleCssQuery(selectors)
-
-          functionResponses.push({
-            functionResponse: {
-              name: 'css_query',
-              response: result.error ? { error: result.error } : { result: result.result }
-            }
-          })
-        } else if (functionCall.name === 'xpath_query') {
-          const xpath = functionCall.args.xpath as string
-          const maxResults = (functionCall.args.maxResults as number) || 10
-          const result = await handleXPathQuery(xpath, maxResults)
-
-          functionResponses.push({
-            functionResponse: {
-              name: 'xpath_query',
-              response: result.error ? { error: result.error } : { result: result.result }
-            }
-          })
-        } else {
-          functionResponses.push({
-            functionResponse: {
-              name: functionCall.name,
-              response: {
-                error: `Unknown function "${functionCall.name}"`
-              }
-            }
-          })
-        }
-      }
-
-      if (functionResponses.length > 0) {
-        contents.push({
-          role: 'user',
-          parts: functionResponses
-        })
-        debugLog(`[Gemini] ✅ Processed ${functionResponses.length} function results, continuing loop...`)
-      }
+      contents.push({ role: 'user', parts: functionResponses })
+      debugLog(`[Gemini] Processed ${functionResponses.length} function results, continuing loop...`)
     }
 
     throw new Error(`Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`)

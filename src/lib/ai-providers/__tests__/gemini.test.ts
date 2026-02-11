@@ -405,7 +405,7 @@ describe('GeminiProvider', () => {
 
       await expect(
         provider.generate('<html></html>', 'test prompt', [], undefined, {})
-      ).rejects.toThrow('Function call validation failed')
+      ).rejects.toThrow('Tool call validation failed')
     })
 
     it('should include generationConfig in request body', async () => {
