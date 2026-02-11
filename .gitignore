@@ -71,6 +71,7 @@ test-*.html
 *.bak*
 *.orig
 *~
+sdk-plugin-backup/
 
 # Docs and PRPs
 PRPs
