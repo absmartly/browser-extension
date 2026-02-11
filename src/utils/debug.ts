@@ -29,9 +29,4 @@ export const debugError = function(...args: any[]) {
   console.error(...args)
 }
 
-/**
- * Always log - bypasses debug flag (use for important messages)
- */
-export const alwaysLog = function(...args: any[]) {
-  debugLog(...args)
-}
+
