@@ -1,4 +1,4 @@
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import {
   DB_NAME,
   DB_VERSION,
@@ -17,7 +17,7 @@ export async function openDatabase(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onerror = () => {
-      console.error('[IndexedDB] Error opening database:', request.error)
+      debugError('[IndexedDB] Error opening database:', request.error)
       dbPromise = null
       reject(request.error)
     }
@@ -69,7 +69,9 @@ export async function openDatabase(): Promise<IDBDatabase> {
 
 export function closeDatabase(): void {
   if (dbPromise) {
-    dbPromise.then(db => db.close())
+    dbPromise.then(db => db.close()).catch(error => {
+      debugError('[IndexedDB] Error closing database:', error)
+    })
     dbPromise = null
   }
 }

@@ -25,26 +25,31 @@ async function injectSDKBridgeScript(): Promise<void> {
   })
 }
 
-export async function ensureSDKPluginInjected() {
+export async function ensureSDKPluginInjected(): Promise<boolean> {
   if (!sdkBridgeInjected && !sdkBridgeInjecting) {
-    console.log("[Content Script] 🚀 Injecting SDK bridge...")
+    debugLog("[Content Script] Injecting SDK bridge...")
     sdkBridgeInjecting = true
     try {
       await injectSDKBridgeScript()
       sdkBridgeInjected = true
-      console.log("[Content Script] ✅ SDK bridge injected successfully")
+      debugLog("[Content Script] SDK bridge injected successfully")
+      await new Promise((resolve) => setTimeout(resolve, 50))
     } catch (error) {
-      console.error("[Content Script] ❌ Failed to inject SDK bridge:", error)
+      debugError("[Content Script] Failed to inject SDK bridge:", error)
+      return false
     } finally {
       sdkBridgeInjecting = false
     }
-    await new Promise((resolve) => setTimeout(resolve, 50))
   } else if (sdkBridgeInjecting) {
-    console.log(
-      "[Content Script] ⏳ SDK bridge injection already in progress, waiting..."
-    )
+    debugLog("[Content Script] SDK bridge injection already in progress, waiting...")
+    const deadline = Date.now() + 5000
     while (sdkBridgeInjecting) {
+      if (Date.now() > deadline) {
+        debugError("[Content Script] SDK bridge injection timed out after 5s")
+        return false
+      }
       await new Promise((resolve) => setTimeout(resolve, 10))
     }
   }
+  return sdkBridgeInjected
 }

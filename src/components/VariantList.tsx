@@ -304,7 +304,8 @@ export function VariantList({
       if (value && (value.startsWith('{') || value.startsWith('['))) {
         parsedValue = JSON.parse(value)
       }
-    } catch {
+    } catch (error) {
+      debugWarn(`[VariantList] Failed to parse variable value as JSON for key "${key}":`, error)
     }
 
     newVariants[index] = {
@@ -330,7 +331,8 @@ export function VariantList({
       if (value.startsWith('{') || value.startsWith('[')) {
         parsedValue = JSON.parse(value)
       }
-    } catch {
+    } catch (error) {
+      debugWarn(`[VariantList] Failed to parse variable value as JSON for key "${key}":`, error)
     }
     newVariants[index] = {
       ...newVariants[index],

@@ -68,7 +68,7 @@ export async function registerFileUrlContentScript(): Promise<void> {
         debugLog('[InjectionHandler] Test mode: Re-registered content script for file:// URLs')
       }
     } catch (retryError) {
-      console.error('[InjectionHandler] Test mode: Failed to register file:// content script:', retryError)
+      debugError('[InjectionHandler] Test mode: Failed to register file:// content script:', retryError)
     }
   }
 }

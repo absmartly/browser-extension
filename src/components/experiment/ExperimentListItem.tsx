@@ -1,4 +1,5 @@
 import React from 'react'
+import { debugWarn } from '~src/utils/debug'
 import type { Experiment } from '~src/types/absmartly'
 import type { ExperimentOverrides } from '~src/utils/overrides'
 import type { VariantAssignments } from "~src/utils/sdk-bridge"
@@ -41,7 +42,8 @@ export const ExperimentListItem = React.memo(function ExperimentListItem({
         if (config[domFieldName] && Array.isArray(config[domFieldName])) {
           totalChanges += config[domFieldName].length
         }
-      } catch {
+      } catch (error) {
+        debugWarn(`[ExperimentListItem] Failed to parse variant config for "${variant.name}":`, error)
       }
     })
     return totalChanges
