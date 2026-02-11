@@ -2,7 +2,7 @@ import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
 import type { OpenRouterChatMessage, OpenRouterChatCompletionRequest } from '~src/types/openrouter'
-import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
+import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession, parseToolArguments } from './utils'
 import {
   SHARED_TOOL_SCHEMA,
   CSS_QUERY_SCHEMA,
@@ -236,7 +236,7 @@ export class OpenRouterProvider implements AIProvider {
         if (fn.name === 'dom_changes_generator') {
           debugLog('[OpenRouter] Received dom_changes_generator result')
 
-          const toolInput = JSON.parse(fn.arguments)
+          const toolInput = parseToolArguments(fn.arguments, fn.name, 'OpenRouter')
           const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
 
           if (!validation.isValid) {
@@ -253,7 +253,7 @@ export class OpenRouterProvider implements AIProvider {
             session
           }
         } else if (fn.name === 'css_query') {
-          const args = JSON.parse(fn.arguments)
+          const args = parseToolArguments(fn.arguments, fn.name, 'OpenRouter')
           const selectors = args.selectors as string[]
           const result = await handleCssQuery(selectors)
 
@@ -263,7 +263,7 @@ export class OpenRouterProvider implements AIProvider {
             content: result.error || result.result || ''
           })
         } else if (fn.name === 'xpath_query') {
-          const args = JSON.parse(fn.arguments)
+          const args = parseToolArguments(fn.arguments, fn.name, 'OpenRouter')
           const xpath = args.xpath as string
           const maxResults = (args.maxResults as number) || 10
           const result = await handleXPathQuery(xpath, maxResults)

@@ -71,6 +71,7 @@ export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ 
       return { authenticated: true }
     }
   } catch (error) {
+    console.error('[Auth] Failed to check current user:', error)
   }
 
   chrome.tabs.create({ url: baseUrl })

@@ -17,6 +17,7 @@ import { EditorCoordinator } from './editor-coordinator'
 import type { EditorCoordinatorCallbacks } from './editor-coordinator'
 import type { DOMChange } from '../types/visual-editor'
 
+import DOMPurify from 'dompurify'
 import { debugLog, debugWarn } from '~src/utils/debug'
 export interface VisualEditorOptions {
   variantName: string
@@ -518,7 +519,7 @@ export class VisualEditor {
       if (change.type === 'text' && oldValue !== null) {
         htmlElement.textContent = oldValue
       } else if (change.type === 'html' && oldValue !== null) {
-        htmlElement.innerHTML = oldValue
+        htmlElement.innerHTML = DOMPurify.sanitize(oldValue)
       } else if (change.type === 'style' && oldValue) {
         Object.assign(htmlElement.style, oldValue)
       } else if (change.type === 'remove') {
@@ -596,7 +597,7 @@ export class VisualEditor {
       if (change.type === 'text' && change.value !== undefined) {
         htmlElement.textContent = change.value
       } else if (change.type === 'html' && change.value !== undefined) {
-        htmlElement.innerHTML = change.value
+        htmlElement.innerHTML = DOMPurify.sanitize(change.value)
       } else if (change.type === 'style' && change.value) {
         Object.assign(htmlElement.style, change.value)
       } else if (change.type === 'remove') {
@@ -609,7 +610,7 @@ export class VisualEditor {
         const insertChange = change as any
         if (insertChange.html && insertChange.position) {
           const tempContainer = document.createElement('div')
-          tempContainer.innerHTML = insertChange.html
+          tempContainer.innerHTML = DOMPurify.sanitize(insertChange.html)
           const newElement = tempContainer.firstElementChild
           if (newElement && element) {
             if (insertChange.position === 'before') {

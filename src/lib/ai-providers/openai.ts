@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
 import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
-import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
+import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession, parseToolArguments } from './utils'
 import {
   SHARED_TOOL_SCHEMA,
   CSS_QUERY_SCHEMA,
@@ -178,7 +178,7 @@ export class OpenAIProvider implements AIProvider {
         if (fn.name === 'dom_changes_generator') {
           debugLog('[OpenAI] Received dom_changes_generator result')
 
-          const toolInput = JSON.parse(fn.arguments)
+          const toolInput = parseToolArguments(fn.arguments, fn.name, 'OpenAI')
           const validation = validateAIDOMGenerationResult(JSON.stringify(toolInput))
 
           if (!validation.isValid) {
@@ -195,7 +195,7 @@ export class OpenAIProvider implements AIProvider {
             session
           }
         } else if (fn.name === 'css_query') {
-          const args = JSON.parse(fn.arguments)
+          const args = parseToolArguments(fn.arguments, fn.name, 'OpenAI')
           const selectors = args.selectors as string[]
           const result = await handleCssQuery(selectors)
 
@@ -205,7 +205,7 @@ export class OpenAIProvider implements AIProvider {
             content: result.error || result.result || ''
           })
         } else if (fn.name === 'xpath_query') {
-          const args = JSON.parse(fn.arguments)
+          const args = parseToolArguments(fn.arguments, fn.name, 'OpenAI')
           const xpath = args.xpath as string
           const maxResults = (args.maxResults as number) || 10
           const result = await handleXPathQuery(xpath, maxResults)

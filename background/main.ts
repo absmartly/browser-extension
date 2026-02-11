@@ -305,9 +305,17 @@ export function initializeBackgroundScript() {
     } else if (message.type === 'TOGGLE_VISUAL_EDITOR') {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, message)
+          chrome.tabs.sendMessage(tabs[0].id, message).catch((error) => {
+            debugError('[Background] Failed to toggle visual editor:', error?.message)
+            sendResponse({ success: false, error: error?.message || 'Failed to toggle visual editor' })
+          })
+          sendResponse({ success: true })
+        } else {
+          debugWarn('[Background] No active tab found for TOGGLE_VISUAL_EDITOR')
+          sendResponse({ success: false, error: 'No active tab' })
         }
       })
+      return true
     } else if (message.type === 'ELEMENT_SELECTED') {
       sessionStorage.get<DOMChangesInlineState>('domChangesInlineState').then(async (state) => {
         if (state && state.pickingForField) {
@@ -332,6 +340,8 @@ export function initializeBackgroundScript() {
             }
           })
         }
+      }).catch((error) => {
+        debugError("[Background] Failed to handle ELEMENT_SELECTED:", error)
       })
     } else if (message.type === 'GET_CURRENT_TAB_URL') {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -467,6 +477,12 @@ export function initializeBackgroundScript() {
           }
           sendResponse(errorResult)
         }
+      }).catch((error) => {
+        debugError('[Background CHECK_AUTH] Failed to resolve config:', error)
+        sendResponse({
+          success: false,
+          error: 'Failed to load configuration'
+        })
       })
 
       return true
@@ -515,10 +531,11 @@ export function initializeBackgroundScript() {
             throw new Error('HTML is required for the first message in a conversation')
           }
 
-          const isTestPage = typeof pageUrl === 'string' && (
-            /visual-editor-test\.html/.test(pageUrl) ||
-            pageUrl.includes('chrome-extension://')
-          )
+          const isTestPage = process.env.NODE_ENV !== 'production' &&
+            typeof pageUrl === 'string' && (
+              /visual-editor-test\.html/.test(pageUrl) ||
+              pageUrl.includes('chrome-extension://')
+            )
           if (isTestPage) {
             debugLog('[Background] Using mock AI response for visual-editor-test page')
 

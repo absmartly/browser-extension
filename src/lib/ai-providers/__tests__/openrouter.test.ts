@@ -8,6 +8,7 @@ jest.mock('../utils', () => ({
   buildSystemPromptWithDOMStructure: jest.fn((prompt, domStructure) =>
     domStructure ? prompt + '\n\n## Page DOM Structure\n' + domStructure : prompt
   ),
+  parseToolArguments: jest.fn((raw, toolName, provider) => JSON.parse(raw)),
   createSession: jest.fn((session) => session || {
     id: 'test-session-id',
     htmlSent: false,

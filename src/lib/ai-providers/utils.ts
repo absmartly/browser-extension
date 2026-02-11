@@ -164,6 +164,15 @@ export function compressHtml(html: string): string {
     .trim()
 }
 
+export function parseToolArguments(rawArguments: string, toolName: string, providerName: string): Record<string, unknown> {
+  try {
+    return JSON.parse(rawArguments)
+  } catch (error) {
+    const preview = rawArguments.length > 200 ? rawArguments.slice(0, 200) + '...' : rawArguments
+    throw new Error(`[${providerName}] Failed to parse arguments for tool "${toolName}": ${preview}`)
+  }
+}
+
 const systemPromptCache = new Map<string, string>()
 
 export async function getSystemPrompt(chunkRetrievalPrompt: string): Promise<string> {
