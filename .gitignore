@@ -11,9 +11,6 @@
 # claude tasks
 .claude/tasks/
 
-# serena
-.serena
-
 public/*.{min,dev}.js
 react.production.min.js
 
@@ -21,7 +18,6 @@ react.production.min.js
 public/absmartly-sdk-bridge.bundle.js
 public/absmartly-sdk-bridge.bundle.js.map
 playwright-report/
-playwright-report/index.html
 test-results
 
 # dependencies
@@ -29,14 +25,15 @@ test-results
 /.pnp
 .pnp.js
 
-# testing
+# testing & coverage
 /coverage
+coverage-handlers/
 
 # misc
 .DS_Store
 *.pem
 
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -59,36 +56,21 @@ dist/
 tsconfig.tsbuildinfo
 injected-bundles/
 
-# Temporary test files and screenshots
-test-*.html
-*-test-*.html
-preview-*.png
-*-preview-*.png
-visual-editor-*.png
-*-test-result*.png
-*-screenshot-*.png
-tests/e2e/*-mock.spec.ts
-tests/e2e/*-real.spec.ts
-tests/e2e/*-temp.spec.ts
+# Test files, screenshots, and artifacts
 tests/
 .test-backups
-
-# Debug screenshots and test artifacts
-after-*.png
-before-*.png
-menu-*.png
-debug-*.png
-tests/e2e/menu-*.png
-tests/e2e/after-*.png
-tests/e2e/before-*.png
-test-*.png
+test-*.html
+*-test-*.html
+*.png
+!assets/*.png
+!src/assets/*.png
+.playwright-mcp/
 
 # Backup files
 *.bak
 *.bak*
 *.orig
 *~
-*.png
 
 # Docs and PRPs
 PRPs
