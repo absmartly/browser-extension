@@ -37,7 +37,7 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   const originalText = await page.locator('#test-paragraph').textContent()
 
   await openContextMenu('#test-paragraph')
-  await page.locator('.menu-item:has-text("Edit Text")').evaluate((el) => {
+  await page.locator('.menu-item[data-action="edit"]').evaluate((el) => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
   await page.waitForFunction(() => {
@@ -77,7 +77,7 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   const originalHtml = await page.locator('#test-paragraph').innerHTML()
 
   await openContextMenu('#test-paragraph')
-  await page.locator('.menu-item:has-text("Edit HTML")').evaluate((el) => {
+  await page.locator('.menu-item[data-action="editHtml"]').evaluate((el) => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
   await page.waitForSelector('#html-editor-dialog', { state: 'visible' })
@@ -92,7 +92,7 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
 
   await page.keyboard.press('Meta+A')
   await page.keyboard.type('<strong>Bold HTML test</strong>')
-  await page.locator('#html-editor-dialog button:has-text("Apply")').click()
+  await page.locator('#html-editor-apply-button').click()
   await page.locator('#html-editor-dialog').waitFor({ state: 'hidden' })
 
   let currentHtml = await page.locator('#test-paragraph').innerHTML()
@@ -114,7 +114,7 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   expect(isVisible).toBe(true)
 
   await openContextMenu('#test-paragraph')
-  await page.locator('.menu-item:has-text("Hide")').evaluate((el) => {
+  await page.locator('.menu-item[data-action="hide"]').evaluate((el) => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 
@@ -137,7 +137,7 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   expect(elementVisible).toBe(true)
 
   await openContextMenu('#test-paragraph')
-  await page.locator('.menu-item:has-text("Delete")').evaluate((el) => {
+  await page.locator('.menu-item[data-action="delete"]').evaluate((el) => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 

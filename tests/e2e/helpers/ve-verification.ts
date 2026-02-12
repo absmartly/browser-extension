@@ -10,7 +10,7 @@ import { log, debugWait } from '../utils/test-helpers'
  * This ensures only one VE instance can be active at a time.
  */
 export async function verifyVEProtection(sidebar: FrameLocator): Promise<void> {
-  const allVEButtons = sidebar.locator('button:has-text("Visual Editor")')
+  const allVEButtons = sidebar.locator('#visual-editor-button')
   const buttonCount = await allVEButtons.count()
 
   // Check ALL buttons are disabled

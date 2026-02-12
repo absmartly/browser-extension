@@ -87,7 +87,7 @@ export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page
   log('Looking for Add DOM Change button')
 
   // Scroll to the Add DOM Change button
-  const addChangeButton = sidebar.locator('button:has-text("Add DOM Change")').first()
+  const addChangeButton = sidebar.locator('#add-dom-change-button')
   await addChangeButton.scrollIntoViewIfNeeded()
   log('Scrolled to Add DOM Change button')
 

@@ -39,7 +39,7 @@ log(`Text before launching VE: "${originalText}"`)
 
   await page.screenshot({ path: 'test-results/before-discard-test-ve-launch.png', fullPage: true })
 
-  const veButtons = sidebar.locator('button:has-text("Visual Editor")')
+  const veButtons = sidebar.locator('#visual-editor-button')
   await veButtons.nth(0).waitFor({ state: 'attached', timeout: 5000 })
 
   let buttonEnabled = false
@@ -106,7 +106,7 @@ log(`Text before launching VE: "${originalText}"`)
   const contextMenu = page.locator('.menu-container')
   await expect(contextMenu).toBeVisible()
 
-  const editTextButton = page.locator('.menu-item:has-text("Edit Text")')
+  const editTextButton = page.locator('.menu-item[data-action="edit"]')
   await editTextButton.click()
 
   await page.waitForFunction(() => {
@@ -129,7 +129,7 @@ log(`Text before launching VE: "${originalText}"`)
   expect(textBeforeDiscard).toBe('Discarded change')
   log('  ✓ Change is visible on page')
 
-  const exitButton = page.locator('button:has-text("Exit")').first()
+  const exitButton = page.locator('[data-action="exit"]')
   await expect(exitButton).toBeVisible()
 
   page.once('dialog', async dialog => {

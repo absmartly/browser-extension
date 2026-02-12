@@ -130,10 +130,7 @@ export function setupConsoleLogging(
  * @returns Whether experiments are available
  */
 export async function waitForExperiments(sidebar: FrameLocator): Promise<boolean> {
-  const experimentItem = sidebar
-    .locator('div[role="button"], button, [class*="cursor-pointer"]')
-    .filter({ hasText: /Experiment|Test/i })
-    .first()
+  const experimentItem = sidebar.locator('[data-testid="experiment-list-item"]').first()
 
   return await experimentItem.isVisible({ timeout: 10000 }).catch(() => false)
 }

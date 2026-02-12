@@ -526,7 +526,11 @@ describe('useVariantPreview', () => {
       })
 
       expect(result.current.previewEnabled).toBe(true)
-      expect(mockSendToContent).not.toHaveBeenCalled()
+      expect(mockSendToContent).toHaveBeenCalledWith({
+        type: 'ABSMARTLY_PREVIEW',
+        action: 'remove',
+        experimentName: 'test-experiment'
+      })
     })
   })
 })

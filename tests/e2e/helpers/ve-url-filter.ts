@@ -99,7 +99,7 @@ export async function testURLFilterAndPayload(sidebar: FrameLocator, page: Page)
 
   log('  ✓ URL filter verified in JSON payload')
 
-  const closeButton = page.locator('button:has-text("Cancel"), button:has-text("Close")').first()
+  const closeButton = page.locator('#json-editor-close-button')
   await closeButton.click()
 
   await jsonEditorInPage.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})

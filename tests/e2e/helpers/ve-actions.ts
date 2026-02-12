@@ -27,7 +27,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   // Action 4: Edit HTML with CodeMirror editor on parent container
   await page.click('#test-container', { force: true })
   await page.locator('.menu-container').waitFor({ state: 'visible' })
-  await page.locator('.menu-item:has-text("Edit HTML")').click()
+  await page.locator('.menu-item[data-action="editHtml"]').click()
 
   await page.locator('.cm-editor').waitFor({ state: 'visible' })
   await debugWait()
@@ -196,7 +196,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await page.locator('#test-image').click({ force: true })
   await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
 
-  const changeImageOption = page.locator('.menu-item:has-text("Change image source")')
+  const changeImageOption = page.locator('.menu-item[data-action="change-image-source"]')
   await changeImageOption.waitFor({ state: 'visible', timeout: 2000 })
 
   await changeImageOption.click()
