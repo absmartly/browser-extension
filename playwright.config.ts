@@ -19,13 +19,21 @@ export default defineConfig({
     baseURL: 'http://localhost:3456'
   },
 
-  // Web server to serve test pages
-  webServer: {
-    command: 'npx http-server tests/test-pages -p 3456 --silent',
-    port: 3456,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000
-  },
+  // Web servers: test pages + AI CLI bridge
+  webServer: [
+    {
+      command: 'npx http-server tests/test-pages -p 3456 --silent',
+      port: 3456,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000
+    },
+    {
+      command: 'node ../claude-code-bridge/index.js',
+      port: 3000,
+      reuseExistingServer: true,
+      timeout: 30 * 1000
+    }
+  ],
 
   projects: [
     {

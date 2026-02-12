@@ -178,6 +178,7 @@ export function ChatInput({
           id="ai-generate-button"
           onClick={onSubmit}
           disabled={loading || (!prompt.trim() && images.length === 0)}
+          data-loading={loading ? 'true' : 'false'}
           className="flex-1"
         >
           {loading ? (

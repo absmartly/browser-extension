@@ -378,7 +378,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
               <SparklesIcon className="h-6 w-6 text-purple-600" />
               <div>
                 <h2 id="ai-dom-generator-heading" className="text-lg font-semibold text-gray-900">Vibe Studio</h2>
-                <p className="text-xs text-gray-600">Variant: {variantName}</p>
+                <p id="ai-variant-label" className="text-xs text-gray-600">Variant: {variantName}</p>
               </div>
             </div>
           }

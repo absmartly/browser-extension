@@ -476,7 +476,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 rounded-full ${getStatusColor(connectionState)}`} />
               <div>
-                <p className="text-sm font-medium">
+                <p id="bridge-connection-status" className="text-sm font-medium">
                   {connectionState === ConnectionState.CONNECTED ? `Connected (port ${bridgePort})` : 'Not Connected'}
                 </p>
                 <p className="text-xs text-gray-600">
@@ -500,19 +500,19 @@ export const AIProviderSection = React.memo(function AIProviderSection({
             <Alert className="mt-3">
               <AlertDescription>
                 <div className="space-y-2">
-                  <p className="font-medium">Claude Subscription requires a local bridge server:</p>
+                  <p id="claude-subscription-instructions" className="font-medium">Claude Subscription requires a local bridge server:</p>
 
                   <div className="pl-4 space-y-2">
                     <div>
                       <p className="font-medium text-xs">1. Login to Claude CLI (one-time setup):</p>
-                      <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                      <code id="claude-login-command" className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
                         npx @anthropic-ai/claude-code /login
                       </code>
                     </div>
 
                     <div>
                       <p className="font-medium text-xs">2. Start the bridge server:</p>
-                      <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                      <code id="bridge-start-command" className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
                         npx @absmartly/ai-cli-bridge --claude
                       </code>
                     </div>
@@ -557,7 +557,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
           )}
 
           <details className="text-sm">
-            <summary className="cursor-pointer text-gray-700 hover:text-gray-900">
+            <summary id="advanced-port-config-summary" className="cursor-pointer text-gray-700 hover:text-gray-900">
               Advanced: Custom Port Configuration
             </summary>
             <div className="mt-2 space-y-2">

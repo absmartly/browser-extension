@@ -78,7 +78,7 @@ export const ExperimentListItem = React.memo(function ExperimentListItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-2">
-              <h3 className="text-sm font-medium text-gray-900 truncate">
+              <h3 className="text-sm font-medium text-gray-900 truncate" data-experiment-name={experiment.name}>
                 {experiment.display_name || experiment.name}
               </h3>
               <p className="text-xs text-gray-500 truncate">
