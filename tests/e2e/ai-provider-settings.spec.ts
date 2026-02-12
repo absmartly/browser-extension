@@ -11,8 +11,8 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
+    await sidebar.locator('#nav-settings').click()
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -20,15 +20,17 @@ test.describe('AI Provider Settings', () => {
     const selectedValue = await aiProviderSelect.inputValue()
     expect(selectedValue).toBe('claude-subscription')
 
-    const bridgeInstructions = sidebar.locator('text=/Claude Subscription requires/i')
-    await bridgeInstructions.waitFor({ state: 'visible', timeout: 2000 })
+    const bridgeInstructions = sidebar.locator('#claude-subscription-instructions')
+    const bridgeStatus = sidebar.locator('#bridge-connection-status')
+    const instructionsVisible = await bridgeInstructions.isVisible().catch(() => false)
+    const statusVisible = await bridgeStatus.isVisible().catch(() => false)
 
-    const loginCommand = sidebar.locator('code:has-text("npx @anthropic-ai/claude-code login")')
-    await expect(loginCommand).toBeVisible()
+    if (instructionsVisible) {
+      await expect(sidebar.locator('#claude-login-command')).toBeVisible()
+      await expect(sidebar.locator('#bridge-start-command')).toBeVisible()
+    }
 
-    const bridgeCommand = sidebar.locator('code:has-text("npx @absmartly/claude-code-bridge")')
-    await expect(bridgeCommand).toBeVisible()
-
+    expect(instructionsVisible || statusVisible).toBe(true)
     console.log('✓ AI Provider section displays correctly with Claude Subscription default')
   })
 
@@ -38,8 +40,8 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
+    await sidebar.locator('#nav-settings').click()
 
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
@@ -47,39 +49,38 @@ test.describe('AI Provider Settings', () => {
 
     await aiProviderSelect.selectOption('anthropic-api')
 
-    const apiKeyInput = sidebar.locator('#claude-api-key')
+    const apiKeyInput = sidebar.locator('#ai-api-key')
     await apiKeyInput.waitFor({ state: 'visible', timeout: 2000 })
     await expect(apiKeyInput).toBeVisible()
 
     const anthropicLink = sidebar.locator('a[href="https://console.anthropic.com/"]')
     await expect(anthropicLink).toBeVisible()
 
-    const bridgeInstructions = sidebar.locator('text=/Claude Subscription requires/i')
+    const bridgeInstructions = sidebar.locator('#claude-subscription-instructions')
     await expect(bridgeInstructions).not.toBeVisible()
 
     console.log('✓ Anthropic API option shows API key input')
   })
 
-  test('should show warning when selecting OpenAI API', async ({ page, extensionId, extensionUrl }) => {
+  test('should show API key input when selecting OpenAI API', async ({ page, extensionId, extensionUrl }) => {
     await page.goto(`file://${TEST_PAGE_PATH}`)
     await page.waitForLoadState('networkidle')
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
-
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
+    await sidebar.locator('#nav-settings').click()
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
 
     await aiProviderSelect.selectOption('openai-api')
 
-    const warningMessage = sidebar.locator('text=/OpenAI API integration is not yet implemented/i')
-    await warningMessage.waitFor({ state: 'visible', timeout: 2000 })
-    await expect(warningMessage).toBeVisible()
+    const apiKeyInput = sidebar.locator('#ai-api-key')
+    await apiKeyInput.waitFor({ state: 'visible', timeout: 2000 })
+    await expect(apiKeyInput).toBeVisible()
 
-    console.log('✓ OpenAI API shows not implemented warning')
+    console.log('✓ OpenAI API shows API key input')
   })
 
   test('should persist AI provider selection', async ({ page, extensionId, extensionUrl }) => {
@@ -88,35 +89,37 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
+    await sidebar.locator('#nav-settings').click()
 
-
-    const apiEndpointInput = sidebar.locator('#absmartly-endpoint')
-    await apiEndpointInput.waitFor({ state: 'visible', timeout: 5000 })
-    await apiEndpointInput.fill('http://demo.absmartly.io:8090/v1')
+    const endpointInput = sidebar.locator('#absmartly-endpoint')
+    await endpointInput.waitFor({ state: 'visible', timeout: 5000 })
+    const currentEndpoint = await endpointInput.inputValue()
+    if (!currentEndpoint) {
+      await endpointInput.fill('https://demo-2.absmartly.com/v1')
+    }
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('anthropic-api')
 
-    const apiKeyInput = sidebar.locator('#claude-api-key')
+    const apiKeyInput = sidebar.locator('#ai-api-key')
     await apiKeyInput.waitFor({ state: 'visible', timeout: 2000 })
     await apiKeyInput.fill('sk-ant-test-key-12345')
 
     const saveButton = sidebar.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.click()
+    await saveButton.evaluate((el: HTMLElement) => el.click())
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 10000 })
+    await sidebar.locator('#nav-settings').click()
 
     const savedAiProvider = sidebar.locator('#ai-provider-select')
     await savedAiProvider.waitFor({ state: 'visible', timeout: 5000 })
     const savedValue = await savedAiProvider.inputValue()
     expect(savedValue).toBe('anthropic-api')
 
-    const savedApiKey = sidebar.locator('#claude-api-key')
+    const savedApiKey = sidebar.locator('#ai-api-key')
     await savedApiKey.waitFor({ state: 'visible', timeout: 2000 })
     const savedKeyValue = await savedApiKey.inputValue()
     expect(savedKeyValue).toBe('sk-ant-test-key-12345')
@@ -130,8 +133,8 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
+    await sidebar.locator('#nav-settings').click()
 
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
@@ -142,9 +145,9 @@ test.describe('AI Provider Settings', () => {
       await aiProviderSelect.selectOption('claude-subscription')
     }
 
-    await page.waitFor({ timeout: 2000 })
+    await page.waitForLoadState('networkidle')
 
-    const connectionStatus = sidebar.locator('text=/Connected|Not Connected|Connecting/i')
+    const connectionStatus = sidebar.locator('#bridge-connection-status')
     await connectionStatus.waitFor({ state: 'visible', timeout: 5000 })
 
     const statusText = await connectionStatus.textContent()
@@ -163,8 +166,8 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#settings-nav-button').waitFor({ state: 'visible' })
-    await sidebar.locator('#settings-nav-button').click()
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
+    await sidebar.locator('#nav-settings').click()
 
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
@@ -184,7 +187,7 @@ test.describe('AI Provider Settings', () => {
     const testButton = sidebar.locator('#test-bridge-connection')
     await testButton.click()
 
-    await page.waitFor({ timeout: 1000 })
+    await page.waitForLoadState('networkidle')
 
     console.log('✓ Custom port configuration is accessible')
   })

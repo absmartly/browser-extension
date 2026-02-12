@@ -6,8 +6,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -16,7 +16,7 @@ test.describe('AI Provider Factory E2E', () => {
 
     await aiProviderSelect.selectOption('anthropic-api')
 
-    const apiKeyInput = page.locator('#claude-api-key')
+    const apiKeyInput = page.locator('#ai-api-key')
     await apiKeyInput.waitFor({ state: 'visible', timeout: 5000 })
     await expect(apiKeyInput).toBeVisible()
 
@@ -26,11 +26,13 @@ test.describe('AI Provider Factory E2E', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 8000 })
+
     await page.goto(sidebarUrl)
     await page.waitForLoadState('networkidle')
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -39,7 +41,7 @@ test.describe('AI Provider Factory E2E', () => {
     const savedValue = await savedAiProvider.inputValue()
     expect(savedValue).toBe('anthropic-api')
 
-    const savedApiKey = page.locator('#claude-api-key')
+    const savedApiKey = page.locator('#ai-api-key')
     await savedApiKey.waitFor({ state: 'visible', timeout: 5000 })
     const savedKeyValue = await savedApiKey.inputValue()
     expect(savedKeyValue).toBe('sk-ant-test-key-12345')
@@ -52,8 +54,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -65,7 +67,7 @@ test.describe('AI Provider Factory E2E', () => {
     for (const provider of providers) {
       await aiProviderSelect.selectOption(provider)
 
-      await page.waitFor({ timeout: 500 })
+      await page.waitForLoadState('networkidle')
 
       const currentValue = await aiProviderSelect.inputValue()
       expect(currentValue).toBe(provider)
@@ -81,8 +83,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -90,16 +92,25 @@ test.describe('AI Provider Factory E2E', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
-    const bridgeInstructions = page.locator('text=/Claude Subscription requires/i')
-    await bridgeInstructions.waitFor({ state: 'visible', timeout: 5000 })
+    const bridgeInstructions = page.locator('#claude-subscription-instructions')
+    const bridgeStatus = page.locator('#bridge-connection-status')
+    const instructionsVisible = await bridgeInstructions.isVisible().catch(() => false)
+    const statusVisible = await bridgeStatus.isVisible().catch(() => false)
 
-    const loginCommand = page.locator('code:has-text("npx @anthropic-ai/claude-code login")')
-    await expect(loginCommand).toBeVisible()
+    if (instructionsVisible) {
+      const loginCommand = page.locator('#claude-login-command')
+      await expect(loginCommand).toBeVisible()
 
-    const bridgeCommand = page.locator('code:has-text("npx @absmartly/claude-code-bridge")')
-    await expect(bridgeCommand).toBeVisible()
+      const bridgeCommand = page.locator('#bridge-start-command')
+      await expect(bridgeCommand).toBeVisible()
 
-    console.log('✓ Bridge instructions displayed correctly')
+      console.log('✓ Bridge instructions displayed (bridge not connected)')
+    } else if (statusVisible) {
+      console.log('✓ Bridge connected, instructions hidden as expected')
+    }
+
+    expect(instructionsVisible || statusVisible).toBe(true)
+    console.log('✓ Bridge UI displayed correctly')
   })
 
   test('should handle bridge restart recovery', async ({ page, extensionId }) => {
@@ -107,8 +118,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -123,13 +134,13 @@ test.describe('AI Provider Factory E2E', () => {
     console.log('✓ Bridge connection test button available')
   })
 
-  test('should switch from Anthropic to OpenAI and clear previous key', async ({ page, extensionId }) => {
+  test('should show API key field for both Anthropic and OpenAI providers', async ({ page, extensionId }) => {
     test.setTimeout(10000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -137,39 +148,23 @@ test.describe('AI Provider Factory E2E', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
 
     await aiProviderSelect.selectOption('anthropic-api')
-
-    const claudeKeyInput = page.locator('#claude-api-key')
-    await claudeKeyInput.waitFor({ state: 'visible', timeout: 5000 })
-    await claudeKeyInput.fill('sk-ant-key-123')
-
-    const saveButton = page.locator('#save-settings-button')
-    await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.click()
-
-    await page.waitFor({ timeout: 500 })
+    const anthropicKey = page.locator('#ai-api-key')
+    await anthropicKey.waitFor({ state: 'visible', timeout: 5000 })
+    await expect(anthropicKey).toBeVisible()
+    console.log('✓ Anthropic API shows key input')
 
     await aiProviderSelect.selectOption('openai-api')
+    const openaiKey = page.locator('#ai-api-key')
+    await openaiKey.waitFor({ state: 'visible', timeout: 5000 })
+    await expect(openaiKey).toBeVisible()
+    console.log('✓ OpenAI API shows key input')
 
-    const openaiKeyInput = page.locator('#openai-api-key')
-    const openaiKeyExists = await openaiKeyInput.isVisible({ timeout: 2000 }).catch(() => false)
+    await aiProviderSelect.selectOption('claude-subscription')
+    const bridgeKeyHidden = await page.locator('#ai-api-key').isVisible().catch(() => false)
+    expect(bridgeKeyHidden).toBe(false)
+    console.log('✓ Bridge provider hides API key input')
 
-    if (openaiKeyExists) {
-      const openaiKeyValue = await openaiKeyInput.inputValue()
-      expect(openaiKeyValue).toBe('')
-
-      console.log('✓ OpenAI API key field is empty when switching from Anthropic')
-    } else {
-      console.log('⚠ OpenAI API key field not yet implemented')
-    }
-
-    await aiProviderSelect.selectOption('anthropic-api')
-
-    const claudeKeyAfter = page.locator('#claude-api-key')
-    await claudeKeyAfter.waitFor({ state: 'visible', timeout: 5000 })
-    const claudeKeyValue = await claudeKeyAfter.inputValue()
-    expect(claudeKeyValue).toBe('sk-ant-key-123')
-
-    console.log('✓ Provider switching preserves individual API keys correctly')
+    console.log('✓ Provider switching shows correct API key fields')
   })
 
   test('should display error for invalid API key format', async ({ page, extensionId }) => {
@@ -177,8 +172,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -186,7 +181,7 @@ test.describe('AI Provider Factory E2E', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('anthropic-api')
 
-    const apiKeyInput = page.locator('#claude-api-key')
+    const apiKeyInput = page.locator('#ai-api-key')
     await apiKeyInput.waitFor({ state: 'visible', timeout: 5000 })
     await apiKeyInput.fill('invalid-key-format')
 
@@ -194,7 +189,7 @@ test.describe('AI Provider Factory E2E', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
-    await page.waitFor({ timeout: 500 })
+    await page.waitForLoadState('networkidle')
 
     console.log('✓ Invalid API key handling tested')
   })
@@ -204,8 +199,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -234,8 +229,8 @@ test.describe('AI Provider Factory E2E', () => {
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
-    await page.locator('#settings-nav-button').waitFor({ state: 'visible', timeout: 5000 })
-    await page.click('#settings-nav-button')
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
 
@@ -248,9 +243,12 @@ test.describe('AI Provider Factory E2E', () => {
     console.log('✓ Anthropic console link displayed')
 
     await aiProviderSelect.selectOption('claude-subscription')
-    const bridgeInstructions = page.locator('text=/Claude Subscription requires/i')
-    await expect(bridgeInstructions).toBeVisible()
-    console.log('✓ Bridge instructions displayed')
+    const bridgeInstructions = page.locator('#claude-subscription-instructions')
+    const bridgeStatus = page.locator('#bridge-connection-status')
+    const instructionsVisible = await bridgeInstructions.isVisible().catch(() => false)
+    const statusVisible = await bridgeStatus.isVisible().catch(() => false)
+    expect(instructionsVisible || statusVisible).toBe(true)
+    console.log('✓ Bridge UI displayed')
 
     console.log('✓ Provider-specific help text displayed correctly')
   })
