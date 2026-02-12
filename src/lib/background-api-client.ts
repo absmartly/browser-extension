@@ -130,7 +130,6 @@ export class BackgroundAPIClient {
       debugLog('[createExperiment] Full response:', JSON.stringify(response, null, 2))
       return response as Experiment
     } catch (error) {
-      console.error('[createExperiment] Error:', error)
       debugError('Failed to create experiment:', error)
       throw error
     }

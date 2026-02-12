@@ -7,9 +7,14 @@ import { BackgroundAPIClient } from '~src/lib/background-api-client'
 import { notifyError, notifyWarning, notifySuccess } from '~src/utils/notifications'
 
 export interface ExperimentFormData {
+  name?: string
   display_name?: string
   unit_type_id?: number
   percentage_of_traffic?: number
+  nr_variants?: number
+  percentages?: string
+  audience?: string
+  audience_strict?: boolean
   application_ids: number[]
   tag_ids: number[]
   owner_ids: number[]
@@ -150,7 +155,13 @@ async function createNewExperiment(
     template_description: string
     custom_section_field_values: Record<string, { value: string; type: string; id: number }>
   } = {
-    ...formData,
+    name: formData.name,
+    display_name: formData.display_name,
+    percentage_of_traffic: formData.percentage_of_traffic,
+    nr_variants: formData.nr_variants || 2,
+    percentages: formData.percentages || '50/50',
+    audience: formData.audience || '{"filter":[{"and":[]}]}',
+    audience_strict: formData.audience_strict ?? false,
     state: 'created',
     iteration: 1,
     unit_type: formData.unit_type_id ? { unit_type_id: formData.unit_type_id } : undefined,

@@ -30,14 +30,16 @@ export class PreviewManager {
 
     // Create mock plugin for DOMManipulator
     const mockPlugin: any = {
-      config: { spa: true }, // Enable SPA mode (waitForElement, style persistence)
+      config: { spa: true },
+      reapplyingElements: new Set(),
       getStyleManager: (experimentName: string) => {
         if (!this.styleManagers.has(experimentName)) {
           this.styleManagers.set(experimentName, new StyleSheetManager(`absmartly-styles-${experimentName}`, true))
         }
         return this.styleManagers.get(experimentName)
       },
-      buildStateRules: this.buildStateRules.bind(this)
+      buildStateRules: this.buildStateRules.bind(this),
+      watchElement: () => {}
     }
 
     // Delegate all DOM manipulation to SDK plugin

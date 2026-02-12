@@ -121,6 +121,7 @@ export function StyleRulesEditor({ change, onChange }: StyleRulesEditorProps) {
             
             return (
               <button
+                type="button"
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`
@@ -164,6 +165,7 @@ export function StyleRulesEditor({ change, onChange }: StyleRulesEditorProps) {
           <div className="grid grid-cols-2 gap-2">
             {STYLE_RULES_TEMPLATES.map((template) => (
               <button
+                type="button"
                 key={template.id}
                 onClick={() => applyTemplate(template)}
                 className="text-left p-2 border border-gray-200 rounded hover:bg-white hover:border-blue-300 transition-colors"

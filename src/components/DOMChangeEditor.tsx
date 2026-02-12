@@ -161,6 +161,7 @@ export const DOMChangeEditor = ({
         </h5>
         <div className="flex gap-2">
           <button
+            type="button"
             id={`dom-change-save-${idSuffix}`}
             onClick={() => onSave(localChange)}
             className="p-1 text-green-600 hover:text-green-800"
@@ -169,6 +170,7 @@ export const DOMChangeEditor = ({
             <CheckIcon className="h-5 w-5" />
           </button>
           <button
+            type="button"
             id={`dom-change-cancel-${idSuffix}`}
             onClick={onCancel}
             className="p-1 text-gray-400 hover:text-gray-600"

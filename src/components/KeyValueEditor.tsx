@@ -225,6 +225,7 @@ export const KeyValueEditor = ({
             <span className="text-gray-500">{config.separatorAfter}</span>
 
             <button
+              type="button"
               onClick={() => handleRemoveProperty(index)}
               className="text-red-400 hover:text-red-300 ml-2"
               title={`Remove ${config.keyPlaceholder}`}

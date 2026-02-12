@@ -258,6 +258,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
         <span className="text-gray-900">{option.display_name || option.name}</span>
         {onRemove && (
           <button
+            type="button"
             onClick={onRemove}
             className="text-gray-400 hover:text-gray-600"
             disabled={disabled}
@@ -277,7 +278,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
 
   return (
     <div className="relative" ref={containerRef} data-testid={dataTestId}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label id={id} className="block text-sm font-medium text-gray-700 mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -354,6 +355,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
           {mode === 'multi' && selectedOptions.length > 0 && (
             <div className="p-2 border-t border-gray-200">
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleClearAll()

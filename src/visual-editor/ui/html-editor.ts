@@ -120,7 +120,8 @@ export class HtmlEditor {
 
       const saveBtn = document.createElement('button')
       saveBtn.className = 'editor-button editor-button-save'
-      saveBtn.innerHTML = '<span>✓</span> Apply Changes'
+      saveBtn.id = 'html-editor-apply-button'
+      saveBtn.innerHTML = '<span>✓</span> Apply Changes' // Static content, safe
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)

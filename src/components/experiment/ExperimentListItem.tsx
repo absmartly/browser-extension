@@ -54,7 +54,7 @@ export const ExperimentListItem = React.memo(function ExperimentListItem({
   const domChangesCount = getDOMChangesCount()
 
   return (
-    <div className="experiment-item px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100">
+    <div data-testid="experiment-list-item" className="experiment-item px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100">
       <div
         onClick={() => onExperimentClick(experiment)}
         className="flex items-start gap-3 flex-1 min-w-0 text-left cursor-pointer"

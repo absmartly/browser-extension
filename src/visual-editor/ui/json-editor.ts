@@ -90,6 +90,7 @@ export class JSONEditor {
 
       const cancelBtn = document.createElement('button')
       cancelBtn.className = 'json-editor-button json-editor-button-cancel'
+      cancelBtn.id = 'json-editor-close-button'
       cancelBtn.innerHTML = '<span>✕</span> Cancel'
 
       const saveBtn = document.createElement('button')
