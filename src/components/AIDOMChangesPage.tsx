@@ -478,6 +478,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                 )}
               </button>
               <button
+                id="ai-new-chat-button"
                 onClick={handleNewChatClick}
                 className="p-2 hover:bg-gray-100 rounded-md transition-colors"
                 title="New Chat"

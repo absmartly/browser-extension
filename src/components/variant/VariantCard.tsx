@@ -179,7 +179,7 @@ export const VariantCard = React.memo(function VariantCard({
             </div>
           )}
           <div>
-            <h5 className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
+            <h5 id="variables-heading" className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
             <div className="space-y-2">
               {Object.entries(displayVariables).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2">
@@ -257,6 +257,7 @@ export const VariantCard = React.memo(function VariantCard({
               )}
               {canEdit && addingVariableForVariant !== index && (
                 <Button
+                  id="add-variable-button"
                   type="button"
                   onClick={onAddVariable}
                   size="sm"

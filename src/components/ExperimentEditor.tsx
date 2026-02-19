@@ -284,7 +284,7 @@ export function ExperimentEditor({
   return (
     <div className="p-4">
       <Header
-        title={experiment?.id ? 'Edit Experiment' : 'Create New Experiment'}
+        title={<h2 id="create-experiment-header" className="text-lg font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{experiment?.id ? 'Edit Experiment' : 'Create New Experiment'}</h2>}
         onBack={handleCancel}
       />
 

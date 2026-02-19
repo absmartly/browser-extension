@@ -23,6 +23,7 @@ export function Header({ title, onBack, actions, config }: HeaderProps) {
       <div className="flex items-center gap-1 flex-shrink-0">
         {actions}
         <button
+          id="header-back-button"
           onClick={onBack}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
           aria-label="Go back"
