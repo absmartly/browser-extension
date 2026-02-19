@@ -112,12 +112,11 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should show "Change image source" for img elements', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const img = testPage.locator('#product-image')
     await img.waitFor({ state: 'visible', timeout: 5000 })
 
-    log('Right-clicking on img element')
-    await img.click({ button: 'right' })
+    log('Clicking on img element')
+    await img.click({ force: true })
 
     const menuAppeared = await waitForContextMenu(testPage)
     expect(menuAppeared).toBe(true)
@@ -131,12 +130,11 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should show "Change image source" for background-image elements', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const heroBanner = testPage.locator('#hero-banner')
     await heroBanner.waitFor({ state: 'visible', timeout: 5000 })
 
-    log('Right-clicking on background-image element')
-    await heroBanner.click({ button: 'right' })
+    log('Clicking on background-image element')
+    await heroBanner.click({ force: true })
 
     const menuAppeared = await waitForContextMenu(testPage)
     expect(menuAppeared).toBe(true)
@@ -148,12 +146,11 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should NOT show "Change image source" for regular elements', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const regularDiv = testPage.locator('#test-container')
     await regularDiv.waitFor({ state: 'visible', timeout: 5000 })
 
-    log('Right-clicking on regular div')
-    await regularDiv.click({ button: 'right' })
+    log('Clicking on regular div')
+    await regularDiv.click({ force: true })
 
     const menuAppeared = await waitForContextMenu(testPage)
     expect(menuAppeared).toBe(true)
@@ -165,11 +162,10 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should NOT show "Move up" or "Move down" in context menu', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const regularDiv = testPage.locator('#test-container')
     await regularDiv.waitFor({ state: 'visible', timeout: 5000 })
 
-    await regularDiv.click({ button: 'right' })
+    await regularDiv.click({ force: true })
 
     const menuAppeared = await waitForContextMenu(testPage)
     expect(menuAppeared).toBe(true)
@@ -181,11 +177,10 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should change img src when new URL is provided', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const img = testPage.locator('#product-image')
     const originalSrc = await img.getAttribute('src')
 
-    await img.click({ button: 'right' })
+    await img.click({ force: true })
     await waitForContextMenu(testPage)
     await clickMenuItem(testPage, 'Change image source')
 
@@ -207,7 +202,6 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should change background-image when new URL is provided', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const heroBanner = testPage.locator('#hero-banner')
 
     const originalBg = await testPage.evaluate(() => {
@@ -215,7 +209,7 @@ test.describe('Visual Editor - Change Image Source', () => {
       return el?.style.backgroundImage || ''
     })
 
-    await heroBanner.click({ button: 'right' })
+    await heroBanner.click({ force: true })
     await waitForContextMenu(testPage)
     await clickMenuItem(testPage, 'Change image source')
 
@@ -242,11 +236,10 @@ test.describe('Visual Editor - Change Image Source', () => {
   })
 
   test('should not change when dialog is cancelled', async () => {
-    test.skip(true, 'Visual editor context menu requires full VE activation pipeline with real API experiment creation')
     const img = testPage.locator('#product-image')
     const originalSrc = await img.getAttribute('src')
 
-    await img.click({ button: 'right' })
+    await img.click({ force: true })
     await waitForContextMenu(testPage)
     await clickMenuItem(testPage, 'Change image source')
 

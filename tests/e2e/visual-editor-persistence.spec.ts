@@ -1400,14 +1400,6 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   })
 
   test('13. Cross-tab synchronization of changes - test broadcast channel or storage events', async () => {
-    // SKIP REASON: ENVIRONMENTAL (LEGITIMATE)
-    // BroadcastChannel API is not fully supported in Playwright headless environments
-    // This test would verify cross-tab state synchronization in real browsers but
-    // cannot run in automated test environment due to Playwright limitation
-    // RESOLUTION: Test manually in real browser OR implement alternative sync mechanism
-    test.skip()
-
-    // Create two tabs to test cross-tab synchronization
     const tab1 = await context.newPage()
     const tab2 = await context.newPage()
 
@@ -1418,161 +1410,128 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
       tab2.waitForSelector('body', { timeout: 5000 })
     ])
 
-    // Test cross-tab synchronization
-    const syncResult = await Promise.all([
-      // Tab 1: Setup sync listener and make changes
-      tab1.evaluate(() => {
-        return new Promise((resolve) => {
-          const syncData = {
-            sent: [] as any[],
-            received: [] as any[]
-          }
+    await tab2.evaluate(() => {
+      const channel = new BroadcastChannel('absmartly-sync')
+      ;(window as any).__syncChannel = channel
+      ;(window as any).__syncReceived = [] as any[]
+      ;(window as any).__syncSent = [] as any[]
 
-          // Setup BroadcastChannel for cross-tab communication
-          const channel = new BroadcastChannel('absmartly-sync')
+      channel.onmessage = (event) => {
+        ;(window as any).__syncReceived.push({
+          type: event.data.type,
+          timestamp: Date.now(),
+          data: event.data
+        })
 
-          channel.onmessage = (event) => {
-            syncData.received.push({
-              type: event.data.type,
-              timestamp: Date.now(),
-              data: event.data
-            })
-          }
-
-          // Setup storage event listener as fallback
-          const storageHandler = (event: StorageEvent) => {
-            if (event.key?.startsWith('absmartly_sync_')) {
-              syncData.received.push({
-                type: 'storage-event',
-                key: event.key,
-                newValue: event.newValue,
-                timestamp: Date.now()
-              })
+        if (event.data.type === 'CHANGES_SYNC' && event.data.changes) {
+          event.data.changes.forEach((change: any) => {
+            const element = document.querySelector(change.selector)
+            if (element) {
+              if (change.type === 'style') {
+                Object.assign((element as HTMLElement).style, change.value)
+              } else if (change.type === 'text') {
+                element.textContent = change.value
+              }
             }
-          }
-          window.addEventListener('storage', storageHandler)
+          })
 
-          // Send sync messages
-          const testChanges = [
-            {
-              selector: '#test-button',
-              type: 'style',
-              value: { 'background-color': 'purple' },
-              source: 'tab1'
-            },
-            {
-              selector: '.test-paragraph',
-              type: 'text',
-              value: 'Synchronized text from tab 1',
-              source: 'tab1'
-            }
-          ]
-
-          // Broadcast changes
-          const syncMessage = {
-            type: 'CHANGES_SYNC',
-            experimentId: 'exp-sync-test',
-            variantId: 'var-sync',
-            changes: testChanges,
+          const ackMessage = {
+            type: 'SYNC_ACK',
+            originalMessage: event.data,
             timestamp: Date.now(),
-            tabId: 'tab-1'
+            tabId: 'tab-2'
           }
+          channel.postMessage(ackMessage)
+          ;(window as any).__syncSent.push(ackMessage)
+        }
+      }
 
-          channel.postMessage(syncMessage)
-          syncData.sent.push(syncMessage)
-
-          // Also use localStorage as backup sync method
-          localStorage.setItem('absmartly_sync_changes', JSON.stringify(syncMessage))
-
-          // Wait for potential responses (increased to 3s for reliability in full test suite)
-          setTimeout(() => {
-            channel.close()
-            window.removeEventListener('storage', storageHandler)
-            resolve({
-              tab: 'tab1',
-              syncData,
-              channelSupported: typeof BroadcastChannel !== 'undefined'
+      const storageHandler = (event: StorageEvent) => {
+        if (event.key === 'absmartly_sync_changes' && event.newValue) {
+          try {
+            const syncMessage = JSON.parse(event.newValue)
+            ;(window as any).__syncReceived.push({
+              type: 'storage-sync',
+              data: syncMessage,
+              timestamp: Date.now()
             })
-          }, 3000)
+          } catch (e) {
+            // Ignore invalid JSON
+          }
+        }
+      }
+      window.addEventListener('storage', storageHandler)
+    })
+
+    const tab1Result = await tab1.evaluate(() => {
+      const syncData = {
+        sent: [] as any[],
+        received: [] as any[]
+      }
+
+      const channel = new BroadcastChannel('absmartly-sync')
+
+      channel.onmessage = (event) => {
+        syncData.received.push({
+          type: event.data.type,
+          timestamp: Date.now(),
+          data: event.data
         })
-      }),
+      }
 
-      // Tab 2: Listen for sync messages and respond
-      tab2.evaluate(() => {
-        return new Promise((resolve) => {
-          const syncData = {
-            sent: [] as any[],
-            received: [] as any[]
-          }
+      const testChanges = [
+        {
+          selector: '#test-button',
+          type: 'style',
+          value: { 'background-color': 'purple' },
+          source: 'tab1'
+        },
+        {
+          selector: '.test-paragraph',
+          type: 'text',
+          value: 'Synchronized text from tab 1',
+          source: 'tab1'
+        }
+      ]
 
-          // Setup BroadcastChannel listener
-          const channel = new BroadcastChannel('absmartly-sync')
+      const syncMessage = {
+        type: 'CHANGES_SYNC',
+        experimentId: 'exp-sync-test',
+        variantId: 'var-sync',
+        changes: testChanges,
+        timestamp: Date.now(),
+        tabId: 'tab-1'
+      }
 
-          channel.onmessage = (event) => {
-            syncData.received.push({
-              type: event.data.type,
-              timestamp: Date.now(),
-              data: event.data
-            })
+      channel.postMessage(syncMessage)
+      syncData.sent.push(syncMessage)
 
-            // Apply received changes
-            if (event.data.type === 'CHANGES_SYNC' && event.data.changes) {
-              event.data.changes.forEach((change: any) => {
-                const element = document.querySelector(change.selector)
-                if (element) {
-                  if (change.type === 'style') {
-                    Object.assign((element as HTMLElement).style, change.value)
-                  } else if (change.type === 'text') {
-                    element.textContent = change.value
-                  }
-                }
-              })
+      localStorage.setItem('absmartly_sync_changes', JSON.stringify(syncMessage))
 
-              // Send acknowledgment
-              const ackMessage = {
-                type: 'SYNC_ACK',
-                originalMessage: event.data,
-                timestamp: Date.now(),
-                tabId: 'tab-2'
-              }
-              channel.postMessage(ackMessage)
-              syncData.sent.push(ackMessage)
-            }
-          }
+      channel.close()
+      return {
+        tab: 'tab1',
+        syncData,
+        channelSupported: typeof BroadcastChannel !== 'undefined'
+      }
+    })
 
-          // Monitor localStorage for sync
-          const storageHandler = (event: StorageEvent) => {
-            if (event.key === 'absmartly_sync_changes' && event.newValue) {
-              try {
-                const syncMessage = JSON.parse(event.newValue)
-                syncData.received.push({
-                  type: 'storage-sync',
-                  data: syncMessage,
-                  timestamp: Date.now()
-                })
-              } catch (e) {
-                // Ignore invalid JSON
-              }
-            }
-          }
-          window.addEventListener('storage', storageHandler)
+    await tab2.waitForFunction(() => {
+      return (window as any).__syncReceived && (window as any).__syncReceived.length > 0
+    }, { timeout: 5000 })
 
-          setTimeout(() => {
-            channel.close()
-            window.removeEventListener('storage', storageHandler)
-            resolve({
-              tab: 'tab2',
-              syncData,
-              channelSupported: typeof BroadcastChannel !== 'undefined'
-            })
-          }, 3000)
-        })
-      })
-    ])
-
-    // Verify cross-tab synchronization
-    const tab1Result = syncResult[0] as any
-    const tab2Result = syncResult[1] as any
+    const tab2Result = await tab2.evaluate(() => {
+      const channel = (window as any).__syncChannel as BroadcastChannel
+      if (channel) channel.close()
+      return {
+        tab: 'tab2',
+        syncData: {
+          received: (window as any).__syncReceived || [],
+          sent: (window as any).__syncSent || []
+        },
+        channelSupported: typeof BroadcastChannel !== 'undefined'
+      }
+    })
 
     expect(tab1Result.channelSupported).toBeTruthy()
     expect(tab2Result.channelSupported).toBeTruthy()
@@ -1580,13 +1539,11 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     expect(tab1Result.syncData.sent.length).toBeGreaterThan(0)
     expect(tab2Result.syncData.received.length).toBeGreaterThan(0)
 
-    // Verify tab2 received the sync message from tab1
     const receivedSync = tab2Result.syncData.received.find((msg: any) =>
       msg.type === 'CHANGES_SYNC' || msg.data?.type === 'CHANGES_SYNC'
     )
     expect(receivedSync).toBeTruthy()
 
-    // Verify acknowledgment was sent back
     expect(tab2Result.syncData.sent.length).toBeGreaterThan(0)
 
     await Promise.all([tab1.close(), tab2.close()])

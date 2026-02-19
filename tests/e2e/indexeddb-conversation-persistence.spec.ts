@@ -2,6 +2,17 @@ import { test, expect } from '../fixtures/extension'
 import { setupTestPage, injectSidebar, click, debugWait, log, initializeTestLogging } from './utils/test-helpers'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
+const BRIDGE_URL = 'http://localhost:3000'
+
+async function isBridgeAvailable(): Promise<boolean> {
+  try {
+    const resp = await fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(3000) })
+    const data = await resp.json()
+    return data.ok && data.authenticated
+  } catch {
+    return false
+  }
+}
 
 test.describe('IndexedDB Conversation Persistence', () => {
   let testPage: any
@@ -32,7 +43,8 @@ test.describe('IndexedDB Conversation Persistence', () => {
   })
 
   test('should persist conversations to IndexedDB', async ({ context, extensionUrl }) => {
-    test.skip(true, 'Requires AI generation with real API and full extension context for conversation persistence across reloads')
+    const bridgeAvailable = await isBridgeAvailable()
+    if (!bridgeAvailable) { test.skip(true, 'Bridge not reachable or not authenticated - required for AI generation'); return }
     test.setTimeout(process.env.SLOW === '1' ? 120000 : 60000)
 
     let sidebar: any

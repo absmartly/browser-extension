@@ -7,6 +7,19 @@ function log(message: string) {
   console.log(`[${new Date().toISOString()}] ${message}`)
 }
 
+async function injectSDKBridge(page: Page, extensionUrl: (path: string) => string): Promise<void> {
+  const bundleUrl = extensionUrl('absmartly-sdk-bridge.bundle.js')
+  await page.evaluate((url) => {
+    return new Promise<void>((resolve) => {
+      const script = document.createElement('script')
+      script.src = url
+      script.onload = () => resolve()
+      script.onerror = () => resolve()
+      document.head.appendChild(script)
+    })
+  }, bundleUrl)
+}
+
 async function applyDOMChangeWithPersistence(
   page: Page,
   change: any,
@@ -14,22 +27,28 @@ async function applyDOMChangeWithPersistence(
 ) {
   await page.evaluate(
     ({ change, experimentName }) => {
-      if (typeof (window as any).applyPreviewChange === 'function') {
-        (window as any).applyPreviewChange(change, experimentName)
-      } else {
-        console.error('applyPreviewChange function not available')
-      }
+      window.postMessage({
+        source: 'absmartly-extension',
+        type: 'PREVIEW_CHANGES',
+        payload: {
+          changes: [change],
+          experimentName: experimentName,
+          variantName: 'test-variant'
+        }
+      }, window.location.origin)
     },
     { change, experimentName }
   )
 }
 
 test.describe('UI Persistence - Style and Attribute Checkboxes', () => {
-  test('should persist styles when persistStyle is true', async ({ context }) => {
-    test.skip(true, 'Requires content script injection for window.applyPreviewChange which is not available in test environment')
+  test('should persist styles when persistStyle is true', async ({ context, extensionUrl }) => {
     const page = await context.newPage()
-    await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.goto(`http://localhost:3456${TEST_PAGE_URL}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     log('Navigated to test page')
+
+    await injectSDKBridge(page, extensionUrl)
+    log('SDK bridge injected')
 
     await page.evaluate(() => {
       const button = document.createElement('button')
@@ -78,11 +97,13 @@ test.describe('UI Persistence - Style and Attribute Checkboxes', () => {
     await page.close()
   })
 
-  test('should persist attributes when persistAttribute is true', async ({ context }) => {
-    test.skip(true, 'Requires content script injection for window.applyPreviewChange which is not available in test environment')
+  test('should persist attributes when persistAttribute is true', async ({ context, extensionUrl }) => {
     const page = await context.newPage()
-    await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.goto(`http://localhost:3456${TEST_PAGE_URL}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     log('Navigated to test page')
+
+    await injectSDKBridge(page, extensionUrl)
+    log('SDK bridge injected')
 
     await page.evaluate(() => {
       const link = document.createElement('a')
@@ -143,11 +164,13 @@ test.describe('UI Persistence - Style and Attribute Checkboxes', () => {
     await page.close()
   })
 
-  test('should NOT persist when persistStyle is false', async ({ context }) => {
-    test.skip(true, 'Requires content script injection for window.applyPreviewChange which is not available in test environment')
+  test('should NOT persist when persistStyle is false', async ({ context, extensionUrl }) => {
     const page = await context.newPage()
-    await page.goto(TEST_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
+    await page.goto(`http://localhost:3456${TEST_PAGE_URL}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
     log('Navigated to test page')
+
+    await injectSDKBridge(page, extensionUrl)
+    log('SDK bridge injected')
 
     await page.evaluate(() => {
       const div = document.createElement('div')

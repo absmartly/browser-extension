@@ -66,8 +66,14 @@ test.describe('Claude API Key Authentication', () => {
     await page.close()
   })
 
-  test('should persist Claude API Key across page reloads', async ({ context, extensionUrl }) => {
-    test.skip(true, 'Chrome extension storage persistence not available when sidebar is re-injected via injectSidebar after page reload')
+  test('should persist Claude API Key across page reloads', async ({ context, extensionUrl, seedStorage }) => {
+    await seedStorage({
+      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+      'absmartly-auth-method': 'apikey'
+    })
+
     const page = await context.newPage()
 
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
@@ -92,6 +98,9 @@ test.describe('Claude API Key Authentication', () => {
     await saveButton.evaluate((btn: HTMLElement) =>
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     )
+
+    // Wait for save to complete - save navigates away from settings page
+    await sidebar.locator('#experiments-heading, [data-testid="experiment-list"], #configure-settings-button').first().waitFor({ state: 'visible', timeout: 15000 })
 
     await page.reload({ waitUntil: 'domcontentloaded' })
 
