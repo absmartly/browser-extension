@@ -1,9 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
-import path from 'path'
 import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
-
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
 /**
  * E2E Tests for Variant List Performance (React.memo)
@@ -20,7 +17,14 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, seedStorage }) => {
+    await seedStorage({
+      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+      'absmartly-auth-method': 'apikey'
+    })
+
     testPage = await context.newPage()
 
     allConsoleMessages = setupConsoleLogging(
@@ -28,7 +32,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       (msg) => msg.text.includes('[ABsmartly]') || msg.text.includes('[Background]')
     )
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=0`)
+    await testPage.goto('http://localhost:3456/visual-editor-test.html?use_shadow_dom_for_visual_editor_context_menu=0')
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForSelector('body', { timeout: 5000 })
 
@@ -56,19 +60,23 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
     await test.step('Create or edit experiment', async () => {
       console.log('\n➕ STEP 2: Creating/editing experiment')
 
-      // Try to find create button
-      const createButton = sidebar.locator('#create-experiment-button')
-
-      if (await createButton.count() > 0) {
-        await createButton.first().evaluate((btn: HTMLElement) =>
+      const createButton = sidebar.locator('button[title="Create New Experiment"]')
+      if (await createButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await createButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
-        console.log('  ✓ Clicked create experiment')
+        await debugWait()
+
+        const fromScratchButton = sidebar.locator('#from-scratch-button')
+        await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
+        await fromScratchButton.evaluate((btn: HTMLElement) =>
+          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        )
+        console.log('  ✓ Opened experiment editor from scratch')
         await debugWait()
       } else {
-        // Try to find and click an existing experiment
-        const experimentItem = sidebar.locator('[data-testid*="experiment"]').first()
-        if (await experimentItem.count() > 0) {
+        const experimentItem = sidebar.locator('[data-testid="experiment-card"]').first()
+        if (await experimentItem.isVisible({ timeout: 3000 }).catch(() => false)) {
           await experimentItem.evaluate((el: HTMLElement) =>
             el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
           )
@@ -82,7 +90,7 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n📦 STEP 3: Expanding variant')
 
       // Look for variant expand button (arrow icon)
-      const expandButton = sidebar.locator('[aria-label*="expand"], [aria-label*="collapse"], button:has-text("▶")').first()
+      const expandButton = sidebar.locator('[aria-label*="expand"], [aria-label*="collapse"], [id^="variant-toggle-"]').first()
 
       if (await expandButton.count() > 0) {
         await expandButton.evaluate((btn: HTMLElement) =>
@@ -99,15 +107,14 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n🔗 STEP 4: Finding URL filtering section')
 
       // Look for URL filtering section header
-      const urlFilterSection = sidebar.locator('text=URL Filtering, text=URL Filter')
+      const urlFilterHeading = sidebar.locator('[id^="url-filtering-heading-variant-"]').first()
 
-      if (await urlFilterSection.count() > 0) {
+      if (await urlFilterHeading.count() > 0) {
         console.log('  ✓ URL filtering section found')
 
-        // Expand if collapsed
-        const expandButton = urlFilterSection.locator('..').locator('[aria-label*="toggle"], button:has-text("+")')
-        if (await expandButton.count() > 0) {
-          await expandButton.first().evaluate((btn: HTMLElement) =>
+        const urlFilterButton = sidebar.locator('[id^="url-filtering-toggle-variant-"]').first()
+        if (await urlFilterButton.count() > 0) {
+          await urlFilterButton.evaluate((btn: HTMLElement) =>
             btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
           )
           console.log('  ✓ Expanded URL filtering')
@@ -122,11 +129,11 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       console.log('\n⚙️ STEP 5: Interacting with URL filter')
 
       // Look for URL filter mode dropdown
-      const modeSelect = sidebar.locator('#url-filter-mode-select, select').first()
+      const modeSelect = sidebar.locator('[id^="url-filter-mode-variant-"]').first()
 
       if (await modeSelect.count() > 0) {
         // Change mode to simple
-        await modeSelect.first().selectOption({ label: /Target specific/i })
+        await modeSelect.first().selectOption('simple')
         console.log('  ✓ Changed to simple mode')
         await debugWait()
 
@@ -169,17 +176,22 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
     await test.step('Navigate to variant editor', async () => {
       console.log('\n📦 Navigating to variant')
 
-      // Create or edit experiment
-      const createButton = sidebar.locator('#create-experiment-button')
-      if (await createButton.count() > 0) {
-        await createButton.first().evaluate((btn: HTMLElement) =>
+      const createButton = sidebar.locator('button[title="Create New Experiment"]')
+      if (await createButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await createButton.evaluate((btn: HTMLElement) =>
+          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        )
+        await debugWait()
+
+        const fromScratchButton = sidebar.locator('#from-scratch-button')
+        await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
+        await fromScratchButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
         await debugWait()
       }
 
-      // Expand variant
-      const expandButton = sidebar.locator('[aria-label*="expand"], button:has-text("▶")').first()
+      const expandButton = sidebar.locator('[aria-label*="expand"], [id^="variant-toggle-"]').first()
       if (await expandButton.count() > 0) {
         await expandButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -191,15 +203,14 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
     await test.step('Find global defaults section', async () => {
       console.log('\n⚙️ Finding global defaults section')
 
-      const globalDefaultsSection = sidebar.locator('text=Global Defaults')
+      const globalDefaultsHeading = sidebar.locator('#global-defaults-heading')
 
-      if (await globalDefaultsSection.count() > 0) {
+      if (await globalDefaultsHeading.count() > 0) {
         console.log('  ✓ Global defaults section found')
 
-        // Expand it
-        const expandButton = globalDefaultsSection.locator('..').locator('[aria-label*="toggle"], button:has-text("+")')
-        if (await expandButton.count() > 0) {
-          await expandButton.first().evaluate((btn: HTMLElement) =>
+        const globalDefaultsButton = sidebar.locator('#global-defaults-button').first()
+        if (await globalDefaultsButton.count() > 0) {
+          await globalDefaultsButton.evaluate((btn: HTMLElement) =>
             btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
           )
           console.log('  ✓ Expanded global defaults')
@@ -218,24 +229,34 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       const waitCheckbox = sidebar.locator('input[id*="wait"]')
 
       if (await importantCheckbox.count() > 0) {
-        // Toggle important flag
-        await importantCheckbox.first().check()
-        console.log('  ✓ Checked important')
+        await importantCheckbox.first().evaluate((el: HTMLInputElement) => {
+          el.checked = !el.checked
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        console.log('  ✓ Toggled important')
         await debugWait()
 
-        await importantCheckbox.first().uncheck()
-        console.log('  ✓ Unchecked important')
+        await importantCheckbox.first().evaluate((el: HTMLInputElement) => {
+          el.checked = !el.checked
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        console.log('  ✓ Toggled important back')
         await debugWait()
       }
 
       if (await waitCheckbox.count() > 0) {
-        // Toggle wait for element
-        await waitCheckbox.first().check()
-        console.log('  ✓ Checked wait for element')
+        await waitCheckbox.first().evaluate((el: HTMLInputElement) => {
+          el.checked = !el.checked
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        console.log('  ✓ Toggled wait for element')
         await debugWait()
 
-        await waitCheckbox.first().uncheck()
-        console.log('  ✓ Unchecked wait for element')
+        await waitCheckbox.first().evaluate((el: HTMLInputElement) => {
+          el.checked = !el.checked
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        console.log('  ✓ Toggled wait for element back')
         await debugWait()
       }
 
@@ -257,10 +278,16 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
       sidebar = await injectSidebar(testPage, extensionUrl)
       await debugWait()
 
-      // Navigate to experiment editor
-      const createButton = sidebar.locator('#create-experiment-button')
-      if (await createButton.count() > 0) {
-        await createButton.first().evaluate((btn: HTMLElement) =>
+      const createButton = sidebar.locator('button[title="Create New Experiment"]')
+      if (await createButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await createButton.evaluate((btn: HTMLElement) =>
+          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        )
+        await debugWait()
+
+        const fromScratchButton = sidebar.locator('#from-scratch-button')
+        await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
+        await fromScratchButton.evaluate((btn: HTMLElement) =>
           btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
         )
         await debugWait()

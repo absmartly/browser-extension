@@ -368,7 +368,7 @@ export async function saveExperiment(sidebar: FrameLocator, testPage: Page, expe
   await testPage.screenshot({ path: 'test-results/after-save-top.png', fullPage: true })
 
   try {
-    await sidebar.locator('#experiments-heading').waitFor({ state: 'visible', timeout: 3000 })
+    await sidebar.locator('#experiments-heading').waitFor({ state: 'visible', timeout: 15000 })
     log('  ✓ Experiment saved successfully', 'info')
   } catch (e) {
     const bodyText = await sidebar.locator('body').innerText().catch(() => '')

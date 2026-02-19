@@ -337,16 +337,11 @@ test.describe('Events Debug Page', () => {
       await test.step('Click clear button', async () => {
         const clearButton = sidebar.locator('button[title="Clear all events"]')
         await expect(clearButton).toBeVisible()
-        await clearButton.evaluate((button) => {
-          button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        })
+        await clearButton.click()
 
-        // Wait for confirmation modal and click confirm
         const confirmButton = sidebar.locator('#clear-all-button')
         await confirmButton.waitFor({ state: 'visible', timeout: 5000 })
-        await confirmButton.evaluate((button) => {
-          button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        })
+        await confirmButton.click()
       })
 
       await test.step('Verify events cleared', async () => {
