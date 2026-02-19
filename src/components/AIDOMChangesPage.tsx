@@ -402,7 +402,7 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
                 {showHistory && conversationList.length > 0 && (
                   <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
                     <div className="p-3 border-b border-gray-200 bg-gray-50">
-                      <h3 className="text-sm font-semibold text-gray-900">Conversation History</h3>
+                      <h3 id="conversation-history-title" className="text-sm font-semibold text-gray-900">Conversation History</h3>
                       <p className="text-xs text-gray-600">{conversationList.length} conversation{conversationList.length !== 1 ? 's' : ''}</p>
                     </div>
                     <div className="divide-y divide-gray-100">

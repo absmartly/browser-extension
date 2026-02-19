@@ -188,11 +188,12 @@ export function ExperimentCodeInjection({
     <div className="bg-gray-50 rounded-lg border border-gray-200">
       <button
         type="button"
+        id="custom-code-injection-button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-100 transition-colors rounded-lg"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">Custom Code Injection</span>
+          <span id="custom-code-injection-heading" className="text-sm font-medium text-gray-700">Custom Code Injection</span>
           {codeCount > 0 && (
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
               {codeCount} {codeCount === 1 ? 'section' : 'sections'}
@@ -448,6 +449,7 @@ export function ExperimentCodeInjection({
             {sections.map((section) => (
               <div
                 key={section.key}
+                id={`code-injection-${section.key}-card`}
                 onClick={() => handleSectionClick(section.key)}
                 className="border rounded-lg p-3 transition-colors cursor-pointer hover:bg-gray-50 border-gray-300"
               >

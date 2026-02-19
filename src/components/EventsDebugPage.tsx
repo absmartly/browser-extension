@@ -205,7 +205,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
                         )}`}>
                         {event.eventName}
                       </span>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                      <span data-testid="event-timestamp" className="text-xs text-gray-500 whitespace-nowrap">
                         {formatTimestamp(event.timestamp)}
                       </span>
                     </div>
@@ -257,6 +257,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
                 Cancel
               </button>
               <button
+                id="clear-all-button"
                 onClick={confirmClearEvents}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
                 Clear All

@@ -320,7 +320,7 @@ function SidebarContent() {
           <p className="text-sm text-gray-600 text-center">
             Please configure your API settings to get started
           </p>
-          <Button onClick={() => setView('settings')}>
+          <Button id="configure-settings-button" onClick={() => setView('settings')}>
             Configure Settings
           </Button>
         </div>

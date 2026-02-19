@@ -127,7 +127,7 @@ const URLFilterSection = React.memo(function URLFilterSection({ variantIndex, co
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-blue-100 transition-colors rounded-lg"
       >
-        <span className="text-xs font-medium text-gray-700">URL Filtering</span>
+        <span id={`url-filtering-heading-variant-${variantIndex}`} className="text-xs font-medium text-gray-700">URL Filtering</span>
         <span className="text-gray-500">{isExpanded ? '−' : '+'}</span>
       </button>
 

@@ -16,10 +16,11 @@ const GlobalDefaultsSection = React.memo(function GlobalDefaultsSection({ config
       {/* Header with toggle */}
       <button
         type="button"
+        id="global-defaults-button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 transition-colors rounded-lg"
       >
-        <span className="text-xs font-medium text-gray-700">Global Defaults</span>
+        <span id="global-defaults-heading" className="text-xs font-medium text-gray-700">Global Defaults</span>
         <span className="text-gray-500">{isExpanded ? '−' : '+'}</span>
       </button>
 

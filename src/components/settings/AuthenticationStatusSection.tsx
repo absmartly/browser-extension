@@ -36,7 +36,7 @@ export const AuthenticationStatusSection = React.memo(function AuthenticationSta
   return (
     <div className="bg-gray-50 p-3 rounded-md" data-testid="auth-status-section">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-sm font-medium text-gray-700">Authentication Status</div>
+        <div id="authentication-status-heading" className="text-sm font-medium text-gray-700">Authentication Status</div>
         {apiEndpoint && !checkingAuth && (
           <Button
             id="auth-refresh-button"
