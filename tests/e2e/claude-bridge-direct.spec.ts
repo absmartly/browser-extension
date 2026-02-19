@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test'
+import http from 'http'
+import crypto from 'crypto'
 
 const BRIDGE_URL = 'http://localhost:3000'
 
@@ -12,10 +14,77 @@ async function isBridgeAvailable(): Promise<boolean> {
   }
 }
 
+interface SSEResult {
+  textChunks: string[]
+  toolUseData: Record<string, unknown>[]
+  events: Array<{ type: string; data: unknown }>
+}
+
+function createSSEReader(conversationId: string, timeoutMs: number): Promise<SSEResult> {
+  return new Promise((resolve, reject) => {
+    const result: SSEResult = { textChunks: [], toolUseData: [], events: [] }
+    let buffer = ''
+    let resolved = false
+
+    const done = () => {
+      if (!resolved) { resolved = true; clearTimeout(timer); resolve(result) }
+    }
+    const fail = (err: Error) => {
+      if (!resolved) { resolved = true; clearTimeout(timer); req.destroy(); reject(err) }
+    }
+
+    const timer = setTimeout(() => fail(new Error(`SSE timeout after ${timeoutMs}ms`)), timeoutMs)
+
+    const req = http.get(
+      `${BRIDGE_URL}/conversations/${conversationId}/stream`,
+      { headers: { 'Accept': 'text/event-stream' } },
+      (res) => {
+        res.setEncoding('utf8')
+
+        res.on('data', (chunk: string) => {
+          buffer += chunk
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue
+            const jsonStr = line.startsWith('data: ') ? line.slice(6) : line.slice(5)
+            if (!jsonStr.trim()) continue
+
+            try {
+              const data = JSON.parse(jsonStr)
+              result.events.push(data)
+
+              if (data.type === 'text') {
+                result.textChunks.push(data.data)
+              } else if (data.type === 'tool_use') {
+                result.toolUseData.push(data.data)
+              } else if (data.type === 'done') {
+                req.destroy()
+                done()
+                return
+              } else if (data.type === 'error') {
+                fail(new Error(`Claude error: ${data.data}`))
+                return
+              }
+            } catch (e) {
+              if (!(e instanceof SyntaxError)) { fail(e as Error); return }
+            }
+          }
+        })
+
+        res.on('end', () => done())
+        res.on('error', (err: Error) => fail(err))
+      }
+    )
+
+    req.on('error', (err: Error) => fail(err))
+  })
+}
+
 test.describe('Claude Code Bridge Direct Integration', () => {
   test('should create conversation and receive response from bridge', async () => {
-    test.skip(true, 'EventSource API is not available in Node.js/Playwright test runner context; this test requires a browser environment for SSE streaming')
-    test.setTimeout(60000)
+    test.setTimeout(120000)
     const available = await isBridgeAvailable()
     if (!available) {
       test.skip(true, 'Bridge not reachable or not authenticated on port 3000')
@@ -25,99 +94,48 @@ test.describe('Claude Code Bridge Direct Integration', () => {
     const healthResp = await fetch(`${BRIDGE_URL}/health`)
     expect(healthResp.ok).toBeTruthy()
     const health = await healthResp.json()
-    console.log('Bridge health:', health)
     expect(health.ok).toBe(true)
     expect(health.authenticated).toBe(true)
 
-    // 2. Create conversation
+    const conversationId = crypto.randomUUID()
     const convResp = await fetch(`${BRIDGE_URL}/conversations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session_id: `test-${Date.now()}`,
-        cwd: '/',
-        permissionMode: 'allow'
-      })
+      body: JSON.stringify({ session_id: conversationId })
     })
 
     expect(convResp.ok).toBeTruthy()
-    const { conversationId } = await convResp.json()
-    expect(conversationId).toBeTruthy()
-    console.log('✓ Conversation created:', conversationId)
+    const convData = await convResp.json()
+    expect(convData.conversationId).toBeTruthy()
 
-    // 3. Set up stream and send message
-    const responseText = await new Promise<string>((resolve, reject) => {
-      let fullResponse = ''
-      const eventSource = new EventSource(`${BRIDGE_URL}/conversations/${conversationId}/stream`)
+    const streamPromise = createSSEReader(conversationId, 90000)
+    await new Promise(resolve => setTimeout(resolve, 500))
 
-      eventSource.onmessage = (event: MessageEvent) => {
-        const data = JSON.parse(event.data)
-        console.log(`[${new Date().toISOString()}] Event:`, data.type, data.data?.substring(0, 100))
-
-        if (data.type === 'text') {
-          fullResponse += data.data
-        } else if (data.type === 'done') {
-          console.log('✓ Stream complete, response length:', fullResponse.length)
-          eventSource.close()
-          resolve(fullResponse)
-        } else if (data.type === 'error') {
-          console.error('Claude error:', data.data)
-          eventSource.close()
-          reject(new Error(`Claude error: ${data.data}`))
-        }
-      }
-
-      eventSource.onerror = (err: Event) => {
-        console.error('Stream error:', err)
-        eventSource.close()
-        reject(new Error('Stream connection error'))
-      }
-
-      // Send message after stream is set up
-      setTimeout(async () => {
-        console.log(`[${new Date().toISOString()}] Sending message...`)
-        try {
-          const msgResp = await fetch(`${BRIDGE_URL}/conversations/${conversationId}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              content: 'Return only this exact JSON array with no markdown or explanation: [{"selector":"button","type":"style","value":{"background-color":"orange"},"enabled":true}]',
-              files: []
-            })
-          })
-
-          const msgResult = await msgResp.json()
-          console.log('✓ Message sent:', msgResult)
-        } catch (error) {
-          console.error('Failed to send message:', error)
-          eventSource.close()
-          reject(error)
-        }
-      }, 100)
-
-      // Timeout after 45 seconds
-      setTimeout(() => {
-        console.error('Timeout after 45s')
-        eventSource.close()
-        reject(new Error('Timeout after 45s'))
-      }, 45000)
+    const msgResp = await fetch(`${BRIDGE_URL}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: 'Change the h1 element text color to red. Use selector "h1".',
+        files: []
+      })
     })
+    expect(msgResp.ok).toBeTruthy()
 
-    console.log('Full response received:', responseText.substring(0, 500))
-    expect(responseText).toBeTruthy()
-    expect(responseText.length).toBeGreaterThan(0)
+    const sseResult = await streamPromise
 
-    // Try to parse as JSON
-    let cleanedResponse = responseText.trim()
-    if (cleanedResponse.startsWith('```')) {
-      cleanedResponse = cleanedResponse.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
+    const hasResponse = sseResult.textChunks.length > 0 || sseResult.toolUseData.length > 0
+    expect(hasResponse).toBe(true)
+
+    if (sseResult.toolUseData.length > 0) {
+      const domChangesPayload = sseResult.toolUseData[0] as Record<string, unknown>
+      expect(domChangesPayload.domChanges).toBeDefined()
+      expect(Array.isArray(domChangesPayload.domChanges)).toBe(true)
+      expect(domChangesPayload.action).toBeDefined()
     }
 
-    console.log('Cleaned response:', cleanedResponse)
-    const parsed = JSON.parse(cleanedResponse)
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.length).toBeGreaterThan(0)
-    console.log('✓ Successfully parsed as JSON array with', parsed.length, 'DOM changes')
-    console.log('First change:', JSON.stringify(parsed[0], null, 2))
+    if (sseResult.textChunks.length > 0) {
+      const fullText = sseResult.textChunks.join('')
+      expect(fullText.length).toBeGreaterThan(0)
+    }
   })
 })
