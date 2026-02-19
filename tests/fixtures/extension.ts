@@ -62,7 +62,10 @@ export const test = base.extend<ExtFixtures>({
     })
 
     await use(context)
-    await context.close()
+    await Promise.race([
+      context.close(),
+      new Promise<void>(resolve => setTimeout(resolve, 30000))
+    ])
   },
 
   extensionId: async ({ context }, use) => {

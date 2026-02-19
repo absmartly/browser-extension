@@ -342,15 +342,13 @@ test.describe('IndexedDB Conversation Persistence', () => {
         const isOnDetailPage = await domChangesSection.isVisible({ timeout: 2000 }).catch(() => false)
 
         if (isOnExpListInner) {
-          log('Starting from experiment list - waiting for experiments to load...')
-          const firstExperiment = sidebar.locator('[data-testid="experiment-card"]').first()
-          await firstExperiment.waitFor({ state: 'visible', timeout: 15000 })
-          await click(sidebar, firstExperiment)
+          log('Starting from experiment list - creating new experiment to access AI page...')
+          await click(sidebar, 'button[title="Create New Experiment"]', 10000)
           await debugWait()
-          log('✓ Clicked experiment')
-
-          await sidebar.locator('#dom-changes-heading').waitFor({ state: 'visible', timeout: 10000 })
-          log('✓ Experiment detail page loaded')
+          await click(sidebar, '#from-scratch-button', 5000)
+          await debugWait()
+          await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
+          log('✓ New experiment created')
         } else if (isOnDetailPage) {
           log('Already on experiment detail page')
         } else {

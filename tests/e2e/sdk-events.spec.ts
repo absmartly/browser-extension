@@ -112,7 +112,7 @@ async function isCopyButtonSuccess(page: Page): Promise<boolean> {
 }
 
 test('SDK Events Debug Page - Complete Flow', async ({ context, extensionUrl }) => {
-  test.setTimeout(180000)
+  test.setTimeout(60000)
   console.log('Test: SDK Events Debug Page - Complete Flow\n')
 
   const testPage = await context.newPage()
@@ -192,7 +192,10 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionUrl }) 
   console.log('  Copy button shows success feedback')
 
   try {
-    const clipboardText = await testPage.evaluate(() => navigator.clipboard.readText())
+    const clipboardText = await Promise.race([
+      testPage.evaluate(() => navigator.clipboard.readText()),
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('clipboard timeout')), 3000))
+    ])
     if (clipboardText && clipboardText.length > 0) {
       expect(clipboardText).toContain('conversion')
       expect(clipboardText).toContain('99.99')
@@ -205,7 +208,4 @@ test('SDK Events Debug Page - Complete Flow', async ({ context, extensionUrl }) 
   }
 
   console.log('\nAll SDK Events features verified successfully')
-
-  await testPage.goto('about:blank')
-  await testPage.close()
 })
