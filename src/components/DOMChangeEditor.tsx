@@ -1,0 +1,555 @@
+import React, { useState, useEffect, useRef } from 'react'
+import { debugLog } from '~src/utils/debug'
+import { all as knownCSSProperties } from 'known-css-properties'
+import type { DOMChangeType } from '~src/types/dom-changes'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
+import { MultiSelectTags } from './ui/MultiSelectTags'
+import { StyleRulesEditor } from './StyleRulesEditor'
+import { AttributeEditor } from './AttributeEditor'
+import { DOMChangeOptions } from './DOMChangeOptions'
+import { CheckIcon, XMarkIcon, TrashIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline'
+import { JavaScriptEditor } from '~src/visual-editor/ui/javascript-editor'
+import { sendToContent } from '~src/lib/messaging'
+import { CSSStyleEditor } from './CSSStyleEditor'
+
+export interface EditingDOMChange {
+  index: number | null
+  selector: string
+  type: DOMChangeType
+  textValue?: string
+  styleProperties?: Array<{ key: string; value: string }>
+  styleRulesStates?: {
+    normal?: Record<string, string>
+    hover?: Record<string, string>
+    active?: Record<string, string>
+    focus?: Record<string, string>
+  }
+  styleRulesImportant?: boolean
+  styleImportant?: boolean
+  classAdd?: string[]
+  classRemove?: string[]
+  classesWithStatus?: Array<{ name: string; action: 'add' | 'remove' }>
+  attributeProperties?: Array<{ key: string; value: string }>
+  htmlValue?: string
+  jsValue?: string
+  targetSelector?: string
+  position?: 'before' | 'after' | 'firstChild' | 'lastChild'
+  mode?: 'replace' | 'merge'
+  waitForElement?: boolean
+  triggerOnView?: boolean
+  observerRoot?: string
+  persistStyle?: boolean
+  persistAttribute?: boolean
+  persistScript?: boolean
+}
+
+export const createEmptyChange = (): EditingDOMChange => ({
+  index: null,
+  selector: '',
+  type: 'style',
+  styleProperties: [{ key: '', value: '' }],
+  classAdd: [],
+  classRemove: [],
+  classesWithStatus: [],
+  attributeProperties: [{ key: '', value: '' }],
+  textValue: '',
+  htmlValue: '',
+  jsValue: '',
+  targetSelector: '',
+  position: 'after',
+  mode: 'merge'
+})
+
+// Helper function to handle type changes and preserve styles
+export const handleDOMChangeTypeChange = (
+  editingChange: EditingDOMChange,
+  newType: DOMChangeType
+): EditingDOMChange => {
+  debugLog('📝 Changing type to:', newType)
+  let updatedChange = { ...editingChange, type: newType }
+
+  // Preserve styles when switching between style and styleRules
+  if (editingChange.type === 'style' && newType === 'styleRules') {
+    // From style to styleRules: preserve inline styles in the normal state
+    const normalStyles: Record<string, string> = {}
+    if (editingChange.styleProperties) {
+      editingChange.styleProperties.forEach(({ key, value }) => {
+        if (key && value) {
+          normalStyles[key] = value
+        }
+      })
+    }
+
+    updatedChange.styleRulesStates = {
+      normal: normalStyles,
+      hover: editingChange.styleRulesStates?.hover || {},
+      active: editingChange.styleRulesStates?.active || {},
+      focus: editingChange.styleRulesStates?.focus || {},
+    }
+  } else if (editingChange.type === 'styleRules' && newType === 'style') {
+    // From styleRules to style: preserve normal state styles as inline styles
+    const styleProperties: Array<{ key: string; value: string }> = []
+    if (editingChange.styleRulesStates?.normal) {
+      Object.entries(editingChange.styleRulesStates.normal).forEach(([key, value]) => {
+        if (key && value) {
+          styleProperties.push({ key, value })
+        }
+      })
+    }
+
+    // If no normal styles exist but we have inline styles already, keep them
+    if (styleProperties.length === 0 && editingChange.styleProperties) {
+      updatedChange.styleProperties = editingChange.styleProperties
+    } else if (styleProperties.length > 0) {
+      updatedChange.styleProperties = styleProperties
+    } else {
+      // Default empty property if nothing exists
+      updatedChange.styleProperties = [{ key: '', value: '' }]
+    }
+  }
+
+  debugLog('📝 Updated editingChange:', updatedChange)
+  return updatedChange
+}
+
+// Unified DOM Change Editor Component
+export const DOMChangeEditor = ({
+  editingChange: initialChange,
+  variantIndex,
+  onSave,
+  onCancel,
+  onStartPicker
+}: {
+  editingChange: EditingDOMChange,
+  variantIndex: number,
+  onSave: (change: EditingDOMChange) => void,
+  onCancel: () => void,
+  onStartPicker: (field: string) => void
+}) => {
+  const [localChange, setLocalChange] = useState<EditingDOMChange>(initialChange)
+  const [pickingForField, setPickingForField] = useState<string | null>(null)
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setLocalChange(initialChange)
+  }, [initialChange])
+
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === 'JAVASCRIPT_EDITOR_SAVE') {
+        setLocalChange(prev => ({ ...prev, jsValue: message.value }))
+      }
+    }
+    chrome.runtime.onMessage.addListener(handleMessage)
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [])
+
+  const isEditMode = localChange.index !== null
+  // Create unique ID suffix using variant index and change index
+  // For new changes (index === null), use 'new' as the change index
+  const changeIdx = localChange.index !== null ? localChange.index : 'new'
+  const idSuffix = `${variantIndex}-${changeIdx}`
+
+  return (
+    <div className="border-2 border-blue-500 rounded-lg p-4 space-y-4 bg-blue-50">
+      <div className="flex items-center justify-between">
+        <h5 className="font-medium text-gray-900">
+          {isEditMode ? 'Edit' : 'Add'} DOM Change
+        </h5>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            id={`dom-change-save-${idSuffix}`}
+            onClick={() => onSave(localChange)}
+            className="p-1 text-green-600 hover:text-green-800"
+            title="Save"
+          >
+            <CheckIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            id={`dom-change-cancel-${idSuffix}`}
+            onClick={onCancel}
+            className="p-1 text-gray-400 hover:text-gray-600"
+            title="Cancel"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Selector field with picker */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Element Selector
+        </label>
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              id={`dom-change-selector-${idSuffix}`}
+              value={localChange.selector}
+              onChange={(e) => setLocalChange({ ...localChange, selector: e.target.value })}
+              placeholder=".cta-button, #header, [data-test='submit']"
+              className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'selector' ? 'border-blue-500' : 'border-gray-300'}`}
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setPickingForField('selector')
+              onStartPicker('selector')
+            }}
+            size="sm"
+            variant="secondary"
+            title="Pick element"
+            className={pickingForField === 'selector' ? 'bg-blue-100' : ''}
+          >
+            🎯
+          </Button>
+        </div>
+        {pickingForField === 'selector' && (
+          <p className="text-xs text-blue-600 mt-1 animate-pulse">
+            Click an element on the page...
+          </p>
+        )}
+      </div>
+
+      {/* Change type selector */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Change Type
+        </label>
+        <select
+          id={`dom-change-type-${idSuffix}`}
+          value={localChange.type}
+          onChange={(e) => {
+            const newType = e.target.value as DOMChangeType
+            setLocalChange(handleDOMChangeTypeChange(localChange, newType))
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        >
+          <option value="text">Text</option>
+          <option value="style">Inline Style</option>
+          <option value="styleRules">Stylesheet</option>
+          <option value="class">Class</option>
+          <option value="attribute">Attribute</option>
+          <option value="html">HTML</option>
+          <option value="javascript">JavaScript</option>
+          <option value="move">Move/Reorder</option>
+        </select>
+      </div>
+
+      {/* Dynamic value fields based on type */}
+      {localChange.type === 'text' && (
+        <div>
+          <label htmlFor={`dom-change-text-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
+            Text Content
+          </label>
+          <Input
+            id={`dom-change-text-${idSuffix}`}
+            value={localChange.textValue || ''}
+            onChange={(e) => setLocalChange({ ...localChange, textValue: e.target.value })}
+            placeholder="New text content"
+          />
+        </div>
+      )}
+
+      {localChange.type === 'style' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Style Properties
+            </label>
+            {/* Mode checkbox instead of dropdown */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="merge-mode"
+                checked={localChange.mode === 'merge'}
+                onChange={(e) => setLocalChange({ ...localChange, mode: e.target.checked ? 'merge' : 'replace' })}
+                className="mr-2"
+              />
+              <label htmlFor="merge-mode" className="text-sm text-gray-600">
+                Merge with existing styles
+              </label>
+            </div>
+          </div>
+          <CSSStyleEditor
+            styleProperties={localChange.styleProperties}
+            onChange={(newProps) => setLocalChange({ ...localChange, styleProperties: newProps })}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'styleRules' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Style Rules (with pseudo-classes)
+          </label>
+          <StyleRulesEditor
+            change={{
+              selector: localChange.selector,
+              type: 'styleRules',
+              states: localChange.styleRulesStates || { normal: {}, hover: {}, active: {}, focus: {} },
+              important: localChange.styleRulesImportant,
+              waitForElement: localChange.waitForElement,
+              observerRoot: localChange.observerRoot
+            }}
+            onChange={(change) => setLocalChange({
+              ...localChange,
+              styleRulesStates: change.states,
+              styleRulesImportant: change.important,
+              waitForElement: change.waitForElement,
+              observerRoot: change.observerRoot
+            })}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'class' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              CSS Classes
+            </label>
+            {/* Mode checkbox instead of dropdown */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="class-merge-mode"
+                checked={localChange.mode === 'merge'}
+                onChange={(e) => setLocalChange({ ...localChange, mode: e.target.checked ? 'merge' : 'replace' })}
+                className="mr-2"
+              />
+              <label htmlFor="class-merge-mode" className="text-sm text-gray-600">
+                Merge with existing classes
+              </label>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Classes to Add
+            </label>
+            <MultiSelectTags
+              currentClasses={localChange.classAdd || []}
+              onAddClass={(className) => {
+                const classAdd = [...(localChange.classAdd || []), className]
+                setLocalChange({ ...localChange, classAdd })
+              }}
+              onRemoveClass={(className) => {
+                const classAdd = (localChange.classAdd || []).filter(c => c !== className)
+                setLocalChange({ ...localChange, classAdd })
+              }}
+              placeholder="Type class name and press Enter"
+              pillColor="green"
+            />
+
+            <label className="block text-sm font-medium text-gray-700 mt-4">
+              Classes to Remove
+            </label>
+            <MultiSelectTags
+              currentClasses={localChange.classRemove || []}
+              onAddClass={(className) => {
+                const classRemove = [...(localChange.classRemove || []), className]
+                setLocalChange({ ...localChange, classRemove })
+              }}
+              onRemoveClass={(className) => {
+                const classRemove = (localChange.classRemove || []).filter(c => c !== className)
+                setLocalChange({ ...localChange, classRemove })
+              }}
+              placeholder="Type class name and press Enter"
+              pillColor="red"
+            />
+          </div>
+        </div>
+      )}
+
+      {localChange.type === 'attribute' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Attributes
+            </label>
+            {/* Mode checkbox instead of dropdown */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="attr-merge-mode"
+                checked={localChange.mode === 'merge'}
+                onChange={(e) => setLocalChange({ ...localChange, mode: e.target.checked ? 'merge' : 'replace' })}
+                className="mr-2"
+              />
+              <label htmlFor="attr-merge-mode" className="text-sm text-gray-600">
+                Merge with existing attributes
+              </label>
+            </div>
+          </div>
+          <AttributeEditor
+            attributeProperties={localChange.attributeProperties || [{ key: '', value: '' }]}
+            onChange={(attrs) => setLocalChange({ ...localChange, attributeProperties: attrs })}
+            idSuffix={idSuffix}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'html' && (
+        <div>
+          <label htmlFor={`dom-change-html-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
+            HTML Content
+          </label>
+          <textarea
+            id={`dom-change-html-${idSuffix}`}
+            value={localChange.htmlValue || ''}
+            onChange={(e) => setLocalChange({ ...localChange, htmlValue: e.target.value })}
+            placeholder="<div>New HTML content</div>"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+            rows={5}
+          />
+        </div>
+      )}
+
+      {localChange.type === 'javascript' && (
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor={`dom-change-js-${idSuffix}`} className="block text-sm font-medium text-gray-700">
+                JavaScript Code
+              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  // Send message to content script to open editor in page context
+                  try {
+                    await sendToContent({
+                      type: 'OPEN_JAVASCRIPT_EDITOR',
+                      data: {
+                        value: localChange.jsValue || ''
+                      }
+                    })
+                  } catch (error) {
+                    console.error('Error opening JavaScript editor:', error)
+                  }
+                }}
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                title="Open fullscreen editor"
+              >
+                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                Fullscreen
+              </button>
+            </div>
+            <textarea
+              id={`dom-change-js-${idSuffix}`}
+              value={localChange.jsValue || ''}
+              onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
+              placeholder="// JavaScript code to execute
+// Available context:
+// - element: The selected element
+// - document: Page document
+// - window: Page window
+// - console: For logging
+// - experimentName: Experiment identifier
+
+debugLog('Hello from experiment:', experimentName);"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+              rows={6}
+            />
+          </div>
+        </div>
+      )}
+
+      {localChange.type === 'move' && (
+        <div className="space-y-3">
+          <div>
+            <label htmlFor={`dom-change-target-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
+              Target Selector
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  id={`dom-change-target-${idSuffix}`}
+                  value={localChange.targetSelector || ''}
+                  onChange={(e) => setLocalChange({ ...localChange, targetSelector: e.target.value })}
+                  placeholder=".target-container, #sidebar"
+                  className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${pickingForField === 'targetSelector' ? 'border-blue-500' : 'border-gray-300'}`}
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  setPickingForField('targetSelector')
+                  onStartPicker('targetSelector')
+                }}
+                size="sm"
+                variant="secondary"
+                title="Pick target element"
+                className={pickingForField === 'targetSelector' ? 'bg-blue-100' : ''}
+              >
+                🎯
+              </Button>
+            </div>
+            {pickingForField === 'targetSelector' && (
+              <p className="text-xs text-blue-600 mt-1 animate-pulse">
+                Click the target element...
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor={`dom-change-position-${idSuffix}`} className="block text-sm font-medium text-gray-700 mb-1">
+              Position
+            </label>
+            <select
+              id={`dom-change-position-${idSuffix}`}
+              value={localChange.position || 'after'}
+              onChange={(e) => setLocalChange({ ...localChange, position: e.target.value as any })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="before">Before target</option>
+              <option value="after">After target</option>
+              <option value="firstChild">As first child</option>
+              <option value="lastChild">As last child</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Unified DOM change options section for applicable types */}
+      {localChange.type !== 'styleRules' && (
+        <div className="pt-2 border-t border-gray-200">
+          <DOMChangeOptions
+            important={localChange.type === 'style' ? (localChange.styleImportant || false) : undefined}
+            waitForElement={localChange.waitForElement || false}
+            triggerOnView={localChange.triggerOnView || false}
+            persistStyle={
+              localChange.type === 'style' ? (localChange.persistStyle || false) :
+              localChange.type === 'attribute' ? (localChange.persistAttribute || false) :
+              localChange.type === 'javascript' ? (localChange.persistScript || false) :
+              undefined
+            }
+            observerRoot={localChange.observerRoot || ''}
+            onImportantChange={localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, styleImportant: value })) : undefined}
+            onWaitForElementChange={(value) => setLocalChange({ ...localChange, waitForElement: value })}
+            onTriggerOnViewChange={(value) => setLocalChange({ ...localChange, triggerOnView: value })}
+            onPersistStyleChange={
+              localChange.type === 'style' ? ((value) => setLocalChange({ ...localChange, persistStyle: value })) :
+              localChange.type === 'attribute' ? ((value) => setLocalChange({ ...localChange, persistAttribute: value })) :
+              localChange.type === 'javascript' ? ((value) => setLocalChange({ ...localChange, persistScript: value })) :
+              undefined
+            }
+            onObserverRootChange={(value) => setLocalChange({ ...localChange, observerRoot: value })}
+            onStartPicker={onStartPicker}
+            pickingForField={pickingForField}
+            idPrefix={`options-${isEditMode ? 'edit' : 'new'}`}
+            showImportant={localChange.type === 'style'}
+            showWaitForElement={true}
+            showTriggerOnView={true}
+            showPersistStyle={localChange.type === 'style' || localChange.type === 'attribute' || localChange.type === 'javascript'}
+            showObserverRoot={true}
+          />
+        </div>
+      )}
+    </div>
+  )
+}

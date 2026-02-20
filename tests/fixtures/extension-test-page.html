@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABsmartly Extension Test Page</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+      transition: padding-right 0.3s ease-in-out;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    .button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .primary { background: #3b82f6; color: white; }
+    .secondary { background: #e5e7eb; color: #374151; }
+    .danger { background: #ef4444; color: white; }
+    #inject-extension-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 10000;
+    }
+    #inject-extension-btn:hover {
+      background: #059669;
+    }
+  </style>
+</head>
+<body>
+  <button id="inject-extension-btn" onclick="injectExtension()">Click to Inject Extension (Like Extension Icon)</button>
+
+  <div class="container">
+    <!-- Test Elements for Visual Editor -->
+    <h1 id="main-title">Welcome to ABsmartly Test Page</h1>
+    <p id="description">This is a test page for the visual editor functionality.</p>
+
+    <div id="button-section">
+      <button id="hero-cta" class="button primary">Get Started</button>
+      <button id="secondary-button" class="button secondary">Learn More</button>
+      <button id="danger-button" class="button danger">Delete</button>
+    </div>
+
+    <div id="link-section">
+      <a href="https://example.com" id="external-link">External Link</a>
+      <a href="#section" id="internal-link">Internal Link</a>
+    </div>
+
+    <p id="info-text">Some information text that can be hidden.</p>
+
+    <ul id="test-list">
+      <li id="list-1">First item</li>
+      <li id="list-2">Second item</li>
+      <li id="list-3">Third item</li>
+    </ul>
+
+    <div id="dynamic-content">Dynamic content area for JavaScript execution</div>
+
+    <form id="test-form">
+      <input type="text" id="input-field" placeholder="Enter text">
+      <select id="select-field">
+        <option value="option1">Option 1</option>
+        <option value="option2">Option 2</option>
+      </select>
+      <textarea id="textarea-field" placeholder="Enter description"></textarea>
+    </form>
+  </div>
+
+  <script>
+    // Get server port from URL parameter if provided
+    const urlParams = new URLSearchParams(window.location.search);
+    const serverPort = urlParams.get('port') || '8080';
+    const EXTENSION_PATH = `http://localhost:${serverPort}`;
+
+    // First, inject the content script
+    async function injectContentScript() {
+      const script = document.createElement('script');
+      script.src = `${EXTENSION_PATH}/content.672cac6b.js`;
+      document.head.appendChild(script);
+
+      return new Promise(resolve => {
+        script.onload = () => {
+          console.log('✅ Content script loaded');
+          window.__absmartlyContentLoaded = true;
+          resolve();
+        };
+      });
+    }
+
+    // Function to inject the extension sidebar (mimics chrome.action.onClicked)
+    async function injectExtension() {
+      // First inject content script if not already loaded
+      if (!window.__absmartlyContentLoaded) {
+        await injectContentScript();
+      }
+
+      // Check if sidebar is already injected
+      const existingSidebar = document.getElementById('absmartly-sidebar-root');
+      if (existingSidebar) {
+        console.log('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility');
+
+        // Get current transform to determine actual visibility
+        const currentTransform = existingSidebar.style.transform;
+        console.log('Current transform:', currentTransform);
+
+        // Check if sidebar is currently visible (showing)
+        const isCurrentlyVisible = !currentTransform || currentTransform === 'translateX(0px)';
+
+        if (isCurrentlyVisible) {
+          console.log('Hiding sidebar');
+          // Hide sidebar
+          existingSidebar.style.transform = 'translateX(400px)';
+
+          // Restore body padding
+          const originalPadding = document.body.getAttribute('data-absmartly-original-padding-right');
+          if (originalPadding !== null) {
+            document.body.style.transition = 'padding-right 0.3s ease-in-out';
+            document.body.style.paddingRight = originalPadding;
+            document.body.removeAttribute('data-absmartly-original-padding-right');
+            setTimeout(() => {
+              document.body.style.transition = '';
+            }, 350);
+          }
+        } else {
+          console.log('Showing sidebar');
+          // Show sidebar
+          existingSidebar.style.transform = 'translateX(0)';
+
+          // Store and modify body padding
+          if (!document.body.hasAttribute('data-absmartly-original-padding-right')) {
+            const currentPadding = document.body.style.paddingRight || '0px';
+            document.body.setAttribute('data-absmartly-original-padding-right', currentPadding);
+            document.body.style.transition = 'padding-right 0.3s ease-in-out';
+            document.body.style.paddingRight = '384px';
+          }
+        }
+        return;
+      }
+
+      console.log('🔵 ABSmartly Extension: Injecting sidebar');
+
+      // Store original body padding before modifying
+      const originalPadding = document.body.style.paddingRight || '0px';
+      document.body.setAttribute('data-absmartly-original-padding-right', originalPadding);
+
+      // Add transition to body for smooth animation
+      document.body.style.transition = 'padding-right 0.3s ease-in-out';
+
+      // Set body padding to push content left
+      document.body.style.paddingRight = '384px';
+
+      // Create the sidebar container
+      const container = document.createElement('div');
+      container.id = 'absmartly-sidebar-root';
+      container.style.cssText = `
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 384px;
+        height: 100vh;
+        background-color: white;
+        box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+        z-index: 2147483646;
+        transform: translateX(0);
+        transition: transform 0.3s ease-in-out;
+      `;
+
+      // Create the iframe
+      const iframe = document.createElement('iframe');
+      iframe.id = 'absmartly-sidebar-iframe';
+      iframe.style.cssText = `
+        width: 100%;
+        height: 100%;
+        border: none;
+      `;
+
+      // Set up iframe's onload to configure its environment
+      iframe.onload = () => {
+        try {
+          const iframeWindow = iframe.contentWindow;
+          if (iframeWindow) {
+            // Setup chrome.storage mock in iframe context
+            if (!iframeWindow.chrome) {
+              iframeWindow.chrome = {};
+            }
+
+            const storage = {
+              'absmartly-apikey': 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+              'absmartly-endpoint': 'https://dev-1.absmartly.com/v1',
+              'absmartly-env': 'development',
+              'absmartly-auth-method': 'apikey',
+              absmartlyConfig: {
+                apiKey: 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+                apiEndpoint: 'https://dev-1.absmartly.com/v1',
+                environment: 'development',
+                authMethod: 'apikey'
+              }
+            };
+
+            iframeWindow.chrome.storage = {
+              local: {
+                get: (keys, callback) => {
+                  const result = {};
+                  if (Array.isArray(keys)) {
+                    keys.forEach(key => {
+                      result[key] = storage[key];
+                    });
+                  } else if (typeof keys === 'string') {
+                    result[keys] = storage[keys];
+                  } else if (!keys) {
+                    Object.assign(result, storage);
+                  }
+                  if (callback) callback(result);
+                  return Promise.resolve(result);
+                },
+                set: (items, callback) => {
+                  Object.assign(storage, items);
+                  if (callback) callback();
+                  return Promise.resolve();
+                }
+              }
+            };
+
+            // Also setup chrome.runtime for message passing
+            iframeWindow.chrome.runtime = window.chrome.runtime;
+
+            console.log('✅ Configured iframe chrome APIs');
+          }
+        } catch (e) {
+          console.warn('Could not configure iframe:', e);
+        }
+      };
+
+      // Load the sidebar HTML from the test server
+      iframe.src = `${EXTENSION_PATH}/tabs/sidebar.html`;
+
+      container.appendChild(iframe);
+      document.body.appendChild(container);
+
+      console.log('🔵 ABSmartly Extension: Sidebar injected successfully');
+
+      // Set up chrome runtime mock for communication
+      setupChromeRuntimeMock();
+    }
+
+    // Mock chrome.runtime for extension communication
+    function setupChromeRuntimeMock() {
+      if (!window.chrome) {
+        window.chrome = {};
+      }
+
+      if (!window.chrome.runtime) {
+        window.chrome.runtime = {
+          getURL: (path) => `${EXTENSION_PATH}/${path}`,
+          sendMessage: (message, callback) => {
+            console.log('chrome.runtime.sendMessage:', message);
+            // Message will be handled by BackgroundRunner
+            if (callback) {
+              setTimeout(() => callback({ success: true }), 100);
+            }
+          },
+          onMessage: {
+            addListener: (listener) => {
+              console.log('Mock chrome.runtime.onMessage listener added');
+              window.__chromeMessageListener = listener;
+            }
+          },
+          connect: () => {
+            console.log('Mock chrome.runtime.connect');
+            return {
+              postMessage: (msg) => console.log('Port message:', msg),
+              onMessage: {
+                addListener: (listener) => console.log('Port listener added')
+              },
+              onDisconnect: {
+                addListener: (listener) => console.log('Port disconnect listener added')
+              }
+            };
+          }
+        };
+      }
+
+      if (!window.chrome.tabs) {
+        window.chrome.tabs = {
+          connect: (tabId, info) => {
+            console.log('Mock chrome.tabs.connect:', tabId, info);
+            return {
+              postMessage: (msg) => console.log('Tab port message:', msg),
+              onMessage: {
+                addListener: (listener) => console.log('Tab port listener added')
+              },
+              onDisconnect: {
+                addListener: (listener) => console.log('Tab port disconnect listener added')
+              }
+            };
+          },
+          sendMessage: (tabId, message, callback) => {
+            console.log('Mock chrome.tabs.sendMessage:', message);
+            if (callback) callback({ success: true });
+          },
+          query: (query, callback) => {
+            callback([{ id: 1, url: window.location.href }]);
+          }
+        };
+      }
+
+      if (!window.chrome.storage) {
+        const storage = {
+          'absmartly-apikey': 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+          'absmartly-endpoint': 'https://dev-1.absmartly.com/v1',
+          'absmartly-env': 'development',
+          'absmartly-auth-method': 'apikey',
+          absmartlyConfig: {
+            apiKey: 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+            apiEndpoint: 'https://dev-1.absmartly.com/v1',
+            environment: 'development',
+            authMethod: 'apikey'
+          }
+        };
+        window.chrome.storage = {
+          local: {
+            get: (keys, callback) => {
+              const result = {};
+              if (Array.isArray(keys)) {
+                keys.forEach(key => {
+                  result[key] = storage[key];
+                });
+              } else if (typeof keys === 'string') {
+                result[keys] = storage[keys];
+              } else if (!keys) {
+                Object.assign(result, storage);
+              }
+              if (callback) callback(result);
+              return Promise.resolve(result);
+            },
+            set: (items, callback) => {
+              Object.assign(storage, items);
+              if (callback) callback();
+              return Promise.resolve();
+            }
+          }
+        };
+      }
+    }
+
+    // Mock API request handler
+    function handleMockAPIRequest(message, callback) {
+      console.log('Handling mock API request:', message);
+
+      // Mock experiment list response
+      if (message.endpoint === '/experiments' || message.endpoint === '/v1/experiments') {
+        callback({
+          success: true,
+          data: {
+            experiments: [
+              {
+                id: 1,
+                name: 'test_experiment',
+                status: 'running',
+                type: 'test',
+                state: 'running',
+                variants: [
+                  { name: 'control', config: {} },
+                  { name: 'variant_1', config: { dom_changes: [] } }
+                ]
+              }
+            ],
+            total: 1
+          }
+        });
+      } else {
+        callback({ success: true, data: {} });
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('Test page ready. Click the green button to inject the extension.');
+      setupChromeRuntimeMock();
+    });
+  </script>
+</body>
+</html>

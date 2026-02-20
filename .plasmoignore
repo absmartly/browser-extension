@@ -1,0 +1,3 @@
+# Ignore bundled files
+injected-bundles/
+*.bundle

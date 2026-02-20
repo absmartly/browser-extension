@@ -1,0 +1,166 @@
+import { test, expect } from '../fixtures/extension'
+import { type Page, type FrameLocator } from '@playwright/test'
+import { debugWait, log, initializeTestLogging, setupTestPage } from './utils/test-helpers'
+import { createExperiment, activateVisualEditor } from './helpers/ve-experiment-setup'
+
+const TEST_PAGE_URL = '/visual-editor-test.html'
+
+test.describe('Focused Visual Editor Test', () => {
+  let testPage: Page
+  let sidebar: FrameLocator
+
+  test.beforeEach(async ({ context, extensionUrl }) => {
+    initializeTestLogging()
+    testPage = await context.newPage()
+
+    const result = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
+    sidebar = result.sidebar
+
+    log('✅ Test page loaded (test mode enabled)', 'info')
+  })
+
+  test.afterEach(async () => {
+    if (testPage && !process.env.SLOW) await testPage.close()
+  })
+
+  test('Test key visual editor operations and save', async () => {
+    test.setTimeout(90000)
+
+    log('\n🚀 Starting Focused Visual Editor Test')
+
+    log('⏳ Waiting for experiments to load...')
+    await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
+      .waitFor({ state: 'hidden', timeout: 30000 })
+      .catch(() => {})
+    log('✅ Experiments loaded')
+
+    log('\n📝 Creating new experiment')
+    const experimentName = await createExperiment(sidebar)
+    log(`✅ Experiment created: ${experimentName}`)
+
+    log('\n🚀 Launching Visual Editor')
+    await activateVisualEditor(sidebar, testPage)
+    log('✅ Visual Editor active')
+
+    const hasVisualEditor = await testPage.locator('#absmartly-visual-editor-banner-host').isVisible({ timeout: 5000 })
+    expect(hasVisualEditor).toBe(true)
+
+    log('\n🧪 Testing visual editor operations...')
+
+    log('1️⃣ Edit Text...')
+    const title = testPage.locator('#main-title').first()
+    await title.scrollIntoViewIfNeeded()
+    await title.click()
+    await debugWait()
+
+    const editOption = testPage.locator('text="Edit Element"').first()
+    if (await editOption.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await editOption.click()
+      await debugWait()
+      await testPage.keyboard.type('MODIFIED TITLE')
+      await testPage.keyboard.press('Enter')
+      log('✅ Text edited')
+      await debugWait()
+    } else {
+      log('⚠️ Edit Element option not found')
+    }
+
+    // Close any open menu by clicking on a safe area
+    const backdrop = testPage.locator('.menu-backdrop').first()
+    if (await backdrop.isVisible({ timeout: 500 }).catch(() => false)) {
+      await testPage.mouse.click(10, 10)  // Click top-left corner to close menu
+      await backdrop.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+      await debugWait()
+    }
+
+    log('2️⃣ Hide Element...')
+    const card = testPage.locator('#button-2').first()
+    await card.scrollIntoViewIfNeeded()
+    await card.click()
+    await debugWait()
+
+    const hideOption = testPage.locator('text="Hide"').first()
+    if (await hideOption.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await hideOption.click()
+      log('✅ Element hidden')
+      await debugWait()
+    } else {
+      log('⚠️ Hide option not found')
+    }
+
+    log('3️⃣ Inline Edit...')
+    const button = testPage.locator('#button-1').first()
+    await button.scrollIntoViewIfNeeded()
+    await button.click()
+    await debugWait()
+
+    const inlineOption = testPage.locator('text="Inline Edit"').first()
+    if (await inlineOption.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await inlineOption.click()
+      await debugWait()
+      await testPage.keyboard.press('Control+A')
+      await testPage.keyboard.type('NEW BUTTON TEXT')
+      await testPage.keyboard.press('Enter')
+      log('✅ Inline edit done')
+      await debugWait()
+    } else {
+      log('⚠️ Inline Edit option not found')
+    }
+
+    log('\n📊 Checking changes...')
+    const changesCounter = testPage.locator('text=/\\d+ changes/').first()
+    const changesText = await changesCounter.textContent().catch(() => null)
+    if (changesText) {
+      log(`Changes made: ${changesText}`)
+    }
+
+    log('\n💾 Saving changes...')
+
+    // Close any open menu before clicking save
+    const backdropBeforeSave = testPage.locator('.menu-backdrop').first()
+    if (await backdropBeforeSave.isVisible({ timeout: 500 }).catch(() => false)) {
+      await testPage.mouse.click(10, 10)
+      await backdropBeforeSave.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+      await debugWait()
+    }
+
+    const saveBtn = testPage.locator('button').filter({ hasText: 'Save' }).first()
+    if (await saveBtn.isVisible()) {
+      await saveBtn.click()
+      log('✅ Save button clicked')
+      await debugWait(3000)
+
+      log('\n🔍 Checking DOM changes in sidebar...')
+
+      const domChanges = sidebar.locator('text=/DOM Changes/i').first()
+      const hasChanges = await domChanges.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (hasChanges) {
+        log('✅ DOM Changes section found in sidebar')
+
+        const changesCount = await sidebar.locator('text=/\\d+\\s+DOM change/i').count()
+        if (changesCount > 0) {
+          const text = await sidebar.locator('text=/\\d+\\s+DOM change/i').first().textContent()
+          log(`✅ ${text} saved to experiment`)
+        }
+
+        const jsonTab = sidebar.locator('button').filter({ hasText: 'JSON' }).first()
+        if (await jsonTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await jsonTab.click()
+          await debugWait()
+          log('✅ Viewing DOM changes in JSON editor')
+        }
+      } else {
+        log('⚠️ DOM Changes section not visible in sidebar')
+      }
+    }
+
+    await testPage.screenshot({
+      path: 'test-results/visual-editor-focused-final.png',
+      fullPage: true
+    })
+    log('\n📸 Screenshot saved')
+
+    log('\n✨ Test complete!')
+  })
+})

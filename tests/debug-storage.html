@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Debug Storage</title>
+</head>
+<body>
+  <h1>Storage Debug Page</h1>
+  <pre id="output"></pre>
+  <script>
+    async function debugStorage() {
+      const output = document.getElementById('output');
+      let result = '=== RAW STORAGE ===\n';
+
+      // Get raw storage
+      const raw = await chrome.storage.local.get(null);
+      result += JSON.stringify(raw, null, 2) + '\n\n';
+
+      result += '=== DESERIALIZED STORAGE ===\n';
+      for (const [key, value] of Object.entries(raw)) {
+        try {
+          const deserialized = JSON.parse(value);
+          result += `${key}: ${JSON.stringify(deserialized, null, 2)}\n`;
+        } catch (e) {
+          result += `${key}: [PARSE ERROR] ${value}\n`;
+        }
+      }
+
+      output.textContent = result;
+      console.log(result);
+    }
+
+    debugStorage();
+  </script>
+</body>
+</html>

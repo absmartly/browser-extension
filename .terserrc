@@ -1,0 +1,11 @@
+{
+  "compress": {
+    "drop_console": true,
+    "pure_funcs": [
+      "console.log",
+      "console.debug",
+      "console.info",
+      "console.trace"
+    ]
+  }
+}

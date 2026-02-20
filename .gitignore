@@ -1,0 +1,84 @@
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# mcp servers
+.mcp.json.bk
+.mcp.json
+
+# serena cache
+.serena
+
+# claude tasks, plans, and session files
+.claude/tasks/
+.claude/plans/
+
+public/*.{min,dev}.js
+react.production.min.js
+
+# Generated SDK bridge bundle
+public/absmartly-sdk-bridge.bundle.js
+public/absmartly-sdk-bridge.bundle.js.map
+playwright-report/
+test-results
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing & coverage
+/coverage
+coverage-handlers/
+
+# misc
+.DS_Store
+*.pem
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# local env files
+.env
+.env*.local
+
+out/
+build/
+dist/
+
+# plasmo
+.plasmo
+
+# typescript
+.tsbuildinfo
+tsconfig.tsbuildinfo
+injected-bundles/
+
+# Test files, screenshots, and artifacts
+tests/
+.test-backups
+test-*.html
+*-test-*.html
+*.png
+!assets/*.png
+!src/assets/*.png
+.playwright-mcp/
+
+# Backup files
+*.backup
+*.bak
+*.bak*
+*.orig
+*~
+sdk-plugin-backup/
+
+# Docs, PRPs, and generated reports
+docs/
+PRPs/
+
+# Temporary test files
+TEST_SUMMARY.md
+test-html-compression.js

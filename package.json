@@ -1,0 +1,131 @@
+{
+  "name": "absmartly-launchpad",
+  "displayName": "ABsmartly LaunchPad",
+  "version": "1.0.1",
+  "description": "Visual A/B testing extension for ABsmartly. Create DOM-based experiments with drag & drop editing and real-time preview.",
+  "author": "Jonas Alves",
+  "private": true,
+  "scripts": {
+    "postinstall": "patch-package",
+    "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
+    "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'npm run build:sdk-bridge'",
+    "dev": "npm run build:sdk-bridge && NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",
+    "build": "NODE_ENV=production npm run build:sdk-bridge && NODE_ENV=production plasmo build --src-path=. && NODE_ENV=production node scripts/post-build.js",
+    "build:dev": "npm run build:sdk-bridge && bash scripts/build-dev-once.sh",
+    "package": "plasmo package --src-path=.",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:quick": "npm run test:unit && npm run test:e2e:visual-editor",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:visual-editor": "playwright test tests/e2e/visual-editor-complete.spec.ts --reporter=list",
+    "test:unit": "jest",
+    "test:unit:watch": "jest --watch",
+    "test:unit:coverage": "jest --coverage",
+    "test:claude": "node test-claude-api.js"
+  },
+  "dependencies": {
+    "@absmartly/sdk-plugins": "^1.2.1",
+    "@anthropic-ai/sdk": "^0.65.0",
+    "@codemirror/autocomplete": "^6.19.0",
+    "@codemirror/commands": "^6.9.0",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/lint": "^6.9.0",
+    "@codemirror/search": "^6.5.11",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.38.4",
+    "@heroicons/react": "^2.0.18",
+    "@monaco-editor/react": "^4.7.0",
+    "@plasmohq/storage": "^1.9.0",
+    "@types/dompurify": "^3.0.5",
+    "@uiw/react-codemirror": "^4.25.3",
+    "axios": "^1.6.0",
+    "clsx": "^2.0.0",
+    "codemirror": "^6.0.2",
+    "dompurify": "^3.3.0",
+    "emoji-regex": "^10.6.0",
+    "known-css-properties": "^0.37.0",
+    "marked": "^17.0.0",
+    "monaco-editor": "^0.53.0",
+    "openai": "^6.9.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@absmartly/javascript-sdk": "^1.13.2",
+    "@ianvs/prettier-plugin-sort-imports": "4.1.1",
+    "@playwright/test": "^1.40.0",
+    "@swc/core": "^1.14.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/chrome": "0.0.258",
+    "@types/jest": "^30.0.0",
+    "@types/node": "20.11.5",
+    "@types/node-fetch": "^2.6.13",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "autoprefixer": "^10.4.16",
+    "eventsource": "^4.1.0",
+    "fake-indexeddb": "^6.2.5",
+    "fast-glob": "^3.3.3",
+    "http-server": "^14.1.1",
+    "jest": "^30.1.3",
+    "jest-environment-jsdom": "^30.1.2",
+    "jsdom": "^27.0.0",
+    "patch-package": "^8.0.1",
+    "plasmo": "0.90.5",
+    "playwright": "^1.55.0",
+    "postcss": "^8.4.32",
+    "prettier": "3.2.4",
+    "tailwindcss": "^3.4.0",
+    "ts-jest": "^29.4.1",
+    "typescript": "5.3.3"
+  },
+  "terser": {
+    "compress": {
+      "drop_console": true,
+      "pure_funcs": [
+        "console.log",
+        "console.debug",
+        "console.info",
+        "console.trace"
+      ]
+    }
+  },
+  "manifest": {
+    "permissions": [
+      "storage",
+      "activeTab",
+      "tabs",
+      "scripting",
+      "cookies"
+    ],
+    "host_permissions": [
+      "https://*.absmartly.com/*",
+      "http://localhost/*"
+    ],
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "assets/logo.png",
+          "assets/icon.png",
+          "assets/icon128.png",
+          "assets/absmartly-logo-white.svg",
+          "tabs/*",
+          "absmartly-sdk-bridge.bundle.js"
+        ],
+        "matches": [
+          "<all_urls>"
+        ]
+      }
+    ]
+  },
+  "overrides": {
+    "svelte": "^4.2.19",
+    "content-security-policy-parser": "^0.6.0"
+  }
+}
