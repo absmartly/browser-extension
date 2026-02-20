@@ -25,6 +25,13 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
     case 'claude-subscription':
     case 'codex':
       return new BridgeProvider(config)
+
+    default:
+      throw new Error(
+        `Unknown AI provider: "${(config as { aiProvider: string }).aiProvider}". ` +
+        `Supported providers: anthropic-api, openai-api, openrouter-api, gemini-api, claude-subscription, codex. ` +
+        `Please check your provider selection in Settings.`
+      )
   }
 }
 

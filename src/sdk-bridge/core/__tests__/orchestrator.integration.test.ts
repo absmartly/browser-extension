@@ -91,7 +91,7 @@ describe('Orchestrator Integration Tests', () => {
       jest.advanceTimersByTime(100)
 
       expect(Logger.log).toHaveBeenCalledWith(
-        expect.stringContaining('No ABsmartly SDK found after 5 seconds')
+        expect.stringContaining('No ABsmartly SDK found after')
       )
 
       const state = orchestrator.getState()

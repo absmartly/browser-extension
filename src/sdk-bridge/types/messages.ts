@@ -1,3 +1,5 @@
+import type { DOMChange } from '../../types/dom-changes'
+
 export type MessageSource = 'absmartly-page' | 'absmartly-extension'
 
 export interface SDKEventPayload {
@@ -8,7 +10,7 @@ export interface SDKEventPayload {
 
 
 export interface PreviewChangesPayload {
-  changes: unknown[]
+  changes: DOMChange[]
   experimentName: string
 }
 

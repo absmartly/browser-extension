@@ -165,16 +165,7 @@ export function generateRobustSelector(
     }
   }
 
-  // 5. Try text content for buttons/links
-  const textSelector = getTextContentSelector(element)
-  if (textSelector) {
-    const matches = document.querySelectorAll(textSelector)
-    if (matches.length === 1) {
-      return textSelector
-    }
-  }
-
-  // 6. Build a contextual selector with parent elements
+  // 5. Build a contextual selector with parent elements
   if (includeParentContext) {
     const contextSelector = buildContextualSelector(element, maxParentLevels)
     if (contextSelector) {
@@ -185,7 +176,7 @@ export function generateRobustSelector(
     }
   }
 
-  // 7. Last resort: use position-based selector
+  // 6. Last resort: use position-based selector
   return buildPositionalSelector(element)
 }
 
@@ -417,26 +408,6 @@ function getAriaSelector(element: Element): string | null {
     return `${tagName}[role="${CSS.escape(role)}"]`
   }
 
-  return null
-}
-
-function getTextContentSelector(element: Element): string | null {
-  const tagName = element.tagName.toLowerCase()
-  
-  // Only use text content for specific elements
-  if (!['button', 'a', 'label'].includes(tagName)) {
-    return null
-  }
-
-  const text = element.textContent?.trim()
-  if (!text || text.length > 50) {
-    return null
-  }
-
-  // Check if this text is unique for this element type
-  const selector = `${tagName}:contains("${text}")`
-  // Note: :contains is not standard CSS, but we can use XPath or implement custom matching
-  // For now, return null as this would need special handling
   return null
 }
 

@@ -192,7 +192,7 @@ The response will contain the HTML for each selector. Use this to inspect elemen
                 try {
                   toolInput = JSON.parse(toolInput)
                 } catch (e) {
-                  // Not JSON, ignore
+                  debugWarn('[Bridge] Failed to parse tool_use data as JSON:', toolInput?.substring(0, 200))
                 }
               }
 
@@ -339,17 +339,19 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           }
         )
 
-        // Send the message
-        sendTimeoutId = setTimeout(async () => {
+        const sendMessage = async () => {
           try {
             await this.bridgeClient.sendMessage(conversationId, userMessage, images || [], systemPromptToSend, SHARED_TOOL_SCHEMA)
             debugLog('[Bridge] Message sent')
           } catch (error) {
-            cleanup()
-            eventSource.close()
-            reject(error)
+            if (!resolved) {
+              cleanup()
+              eventSource.close()
+              reject(error)
+            }
           }
-        }, 100)
+        }
+        sendTimeoutId = setTimeout(sendMessage, 100)
 
         // Timeout after 5 minutes (Claude Code may take a while with multiple tool calls)
         responseTimeoutId = setTimeout(() => {

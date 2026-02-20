@@ -109,7 +109,7 @@ export function withRateLimitRetry<T>(
     retryableStatusCodes: [429],
     shouldRetry: (error, attempt) => {
       if (error.response?.status === 429) {
-        const retryAfter = error.response?.headers?.[' retry-after']
+        const retryAfter = error.response?.headers?.['retry-after']
         if (retryAfter) {
           const retryAfterMs = parseInt(retryAfter) * 1000
           debugLog('[Retry] Rate limited, retry-after header:', retryAfterMs)

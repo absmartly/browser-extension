@@ -30,7 +30,7 @@ export interface VisualEditorState {
   changes: DOMChange[]
   undoStack: DOMChange[]
   redoStack: DOMChange[]
-  originalValues: Map<string, any>
+  originalValues: Map<string, unknown>
   isRearranging: boolean
   isResizing: boolean
   draggedElement: Element | null
@@ -129,7 +129,7 @@ export interface VisualEditorMessage {
   changes?: DOMChange[]
   experimentName?: string
   variantName?: string
-  payload?: any
+  payload?: Record<string, unknown>
 }
 
 // Error types
@@ -142,7 +142,6 @@ export class VisualEditorError extends Error {
 
 // Utility types
 export type ElementSelector = string
-export type CSSSelector = string
 export type HTMLString = string
 
 // Element metadata

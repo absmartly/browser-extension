@@ -88,25 +88,20 @@ export async function loadOverridesFromStorage(): Promise<ExperimentOverrides> {
  * Save overrides to both chrome.storage.local and cookie
  */
 export async function saveOverrides(overrides: ExperimentOverrides): Promise<void> {
+  const cleanedOverrides = Object.entries(overrides)
+    .filter(([_, value]) => {
+      if (value === undefined || value === null) return false
+      if (typeof value === 'number') return value !== -1
+      return value.variant !== -1
+    })
+    .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {})
+
+  await storage.set(OVERRIDES_STORAGE_KEY, cleanedOverrides)
+
   try {
-    debugLog('[ABsmartly] saveOverrides called with:', overrides)
-    // Clean up: remove experiments with variant -1 (off) and handle undefined/null values
-    const cleanedOverrides = Object.entries(overrides)
-      .filter(([_, value]) => {
-        if (value === undefined || value === null) return false
-        if (typeof value === 'number') return value !== -1
-        return value.variant !== -1
-      })
-      .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {})
-
-    debugLog('[ABsmartly] Cleaned overrides:', cleanedOverrides)
-    // Save to chrome.storage.local (primary)
-    await storage.set(OVERRIDES_STORAGE_KEY, cleanedOverrides)
-
-    // Sync to cookie for SSR compatibility
     await syncOverridesToCookie(cleanedOverrides)
   } catch (error) {
-    console.error('Failed to save overrides:', error)
+    debugWarn('Failed to sync overrides to cookie (non-critical):', error)
   }
 }
 

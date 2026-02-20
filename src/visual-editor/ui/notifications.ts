@@ -31,12 +31,13 @@ export class Notifications {
       animation: absmartly-slideUp 0.3s ease-out !important;
     `
 
-    // Create content
-    const content = message
-      ? `<strong>${title}</strong> · ${message}`
-      : `<strong>${title}</strong>`
+    const strong = document.createElement('strong')
+    strong.textContent = title
+    notification.appendChild(strong)
 
-    notification.innerHTML = content
+    if (message) {
+      notification.appendChild(document.createTextNode(` · ${message}`))
+    }
 
     // Add animations if not already added
     this.addAnimationStyles()

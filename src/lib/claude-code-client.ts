@@ -317,7 +317,8 @@ Common issues:
         const data = JSON.parse(event.data)
         onMessage(data)
       } catch (error) {
-        debugError('[Bridge] Failed to parse SSE message:', error)
+        debugError('[Bridge] Failed to parse SSE message:', error, 'Raw data:', event.data?.substring(0, 200))
+        onError(new Error(`Failed to parse bridge response: ${error instanceof Error ? error.message : String(error)}`))
       }
     }
 

@@ -311,10 +311,7 @@ describe('Notifications', () => {
       notifications.show('<script>alert("xss")</script>', 'Test message')
 
       const notification = document.querySelector('.absmartly-notification')
-      expect(notification?.innerHTML).toBe('<strong><script>alert("xss")</script></strong> · Test message')
-
-      // Script should not execute in test environment
-      // This is a basic check - in real scenarios, content should be sanitized
+      expect(notification?.innerHTML).toBe('<strong>&lt;script&gt;alert("xss")&lt;/script&gt;</strong> · Test message')
     })
   })
 

@@ -132,7 +132,7 @@ export class Orchestrator {
       } else if (attempts < this.config.maxAttempts) {
         setTimeout(checkAndInit, this.config.attemptInterval)
       } else {
-        Logger.log('[ABsmartly Extension] No ABsmartly SDK found after 5 seconds')
+        Logger.log(`[ABsmartly Extension] No ABsmartly SDK found after ${this.config.maxAttempts} attempts (${(this.config.maxAttempts * this.config.attemptInterval) / 1000}s)`)
       }
     }
 

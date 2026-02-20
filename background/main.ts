@@ -43,6 +43,29 @@ import {
 import { safeValidateAPIRequest, ConfigSchema } from './utils/validation'
 import { checkRateLimit } from './utils/rate-limiter'
 
+const ALLOWED_STORAGE_KEYS = new Set([
+  'absmartly-config',
+  'experiment_overrides',
+  'development_environment',
+  'domChangesInlineState',
+  'elementPickerResult',
+  'claudeBridgePort',
+  'recent-experiments',
+  'experiments-cache',
+  'experiments-cache_meta',
+  'sidebar-state',
+  'sdk-events',
+  'visual-editor-state',
+  'ai-conversation-active'
+])
+
+function isAllowedStorageKey(key: string): boolean {
+  if (ALLOWED_STORAGE_KEYS.has(key)) return true
+  if (key.startsWith('experiments-cache_chunk_')) return true
+  if (key.startsWith('ai-conversation-')) return true
+  return false
+}
+
 export function detectPluginStatusInPage() {
   const registry = (window as any).__ABSMARTLY_PLUGINS__ || null
   const domInitialized = !!registry?.dom?.initialized
@@ -180,10 +203,18 @@ export function initializeBackgroundScript() {
       return result.async
     }
 
+    if (message.type === 'STORAGE_GET' || message.type === 'STORAGE_SET' || message.type === 'STORAGE_REMOVE') {
+      if (!isAllowedStorageKey(message.key)) {
+        debugWarn('[Background] Rejected storage access for disallowed key:', message.key)
+        sendResponse({ success: false, error: `Storage key not allowed: ${message.key}` })
+        return false
+      }
+    }
+
     if (message.type === 'STORAGE_GET') {
       handleStorageGet(message.key)
         .then(value => {
-          debugLog('[Background] Storage GET:', message.key, '=', value)
+          debugLog('[Background] Storage GET:', message.key)
           sendResponse({ success: true, value })
         })
         .catch(error => {
@@ -194,7 +225,7 @@ export function initializeBackgroundScript() {
     } else if (message.type === 'STORAGE_SET') {
       handleStorageSet(message.key, message.value)
         .then(() => {
-          debugLog('[Background] Storage SET:', message.key, '=', message.value)
+          debugLog('[Background] Storage SET:', message.key)
           sendResponse({ success: true })
         })
         .catch(error => {
@@ -305,11 +336,14 @@ export function initializeBackgroundScript() {
     } else if (message.type === 'TOGGLE_VISUAL_EDITOR') {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, message).catch((error) => {
-            debugError('[Background] Failed to toggle visual editor:', error?.message)
-            sendResponse({ success: false, error: error?.message || 'Failed to toggle visual editor' })
-          })
-          sendResponse({ success: true })
+          chrome.tabs.sendMessage(tabs[0].id, message)
+            .then(() => {
+              sendResponse({ success: true })
+            })
+            .catch((error) => {
+              debugError('[Background] Failed to toggle visual editor:', error?.message)
+              sendResponse({ success: false, error: error?.message || 'Failed to toggle visual editor' })
+            })
         } else {
           debugWarn('[Background] No active tab found for TOGGLE_VISUAL_EDITOR')
           sendResponse({ success: false, error: 'No active tab' })
@@ -382,7 +416,13 @@ export function initializeBackgroundScript() {
       })
       return true
     } else if (message.type === 'API_REQUEST') {
-      makeAPIRequest(message.method, message.path, message.data)
+      const validation = safeValidateAPIRequest({ method: message.method, path: message.path, data: message.data })
+      if (!validation.success) {
+        debugWarn('[Background] Invalid API request:', validation.error.issues)
+        sendResponse({ success: false, error: 'Invalid API request parameters' })
+        return false
+      }
+      makeAPIRequest(validation.data.method, validation.data.path, validation.data.data)
         .then(data => {
           sendResponse({ success: true, data })
         })

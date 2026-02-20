@@ -1,3 +1,5 @@
+import type { DOMChange } from './dom-changes'
+
 export interface ElementSelectedMessage {
   type: 'ELEMENT_SELECTED'
   selector: string
@@ -13,14 +15,14 @@ export interface DragDropCompleteMessage {
 
 export interface VisualEditorMessage {
   type: 'VISUAL_EDITOR_CHANGES'
-  changes: unknown[]
+  changes: DOMChange[]
   variantName: string
   experimentId?: number
 }
 
 export interface VisualEditorCompleteMessage {
   type: 'VISUAL_EDITOR_CHANGES_COMPLETE'
-  changes: unknown[]
+  changes: DOMChange[]
   variantName: string
 }
 

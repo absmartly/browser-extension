@@ -26,8 +26,8 @@ export const ALLOWED_API_DOMAINS = ['absmartly.com', 'absmartly.io']
  * - ::1: IPv6 loopback (equivalent to 127.0.0.1)
  * - [::1]: Bracketed notation for IPv6 loopback (used in URLs)
  * - fc00::/7: Unique Local Addresses (ULA) - private IPv6 addresses
- *   - fc: Prefix for fc00::/8 to fdff::/8 range (all ULAs start with fc or fd)
- *   - fd: Prefix for fd00::/8 (most common ULA range)
+ *   - fc: Prefix for fc00::/8 to fcff::/8 range (matched only for IPv6 hostnames)
+ *   - fd: Prefix for fd00::/8 to fdff::/8 range (matched only for IPv6 hostnames)
  * - fe80::/10: Link-local addresses (similar to 169.254.x.x in IPv4)
  */
 export const BLOCKED_HOSTS = [
@@ -100,6 +100,7 @@ export function isSSRFSafe(url: string): boolean {
 
     for (const prefix of PREFIX_BLOCKED_HOSTS) {
       if (hostname.startsWith(prefix)) {
+        if (prefix.length <= 2 && !hostname.includes(':')) continue
         debugError(`[Security] SSRF attempt blocked: ${url}`)
         return false
       }

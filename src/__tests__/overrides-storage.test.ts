@@ -54,11 +54,9 @@ const mockStorage = (() => {
 
 describe('Storage Functions', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockStorage.get.mockClear()
-    mockStorage.set.mockClear()
-    mockChromeApi.tabs.query.mockClear()
-    mockChromeApi.scripting.executeScript.mockClear()
+    jest.resetAllMocks()
+    mockStorage.get.mockResolvedValue(undefined)
+    mockStorage.set.mockResolvedValue(undefined)
   })
 
   describe('loadOverridesFromStorage', () => {
@@ -186,19 +184,14 @@ describe('Storage Functions', () => {
       expect(mockChromeApi.scripting.executeScript).not.toHaveBeenCalled()
     })
 
-    it('should handle storage errors gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+    it('should propagate storage errors to callers', async () => {
       mockStorage.set.mockRejectedValue(new Error('Storage error'))
 
       const overrides: ExperimentOverrides = {
         experiment1: 1,
       }
 
-      await saveOverrides(overrides)
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to save overrides:', expect.any(Error))
-
-      consoleSpy.mockRestore()
+      await expect(saveOverrides(overrides)).rejects.toThrow('Storage error')
     })
   })
 

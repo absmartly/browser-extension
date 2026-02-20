@@ -39,20 +39,26 @@ export async function getConfig(): Promise<ABsmartlyConfig | null> {
 }
 
 export async function setConfig(config: ABsmartlyConfig): Promise<void> {
-  if (config.apiKey) {
-    await secureStorage.set("absmartly-apikey", config.apiKey)
-  } else {
-    await secureStorage.remove("absmartly-apikey")
-  }
+  try {
+    if (config.apiKey) {
+      await secureStorage.set("absmartly-apikey", config.apiKey)
+    } else {
+      await secureStorage.remove("absmartly-apikey")
+    }
 
-  if (config.aiApiKey) {
-    await secureStorage.set("ai-apikey", config.aiApiKey)
-  } else {
-    await secureStorage.remove("ai-apikey")
-  }
+    if (config.aiApiKey) {
+      await secureStorage.set("ai-apikey", config.aiApiKey)
+    } else {
+      await secureStorage.remove("ai-apikey")
+    }
 
-  const configToStore = { ...config, apiKey: '', aiApiKey: '' }
-  await storage.set(STORAGE_KEYS.CONFIG, configToStore)
+    const configToStore = { ...config, apiKey: '', aiApiKey: '' }
+    await storage.set(STORAGE_KEYS.CONFIG, configToStore)
+  } catch (error) {
+    console.error('[Storage] Failed to save config:', error)
+    notifyUser('Failed to save settings. Please try again.', 'error')
+    throw error
+  }
 }
 
 export async function getRecentExperiments(): Promise<number[]> {
