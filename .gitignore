@@ -8,8 +8,9 @@
 # serena cache
 .serena
 
-# claude tasks
+# claude tasks, plans, and session files
 .claude/tasks/
+.claude/plans/
 
 public/*.{min,dev}.js
 react.production.min.js
@@ -67,16 +68,17 @@ test-*.html
 .playwright-mcp/
 
 # Backup files
+*.backup
 *.bak
 *.bak*
 *.orig
 *~
 sdk-plugin-backup/
 
-# Docs and PRPs
-PRPs
+# Docs, PRPs, and generated reports
+docs/
+PRPs/
 
 # Temporary test files
 TEST_SUMMARY.md
 test-html-compression.js
-docs/get_html_chunk_tool.md
