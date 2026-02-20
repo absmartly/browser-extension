@@ -128,7 +128,11 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     debugLog('[ABsmartly] New overrides to save:', newOverrides)
     setOverrides(newOverrides)
 
-    await saveOverrides(newOverrides)
+    try {
+      await saveOverrides(newOverrides)
+    } catch (error) {
+      debugError('[ABsmartly] Failed to save overrides:', error)
+    }
 
     const hasActiveOverrides = Object.entries(newOverrides).some(([expName, overrideValue]) => {
       const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
@@ -144,7 +148,12 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
   }, [])
 
   const handleClearAll = useCallback(async () => {
-    await saveOverrides({})
+    try {
+      await saveOverrides({})
+    } catch (error) {
+      debugError('[ABsmartly] Failed to clear overrides:', error)
+      return
+    }
     setOverrides({})
     setShowReloadBanner(false)
     await reloadPageWithOverrides()

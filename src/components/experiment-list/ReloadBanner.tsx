@@ -1,4 +1,5 @@
 import React from 'react'
+import { debugError } from '~src/utils/debug'
 import { saveOverrides, reloadPageWithOverrides } from '~src/utils/overrides'
 
 interface ReloadBannerProps {
@@ -13,7 +14,12 @@ export const ReloadBanner = React.memo(function ReloadBanner({ onReload, onDismi
       if (onClearAll) {
         await onClearAll()
       } else {
-        await saveOverrides({})
+        try {
+          await saveOverrides({})
+        } catch (error) {
+          debugError('[ABsmartly] Failed to clear overrides:', error)
+          return
+        }
         await reloadPageWithOverrides()
       }
     }
