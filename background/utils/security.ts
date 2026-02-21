@@ -11,25 +11,6 @@ try {
 
 export const ALLOWED_API_DOMAINS = ['absmartly.com', 'absmartly.io']
 
-/**
- * BLOCKED_HOSTS - List of hosts to block for SSRF protection
- *
- * IPv4 Addresses:
- * - localhost, 127.0.0.1: Loopback addresses
- * - 0.0.0.0: Wildcard/unspecified address
- * - 169.254.x.x: Link-local addresses (APIPA)
- * - 192.168.x.x: Private network (Class C)
- * - 10.x.x.x: Private network (Class A)
- * - 172.16-31.x.x: Private network (Class B)
- *
- * IPv6 Addresses:
- * - ::1: IPv6 loopback (equivalent to 127.0.0.1)
- * - [::1]: Bracketed notation for IPv6 loopback (used in URLs)
- * - fc00::/7: Unique Local Addresses (ULA) - private IPv6 addresses
- *   - fc: Prefix for fc00::/8 to fcff::/8 range (matched only for IPv6 hostnames)
- *   - fd: Prefix for fd00::/8 to fdff::/8 range (matched only for IPv6 hostnames)
- * - fe80::/10: Link-local addresses (similar to 169.254.x.x in IPv4)
- */
 export const BLOCKED_HOSTS = [
   'localhost',
   '127.0.0.1',

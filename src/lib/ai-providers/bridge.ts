@@ -170,16 +170,20 @@ The response will contain the HTML for each selector. Use this to inspect elemen
         let sendTimeoutId: ReturnType<typeof setTimeout> | undefined
         let responseTimeoutId: ReturnType<typeof setTimeout> | undefined
         let resolved = false
+        let eventSource: EventSource | null = null
 
         const cleanup = () => {
           if (sendTimeoutId !== undefined) clearTimeout(sendTimeoutId)
           if (responseTimeoutId !== undefined) clearTimeout(responseTimeoutId)
+          if (eventSource) eventSource.close()
           resolved = true
         }
 
         debugLog('[Bridge] Starting stream for conversation:', conversationId)
         debugLog('[Bridge] Bridge connection URL:', this.bridgeClient.getConnection()?.url)
-        const eventSource = this.bridgeClient.streamResponses(
+
+        try {
+          eventSource = this.bridgeClient.streamResponses(
           conversationId,
           (event) => {
             debugLog(`[Bridge] 📦 Event: ${event.type}`)
@@ -215,7 +219,6 @@ The response will contain the HTML for each selector. Use this to inspect elemen
             } else if (event.type === 'done') {
               debugLog('[Bridge] ✅ Stream done')
               cleanup()
-              eventSource.close()
 
               // If we got a final tool result, validate and return it
               if (finalToolResult) {
@@ -261,7 +264,6 @@ The response will contain the HTML for each selector. Use this to inspect elemen
             } else if (event.type === 'error') {
               console.error('[Bridge] ❌ Error:', event.data)
               cleanup()
-              eventSource.close()
 
               let errorData = event.data
               if (typeof errorData === 'string') {
@@ -334,10 +336,13 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           (error) => {
             console.error('[Bridge] Stream error:', error)
             cleanup()
-            eventSource.close()
             reject(error)
           }
         )
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)))
+          return
+        }
 
         const sendMessage = async () => {
           try {
@@ -346,18 +351,15 @@ The response will contain the HTML for each selector. Use this to inspect elemen
           } catch (error) {
             if (!resolved) {
               cleanup()
-              eventSource.close()
               reject(error)
             }
           }
         }
         sendTimeoutId = setTimeout(sendMessage, 100)
 
-        // Timeout after 5 minutes (Claude Code may take a while with multiple tool calls)
         responseTimeoutId = setTimeout(() => {
           if (!resolved) {
             cleanup()
-            eventSource.close()
             reject(new Error('Response timeout after 5 minutes'))
           }
         }, 300000)

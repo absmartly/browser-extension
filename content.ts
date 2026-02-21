@@ -31,10 +31,10 @@ export const config: PlasmoCSConfig = {
   run_at: "document_start"
 }
 
-console.log("[ABsmartly] Content script executing - TOP OF FILE")
+debugLog("[ABsmartly] Content script executing - TOP OF FILE")
 const w = window as any
 w.__absmartlyContentScriptLoaded = true
-console.log(
+debugLog(
   "[ABsmartly] Content script marker set:",
   w.__absmartlyContentScriptLoaded
 )
@@ -63,12 +63,12 @@ setupWindowMessageListener(
 )
 
 if (!w.__absmartlyMessageListenerRegistered) {
-  console.log("[ABsmartly] Registering chrome.runtime.onMessage listener")
+  debugLog("[ABsmartly] Registering chrome.runtime.onMessage listener")
   w.__absmartlyMessageListenerRegistered = true
 
   const messageListenerRegistered = chrome.runtime.onMessage.addListener(
     (message, sender, sendResponse) => {
-      console.log("[ABsmartly] Message received:", message?.type)
+      debugLog("[ABsmartly] Message received:", message?.type)
       debugLog("[Visual Editor Content Script] Received message:", message.type)
 
       const validation = validateMessage(message, sender, {
@@ -85,13 +85,13 @@ if (!w.__absmartlyMessageListenerRegistered) {
       }
 
       if (message.type === "PING") {
-        console.log("[ABsmartly] PING received, sending PONG")
+        debugLog("[ABsmartly] PING received, sending PONG")
         sendResponse({ success: true, pong: true })
         return true
       }
 
       if (message.type === "INJECT_SDK_PLUGIN") {
-        console.log("[Content Script] 📌 Received INJECT_SDK_PLUGIN message")
+        debugLog("[Content Script] Received INJECT_SDK_PLUGIN message")
         debugLog(
           "[Visual Editor Content Script] Injecting SDK plugin on demand"
         )
@@ -147,8 +147,8 @@ if (!w.__absmartlyMessageListenerRegistered) {
       }
 
       if (message.type === "START_VISUAL_EDITOR") {
-        console.log("[ABsmartly] ✅ MESSAGE RECEIVED: START_VISUAL_EDITOR")
-        console.log("[ABsmartly] Message payload:", JSON.stringify(message))
+        debugLog("[ABsmartly] MESSAGE RECEIVED: START_VISUAL_EDITOR")
+        debugLog("[ABsmartly] Message payload:", JSON.stringify(message))
         debugLog(
           "[Visual Editor Content Script] START_VISUAL_EDITOR received:",
           {
@@ -177,8 +177,8 @@ if (!w.__absmartlyMessageListenerRegistered) {
             if (result.editor) {
               currentEditor = result.editor
             }
-            console.log(
-              "[ABsmartly] ✅ startVisualEditor completed with result:",
+            debugLog(
+              "[ABsmartly] startVisualEditor completed with result:",
               JSON.stringify(result)
             )
             debugLog(
@@ -188,7 +188,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
             sendResponse(result)
           })
           .catch((error) => {
-            console.error("[ABsmartly] ❌ startVisualEditor failed:", error)
+            debugError("[ABsmartly] startVisualEditor failed:", error)
             debugError(
               "[Visual Editor Content Script] Error in startVisualEditor:",
               error
@@ -295,7 +295,7 @@ if (!w.__absmartlyMessageListenerRegistered) {
 
   debugLog("[Visual Editor Content Script] Loaded and listening for messages")
 } else {
-  console.log(
+  debugLog(
     "[ABsmartly] chrome.runtime.onMessage listener already registered, skipping"
   )
   debugLog("[Visual Editor Content Script] Message listener already registered")

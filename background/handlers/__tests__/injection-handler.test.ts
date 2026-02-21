@@ -188,7 +188,7 @@ describe('InjectionHandler', () => {
       const mockError = new Error('Injection failed')
       mockChrome.scripting.executeScript.mockRejectedValue(mockError)
 
-      await injectOrToggleSidebar(1, 'https://example.com')
+      await expect(injectOrToggleSidebar(1, 'https://example.com')).rejects.toThrow('Injection failed')
 
       expect(mockChrome.scripting.executeScript).toHaveBeenCalled()
     })

@@ -39,9 +39,10 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       try {
         const response = await sendToBackground({ type: 'GET_BUFFERED_EVENTS' })
         debugLog('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
-        if (response?.success && response.events) {
-          debugLog('[EventsDebugPage] Loaded', response.events.length, 'buffered events')
-          setEvents(response.events)
+        const events = response?.events as SDKEvent[] | undefined
+        if (response?.success && events) {
+          debugLog('[EventsDebugPage] Loaded', events.length, 'buffered events')
+          setEvents(events)
         } else {
           debugLog('[EventsDebugPage] No buffered events found')
         }

@@ -103,6 +103,7 @@ export async function injectOrToggleSidebar(tabId: number, tabUrl: string): Prom
     })
   } catch (error) {
     debugError('[InjectionHandler] Failed to inject sidebar:', error)
+    throw error
   }
 }
 

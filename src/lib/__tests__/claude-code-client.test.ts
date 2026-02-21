@@ -635,13 +635,11 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgePort', 3005)
     })
 
-    it('should return false on connection failure', async () => {
+    it('should throw on connection failure', async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch.mockRejectedValue(new Error('Connection refused'))
 
-      const result = await client.testConnection()
-
-      expect(result).toBe(false)
+      await expect(client.testConnection()).rejects.toThrow()
     })
   })
 

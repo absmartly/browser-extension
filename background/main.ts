@@ -43,6 +43,8 @@ import {
 import { safeValidateAPIRequest, ConfigSchema } from './utils/validation'
 import { checkRateLimit } from './utils/rate-limiter'
 
+let configInitError: string | null = null
+
 const ALLOWED_STORAGE_KEYS = new Set([
   'absmartly-config',
   'experiment_overrides',
@@ -168,9 +170,11 @@ export function detectPluginStatusInPage() {
 export function initializeBackgroundScript() {
   debugLog('[Background] Initializing background script...')
 
-  initializeConfig(storage, secureStorage).catch(err =>
+  initializeConfig(storage, secureStorage).catch(err => {
+    configInitError = err instanceof Error ? err.message : String(err)
     debugError('[Background] Init config error:', err)
-  )
+    console.error('[Background] CRITICAL: Config initialization failed:', err)
+  })
 
   initializeInjectionHandler()
   initializeAvatarProxy()
@@ -204,54 +208,59 @@ export function initializeBackgroundScript() {
     }
 
     if (message.type === 'STORAGE_GET' || message.type === 'STORAGE_SET' || message.type === 'STORAGE_REMOVE') {
-      if (!isAllowedStorageKey(message.key)) {
-        debugWarn('[Background] Rejected storage access for disallowed key:', message.key)
-        sendResponse({ success: false, error: `Storage key not allowed: ${message.key}` })
+      const validatedKey = String(message.key)
+      if (!isAllowedStorageKey(validatedKey)) {
+        debugWarn('[Background] Rejected storage access for disallowed key:', validatedKey)
+        sendResponse({ success: false, error: `Storage key not allowed: ${validatedKey}` })
         return false
+      }
+
+      if (message.type === 'STORAGE_GET') {
+        handleStorageGet(validatedKey)
+          .then(value => {
+            debugLog('[Background] Storage GET:', validatedKey)
+            sendResponse({ success: true, value })
+          })
+          .catch(error => {
+            debugError('[Background] Storage GET error:', error)
+            sendResponse({ success: false, error: error.message })
+          })
+        return true
+      } else if (message.type === 'STORAGE_SET') {
+        handleStorageSet(validatedKey, message.value)
+          .then(() => {
+            debugLog('[Background] Storage SET:', validatedKey)
+            sendResponse({ success: true })
+          })
+          .catch(error => {
+            debugError('[Background] Storage SET error:', error)
+            sendResponse({ success: false, error: error.message })
+          })
+        return true
+      } else {
+        handleStorageRemove(validatedKey)
+          .then(() => {
+            debugLog('[Background] Storage REMOVE:', validatedKey)
+            sendResponse({ success: true })
+          })
+          .catch(error => {
+            debugError('[Background] Storage REMOVE error:', error)
+            sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) })
+          })
+        return true
       }
     }
 
-    if (message.type === 'STORAGE_GET') {
-      handleStorageGet(message.key)
-        .then(value => {
-          debugLog('[Background] Storage GET:', message.key)
-          sendResponse({ success: true, value })
-        })
-        .catch(error => {
-          debugError('[Background] Storage GET error:', error)
-          sendResponse({ success: false, error: error.message })
-        })
-      return true
-    } else if (message.type === 'STORAGE_SET') {
-      handleStorageSet(message.key, message.value)
-        .then(() => {
-          debugLog('[Background] Storage SET:', message.key)
-          sendResponse({ success: true })
-        })
-        .catch(error => {
-          debugError('[Background] Storage SET error:', error)
-          sendResponse({ success: false, error: error.message })
-        })
-      return true
-    } else if (message.type === 'STORAGE_REMOVE') {
-      handleStorageRemove(message.key)
-        .then(() => {
-          debugLog('[Background] Storage REMOVE:', message.key)
-          sendResponse({ success: true })
-        })
-        .catch(error => {
-          debugError('[Background] Storage REMOVE error:', error)
-          sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) })
-        })
-      return true
-    } else if (message.type === 'GET_CONFIG') {
+    if (message.type === 'GET_CONFIG') {
       debugLog('[Background] GET_CONFIG message received from:', sender.tab?.id, sender.url)
       getConfig(storage, secureStorage)
         .then(config => {
+          if (!config && configInitError) {
+            sendResponse({ success: false, error: `Config initialization failed: ${configInitError}` })
+            return
+          }
           debugLog('[Background] GET_CONFIG config retrieved:', !!config)
-          debugLog('[Background] GET_CONFIG returning config')
           sendResponse({ success: true, config })
-          debugLog('[Background] GET_CONFIG response sent')
         })
         .catch(error => {
           console.error('[Background] GET_CONFIG error:', error)
@@ -324,8 +333,14 @@ export function initializeBackgroundScript() {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.tabs.sendMessage(tabs[0].id, { type: 'INJECT_SDK_PLUGIN' }, (response) => {
+            const lastError = chrome.runtime.lastError
+            if (lastError) {
+              debugError('[Background] SDK plugin injection failed:', lastError.message)
+              sendResponse({ success: false, error: lastError.message || 'Failed to inject SDK plugin' })
+              return
+            }
             debugLog('[Background] Content script injection response:', response)
-            sendResponse(response || { success: true })
+            sendResponse(response || { success: false, error: 'No response from content script' })
           })
         } else {
           debugWarn('[Background] No active tab found for SDK plugin injection')
@@ -373,10 +388,17 @@ export function initializeBackgroundScript() {
               debugError("[Background] Unexpected error sending ELEMENT_PICKER_RESULT:", error)
             }
           })
+
+          sendResponse({ success: true })
+        } else {
+          debugWarn("[Background] ELEMENT_SELECTED received but no active element picker state")
+          sendResponse({ success: false, error: 'No active element picker' })
         }
       }).catch((error) => {
         debugError("[Background] Failed to handle ELEMENT_SELECTED:", error)
+        sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) })
       })
+      return true
     } else if (message.type === 'GET_CURRENT_TAB_URL') {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         sendResponse({ url: tabs[0]?.url || "" })
@@ -545,7 +567,7 @@ export function initializeBackgroundScript() {
 
           const apiKeyToUse = config?.aiApiKey || ''
 
-          // SECURITY: Never log API keys, even partially
+          // SECURITY: Never log API key values, only log presence
           debugLog('[Background] Config aiApiKey:', config?.aiApiKey ? 'present' : 'missing')
           debugLog('[Background] Using API key for AI:', apiKeyToUse ? 'present' : 'missing (OK for Claude subscription)')
 

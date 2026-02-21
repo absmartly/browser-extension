@@ -13,12 +13,14 @@ export function ExperimentActions({ experimentId }: ExperimentActionsProps) {
       <div className="relative group">
         <button
           onClick={async () => {
-            const config = await getConfig()
-            if (config?.apiEndpoint) {
-              const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-              const url = `${baseUrl}/experiments/${experimentId}`
-              chrome.tabs.create({ url })
-            }
+            try {
+              const config = await getConfig()
+              if (config?.apiEndpoint) {
+                const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                const url = `${baseUrl}/experiments/${experimentId}`
+                chrome.tabs.create({ url })
+              }
+            } catch { /* config unavailable */ }
           }}
           className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
           aria-label="Open in ABsmartly"
@@ -36,12 +38,14 @@ export function ExperimentActions({ experimentId }: ExperimentActionsProps) {
       <div className="relative group">
         <button
           onClick={async () => {
-            const config = await getConfig()
-            if (config?.apiEndpoint) {
-              const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-              const url = `${baseUrl}/experiments/${experimentId}/edit`
-              chrome.tabs.create({ url })
-            }
+            try {
+              const config = await getConfig()
+              if (config?.apiEndpoint) {
+                const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                const url = `${baseUrl}/experiments/${experimentId}/edit`
+                chrome.tabs.create({ url })
+              }
+            } catch { /* config unavailable */ }
           }}
           className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
           aria-label="Edit in ABsmartly"

@@ -1,8 +1,3 @@
-/**
- * Advanced selector generator that creates robust selectors
- * avoiding auto-generated classes when possible
- */
-
 // Patterns that indicate auto-generated or framework-specific classes
 const AUTO_GENERATED_PATTERNS = [
   /^framer-[a-zA-Z0-9]+$/,  // Framer classes like framer-F46SA
@@ -46,10 +41,6 @@ interface SelectorOptions {
   debug?: boolean
 }
 
-/**
- * Escapes an ID for use in a CSS selector
- * IDs starting with numbers or containing special characters need escaping
- */
 function escapeIdForSelector(id: string): string {
   if (!id) return ''
   
@@ -63,17 +54,11 @@ function escapeIdForSelector(id: string): string {
   return '#' + id.replace(/([^\w-])/g, '\\$1')
 }
 
-/**
- * Checks if an ID is valid for CSS selectors (without escaping)
- */
 function isValidCssId(id: string): boolean {
   // IDs starting with numbers or containing special chars need escaping
   return /^[a-zA-Z][\w-]*$/.test(id)
 }
 
-/**
- * Validates a CSS selector by trying to use it
- */
 function isValidSelector(selector: string): boolean {
   try {
     document.querySelector(selector)

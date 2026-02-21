@@ -37,7 +37,7 @@ export function useConversationHistory(variantName: string) {
         setConversationSession(initializedSession)
         debugLog('[initializeSessionHTML] ✅ HTML context initialized successfully')
       } else {
-        throw new Error(response.error || 'Failed to initialize session')
+        throw new Error((response.error as string) || 'Failed to initialize session')
       }
     } catch (error) {
       console.error('[initializeSessionHTML] ❌ HTML capture failed:', error)
@@ -236,7 +236,7 @@ export function useConversationHistory(variantName: string) {
         debugLog('[useConversationHistory] ✅ HTML context refreshed successfully')
         return true
       } else {
-        throw new Error(response.error || 'Failed to refresh HTML')
+        throw new Error((response.error as string) || 'Failed to refresh HTML')
       }
     } catch (error) {
       console.error('[useConversationHistory] ❌ HTML refresh failed:', error)

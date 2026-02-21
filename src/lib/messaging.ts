@@ -7,10 +7,10 @@ export interface ExtensionMessage {
   type: string
   from?: 'sidebar' | 'content' | 'background'
   to?: 'sidebar' | 'content' | 'background'
-  payload?: any
+  payload?: Record<string, unknown>
   requestId?: string
   expectsResponse?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**
@@ -18,7 +18,7 @@ export interface ExtensionMessage {
  * @param message Message object to send
  * @returns Promise resolving to the response from content script
  */
-export async function sendToContent(message: any): Promise<any> {
+export async function sendToContent(message: ExtensionMessage): Promise<Record<string, unknown>> {
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tabs[0]?.id) {
@@ -37,7 +37,7 @@ export async function sendToContent(message: any): Promise<any> {
  * @param message Message object to send
  * @returns Promise resolving to the response from background
  */
-export async function sendToBackground(message: any): Promise<any> {
+export async function sendToBackground(message: ExtensionMessage): Promise<Record<string, unknown>> {
   try {
     debugLog('[Messaging] Sending to background:', message.type)
     return await chrome.runtime.sendMessage(message)
@@ -51,7 +51,7 @@ export async function sendToBackground(message: any): Promise<any> {
  * Broadcast message to all extension pages (sidebar, popups, etc.)
  * @param message Message object to broadcast
  */
-export async function broadcastToExtension(message: any): Promise<void> {
+export async function broadcastToExtension(message: ExtensionMessage): Promise<void> {
   try {
     debugLog('[Messaging] Broadcasting to extension:', message.type)
     await chrome.runtime.sendMessage(message)

@@ -1,5 +1,13 @@
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
+export type ToolDefinition = {
+  name?: string
+  description?: string
+  type?: string
+  input_schema?: Record<string, unknown>
+  parameters?: Record<string, unknown>
+  function?: { name: string; description?: string; parameters?: Record<string, unknown> }
+}
 
 export type AIProviderType =
   | 'claude-subscription'
@@ -62,7 +70,7 @@ export interface AIProvider {
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }>
 
-  getToolDefinition(): any
+  getToolDefinition(): ToolDefinition
 
   getChunkRetrievalPrompt(): string
 }

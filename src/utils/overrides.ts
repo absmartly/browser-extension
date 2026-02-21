@@ -1,7 +1,7 @@
 import { Storage } from '@plasmohq/storage'
 import { parseCookieValue, serializeOverrides, generateCookieParserScript } from './cookie-serialization'
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 export const OVERRIDES_COOKIE_NAME = 'absmartly_overrides'
 export const OVERRIDES_STORAGE_KEY = 'experiment_overrides'
 export const DEV_ENV_STORAGE_KEY = 'development_environment'
@@ -109,10 +109,9 @@ export async function saveOverrides(overrides: ExperimentOverrides): Promise<voi
  * Save the development environment name
  */
 export async function saveDevelopmentEnvironment(envName: string): Promise<void> {
-  try {
-    await storage.set(DEV_ENV_STORAGE_KEY, envName)
+  await storage.set(DEV_ENV_STORAGE_KEY, envName)
 
-    // Also save to cookie for SDK access
+  try {
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       if (!tabs[0]?.id) return
@@ -128,7 +127,7 @@ export async function saveDevelopmentEnvironment(envName: string): Promise<void>
       })
     }
   } catch (error) {
-    console.error('Failed to save development environment:', error)
+    debugWarn('[Overrides] Failed to sync dev environment to cookie (non-critical):', error)
   }
 }
 

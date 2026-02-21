@@ -254,17 +254,10 @@ describe('Storage Functions', () => {
       }
     })
 
-    it('should handle errors gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+    it('should propagate storage errors to caller', async () => {
       mockStorage.set.mockRejectedValue(new Error('Storage error'))
 
-      const envName = 'test'
-
-      await saveDevelopmentEnvironment(envName)
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to save development environment:', expect.any(Error))
-
-      consoleSpy.mockRestore()
+      await expect(saveDevelopmentEnvironment('test')).rejects.toThrow('Storage error')
     })
   })
 

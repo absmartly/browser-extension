@@ -1,5 +1,5 @@
 import { debugWarn, debugLog } from './debug'
-import { BLOCKED_HOSTS } from '~background/utils/security'
+import { isSSRFSafe } from '~background/utils/security'
 
 export interface ValidationResult {
   valid: boolean
@@ -92,20 +92,10 @@ export function validateExperimentURL(url: string): ValidationResult {
       }
     }
 
-    const hostname = parsed.hostname.toLowerCase()
-    for (const blocked of BLOCKED_HOSTS) {
-      if (blocked.endsWith('.')) {
-        if (hostname.startsWith(blocked)) {
-          return {
-            valid: false,
-            reason: `Access to internal network address blocked: ${hostname}`
-          }
-        }
-      } else if (hostname === blocked) {
-        return {
-          valid: false,
-          reason: `Access to internal network address blocked: ${hostname}`
-        }
+    if (!isSSRFSafe(url)) {
+      return {
+        valid: false,
+        reason: `Access to internal network address blocked: ${parsed.hostname}`
       }
     }
 

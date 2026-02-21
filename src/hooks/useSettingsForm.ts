@@ -29,6 +29,7 @@ export function useSettingsForm() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [cookiePermissionGranted, setCookiePermissionGranted] = useState<boolean | null>(null)
   const [showCookieConsentModal, setShowCookieConsentModal] = useState(false)
+  const [configLoadError, setConfigLoadError] = useState<string | null>(null)
 
   const checkCookiePermission = async (): Promise<boolean> => {
     const permissions = await chrome.permissions.getAll()
@@ -126,6 +127,7 @@ export function useSettingsForm() {
       setLoading(false)
     } catch (error) {
       debugError('[useSettingsForm] Failed to load config:', error)
+      setConfigLoadError(error instanceof Error ? error.message : 'Failed to load settings')
       setLoading(false)
     }
   }
@@ -147,10 +149,12 @@ export function useSettingsForm() {
         }
       })
 
-      if (response.success && response.data?.user) {
-        setUser(response.data.user)
-        if (response.data.user.avatarUrl) {
-          setAvatarUrl(response.data.user.avatarUrl)
+      const data = response.data as Record<string, unknown> | undefined
+      if (response.success && data?.user) {
+        const user = data.user as ABsmartlyUser
+        setUser(user)
+        if (user.avatarUrl) {
+          setAvatarUrl(user.avatarUrl)
         }
       } else {
         setUser(null)
@@ -312,6 +316,7 @@ export function useSettingsForm() {
     cookiePermissionGranted,
     showCookieConsentModal,
     setShowCookieConsentModal,
+    configLoadError,
     loadConfig,
     checkAuthStatus,
     normalizeEndpoint,

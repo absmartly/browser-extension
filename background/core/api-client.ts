@@ -6,7 +6,7 @@ import { withRetry, withNetworkRetry } from '~src/lib/api-retry'
 import { safeParseExperiments, parseExperiment } from '~src/lib/validation-schemas'
 import { storage, secureStorage } from '~src/lib/storage-instances'
 
-import { debugWarn } from '~src/utils/debug'
+import { debugWarn, debugError } from '~src/utils/debug'
 async function getConfig(): Promise<ABsmartlyConfig | null> {
   return getConfigWithStorages(storage, secureStorage)
 }
@@ -48,11 +48,12 @@ export async function getJWTCookie(domain: string): Promise<string | null> {
 
     return jwtCookie?.value || null
   } catch (error) {
-    console.error('[Auth] Failed to get JWT cookie:', error)
     if (error instanceof TypeError) {
-      console.error('[Auth] Invalid domain format:', domain)
+      debugError('[Auth] Invalid domain format:', domain)
+    } else {
+      debugError('[Auth] Failed to get JWT cookie:', error)
     }
-    return null
+    throw error
   }
 }
 
@@ -71,7 +72,11 @@ export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ 
       return { authenticated: true }
     }
   } catch (error) {
-    console.error('[Auth] Failed to check current user:', error)
+    const isAuth = error instanceof Error && (error.message === 'AUTH_EXPIRED' || isAuthError(error))
+    if (!isAuth) {
+      debugWarn('[Auth] Network error checking auth status:', error instanceof Error ? error.message : String(error))
+      throw error
+    }
   }
 
   chrome.tabs.create({ url: baseUrl })

@@ -1,11 +1,3 @@
-/**
- * Core Orchestrator
- *
- * Coordinates SDK detection, plugin initialization, and message handling
- *
- * @module Orchestrator
- */
-
 import { Logger } from '../utils/logger'
 import { SDKDetector } from '../sdk/sdk-detector'
 import { PluginDetector } from '../sdk/plugin-detector'
@@ -36,7 +28,7 @@ export class Orchestrator {
 
   constructor(config: OrchestratorConfig = {}) {
     this.config = {
-      maxAttempts: config.maxAttempts || 5, // 0.5 seconds at 100ms intervals
+      maxAttempts: config.maxAttempts || 5,
       attemptInterval: config.attemptInterval || 100,
       debug: config.debug !== false
     }
@@ -247,13 +239,9 @@ export class Orchestrator {
     Logger.log('[ABsmartly Page] Applying overrides dynamically')
     const { overrides } = payload || {}
 
-    // The OverridesPlugin handles override application
-    // We just need to update metadata and reload the page
     if (overrides) {
-      // Store metadata about overrides
       this.overrideManager.checkOverridesCookie()
-      // After updating overrides, we need to refresh the page for changes to take effect
-      Logger.log('[ABsmartly Page] Override metadata updated. Page will reload to apply changes.')
+      Logger.log('[ABsmartly Page] Override metadata updated.')
     }
   }
 

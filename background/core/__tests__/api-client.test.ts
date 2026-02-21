@@ -105,7 +105,9 @@ describe('api-client', () => {
       expect(token).toBeNull()
     })
 
-    it('should handle invalid domain gracefully', async () => {
+    it('should return null when no JWT cookie found for domain', async () => {
+      mockChrome.cookies.getAll.mockResolvedValue([])
+
       const token = await getJWTCookie('invalid-url')
       expect(token).toBeNull()
     })
@@ -118,11 +120,10 @@ describe('api-client', () => {
       expect(token).toBe('token')
     })
 
-    it('should handle errors from chrome.cookies API', async () => {
+    it('should propagate errors from chrome.cookies API', async () => {
       mockChrome.cookies.getAll.mockRejectedValue(new Error('Cookie API error'))
 
-      const token = await getJWTCookie('https://api.absmartly.com')
-      expect(token).toBeNull()
+      await expect(getJWTCookie('https://api.absmartly.com')).rejects.toThrow('Cookie API error')
     })
   })
 

@@ -4,6 +4,7 @@ import { sendToContent, sendToBackground } from '~src/lib/messaging'
 import { capturePageHTML } from '~src/utils/html-capture'
 import { applyDOMChangeAction } from '~src/utils/dom-change-operations'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
+import type { ConversationSession } from '~src/types/absmartly'
 import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
 import { createEmptyChange } from '~src/components/DOMChangeEditor'
 
@@ -397,7 +398,7 @@ export function useDOMChangesEditor({
               errorMsg = response.error
             }
           } else if (response.error && typeof response.error === 'object') {
-            errorMsg = response.error.message || String(response.error)
+            errorMsg = (response.error as Record<string, unknown>).message as string || String(response.error)
           }
         } catch (e) {
           console.error('[AI Generate] Error extracting error message:', e)
@@ -435,9 +436,10 @@ export function useDOMChangesEditor({
       debugLog('[AI Generate] ✅ AI-generated changes applied successfully')
       debugLog('✅ AI-generated changes applied successfully')
 
-      if (response.session) {
-        debugLog('[AI Generate] Session returned from background:', response.session.id)
-        return { ...result, session: response.session }
+      const session = response.session as ConversationSession | undefined
+      if (session) {
+        debugLog('[AI Generate] Session returned from background:', session.id)
+        return { ...result, session }
       }
 
       return result

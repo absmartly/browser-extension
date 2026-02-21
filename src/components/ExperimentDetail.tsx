@@ -95,9 +95,13 @@ export function ExperimentDetail({
 
   useEffect(() => {
     const loadConfig = async () => {
-      const config = await getConfig()
-      const fieldName = config?.domChangesFieldName || '__dom_changes'
-      setDomFieldName(fieldName)
+      try {
+        const config = await getConfig()
+        const fieldName = config?.domChangesFieldName || '__dom_changes'
+        setDomFieldName(fieldName)
+      } catch {
+        setDomFieldName('__dom_changes')
+      }
     }
     loadConfig()
   }, [])

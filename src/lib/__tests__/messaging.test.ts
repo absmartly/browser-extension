@@ -130,7 +130,7 @@ describe('Messaging System', () => {
     })
 
     it('should accept any message type for broadcast', async () => {
-      const message = {
+      const message: ExtensionMessage = {
         type: 'CUSTOM_EVENT',
         from: 'content',
         payload: { custom: 'data' },

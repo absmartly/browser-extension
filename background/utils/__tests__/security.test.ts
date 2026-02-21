@@ -433,6 +433,12 @@ describe('Security Utilities', () => {
         expect(isSSRFSafe('https://[2001:4860:4860::8888]')).toBe(true)
         expect(isSSRFSafe('https://[2a00:1450:4001:809::200e]')).toBe(true)
       })
+
+      it('should not block non-IPv6 hostnames starting with fc or fd', () => {
+        expect(isSSRFSafe('https://fcm.googleapis.com')).toBe(true)
+        expect(isSSRFSafe('https://fdic.gov')).toBe(true)
+        expect(isSSRFSafe('https://fdc.example.com')).toBe(true)
+      })
     })
 
     describe('domain validation edge cases', () => {

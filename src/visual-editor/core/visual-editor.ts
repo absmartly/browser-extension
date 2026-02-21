@@ -1,8 +1,3 @@
-/**
- * Unified Visual Editor
- * Refactored to use ElementActions and EditorCoordinator for better separation of concerns
- */
-
 import StateManager from './state-manager'
 import type { VisualEditorConfig } from './state-manager'
 import EventHandlers from './event-handlers'

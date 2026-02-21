@@ -23,19 +23,14 @@ const CHUNK_CLEANUP_LIMIT = 10
 const EXPERIMENTS_CACHE_VERSION = 1
 
 export async function getConfig(): Promise<ABsmartlyConfig | null> {
-  try {
-    const config = await storage.get(STORAGE_KEYS.CONFIG) as ABsmartlyConfig | null
+  const config = await storage.get(STORAGE_KEYS.CONFIG) as ABsmartlyConfig | null
 
-    if (config) {
-      config.apiKey = await secureStorage.get("absmartly-apikey") || ''
-      config.aiApiKey = await secureStorage.get("ai-apikey") || ''
-    }
-
-    return config
-  } catch (error) {
-    console.error('[Storage] Failed to get config:', error)
-    return null
+  if (config) {
+    config.apiKey = await secureStorage.get("absmartly-apikey") || ''
+    config.aiApiKey = await secureStorage.get("ai-apikey") || ''
   }
+
+  return config
 }
 
 export async function setConfig(config: ABsmartlyConfig): Promise<void> {
@@ -105,8 +100,13 @@ export async function getExperimentsCache(): Promise<ExperimentsCache | null> {
         throw new Error('Cache version mismatch')
       }
 
+      const chunkCount = Number((metadata as any).chunks)
+      if (!Number.isFinite(chunkCount) || chunkCount < 0 || chunkCount > MAX_CACHE_CHUNKS) {
+        throw new Error(`Invalid chunk count: ${(metadata as any).chunks}`)
+      }
+
       const chunks: string[] = []
-      for (let i = 0; i < (metadata as any).chunks; i++) {
+      for (let i = 0; i < chunkCount; i++) {
         const chunk = await storage.get(STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_' + i)
         if (!chunk) {
           debugWarn(`Missing chunk ${i}, cache is corrupted`)

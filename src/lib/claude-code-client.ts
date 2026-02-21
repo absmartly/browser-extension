@@ -1,4 +1,4 @@
-import { debugLog, debugError } from '~src/utils/debug'
+import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 import { Storage } from '@plasmohq/storage'
 
 const DEFAULT_PORTS = [3000, 3001, 3002, 3003, 3004]
@@ -178,19 +178,14 @@ Common issues:
   }
 
   async testConnection(customPort?: number): Promise<boolean> {
-    try {
-      const port = customPort || await this.findBridgePort()
-      await this.tryConnect(port)
+    const port = customPort || await this.findBridgePort()
+    await this.tryConnect(port)
 
-      if (customPort) {
-        await this.storage.set(STORAGE_KEY_BRIDGE_PORT, customPort)
-      }
-
-      return true
-    } catch (error) {
-      debugError('[Bridge] Test connection failed:', error)
-      return false
+    if (customPort) {
+      await this.storage.set(STORAGE_KEY_BRIDGE_PORT, customPort)
     }
+
+    return true
   }
 
   async createConversation(
@@ -317,8 +312,7 @@ Common issues:
         const data = JSON.parse(event.data)
         onMessage(data)
       } catch (error) {
-        debugError('[Bridge] Failed to parse SSE message:', error, 'Raw data:', event.data?.substring(0, 200))
-        onError(new Error(`Failed to parse bridge response: ${error instanceof Error ? error.message : String(error)}`))
+        debugWarn('[Bridge] Skipping malformed SSE message:', event.data?.substring(0, 200))
       }
     }
 
