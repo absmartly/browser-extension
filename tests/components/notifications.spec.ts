@@ -647,6 +647,7 @@ test.describe('Notifications Component Tests', () => {
     await expect(notification).toBeVisible()
 
     await page.click('#clear-btn')
+    await notification.waitFor({ state: 'detached' })
 
     // Test empty message
     await page.evaluate(() => {
@@ -658,6 +659,7 @@ test.describe('Notifications Component Tests', () => {
     await expect(notification.locator('.notification-message')).not.toBeVisible()
 
     await page.click('#clear-btn')
+    await notification.waitFor({ state: 'detached' })
 
     // Test HTML escaping
     await page.evaluate(() => {
