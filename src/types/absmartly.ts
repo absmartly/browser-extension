@@ -157,6 +157,7 @@ type ABsmartlyConfigBase = {
   domChangesFieldName?: string
   queryPrefix?: string
   persistQueryToCookie?: boolean
+  vibeStudioEnabled?: boolean
 }
 
 export type ABsmartlyConfig = ABsmartlyConfigBase &

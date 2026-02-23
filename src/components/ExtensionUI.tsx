@@ -381,7 +381,7 @@ function SidebarContent() {
             owners={owners}
             teams={teams}
             tags={tags}
-            onNavigateToAI={handleNavigateToAI}
+            onNavigateToAI={config?.vibeStudioEnabled ? handleNavigateToAI : undefined}
             autoNavigateToAI={autoNavigateToAI}
             onUpdate={handleUpdateExperiment}
             loading={experimentDetailLoading}
@@ -419,11 +419,11 @@ function SidebarContent() {
           tags={tags}
           owners={owners}
           teams={teams}
-          onNavigateToAI={handleNavigateToAI}
+          onNavigateToAI={config?.vibeStudioEnabled ? handleNavigateToAI : undefined}
         />
       )}
 
-      {view === 'ai-dom-changes' && (
+      {view === 'ai-dom-changes' && config?.vibeStudioEnabled && (
         <AIDOMChangesView
           aiDomContext={aiDomContext}
           onBackFromAI={handleBackFromAI}

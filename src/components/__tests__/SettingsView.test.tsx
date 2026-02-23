@@ -53,6 +53,8 @@ const mockUseSettingsFormReturn = {
   setCustomEndpoint: jest.fn(),
   providerEndpoints: {},
   setProviderEndpoints: jest.fn(),
+  vibeStudioEnabled: false,
+  setVibeStudioEnabled: jest.fn(),
   errors: {},
   setErrors: jest.fn(),
   loading: false,
@@ -274,8 +276,20 @@ describe('SettingsView', () => {
     })
   })
 
-  describe('AI Provider', () => {
-    it('should render AI provider section', () => {
+  describe('Vibe Studio Toggle', () => {
+    it('should hide AI provider section by default', () => {
+      render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+      expect(screen.queryByText(/AI Provider/i)).not.toBeInTheDocument()
+    })
+
+    it('should show AI provider section when Vibe Studio is enabled', () => {
+      const { useSettingsForm } = require('~src/hooks/useSettingsForm')
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
+        vibeStudioEnabled: true
+      })
+
       render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
 
       expect(screen.getByText(/AI Provider/i)).toBeInTheDocument()

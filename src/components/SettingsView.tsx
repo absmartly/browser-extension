@@ -9,6 +9,7 @@ import { SDKConfigSection } from './settings/SDKConfigSection'
 import { QueryStringOverridesSection } from './settings/QueryStringOverridesSection'
 import { AIProviderSection } from './settings/AIProviderSection'
 import { SystemPromptSection } from './settings/SystemPromptSection'
+import { Checkbox } from './ui/Checkbox'
 import { useSettingsForm } from '~src/hooks/useSettingsForm'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { setConfig } from '~src/utils/storage'
@@ -49,6 +50,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setCustomEndpoint,
     providerEndpoints,
     setProviderEndpoints,
+    vibeStudioEnabled,
+    setVibeStudioEnabled,
     errors,
     setErrors,
     loading,
@@ -248,22 +251,43 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         onPersistQueryToCookieChange={setPersistQueryToCookie}
       />
 
-      <AIProviderSection
-        aiProvider={aiProvider}
-        aiApiKey={aiApiKey}
-        llmModel={llmModel}
-        providerModels={providerModels}
-        customEndpoint={customEndpoint}
-        providerEndpoints={providerEndpoints}
-        onAiProviderChange={setAiProvider}
-        onAiApiKeyChange={setAiApiKey}
-        onLlmModelChange={setLlmModel}
-        onProviderModelsChange={setProviderModels}
-        onCustomEndpointChange={setCustomEndpoint}
-        onProviderEndpointsChange={setProviderEndpoints}
-      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            id="vibe-studio-toggle"
+            checked={vibeStudioEnabled}
+            onChange={setVibeStudioEnabled}
+          />
+          <label htmlFor="vibe-studio-toggle" className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+            Vibe Studio
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Beta</span>
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 ml-8">
+          Enable AI-powered visual editing features. This feature is in beta.
+        </p>
+      </div>
 
-      <SystemPromptSection />
+      {vibeStudioEnabled && (
+        <>
+          <AIProviderSection
+            aiProvider={aiProvider}
+            aiApiKey={aiApiKey}
+            llmModel={llmModel}
+            providerModels={providerModels}
+            customEndpoint={customEndpoint}
+            providerEndpoints={providerEndpoints}
+            onAiProviderChange={setAiProvider}
+            onAiApiKeyChange={setAiApiKey}
+            onLlmModelChange={setLlmModel}
+            onProviderModelsChange={setProviderModels}
+            onCustomEndpointChange={setCustomEndpoint}
+            onProviderEndpointsChange={setProviderEndpoints}
+          />
+
+          <SystemPromptSection />
+        </>
+      )}
 
       <div className="flex gap-2 pt-2">
         <Button id="save-settings-button" onClick={handleSave} variant="primary">

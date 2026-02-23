@@ -320,6 +320,15 @@ describe('ExtensionUI', () => {
     })
 
     it('should navigate to AI page', async () => {
+      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
+      useABsmartly.mockReturnValue(mockABsmartlyHook({
+        config: {
+          apiEndpoint: 'https://api.absmartly.com',
+          authMethod: 'jwt',
+          vibeStudioEnabled: true
+        }
+      }))
+
       const useViewNavigation = require('~src/hooks/useViewNavigation').useViewNavigation
       useViewNavigation.mockReturnValue({
         view: 'ai-dom-changes',

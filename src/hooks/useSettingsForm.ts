@@ -29,6 +29,7 @@ export function useSettingsForm() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [cookiePermissionGranted, setCookiePermissionGranted] = useState<boolean | null>(null)
   const [showCookieConsentModal, setShowCookieConsentModal] = useState(false)
+  const [vibeStudioEnabled, setVibeStudioEnabled] = useState(false)
   const [configLoadError, setConfigLoadError] = useState<string | null>(null)
 
   const checkCookiePermission = async (): Promise<boolean> => {
@@ -53,6 +54,7 @@ export function useSettingsForm() {
       let loadedAiProvider = config?.aiProvider || 'claude-subscription'
       let loadedAiApiKey = config?.aiApiKey || ''
       let loadedProviderModels = config?.providerModels || {}
+      let loadedVibeStudioEnabled = config?.vibeStudioEnabled ?? false
       let loadedProviderEndpoints = config?.providerEndpoints || {}
 
       if (config?.llmModel && !loadedProviderModels[loadedAiProvider]) {
@@ -90,6 +92,7 @@ export function useSettingsForm() {
       setProviderModels(loadedProviderModels)
       setLlmModel(loadedLlmModel)
       setProviderEndpoints(loadedProviderEndpoints)
+      setVibeStudioEnabled(loadedVibeStudioEnabled)
       setCustomEndpoint(loadedCustomEndpoint)
 
       const hasStoredConfig = (config?.apiKey || config?.apiEndpoint)
@@ -103,6 +106,7 @@ export function useSettingsForm() {
           sdkWindowProperty: loadedSdkWindowProperty.trim() || undefined,
           queryPrefix: loadedQueryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
           persistQueryToCookie: loadedPersistQueryToCookie,
+          vibeStudioEnabled: loadedVibeStudioEnabled,
           aiProvider: loadedAiProvider,
           aiApiKey: loadedAiApiKey.trim() || undefined,
           providerModels: loadedProviderModels,
@@ -254,6 +258,7 @@ export function useSettingsForm() {
       sdkWindowProperty: sdkWindowProperty.trim() || undefined,
       queryPrefix: queryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
       persistQueryToCookie,
+      vibeStudioEnabled,
       aiProvider,
       aiApiKey: aiApiKey.trim() || undefined,
       providerModels: updatedProviderModels,
@@ -307,6 +312,8 @@ export function useSettingsForm() {
     setCustomEndpoint,
     providerEndpoints,
     setProviderEndpoints,
+    vibeStudioEnabled,
+    setVibeStudioEnabled,
     errors,
     setErrors,
     loading,
