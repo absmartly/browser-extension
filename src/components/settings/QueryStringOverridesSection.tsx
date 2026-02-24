@@ -1,6 +1,7 @@
 import React from 'react'
 import { DEFAULT_CONFIG } from '../../config/defaults'
 import { Input } from '../ui/Input'
+import { Checkbox } from '../ui/Checkbox'
 
 interface QueryStringOverridesSectionProps {
   queryPrefix: string
@@ -30,15 +31,13 @@ export const QueryStringOverridesSection = React.memo(function QueryStringOverri
         Prefix for query parameters (e.g., ?{DEFAULT_CONFIG.queryPrefix}button_color=1)
       </p>
 
-      <div className="mt-4 flex items-center">
-        <input
+      <div className="mt-4 flex items-center gap-3">
+        <Checkbox
           id="persistQueryToCookie"
-          type="checkbox"
           checked={persistQueryToCookie}
-          onChange={(e) => onPersistQueryToCookieChange(e.target.checked)}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          onChange={onPersistQueryToCookieChange}
         />
-        <label htmlFor="persistQueryToCookie" className="ml-2 block text-sm text-gray-700">
+        <label htmlFor="persistQueryToCookie" className="block text-sm text-gray-700 cursor-pointer">
           Persist query string overrides to cookie
         </label>
       </div>

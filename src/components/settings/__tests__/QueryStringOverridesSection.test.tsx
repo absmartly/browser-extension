@@ -83,7 +83,7 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const checkbox = screen.getByLabelText(/Persist query string overrides to cookie/i)
+      const checkbox = screen.getByRole('checkbox', { name: /Persist query string overrides to cookie/i })
       fireEvent.click(checkbox)
 
       expect(mockOnPersistQueryToCookieChange).toHaveBeenCalledWith(false)
@@ -117,8 +117,8 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const checkbox = screen.getByLabelText(/Persist query string overrides to cookie/i) as HTMLInputElement
-      expect(checkbox.checked).toBe(true)
+      const checkbox = screen.getByRole('checkbox', { name: /Persist query string overrides to cookie/i })
+      expect(checkbox.getAttribute('aria-checked')).toBe('true')
     })
 
     it('should show checkbox unchecked when persistQueryToCookie is false', () => {
@@ -131,8 +131,8 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const checkbox = screen.getByLabelText(/Persist query string overrides to cookie/i) as HTMLInputElement
-      expect(checkbox.checked).toBe(false)
+      const checkbox = screen.getByRole('checkbox', { name: /Persist query string overrides to cookie/i })
+      expect(checkbox.getAttribute('aria-checked')).toBe('false')
     })
   })
 
