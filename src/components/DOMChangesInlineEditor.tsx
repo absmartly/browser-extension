@@ -3,7 +3,6 @@ import { debugLog, debugError } from '~src/utils/debug'
 import { Button } from './ui/Button'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import { DOMChangeEditor } from './DOMChangeEditor'
-import { AIDOMChangesDialog } from './AIDOMChangesDialog'
 import { DOMChangeList } from './dom-editor'
 import { useDOMChangesEditor } from '~src/hooks/useDOMChangesEditor'
 import { useVisualEditorCoordination } from '~src/hooks/useVisualEditorCoordination'
@@ -108,7 +107,6 @@ export function DOMChangesInlineEditor({
   })
 
   const [isDragOver, setIsDragOver] = useState(false)
-  const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
   const handlePreviewWithChanges = useCallback((enabled: boolean, domChanges: DOMChange[]) => {
     onPreviewToggle(enabled)
@@ -329,34 +327,22 @@ export function DOMChangesInlineEditor({
             <PlusIcon className="h-4 w-4 mr-1" />
             Add DOM Change
           </Button>
-          <Button id="generate-with-ai-button"
-            type="button"
-            data-variant-name={variantName}
-            onClick={() => {
-              const previewRefresh = onPreviewRefresh || (() => {})
-              if (onNavigateToAI) {
+          {onNavigateToAI && (
+            <Button id="generate-with-ai-button"
+              type="button"
+              data-variant-name={variantName}
+              onClick={() => {
+                const previewRefresh = onPreviewRefresh || (() => {})
                 onNavigateToAI(variantName, handleAIGenerate, changes, onChange, onPreviewToggle, previewRefresh, handlePreviewWithChanges)
-              } else {
-                setAiDialogOpen(true)
-                ;(window as any).__absmartlyAIContext = {
-                  variantName,
-                  onGenerate: handleAIGenerate,
-                  currentChanges: changes,
-                  onRestoreChanges: onChange,
-                  onPreviewToggle,
-                  onPreviewRefresh: previewRefresh,
-                  onPreviewWithChanges: handlePreviewWithChanges
-                }
-                window.dispatchEvent(new CustomEvent('absmartly:navigate-ai'))
-              }
-            }}
-            size="sm"
-            variant="secondary"
-            className="flex-1"
-          >
-            <SparklesIcon className="h-4 w-4 mr-1" />
-            Generate with AI
-          </Button>
+              }}
+              size="sm"
+              variant="secondary"
+              className="flex-1"
+            >
+              <SparklesIcon className="h-4 w-4 mr-1" />
+              Generate with AI
+            </Button>
+          )}
           <Button id="visual-editor-button"
             type="button"
             onClick={handleLaunchVisualEditor}
@@ -378,12 +364,6 @@ export function DOMChangesInlineEditor({
         </div>
       )}
 
-      <AIDOMChangesDialog
-        isOpen={aiDialogOpen}
-        onClose={() => setAiDialogOpen(false)}
-        onGenerate={async (prompt) => { await handleAIGenerate(prompt) }}
-        variantName={variantName}
-      />
     </div>
   )
 }

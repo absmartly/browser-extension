@@ -472,7 +472,7 @@ export function VariantList({
               onPreviewRefresh={() => handlePreviewRefresh(index)}
               onVEStart={() => setActiveVEVariant(variant.name)}
               onVEStop={() => setActiveVEVariant(null)}
-              onNavigateToAI={handleNavigateToAIWithPreview}
+              onNavigateToAI={onNavigateToAI ? handleNavigateToAIWithPreview : undefined}
               allVariantsCount={variants.length}
             />
           )
