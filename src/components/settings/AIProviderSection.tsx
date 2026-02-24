@@ -128,7 +128,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const [testingConnection, setTestingConnection] = useState(false)
   const [bridgePort, setBridgePort] = useState<number | null>(null)
   const [subscriptionType, setSubscriptionType] = useState<string | undefined>(undefined)
-  const [customPort, setCustomPort] = useState('')
+  const [customBridgeEndpoint, setCustomBridgeEndpoint] = useState('')
 
   const [models, setModels] = useState<ModelInfo[]>([])
   const [groupedModels, setGroupedModels] = useState<GroupedModels>({})
@@ -232,18 +232,19 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const handleTestConnection = async () => {
     setTestingConnection(true)
     try {
-      const port = customPort ? parseInt(customPort) : undefined
-      const success = await bridgeClient.testConnection(port)
-      if (success) {
-        const connection = bridgeClient.getConnection()
-        if (connection) {
-          setBridgePort(connection.port)
-          setSubscriptionType(connection.subscriptionType)
-        }
-        setConnectionState(ConnectionState.CONNECTED)
+      if (customBridgeEndpoint) {
+        await bridgeClient.testEndpoint(customBridgeEndpoint)
+        await bridgeClient.connect()
       } else {
-        setConnectionState(ConnectionState.SERVER_NOT_FOUND)
+        await bridgeClient.clearCustomEndpoint()
+        await bridgeClient.connect()
       }
+      const connection = bridgeClient.getConnection()
+      if (connection) {
+        setBridgePort(connection.port)
+        setSubscriptionType(connection.subscriptionType)
+      }
+      setConnectionState(ConnectionState.CONNECTED)
     } catch (error) {
       setConnectionState(ConnectionState.CONNECTION_FAILED)
     } finally {
@@ -477,7 +478,11 @@ export const AIProviderSection = React.memo(function AIProviderSection({
               <div className={`w-3 h-3 rounded-full ${getStatusColor(connectionState)}`} />
               <div>
                 <p id="bridge-connection-status" className="text-sm font-medium">
-                  {connectionState === ConnectionState.CONNECTED ? `Connected (port ${bridgePort})` : 'Not Connected'}
+                  {connectionState === ConnectionState.CONNECTED
+                    ? bridgePort
+                      ? `Connected (port ${bridgePort})`
+                      : `Connected (${bridgeClient.getConnection()?.url || 'custom endpoint'})`
+                    : 'Not Connected'}
                 </p>
                 <p className="text-xs text-gray-600">
                   {connectionState === ConnectionState.CONNECTED && subscriptionType
@@ -557,20 +562,20 @@ export const AIProviderSection = React.memo(function AIProviderSection({
           )}
 
           <details className="text-sm">
-            <summary id="advanced-port-config-summary" className="cursor-pointer text-gray-700 hover:text-gray-900">
-              Advanced: Custom Port Configuration
+            <summary id="advanced-endpoint-config-summary" className="cursor-pointer text-gray-700 hover:text-gray-900">
+              Advanced: Custom Bridge Endpoint
             </summary>
             <div className="mt-2 space-y-2">
               <Input
-                id="custom-bridge-port"
-                label="Custom Bridge Port"
-                type="number"
-                value={customPort}
-                onChange={(e) => setCustomPort(e.target.value)}
-                placeholder="3000"
+                id="custom-bridge-endpoint"
+                label="Custom Bridge Endpoint"
+                type="url"
+                value={customBridgeEndpoint}
+                onChange={(e) => setCustomBridgeEndpoint(e.target.value)}
+                placeholder="http://localhost:3000"
               />
               <p className="text-xs text-gray-500">
-                Leave blank to auto-detect (ports 3000-3004). Only change if you started the bridge on a custom port.
+                Leave blank to auto-detect locally (ports 3000-3004). Set a full URL to connect to a remote bridge server.
               </p>
             </div>
           </details>

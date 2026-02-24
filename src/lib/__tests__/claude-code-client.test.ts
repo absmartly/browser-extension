@@ -997,6 +997,151 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
+  describe('testEndpoint()', () => {
+    it('should test connection with a full endpoint URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
+      } as any)
+
+      const result = await client.testEndpoint('https://remote-bridge.example.com:3000')
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://remote-bridge.example.com:3000/health',
+        expect.objectContaining({ method: 'GET' })
+      )
+      expect(result).toBe(true)
+      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+    })
+
+    it('should strip trailing slashes from endpoint URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
+      } as any)
+
+      await client.testEndpoint('https://remote-bridge.example.com:3000/')
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://remote-bridge.example.com:3000/health',
+        expect.objectContaining({ method: 'GET' })
+      )
+      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+    })
+
+    it('should throw on endpoint connection failure', async () => {
+      mockFetch.mockRejectedValue(new Error('Connection refused'))
+
+      await expect(client.testEndpoint('https://bad-host.example.com')).rejects.toThrow()
+    })
+  })
+
+  describe('setCustomEndpoint()', () => {
+    it('should save custom endpoint and disconnect', async () => {
+      await client.setCustomEndpoint('https://remote-bridge.example.com:3000')
+
+      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+      expect(client.getConnection()).toBeNull()
+      expect(client.getConnectionState()).toBe(ConnectionState.NOT_CONFIGURED)
+    })
+
+    it('should strip trailing slashes when saving', async () => {
+      await client.setCustomEndpoint('https://remote-bridge.example.com:3000/')
+
+      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+    })
+  })
+
+  describe('clearCustomEndpoint()', () => {
+    it('should remove custom endpoint from storage and disconnect', async () => {
+      await client.clearCustomEndpoint()
+
+      expect(mockStorage.remove).toHaveBeenCalledWith('claudeBridgeEndpoint')
+      expect(client.getConnection()).toBeNull()
+      expect(client.getConnectionState()).toBe(ConnectionState.NOT_CONFIGURED)
+    })
+  })
+
+  describe('connect() with custom endpoint', () => {
+    it('should use custom endpoint when set in storage', async () => {
+      mockStorage.get.mockImplementation((key: string) => {
+        if (key === 'claudeBridgeEndpoint') return Promise.resolve('https://remote.example.com:3000')
+        return Promise.resolve(null)
+      })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true, subscriptionType: 'pro' })
+      } as any)
+
+      const connection = await client.connect()
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://remote.example.com:3000/health',
+        expect.objectContaining({ method: 'GET' })
+      )
+      expect(connection).toEqual({
+        url: 'https://remote.example.com:3000',
+        port: 0,
+        authenticated: true,
+        subscriptionType: 'pro'
+      })
+      expect(client.getConnectionState()).toBe(ConnectionState.CONNECTED)
+    })
+
+    it('should skip port discovery when custom endpoint is set', async () => {
+      mockStorage.get.mockImplementation((key: string) => {
+        if (key === 'claudeBridgeEndpoint') return Promise.resolve('https://remote.example.com')
+        if (key === 'claudeBridgePort') return Promise.resolve(3005)
+        return Promise.resolve(null)
+      })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
+      } as any)
+
+      await client.connect()
+
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://remote.example.com/health',
+        expect.any(Object)
+      )
+    })
+
+    it('should fall back to port discovery when custom endpoint is not set', async () => {
+      mockStorage.get.mockImplementation((key: string) => {
+        if (key === 'claudeBridgeEndpoint') return Promise.resolve(null)
+        if (key === 'claudeBridgePort') return Promise.resolve(null)
+        return Promise.resolve(null)
+      })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
+      } as any)
+
+      const connection = await client.connect()
+
+      expect(connection.url).toBe('http://localhost:3000')
+      expect(connection.port).toBe(3000)
+    })
+
+    it('should fail when custom endpoint is unreachable', async () => {
+      mockStorage.get.mockImplementation((key: string) => {
+        if (key === 'claudeBridgeEndpoint') return Promise.resolve('https://unreachable.example.com')
+        return Promise.resolve(null)
+      })
+      mockFetch.mockRejectedValue(new Error('Connection refused'))
+
+      await expect(client.connect()).rejects.toThrow()
+      expect(client.getConnectionState()).toBe(ConnectionState.SERVER_NOT_FOUND)
+    })
+  })
+
   describe('getConnectionStateMessage()', () => {
     it('should return correct message for each state', async () => {
       const { getConnectionStateMessage } = await import('../claude-code-client')

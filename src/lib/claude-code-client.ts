@@ -4,6 +4,7 @@ import { Storage } from '@plasmohq/storage'
 const DEFAULT_PORTS = [3000, 3001, 3002, 3003, 3004]
 const CONNECTION_TIMEOUT = 2000
 const STORAGE_KEY_BRIDGE_PORT = 'claudeBridgePort'
+const STORAGE_KEY_BRIDGE_ENDPOINT = 'claudeBridgeEndpoint'
 
 export enum ConnectionState {
   NOT_CONFIGURED = 'not_configured',
@@ -112,7 +113,11 @@ Common issues:
   }
 
   private async tryConnect(port: number): Promise<BridgeHealthResponse> {
-    const url = `http://localhost:${port}/health`
+    return this.tryConnectUrl(`http://localhost:${port}`)
+  }
+
+  private async tryConnectUrl(baseUrl: string): Promise<BridgeHealthResponse> {
+    const url = `${baseUrl.replace(/\/+$/, '')}/health`
     debugLog(`[Bridge] Fetching ${url}...`)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT)
@@ -142,7 +147,7 @@ Common issues:
       clearTimeout(timeout)
       debugLog(`[Bridge] Fetch failed: ${error.name} - ${error.message}`)
       if (error.name === 'AbortError') {
-        throw new Error(`Connection timeout to port ${port}`)
+        throw new Error(`Connection timeout to ${baseUrl}`)
       }
       throw error
     }
@@ -153,6 +158,26 @@ Common issues:
     this.connectionState = ConnectionState.CONNECTING
 
     try {
+      const customEndpoint = await this.storage.get<string>(STORAGE_KEY_BRIDGE_ENDPOINT)
+
+      if (customEndpoint) {
+        debugLog(`[Bridge] Using custom endpoint: ${customEndpoint}`)
+        const url = customEndpoint.replace(/\/+$/, '')
+        const healthResponse = await this.tryConnectUrl(url)
+
+        this.connection = {
+          url,
+          port: 0,
+          authenticated: healthResponse.authenticated,
+          subscriptionType: healthResponse.subscriptionType
+        }
+
+        this.connectionState = ConnectionState.CONNECTED
+        debugLog(`[Bridge] ✅ Connected to custom endpoint ${url}`, this.connection)
+
+        return this.connection
+      }
+
       const port = await this.findBridgePort()
       const url = `http://localhost:${port}`
       debugLog(`[Bridge] Found port ${port}, full URL: ${url}`)
@@ -362,6 +387,23 @@ Common issues:
   disconnect(): void {
     this.connection = null
     this.connectionState = ConnectionState.NOT_CONFIGURED
+  }
+
+  async testEndpoint(endpoint: string): Promise<boolean> {
+    const url = endpoint.replace(/\/+$/, '')
+    await this.tryConnectUrl(url)
+    await this.storage.set(STORAGE_KEY_BRIDGE_ENDPOINT, url)
+    return true
+  }
+
+  async setCustomEndpoint(endpoint: string): Promise<void> {
+    await this.storage.set(STORAGE_KEY_BRIDGE_ENDPOINT, endpoint.replace(/\/+$/, ''))
+    this.disconnect()
+  }
+
+  async clearCustomEndpoint(): Promise<void> {
+    await this.storage.remove(STORAGE_KEY_BRIDGE_ENDPOINT)
+    this.disconnect()
   }
 
   async setCustomPort(port: number): Promise<void> {
