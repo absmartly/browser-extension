@@ -410,6 +410,124 @@ describe('Validation Schemas', () => {
       const result = safeParseVariantConfig(configStr)
       expect(result.success).toBe(false)
     })
+
+    it('should parse DOM changes in DOMChangesConfig format (object with changes array)', () => {
+      const configStr = JSON.stringify({
+        __dom_changes: {
+          changes: [
+            {
+              selector: '.test',
+              type: 'style',
+              value: { color: 'red' }
+            }
+          ],
+          urlFilter: {
+            include: ['https://example.com/*'],
+            mode: 'simple'
+          }
+        }
+      })
+
+      const result = safeParseVariantConfig(configStr)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const data = result.data as any
+        expect(data.__dom_changes).toBeDefined()
+        expect(data.__dom_changes.changes).toHaveLength(1)
+        expect(data.__dom_changes.changes[0].selector).toBe('.test')
+        expect(data.__dom_changes.urlFilter).toEqual({
+          include: ['https://example.com/*'],
+          mode: 'simple'
+        })
+      }
+    })
+
+    it('should parse DOM changes in plain array format', () => {
+      const configStr = JSON.stringify({
+        __dom_changes: [
+          {
+            selector: '.test',
+            type: 'text',
+            value: 'Hello'
+          }
+        ]
+      })
+
+      const result = safeParseVariantConfig(configStr)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const data = result.data as any
+        expect(data.__dom_changes).toHaveLength(1)
+        expect(data.__dom_changes[0].value).toBe('Hello')
+      }
+    })
+
+    it('should preserve other config keys when __dom_changes is present', () => {
+      const configStr = JSON.stringify({
+        __dom_changes: [
+          {
+            selector: '.test',
+            type: 'style',
+            value: { color: 'red' }
+          }
+        ],
+        custom_variable: 'some_value',
+        another_field: 42
+      })
+
+      const result = safeParseVariantConfig(configStr)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const data = result.data as any
+        expect(data.__dom_changes).toHaveLength(1)
+        expect(data.custom_variable).toBe('some_value')
+        expect(data.another_field).toBe(42)
+      }
+    })
+
+    it('should handle DOMChangesConfig with urlFilter string', () => {
+      const configStr = JSON.stringify({
+        __dom_changes: {
+          changes: [
+            {
+              selector: '#banner',
+              type: 'html',
+              value: '<div>New Banner</div>'
+            }
+          ],
+          urlFilter: 'https://example.com/page'
+        }
+      })
+
+      const result = safeParseVariantConfig(configStr)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const data = result.data as any
+        expect(data.__dom_changes.changes).toHaveLength(1)
+        expect(data.__dom_changes.urlFilter).toBe('https://example.com/page')
+      }
+    })
+
+    it('should handle dom_changes field in DOMChangesConfig format', () => {
+      const configStr = JSON.stringify({
+        dom_changes: {
+          changes: [
+            {
+              selector: '.cta',
+              type: 'style',
+              value: { 'background-color': 'green' }
+            }
+          ]
+        }
+      })
+
+      const result = safeParseVariantConfig(configStr)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const data = result.data as any
+        expect(data.dom_changes.changes).toHaveLength(1)
+      }
+    })
   })
 
   describe('parseExperimentsCache', () => {

@@ -273,9 +273,9 @@ export const DOMChangesConfigSchema = z.object({
 export const DOMChangesDataSchema = z.union([z.array(DOMChangeSchema), DOMChangesConfigSchema])
 
 export const VariantConfigSchema = z.object({
-  __dom_changes: z.array(DOMChangeSchema).optional(),
-  dom_changes: z.array(DOMChangeSchema).optional()
-})
+  __dom_changes: DOMChangesDataSchema.optional(),
+  dom_changes: DOMChangesDataSchema.optional()
+}).passthrough()
 
 export const ExperimentsCacheSchema = z.object({
   version: z.number().int().positive(),
