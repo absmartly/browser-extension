@@ -508,26 +508,6 @@ describe('Validation Schemas', () => {
       }
     })
 
-    it('should handle dom_changes field in DOMChangesConfig format', () => {
-      const configStr = JSON.stringify({
-        dom_changes: {
-          changes: [
-            {
-              selector: '.cta',
-              type: 'style',
-              value: { 'background-color': 'green' }
-            }
-          ]
-        }
-      })
-
-      const result = safeParseVariantConfig(configStr)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        const data = result.data as any
-        expect(data.dom_changes.changes).toHaveLength(1)
-      }
-    })
   })
 
   describe('parseExperimentsCache', () => {

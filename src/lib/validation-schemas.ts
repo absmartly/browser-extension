@@ -273,8 +273,7 @@ export const DOMChangesConfigSchema = z.object({
 export const DOMChangesDataSchema = z.union([z.array(DOMChangeSchema), DOMChangesConfigSchema])
 
 export const VariantConfigSchema = z.object({
-  __dom_changes: DOMChangesDataSchema.optional(),
-  dom_changes: DOMChangesDataSchema.optional()
+  __dom_changes: DOMChangesDataSchema.optional()
 }).passthrough()
 
 export const ExperimentsCacheSchema = z.object({
@@ -330,7 +329,7 @@ export function parseVariantConfig(configStr: string): unknown {
   try {
     const parsed = JSON.parse(configStr)
 
-    if (parsed.__dom_changes || parsed.dom_changes) {
+    if (parsed.__dom_changes) {
       const validated = VariantConfigSchema.parse(parsed)
       return validated
     }
@@ -354,7 +353,7 @@ export function safeParseVariantConfig(configStr: string): { success: true; data
   try {
     const parsed = JSON.parse(configStr)
 
-    if (parsed.__dom_changes || parsed.dom_changes) {
+    if (parsed.__dom_changes) {
       const result = VariantConfigSchema.safeParse(parsed)
       if (result.success) {
         return { success: true, data: result.data }
