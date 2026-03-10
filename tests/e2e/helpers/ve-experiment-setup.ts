@@ -335,6 +335,25 @@ export async function saveExperiment(sidebar: FrameLocator, testPage: Page, expe
 
   const form = sidebar.locator('form')
 
+  const nameInput = sidebar.locator('#experiment-name-input')
+  await nameInput.scrollIntoViewIfNeeded()
+  const currentName = await nameInput.inputValue()
+  if (!currentName || currentName.trim() === '') {
+    log(`  Experiment name is empty, filling with: ${experimentName}`)
+    const displayNameInput = sidebar.locator('#display-name-input')
+    await displayNameInput.fill(experimentName)
+    await debugWait()
+    const autoFilledName = await nameInput.inputValue()
+    if (!autoFilledName || autoFilledName.trim() === '') {
+      log('  Display name sync did not fill experiment name, filling directly')
+      await nameInput.fill(experimentName.toLowerCase().replace(/\s+/g, '_'))
+    } else {
+      log(`  Experiment name auto-filled: "${autoFilledName}"`)
+    }
+  } else {
+    log(`  Experiment name already set: "${currentName}"`)
+  }
+
   const saveButton = sidebar.locator('#create-experiment-button')
   await saveButton.scrollIntoViewIfNeeded()
   await debugWait()
