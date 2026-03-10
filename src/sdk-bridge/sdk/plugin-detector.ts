@@ -35,10 +35,10 @@ export class PluginDetector {
       return (window as any).__absmartlyDOMChangesPlugin
     }
 
-    // Check global plugin registry (window.__ABSMARTLY_PLUGINS__)
-    const registry = (window as any).__ABSMARTLY_PLUGINS__
+    // Check global plugin registry (window.__ABSMARTLY_PLUGINS__ or window.ABsmartlySDKPlugins)
+    const registry = (window as any).__ABSMARTLY_PLUGINS__ || (window as any).ABsmartlySDKPlugins
     if (registry) {
-      const domPlugin = registry.dom
+      const domPlugin = registry.dom || registry.domChanges
       const overridesPlugin = registry.overrides
       const domInitialized = !!domPlugin?.initialized
       const overridesInitialized = !!overridesPlugin?.initialized

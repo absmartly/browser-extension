@@ -69,14 +69,15 @@ function isAllowedStorageKey(key: string): boolean {
 }
 
 export function detectPluginStatusInPage() {
-  const registry = (window as any).__ABSMARTLY_PLUGINS__ || null
-  const domInitialized = !!registry?.dom?.initialized
+  const registry = (window as any).__ABSMARTLY_PLUGINS__ || (window as any).ABsmartlySDKPlugins || null
+  const domInitialized = !!registry?.dom?.initialized || !!registry?.domChanges?.initialized
   const overridesInitialized = !!registry?.overrides?.initialized
   const hasWindowPlugin = !!(window as any).__absmartlyPlugin
   const hasWindowDomPlugin = !!(window as any).__absmartlyDOMChangesPlugin
 
   const possibleLocations = [
     (window as any).ABsmartlyContext,
+    (window as any).ABSMARTLY_CONTEXT,
     (window as any).absmartly,
     (window as any).ABsmartly,
     (window as any).__absmartly,
@@ -91,7 +92,7 @@ export function detectPluginStatusInPage() {
   let contextPath: string | null = null
 
   for (const location of possibleLocations) {
-    if (location && typeof location.treatment === 'function') {
+    if (location && (typeof location.treatment === 'function' || typeof location.track === 'function')) {
       context = location
       break
     }
@@ -99,7 +100,7 @@ export function detectPluginStatusInPage() {
 
   if (!context) {
     for (const location of possibleLocations) {
-      if (location && location.context && typeof location.context.treatment === 'function') {
+      if (location && location.context && (typeof location.context.treatment === 'function' || typeof location.context.track === 'function')) {
         context = location.context
         break
       }
@@ -110,7 +111,7 @@ export function detectPluginStatusInPage() {
     for (const location of possibleLocations) {
       if (location && Array.isArray(location.contexts) && location.contexts.length > 0) {
         for (const ctx of location.contexts) {
-          if (ctx && typeof ctx.treatment === 'function') {
+          if (ctx && (typeof ctx.treatment === 'function' || typeof ctx.track === 'function')) {
             context = ctx
             break
           }
@@ -123,6 +124,8 @@ export function detectPluginStatusInPage() {
   if (context) {
     if ((window as any).ABsmartlyContext === context) {
       contextPath = 'ABsmartlyContext'
+    } else if ((window as any).ABSMARTLY_CONTEXT === context) {
+      contextPath = 'ABSMARTLY_CONTEXT'
     } else if ((window as any).absmartly === context) {
       contextPath = 'absmartly'
     } else if ((window as any).sdk && (window as any).sdk.context === context) {
