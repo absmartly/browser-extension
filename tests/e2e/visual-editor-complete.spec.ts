@@ -6,7 +6,7 @@ import { testAllVisualEditorActions } from './helpers/ve-actions'
 import { testUndoRedoForAllActions, testUndoRedoButtonStates } from './helpers/ve-undo-redo'
 import { verifyVEProtection, verifySidebarHasChanges, verifyChangesAfterVEExit, clickSaveButton } from './helpers/ve-verification'
 import { testPreviewToggle } from './helpers/ve-preview'
-import { testIndividualPreviewToggle, testAttributeChanges } from './helpers/ve-preview-toggle'
+import { testIndividualPreviewToggle, testVisibilityHiddenChange, testAttributeChanges } from './helpers/ve-preview-toggle'
 import { testURLFilterAndPayload } from './helpers/ve-url-filter'
 import { testDiscardChanges } from './helpers/ve-discard'
 
@@ -277,6 +277,11 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Test individual DOM change checkbox toggles', async () => {
       step('Testing individual preview toggle', '🔘')
       await testIndividualPreviewToggle(sidebar, testPage)
+    })
+
+    await test.step('Test visibility:hidden style change with preview toggle', async () => {
+      step('Testing visibility:hidden preview toggle', '👁️')
+      await testVisibilityHiddenChange(sidebar, testPage)
     })
 
     await test.step('Test attribute changes in preview mode', async () => {

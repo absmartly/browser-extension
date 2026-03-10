@@ -74,6 +74,122 @@ export async function testIndividualPreviewToggle(sidebar: FrameLocator, testPag
   log('✅ Individual preview toggle test passed')
 }
 
+export async function testVisibilityHiddenChange(sidebar: FrameLocator, testPage: Page) {
+  log('Testing visibility:hidden style change with preview toggle')
+
+  const previewMarkersPresent = await testPage.evaluate(() => {
+    return document.querySelectorAll('[data-absmartly-modified]').length > 0
+  })
+
+  const previewToggle = sidebar.locator('#preview-variant-1')
+
+  if (previewMarkersPresent) {
+    log('Preview is active, disabling first')
+    await click(sidebar, previewToggle)
+    await testPage.waitForFunction(() => {
+      return document.querySelectorAll('[data-absmartly-modified]').length === 0
+    }, { timeout: 5000 })
+    log('Preview disabled')
+  }
+
+  const button3Visible = await testPage.evaluate(() => {
+    const el = document.querySelector('#button-3')
+    if (!el) return false
+    const style = window.getComputedStyle(el)
+    return style.visibility !== 'hidden' && style.display !== 'none'
+  })
+  log(`#button-3 initially visible: ${button3Visible}`)
+  expect(button3Visible).toBe(true)
+
+  const addChangeButton = sidebar.locator('#add-dom-change-button')
+  await addChangeButton.scrollIntoViewIfNeeded()
+  await click(sidebar, addChangeButton)
+
+  const selectorInput = sidebar.locator('#dom-change-selector-1-new')
+  await selectorInput.waitFor({ state: 'visible', timeout: 10000 })
+  await selectorInput.fill('#button-3')
+  log('Filled selector: #button-3')
+
+  const typeSelect = sidebar.locator('#dom-change-type-1-new')
+  await typeSelect.waitFor({ state: 'visible' })
+  await typeSelect.selectOption('style')
+  log('Selected style change type')
+
+  const propertyInput = sidebar.locator('input[placeholder="property"]').first()
+  await propertyInput.waitFor({ state: 'visible', timeout: 5000 })
+  await propertyInput.fill('visibility')
+
+  const valueInput = sidebar.locator('input[placeholder="value"]').first()
+  await valueInput.fill('hidden')
+  log('Filled style property: visibility: hidden')
+
+  const saveButton = sidebar.locator('#dom-change-save-1-new')
+  await click(sidebar, saveButton)
+  log('Saved visibility:hidden change')
+
+  await testPage.screenshot({ path: 'test-results/visibility-before-preview.png', fullPage: true })
+
+  log('Enabling preview')
+  await click(sidebar, previewToggle)
+
+  await testPage.waitForFunction(() => {
+    return document.querySelectorAll('[data-absmartly-modified]').length > 0
+  }, { timeout: 5000 })
+  log('Preview enabled')
+
+  await testPage.screenshot({ path: 'test-results/visibility-preview-on.png', fullPage: true })
+
+  const hiddenAfterPreview = await testPage.evaluate(() => {
+    const el = document.querySelector('#button-3')
+    if (!el) return { visibility: 'element-not-found', display: 'element-not-found' }
+    const style = window.getComputedStyle(el)
+    return { visibility: style.visibility, display: style.display }
+  })
+  log(`#button-3 after preview on: visibility=${hiddenAfterPreview.visibility}, display=${hiddenAfterPreview.display}`)
+  expect(hiddenAfterPreview.visibility).toBe('hidden')
+
+  log('Disabling preview')
+  await click(sidebar, previewToggle)
+
+  await testPage.waitForFunction(() => {
+    return document.querySelectorAll('[data-absmartly-modified]').length === 0
+  }, { timeout: 5000 })
+  log('Preview disabled')
+
+  await testPage.screenshot({ path: 'test-results/visibility-preview-off.png', fullPage: true })
+
+  const visibleAfterPreviewOff = await testPage.evaluate(() => {
+    const el = document.querySelector('#button-3')
+    if (!el) return { visibility: 'element-not-found', display: 'element-not-found' }
+    const style = window.getComputedStyle(el)
+    return { visibility: style.visibility, display: style.display }
+  })
+  log(`#button-3 after preview off: visibility=${visibleAfterPreviewOff.visibility}, display=${visibleAfterPreviewOff.display}`)
+  expect(visibleAfterPreviewOff.visibility).toBe('visible')
+
+  log('Re-enabling preview to confirm toggle works again')
+  await click(sidebar, previewToggle)
+
+  await testPage.waitForFunction(() => {
+    return document.querySelectorAll('[data-absmartly-modified]').length > 0
+  }, { timeout: 5000 })
+
+  const hiddenAgain = await testPage.evaluate(() => {
+    const el = document.querySelector('#button-3')
+    if (!el) return 'element-not-found'
+    return window.getComputedStyle(el).visibility
+  })
+  log(`#button-3 after re-enable: visibility=${hiddenAgain}`)
+  expect(hiddenAgain).toBe('hidden')
+
+  await click(sidebar, previewToggle)
+  await testPage.waitForFunction(() => {
+    return document.querySelectorAll('[data-absmartly-modified]').length === 0
+  }, { timeout: 5000 })
+
+  log('✅ Visibility hidden preview toggle test passed')
+}
+
 export async function testAttributeChanges(sidebar: FrameLocator, testPage: Page) {
   log('Testing attribute changes in preview mode')
 
