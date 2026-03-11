@@ -39,7 +39,7 @@ window.seed = async (kv) => {
       serialized[key] = JSON.stringify(value);
     }
 
-    await chrome.storage.local.set(serialized);
+    await chrome.storage.sync.set(serialized);
     console.log('Storage seeded with keys:', Object.keys(kv));
     console.log('Storage seeded with values:', kv);
     return 'ok';
@@ -52,7 +52,7 @@ window.seed = async (kv) => {
 // Function to clear all storage
 window.clear = async () => {
   try {
-    await chrome.storage.local.clear();
+    await chrome.storage.sync.clear();
     console.log('Storage cleared');
     return 'ok';
   } catch (error) {
@@ -64,7 +64,7 @@ window.clear = async () => {
 // Function to get current storage state (for debugging)
 window.getAll = async () => {
   try {
-    const items = await chrome.storage.local.get(null);
+    const items = await chrome.storage.sync.get(null);
     // Deserialize values just like Plasmo Storage does
     const deserialized = {};
     for (const [key, value] of Object.entries(items)) {

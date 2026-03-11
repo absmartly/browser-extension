@@ -68,6 +68,7 @@ export function useSettingsForm() {
       const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
       const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
       const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
+      const envVibeStudioEnabled = process.env.PLASMO_PUBLIC_VIBE_STUDIO_ENABLED
 
       if (!loadedApiKey && envApiKey) {
         loadedApiKey = envApiKey
@@ -77,6 +78,9 @@ export function useSettingsForm() {
       }
       if (!loadedApplicationName && envApplicationName) {
         loadedApplicationName = envApplicationName
+      }
+      if (!loadedVibeStudioEnabled && envVibeStudioEnabled === 'true') {
+        loadedVibeStudioEnabled = true
       }
 
       setApiKey(loadedApiKey)

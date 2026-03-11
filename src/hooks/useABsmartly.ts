@@ -123,7 +123,8 @@ export function useABsmartly() {
             apiEndpoint: envApiEndpoint,
             applicationName: envApplicationName,
             authMethod: 'apikey',
-            domChangesFieldName: '__dom_changes'
+            domChangesFieldName: '__dom_changes',
+            vibeStudioEnabled: process.env.PLASMO_PUBLIC_VIBE_STUDIO_ENABLED === 'true'
           } as ABsmartlyConfig
           debugLog('[useABsmartly] Using config from environment variables (not saved to storage)')
         }
@@ -165,11 +166,11 @@ export function useABsmartly() {
   }, [client])
 
   const createExperiment = useCallback(async (experimentData: Partial<Experiment>): Promise<Experiment> => {
-    return client.createExperiment(experimentData)
+    return client.createExperiment(experimentData as any)
   }, [client])
 
   const updateExperiment = useCallback(async (id: number, experimentData: Partial<Experiment>): Promise<Experiment> => {
-    return client.updateExperiment(id, experimentData)
+    return client.updateExperiment(id, experimentData as any)
   }, [client])
 
   const getFavorites = useCallback(async (): Promise<number[]> => {

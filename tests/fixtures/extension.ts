@@ -61,6 +61,26 @@ export const test = base.extend<ExtFixtures>({
       viewport: { width: 1920, height: 1080 },
     })
 
+    // Seed vibeStudioEnabled in extension config so AI tests can find the Generate with AI button
+    let [sw] = context.serviceWorkers()
+    if (!sw) {
+      sw = await context.waitForEvent('serviceworker')
+    }
+    const seedExtId = new URL(sw.url()).host
+    const seedPage = await context.newPage()
+    const seedUrl = `chrome-extension://${seedExtId}/tests/seed.html`
+    await seedPage.goto(seedUrl)
+    await seedPage.waitForFunction(() => typeof (window as any).seed === 'function', { timeout: 5000 })
+    await seedPage.evaluate((data) => (window as any).seed(data), {
+      'absmartly-config': {
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
+        authMethod: process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD || 'apikey',
+        domChangesFieldName: '__dom_changes',
+        vibeStudioEnabled: true
+      }
+    })
+    await seedPage.close()
+
     await use(context)
     await Promise.race([
       context.close(),
