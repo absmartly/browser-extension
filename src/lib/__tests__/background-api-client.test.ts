@@ -46,22 +46,16 @@ describe('BackgroundAPIClient - Custom Section Fields', () => {
         }
       ]
 
-      const mockResponse = {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
-        data: {
-          experiment_custom_section_fields: mockFields
-        }
-      }
-
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(mockResponse)
+        data: mockFields
+      })
 
       const result = await client.getCustomSectionFields()
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'API_REQUEST',
-        method: 'GET',
-        path: '/experiment_custom_section_fields',
-        data: { items: 100 }
+        type: 'API_OPERATION',
+        operation: { op: 'listCustomSectionFields' }
       })
 
       expect(result).toEqual(mockFields)
@@ -71,14 +65,10 @@ describe('BackgroundAPIClient - Custom Section Fields', () => {
     })
 
     it('should return empty array when no custom fields exist', async () => {
-      const mockResponse = {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
-        data: {
-          experiment_custom_section_fields: []
-        }
-      }
-
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(mockResponse)
+        data: []
+      })
 
       const result = await client.getCustomSectionFields()
 
@@ -86,12 +76,10 @@ describe('BackgroundAPIClient - Custom Section Fields', () => {
     })
 
     it('should return empty array when response data is null', async () => {
-      const mockResponse = {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
-        data: {}
-      }
-
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(mockResponse)
+        data: null
+      })
 
       const result = await client.getCustomSectionFields()
 
@@ -99,12 +87,10 @@ describe('BackgroundAPIClient - Custom Section Fields', () => {
     })
 
     it('should throw error when API request fails', async () => {
-      const mockResponse = {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: false,
         error: 'Unauthorized'
-      }
-
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(mockResponse)
+      })
 
       await expect(client.getCustomSectionFields()).rejects.toThrow('Unauthorized')
     })
@@ -124,14 +110,10 @@ describe('BackgroundAPIClient - Custom Section Fields', () => {
         { id: 5, type: 'number', title: 'Number Field', default_value: '0' }
       ]
 
-      const mockResponse = {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
-        data: {
-          experiment_custom_section_fields: mockFields
-        }
-      }
-
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(mockResponse)
+        data: mockFields
+      })
 
       const result = await client.getCustomSectionFields()
 
@@ -145,14 +127,10 @@ describe('BackgroundAPIClient - Custom Section Fields', () => {
         { id: 2, title: 'Optional Field', required: false, default_value: 'default' }
       ]
 
-      const mockResponse = {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
-        data: {
-          experiment_custom_section_fields: mockFields
-        }
-      }
-
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(mockResponse)
+        data: mockFields
+      })
 
       const result = await client.getCustomSectionFields()
 

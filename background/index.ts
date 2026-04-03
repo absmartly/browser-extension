@@ -28,6 +28,16 @@ export {
 } from './core/api-client'
 
 export {
+  createExtensionClient
+} from './core/absmartly-client'
+
+export {
+  routeAPIOperation
+} from './core/api-operations'
+
+export type { APIOperation } from './core/api-operations'
+
+export {
   getConfig,
   initializeConfig
 } from './core/config-manager'

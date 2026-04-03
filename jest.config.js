@@ -18,7 +18,9 @@ module.exports = {
         strict: false,
       }
     }],
-    '^.+\\.(js|jsx|mjs)$': 'babel-jest',
+    '^.+\\.(js|jsx|mjs)$': ['babel-jest', {
+      presets: [['@babel/preset-env', { targets: { node: 'current' } }]],
+    }],
   },
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
@@ -37,10 +39,12 @@ module.exports = {
     '<rootDir>/tests/', // Ignore Playwright tests
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!(@plasmohq/storage|pify|marked))',
+    'node_modules/(?!(@plasmohq/storage|@absmartly/cli|pify|marked))',
   ],
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': '<rootDir>/tests/mocks/styleMock.js',
+    '^@absmartly/cli/api-client$': '<rootDir>/tests/mocks/absmartly-cli-api-client.js',
+    '^~style\\.css$': '<rootDir>/tests/mocks/styleMock.js',
     '^~src/(.*)$': '<rootDir>/src/$1',
     '^~(.*)$': '<rootDir>/$1',
   },

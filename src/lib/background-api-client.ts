@@ -12,14 +12,6 @@ import type {
 } from '~src/types/absmartly'
 import { APIError } from '~src/types/errors'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import {
-  ExperimentSchema,
-  ExperimentsResponseSchema,
-  ApplicationsResponseSchema,
-  UnitTypesResponseSchema,
-  MetricsResponseSchema,
-  ExperimentTagsResponseSchema
-} from './api-schemas'
 
 interface ExperimentParams {
   page?: number
@@ -48,6 +40,23 @@ interface UpdateExperimentData {
 }
 
 export class BackgroundAPIClient {
+  private async sendOperation(operation: Record<string, unknown>): Promise<unknown> {
+    debugLog('BackgroundAPIClient.sendOperation:', operation)
+
+    const response = await chrome.runtime.sendMessage({
+      type: 'API_OPERATION',
+      operation
+    })
+    debugLog('BackgroundAPIClient operation response:', response)
+    if (!response.success) {
+      throw new APIError(
+        response.error || 'API operation failed',
+        response.isAuthError || false
+      )
+    }
+    return response.data
+  }
+
   async makeRequest(method: string, path: string, data?: unknown): Promise<unknown> {
     debugLog('BackgroundAPIClient.makeRequest:', { method, path, data })
 
@@ -78,27 +87,13 @@ export class BackgroundAPIClient {
     try {
       debugLog('getExperiments called with params:', params)
 
-      const rawData = await this.makeRequest('GET', '/experiments', params)
-      debugLog('API response structure:', rawData)
-
-      const validation = ExperimentsResponseSchema.safeParse(rawData)
-      if (!validation.success) {
-        debugWarn('API response validation failed:', validation.error)
-      }
-
-      const data = rawData as Record<string, unknown>
-      const experimentsData = data.experiments || data.data || data
-      const experiments = Array.isArray(experimentsData) ? experimentsData as Experiment[] : []
-      const total = typeof data.total === 'number' ? data.total :
-                   typeof data.totalCount === 'number' ? data.totalCount :
-                   typeof data.count === 'number' ? data.count : undefined
-      const hasMore = data.has_more === true || data.hasMore === true ||
-                     (params?.page && experiments.length === params.items)
+      const experiments = await this.sendOperation({
+        op: 'listExperiments',
+        params
+      }) as Experiment[]
 
       return {
-        experiments,
-        total,
-        hasMore
+        experiments: Array.isArray(experiments) ? experiments : [],
       }
     } catch (error) {
       debugError('Failed to fetch experiments:', error)
@@ -108,15 +103,10 @@ export class BackgroundAPIClient {
 
   async getExperiment(id: number): Promise<Experiment> {
     try {
-      const rawResponse = await this.makeRequest('GET', `/experiments/${id}`)
-      const experimentData = (rawResponse as any).experiment || rawResponse
-
-      const validation = ExperimentSchema.safeParse(experimentData)
-      if (!validation.success) {
-        debugWarn(`Experiment ${id} validation failed:`, validation.error)
-      }
-
-      return experimentData as Experiment
+      return await this.sendOperation({
+        op: 'getExperiment',
+        id
+      }) as Experiment
     } catch (error) {
       debugError(`Failed to fetch experiment ${id}:`, error)
       throw error
@@ -126,7 +116,10 @@ export class BackgroundAPIClient {
   async createExperiment(data: CreateExperimentData): Promise<Experiment> {
     try {
       debugLog('[createExperiment] Request data:', JSON.stringify(data, null, 2))
-      const response = await this.makeRequest('POST', '/experiments', data)
+      const response = await this.sendOperation({
+        op: 'createExperiment',
+        data
+      })
       debugLog('[createExperiment] Full response:', JSON.stringify(response, null, 2))
       return response as Experiment
     } catch (error) {
@@ -137,7 +130,11 @@ export class BackgroundAPIClient {
 
   async updateExperiment(id: number, data: UpdateExperimentData): Promise<Experiment> {
     try {
-      return await this.makeRequest('PUT', `/experiments/${id}`, data) as Experiment
+      return await this.sendOperation({
+        op: 'updateExperiment',
+        id,
+        data
+      }) as Experiment
     } catch (error) {
       debugError(`Failed to update experiment ${id}:`, error)
       throw error
@@ -146,8 +143,10 @@ export class BackgroundAPIClient {
 
   async startExperiment(id: number): Promise<Experiment> {
     try {
-      const response = await this.makeRequest('PUT', `/experiments/${id}/start`) as Record<string, unknown>
-      return (response.experiment || response) as Experiment
+      return await this.sendOperation({
+        op: 'startExperiment',
+        id
+      }) as Experiment
     } catch (error) {
       debugError(`Failed to start experiment ${id}:`, error)
       throw error
@@ -156,8 +155,10 @@ export class BackgroundAPIClient {
 
   async stopExperiment(id: number): Promise<Experiment> {
     try {
-      const response = await this.makeRequest('PUT', `/experiments/${id}/stop`) as Record<string, unknown>
-      return (response.experiment || response) as Experiment
+      return await this.sendOperation({
+        op: 'stopExperiment',
+        id
+      }) as Experiment
     } catch (error) {
       debugError(`Failed to stop experiment ${id}:`, error)
       throw error
@@ -166,8 +167,7 @@ export class BackgroundAPIClient {
 
   async getApplications(): Promise<Application[]> {
     try {
-      const data = await this.makeRequest('GET', '/applications') as Record<string, unknown>
-      const apps = data.applications || []
+      const apps = await this.sendOperation({ op: 'listApplications' })
       return Array.isArray(apps) ? apps as Application[] : []
     } catch (error) {
       debugError('Failed to fetch applications:', error)
@@ -177,18 +177,8 @@ export class BackgroundAPIClient {
 
   async getUnitTypes(): Promise<UnitType[]> {
     try {
-      const data = await this.makeRequest('GET', '/unit_types')
-
-      if (Array.isArray(data)) {
-        debugLog('Unit types is direct array, length:', data.length)
-        return data as UnitType[]
-      }
-
-      const dataObj = data as Record<string, unknown>
-      const unitTypesData = dataObj.unit_types || dataObj.data || dataObj.items || []
-      const unitTypes = Array.isArray(unitTypesData) ? unitTypesData as UnitType[] : []
-      debugLog('Extracted unit types, length:', unitTypes.length, 'first item:', unitTypes[0])
-      return unitTypes
+      const unitTypes = await this.sendOperation({ op: 'listUnitTypes' })
+      return Array.isArray(unitTypes) ? unitTypes as UnitType[] : []
     } catch (error) {
       debugError('Failed to fetch unit types:', error)
       throw error
@@ -197,8 +187,7 @@ export class BackgroundAPIClient {
 
   async getMetrics(): Promise<Metric[]> {
     try {
-      const data = await this.makeRequest('GET', '/metrics') as Record<string, unknown>
-      const metrics = data.metrics || []
+      const metrics = await this.sendOperation({ op: 'listMetrics' })
       return Array.isArray(metrics) ? metrics as Metric[] : []
     } catch (error) {
       debugError('Failed to fetch metrics:', error)
@@ -208,8 +197,7 @@ export class BackgroundAPIClient {
 
   async getExperimentTags(): Promise<ExperimentTag[]> {
     try {
-      const data = await this.makeRequest('GET', '/experiment_tags') as Record<string, unknown>
-      const tags = data.experiment_tags || []
+      const tags = await this.sendOperation({ op: 'listExperimentTags' })
       return Array.isArray(tags) ? tags as ExperimentTag[] : []
     } catch (error) {
       debugError('Failed to fetch experiment tags:', error)
@@ -219,8 +207,7 @@ export class BackgroundAPIClient {
 
   async getOwners(): Promise<ExperimentUser[]> {
     try {
-      const data = await this.makeRequest('GET', '/users') as Record<string, unknown>
-      const users = data.users || []
+      const users = await this.sendOperation({ op: 'listUsers' })
       return Array.isArray(users) ? users as ExperimentUser[] : []
     } catch (error) {
       debugError('Failed to fetch owners:', error)
@@ -230,8 +217,7 @@ export class BackgroundAPIClient {
 
   async getTeams(): Promise<ExperimentTeam[]> {
     try {
-      const data = await this.makeRequest('GET', '/teams') as Record<string, unknown>
-      const teams = data.teams || []
+      const teams = await this.sendOperation({ op: 'listTeams' })
       return Array.isArray(teams) ? teams as ExperimentTeam[] : []
     } catch (error) {
       debugError('Failed to fetch teams:', error)
@@ -241,6 +227,7 @@ export class BackgroundAPIClient {
 
   async getFavorites(): Promise<number[]> {
     try {
+      // favorites list not yet in CLI core, use generic request
       const data = await this.makeRequest('GET', '/favorites') as Record<string, unknown>
       const experiments = data?.experiments
       return Array.isArray(experiments) ? experiments as number[] : []
@@ -252,7 +239,11 @@ export class BackgroundAPIClient {
 
   async setExperimentFavorite(id: number, favorite: boolean): Promise<void> {
     try {
-      await this.makeRequest('PUT', `/favorites/experiment?id=${id}&favorite=${favorite}`)
+      await this.sendOperation({
+        op: 'favoriteExperiment',
+        id,
+        favorite
+      })
     } catch (error) {
       debugError(`Failed to ${favorite ? 'add' : 'remove'} favorite for experiment ${id}:`, error)
       throw error
@@ -261,8 +252,7 @@ export class BackgroundAPIClient {
 
   async getEnvironments(): Promise<Environment[]> {
     try {
-      const data = await this.makeRequest('GET', '/environments') as Record<string, unknown>
-      const environments = data?.environments || []
+      const environments = await this.sendOperation({ op: 'listEnvironments' })
       return Array.isArray(environments) ? environments as Environment[] : []
     } catch (error) {
       debugError('Failed to fetch environments:', error)
@@ -272,9 +262,11 @@ export class BackgroundAPIClient {
 
   async getTemplates(type: 'test_template' | 'feature_template' | 'test_template,feature_template' = 'test_template'): Promise<Experiment[]> {
     try {
-      const data = await this.makeRequest('GET', '/experiments', { type }) as Record<string, unknown>
-      const experiments = data.experiments || []
-      return Array.isArray(experiments) ? experiments as Experiment[] : []
+      const experiments = await this.sendOperation({
+        op: 'listExperiments',
+        params: { type }
+      }) as Experiment[]
+      return Array.isArray(experiments) ? experiments : []
     } catch (error) {
       debugError('Failed to fetch templates:', error)
       throw error
@@ -283,8 +275,7 @@ export class BackgroundAPIClient {
 
   async getCustomSectionFields(): Promise<ExperimentCustomSectionField[]> {
     try {
-      const data = await this.makeRequest('GET', '/experiment_custom_section_fields', { items: 100 }) as Record<string, unknown>
-      const fields = data.experiment_custom_section_fields || []
+      const fields = await this.sendOperation({ op: 'listCustomSectionFields' })
       return Array.isArray(fields) ? fields as ExperimentCustomSectionField[] : []
     } catch (error) {
       debugError('Failed to fetch custom section fields:', error)

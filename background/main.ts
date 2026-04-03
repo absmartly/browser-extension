@@ -18,6 +18,9 @@ import { storage, secureStorage, sessionStorage } from '~src/lib/storage-instanc
 
 import { routeMessage, validateSender } from './core/message-router'
 import { makeAPIRequest, openLoginPage } from './core/api-client'
+import { createExtensionClient } from './core/absmartly-client'
+import { routeAPIOperation } from './core/api-operations'
+import type { APIOperation } from './core/api-operations'
 import { getConfig, initializeConfig } from './core/config-manager'
 
 import {
@@ -439,6 +442,34 @@ export function initializeBackgroundScript() {
           sendResponse(false)
         }
       })
+      return true
+    } else if (message.type === 'API_OPERATION') {
+      const operation = message.operation as APIOperation
+      if (!operation?.op) {
+        sendResponse({ success: false, error: 'Missing operation' })
+        return false
+      }
+
+      ;(async () => {
+        try {
+          const config = await getConfig(storage, secureStorage)
+          if (!config) {
+            sendResponse({ success: false, error: 'No configuration available' })
+            return
+          }
+          const client = createExtensionClient(config)
+          const data = await routeAPIOperation(client, operation)
+          sendResponse({ success: true, data })
+        } catch (error) {
+          debugError('[Background] API operation failed:', error)
+          const errorMessage = error instanceof Error ? error.message : 'API operation failed'
+          sendResponse({
+            success: false,
+            error: errorMessage,
+            isAuthError: errorMessage === 'AUTH_EXPIRED'
+          })
+        }
+      })()
       return true
     } else if (message.type === 'API_REQUEST') {
       const validation = safeValidateAPIRequest({ method: message.method, path: message.path, data: message.data })

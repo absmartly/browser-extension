@@ -1,4 +1,3 @@
-import axios from 'axios'
 import {
   isAuthError,
   getJWTCookie,
@@ -9,7 +8,16 @@ import {
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { unsafeAPIEndpoint } from '~src/types/branded'
 
-jest.mock('axios')
+// Mock the absmartly-client module
+const mockRequest = jest.fn()
+const mockGetCurrentUser = jest.fn()
+jest.mock('../absmartly-client', () => ({
+  createExtensionClient: jest.fn(() => ({
+    httpClient: { request: mockRequest },
+    getCurrentUser: mockGetCurrentUser,
+  })),
+}))
+
 jest.mock('~src/utils/debug', () => ({
   debugLog: jest.fn(),
   debugError: jest.fn(),
@@ -22,6 +30,9 @@ const mockChrome = {
   },
   tabs: {
     create: jest.fn()
+  },
+  permissions: {
+    contains: jest.fn().mockResolvedValue(true)
   }
 }
 
@@ -167,100 +178,54 @@ describe('api-client', () => {
       authMethod: 'apikey'
     }
 
-    it('should make successful GET request with API key', async () => {
+    it('should make successful GET request', async () => {
       const mockData = { experiments: [] }
-      jest.mocked(axios).mockResolvedValue({ data: mockData })
+      mockRequest.mockResolvedValue({ status: 200, data: mockData, headers: {} })
 
       const result = await makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)
 
       expect(result).toEqual(mockData)
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
         method: 'GET',
         url: 'https://api.absmartly.com/v1/experiments',
-        headers: expect.objectContaining({
-          'Authorization': 'Api-Key test-api-key'
-        })
       }))
     })
 
     it('should make successful POST request with data', async () => {
       const postData = { name: 'New Experiment' }
       const mockResponse = { id: 123, ...postData }
-      jest.mocked(axios).mockResolvedValue({ data: mockResponse })
+      mockRequest.mockResolvedValue({ status: 200, data: mockResponse, headers: {} })
 
       const result = await makeAPIRequest('POST', '/experiments', postData, true, mockConfig)
 
       expect(result).toEqual(mockResponse)
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
         method: 'POST',
         url: 'https://api.absmartly.com/v1/experiments',
         data: postData
       }))
     })
 
-    it('should convert GET request data to query parameters', async () => {
+    it('should convert GET request data to query params', async () => {
       const queryData = { state: 'running', limit: 10 }
-      jest.mocked(axios).mockResolvedValue({ data: [] })
+      mockRequest.mockResolvedValue({ status: 200, data: [], headers: {} })
 
       await makeAPIRequest('GET', '/experiments', queryData, true, mockConfig)
 
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'https://api.absmartly.com/v1/experiments?state=running&limit=10'
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
+        params: { state: 'running', limit: '10' }
       }))
     })
 
-
     it('should throw AUTH_EXPIRED on 401 error', async () => {
-      jest.mocked(axios).mockRejectedValue({
-        response: { status: 401, data: {} }
-      })
-
-      mockChrome.cookies.getAll.mockResolvedValue([])
+      mockRequest.mockRejectedValue(new Error('AUTH_EXPIRED'))
 
       await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('AUTH_EXPIRED')
-    })
-
-    it('should throw AUTH_EXPIRED when API key fails with 401', async () => {
-      const jwtToken = 'header.payload.signature'
-      mockChrome.cookies.getAll.mockResolvedValue([
-        { name: 'jwt', value: jwtToken, domain: '.absmartly.com' }
-      ])
-
-      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
-
-      // No retries - auth failures throw AUTH_EXPIRED immediately
-      await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('AUTH_EXPIRED')
-      expect(axios).toHaveBeenCalledTimes(1)
-    })
-
-    it('should throw AUTH_EXPIRED when JWT fails with 401', async () => {
-      const jwtConfig: ABsmartlyConfig = {
-        apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com'),
-        authMethod: 'jwt'
-      }
-
-      mockChrome.cookies.getAll.mockResolvedValue([
-        { name: 'jwt', value: 'expired.jwt.token', domain: '.absmartly.com' }
-      ])
-
-      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
-
-      // No retries - auth failures throw AUTH_EXPIRED immediately
-      await expect(makeAPIRequest('GET', '/experiments', undefined, true, jwtConfig)).rejects.toThrow('AUTH_EXPIRED')
-      expect(axios).toHaveBeenCalledTimes(1)
-    })
-
-    it('should not retry when retryWithJWT is false', async () => {
-      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
-
-      await expect(makeAPIRequest('GET', '/experiments', undefined, false, mockConfig)).rejects.toThrow('AUTH_EXPIRED')
-      expect(axios).toHaveBeenCalledTimes(1)
     })
 
     it('should throw original error for non-auth errors', async () => {
       const networkError = new Error('Network timeout')
-      mockChrome.cookies.getAll.mockResolvedValue([])
-      jest.mocked(axios).mockRejectedValue(networkError)
+      mockRequest.mockRejectedValue(networkError)
 
       await expect(makeAPIRequest('GET', '/experiments', undefined, true, mockConfig)).rejects.toThrow('Network timeout')
     }, 10000)
@@ -278,11 +243,11 @@ describe('api-client', () => {
         authMethod: 'apikey'
       }
 
-      jest.mocked(axios).mockResolvedValue({ data: {} })
+      mockRequest.mockResolvedValue({ status: 200, data: {}, headers: {} })
 
       await makeAPIRequest('GET', '/experiments', undefined, true, configWithSlash)
 
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
         url: 'https://api.absmartly.com/v1/experiments'
       }))
     })
@@ -294,21 +259,21 @@ describe('api-client', () => {
         authMethod: 'apikey'
       }
 
-      jest.mocked(axios).mockResolvedValue({ data: {} })
+      mockRequest.mockResolvedValue({ status: 200, data: {}, headers: {} })
 
       await makeAPIRequest('GET', '/experiments', undefined, true, configNoV1)
 
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
         url: 'https://api.absmartly.com/v1/experiments'
       }))
     })
 
     it('should handle path without leading slash', async () => {
-      jest.mocked(axios).mockResolvedValue({ data: {} })
+      mockRequest.mockResolvedValue({ status: 200, data: {}, headers: {} })
 
       await makeAPIRequest('GET', 'experiments', undefined, true, mockConfig)
 
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
         url: expect.stringMatching(/\/experiments$/)
       }))
     })
@@ -321,25 +286,35 @@ describe('api-client', () => {
         search: 'test'
       }
 
-      jest.mocked(axios).mockResolvedValue({ data: [] })
+      mockRequest.mockResolvedValue({ status: 200, data: [], headers: {} })
 
       await makeAPIRequest('GET', '/experiments', queryData, true, mockConfig)
 
-      expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'https://api.absmartly.com/v1/experiments?state=running&search=test'
+      expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({
+        params: { state: 'running', search: 'test' }
       }))
+    })
+
+    it('should throw on API error response with ok: false', async () => {
+      mockRequest.mockResolvedValue({
+        status: 200,
+        data: { ok: false, errors: ['Validation failed'] },
+        headers: {}
+      })
+
+      await expect(makeAPIRequest('POST', '/experiments', {}, true, mockConfig))
+        .rejects.toThrow('Validation failed')
     })
   })
 
   describe('openLoginPage', () => {
-    it('should open login page when config is valid', async () => {
+    it('should open login page when auth check fails', async () => {
       const config: ABsmartlyConfig = {
         apiEndpoint: unsafeAPIEndpoint('https://api.absmartly.com/v1'),
         authMethod: 'jwt'
       }
 
-      mockChrome.cookies.getAll.mockResolvedValue([])
-      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
+      mockGetCurrentUser.mockRejectedValue(new Error('AUTH_EXPIRED'))
 
       const result = await openLoginPage(config)
 
@@ -353,10 +328,7 @@ describe('api-client', () => {
         authMethod: 'jwt'
       }
 
-      mockChrome.cookies.getAll.mockResolvedValue([
-        { name: 'jwt', value: 'valid.jwt.token', domain: '.absmartly.com' }
-      ])
-      jest.mocked(axios).mockResolvedValue({ data: { user: {} } })
+      mockGetCurrentUser.mockResolvedValue({ id: 1, name: 'Test User' })
 
       const result = await openLoginPage(config)
 
@@ -377,8 +349,7 @@ describe('api-client', () => {
         authMethod: 'jwt'
       }
 
-      mockChrome.cookies.getAll.mockResolvedValue([])
-      jest.mocked(axios).mockRejectedValue({ response: { status: 401 } })
+      mockGetCurrentUser.mockRejectedValue(new Error('AUTH_EXPIRED'))
 
       await openLoginPage(config)
 

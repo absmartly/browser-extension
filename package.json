@@ -25,6 +25,7 @@
     "test:claude": "node test-claude-api.js"
   },
   "dependencies": {
+    "@absmartly/cli": "file:../../../../absmartly-cli-ts/.claude/worktrees/feat/cli-core-refactor",
     "@absmartly/sdk-plugins": "^1.2.1",
     "@anthropic-ai/sdk": "^0.65.0",
     "@codemirror/autocomplete": "^6.19.0",
@@ -58,6 +59,7 @@
   },
   "devDependencies": {
     "@absmartly/javascript-sdk": "^1.13.2",
+    "@babel/preset-env": "^7.29.2",
     "@ianvs/prettier-plugin-sort-imports": "4.1.1",
     "@playwright/test": "^1.55.0",
     "@swc/core": "^1.14.0",
