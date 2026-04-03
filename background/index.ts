@@ -28,7 +28,9 @@ export {
 } from './core/api-client'
 
 export {
-  createExtensionClient
+  createExtensionClient,
+  createExtensionHttpClient,
+  AuthExpiredError,
 } from './core/absmartly-client'
 
 export {

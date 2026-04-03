@@ -13,9 +13,17 @@ const mockRequest = jest.fn()
 const mockGetCurrentUser = jest.fn()
 jest.mock('../absmartly-client', () => ({
   createExtensionClient: jest.fn(() => ({
-    httpClient: { request: mockRequest },
     getCurrentUser: mockGetCurrentUser,
   })),
+  createExtensionHttpClient: jest.fn(() => ({
+    request: mockRequest,
+  })),
+  AuthExpiredError: class AuthExpiredError extends Error {
+    constructor() {
+      super('AUTH_EXPIRED')
+      this.name = 'AuthExpiredError'
+    }
+  },
 }))
 
 jest.mock('~src/utils/debug', () => ({

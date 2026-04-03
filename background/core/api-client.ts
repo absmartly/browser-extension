@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { getConfig as getConfigWithStorages } from './config-manager'
 import { storage, secureStorage } from '~src/lib/storage-instances'
-import { createExtensionClient } from './absmartly-client'
+import { createExtensionClient, createExtensionHttpClient, AuthExpiredError } from './absmartly-client'
 
 import { debugWarn, debugError } from '~src/utils/debug'
 async function getConfig(): Promise<ABsmartlyConfig | null> {
@@ -71,7 +71,9 @@ export async function openLoginPage(config?: ABsmartlyConfig | null): Promise<{ 
       return { authenticated: true }
     }
   } catch (error) {
-    const isAuth = error instanceof Error && (error.message === 'AUTH_EXPIRED' || isAuthError(error))
+    const isAuth = error instanceof AuthExpiredError ||
+      (error instanceof Error && error.message === 'AUTH_EXPIRED') ||
+      isAuthError(error)
     if (!isAuth) {
       debugWarn('[Auth] Network error checking auth status:', error instanceof Error ? error.message : String(error))
       throw error
@@ -86,7 +88,7 @@ export async function makeAPIRequest(
   method: string,
   path: string,
   data?: any,
-  _retryWithJWT: boolean = true,
+  _retryWithJWT?: boolean,
   configOverride?: ABsmartlyConfig
 ): Promise<any> {
   const config = configOverride || await getConfig()
@@ -122,8 +124,7 @@ export async function makeAPIRequest(
       : []
 
   try {
-    const client = createExtensionClient(config)
-    const httpClient = (client as any).httpClient as import('@absmartly/cli/api-client').HttpClient
+    const httpClient = createExtensionHttpClient(config)
     const response = await httpClient.request({
       method: method.toUpperCase() as 'GET' | 'POST' | 'PUT' | 'DELETE',
       url,
@@ -147,6 +148,9 @@ export async function makeAPIRequest(
 
     return responseData
   } catch (error) {
+    if (error instanceof AuthExpiredError) {
+      throw new Error('AUTH_EXPIRED')
+    }
     const statusCode = (error as any).response?.status
     if (statusCode === 500) {
       debugWarn('[API] 500 from server', {

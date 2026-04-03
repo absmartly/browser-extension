@@ -1,9 +1,24 @@
 import type { APIClient } from "@absmartly/cli/api-client"
+import type { ListOptions } from "@absmartly/cli/api-client"
 import { ExperimentId } from "@absmartly/cli/api-client"
-import { debugLog, debugError } from "~src/utils/debug"
+import { debugLog } from "~src/utils/debug"
+
+interface ListMetricsParams {
+  items?: number
+  page?: number
+  archived?: boolean
+  include_drafts?: boolean
+  search?: string
+  sort?: string
+  sort_asc?: boolean
+  ids?: string
+  owners?: string
+  teams?: string
+  review_status?: string
+}
 
 export type APIOperation =
-  | { op: "listExperiments"; params?: Record<string, unknown> }
+  | { op: "listExperiments"; params?: ListOptions }
   | { op: "getExperiment"; id: number }
   | { op: "createExperiment"; data: Record<string, unknown> }
   | { op: "updateExperiment"; id: number; data: Record<string, unknown> }
@@ -11,9 +26,9 @@ export type APIOperation =
   | { op: "stopExperiment"; id: number; reason?: string }
   | { op: "listApplications" }
   | { op: "listUnitTypes" }
-  | { op: "listMetrics"; params?: Record<string, unknown> }
+  | { op: "listMetrics"; params?: ListMetricsParams }
   | { op: "listExperimentTags" }
-  | { op: "listUsers"; params?: Record<string, unknown> }
+  | { op: "listUsers"; params?: { includeArchived?: boolean; items?: number; page?: number } }
   | { op: "listTeams" }
   | { op: "listEnvironments" }
   | { op: "listCustomSectionFields" }
@@ -28,7 +43,7 @@ export async function routeAPIOperation(
 
   switch (operation.op) {
     case "listExperiments": {
-      return await client.listExperiments(operation.params as any)
+      return await client.listExperiments(operation.params)
     }
 
     case "getExperiment": {
@@ -66,7 +81,7 @@ export async function routeAPIOperation(
     }
 
     case "listMetrics": {
-      return await client.listMetrics(operation.params as any)
+      return await client.listMetrics(operation.params)
     }
 
     case "listExperimentTags": {
@@ -74,7 +89,7 @@ export async function routeAPIOperation(
     }
 
     case "listUsers": {
-      return await client.listUsers(operation.params as any)
+      return await client.listUsers(operation.params)
     }
 
     case "listTeams": {

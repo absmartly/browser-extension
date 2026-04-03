@@ -10,6 +10,7 @@ import type {
   Environment,
   ExperimentCustomSectionField
 } from '~src/types/absmartly'
+import type { APIOperation } from '~background/core/api-operations'
 import { APIError } from '~src/types/errors'
 import { debugLog, debugError, debugWarn } from '~src/utils/debug'
 
@@ -40,13 +41,21 @@ interface UpdateExperimentData {
 }
 
 export class BackgroundAPIClient {
-  private async sendOperation(operation: Record<string, unknown>): Promise<unknown> {
+  private async sendOperation(operation: APIOperation): Promise<unknown> {
     debugLog('BackgroundAPIClient.sendOperation:', operation)
 
     const response = await chrome.runtime.sendMessage({
       type: 'API_OPERATION',
       operation
     })
+
+    if (!response) {
+      throw new APIError(
+        'Background service worker did not respond. The extension may need to be reloaded.',
+        false
+      )
+    }
+
     debugLog('BackgroundAPIClient operation response:', response)
     if (!response.success) {
       throw new APIError(
@@ -66,6 +75,14 @@ export class BackgroundAPIClient {
       path,
       data
     })
+
+    if (!response) {
+      throw new APIError(
+        'Background service worker did not respond. The extension may need to be reloaded.',
+        false
+      )
+    }
+
     debugLog('BackgroundAPIClient response:', response)
     if (!response.success) {
       throw new APIError(
@@ -87,13 +104,21 @@ export class BackgroundAPIClient {
     try {
       debugLog('getExperiments called with params:', params)
 
-      const experiments = await this.sendOperation({
-        op: 'listExperiments',
-        params
-      }) as Experiment[]
+      // Use generic request to get full paginated response
+      const rawData = await this.makeRequest('GET', '/experiments', params) as Record<string, unknown>
+
+      const experimentsData = rawData.experiments || rawData.data || rawData
+      const experiments = Array.isArray(experimentsData) ? experimentsData as Experiment[] : []
+      const total = typeof rawData.total === 'number' ? rawData.total :
+                   typeof rawData.totalCount === 'number' ? rawData.totalCount :
+                   typeof rawData.count === 'number' ? rawData.count : undefined
+      const hasMore = rawData.has_more === true || rawData.hasMore === true ||
+                     (params?.page !== undefined && experiments.length === params.items)
 
       return {
-        experiments: Array.isArray(experiments) ? experiments : [],
+        experiments,
+        total,
+        hasMore
       }
     } catch (error) {
       debugError('Failed to fetch experiments:', error)
@@ -168,7 +193,11 @@ export class BackgroundAPIClient {
   async getApplications(): Promise<Application[]> {
     try {
       const apps = await this.sendOperation({ op: 'listApplications' })
-      return Array.isArray(apps) ? apps as Application[] : []
+      if (!Array.isArray(apps)) {
+        debugWarn('[BackgroundAPIClient] listApplications returned non-array:', typeof apps)
+        return []
+      }
+      return apps as Application[]
     } catch (error) {
       debugError('Failed to fetch applications:', error)
       throw error
@@ -178,7 +207,11 @@ export class BackgroundAPIClient {
   async getUnitTypes(): Promise<UnitType[]> {
     try {
       const unitTypes = await this.sendOperation({ op: 'listUnitTypes' })
-      return Array.isArray(unitTypes) ? unitTypes as UnitType[] : []
+      if (!Array.isArray(unitTypes)) {
+        debugWarn('[BackgroundAPIClient] listUnitTypes returned non-array:', typeof unitTypes)
+        return []
+      }
+      return unitTypes as UnitType[]
     } catch (error) {
       debugError('Failed to fetch unit types:', error)
       throw error
@@ -188,7 +221,11 @@ export class BackgroundAPIClient {
   async getMetrics(): Promise<Metric[]> {
     try {
       const metrics = await this.sendOperation({ op: 'listMetrics' })
-      return Array.isArray(metrics) ? metrics as Metric[] : []
+      if (!Array.isArray(metrics)) {
+        debugWarn('[BackgroundAPIClient] listMetrics returned non-array:', typeof metrics)
+        return []
+      }
+      return metrics as Metric[]
     } catch (error) {
       debugError('Failed to fetch metrics:', error)
       throw error
@@ -198,7 +235,11 @@ export class BackgroundAPIClient {
   async getExperimentTags(): Promise<ExperimentTag[]> {
     try {
       const tags = await this.sendOperation({ op: 'listExperimentTags' })
-      return Array.isArray(tags) ? tags as ExperimentTag[] : []
+      if (!Array.isArray(tags)) {
+        debugWarn('[BackgroundAPIClient] listExperimentTags returned non-array:', typeof tags)
+        return []
+      }
+      return tags as ExperimentTag[]
     } catch (error) {
       debugError('Failed to fetch experiment tags:', error)
       throw error
@@ -208,7 +249,11 @@ export class BackgroundAPIClient {
   async getOwners(): Promise<ExperimentUser[]> {
     try {
       const users = await this.sendOperation({ op: 'listUsers' })
-      return Array.isArray(users) ? users as ExperimentUser[] : []
+      if (!Array.isArray(users)) {
+        debugWarn('[BackgroundAPIClient] listUsers returned non-array:', typeof users)
+        return []
+      }
+      return users as ExperimentUser[]
     } catch (error) {
       debugError('Failed to fetch owners:', error)
       throw error
@@ -218,7 +263,11 @@ export class BackgroundAPIClient {
   async getTeams(): Promise<ExperimentTeam[]> {
     try {
       const teams = await this.sendOperation({ op: 'listTeams' })
-      return Array.isArray(teams) ? teams as ExperimentTeam[] : []
+      if (!Array.isArray(teams)) {
+        debugWarn('[BackgroundAPIClient] listTeams returned non-array:', typeof teams)
+        return []
+      }
+      return teams as ExperimentTeam[]
     } catch (error) {
       debugError('Failed to fetch teams:', error)
       throw error
@@ -253,7 +302,11 @@ export class BackgroundAPIClient {
   async getEnvironments(): Promise<Environment[]> {
     try {
       const environments = await this.sendOperation({ op: 'listEnvironments' })
-      return Array.isArray(environments) ? environments as Environment[] : []
+      if (!Array.isArray(environments)) {
+        debugWarn('[BackgroundAPIClient] listEnvironments returned non-array:', typeof environments)
+        return []
+      }
+      return environments as Environment[]
     } catch (error) {
       debugError('Failed to fetch environments:', error)
       throw error
@@ -276,7 +329,11 @@ export class BackgroundAPIClient {
   async getCustomSectionFields(): Promise<ExperimentCustomSectionField[]> {
     try {
       const fields = await this.sendOperation({ op: 'listCustomSectionFields' })
-      return Array.isArray(fields) ? fields as ExperimentCustomSectionField[] : []
+      if (!Array.isArray(fields)) {
+        debugWarn('[BackgroundAPIClient] listCustomSectionFields returned non-array:', typeof fields)
+        return []
+      }
+      return fields as ExperimentCustomSectionField[]
     } catch (error) {
       debugError('Failed to fetch custom section fields:', error)
       throw error

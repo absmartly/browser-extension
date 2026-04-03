@@ -6,12 +6,19 @@ import type {
 } from "@absmartly/cli/api-client"
 import type { ABsmartlyConfig } from "~src/types/absmartly"
 import { withNetworkRetry } from "~src/lib/api-retry"
-import { debugWarn, debugError } from "~src/utils/debug"
-import { getJWTCookie } from "./api-client"
 
-export type { APIClient }
+export type { APIClient, HttpClient, HttpRequestConfig, HttpResponse }
 
-class ExtensionHttpClient implements HttpClient {
+class AuthExpiredError extends Error {
+  constructor() {
+    super("AUTH_EXPIRED")
+    this.name = "AuthExpiredError"
+  }
+}
+
+export { AuthExpiredError }
+
+export class ExtensionHttpClient implements HttpClient {
   constructor(
     private endpoint: string,
     private config: ABsmartlyConfig
@@ -64,10 +71,25 @@ class ExtensionHttpClient implements HttpClient {
         credentials: "include",
       })
 
-      const data = (await fetchResponse.json()) as T
-
       if (fetchResponse.status === 401 || fetchResponse.status === 403) {
-        throw new Error("AUTH_EXPIRED")
+        throw new AuthExpiredError()
+      }
+
+      let data: T
+      try {
+        data = (await fetchResponse.json()) as T
+      } catch {
+        throw new Error(
+          `API returned non-JSON response (status ${fetchResponse.status})`
+        )
+      }
+
+      if (!fetchResponse.ok) {
+        const error = new Error(
+          `API request failed with status ${fetchResponse.status}`
+        )
+        ;(error as any).response = { status: fetchResponse.status, data }
+        throw error
       }
 
       const responseHeaders: Record<string, string> = {}
@@ -84,6 +106,15 @@ class ExtensionHttpClient implements HttpClient {
 
     return response
   }
+}
+
+export function createExtensionHttpClient(
+  config: ABsmartlyConfig
+): ExtensionHttpClient {
+  if (!config.apiEndpoint) {
+    throw new Error("No API endpoint configured")
+  }
+  return new ExtensionHttpClient(config.apiEndpoint, config)
 }
 
 export function createExtensionClient(config: ABsmartlyConfig): APIClient {

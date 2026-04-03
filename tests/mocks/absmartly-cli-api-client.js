@@ -45,4 +45,7 @@ module.exports = {
   createAPIClient,
   ExperimentId,
   APIError,
+  // Types are erased at runtime, but export empty objects for any runtime references
+  ListOptions: undefined,
+  ListMetricsOptions: undefined,
 }
