@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
-import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
+import type { AIProvider, AIProviderConfig, GenerateOptions, ModelConfig, ModelInfo } from './base'
 import { sanitizeHtml } from './utils'
 import {
   SHARED_TOOL_SCHEMA,
@@ -32,6 +32,28 @@ function isToolUseBlock(block: Anthropic.ContentBlock): block is Anthropic.ToolU
 }
 
 export class AnthropicProvider implements AIProvider {
+  static modelConfig: ModelConfig = {
+    defaultEndpoint: 'https://api.anthropic.com',
+    modelsPath: '/v1/models',
+    headers: (apiKey) => ({ 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }),
+    parseModels: (data) =>
+      (data.data || [])
+        .filter((m: any) => m.id && (m.type === 'model' || m.object === 'model'))
+        .map((m: any): ModelInfo => ({
+          id: m.id,
+          name: m.display_name || m.id,
+          provider: m.owned_by ? m.owned_by.charAt(0).toUpperCase() + m.owned_by.slice(1) : 'Anthropic',
+          contextWindow: m.context_window || undefined
+        }))
+        .sort((a: ModelInfo, b: ModelInfo) => a.name.localeCompare(b.name)),
+    staticModels: () => [
+      { id: 'claude-sonnet-4-5-20250514', name: 'Claude Sonnet 4.5', provider: 'Anthropic', contextWindow: 200000 },
+      { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'Anthropic', contextWindow: 200000 },
+      { id: 'claude-haiku-4-20250414', name: 'Claude Haiku 4', provider: 'Anthropic', contextWindow: 200000 },
+      { id: 'claude-haiku-3-5-20241022', name: 'Claude Haiku 3.5', provider: 'Anthropic', contextWindow: 200000 }
+    ]
+  }
+
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {
@@ -134,7 +156,7 @@ export class AnthropicProvider implements AIProvider {
       let message: Anthropic.Message
       try {
         message = await withTimeout(anthropic.messages.create({
-          model: this.config.llmModel || 'claude-sonnet-4-5-20250929',
+          model: this.config.llmModel || 'claude-sonnet-4-5-20250514',
           max_tokens: 4096,
           system: systemPrompt,
           messages,

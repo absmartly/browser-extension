@@ -172,7 +172,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
 
   if (experiments.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div id="no-experiments-message" className="text-center py-8 text-gray-500">
         No experiments found
       </div>
     )

@@ -59,6 +59,7 @@ const OPENROUTER_KEY = envVars.PLASMO_PUBLIC_OPENROUTER_API_KEY || ''
 const GEMINI_KEY = envVars.PLASMO_PUBLIC_GEMINI_API_KEY || ''
 const OPENAI_KEY = envVars.PLASMO_PUBLIC_OPENAI_API_KEY || ''
 const ANTHROPIC_KEY = envVars.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
+const ANTHROPIC_ENDPOINT = envVars.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || 'https://api.anthropic.com'
 
 const testHtml = `
 <html>
@@ -152,7 +153,7 @@ async function main() {
   // Test OpenAI
   if (OPENAI_KEY) {
     try {
-      const models = await ModelFetcher.fetchOpenAIModels(OPENAI_KEY)
+      const models = await ModelFetcher.fetchModels('openai-api', OPENAI_KEY, OpenAIProvider.modelConfig)
       const cheapest = models.find(m => m.id === 'gpt-3.5-turbo') || models[0]
 
       const config: AIProviderConfig = {
@@ -174,7 +175,7 @@ async function main() {
   // Test Gemini
   if (GEMINI_KEY) {
     try {
-      const models = await ModelFetcher.fetchGeminiModels(GEMINI_KEY)
+      const models = await ModelFetcher.fetchModels('gemini-api', GEMINI_KEY, GeminiProvider.modelConfig)
       const cheapest = models.find(m => m.id.toLowerCase().includes('flash')) || models[0]
 
       const config: AIProviderConfig = {
@@ -196,7 +197,7 @@ async function main() {
   // Test OpenRouter
   if (OPENROUTER_KEY) {
     try {
-      const groupedModels = await ModelFetcher.fetchOpenRouterModels(OPENROUTER_KEY)
+      const groupedModels = await ModelFetcher.fetchGroupedModels('openrouter-api', OPENROUTER_KEY, OpenRouterProvider.modelConfig)
       const allModels = Object.values(groupedModels).flat()
 
       const modelsWithPricing = allModels
@@ -236,13 +237,14 @@ async function main() {
 
   // Test Anthropic
   if (ANTHROPIC_KEY) {
-    const models = ModelFetcher.getStaticAnthropicModels()
+    const models = AnthropicProvider.modelConfig.staticModels()
     const cheapest = models.find(m => m.name.includes('Haiku')) || models[models.length - 1]
 
     const config: AIProviderConfig = {
       apiKey: ANTHROPIC_KEY,
       aiProvider: 'anthropic-api',
-      llmModel: cheapest.id
+      llmModel: cheapest.id,
+      customEndpoint: ANTHROPIC_ENDPOINT
     }
     const provider = new AnthropicProvider(config)
     results.anthropic = await testProvider('Anthropic', '🟡', provider, cheapest.id)

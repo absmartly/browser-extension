@@ -111,6 +111,9 @@
       "https://*.absmartly.com/*",
       "http://localhost/*"
     ],
+    "optional_host_permissions": [
+      "<all_urls>"
+    ],
     "web_accessible_resources": [
       {
         "resources": [

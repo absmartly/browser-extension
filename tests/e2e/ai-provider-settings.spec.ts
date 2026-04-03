@@ -174,15 +174,15 @@ test.describe('AI Provider Settings', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
-    const advancedToggle = sidebar.locator('#advanced-port-config-summary')
+    const advancedToggle = sidebar.locator('#advanced-endpoint-config-summary')
     await advancedToggle.waitFor({ state: 'visible', timeout: 2000 })
     await advancedToggle.click()
 
-    const customPortInput = sidebar.locator('#custom-bridge-port')
+    const customPortInput = sidebar.locator('#custom-bridge-endpoint')
     await customPortInput.waitFor({ state: 'visible', timeout: 2000 })
     await expect(customPortInput).toBeVisible()
 
-    await customPortInput.fill('3010')
+    await customPortInput.fill('http://localhost:3010')
 
     const testButton = sidebar.locator('#test-bridge-connection')
     await testButton.click()

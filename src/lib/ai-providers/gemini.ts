@@ -1,6 +1,6 @@
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
-import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
+import type { AIProvider, AIProviderConfig, GenerateOptions, ModelConfig, ModelInfo } from './base'
 import type {
   GeminiContent,
   GeminiGenerateContentRequest,
@@ -31,6 +31,28 @@ import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classi
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 export class GeminiProvider implements AIProvider {
+  static modelConfig: ModelConfig = {
+    defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta',
+    modelsPath: '/models',
+    headers: () => ({}),
+    buildUrl: (baseURL, apiKey) => `${baseURL}/models?key=${apiKey}`,
+    parseModels: (data) =>
+      (data.models || [])
+        .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+        .map((m: any): ModelInfo => ({
+          id: (m.name || '').replace('models/', ''),
+          name: m.displayName || m.name,
+          provider: 'Google',
+          contextWindow: m.inputTokenLimit,
+          description: m.description
+        })),
+    staticModels: () => [
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google', contextWindow: 2097152 },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'Google', contextWindow: 1048576 },
+      { id: 'gemini-pro', name: 'Gemini Pro', provider: 'Google', contextWindow: 32768 }
+    ]
+  }
+
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {

@@ -14,7 +14,8 @@ jest.mock('~src/lib/messaging', () => ({
 
 jest.mock('~src/utils/storage', () => ({
   getConfig: jest.fn().mockResolvedValue({
-    domChangesFieldName: '__dom_changes'
+    domChangesFieldName: '__dom_changes',
+    htmlInjectionEnabled: true
   }),
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
@@ -455,10 +456,12 @@ describe('ExperimentEditor', () => {
   })
 
   describe('Code Injection', () => {
-    it('should render code injection section for control variant', () => {
+    it('should render code injection section for control variant', async () => {
       render(<ExperimentEditor {...defaultProps} experiment={mockExperiment} />)
 
-      expect(screen.queryByText(/inject/i)).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByTestId('code-injection')).toBeInTheDocument()
+      })
     })
 
     it('should update injection code', async () => {

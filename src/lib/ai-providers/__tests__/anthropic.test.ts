@@ -314,7 +314,7 @@ describe('AnthropicProvider', () => {
       )
     })
 
-    it('should use claude-sonnet-4-5-20250929 model', async () => {
+    it('should use claude-sonnet-4-5-20250514 model', async () => {
       const provider = new AnthropicProvider(createConfig())
 
       mockMessages.create.mockResolvedValue({
@@ -333,7 +333,7 @@ describe('AnthropicProvider', () => {
 
       expect(mockMessages.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'claude-sonnet-4-5-20250929'
+          model: 'claude-sonnet-4-5-20250514'
         })
       )
     })

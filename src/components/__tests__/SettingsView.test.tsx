@@ -18,7 +18,7 @@ jest.mock('~src/utils/storage', () => ({
     persistQueryToCookie: false,
     aiProvider: 'anthropic-api',
     aiApiKey: '',
-    llmModel: 'claude-sonnet-4-5-20250929',
+    llmModel: 'claude-sonnet-4-5-20250514',
     providerModels: {},
     providerEndpoints: {}
   })

@@ -49,8 +49,8 @@ export class Toolbar {
     this.shadowHost.id = 'absmartly-visual-editor-toolbar-host'
     this.shadowHost.style.cssText = 'all: initial; position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;'
 
-    // Attach shadow root (closed mode for better encapsulation)
-    this.shadowRoot = this.shadowHost.attachShadow({ mode: 'closed' })
+    // Attach shadow root (open mode for testability with Playwright)
+    this.shadowRoot = this.shadowHost.attachShadow({ mode: 'open' })
 
     this.toolbar = document.createElement('div')
     this.toolbar.className = 'absmartly-toolbar'

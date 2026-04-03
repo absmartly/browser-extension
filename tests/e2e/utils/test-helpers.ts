@@ -91,7 +91,10 @@ export async function injectSidebarMinimal(page: Page, extensionUrl: (path: stri
   return sidebar
 }
 
-export async function debugWait(_ms: number = 300): Promise<void> {
+export async function debugWait(ms: number = 1000): Promise<void> {
+  if (process.env.SLOW === '1') {
+    await new Promise(resolve => setTimeout(resolve, ms))
+  }
 }
 
 /**

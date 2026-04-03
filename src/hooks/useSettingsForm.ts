@@ -30,6 +30,7 @@ export function useSettingsForm() {
   const [cookiePermissionGranted, setCookiePermissionGranted] = useState<boolean | null>(null)
   const [showCookieConsentModal, setShowCookieConsentModal] = useState(false)
   const [vibeStudioEnabled, setVibeStudioEnabled] = useState(false)
+  const [htmlInjectionEnabled, setHtmlInjectionEnabled] = useState(false)
   const [configLoadError, setConfigLoadError] = useState<string | null>(null)
 
   const checkCookiePermission = async (): Promise<boolean> => {
@@ -55,6 +56,7 @@ export function useSettingsForm() {
       let loadedAiApiKey = config?.aiApiKey || ''
       let loadedProviderModels = config?.providerModels || {}
       let loadedVibeStudioEnabled = config?.vibeStudioEnabled ?? false
+      let loadedHtmlInjectionEnabled = config?.htmlInjectionEnabled ?? false
       let loadedProviderEndpoints = config?.providerEndpoints || {}
 
       if (config?.llmModel && !loadedProviderModels[loadedAiProvider]) {
@@ -69,6 +71,8 @@ export function useSettingsForm() {
       const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
       const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
       const envVibeStudioEnabled = process.env.PLASMO_PUBLIC_VIBE_STUDIO_ENABLED
+      const envAnthropicApiKey = process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
+      const envAnthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT
 
       if (!loadedApiKey && envApiKey) {
         loadedApiKey = envApiKey
@@ -81,6 +85,19 @@ export function useSettingsForm() {
       }
       if (!loadedVibeStudioEnabled && envVibeStudioEnabled === 'true') {
         loadedVibeStudioEnabled = true
+      }
+
+      const hasStoredConfig = !!(config?.apiKey || config?.apiEndpoint || config?.aiApiKey)
+
+      if (!hasStoredConfig && !loadedAiApiKey && envAnthropicApiKey) {
+        loadedAiApiKey = envAnthropicApiKey
+        loadedAiProvider = 'anthropic-api'
+      }
+      if (!hasStoredConfig && envAnthropicEndpoint && !loadedProviderEndpoints['anthropic-api']) {
+        loadedProviderEndpoints = { ...loadedProviderEndpoints, 'anthropic-api': envAnthropicEndpoint }
+        if (loadedAiProvider === 'anthropic-api') {
+          loadedCustomEndpoint = envAnthropicEndpoint
+        }
       }
 
       setApiKey(loadedApiKey)
@@ -97,9 +114,9 @@ export function useSettingsForm() {
       setLlmModel(loadedLlmModel)
       setProviderEndpoints(loadedProviderEndpoints)
       setVibeStudioEnabled(loadedVibeStudioEnabled)
+      setHtmlInjectionEnabled(loadedHtmlInjectionEnabled)
       setCustomEndpoint(loadedCustomEndpoint)
 
-      const hasStoredConfig = (config?.apiKey || config?.apiEndpoint)
       if (!hasStoredConfig && envApiKey && envApiEndpoint) {
         const autoConfig = {
           apiKey: loadedApiKey.trim() || undefined,
@@ -111,6 +128,7 @@ export function useSettingsForm() {
           queryPrefix: loadedQueryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
           persistQueryToCookie: loadedPersistQueryToCookie,
           vibeStudioEnabled: loadedVibeStudioEnabled,
+          htmlInjectionEnabled: loadedHtmlInjectionEnabled,
           aiProvider: loadedAiProvider,
           aiApiKey: loadedAiApiKey.trim() || undefined,
           providerModels: loadedProviderModels,
@@ -263,6 +281,7 @@ export function useSettingsForm() {
       queryPrefix: queryPrefix.trim() || DEFAULT_CONFIG.queryPrefix,
       persistQueryToCookie,
       vibeStudioEnabled,
+      htmlInjectionEnabled,
       aiProvider,
       aiApiKey: aiApiKey.trim() || undefined,
       providerModels: updatedProviderModels,
@@ -318,6 +337,8 @@ export function useSettingsForm() {
     setProviderEndpoints,
     vibeStudioEnabled,
     setVibeStudioEnabled,
+    htmlInjectionEnabled,
+    setHtmlInjectionEnabled,
     errors,
     setErrors,
     loading,

@@ -632,7 +632,8 @@ export function initializeBackgroundScript() {
               /visual-editor-test\.html/.test(pageUrl) ||
               pageUrl.includes('chrome-extension://')
             )
-          if (isTestPage) {
+          const useRealAI = isTestPage && !!apiKeyToUse && !!customEndpoint
+          if (isTestPage && !useRealAI) {
             debugLog('[Background] Using mock AI response for visual-editor-test page')
 
             const normalizedPrompt = String(prompt || '').toLowerCase()

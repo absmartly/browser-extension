@@ -13,6 +13,7 @@ import { Checkbox } from './ui/Checkbox'
 import { useSettingsForm } from '~src/hooks/useSettingsForm'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { setConfig } from '~src/utils/storage'
+import { ensureProviderPermissions, PROVIDER_REGISTRY } from '~src/lib/ai-providers'
 import { debugError } from '~src/utils/debug'
 
 interface SettingsViewProps {
@@ -52,6 +53,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setProviderEndpoints,
     vibeStudioEnabled,
     setVibeStudioEnabled,
+    htmlInjectionEnabled,
+    setHtmlInjectionEnabled,
     errors,
     setErrors,
     loading,
@@ -76,6 +79,10 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const handleSave = async () => {
     const isValid = await validateForm()
     if (!isValid) return
+
+    if (aiApiKey && !PROVIDER_REGISTRY[aiProvider]?.isBridge) {
+      await ensureProviderPermissions(aiProvider, customEndpoint || undefined).catch(() => {})
+    }
 
     const config = buildConfig()
 
@@ -265,6 +272,23 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         </div>
         <p className="text-xs text-gray-500 ml-8">
           Enable AI-powered visual editing features. This feature is in beta.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            id="html-injection-toggle"
+            checked={htmlInjectionEnabled}
+            onChange={setHtmlInjectionEnabled}
+          />
+          <label htmlFor="html-injection-toggle" className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+            HTML Injection
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Advanced</span>
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 ml-8">
+          Enable the HTML injection section in experiments. Injected HTML applies to all variants regardless of assignment.
         </p>
       </div>
 

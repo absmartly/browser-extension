@@ -1,7 +1,10 @@
 import { test, expect } from '../fixtures/extension'
-import { type Page } from '@playwright/test'
+import { type Page, type FrameLocator } from '@playwright/test'
 import { log, initializeTestLogging, debugWait } from './utils/test-helpers'
 import { spawn, ChildProcess } from 'child_process'
+import path from 'path'
+
+const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
 const BRIDGE_PORTS = [3000, 3001, 3002, 3003, 3004]
 
@@ -93,44 +96,91 @@ async function stopBridge(): Promise<void> {
   }
 }
 
-async function setupExperimentAndAI(testPage: Page, extensionUrl: (path: string) => string): Promise<void> {
-  const sidebarUrl = extensionUrl('tabs/sidebar.html')
-  await testPage.goto(sidebarUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
+async function setupExperimentAndAI(testPage: Page, extensionUrl: (path: string) => string): Promise<FrameLocator> {
+  // Inject sidebar as iframe
+  await testPage.evaluate((extUrl) => {
+    const originalPadding = document.body.style.paddingRight || '0px'
+    document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
+    document.body.style.transition = 'padding-right 0.3s ease-in-out'
+    document.body.style.paddingRight = '384px'
 
-  const createButton = testPage.locator('button[title="Create New Experiment"]')
+    const container = document.createElement('div')
+    container.id = 'absmartly-sidebar-root'
+    container.style.cssText = `
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 384px;
+      height: 100vh;
+      background-color: white;
+      border-left: 1px solid #e5e7eb;
+      box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+      z-index: 2147483647;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #111827;
+      transform: translateX(0);
+      transition: transform 0.3s ease-in-out;
+    `
+
+    const iframe = document.createElement('iframe')
+    iframe.id = 'absmartly-sidebar-iframe'
+    iframe.style.cssText = `
+      width: 100%;
+      height: 100%;
+      border: none;
+    `
+    iframe.src = extUrl
+
+    container.appendChild(iframe)
+    document.body.appendChild(container)
+  }, extensionUrl('tabs/sidebar.html'))
+
+  const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+  await sidebar.locator('body').waitFor({ timeout: 10000 })
+  log('✓ Sidebar injected and loaded')
+
+  const createButton = sidebar.locator('button[title="Create New Experiment"]')
   await createButton.waitFor({ state: 'visible', timeout: 10000 })
   await createButton.click()
 
-  const fromScratchButton = testPage.locator('#from-scratch-button')
+  const fromScratchButton = sidebar.locator('#from-scratch-button')
   await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
   await fromScratchButton.click()
 
-  await testPage.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
+  await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
   log('✓ Experiment editor opened')
 
-  await testPage.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
+  await sidebar.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
 
-  const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
+  const generateWithAIButton = sidebar.locator('#generate-with-ai-button').first()
   await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
-  await generateWithAIButton.click()
+  await generateWithAIButton.evaluate((button) => {
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  })
 
-  await testPage.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
+  await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
   log('✓ AI page opened')
+
+  return sidebar
 }
 
-async function generateAndWait(testPage: Page, prompt: string): Promise<void> {
-  const promptInput = testPage.locator('textarea#ai-prompt')
+async function generateAndWait(sidebar: FrameLocator, prompt: string): Promise<void> {
+  const promptInput = sidebar.locator('textarea#ai-prompt')
   await promptInput.fill(prompt)
 
-  await testPage.locator('#ai-generate-button').click()
+  await sidebar.locator('#ai-generate-button').click()
   log(`✓ Generate clicked: "${prompt.substring(0, 50)}..."`)
 
-  await testPage.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
+  await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
   log('✓ Generation completed')
 }
 
 async function getLatestChanges(testPage: Page): Promise<any[]> {
-  return testPage.evaluate(() => {
+  const frame = testPage.frame({ url: /sidebar\.html/ }) || testPage.frames().find(f => f.url().includes('sidebar'))
+  if (!frame) return []
+  return frame.evaluate(() => {
     const data = (window as any).__absmartlyLatestDomChanges
     return data?.changes || []
   })
@@ -173,16 +223,13 @@ test.describe('AI DOM Granular Operations', () => {
     log('Configuring extension (bridge client will auto-detect ports 3000-3004)')
 
     await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey',
       'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
         authMethod: 'apikey',
-        aiProvider: 'claude-subscription'
+        domChangesFieldName: '__dom_changes',
+        aiProvider: 'claude-subscription',
+        vibeStudioEnabled: true
       }
     })
 
@@ -192,6 +239,16 @@ test.describe('AI DOM Granular Operations', () => {
     testPage.on('console', (msg) => {
       allConsoleMessages.push({ type: msg.type(), text: msg.text() })
     })
+
+    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=1`)
+    await testPage.setViewportSize({ width: 1920, height: 1080 })
+    await testPage.waitForLoadState('networkidle')
+
+    await testPage.evaluate(() => {
+      (window as any).__absmartlyTestMode = true
+    })
+
+    log('✓ Test page loaded (test mode enabled)')
   })
 
   test.afterEach(async () => {
@@ -199,9 +256,11 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle append action - add new changes to existing ones', async ({ extensionUrl }) => {
+    let sidebar: FrameLocator
+
     await test.step('Setup and generate initial changes', async () => {
-      await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(testPage, 'Make all buttons have an orange background')
+      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
+      await generateAndWait(sidebar, 'Make all buttons have an orange background')
     })
 
     await test.step('Verify initial changes exist', async () => {
@@ -213,7 +272,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Generate additional changes (append)', async () => {
-      await generateAndWait(testPage, 'Also make all headings blue and bold')
+      await generateAndWait(sidebar!, 'Also make all headings blue and bold')
     })
 
     await test.step('Verify both initial and new changes exist', async () => {
@@ -232,9 +291,11 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle replace_all action - replace all existing changes', async ({ extensionUrl }) => {
+    let sidebar: FrameLocator
+
     await test.step('Setup and generate initial changes', async () => {
-      await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(testPage, 'Make all buttons orange')
+      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
+      await generateAndWait(sidebar, 'Make all buttons orange')
     })
 
     await test.step('Verify initial changes', async () => {
@@ -244,7 +305,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Generate replacement changes', async () => {
-      await generateAndWait(testPage, 'Actually, forget the buttons. Instead make all headings green and italic')
+      await generateAndWait(sidebar!, 'Actually, forget the buttons. Instead make all headings green and italic')
     })
 
     await test.step('Verify changes were replaced', async () => {
@@ -258,9 +319,11 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle replace_specific action - replace specific changes only', async ({ extensionUrl }) => {
+    let sidebar: FrameLocator
+
     await test.step('Setup and generate multiple changes', async () => {
-      await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(testPage, 'Make buttons orange and headings blue')
+      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
+      await generateAndWait(sidebar, 'Make buttons orange and headings blue')
     })
 
     await test.step('Verify initial changes', async () => {
@@ -270,7 +333,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Replace specific changes', async () => {
-      await generateAndWait(testPage, 'Change the buttons to red instead of orange, but keep the headings as they are')
+      await generateAndWait(sidebar!, 'Change the buttons to red instead of orange, but keep the headings as they are')
     })
 
     await test.step('Verify specific changes replaced', async () => {
@@ -284,9 +347,11 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle remove_specific action - remove specific changes only', async ({ extensionUrl }) => {
+    let sidebar: FrameLocator
+
     await test.step('Setup and generate multiple changes', async () => {
-      await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(testPage, 'Make buttons orange, headings blue, and paragraphs italic')
+      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
+      await generateAndWait(sidebar, 'Make buttons orange, headings blue, and paragraphs italic')
     })
 
     await test.step('Verify initial changes', async () => {
@@ -296,7 +361,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Remove specific changes', async () => {
-      await generateAndWait(testPage, 'Remove the button styling but keep everything else')
+      await generateAndWait(sidebar!, 'Remove the button styling but keep everything else')
     })
 
     await test.step('Verify specific changes removed', async () => {
@@ -310,9 +375,11 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle none action - conversational response only', async ({ extensionUrl }) => {
+    let sidebar: FrameLocator
+
     await test.step('Setup and generate initial changes', async () => {
-      await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(testPage, 'Make buttons orange')
+      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
+      await generateAndWait(sidebar, 'Make buttons orange')
     })
 
     await test.step('Verify initial changes exist', async () => {
@@ -323,13 +390,13 @@ test.describe('AI DOM Granular Operations', () => {
 
     await test.step('Ask a question (no DOM changes expected)', async () => {
       const changesBefore = await getLatestChanges(testPage)
-      await generateAndWait(testPage, 'What colors work well for call-to-action buttons?')
+      await generateAndWait(sidebar!, 'What colors work well for call-to-action buttons?')
 
       const changesAfter = await getLatestChanges(testPage)
       log(`Changes before question: ${changesBefore.length}`)
       log(`Changes after question: ${changesAfter.length}`)
 
-      const messageCount = await testPage.locator('[data-message-index]').count()
+      const messageCount = await sidebar!.locator('[data-message-index]').count()
       log(`Chat messages: ${messageCount}`)
       expect(messageCount).toBeGreaterThanOrEqual(4)
 
@@ -338,12 +405,14 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should maintain change history across multiple operations', async ({ extensionUrl }) => {
+    let sidebar: FrameLocator
+
     await test.step('Setup', async () => {
-      await setupExperimentAndAI(testPage, extensionUrl)
+      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
     })
 
     await test.step('Step 1: Create initial changes', async () => {
-      await generateAndWait(testPage, 'Make buttons orange')
+      await generateAndWait(sidebar!, 'Make buttons orange')
 
       const changes = await getLatestChanges(testPage)
       expect(changes.length).toBeGreaterThan(0)
@@ -351,7 +420,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Step 2: Append heading changes', async () => {
-      await generateAndWait(testPage, 'Also make headings blue')
+      await generateAndWait(sidebar!, 'Also make headings blue')
 
       const changes = await getLatestChanges(testPage)
       expect(changes.length).toBeGreaterThan(0)
@@ -359,12 +428,12 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Step 3: Ask a question (none action)', async () => {
-      await generateAndWait(testPage, 'What is the current color scheme?')
+      await generateAndWait(sidebar!, 'What is the current color scheme?')
       log('✓ Step 3: Question answered')
     })
 
     await test.step('Step 4: Replace button color', async () => {
-      await generateAndWait(testPage, 'Change buttons to red')
+      await generateAndWait(sidebar!, 'Change buttons to red')
 
       const changes = await getLatestChanges(testPage)
       expect(changes.length).toBeGreaterThan(0)
@@ -372,7 +441,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Verify chat history', async () => {
-      const messageCount = await testPage.locator('[data-message-index]').count()
+      const messageCount = await sidebar!.locator('[data-message-index]').count()
       log(`Total chat messages: ${messageCount}`)
       expect(messageCount).toBeGreaterThanOrEqual(8)
       log('✅ Change history maintained across multiple operations')

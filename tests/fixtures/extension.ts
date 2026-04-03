@@ -46,18 +46,18 @@ export const test = base.extend<ExtFixtures>({
     // Ensure seed.html is in the build directory
     ensureSeedFileExists()
 
+    const headed = process.env.HEADED === '1' || process.env.SLOW === '1'
+    console.log(`🖥️  Browser mode: ${headed ? 'HEADED' : 'headless'} (HEADED=${process.env.HEADED}, SLOW=${process.env.SLOW})`)
+
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      // headless is controlled by Playwright config and --headed flag
+      headless: !headed,
       args: [
         `--disable-extensions-except=${extPath}`,
         `--load-extension=${extPath}`,
-        // Allow extensions to run on file:// URLs
         '--enable-file-cookies'
       ],
-      // Add slow motion for debugging if needed
       slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : undefined,
-      // Use larger viewport for better testing
       viewport: { width: 1920, height: 1080 },
     })
 

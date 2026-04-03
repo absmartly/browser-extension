@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
-import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
+import type { AIProvider, AIProviderConfig, GenerateOptions, ModelConfig, ModelInfo } from './base'
 import { parseToolArguments } from './utils'
 import {
   SHARED_TOOL_SCHEMA,
@@ -24,6 +24,32 @@ import { debugLog } from '~src/utils/debug'
 import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
 
 export class OpenAIProvider implements AIProvider {
+  static modelConfig: ModelConfig = {
+    defaultEndpoint: 'https://api.openai.com/v1',
+    modelsPath: '/models',
+    headers: (apiKey) => ({ 'Authorization': `Bearer ${apiKey}` }),
+    parseModels: (data) => {
+      const nameMap: Record<string, string> = {
+        'gpt-4-turbo': 'GPT-4 Turbo', 'gpt-4-turbo-preview': 'GPT-4 Turbo Preview',
+        'gpt-4': 'GPT-4', 'gpt-4-32k': 'GPT-4 32K',
+        'gpt-3.5-turbo': 'GPT-3.5 Turbo', 'gpt-3.5-turbo-16k': 'GPT-3.5 Turbo 16K'
+      }
+      return (data.data || [])
+        .filter((m: any) => m.id.includes('gpt'))
+        .map((m: any): ModelInfo => ({
+          id: m.id,
+          name: nameMap[m.id] || m.id,
+          provider: 'OpenAI'
+        }))
+        .sort((a: ModelInfo, b: ModelInfo) => b.id.localeCompare(a.id))
+    },
+    staticModels: () => [
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'OpenAI' },
+      { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'OpenAI' }
+    ]
+  }
+
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {

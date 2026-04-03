@@ -9,10 +9,14 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
   test.beforeEach(async ({ context, seedStorage }) => {
     // Seed credentials before each test
     await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
+      'absmartly-config': {
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
+        authMethod: 'apikey',
+        domChangesFieldName: '__dom_changes',
+        vibeStudioEnabled: true,
+        htmlInjectionEnabled: true
+      }
     })
 
     testPage = await context.newPage()
@@ -184,7 +188,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       // Make a simple text change
       console.log('  Making text change...')
       await testPage.click('#test-title', { force: true })
-      await testPage.locator('#absmartly-menu-container, .menu-container').waitFor({ state: 'visible', timeout: 5000 })
+      await testPage.locator('#absmartly-menu-host .menu-container, .menu-container').waitFor({ state: 'visible', timeout: 5000 })
       await testPage.locator('.menu-item[data-action="edit"]').click({ timeout: 5000 })
       await testPage.keyboard.type('Modified by VE!')
       await testPage.keyboard.press('Enter')

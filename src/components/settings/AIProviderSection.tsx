@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Select } from '../ui/Select'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { Alert, AlertDescription } from '../ui/Alert'
 import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } from '~src/lib/claude-code-client'
 import { ModelFetcher, type ModelInfo, type GroupedModels } from '~src/lib/model-fetcher'
+import { PROVIDER_REGISTRY, ensureProviderPermissions, hasProviderPermissions } from '~src/lib/ai-providers'
 import type { AIProviderType } from '~src/lib/ai-providers'
 
 import { debugLog, debugWarn } from '~src/utils/debug'
@@ -21,92 +22,6 @@ interface AIProviderSectionProps {
   onProviderModelsChange: (value: Record<string, string>) => void
   onCustomEndpointChange: (value: string) => void
   onProviderEndpointsChange: (value: Record<string, string>) => void
-}
-
-interface ProviderConfig {
-  label: string
-  apiKeyPlaceholder: string
-  apiKeyHelpLink: string
-  apiKeyHelpText: string
-  endpointPlaceholder: string
-  endpointDescription: string
-  defaultModel?: string
-  fetchModels?: (apiKey: string) => Promise<ModelInfo[] | GroupedModels>
-  getStaticModels?: () => ModelInfo[]
-  modelDisplayType: 'simple' | 'grouped' | 'static'
-  modelLabel?: string
-  modelHelpText?: string
-}
-
-const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
-  'claude-subscription': {
-    label: 'Claude Code CLI',
-    apiKeyPlaceholder: '',
-    apiKeyHelpLink: '',
-    apiKeyHelpText: '',
-    endpointPlaceholder: 'Leave blank to use default Claude API',
-    endpointDescription: 'Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).',
-    defaultModel: '',
-    modelDisplayType: 'static'
-  },
-  'codex': {
-    label: 'Codex CLI',
-    apiKeyPlaceholder: '',
-    apiKeyHelpLink: '',
-    apiKeyHelpText: '',
-    endpointPlaceholder: 'http://localhost:9000',
-    endpointDescription: 'Optional: Specify a custom port for the bridge server.',
-    defaultModel: '',
-    modelDisplayType: 'static'
-  },
-  'anthropic-api': {
-    label: 'Anthropic API Key',
-    apiKeyPlaceholder: 'sk-ant-...',
-    apiKeyHelpLink: 'https://console.anthropic.com/',
-    apiKeyHelpText: 'console.anthropic.com',
-    endpointPlaceholder: 'https://api.anthropic.com',
-    endpointDescription: 'Optional: Use a custom API endpoint (e.g., for proxy or self-hosted deployments). Leave blank for default.',
-    getStaticModels: () => ModelFetcher.getStaticAnthropicModels(),
-    modelDisplayType: 'static',
-    modelLabel: 'Claude Model',
-    modelHelpText: 'Select the Claude model to use for generating DOM changes.'
-  },
-  'openai-api': {
-    label: 'OpenAI API Key',
-    apiKeyPlaceholder: 'sk-...',
-    apiKeyHelpLink: 'https://platform.openai.com/api-keys',
-    apiKeyHelpText: 'platform.openai.com',
-    endpointPlaceholder: 'https://api.openai.com/v1',
-    endpointDescription: 'Optional: Use a custom OpenAI-compatible endpoint (e.g., local LLM, Azure OpenAI). Leave blank for default.',
-    fetchModels: (apiKey) => ModelFetcher.fetchOpenAIModels(apiKey),
-    modelDisplayType: 'simple',
-    modelLabel: 'Model',
-    modelHelpText: 'Select the OpenAI model to use for generating DOM changes.'
-  },
-  'openrouter-api': {
-    label: 'OpenRouter API Key',
-    apiKeyPlaceholder: 'sk-or-...',
-    apiKeyHelpLink: 'https://openrouter.ai/keys',
-    apiKeyHelpText: 'openrouter.ai/keys',
-    endpointPlaceholder: 'https://openrouter.ai/api/v1',
-    endpointDescription: 'Optional: Use a custom OpenRouter endpoint. Leave blank for default.',
-    fetchModels: (apiKey) => ModelFetcher.fetchOpenRouterModels(apiKey),
-    modelDisplayType: 'grouped',
-    modelLabel: 'Model',
-    modelHelpText: 'Models are grouped by provider. Pricing shown as input/output per 1M tokens.'
-  },
-  'gemini-api': {
-    label: 'Google Gemini API Key',
-    apiKeyPlaceholder: 'AIza...',
-    apiKeyHelpLink: 'https://makersuite.google.com/app/apikey',
-    apiKeyHelpText: 'Google AI Studio',
-    endpointPlaceholder: 'https://generativelanguage.googleapis.com/v1beta',
-    endpointDescription: 'Optional: Use a custom Gemini-compatible endpoint. Leave blank for default.',
-    fetchModels: (apiKey) => ModelFetcher.fetchGeminiModels(apiKey),
-    modelDisplayType: 'simple',
-    modelLabel: 'Model',
-    modelHelpText: 'Select the Gemini model to use for generating DOM changes.'
-  }
 }
 
 export const AIProviderSection = React.memo(function AIProviderSection({
@@ -134,13 +49,12 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const [groupedModels, setGroupedModels] = useState<GroupedModels>({})
   const [fetchingModels, setFetchingModels] = useState(false)
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null)
+  const [modelsFetched, setModelsFetched] = useState(false)
 
-  const config = PROVIDER_CONFIGS[aiProvider]
-
-  const isBridgeProvider = aiProvider === 'claude-subscription' || aiProvider === 'codex'
+  const meta = PROVIDER_REGISTRY[aiProvider]
 
   useEffect(() => {
-    if (isBridgeProvider) {
+    if (meta.isBridge) {
       checkBridgeConnection()
     }
   }, [aiProvider])
@@ -152,27 +66,23 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     const savedModel = providerModels[aiProvider]
     if (savedModel) {
       onLlmModelChange(savedModel)
-    } else if (config.getStaticModels) {
-      const staticModels = config.getStaticModels()
+    } else if (meta.getStaticModels) {
+      const staticModels = meta.getStaticModels()
       if (staticModels.length > 0) {
         onLlmModelChange(staticModels[0].id)
       }
-    } else if (config.defaultModel) {
-      onLlmModelChange(config.defaultModel)
     }
+
+    setModelsFetched(false)
+    setModels([])
+    setGroupedModels({})
   }, [aiProvider])
 
   useEffect(() => {
-    if (aiApiKey && config.fetchModels) {
-      fetchModels()
-    }
-  }, [aiApiKey, aiProvider])
-
-  useEffect(() => {
     if (!llmModel || !providerModels[aiProvider]) {
-      if (config.modelDisplayType === 'simple' && models.length > 0) {
+      if (meta.modelDisplayType === 'simple' && models.length > 0) {
         onLlmModelChange(models[0].id)
-      } else if (config.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
+      } else if (meta.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
         const firstProvider = Object.keys(groupedModels)[0]
         const firstModel = groupedModels[firstProvider][0]
         if (firstModel) {
@@ -182,21 +92,22 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     }
   }, [models, groupedModels, aiProvider])
 
-  const fetchModels = async () => {
-    if (!aiApiKey || !config.fetchModels) return
+  const fetchModels = useCallback(async () => {
+    if (!aiApiKey || !meta.fetchModels) return
 
     setFetchingModels(true)
     setModelsFetchError(null)
 
     try {
-      const result = await config.fetchModels(aiApiKey)
-      if (config.modelDisplayType === 'grouped') {
+      const result = await meta.fetchModels(aiApiKey, customEndpoint || undefined)
+      if (meta.modelDisplayType === 'grouped') {
         setGroupedModels(result as GroupedModels)
         setModels([])
       } else {
         setModels(result as ModelInfo[])
         setGroupedModels({})
       }
+      setModelsFetched(true)
     } catch (error) {
       console.error('Error fetching models:', error)
       setModelsFetchError(error instanceof Error ? error.message : 'Failed to fetch models')
@@ -205,7 +116,37 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     } finally {
       setFetchingModels(false)
     }
-  }
+  }, [aiApiKey, aiProvider, customEndpoint, meta])
+
+  const handleModelDropdownFocus = useCallback(async () => {
+    if (modelsFetched || fetchingModels || !aiApiKey || !meta.fetchModels) return
+
+    const hasPerms = await hasProviderPermissions(aiProvider, customEndpoint || undefined)
+    if (hasPerms) {
+      ModelFetcher.clearCache()
+      fetchModels()
+      return
+    }
+
+    const granted = await ensureProviderPermissions(aiProvider, customEndpoint || undefined)
+    if (granted) {
+      ModelFetcher.clearCache()
+      fetchModels()
+    }
+  }, [modelsFetched, fetchingModels, aiApiKey, aiProvider, customEndpoint, meta, fetchModels])
+
+  // Auto-fetch when endpoint changes and we have permission
+  useEffect(() => {
+    if (!aiApiKey || !meta.fetchModels) return
+    setModelsFetched(false)
+
+    hasProviderPermissions(aiProvider, customEndpoint || undefined).then(has => {
+      if (has) {
+        ModelFetcher.clearCache()
+        fetchModels()
+      }
+    })
+  }, [customEndpoint])
 
   const checkBridgeConnection = async () => {
     debugLog('[AIProviderSection] Starting bridge connection check...')
@@ -278,10 +219,10 @@ export const AIProviderSection = React.memo(function AIProviderSection({
           type="url"
           value={customEndpoint}
           onChange={(e) => onCustomEndpointChange(e.target.value)}
-          placeholder={config.endpointPlaceholder}
+          placeholder={meta.defaultEndpoint}
         />
         <p className="text-xs text-gray-500">
-          {config.endpointDescription}
+          {meta.endpointDescription}
         </p>
       </div>
     </details>
@@ -291,22 +232,22 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     <>
       <Input
         id="ai-api-key"
-        label={`${config.label.replace(' API Key', '')} API Key`}
+        label={`${meta.label.replace(' API Key', '')} API Key`}
         type="password"
         value={aiApiKey}
         onChange={(e) => onAiApiKeyChange(e.target.value)}
-        placeholder={config.apiKeyPlaceholder}
+        placeholder={meta.apiKeyPlaceholder}
         showPasswordToggle={true}
       />
       <p className="mt-1 text-xs text-gray-500">
         Get your API key from{' '}
         <a
-          href={config.apiKeyHelpLink}
+          href={meta.apiKeyHelpLink}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 hover:underline"
         >
-          {config.apiKeyHelpText}
+          {meta.apiKeyHelpText}
         </a>
       </p>
     </>
@@ -332,13 +273,13 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       )
     }
 
-    if (config.modelDisplayType === 'static' && config.getStaticModels) {
-      const staticModels = config.getStaticModels()
+    if (meta.modelDisplayType === 'static' && meta.getStaticModels) {
+      const staticModels = meta.getStaticModels()
       return (
         <>
           <Select
             id={`${aiProvider}-model-select`}
-            label={config.modelLabel || 'Model'}
+            label={meta.modelLabel || 'Model'}
             value={llmModel || ''}
             onChange={(e) => onLlmModelChange(e.target.value)}
             options={staticModels.map(m => ({
@@ -346,23 +287,24 @@ export const AIProviderSection = React.memo(function AIProviderSection({
               label: m.name
             }))}
           />
-          {config.modelHelpText && (
-            <p className="mt-1 text-xs text-gray-500">{config.modelHelpText}</p>
+          {meta.modelHelpText && (
+            <p className="mt-1 text-xs text-gray-500">{meta.modelHelpText}</p>
           )}
         </>
       )
     }
 
-    if (config.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
+    if (meta.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
       return (
         <>
           <label htmlFor={`${aiProvider}-model-select`} className="block text-sm font-medium text-gray-700 mb-1">
-            {config.modelLabel || 'Model'}
+            {meta.modelLabel || 'Model'}
           </label>
           <select
             id={`${aiProvider}-model-select`}
             value={llmModel || ''}
             onChange={(e) => onLlmModelChange(e.target.value)}
+            onFocus={handleModelDropdownFocus}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">Select a model...</option>
@@ -377,30 +319,33 @@ export const AIProviderSection = React.memo(function AIProviderSection({
               </optgroup>
             ))}
           </select>
-          {config.modelHelpText && (
-            <p className="mt-1 text-xs text-gray-500">{config.modelHelpText}</p>
+          {meta.modelHelpText && (
+            <p className="mt-1 text-xs text-gray-500">{meta.modelHelpText}</p>
           )}
         </>
       )
     }
 
-    if (config.modelDisplayType === 'simple' && models.length > 0) {
+    // Simple model list - show fetched models or static fallback
+    const displayModels = models.length > 0 ? models : (meta.getStaticModels?.() || [])
+    if (meta.modelDisplayType === 'simple' && displayModels.length > 0) {
       return (
         <>
           <Select
             id={`${aiProvider}-model-select`}
-            label={config.modelLabel || 'Model'}
+            label={meta.modelLabel || 'Model'}
             value={llmModel || ''}
             onChange={(e) => onLlmModelChange(e.target.value)}
-            options={models.map(m => ({
+            onFocus={handleModelDropdownFocus}
+            options={displayModels.map(m => ({
               value: m.id,
               label: m.contextWindow
                 ? `${m.name} (${(m.contextWindow / 1024).toFixed(0)}K context)`
                 : m.name
             }))}
           />
-          {config.modelHelpText && (
-            <p className="mt-1 text-xs text-gray-500">{config.modelHelpText}</p>
+          {meta.modelHelpText && (
+            <p className="mt-1 text-xs text-gray-500">{meta.modelHelpText}</p>
           )}
         </>
       )
@@ -416,7 +361,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         label="AI Provider"
         value={aiProvider}
         onChange={(e) => onAiProviderChange(e.target.value as AIProviderType)}
-        options={Object.entries(PROVIDER_CONFIGS).map(([value, cfg]) => ({
+        options={Object.entries(PROVIDER_REGISTRY).map(([value, cfg]) => ({
           value,
           label: cfg.label
         }))}
@@ -425,7 +370,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         Choose how to generate AI-powered DOM changes. Claude and Codex use a local bridge server. OpenRouter provides access to 100+ models.
       </p>
 
-      {isBridgeProvider && (
+      {meta.isBridge && (
         <div className="mt-4 space-y-3">
           {aiProvider === 'claude-subscription' && (
             <>
@@ -582,7 +527,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         </div>
       )}
 
-      {!isBridgeProvider && (
+      {!meta.isBridge && (
         <div className="mt-4 space-y-3">
           <ApiKeySection />
           {aiApiKey && (

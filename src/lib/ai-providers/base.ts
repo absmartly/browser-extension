@@ -1,5 +1,23 @@
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
+
+export interface ModelInfo {
+  id: string
+  name: string
+  provider?: string
+  contextWindow?: number
+  pricing?: { input: number; output: number }
+  description?: string
+}
+
+export interface ModelConfig {
+  defaultEndpoint: string
+  modelsPath: string
+  headers: (apiKey: string) => Record<string, string>
+  buildUrl?: (baseURL: string, apiKey: string) => string
+  parseModels: (data: any) => ModelInfo[]
+  staticModels: () => ModelInfo[]
+}
 export type ToolDefinition = {
   name?: string
   description?: string

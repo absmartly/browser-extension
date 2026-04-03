@@ -208,18 +208,18 @@ test.describe('AI Provider Factory E2E', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
-    const advancedToggle = page.locator('#advanced-port-config-summary')
+    const advancedToggle = page.locator('#advanced-endpoint-config-summary')
     await advancedToggle.waitFor({ state: 'visible', timeout: 5000 })
     await advancedToggle.click()
 
-    const customPortInput = page.locator('#custom-bridge-port')
+    const customPortInput = page.locator('#custom-bridge-endpoint')
     await customPortInput.waitFor({ state: 'visible', timeout: 5000 })
     await expect(customPortInput).toBeVisible()
 
-    await customPortInput.fill('3010')
+    await customPortInput.fill('http://localhost:3010')
 
     const portValue = await customPortInput.inputValue()
-    expect(portValue).toBe('3010')
+    expect(portValue).toBe('http://localhost:3010')
 
     console.log('✓ Custom port configuration available for bridge')
   })

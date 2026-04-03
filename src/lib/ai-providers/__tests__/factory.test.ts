@@ -82,7 +82,7 @@ describe('AI Provider Factory', () => {
       const config: AIProviderConfig = {
         apiKey: 'test-key',
         aiProvider: 'anthropic-api',
-        llmModel: 'claude-sonnet-4-5-20250929'
+        llmModel: 'claude-sonnet-4-5-20250514'
       }
 
       createAIProvider(config)
@@ -92,7 +92,7 @@ describe('AI Provider Factory', () => {
         expect.objectContaining({
           apiKey: 'test-key',
           aiProvider: 'anthropic-api',
-          llmModel: 'claude-sonnet-4-5-20250929'
+          llmModel: 'claude-sonnet-4-5-20250514'
         })
       )
     })

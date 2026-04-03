@@ -29,6 +29,7 @@ const envVars = loadEnvFile('.env.dev.local')
 const OPENROUTER_KEY = envVars.PLASMO_PUBLIC_OPENROUTER_API_KEY || ''
 const GEMINI_KEY = envVars.PLASMO_PUBLIC_GEMINI_API_KEY || ''
 const ANTHROPIC_KEY = envVars.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
+const ANTHROPIC_ENDPOINT = envVars.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || 'https://api.anthropic.com'
 
 const systemPrompt = `You are a helpful assistant that generates DOM changes for A/B testing. When asked to change a button's color and text, respond with a JSON object containing:
 {
@@ -110,7 +111,7 @@ async function testAnthropic() {
   console.log('-'.repeat(80))
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(`${ANTHROPIC_ENDPOINT}/v1/messages`, {
       method: 'POST',
       headers: {
         'x-api-key': ANTHROPIC_KEY,
@@ -118,7 +119,7 @@ async function testAnthropic() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-3-5-20241022',
         max_tokens: 2048,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }]

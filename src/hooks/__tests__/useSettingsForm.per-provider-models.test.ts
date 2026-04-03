@@ -24,7 +24,7 @@ describe('useSettingsForm - Per-Provider Model Selection (buildConfig)', () => {
   it('should preserve models for other providers', () => {
     const providerModels = {
       'openrouter-api': 'moonshotai/kimi-k2.5',
-      'anthropic-api': 'claude-3-5-sonnet-20241022'
+      'anthropic-api': 'claude-sonnet-4-5-20250514'
     }
     const aiProvider = 'claude-subscription'
     const llmModel = 'opus'
@@ -36,7 +36,7 @@ describe('useSettingsForm - Per-Provider Model Selection (buildConfig)', () => {
 
     expect(updatedProviderModels).toEqual({
       'openrouter-api': 'moonshotai/kimi-k2.5',
-      'anthropic-api': 'claude-3-5-sonnet-20241022',
+      'anthropic-api': 'claude-sonnet-4-5-20250514',
       'claude-subscription': 'opus'
     })
   })

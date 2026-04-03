@@ -1,4 +1,8 @@
 import { ModelFetcher } from '../src/lib/model-fetcher'
+import { OpenAIProvider } from '../src/lib/ai-providers/openai'
+import { GeminiProvider } from '../src/lib/ai-providers/gemini'
+import { OpenRouterProvider } from '../src/lib/ai-providers/openrouter'
+import { AnthropicProvider } from '../src/lib/ai-providers/anthropic'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -31,6 +35,7 @@ const OPENROUTER_KEY = envVars.PLASMO_PUBLIC_OPENROUTER_API_KEY || ''
 const GEMINI_KEY = envVars.PLASMO_PUBLIC_GEMINI_API_KEY || ''
 const OPENAI_KEY = envVars.PLASMO_PUBLIC_OPENAI_API_KEY || ''
 const ANTHROPIC_KEY = envVars.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
+const ANTHROPIC_ENDPOINT = envVars.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || 'https://api.anthropic.com'
 
 async function testAllProviders() {
   console.log('\n🚀 AI Provider Integration Test\n')
@@ -49,7 +54,7 @@ async function testAllProviders() {
     console.log('\n🔵 OpenAI Provider')
     console.log('-'.repeat(80))
     try {
-      const models = await ModelFetcher.fetchOpenAIModels(OPENAI_KEY)
+      const models = await ModelFetcher.fetchModels('openai-api', OPENAI_KEY, OpenAIProvider.modelConfig)
       const cheapest = models.find(m => m.id === 'gpt-3.5-turbo') || models[models.length - 1]
 
       results.openai = {
@@ -77,7 +82,7 @@ async function testAllProviders() {
     console.log('\n🟢 Google Gemini Provider')
     console.log('-'.repeat(80))
     try {
-      const models = await ModelFetcher.fetchGeminiModels(GEMINI_KEY)
+      const models = await ModelFetcher.fetchModels('gemini-api', GEMINI_KEY, GeminiProvider.modelConfig)
       const cheapest = models.find(m => m.id.toLowerCase().includes('flash')) || models[0]
 
       results.gemini = {
@@ -107,7 +112,7 @@ async function testAllProviders() {
     console.log('\n🟣 OpenRouter Provider')
     console.log('-'.repeat(80))
     try {
-      const groupedModels = await ModelFetcher.fetchOpenRouterModels(OPENROUTER_KEY)
+      const groupedModels = await ModelFetcher.fetchGroupedModels('openrouter-api', OPENROUTER_KEY, OpenRouterProvider.modelConfig)
       const allModels = Object.values(groupedModels).flat()
 
       const modelsWithPricing = allModels
@@ -154,7 +159,7 @@ async function testAllProviders() {
   if (ANTHROPIC_KEY) {
     console.log('\n🟡 Anthropic Provider (Static Models)')
     console.log('-'.repeat(80))
-    const models = ModelFetcher.getStaticAnthropicModels()
+    const models = AnthropicProvider.modelConfig.staticModels()
     const cheapest = models.find(m => m.name.includes('Haiku')) || models[models.length - 1]
 
     results.anthropic = {

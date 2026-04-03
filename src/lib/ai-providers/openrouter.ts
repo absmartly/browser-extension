@@ -1,6 +1,6 @@
 import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
 import type { ConversationSession } from '~src/types/absmartly'
-import type { AIProvider, AIProviderConfig, GenerateOptions } from './base'
+import type { AIProvider, AIProviderConfig, GenerateOptions, ModelConfig, ModelInfo } from './base'
 import type { OpenRouterChatMessage, OpenRouterChatCompletionRequest } from '~src/types/openrouter'
 import { parseToolArguments } from './utils'
 import {
@@ -36,6 +36,37 @@ function stripEmojis(text: string): string {
 }
 
 export class OpenRouterProvider implements AIProvider {
+  static modelConfig: ModelConfig = {
+    defaultEndpoint: 'https://openrouter.ai/api/v1',
+    modelsPath: '/models',
+    headers: (apiKey) => ({ 'Authorization': `Bearer ${apiKey}` }),
+    parseModels: (data) => {
+      const extractProvider = (id: string) => {
+        const parts = id.split('/')
+        return parts.length >= 2
+          ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+          : 'Unknown'
+      }
+      return (data.data || []).map((m: any): ModelInfo => ({
+        id: m.id,
+        name: m.name,
+        provider: extractProvider(m.id),
+        contextWindow: m.context_length,
+        pricing: m.pricing ? {
+          input: parseFloat(m.pricing.prompt) * 1000000,
+          output: parseFloat(m.pricing.completion) * 1000000
+        } : undefined,
+        description: m.description
+      }))
+    },
+    staticModels: () => [
+      { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'OpenAI' },
+      { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic' },
+      { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', provider: 'Anthropic' },
+      { id: 'google/gemini-pro', name: 'Gemini Pro', provider: 'Google' }
+    ]
+  }
+
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {

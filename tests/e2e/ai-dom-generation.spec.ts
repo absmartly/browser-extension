@@ -372,17 +372,21 @@ test.describe('AI DOM Changes Generation', () => {
 
     // Configure AI provider via seedStorage BEFORE loading pages
     // This ensures the config is loaded when the sidebar initializes
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
     if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required for this test')
+      throw new Error('ANTHROPIC_API_KEY or PLASMO_PUBLIC_ANTHROPIC_API_KEY environment variable is required for this test')
     }
+
+    const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
 
     const config = {
       apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
       apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
       authMethod: 'apikey',
       aiProvider: 'anthropic-api',
-      aiApiKey: '' // API key is stored separately in secure storage
+      aiApiKey: '',
+      vibeStudioEnabled: true,
+      providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
     }
 
     await seedStorage({

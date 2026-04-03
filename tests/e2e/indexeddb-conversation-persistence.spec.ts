@@ -20,10 +20,13 @@ test.describe('IndexedDB Conversation Persistence', () => {
   test.beforeEach(async ({ context, seedStorage }) => {
     initializeTestLogging()
     await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
+      'absmartly-config': {
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
+        authMethod: 'apikey',
+        domChangesFieldName: '__dom_changes',
+        vibeStudioEnabled: true
+      }
     })
     testPage = await context.newPage()
   })
@@ -119,9 +122,12 @@ test.describe('IndexedDB Conversation Persistence', () => {
         log('  ⏳ Generating...')
         await debugWait()
 
-        const generatingText = sidebar.locator('text=Generating').first()
-        await generatingText.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {
-          log('  ⚠️ Generation text did not disappear')
+        const generatingIndicator = sidebar.locator('#ai-generate-button[data-loading="true"]')
+        // Wait for generation to start
+        await generatingIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+        // Wait for generation to complete (data-loading becomes "false")
+        await generatingIndicator.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {
+          log('  Warning: Generation indicator did not disappear')
         })
         log('  ✓ Generation complete')
         await debugWait()

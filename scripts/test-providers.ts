@@ -52,6 +52,7 @@ const OPENROUTER_KEY = envVars.PLASMO_PUBLIC_OPENROUTER_API_KEY || ''
 const GEMINI_KEY = envVars.PLASMO_PUBLIC_GEMINI_API_KEY || ''
 const OPENAI_KEY = envVars.PLASMO_PUBLIC_OPENAI_API_KEY || ''
 const ANTHROPIC_KEY = envVars.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
+const ANTHROPIC_ENDPOINT = envVars.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || 'https://api.anthropic.com'
 
 async function testModelFetching() {
   console.log('\n📋 Testing Model Fetching\n')
@@ -60,7 +61,7 @@ async function testModelFetching() {
   if (OPENAI_KEY) {
     console.log('\n🔵 OpenAI Models:')
     try {
-      const models = await ModelFetcher.fetchOpenAIModels(OPENAI_KEY)
+      const models = await ModelFetcher.fetchModels('openai-api', OPENAI_KEY, OpenAIProvider.modelConfig)
       console.log(`✅ Fetched ${models.length} models`)
       console.log('Sample models:', models.slice(0, 3).map(m => m.name).join(', '))
     } catch (error) {
@@ -71,7 +72,7 @@ async function testModelFetching() {
   if (GEMINI_KEY) {
     console.log('\n🟢 Gemini Models:')
     try {
-      const models = await ModelFetcher.fetchGeminiModels(GEMINI_KEY)
+      const models = await ModelFetcher.fetchModels('gemini-api', GEMINI_KEY, GeminiProvider.modelConfig)
       console.log(`✅ Fetched ${models.length} models`)
       console.log('Sample models:', models.slice(0, 3).map(m => `${m.name} (${(m.contextWindow! / 1024).toFixed(0)}K)`).join(', '))
     } catch (error) {
@@ -82,7 +83,7 @@ async function testModelFetching() {
   if (OPENROUTER_KEY) {
     console.log('\n🟣 OpenRouter Models:')
     try {
-      const groupedModels = await ModelFetcher.fetchOpenRouterModels(OPENROUTER_KEY)
+      const groupedModels = await ModelFetcher.fetchGroupedModels('openrouter-api', OPENROUTER_KEY, OpenRouterProvider.modelConfig)
       const providers = Object.keys(groupedModels)
       const totalModels = Object.values(groupedModels).reduce((sum, models) => sum + models.length, 0)
       console.log(`✅ Fetched ${totalModels} models from ${providers.length} providers`)
@@ -92,10 +93,22 @@ async function testModelFetching() {
     }
   }
 
-  console.log('\n🟡 Anthropic Models (Static):')
-  const anthropicModels = ModelFetcher.getStaticAnthropicModels()
-  console.log(`✅ ${anthropicModels.length} models available`)
-  console.log('Models:', anthropicModels.map(m => m.name).join(', '))
+  console.log('\n🟡 Anthropic Models:')
+  if (ANTHROPIC_KEY) {
+    try {
+      const models = await ModelFetcher.fetchModels('anthropic-api', ANTHROPIC_KEY, AnthropicProvider.modelConfig, ANTHROPIC_ENDPOINT)
+      console.log(`✅ Fetched ${models.length} models`)
+      console.log('Sample models:', models.slice(0, 5).map(m => m.name).join(', '))
+    } catch (error) {
+      console.error('❌ Error:', error instanceof Error ? error.message : error)
+      const staticModels = AnthropicProvider.modelConfig.staticModels()
+      console.log(`Fallback: ${staticModels.length} static models`)
+    }
+  } else {
+    const anthropicModels = AnthropicProvider.modelConfig.staticModels()
+    console.log(`✅ ${anthropicModels.length} static models available`)
+    console.log('Models:', anthropicModels.map(m => m.name).join(', '))
+  }
 }
 
 async function testProviderGeneration() {
@@ -124,7 +137,7 @@ async function testProviderGeneration() {
   let openaiModel = 'gpt-3.5-turbo'
   if (OPENAI_KEY) {
     try {
-      const models = await ModelFetcher.fetchOpenAIModels(OPENAI_KEY)
+      const models = await ModelFetcher.fetchModels('openai-api', OPENAI_KEY, OpenAIProvider.modelConfig)
       // Filter for chat models and prefer gpt-3.5-turbo (cheapest)
       const chatModels = models.filter(m => m.id.includes('gpt-3.5-turbo') || m.id.includes('gpt-4'))
       const cheapest = chatModels.find(m => m.id === 'gpt-3.5-turbo') || chatModels[chatModels.length - 1]
@@ -141,7 +154,7 @@ async function testProviderGeneration() {
   let geminiModel = 'gemini-pro'
   if (GEMINI_KEY) {
     try {
-      const models = await ModelFetcher.fetchGeminiModels(GEMINI_KEY)
+      const models = await ModelFetcher.fetchModels('gemini-api', GEMINI_KEY, GeminiProvider.modelConfig)
       // Prefer Flash models (cheaper than Pro)
       const flashModel = models.find(m => m.id.toLowerCase().includes('flash'))
       const cheapest = flashModel || models[0]
@@ -206,7 +219,7 @@ async function testProviderGeneration() {
   let openrouterModelInfo = ''
   if (OPENROUTER_KEY) {
     try {
-      const groupedModels = await ModelFetcher.fetchOpenRouterModels(OPENROUTER_KEY)
+      const groupedModels = await ModelFetcher.fetchGroupedModels('openrouter-api', OPENROUTER_KEY, OpenRouterProvider.modelConfig)
       const allModels = Object.values(groupedModels).flat()
 
       // Filter for valid models with positive pricing and sort by total cost
@@ -284,7 +297,7 @@ async function testProviderGeneration() {
   if (ANTHROPIC_KEY) {
     console.log('\n🟡 Testing Anthropic Provider:')
     // Select cheapest Anthropic model (Haiku)
-    const anthropicModels = ModelFetcher.getStaticAnthropicModels()
+    const anthropicModels = AnthropicProvider.modelConfig.staticModels()
     const haikuModel = anthropicModels.find(m => m.name.includes('Haiku'))
     const cheapestModel = haikuModel?.id || anthropicModels[anthropicModels.length - 1].id
     console.log(`💰 Selected cheapest Anthropic model: ${cheapestModel}`)
@@ -293,7 +306,8 @@ async function testProviderGeneration() {
       const config: AIProviderConfig = {
         apiKey: ANTHROPIC_KEY,
         aiProvider: 'anthropic-api',
-        llmModel: cheapestModel
+        llmModel: cheapestModel,
+        customEndpoint: ANTHROPIC_ENDPOINT
       }
       const provider = new AnthropicProvider(config)
 

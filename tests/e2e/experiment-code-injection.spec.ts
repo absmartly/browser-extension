@@ -20,7 +20,18 @@ test.describe('Experiment Code Injection UI', () => {
   let sidebar: FrameLocator
   let experimentName: string
 
-  test.beforeEach(async ({ context, extensionUrl }) => {
+  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
+    await seedStorage({
+      'absmartly-config': {
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
+        authMethod: 'apikey',
+        domChangesFieldName: '__dom_changes',
+        htmlInjectionEnabled: true,
+        vibeStudioEnabled: true
+      }
+    })
+
     testPage = await context.newPage()
 
     // Listen to all console messages for debugging

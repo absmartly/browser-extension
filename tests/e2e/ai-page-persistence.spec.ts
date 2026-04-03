@@ -1,9 +1,10 @@
 import { test, expect } from '../fixtures/extension'
-import { type Page } from '@playwright/test'
-import { log, initializeTestLogging } from './utils/test-helpers'
+import { type Page, type FrameLocator } from '@playwright/test'
+import { log, initializeTestLogging, injectSidebar } from './utils/test-helpers'
 import { spawn, ChildProcess } from 'child_process'
+import path from 'path'
 
-const TEST_PAGE_URL = '/visual-editor-test.html'
+const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 const BRIDGE_PORTS = [3000, 3001, 3002, 3003, 3004]
 
 let bridgeProcess: ChildProcess | null = null
@@ -66,7 +67,7 @@ async function startBridge(): Promise<number> {
     })
 
     bridgeProcess.on('error', (err) => {
-      log(`❌ Bridge process error: ${err.message}`)
+      log(`Bridge process error: ${err.message}`)
       reject(err)
     })
 
@@ -96,6 +97,7 @@ async function stopBridge(): Promise<void> {
 
 test.describe('AI Page Persistence and HTML Capture', () => {
   let testPage: Page
+  let sidebar: FrameLocator
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
   test.beforeAll(async () => {
@@ -105,14 +107,14 @@ test.describe('AI Page Persistence and HTML Capture', () => {
     if (existingPort) {
       log(`✓ Using existing bridge on port ${existingPort}`)
     } else {
-      log('⚠️ Bridge not running, starting it...')
+      log('Bridge not running, starting it...')
       try {
         const port = await startBridge()
         log(`✓ Bridge started on port ${port}`)
         await new Promise(resolve => setTimeout(resolve, 1000))
       } catch (error) {
-        log(`❌ Failed to start bridge: ${error.message}`)
-        log('⚠️ AI generation will be skipped in this test')
+        log(`Failed to start bridge: ${error.message}`)
+        log('AI generation will be skipped in this test')
       }
     }
   })
@@ -127,16 +129,13 @@ test.describe('AI Page Persistence and HTML Capture', () => {
     log('Configuring extension (bridge client will auto-detect ports 3000-3004)')
 
     await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey',
       'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
+        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
         authMethod: 'apikey',
-        aiProvider: 'claude-subscription'
+        domChangesFieldName: '__dom_changes',
+        aiProvider: 'claude-subscription',
+        vibeStudioEnabled: true
       }
     })
 
@@ -147,7 +146,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       allConsoleMessages.push({ type: msg.type(), text: msg.text() })
     })
 
-    await testPage.goto(TEST_PAGE_URL, {
+    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=1`, {
       waitUntil: 'domcontentloaded',
       timeout: 10000
     })
@@ -158,6 +157,9 @@ test.describe('AI Page Persistence and HTML Capture', () => {
     await testPage.evaluate(() => {
       (window as any).__absmartlyTestMode = true
     })
+
+    sidebar = await injectSidebar(testPage, extensionUrl)
+    log('✓ Sidebar injected and ready')
   })
 
   test.afterEach(async () => {
@@ -167,16 +169,14 @@ test.describe('AI Page Persistence and HTML Capture', () => {
   test('should persist AI page state after reload and capture HTML successfully', async ({ context, extensionUrl }) => {
     // Open a test page in a separate tab (for HTML capture)
     const contentPage = await context.newPage()
-    await contentPage.goto(`http://localhost:3456${TEST_PAGE_URL}`, { waitUntil: 'load' })
+    await contentPage.goto(`http://localhost:3456/visual-editor-test.html`, { waitUntil: 'load' })
 
     // Wait for content script to be injected (content scripts run at document_idle)
     log('✓ Content page loaded for HTML capture')
 
-    await test.step('Load sidebar in extension context', async () => {
-      log('Loading sidebar in extension context...')
-      const sidebarUrl = extensionUrl('tabs/sidebar.html')
-      await testPage.goto(sidebarUrl, { waitUntil: 'domcontentloaded', timeout: 10000 })
-  
+    await test.step('Verify sidebar is loaded', async () => {
+      log('Verifying sidebar is loaded...')
+
       await testPage.screenshot({ path: 'test-results/ai-persistence-0-sidebar-injected.png', fullPage: true })
       log('Screenshot saved: ai-persistence-0-sidebar-injected.png')
     })
@@ -184,29 +184,29 @@ test.describe('AI Page Persistence and HTML Capture', () => {
     await test.step('Create experiment from scratch', async () => {
       log('Clicking Create Experiment button...')
 
-      const createButton = testPage.locator('button[title="Create New Experiment"]')
+      const createButton = sidebar.locator('button[title="Create New Experiment"]')
       await createButton.waitFor({ state: 'visible', timeout: 10000 })
       await createButton.click()
       log('✓ Create button clicked')
 
-  
+
       await testPage.screenshot({ path: 'test-results/ai-persistence-1-dropdown.png', fullPage: true })
       log('Screenshot saved: ai-persistence-1-dropdown.png')
 
-      const fromScratchButton = testPage.locator('#from-scratch-button')
+      const fromScratchButton = sidebar.locator('#from-scratch-button')
       await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
       await fromScratchButton.click()
       log('✓ From Scratch clicked')
 
 
-      await testPage.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
-        log('⚠️ Editor form not yet visible')
+      await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
+        log('Editor form not yet visible')
       })
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-1.5-after-loading.png', fullPage: true })
       log('Screenshot saved: ai-persistence-1.5-after-loading.png')
 
-      await testPage.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
       log('✓ Experiment editor opened (found Display Name field)')
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-2-editor.png', fullPage: true })
@@ -218,32 +218,34 @@ test.describe('AI Page Persistence and HTML Capture', () => {
 
     await test.step('Navigate to AI page', async () => {
       log('Waiting for form to finish loading...')
-      await testPage.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
-        log('⚠️ Form still loading')
+      await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
+        log('Form still loading')
       })
       log('✓ Form loaded')
 
       log('Scrolling to DOM Changes section...')
-      await testPage.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
-  
+      await sidebar.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
+
       await testPage.screenshot({ path: 'test-results/ai-persistence-2.5-dom-changes.png', fullPage: true })
       log('Screenshot saved: ai-persistence-2.5-dom-changes.png')
 
       log('Finding "Generate with AI" button...')
-      const generateWithAIButton = testPage.locator('#generate-with-ai-button').first()
+      const generateWithAIButton = sidebar.locator('#generate-with-ai-button').first()
       await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
       log('✓ Generate with AI button found')
 
       await generateWithAIButton.scrollIntoViewIfNeeded()
-  
+
       await testPage.screenshot({ path: 'test-results/ai-persistence-2.6-before-click.png', fullPage: true })
       log('Screenshot saved: ai-persistence-2.6-before-click.png')
 
-      await generateWithAIButton.click()
+      await generateWithAIButton.evaluate((button) => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
       log('✓ Clicked Generate with AI button')
 
 
-      await testPage.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
+      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
       log('✓ AI page opened')
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-3-ai-page.png', fullPage: true })
@@ -251,23 +253,23 @@ test.describe('AI Page Persistence and HTML Capture', () => {
 
       variantName = 'Variant 1'
 
-      await expect(testPage.locator('#ai-dom-generator-heading')).toBeVisible()
-      await expect(testPage.locator('#ai-variant-label')).toBeVisible()
+      await expect(sidebar.locator('#ai-dom-generator-heading')).toBeVisible()
+      await expect(sidebar.locator('#ai-variant-label')).toBeVisible()
       log('✓ AI page verified')
     })
 
     await test.step('Generate DOM changes with AI and verify', async () => {
       log('Testing AI DOM generation with Claude Code...')
-      const promptInput = testPage.locator('textarea#ai-prompt')
+      const promptInput = sidebar.locator('textarea#ai-prompt')
       await promptInput.waitFor({ state: 'visible' })
       await promptInput.fill('Make all buttons have an orange background')
       log('✓ Prompt entered: "Make all buttons have an orange background"')
 
-  
+
       await testPage.screenshot({ path: 'test-results/ai-persistence-4-prompt-entered.png', fullPage: true })
       log('Screenshot saved: ai-persistence-4-prompt-entered.png')
 
-      const generateButton = testPage.locator('#ai-generate-button')
+      const generateButton = sidebar.locator('#ai-generate-button')
       await generateButton.waitFor({ state: 'visible' })
       log('Generate button found, trying to click...')
 
@@ -277,7 +279,7 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await generateButton.click()
       log('✓ Generate button clicked')
 
-  
+
       log('Console messages after clicking Generate:')
       allConsoleMessages.slice(-10).forEach(msg => {
         log(`  [${msg.type}] ${msg.text}`)
@@ -285,21 +287,21 @@ test.describe('AI Page Persistence and HTML Capture', () => {
 
       log('Waiting for AI generation to complete...')
 
-      await testPage.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 }).catch(() => {
-        log('⚠️ Generation may still be in progress')
+      await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 }).catch(() => {
+        log('Generation may still be in progress')
       })
 
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-5-after-generate.png', fullPage: true })
       log('Screenshot saved: ai-persistence-5-after-generate.png')
 
-      const chatMessages = await testPage.locator('[data-message-index]').count()
+      const chatMessages = await sidebar.locator('[data-message-index]').count()
       log(`Chat messages found: ${chatMessages}`)
 
       if (chatMessages > 0) {
-        log('✅ Chat messages present after generation')
+        log('Chat messages present after generation')
       } else {
-        log('⚠️ No chat messages found')
+        log('No chat messages found')
       }
     })
 
@@ -310,29 +312,33 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       await testPage.screenshot({ path: 'test-results/ai-persistence-6-before-reload.png', fullPage: true })
       log('Screenshot saved: ai-persistence-6-before-reload.png')
 
+      // Reload the page and re-inject the sidebar
       await testPage.reload({ waitUntil: 'domcontentloaded' })
       log('✓ Page reloaded')
 
+      // Re-inject sidebar after reload
+      sidebar = await injectSidebar(testPage, extensionUrl)
+      log('✓ Sidebar re-injected after reload')
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-7-after-reload.png', fullPage: true })
       log('Screenshot saved: ai-persistence-7-after-reload.png')
 
-      const isOnAIPage = await testPage.locator('#ai-dom-generator-heading').isVisible().catch(() => false)
-      const isOnEditorPage = await testPage.locator('#display-name-label').isVisible().catch(() => false)
-      const isOnListPage = await testPage.locator('#experiments-heading').isVisible().catch(() => false)
+      const isOnAIPage = await sidebar.locator('#ai-dom-generator-heading').isVisible().catch(() => false)
+      const isOnEditorPage = await sidebar.locator('#display-name-label').isVisible().catch(() => false)
+      const isOnListPage = await sidebar.locator('#experiments-heading').isVisible().catch(() => false)
 
       log(`After reload - AI: ${isOnAIPage}, Editor: ${isOnEditorPage}, List: ${isOnListPage}`)
 
       if (isOnAIPage) {
-        log('✅ AI page persisted after reload')
+        log('AI page persisted after reload')
 
-        const chatHistory = testPage.locator('[data-message-index]')
+        const chatHistory = sidebar.locator('[data-message-index]')
         const chatCount = await chatHistory.count()
         log(`Chat history messages: ${chatCount}`)
       } else if (isOnEditorPage) {
-        log('ℹ️ Redirected to editor after reload (AI page state not persisted in-memory)')
+        log('Redirected to editor after reload (AI page state not persisted in-memory)')
       } else if (isOnListPage) {
-        log('ℹ️ Redirected to experiment list after reload')
+        log('Redirected to experiment list after reload')
       }
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-8-final.png', fullPage: true })
@@ -345,25 +351,21 @@ test.describe('AI Page Persistence and HTML Capture', () => {
     await test.step('Verify auto-preview and button colors', async () => {
       log('Verifying auto-preview feature and DOM changes...')
 
-      const isOnAIPageNow = await testPage.locator('#ai-dom-generator-heading').isVisible().catch(() => false)
+      const isOnAIPageNow = await sidebar.locator('#ai-dom-generator-heading').isVisible().catch(() => false)
       if (!isOnAIPageNow) {
-        log('ℹ️ Not on AI page after reload, skipping preview verification')
+        log('Not on AI page after reload, skipping preview verification')
         return
       }
 
-      const backButton = testPage.locator('button[aria-label="Go back"]')
+      const backButton = sidebar.locator('button[aria-label="Go back"]')
       await backButton.waitFor({ state: 'visible', timeout: 5000 })
       await backButton.click()
       log('✓ Clicked back button')
 
-      await testPage.waitForLoadState('domcontentloaded')
-      await testPage.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 }).catch(async () => {
-        const pageInfo = await testPage.evaluate(() => {
-          const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => h.textContent).slice(0, 3)
-          return { url: window.location.href, headings }
-        })
-        log(`Navigation failed. Page info: ${JSON.stringify(pageInfo)}`)
-        throw new Error(`Failed to navigate back to experiment editor. Current page: ${pageInfo.url}`)
+      await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 }).catch(async () => {
+        await testPage.screenshot({ path: 'test-results/ai-persistence-nav-failed.png', fullPage: true })
+        log('Navigation back to editor failed')
+        throw new Error('Failed to navigate back to experiment editor')
       })
 
       await testPage.screenshot({ path: 'test-results/ai-persistence-9-back-to-editor.png', fullPage: true })
@@ -371,10 +373,10 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       log('✓ Back at experiment editor')
 
       log('Scrolling to DOM Changes section...')
-      await testPage.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
+      await sidebar.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
 
       log('Checking and enabling Preview if needed...')
-      const previewToggle = testPage.locator('[data-testid="preview-toggle-variant-1"]')
+      const previewToggle = sidebar.locator('[data-testid="preview-toggle-variant-1"]')
       await previewToggle.waitFor({ state: 'visible', timeout: 10000 })
       await previewToggle.waitFor({ state: 'attached', timeout: 5000 })
 
@@ -386,11 +388,19 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       if (!hasBlueBackground) {
         log('Preview is OFF, enabling it manually...')
         await previewToggle.click()
-        // Wait for toggle animation to complete
-        await testPage.waitForFunction(() => {
-          const toggle = document.querySelector('[data-testid="preview-toggle-variant-1"]')
-          return toggle?.classList.contains('bg-blue-600')
-        }, { timeout: 5000 })
+        // Wait for toggle animation to complete using evaluate on the sidebar frame
+        await previewToggle.evaluate((el) => {
+          return new Promise<boolean>((resolve) => {
+            const check = () => {
+              if (el.classList.contains('bg-blue-600')) {
+                resolve(true)
+              } else {
+                setTimeout(check, 50)
+              }
+            }
+            check()
+          })
+        })
         log('✓ Preview enabled')
       } else {
         log('✓ Preview already enabled')
@@ -400,43 +410,43 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       log('Screenshot saved: ai-persistence-10-preview-enabled.png')
 
       log('Navigating to test page to verify button colors...')
-      const contentPage = context.pages().find(p => p.url().includes('localhost:3456'))
+      const contentPageRef = context.pages().find(p => p.url().includes('localhost:3456'))
 
-      if (contentPage) {
-        await contentPage.bringToFront()
-        await contentPage.reload({ waitUntil: 'domcontentloaded' })
-        await contentPage.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
-          log('⚠️ Network idle timeout, continuing anyway')
+      if (contentPageRef) {
+        await contentPageRef.bringToFront()
+        await contentPageRef.reload({ waitUntil: 'domcontentloaded' })
+        await contentPageRef.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+          log('Network idle timeout, continuing anyway')
         })
 
         // Wait for SDK plugin to initialize and apply changes
-        const sdkLoaded = await contentPage.waitForFunction(() => {
-          return window.__absmartly !== undefined
+        const sdkLoaded = await contentPageRef.waitForFunction(() => {
+          return (window as any).__absmartly !== undefined
         }, { timeout: 10000 }).catch(() => {
-          log('⚠️ ABsmartly SDK plugin not detected')
+          log('ABsmartly SDK plugin not detected')
           return false
         })
 
         if (sdkLoaded) {
           // Wait for DOM changes to be applied by checking if any button style changed
-          await contentPage.waitForFunction(() => {
+          await contentPageRef.waitForFunction(() => {
             const btn1 = document.querySelector('#button-1') as HTMLElement
             if (!btn1) return false
             const bg = window.getComputedStyle(btn1).backgroundColor
             // Check if background is no longer the default blue
             return !bg.includes('59, 130, 246')
           }, { timeout: 5000 }).catch(() => {
-            log('⚠️ DOM changes not applied within timeout')
+            log('DOM changes not applied within timeout')
           })
         }
 
-        await contentPage.screenshot({ path: 'test-results/ai-persistence-11-test-page.png', fullPage: true })
+        await contentPageRef.screenshot({ path: 'test-results/ai-persistence-11-test-page.png', fullPage: true })
         log('Screenshot saved: ai-persistence-11-test-page.png')
 
         log('Checking button colors on test page...')
-        const button1Color = await contentPage.locator('#button-1').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
-        const button2Color = await contentPage.locator('#button-2').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
-        const button3Color = await contentPage.locator('#button-3').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
+        const button1Color = await contentPageRef.locator('#button-1').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
+        const button2Color = await contentPageRef.locator('#button-2').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
+        const button3Color = await contentPageRef.locator('#button-3').evaluate(el => window.getComputedStyle(el).backgroundColor).catch(() => null)
 
         log(`Button 1 background: ${button1Color}`)
         log(`Button 2 background: ${button2Color}`)
@@ -468,15 +478,15 @@ test.describe('AI Page Persistence and HTML Capture', () => {
         log(`Button 3 is orange: ${button3Orange}`)
 
         if (button1Orange && button2Orange && button3Orange) {
-          log('✅ SUCCESS: All buttons have orange backgrounds!')
+          log('SUCCESS: All buttons have orange backgrounds!')
         } else {
-          log('⚠️ WARNING: Not all buttons are orange')
-          log(`   Button 1: ${button1Orange ? '✓' : '✗'}`)
-          log(`   Button 2: ${button2Orange ? '✓' : '✗'}`)
-          log(`   Button 3: ${button3Orange ? '✓' : '✗'}`)
+          log('WARNING: Not all buttons are orange')
+          log(`   Button 1: ${button1Orange ? 'yes' : 'no'}`)
+          log(`   Button 2: ${button2Orange ? 'yes' : 'no'}`)
+          log(`   Button 3: ${button3Orange ? 'yes' : 'no'}`)
         }
 
-        await contentPage.screenshot({ path: 'test-results/ai-persistence-12-final-verification.png', fullPage: true })
+        await contentPageRef.screenshot({ path: 'test-results/ai-persistence-12-final-verification.png', fullPage: true })
         log('Screenshot saved: ai-persistence-12-final-verification.png')
 
         // TODO: Debug why AI-generated DOM changes are not being applied to buttons
@@ -484,14 +494,14 @@ test.describe('AI Page Persistence and HTML Capture', () => {
         // Possible issues: 1) SDK plugin timing, 2) Preview mode not refreshing, 3) Changes not in correct format
         // For now, we'll log a warning but not fail the test since the main persistence feature works
         if (!(button1Orange || button2Orange || button3Orange)) {
-          log('⚠️  KNOWN ISSUE: DOM changes not being applied to test page buttons')
-          log('⚠️  This needs investigation but the core AI persistence feature works correctly')
+          log('KNOWN ISSUE: DOM changes not being applied to test page buttons')
+          log('This needs investigation but the core AI persistence feature works correctly')
         } else {
-          log('✅ At least one button has orange background applied')
+          log('At least one button has orange background applied')
         }
         // expect(button1Orange || button2Orange || button3Orange).toBe(true)
       } else {
-        log('⚠️ Could not find test page to verify button colors')
+        log('Could not find test page to verify button colors')
       }
 
       log('Test completed')
