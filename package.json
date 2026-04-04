@@ -8,14 +8,14 @@
   "scripts": {
     "postinstall": "patch-package",
     "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
-    "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'npm run build:sdk-bridge'",
-    "dev": "npm run build:sdk-bridge && NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",
-    "typecheck": "tsc --noEmit --project tsconfig.build.json",
-    "build": "npm run typecheck && NODE_ENV=production npm run build:sdk-bridge && NODE_ENV=production plasmo build --src-path=. && NODE_ENV=production node scripts/post-build.js",
-    "build:dev": "npm run typecheck && npm run build:sdk-bridge && bash scripts/build-dev-once.sh",
+    "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'bun run build:sdk-bridge'",
+    "dev": "bun run build:sdk-bridge && NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",
+    "typecheck": "tsc --noEmit",
+    "build": "bun run typecheck && NODE_ENV=production bun run build:sdk-bridge && NODE_ENV=production plasmo build --src-path=. && NODE_ENV=production node scripts/post-build.js",
+    "build:dev": "bun run typecheck && bun run build:sdk-bridge && bash scripts/build-dev-once.sh",
     "package": "plasmo package --src-path=.",
-    "test": "npm run test:unit && npm run test:e2e",
-    "test:quick": "npm run test:unit && npm run test:e2e:visual-editor",
+    "test": "bun run test:unit && bun run test:e2e",
+    "test:quick": "bun run test:unit && bun run test:e2e:visual-editor",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual-editor": "playwright test tests/e2e/visual-editor-complete.spec.ts --reporter=list",
@@ -133,5 +133,11 @@
   "overrides": {
     "svelte": "^4.2.19",
     "content-security-policy-parser": "^0.6.0"
-  }
+  },
+  "trustedDependencies": [
+    "@parcel/watcher",
+    "@swc/core",
+    "core-js",
+    "unrs-resolver"
+  ]
 }
