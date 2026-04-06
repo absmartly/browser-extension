@@ -28,7 +28,7 @@ test.describe('AI Session & Image Handling', () => {
     testPage.on('console', consoleHandler)
 
     testPage.on('frameattached', async (frame) => {
-      frame.on('console', consoleHandler)
+      ;(frame as any).on('console', consoleHandler)
     })
 
     const [serviceWorker] = context.serviceWorkers()

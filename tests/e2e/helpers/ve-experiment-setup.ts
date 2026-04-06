@@ -365,11 +365,11 @@ export async function saveExperiment(sidebar: FrameLocator, testPage: Page, expe
   const isDisabled = await saveButton.evaluate((btn) => btn.hasAttribute('disabled'))
 
   if (isDisabled) {
-    await saveButton.waitFor({ state: 'enabled', timeout: 5000 })
+    await saveButton.waitFor({ state: 'visible', timeout: 5000 })
   }
 
   await form.evaluate((f) => {
-    f.requestSubmit()
+    ;(f as HTMLFormElement).requestSubmit()
   })
   await debugWait()
 

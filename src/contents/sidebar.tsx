@@ -358,7 +358,7 @@ export default async () => {
 
   try {
     const wasSidebarVisible = await storage.get('sidebar-visible')
-    if (wasSidebarVisible === true) {
+    if (wasSidebarVisible === "true" || (wasSidebarVisible as unknown) === true) {
       debugLog('🔵 ABSmartly Extension: Auto-injecting sidebar (was previously visible)')
       injectSidebar()
     }

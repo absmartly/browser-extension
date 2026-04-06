@@ -158,6 +158,7 @@ type ABsmartlyConfigBase = {
   queryPrefix?: string
   persistQueryToCookie?: boolean
   vibeStudioEnabled?: boolean
+  htmlInjectionEnabled?: boolean
 }
 
 export type ABsmartlyConfig = ABsmartlyConfigBase &

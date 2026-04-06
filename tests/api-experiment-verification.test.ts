@@ -117,9 +117,9 @@ test.describe('ABSmartly API Experiment Verification', () => {
     expect(foundDomChanges).toBeTruthy()
 
     // Verify treatment_variables if they exist
-    if (detailedExperiment.treatment_variables) {
+    if ((detailedExperiment as any).treatment_variables) {
       console.log('Checking treatment_variables...')
-      for (const [key, value] of Object.entries(detailedExperiment.treatment_variables)) {
+      for (const [key, value] of Object.entries((detailedExperiment as any).treatment_variables)) {
         console.log(`Treatment variable ${key}:`, value)
       }
     }

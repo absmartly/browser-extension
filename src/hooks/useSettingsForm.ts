@@ -286,7 +286,7 @@ export function useSettingsForm() {
       aiApiKey: aiApiKey.trim() || undefined,
       providerModels: updatedProviderModels,
       providerEndpoints: updatedProviderEndpoints
-    } as ABsmartlyConfig
+    } as unknown as ABsmartlyConfig
   }
 
   const requestMissingPermissions = async (): Promise<boolean> => {

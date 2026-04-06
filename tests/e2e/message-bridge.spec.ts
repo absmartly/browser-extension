@@ -36,7 +36,7 @@ test.describe('Message Bridge System', () => {
     testPage.on('console', consoleHandler)
 
     testPage.on('frameattached', async (frame) => {
-      frame.on('console', consoleHandler)
+      ;(frame as any).on('console', consoleHandler)
     })
 
     const [serviceWorker] = context.serviceWorkers()
@@ -111,8 +111,9 @@ test.describe('Message Bridge System', () => {
     })
 
     console.log('PING result:', pingResult)
-    expect(pingResult.success).toBe(true)
-    expect(pingResult.response).toHaveProperty('pong', true)
+    const pingData = pingResult as { success: boolean; response: any }
+    expect(pingData.success).toBe(true)
+    expect(pingData.response).toHaveProperty('pong', true)
   })
 
   test('Test CAPTURE_HTML message (sidebar → content script)', async ({ extensionUrl }) => {
@@ -152,8 +153,9 @@ test.describe('Message Bridge System', () => {
     })
 
     console.log('CAPTURE_HTML result:', captureResult)
-    expect(captureResult.success).toBe(true)
-    expect(captureResult.htmlLength).toBeGreaterThan(0)
+    const captureData = captureResult as { success: boolean; htmlLength: number }
+    expect(captureData.success).toBe(true)
+    expect(captureData.htmlLength).toBeGreaterThan(0)
   })
 
   test('Test AI_GENERATE_DOM_CHANGES message flow', async ({ extensionUrl }) => {
@@ -211,7 +213,8 @@ test.describe('Message Bridge System', () => {
       console.log('Console errors:', errors)
     }
 
-    expect(aiResult.success).toBe(true)
+    const aiData = aiResult as { success: boolean; response: any }
+    expect(aiData.success).toBe(true)
   })
 
   test('Test API_REQUEST message (sidebar → background)', async ({ extensionUrl }) => {
@@ -248,7 +251,8 @@ test.describe('Message Bridge System', () => {
     })
 
     console.log('API_REQUEST result:', apiResult)
-    expect(apiResult.receivedResponse).toBe(true)
+    const apiData = apiResult as { success: boolean; receivedResponse: boolean; response?: any }
+    expect(apiData.receivedResponse).toBe(true)
   })
 
   test('Test CHECK_AUTH message', async ({ extensionUrl }) => {
@@ -285,8 +289,9 @@ test.describe('Message Bridge System', () => {
     })
 
     console.log('CHECK_AUTH result:', authResult)
-    expect(authResult.success).toBe(true)
-    expect(authResult.response).toHaveProperty('success')
+    const authData = authResult as { success: boolean; response: any }
+    expect(authData.success).toBe(true)
+    expect(authData.response).toHaveProperty('success')
   })
 
   test('Test message flow: content script → sidebar → content script', async ({ extensionUrl }) => {
@@ -362,7 +367,8 @@ test.describe('Message Bridge System', () => {
       }
     })
 
-    expect(modeCheckResult.success).toBe(true)
+    const modeCheckData = modeCheckResult as { success: boolean }
+    expect(modeCheckData.success).toBe(true)
 
     const bridgeLogs = allConsoleMessages.filter(m =>
       m.text.includes('[message-bridge]') &&

@@ -8,7 +8,7 @@
 
 export interface DOMChange {
   selector: string
-  type: 'text' | 'html' | 'style' | 'attribute' | 'class' | 'delete' | 'remove'
+  type: 'text' | 'html' | 'style' | 'styles' | 'attribute' | 'class' | 'delete' | 'remove'
   value?: any
   styles?: Record<string, string>
   attribute?: string

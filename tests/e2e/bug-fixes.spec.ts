@@ -53,10 +53,10 @@ test.describe('Bug Fixes E2E Tests', () => {
       await experimentItems.first().click()
 
       // Wait for experiment detail
-      await sidebar.waitForSelector('#back-button', { timeout: 5000 })
+      await sidebar.locator('#back-button').waitFor({ state: 'visible', timeout: 5000 })
 
       // Wait for VE button to appear
-      await sidebar.waitForSelector('#visual-editor-button', { timeout: 5000 })
+      await sidebar.locator('#visual-editor-button').waitFor({ state: 'visible', timeout: 5000 })
 
       // Start VE mode
       await sidebar.locator('#visual-editor-button').first().click()
@@ -66,7 +66,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       await sidebar.locator('#back-button').click()
 
       // Verify we're back at experiment list
-      await sidebar.waitForSelector('.experiment-item', { timeout: 3000 })
+      await sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 3000 })
     })
 
     test('should stop Preview mode when navigating away', async ({ seedStorage }) => {
@@ -250,7 +250,7 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Click on first experiment
       await experimentItems.first().click()
-      await sidebar.waitForSelector('#back-button', { timeout: 5000 })
+      await sidebar.locator('#back-button').waitFor({ state: 'visible', timeout: 5000 })
 
       // Look for unit type field
       const unitTypeLabel = sidebar.locator('text=Unit Type')

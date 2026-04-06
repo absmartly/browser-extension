@@ -137,7 +137,10 @@ export async function verifyMarkersOnPage(
 
   log(`Markers verified: ${markerState.markedElementsCount} marked, ${markerState.elementsWithOriginalsCount} with originals`, 'debug')
 
-  return markerState
+  return {
+    markedElementsCount: markerState.markedElementsCount,
+    originalValuesCount: markerState.elementsWithOriginalsCount
+  }
 }
 
 /**

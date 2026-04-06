@@ -29,7 +29,7 @@ test.describe('AI DOM Changes Generation - Complete Workflow', () => {
     testPage.on('console', consoleHandler)
 
     testPage.on('frameattached', async (frame) => {
-      frame.on('console', consoleHandler)
+      ;(frame as any).on('console', consoleHandler)
     })
 
     // Listen to service worker console logs

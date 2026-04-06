@@ -51,7 +51,7 @@ test.describe('AI Chat Blank Screen Diagnostics', () => {
 
     testPage.on('console', consoleHandler)
     testPage.on('frameattached', async (frame) => {
-      frame.on('console', consoleHandler)
+      ;(frame as any).on('console', consoleHandler)
     })
 
     const [serviceWorker] = context.serviceWorkers()
@@ -103,7 +103,7 @@ test.describe('AI Chat Blank Screen Diagnostics', () => {
     })
     console.log(`  Iframe exists: ${iframeExists}`)
 
-    let iframeContents: IframeContents | null = null
+    let iframeContents: DiagnosticReport['iframeContents'] | null = null
     if (iframeExists) {
       try {
         const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
