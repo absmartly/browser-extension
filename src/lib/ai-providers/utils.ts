@@ -228,16 +228,13 @@ export function buildSystemPromptWithDOMStructure(
 
   const fullPrompt = basePrompt + `\n\n## Page DOM Structure
 
-The following is a tree representation of the page structure. Use the \`css_query\` tool to retrieve specific HTML sections when needed.
+The following is a tree representation of the page structure. Use the selectors visible here (IDs, classes, tags, data attributes) to generate DOM changes DIRECTLY. Only use \`css_query\` or \`xpath_query\` if you need details not visible in this structure.
 
 \`\`\`
 ${domStructure}
 \`\`\`
 
-To inspect sections, call \`css_query\` with selectors FROM THE STRUCTURE ABOVE:
-- \`css_query({ selectors: ["section", "header", "nav"] })\`
-
-IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors.
+IMPORTANT: Only use selectors you see in the structure above. Never invent or guess selectors. Generate DOM changes directly — do not call tools to "verify" selectors.
 `
 
   debugLog(`[${providerName}] Including DOM structure in system prompt (${domStructure.length} chars)`)

@@ -24,8 +24,8 @@ describe('XPath Validator', () => {
         expect(validateXPath("//div[@class='container'][@data-test='value']").valid).toBe(true)
       })
 
-      it('should reject XPath with contains function due to comma', () => {
-        expect(validateXPath("//div[contains(@class, 'test')]").valid).toBe(false)
+      it('should allow XPath with contains function', () => {
+        expect(validateXPath("//div[contains(@class, 'test')]").valid).toBe(true)
       })
 
       it('should allow XPath with nested elements', () => {
@@ -44,8 +44,8 @@ describe('XPath Validator', () => {
         expect(validateXPath("//div[text()='Submit']").valid).toBe(true)
       })
 
-      it('should reject XPath with starts-with function due to comma', () => {
-        expect(validateXPath("//div[starts-with(@class, 'btn')]").valid).toBe(false)
+      it('should allow XPath with starts-with function', () => {
+        expect(validateXPath("//div[starts-with(@class, 'btn')]").valid).toBe(true)
       })
 
       it('should allow XPath with double quotes', () => {
@@ -56,8 +56,8 @@ describe('XPath Validator', () => {
         expect(validateXPath("//div[@class='test']").valid).toBe(true)
       })
 
-      it('should reject complex XPath with function due to comma', () => {
-        expect(validateXPath("//div[@class='container']//span[contains(@class, 'text')]").valid).toBe(false)
+      it('should allow complex XPath with contains function', () => {
+        expect(validateXPath("//div[@class='container']//span[contains(@class, 'text')]").valid).toBe(true)
       })
     })
 
@@ -199,8 +199,8 @@ describe('XPath Validator', () => {
         expect(validateXPath('//svg:path').valid).toBe(true)
       })
 
-      it('should reject XPath with parentheses and commas in functions', () => {
-        expect(validateXPath("//div[contains(text(), 'test')]").valid).toBe(false)
+      it('should allow XPath with parentheses and commas in contains/starts-with', () => {
+        expect(validateXPath("//div[contains(text(), 'test')]").valid).toBe(true)
       })
 
       it('should allow safe common UI elements', () => {

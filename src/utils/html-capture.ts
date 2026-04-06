@@ -168,10 +168,28 @@ export async function searchTextInPage(searchText: string, maxResults: number = 
 
     const results = await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
-      func: (text: string, limit: number, generateSelectorFn: (element: Element) => string) => {
-        const matches: { selector: string; html: string; textContent: string }[] = []
+      func: (text: string, limit: number) => {
+        const generateSelector = (element: Element): string => {
+          if (element.id) return `#${element.id}`
+          const tagName = element.tagName.toLowerCase()
+          const classes = Array.from(element.classList).filter(c => c && !c.includes(':'))
+          if (classes.length > 0) {
+            const classSelector = `${tagName}.${classes.slice(0, 2).join('.')}`
+            if (document.querySelectorAll(classSelector).length === 1) return classSelector
+          }
+          const parent = element.parentElement
+          if (parent) {
+            const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName)
+            if (siblings.length > 1) {
+              const index = siblings.indexOf(element) + 1
+              return `${generateSelector(parent)} > ${tagName}:nth-of-type(${index})`
+            }
+            return `${generateSelector(parent)} > ${tagName}`
+          }
+          return tagName
+        }
 
-        const generateSelector = generateSelectorFn
+        const matches: { selector: string; html: string; textContent: string }[] = []
 
         try {
           const xpath = `//*[contains(text(), "${text.replace(/"/g, '\\"')}")]`
@@ -199,7 +217,7 @@ export async function searchTextInPage(searchText: string, maxResults: number = 
 
         return matches
       },
-      args: [searchText, maxResults, generateSelectorInPage]
+      args: [searchText, maxResults]
     })
 
     if (!results || results.length === 0 || !results[0]?.result) {
@@ -238,10 +256,28 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
 
     const results = await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
-      func: (xpathQuery: string, limit: number, generateSelectorFn: (element: Element) => string) => {
-        const matches: { selector: string; html: string; textContent: string; nodeType: string }[] = []
+      func: (xpathQuery: string, limit: number) => {
+        const generateSelector = (element: Element): string => {
+          if (element.id) return `#${element.id}`
+          const tagName = element.tagName.toLowerCase()
+          const classes = Array.from(element.classList).filter(c => c && !c.includes(':'))
+          if (classes.length > 0) {
+            const classSelector = `${tagName}.${classes.slice(0, 2).join('.')}`
+            if (document.querySelectorAll(classSelector).length === 1) return classSelector
+          }
+          const parent = element.parentElement
+          if (parent) {
+            const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName)
+            if (siblings.length > 1) {
+              const index = siblings.indexOf(element) + 1
+              return `${generateSelector(parent)} > ${tagName}:nth-of-type(${index})`
+            }
+            return `${generateSelector(parent)} > ${tagName}`
+          }
+          return tagName
+        }
 
-        const generateSelector = generateSelectorFn
+        const matches: { selector: string; html: string; textContent: string; nodeType: string }[] = []
 
         try {
           const xpathResult = document.evaluate(
@@ -290,7 +326,7 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
 
         return { matches }
       },
-      args: [xpath, maxResults, generateSelectorInPage]
+      args: [xpath, maxResults]
     })
 
     if (!results || results.length === 0 || !results[0]?.result) {

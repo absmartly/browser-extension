@@ -45,9 +45,10 @@ export function validateSelector(selector: string): boolean {
     }
   }
 
-  try {
-    document.querySelector(selector)
-  } catch (e) {
+  // Basic syntax check: balanced brackets and parentheses (no DOM needed)
+  const brackets = selector.split('[').length - selector.split(']').length
+  const parens = selector.split('(').length - selector.split(')').length
+  if (brackets !== 0 || parens !== 0) {
     debugWarn('[Selector Validator] Invalid CSS selector syntax:', selector)
     return false
   }

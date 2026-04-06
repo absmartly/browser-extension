@@ -19,7 +19,7 @@ export interface XPathValidationResult {
   error?: string
 }
 
-const SAFE_XPATH_PATTERN = /^\/\/[a-zA-Z0-9\[\]@='"\s\.\-_\*\/\(\):]+$/
+const SAFE_XPATH_PATTERN = /^\/\/[a-zA-Z0-9\[\]@='"\s\.\-_\*\/\(\):,]+$/
 
 const DANGEROUS_XPATH_FUNCTIONS = [
   /document\s*\(/i,
@@ -36,10 +36,7 @@ const DANGEROUS_XPATH_FUNCTIONS = [
   /\bid\s*\(/i,
   /local-name\s*\(/i,
   /namespace-uri\s*\(/i,
-  /\bname\s*\(/i,
-  /contains\s*\(/i,
-  /starts-with\s*\(/i,
-  /ends-with\s*\(/i
+  /\bname\s*\(/i
 ]
 
 const XPATH_INJECTION_PATTERNS = [
