@@ -49,6 +49,9 @@ export class ExtensionHttpClient implements HttpClient {
     }
 
     let url = config.url
+    if (url.startsWith("/")) {
+      url = this.getBaseUrl() + url
+    }
 
     if (config.params) {
       const searchParams = new URLSearchParams()
