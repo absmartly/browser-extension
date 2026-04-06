@@ -135,7 +135,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     }
   }, [modelsFetched, fetchingModels, aiApiKey, aiProvider, customEndpoint, meta, fetchModels])
 
-  // Auto-fetch when endpoint changes and we have permission
+  // Auto-fetch when endpoint or API key changes and we have permission
   useEffect(() => {
     if (!aiApiKey || !meta.fetchModels) return
     setModelsFetched(false)
@@ -146,7 +146,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         fetchModels()
       }
     })
-  }, [customEndpoint])
+  }, [customEndpoint, aiApiKey])
 
   const checkBridgeConnection = async () => {
     debugLog('[AIProviderSection] Starting bridge connection check...')
