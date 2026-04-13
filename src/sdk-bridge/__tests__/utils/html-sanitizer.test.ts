@@ -4,11 +4,7 @@
 
 import { sanitizeHTML } from '../../utils/html-sanitizer'
 
-// Mock DOM environment
-import { JSDOM } from 'jsdom'
-const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
-global.document = dom.window.document as any
-global.Element = dom.window.Element as any
+// document and Element are already provided by jest-environment-jsdom
 
 describe('sanitizeHTML', () => {
   describe('basic functionality', () => {

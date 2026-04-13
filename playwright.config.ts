@@ -27,12 +27,12 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000
     },
-    {
+    ...(!process.env.CI ? [{
       command: 'node ../claude-code-bridge/index.js',
       port: 3000,
       reuseExistingServer: true,
       timeout: 30 * 1000
-    }
+    }] : [])
   ],
 
   projects: [
