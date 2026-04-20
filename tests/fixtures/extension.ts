@@ -71,14 +71,32 @@ export const test = base.extend<ExtFixtures>({
     const seedUrl = `chrome-extension://${seedExtId}/tests/seed.html`
     await seedPage.goto(seedUrl)
     await seedPage.waitForFunction(() => typeof (window as any).seed === 'function', { timeout: 5000 })
-    await seedPage.evaluate((data) => (window as any).seed(data), {
-      'absmartly-config': {
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD || 'apikey',
-        domChangesFieldName: '__dom_changes',
-        vibeStudioEnabled: true
-      }
-    })
+
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
+    const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
+
+    const defaultConfig = {
+      apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
+      apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
+      authMethod: process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD || 'apikey',
+      domChangesFieldName: '__dom_changes',
+      vibeStudioEnabled: true,
+      aiProvider: anthropicApiKey ? 'anthropic-api' : 'claude-subscription',
+      aiApiKey: '',
+      providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
+    }
+
+    const seedData: Record<string, unknown> = {
+      'absmartly-config': defaultConfig,
+      'plasmo:absmartly-config': defaultConfig
+    }
+
+    if (anthropicApiKey) {
+      seedData['ai-apikey'] = anthropicApiKey
+      seedData['plasmo:ai-apikey'] = anthropicApiKey
+    }
+
+    await seedPage.evaluate((data) => (window as any).seed(data), seedData)
     await seedPage.close()
 
     await use(context)
