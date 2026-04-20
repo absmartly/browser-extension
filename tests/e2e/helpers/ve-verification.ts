@@ -45,8 +45,8 @@ export async function verifySidebarHasChanges(sidebar: FrameLocator, minExpected
   const allText = cardsText.join(' ')
 
   // Verify each specific change we made is present with correct details
-  const hasEditText = allText.includes('#test-paragraph') && allText.includes('Text undo test')
-  log(`  ${hasEditText ? '✓' : '✗'} Edit Text: #test-paragraph → "Text undo test"`)
+  const hasEditText = allText.includes('#test-paragraph') && allText.includes('Modified text!')
+  log(`  ${hasEditText ? '✓' : '✗'} Edit Text: #test-paragraph → "Modified text!"`)
   expect(hasEditText).toBeTruthy()
 
   const hasHide = allText.includes('#button-1') && allText.includes('display') && allText.includes('none')
@@ -214,7 +214,7 @@ export async function verifyChangesAfterVEExit(page: Page): Promise<void> {
     }
   })
 
-  expect(postVEState.paragraphText).toBe('Bold HTML test')
+  expect(postVEState.paragraphText).toBe('Bold HTML test\nModified text!')
   expect(postVEState.button1Display).toBe('none')
   expect(postVEState.button2Display).toBe('none')
   expect(postVEState.testContainerHTML).toContain('HTML Edited!')

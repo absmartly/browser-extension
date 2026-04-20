@@ -68,6 +68,11 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   expect(currentText?.trim()).toBe('Text undo test')
   log('  ✓ Text undo/redo')
 
+  // Undo text change to return to original state before HTML edit test
+  await page.locator('[data-action="undo"]').click()
+  currentText = await page.locator('#test-paragraph').textContent()
+  expect(currentText?.trim()).toBe(originalText?.trim())
+
   // 2. TEST HTML CHANGE UNDO/REDO
   await page.waitForFunction(() => {
     const para = document.querySelector('#test-paragraph')

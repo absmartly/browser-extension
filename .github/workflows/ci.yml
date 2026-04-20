@@ -61,12 +61,16 @@ jobs:
         env:
           PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+          PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
+          PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
       - run: bun run test:e2e:visual-editor
         env:
           CI: true
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+          PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
+          PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
