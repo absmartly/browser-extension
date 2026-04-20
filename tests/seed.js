@@ -1,22 +1,21 @@
 // Function to seed storage with key-value pairs
 // IMPORTANT: Plasmo Storage expects all values to be JSON-serialized
-// We need to serialize values the same way Plasmo Storage does
+// Secret keys (ai-apikey, absmartly-apikey) go in local storage;
+// everything else goes in sync storage. This mirrors the extension's
+// own routing in src/utils/storage.ts.
 window.seed = async (kv) => {
   try {
-    // Handle special case for legacy individual keys - convert to config object
     if (kv['absmartly-endpoint'] || kv['absmartly-auth-method']) {
       console.log('⚠️  Detected legacy storage format, converting to new format...');
 
-      // Build config object from individual keys
       const config = {
-        apiKey: '', // API key stored separately in secure storage
+        apiKey: '',
         apiEndpoint: kv['absmartly-endpoint'] || kv['absmartly-apiEndpoint'],
         authMethod: kv['absmartly-auth-method'] || kv['absmartly-authMethod'] || 'jwt',
         applicationId: kv['absmartly-applicationId'],
         domChangesFieldName: kv['absmartly-domChangesFieldName']
       };
 
-      // Remove individual keys and use unified config
       delete kv['absmartly-endpoint'];
       delete kv['absmartly-apiEndpoint'];
       delete kv['absmartly-auth-method'];
@@ -26,22 +25,38 @@ window.seed = async (kv) => {
       delete kv['absmartly-applicationId'];
       delete kv['absmartly-domChangesFieldName'];
 
-      // Add config object
       kv['absmartly-config'] = config;
 
       console.log('✅ Converted to config object:', config);
     }
 
-    // Serialize all values using JSON.stringify, just like Plasmo Storage does
-    const serialized = {};
+    const LOCAL_AREA_KEYS = new Set([
+      'ai-apikey',
+      'absmartly-apikey',
+      'plasmo:ai-apikey',
+      'plasmo:absmartly-apikey'
+    ]);
+
+    const syncSerialized = {};
+    const localSerialized = {};
     for (const [key, value] of Object.entries(kv)) {
-      // Plasmo Storage serializes all values with JSON.stringify
-      serialized[key] = JSON.stringify(value);
+      const serialized = JSON.stringify(value);
+      if (LOCAL_AREA_KEYS.has(key)) {
+        localSerialized[key] = serialized;
+      } else {
+        syncSerialized[key] = serialized;
+      }
     }
 
-    await chrome.storage.sync.set(serialized);
-    console.log('Storage seeded with keys:', Object.keys(kv));
-    console.log('Storage seeded with values:', kv);
+    if (Object.keys(syncSerialized).length > 0) {
+      await chrome.storage.sync.set(syncSerialized);
+    }
+    if (Object.keys(localSerialized).length > 0) {
+      await chrome.storage.local.set(localSerialized);
+    }
+
+    console.log('Storage seeded (sync):', Object.keys(syncSerialized));
+    console.log('Storage seeded (local):', Object.keys(localSerialized));
     return 'ok';
   } catch (error) {
     console.error('Failed to seed storage:', error);
@@ -49,11 +64,11 @@ window.seed = async (kv) => {
   }
 };
 
-// Function to clear all storage
 window.clear = async () => {
   try {
     await chrome.storage.sync.clear();
-    console.log('Storage cleared');
+    await chrome.storage.local.clear();
+    console.log('Storage cleared (sync + local)');
     return 'ok';
   } catch (error) {
     console.error('Failed to clear storage:', error);
@@ -61,17 +76,16 @@ window.clear = async () => {
   }
 };
 
-// Function to get current storage state (for debugging)
 window.getAll = async () => {
   try {
-    const items = await chrome.storage.sync.get(null);
-    // Deserialize values just like Plasmo Storage does
+    const syncItems = await chrome.storage.sync.get(null);
+    const localItems = await chrome.storage.local.get(null);
+    const all = { ...syncItems, ...localItems };
     const deserialized = {};
-    for (const [key, value] of Object.entries(items)) {
+    for (const [key, value] of Object.entries(all)) {
       try {
         deserialized[key] = JSON.parse(value);
       } catch {
-        // If parsing fails, return raw value (shouldn't happen if seeded correctly)
         deserialized[key] = value;
       }
     }
@@ -83,7 +97,6 @@ window.getAll = async () => {
   }
 };
 
-// Show storage state on page load for debugging
 window.addEventListener('DOMContentLoaded', async () => {
   const items = await window.getAll();
   document.body.innerHTML += `<pre>${JSON.stringify(items, null, 2)}</pre>`;
