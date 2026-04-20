@@ -214,7 +214,7 @@ export async function verifyChangesAfterVEExit(page: Page): Promise<void> {
     }
   })
 
-  expect(postVEState.paragraphText).toBe('Bold HTML test')
+  expect(postVEState.paragraphText).toBe('Bold HTML test\nModified text!')
   expect(postVEState.button1Display).toBe('none')
   expect(postVEState.button2Display).toBe('none')
   expect(postVEState.testContainerHTML).toContain('HTML Edited!')
