@@ -69,21 +69,21 @@ export function useExperimentInitialization({
                   storage.remove('pendingApplicationFilter')
                   loadExperiments(false, 1, pageSize, newFilters)
                 } else {
-                  loadExperiments(false)
+                  loadExperiments(false, 1, pageSize, filters)
                 }
               } else {
-                loadExperiments(false)
+                loadExperiments(false, 1, pageSize, filters)
               }
             } else {
-              loadExperiments(false)
+              loadExperiments(false, 1, pageSize, filters)
             }
           })
         } else {
-          loadExperiments(false)
+          loadExperiments(false, 1, pageSize, filters)
         }
       }).catch(error => {
         debugError('Failed to load applications:', error)
-        loadExperiments(false)
+        loadExperiments(false, 1, pageSize, filters)
       })
 
       loadFavorites()
