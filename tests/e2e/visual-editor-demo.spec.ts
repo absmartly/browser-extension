@@ -98,6 +98,9 @@ test.describe('Visual Editor Demo', () => {
     })
     console.log('📸 Screenshot: context-menu-heading.png')
 
+    // Close the context menu so the next target isn't blocked by the menu host
+    await page.keyboard.press('Escape')
+
     // 2. Click on button
     console.log('\n2️⃣ Clicking on button...')
     const button = page.locator('#btn-primary').first()
@@ -112,6 +115,8 @@ test.describe('Visual Editor Demo', () => {
       clip: { x: 100, y: 200, width: 800, height: 600 }
     })
     console.log('📸 Screenshot: context-menu-button.png')
+
+    await page.keyboard.press('Escape')
 
     // 3. Click on card
     console.log('\n3️⃣ Clicking on card...')
