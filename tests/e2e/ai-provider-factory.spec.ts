@@ -92,24 +92,24 @@ test.describe('AI Provider Factory E2E', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
-    const bridgeInstructions = page.locator('#claude-subscription-instructions')
+    // The claude-subscription UI has two terminal states that depend on whether
+    // the local claude-code-bridge is reachable. Wait for the connection attempt
+    // to settle so the visible-element check below doesn't race the transition.
     const bridgeStatus = page.locator('#bridge-connection-status')
+    await bridgeStatus.waitFor({ state: 'visible', timeout: 5000 })
+    await expect(bridgeStatus).not.toHaveText(/Checking|Connecting/i, { timeout: 5000 })
+
+    const bridgeInstructions = page.locator('#claude-subscription-instructions')
     const instructionsVisible = await bridgeInstructions.isVisible().catch(() => false)
-    const statusVisible = await bridgeStatus.isVisible().catch(() => false)
 
     if (instructionsVisible) {
-      const loginCommand = page.locator('#claude-login-command')
-      await expect(loginCommand).toBeVisible()
-
-      const bridgeCommand = page.locator('#bridge-start-command')
-      await expect(bridgeCommand).toBeVisible()
-
+      await expect(page.locator('#claude-login-command')).toBeVisible()
+      await expect(page.locator('#bridge-start-command')).toBeVisible()
       console.log('✓ Bridge instructions displayed (bridge not connected)')
-    } else if (statusVisible) {
+    } else {
       console.log('✓ Bridge connected, instructions hidden as expected')
     }
 
-    expect(instructionsVisible || statusVisible).toBe(true)
     console.log('✓ Bridge UI displayed correctly')
   })
 
