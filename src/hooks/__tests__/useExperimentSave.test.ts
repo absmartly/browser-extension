@@ -370,8 +370,8 @@ describe('useExperimentSave - Custom Fields', () => {
       expect(mockOnUpdate).toHaveBeenCalled()
       const updatePayload = mockOnUpdate.mock.calls[0][1]
 
-      expect(updatePayload.data.custom_section_field_values).toBeDefined()
-      expect(updatePayload.data.custom_section_field_values['1']).toEqual({
+      expect(updatePayload.custom_section_field_values).toBeDefined()
+      expect(updatePayload.custom_section_field_values['1']).toEqual({
         experiment_id: 1,
         experiment_custom_section_field_id: 1,
         type: 'text',
@@ -382,6 +382,149 @@ describe('useExperimentSave - Custom Fields', () => {
         id: 1,
         default_value: 'Existing hypothesis'
       })
+    })
+  })
+
+  describe('Update payload shape (CLI contract)', () => {
+    const buildUpdateScenario = () => {
+      const existingExperiment: Partial<Experiment> = {
+        id: unsafeExperimentId(1),
+        name: 'existing-experiment',
+        display_name: 'Existing',
+        state: 'created'
+      }
+
+      const mockFullExperiment = {
+        ...existingExperiment,
+        iteration: 1,
+        variants: [
+          { variant: 0, name: 'Control', config: '{"__dom_changes":[]}' },
+          { variant: 1, name: 'Variant A', config: '{"__dom_changes":[{"selector":".old","action":"text","value":"Old"}]}' }
+        ],
+        percentages: '50/50',
+        audience: '{}',
+        audience_strict: false,
+        updated_at: '2024-01-01T00:00:00Z'
+      }
+
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { experiment: mockFullExperiment }
+      })
+
+      const formData = {
+        display_name: 'Updated Experiment',
+        percentage_of_traffic: 75,
+        unit_type_id: 2,
+        application_ids: [10, 20],
+        owner_ids: [1],
+        team_ids: [5],
+        tag_ids: [3, 4]
+      }
+
+      return { existingExperiment, formData }
+    }
+
+    it('passes a flat Partial<ExperimentInput> — not a {id,version,data:{...}} wrapper — so the CLI merge receives the user edits', async () => {
+      const { existingExperiment, formData } = buildUpdateScenario()
+      const mockOnUpdate = jest.fn()
+
+      const variants = [
+        { name: 'Control', config: { __dom_changes: [] } },
+        { name: 'Variant A', config: { __dom_changes: [{ selector: '.new', action: 'text', value: 'New' }] } }
+      ]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: '__dom_changes'
+        })
+      )
+
+      await act(async () => {
+        await result.current.save(formData, variants, mockOnUpdate, undefined)
+      })
+
+      expect(mockOnUpdate).toHaveBeenCalled()
+      const payload = mockOnUpdate.mock.calls[0][1]
+
+      expect(payload.data).toBeUndefined()
+      expect(payload.id).toBeUndefined()
+      expect(payload.version).toBeUndefined()
+
+      expect(payload.display_name).toBe('Updated Experiment')
+      expect(payload.percentage_of_traffic).toBe(75)
+      expect(payload.unit_type).toEqual({ unit_type_id: 2 })
+      expect(payload.owners).toEqual([{ user_id: 1 }])
+      expect(payload.teams).toEqual([{ team_id: 5 }])
+      expect(payload.experiment_tags).toEqual([
+        { experiment_tag_id: 3 },
+        { experiment_tag_id: 4 }
+      ])
+      expect(payload.applications).toEqual([
+        { application_id: 10, application_version: '0' },
+        { application_id: 20, application_version: '0' }
+      ])
+      expect(payload.variants).toBeDefined()
+    })
+
+    it('round-trips the user-edited __dom_changes through the payload intact', async () => {
+      const { existingExperiment, formData } = buildUpdateScenario()
+      const mockOnUpdate = jest.fn()
+
+      const newDomChanges = [
+        { selector: '.hero', action: 'text', value: 'Fresh copy' },
+        { selector: '.cta', action: 'style', value: '', css: { color: 'red' } }
+      ]
+      const variants = [
+        { name: 'Control', config: { __dom_changes: [] } },
+        { name: 'Variant A', config: { __dom_changes: newDomChanges } }
+      ]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: '__dom_changes'
+        })
+      )
+
+      await act(async () => {
+        await result.current.save(formData, variants, mockOnUpdate, undefined)
+      })
+
+      const payload = mockOnUpdate.mock.calls[0][1]
+      const variantA = payload.variants.find((v: { name: string }) => v.name === 'Variant A')
+      expect(variantA).toBeDefined()
+
+      const parsed = JSON.parse(variantA.config)
+      expect(parsed.__dom_changes).toEqual(newDomChanges)
+    })
+
+    it('preserves the original variant indices when reordering/renaming is absent', async () => {
+      const { existingExperiment, formData } = buildUpdateScenario()
+      const mockOnUpdate = jest.fn()
+
+      const variants = [
+        { name: 'Control', config: { __dom_changes: [] } },
+        { name: 'Variant A', config: { __dom_changes: [] } }
+      ]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: '__dom_changes'
+        })
+      )
+
+      await act(async () => {
+        await result.current.save(formData, variants, mockOnUpdate, undefined)
+      })
+
+      const payload = mockOnUpdate.mock.calls[0][1]
+      expect(payload.variants.map((v: { name: string; variant: number }) => ({ name: v.name, variant: v.variant }))).toEqual([
+        { name: 'Control', variant: 0 },
+        { name: 'Variant A', variant: 1 }
+      ])
     })
   })
 
