@@ -49,6 +49,8 @@ export function useExperimentInitialization({
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
 
+      loadEditorResources()
+
       getApplications().then(apps => {
         if (apps && apps.length > 0) {
           setApplications(apps)
@@ -88,7 +90,7 @@ export function useExperimentInitialization({
 
       loadFavorites()
     }
-  }, [config, isAuthenticated, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, setApplications, setFilters, setHasInitialized])
+  }, [config, isAuthenticated, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, loadEditorResources, setApplications, setFilters, setHasInitialized])
 
   useEffect(() => {
     if (config && isAuthenticated && view === 'list' && applications.length === 0) {
