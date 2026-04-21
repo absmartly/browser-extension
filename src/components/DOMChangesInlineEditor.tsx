@@ -8,6 +8,7 @@ import { useDOMChangesEditor } from '~src/hooks/useDOMChangesEditor'
 import { useVisualEditorCoordination } from '~src/hooks/useVisualEditorCoordination'
 import { useEditorStateRestoration } from '~src/hooks/useEditorStateRestoration'
 import { useJsPreviewDiagnostics } from '~src/hooks/useJsPreviewDiagnostics'
+import { JsPreviewWarnings } from './JsPreviewWarnings'
 import {
   PlusIcon,
   PaintBrushIcon,
@@ -294,29 +295,11 @@ export function DOMChangesInlineEditor({
       </div>
 
       <div className="space-y-2">
-        {hasJavascriptChanges && pageWarning && pageWarning.jsBlocked && (
-          <div
-            id={`js-csp-warning-variant-${variantIndex}`}
-            role="alert"
-            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-          >
-            <div className="font-medium">This page blocks dynamic JavaScript.</div>
-            <div className="mt-0.5 text-amber-800">
-              The page's Content Security Policy prevents both <code>eval</code> and inline <code>&lt;script&gt;</code>,
-              so <code>javascript</code> DOM changes will not execute here or in production on this URL.
-            </div>
-          </div>
-        )}
-        {hasJavascriptChanges && pageWarning && !pageWarning.jsBlocked && !pageWarning.evalAllowed && (
-          <div
-            id={`js-csp-info-variant-${variantIndex}`}
-            role="status"
-            className="rounded-md border border-amber-100 bg-amber-50/60 px-3 py-2 text-xs text-amber-800"
-          >
-            This page blocks <code>eval</code> / <code>new Function()</code>. JavaScript changes will try an inline
-            <code>&lt;script&gt;</code> fallback; if that also fails the change won't run.
-          </div>
-        )}
+        <JsPreviewWarnings
+          pageWarning={pageWarning}
+          hasJavascriptChanges={hasJavascriptChanges}
+          variantIndex={variantIndex}
+        />
         <DOMChangeList
           changes={changes}
           experimentName={experimentName}

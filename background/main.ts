@@ -36,6 +36,11 @@ import {
 } from './handlers/event-buffer'
 
 import {
+  isPreviewDiagnosticMessage,
+  broadcastPreviewDiagnostic
+} from './handlers/preview-diagnostic-relay'
+
+import {
   initializeInjectionHandler
 } from './handlers/injection-handler'
 
@@ -294,20 +299,8 @@ export function initializeBackgroundScript() {
           sendResponse({ success: false, error: error.message })
         })
       return true
-    } else if (
-      message.type === 'PREVIEW_JS_ERROR' ||
-      message.type === 'PREVIEW_CSP_PROBE' ||
-      message.type === 'PREVIEW_JS_PENDING'
-    ) {
-      chrome.runtime.sendMessage({
-        type: `${message.type}_BROADCAST`,
-        payload: message.payload
-      }).catch((error) => {
-        if (!error?.message?.includes('Receiving end does not exist') &&
-            !error?.message?.includes('message port closed')) {
-          debugError(`[Background] Unexpected error broadcasting ${message.type}:`, error)
-        }
-      })
+    } else if (isPreviewDiagnosticMessage(message.type)) {
+      broadcastPreviewDiagnostic({ type: message.type, payload: message.payload })
       sendResponse({ success: true })
       return true
     } else if (message.type === 'GET_BUFFERED_EVENTS') {
