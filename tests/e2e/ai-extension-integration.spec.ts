@@ -7,9 +7,10 @@ test.describe('Extension AI Integration (Anthropic API)', () => {
     test.setTimeout(180000)
 
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
-    if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY or PLASMO_PUBLIC_ANTHROPIC_API_KEY environment variable is required')
-    }
+    test.skip(
+      !anthropicApiKey,
+      'ANTHROPIC_API_KEY / PLASMO_PUBLIC_ANTHROPIC_API_KEY required; test hits the real Anthropic API'
+    )
 
     const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
 
