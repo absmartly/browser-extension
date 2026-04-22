@@ -305,25 +305,33 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
 
       await sidebar.locator('#variables-heading').last().scrollIntoViewIfNeeded()
 
-      // Click "Add Variable" button for Variant 1
-      const addVarButton = sidebar.locator('#add-variable-button').last()
-      await addVarButton.scrollIntoViewIfNeeded()
-      await addVarButton.click()
-      console.log('  Clicked Add Variable button')
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 500 }).catch(() => {})
+      // Two variant cards each render id="add-variable-button". `.last()`
+      // should target Variant 1's button, but in practice the UI briefly
+      // re-renders after step 6 (JSON editor close) and Playwright's click
+      // can retarget to the Control-variant button if the Variant-1 one is
+      // momentarily hidden/removed. Dispatch the click programmatically on
+      // the LAST button that's actually connected and visible so we never
+      // fall back to the wrong variant.
+      await sidebar.locator('#variables-heading').last().waitFor({ state: 'visible', timeout: 5000 })
+      const clickResult = await sidebar.locator('#add-variable-button').evaluateAll((buttons) => {
+        const visibleButtons = (buttons as HTMLElement[]).filter(b => b.offsetParent !== null)
+        const target = visibleButtons[visibleButtons.length - 1]
+        if (target) {
+          target.click()
+          return { clicked: true, count: visibleButtons.length }
+        }
+        return { clicked: false, count: visibleButtons.length }
+      })
+      console.log(`  Clicked Add Variable button (visible buttons: ${clickResult.count})`)
 
-      // The inline form should now be visible (last one = Variant 1)
-      const nameInput = sidebar.locator('input[placeholder="Variable name"]').last()
+      const nameInput = sidebar.locator('#new-variable-name-input-1')
       await nameInput.waitFor({ state: 'visible', timeout: 5000 })
       await nameInput.click()
       await nameInput.type('hello')
       await nameInput.blur()
       console.log('  Typed variable name: hello')
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 200 }).catch(() => {})
 
-      const valueInput = sidebar.locator('input[placeholder="Variable value"]').last()
+      const valueInput = sidebar.locator('#new-variable-value-input-1')
       await valueInput.waitFor({ state: 'visible', timeout: 5000 })
       await valueInput.click()
       await valueInput.type('there')
@@ -413,18 +421,22 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       // Scroll to Variables section for Variant 1
       await sidebar.locator('#variables-heading').last().scrollIntoViewIfNeeded()
 
-      // Click "Add Variable" button again for Variant 1
-      const addVarButton = sidebar.locator('#add-variable-button').last()
-      await addVarButton.scrollIntoViewIfNeeded()
-      await addVarButton.click()
-      // Wait briefly for UI update
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
+      // Click "Add Variable" button again for Variant 1 (same defensive
+      // pattern as step 7 above).
+      await sidebar.locator('#variables-heading').last().waitFor({ state: 'visible', timeout: 5000 })
+      await sidebar.locator('#add-variable-button').evaluateAll((buttons) => {
+        const visibleButtons = (buttons as HTMLElement[]).filter(b => b.offsetParent !== null)
+        const target = visibleButtons[visibleButtons.length - 1]
+        if (target) target.click()
+      })
 
-      // Add second variable (last = Variant 1's form)
-      const nameInput = sidebar.locator('input[placeholder="Variable name"]').last()
+      // Add second variable (use stable id to avoid races)
+      const nameInput = sidebar.locator('#new-variable-name-input-1')
+      await nameInput.waitFor({ state: 'visible', timeout: 5000 })
       await nameInput.fill('foo')
 
-      const valueInput = sidebar.locator('input[placeholder="Variable value"]').last()
+      const valueInput = sidebar.locator('#new-variable-value-input-1')
+      await valueInput.waitFor({ state: 'visible', timeout: 5000 })
       await valueInput.fill('bar')
 
       const saveVarButton = sidebar.locator('button[title="Save variable"]').or(

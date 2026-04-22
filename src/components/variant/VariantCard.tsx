@@ -208,6 +208,7 @@ export const VariantCard = React.memo(function VariantCard({
               {addingVariableForVariant === index && canEdit && (
                 <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-200">
                   <Input
+                    id={`new-variable-name-input-${index}`}
                     ref={newVarNameInputRef}
                     value={newVariableName}
                     onChange={(e) => onNewVariableNameChange(e.target.value)}
@@ -222,6 +223,7 @@ export const VariantCard = React.memo(function VariantCard({
                     className="flex-1 text-sm"
                   />
                   <Input
+                    id={`new-variable-value-input-${index}`}
                     ref={newVarValueInputRef}
                     value={newVariableValue}
                     onChange={(e) => onNewVariableValueChange(e.target.value)}
