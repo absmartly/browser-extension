@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { debugLog } from '~src/utils/debug'
 import { localAreaStorage } from '~src/utils/storage'
 import { useDebounce } from './useDebounce'
@@ -12,6 +12,8 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
   const [filtersLoaded, setFiltersLoaded] = useState(false)
   const [filtersInitialized, setFiltersInitialized] = useState(false)
   const debouncedFilters = useDebounce(filters, DEBOUNCE_DELAY_MS)
+  const onFiltersChangeRef = useRef<((filters: ExperimentFilters) => void) | null>(null)
+  const lastFiredFiltersRef = useRef<string | null>(null)
 
   useEffect(() => {
     const storage = localAreaStorage
@@ -33,8 +35,10 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
 
       if (savedFilters) {
         setFilters(savedFilters)
+        lastFiredFiltersRef.current = JSON.stringify(savedFilters)
       } else {
         setFilters(defaultFilters)
+        lastFiredFiltersRef.current = JSON.stringify(defaultFilters)
       }
       setFiltersLoaded(true)
     })
@@ -47,14 +51,15 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
     debugLog('handleFilterChange called with:', filterState)
     debugLog('Current filters:', filters)
 
-    if (!filtersInitialized) {
-      setFiltersInitialized(true)
-    }
+    onFiltersChangeRef.current = onFiltersChange
 
     const hasActualChange = JSON.stringify(filterState) !== JSON.stringify(filters)
     debugLog('Has actual change:', hasActualChange)
 
     if (hasActualChange) {
+      if (!filtersInitialized) {
+        setFiltersInitialized(true)
+      }
       setFilters(filterState)
       const storage = localAreaStorage
       storage.set('experimentFilters', filterState)
@@ -65,9 +70,16 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
   }, [filters, filtersInitialized])
 
   useEffect(() => {
-    if (debouncedFilters && filtersInitialized) {
-      debugLog('Debounced filters changed, triggering reload')
+    if (!debouncedFilters || !filtersInitialized || !onFiltersChangeRef.current) {
+      return
     }
+    const snapshot = JSON.stringify(debouncedFilters)
+    if (lastFiredFiltersRef.current === snapshot) {
+      return
+    }
+    lastFiredFiltersRef.current = snapshot
+    debugLog('Debounced filters changed, triggering reload')
+    onFiltersChangeRef.current(debouncedFilters)
   }, [debouncedFilters, filtersInitialized])
 
   return {

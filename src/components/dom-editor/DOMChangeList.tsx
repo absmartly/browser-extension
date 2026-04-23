@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { debugLog, debugError } from '~src/utils/debug'
 import type { DOMChange, DOMChangeType, DOMChangeStyleRules } from '~src/types/dom-changes'
+import type { JsChangeDiagnostic } from '~src/hooks/useJsPreviewDiagnostics'
 import { Checkbox } from '../ui/Checkbox'
 import {
   PencilIcon,
@@ -14,7 +15,9 @@ import {
   ArrowsUpDownIcon,
   PlusCircleIcon,
   CursorArrowRaysIcon,
-  SparklesIcon
+  SparklesIcon,
+  ExclamationTriangleIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline'
 
 interface DOMChangeListProps {
@@ -25,6 +28,9 @@ interface DOMChangeListProps {
   onReorder: (changes: DOMChange[]) => void
   editingIndex: number | null
   editorSlot?: React.ReactNode
+  experimentName?: string
+  changeDiagnostics?: Record<string, JsChangeDiagnostic>
+  getChangeKey?: (experimentName: string | undefined, selector: string) => string
 }
 
 export function DOMChangeList({
@@ -34,7 +40,10 @@ export function DOMChangeList({
   onToggle,
   onReorder,
   editingIndex,
-  editorSlot
+  editorSlot,
+  experimentName,
+  changeDiagnostics,
+  getChangeKey
 }: DOMChangeListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
@@ -217,6 +226,9 @@ export function DOMChangeList({
 
       const Icon = getChangeIcon(change.type)
       const isDisabled = change.disabled === true
+      const diagnostic = change.type === 'javascript' && changeDiagnostics && getChangeKey
+        ? changeDiagnostics[getChangeKey(experimentName, change.selector)]
+        : undefined
 
       return (
           <div
@@ -327,6 +339,36 @@ export function DOMChangeList({
                   <div className="text-sm">
                     {getChangeDescription(change)}
                   </div>
+                  {diagnostic && (
+                    <div
+                      role={diagnostic.reason === 'pending' ? 'status' : 'alert'}
+                      className={`mt-2 flex items-start gap-1.5 rounded px-2 py-1 text-xs ${
+                        diagnostic.reason === 'pending'
+                          ? 'bg-blue-50 text-blue-800 border border-blue-100'
+                          : diagnostic.reason === 'csp'
+                            ? 'bg-amber-50 text-amber-900 border border-amber-200'
+                            : 'bg-red-50 text-red-800 border border-red-200'
+                      }`}
+                    >
+                      {diagnostic.reason === 'pending' ? (
+                        <ClockIcon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                      ) : (
+                        <ExclamationTriangleIcon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium">
+                          {diagnostic.reason === 'pending'
+                            ? 'Waiting for selector'
+                            : diagnostic.reason === 'csp'
+                              ? 'Blocked by page CSP'
+                              : 'JavaScript runtime error'}
+                        </div>
+                        <div className="truncate" title={diagnostic.message}>
+                          {diagnostic.message}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -362,7 +404,7 @@ export function DOMChangeList({
           </div>
         )
       })
-  }, [changes, editingIndex, draggedIndex, dragOverIndex, onEdit, onDelete, onToggle, onReorder])
+  }, [changes, editingIndex, draggedIndex, dragOverIndex, onEdit, onDelete, onToggle, onReorder, experimentName, changeDiagnostics, getChangeKey])
 
   if (changes.length === 0) {
     return (

@@ -72,8 +72,16 @@ export const test = base.extend<ExtFixtures>({
     await seedPage.goto(seedUrl)
     await seedPage.waitForFunction(() => typeof (window as any).seed === 'function', { timeout: 5000 })
 
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || ''
+    // When PLASMO_PUBLIC_ANTHROPIC_ENDPOINT points at a proxy (e.g. the
+    // internal llmproxy.absmartly-dev.com), prefer PLASMO_PUBLIC_ANTHROPIC_API_KEY
+    // because the proxy expects its own key format (llmp_sk_...). Only fall
+    // back to ANTHROPIC_API_KEY (the direct Anthropic key, sk-ant-...) when
+    // no endpoint override is configured and we're calling api.anthropic.com
+    // directly.
     const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
+    const anthropicApiKey = anthropicEndpoint
+      ? (process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '')
+      : (process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || '')
 
     const defaultConfig = {
       apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
@@ -83,6 +91,11 @@ export const test = base.extend<ExtFixtures>({
       vibeStudioEnabled: true,
       aiProvider: anthropicApiKey ? 'anthropic-api' : 'claude-subscription',
       aiApiKey: '',
+      // Use the Anthropic model ALIASES (no date suffix) so tests work both
+      // against api.anthropic.com direct and against the internal proxy at
+      // llmproxy.absmartly-dev.com which only maps alias names.
+      llmModel: 'claude-sonnet-4-5',
+      providerModels: { 'anthropic-api': 'claude-sonnet-4-5' },
       providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
     }
 

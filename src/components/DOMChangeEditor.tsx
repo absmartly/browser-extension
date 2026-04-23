@@ -130,9 +130,30 @@ export const DOMChangeEditor = ({
   const [localChange, setLocalChange] = useState<EditingDOMChange>(initialChange)
   const [pickingForField, setPickingForField] = useState<string | null>(null)
 
-  // Update local state when prop changes
   useEffect(() => {
-    setLocalChange(initialChange)
+    setLocalChange(prev => {
+      // Different change being edited - replace state entirely.
+      if (prev.index !== initialChange.index) {
+        return initialChange
+      }
+      // Same change: parent may have updated selector fields via the element
+      // picker, but our localChange holds the user's in-progress edits (type,
+      // type-specific values) that never flow up to the parent. Only adopt
+      // the externally-pickable fields so those edits are preserved.
+      if (
+        prev.selector === initialChange.selector &&
+        prev.targetSelector === initialChange.targetSelector &&
+        prev.observerRoot === initialChange.observerRoot
+      ) {
+        return prev
+      }
+      return {
+        ...prev,
+        selector: initialChange.selector,
+        targetSelector: initialChange.targetSelector,
+        observerRoot: initialChange.observerRoot,
+      }
+    })
   }, [initialChange])
 
   useEffect(() => {
@@ -444,7 +465,7 @@ export const DOMChangeEditor = ({
               id={`dom-change-js-${idSuffix}`}
               value={localChange.jsValue || ''}
               onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
-              placeholder="// JavaScript code to execute
+              placeholder={`// JavaScript code to execute
 // Available context:
 // - element: The selected element
 // - document: Page document
@@ -452,7 +473,7 @@ export const DOMChangeEditor = ({
 // - console: For logging
 // - experimentName: Experiment identifier
 
-debugLog('Hello from experiment:', experimentName);"
+debugLog('Hello from experiment:', experimentName);`}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
               rows={6}
             />

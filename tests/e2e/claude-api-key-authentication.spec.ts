@@ -67,11 +67,21 @@ test.describe('Claude API Key Authentication', () => {
   })
 
   test('should persist Claude API Key across page reloads', async ({ context, extensionUrl, seedStorage }) => {
+    // Previous tests in this file seed via the legacy `absmartly-apikey` /
+    // `absmartly-endpoint` keys that seed.js converts to a partial config.
+    // That conversion omits `vibeStudioEnabled`, which gates the AI provider
+    // section in SettingsView — so #ai-provider-select never rendered and
+    // the test timed out waiting for it. Seed the new-format config
+    // directly with vibeStudioEnabled=true so the AI section shows up.
     await seedStorage({
       'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
+      'absmartly-config': {
+        apiKey: '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+        authMethod: 'apikey',
+        vibeStudioEnabled: true,
+        domChangesFieldName: '__dom_changes'
+      }
     })
 
     const page = await context.newPage()

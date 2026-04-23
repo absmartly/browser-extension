@@ -1005,4 +1005,99 @@ describe('Orchestrator Integration Tests', () => {
       addEventListenerSpy.mockRestore()
     })
   })
+
+  describe('JS preview diagnostics', () => {
+    const findPostedMessage = (type: string): any => {
+      const calls = (mockWindow.postMessage as jest.Mock).mock.calls
+      const match = calls.find((c) => c[0]?.type === type && c[0]?.source === 'absmartly-page')
+      return match ? match[0] : undefined
+    }
+
+    it('forwards absmartly:js-error CustomEvents as PREVIEW_JS_ERROR postMessage', () => {
+      document.dispatchEvent(
+        new CustomEvent('absmartly:js-error', {
+          detail: {
+            experimentName: 'exp_1',
+            selector: '.hero',
+            reason: 'csp',
+            error: 'Refused to evaluate',
+            stack: 'stack-trace'
+          }
+        })
+      )
+
+      const msg = findPostedMessage('PREVIEW_JS_ERROR')
+      expect(msg).toBeDefined()
+      expect(msg.payload).toMatchObject({
+        experimentName: 'exp_1',
+        selector: '.hero',
+        reason: 'csp',
+        error: 'Refused to evaluate',
+        stack: 'stack-trace'
+      })
+      expect(msg.payload.timestamp).toEqual(expect.any(String))
+    })
+
+    it('probeCspAndReport emits PREVIEW_CSP_PROBE when new Function is blocked', () => {
+      const originalFunction = global.Function
+      ;(global as any).Function = function () {
+        throw new EvalError('blocked')
+      } as any
+      ;(global as any).Function.prototype = originalFunction.prototype
+
+      try {
+        ;(orchestrator as any).probeCspAndReport()
+      } finally {
+        global.Function = originalFunction
+      }
+
+      const msg = findPostedMessage('PREVIEW_CSP_PROBE')
+      expect(msg).toBeDefined()
+      expect(msg.payload.evalAllowed).toBe(false)
+      expect(typeof msg.payload.inlineAllowed).toBe('boolean')
+    })
+
+    it('probeCspAndReport stays silent when eval is allowed (primary path works)', () => {
+      ;(mockWindow.postMessage as jest.Mock).mockClear()
+      ;(orchestrator as any).probeCspAndReport()
+      expect(findPostedMessage('PREVIEW_CSP_PROBE')).toBeUndefined()
+    })
+
+    it('reportPendingIfSelectorMissing emits PREVIEW_JS_PENDING when the selector does not match yet', () => {
+      ;(orchestrator as any).reportPendingIfSelectorMissing(
+        { selector: '.not-yet', type: 'javascript', value: 'noop' },
+        'exp_1'
+      )
+      const msg = findPostedMessage('PREVIEW_JS_PENDING')
+      expect(msg).toBeDefined()
+      expect(msg.payload).toMatchObject({
+        experimentName: 'exp_1',
+        selector: '.not-yet'
+      })
+    })
+
+    it('reportPendingIfSelectorMissing does not emit when the selector is present', () => {
+      const el = document.createElement('div')
+      el.className = 'present'
+      document.body.appendChild(el)
+
+      ;(mockWindow.postMessage as jest.Mock).mockClear()
+      ;(orchestrator as any).reportPendingIfSelectorMissing(
+        { selector: '.present', type: 'javascript', value: 'noop' },
+        'exp_1'
+      )
+
+      expect(findPostedMessage('PREVIEW_JS_PENDING')).toBeUndefined()
+      el.remove()
+    })
+
+    it('reportPendingIfSelectorMissing does not throw on invalid selectors', () => {
+      expect(() => {
+        ;(orchestrator as any).reportPendingIfSelectorMissing(
+          { selector: '::::', type: 'javascript', value: 'noop' },
+          'exp_1'
+        )
+      }).not.toThrow()
+    })
+  })
 })

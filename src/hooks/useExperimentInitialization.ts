@@ -49,6 +49,8 @@ export function useExperimentInitialization({
       debugLog('Initializing experiments for this session with filters:', filters)
       setHasInitialized(true)
 
+      loadEditorResources()
+
       getApplications().then(apps => {
         if (apps && apps.length > 0) {
           setApplications(apps)
@@ -69,26 +71,26 @@ export function useExperimentInitialization({
                   storage.remove('pendingApplicationFilter')
                   loadExperiments(false, 1, pageSize, newFilters)
                 } else {
-                  loadExperiments(false)
+                  loadExperiments(false, 1, pageSize, filters)
                 }
               } else {
-                loadExperiments(false)
+                loadExperiments(false, 1, pageSize, filters)
               }
             } else {
-              loadExperiments(false)
+              loadExperiments(false, 1, pageSize, filters)
             }
           })
         } else {
-          loadExperiments(false)
+          loadExperiments(false, 1, pageSize, filters)
         }
       }).catch(error => {
         debugError('Failed to load applications:', error)
-        loadExperiments(false)
+        loadExperiments(false, 1, pageSize, filters)
       })
 
       loadFavorites()
     }
-  }, [config, isAuthenticated, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, setApplications, setFilters, setHasInitialized])
+  }, [config, isAuthenticated, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, loadEditorResources, setApplications, setFilters, setHasInitialized])
 
   useEffect(() => {
     if (config && isAuthenticated && view === 'list' && applications.length === 0) {

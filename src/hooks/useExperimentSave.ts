@@ -295,56 +295,18 @@ async function saveExistingExperiment(
       }
     })
 
-    const putPayload = {
-      id: fullExperiment.id,
-      version: new Date(fullExperiment.updated_at || Date.now()).getTime(),
-      data: {
-        state: fullExperiment.state,
-        name: fullExperiment.name,
-        display_name: formData.display_name || experiment.display_name,
-        iteration: fullExperiment.iteration,
-        percentage_of_traffic: formData.percentage_of_traffic,
-        unit_type: formData.unit_type_id ? { unit_type_id: formData.unit_type_id } : undefined,
-        nr_variants: updatedVariants.length,
-        percentages: fullExperiment.percentages,
-        audience: fullExperiment.audience,
-        audience_strict: fullExperiment.audience_strict,
-        owners: formData.owner_ids.map((id) => ({ user_id: id })),
-        teams: formData.team_ids.map((id) => ({ team_id: id })),
-        experiment_tags: formData.tag_ids.map((id) => ({ experiment_tag_id: id })),
-        applications: formData.application_ids.map((id) => ({
-          application_id: id,
-          application_version: "0"
-        })),
-        primary_metric: fullExperiment.primary_metric ? { metric_id: fullExperiment.primary_metric.metric_id || fullExperiment.primary_metric.id } : undefined,
-        secondary_metrics: fullExperiment.secondary_metrics?.map((m) => ({
-          metric_id: m.metric_id || m.metric?.id || m.id,
-          type: "secondary",
-          order_index: m.order_index || 0
-        })) || [],
-        variants: updatedVariants,
-        variant_screenshots: (fullExperiment.variant_screenshots || []).map((screenshot: any) => ({
-          variant: screenshot.variant,
-          screenshot_file_upload_id: screenshot.screenshot_file_upload_id,
-          label: screenshot.label
-        })),
-        custom_section_field_values: {},
-        parent_experiment: fullExperiment.parent_experiment || null,
-        template_permission: fullExperiment.template_permission || {},
-        template_name: fullExperiment.template_name || fullExperiment.name,
-        template_description: fullExperiment.template_description || "",
-        type: fullExperiment.type || "test",
-        analysis_type: fullExperiment.analysis_type || "group_sequential",
-        baseline_participants_per_day: fullExperiment.baseline_participants_per_day,
-        required_alpha: fullExperiment.required_alpha ? String(parseFloat(fullExperiment.required_alpha).toFixed(3)) : null,
-        required_power: fullExperiment.required_power ? String(parseFloat(fullExperiment.required_power).toFixed(3)) : null,
-        group_sequential_futility_type: fullExperiment.group_sequential_futility_type,
-        group_sequential_analysis_count: fullExperiment.group_sequential_analysis_count,
-        group_sequential_min_analysis_interval: fullExperiment.group_sequential_min_analysis_interval,
-        group_sequential_first_analysis_interval: fullExperiment.group_sequential_first_analysis_interval,
-        minimum_detectable_effect: fullExperiment.minimum_detectable_effect,
-        group_sequential_max_duration_interval: fullExperiment.group_sequential_max_duration_interval
-      }
+    const changes: Record<string, unknown> = {
+      display_name: formData.display_name || experiment.display_name,
+      percentage_of_traffic: formData.percentage_of_traffic,
+      unit_type: formData.unit_type_id ? { unit_type_id: formData.unit_type_id } : undefined,
+      owners: formData.owner_ids.map((id) => ({ user_id: id })),
+      teams: formData.team_ids.map((id) => ({ team_id: id })),
+      experiment_tags: formData.tag_ids.map((id) => ({ experiment_tag_id: id })),
+      applications: formData.application_ids.map((id) => ({
+        application_id: id,
+        application_version: "0"
+      })),
+      variants: updatedVariants
     }
 
     if (fullExperiment.custom_section_field_values) {
@@ -395,12 +357,12 @@ async function saveExistingExperiment(
         }
       }
 
-      putPayload.data.custom_section_field_values = customFieldsObj
+      changes.custom_section_field_values = customFieldsObj
     }
 
     try {
       setSaveStatus?.({ step: 'saving', message: 'Saving to ABsmartly...' })
-      await onUpdate(experiment.id, putPayload)
+      await onUpdate(experiment.id, changes)
       setSaveStatus?.({ step: 'complete', message: 'Experiment saved successfully' })
       await notifySuccess('Experiment saved successfully')
     } catch (error) {

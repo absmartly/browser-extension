@@ -47,6 +47,85 @@ export class Orchestrator {
     })
     this.overrideManager = new OverrideManager()
     this.previewManager = new PreviewManager()
+    this.installJsErrorListener()
+  }
+
+  /**
+   * Listen for JavaScript execution failures dispatched by the SDK plugin's
+   * DOMManipulatorLite (via `document.dispatchEvent(new CustomEvent('absmartly:js-error'))`)
+   * and forward them to the extension sidebar so the user sees which change failed and why.
+   */
+  private installJsErrorListener(): void {
+    document.addEventListener('absmartly:js-error', (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      Logger.warn('[ABsmartly Page] JavaScript change failed:', detail)
+      this.sendMessageToExtension({
+        source: 'absmartly-page',
+        type: 'PREVIEW_JS_ERROR',
+        payload: {
+          experimentName: detail.experimentName,
+          selector: detail.selector,
+          reason: detail.reason, // 'csp' | 'runtime'
+          error: detail.error,
+          stack: detail.stack,
+          timestamp: new Date().toISOString()
+        }
+      })
+    })
+  }
+
+  /**
+   * Check whether the host page's Content Security Policy allows dynamic code
+   * evaluation (new Function / eval). Pages without 'unsafe-eval' will cause
+   * `javascript` DOM changes to fail in production too, so surfacing this up
+   * front gives the user actionable feedback before they try a preview.
+   */
+  private probeCspAndReport(): void {
+    let evalAllowed = true
+    let inlineAllowed = true
+    let evalError: string | undefined
+    let inlineError: string | undefined
+
+    try {
+      new Function('return 1')()
+    } catch (err) {
+      evalAllowed = false
+      evalError = err instanceof Error ? err.message : String(err)
+    }
+
+    try {
+      const probeId = `__absmartly_csp_probe_${Date.now()}`
+      ;(window as any)[probeId] = false
+      const script = document.createElement('script')
+      script.textContent = `window['${probeId}'] = true;`
+      const parent = document.head || document.documentElement
+      parent.appendChild(script)
+      script.remove()
+      inlineAllowed = (window as any)[probeId] === true
+      try { delete (window as any)[probeId] } catch { (window as any)[probeId] = undefined }
+      if (!inlineAllowed) {
+        inlineError = 'inline <script> did not execute (likely blocked by CSP script-src)'
+      }
+    } catch (err) {
+      inlineAllowed = false
+      inlineError = err instanceof Error ? err.message : String(err)
+    }
+
+    const jsBlocked = !evalAllowed && !inlineAllowed
+    if (jsBlocked || !evalAllowed) {
+      this.sendMessageToExtension({
+        source: 'absmartly-page',
+        type: 'PREVIEW_CSP_PROBE',
+        payload: {
+          evalAllowed,
+          inlineAllowed,
+          jsBlocked,
+          evalError,
+          inlineError,
+          timestamp: new Date().toISOString()
+        }
+      })
+    }
   }
 
   /**
@@ -258,6 +337,10 @@ export class Orchestrator {
     Logger.log('[ABsmartly Page] Update mode:', updateMode)
     Logger.log('[ABsmartly Page] Changes to apply:', changes)
 
+    if (Array.isArray(changes) && changes.some((c: any) => c?.type === 'javascript')) {
+      this.probeCspAndReport()
+    }
+
     // If updateMode is 'replace', remove all existing changes first
     if (updateMode === 'replace') {
       Logger.log('[ABsmartly Page] Replace mode: removing existing changes first')
@@ -274,12 +357,40 @@ export class Orchestrator {
       Logger.log('[ABsmartly Page] Applying changes via PreviewManager')
       let appliedCount = 0
       changes.forEach((change: any) => {
+        if (change?.type === 'javascript' && change?.selector) {
+          this.reportPendingIfSelectorMissing(change, expName)
+        }
         const success = this.previewManager.applyPreviewChange(change, expName)
         if (success) appliedCount++
       })
       Logger.log(`[ABsmartly Page] Applied ${appliedCount}/${changes.length} changes successfully`)
     } catch (error) {
       Logger.error('[ABsmartly Page] Error applying preview changes:', error)
+    }
+  }
+
+  /**
+   * If a `javascript` change targets a selector that isn't in the DOM yet,
+   * the SDK plugin's PendingChangeManager will defer it. Emit a
+   * `PREVIEW_JS_PENDING` signal to the sidebar so the user can tell
+   * timing-deferred changes apart from CSP failures.
+   */
+  private reportPendingIfSelectorMissing(change: any, experimentName: string): void {
+    try {
+      const match = document.querySelector(change.selector)
+      if (!match) {
+        this.sendMessageToExtension({
+          source: 'absmartly-page',
+          type: 'PREVIEW_JS_PENDING',
+          payload: {
+            experimentName,
+            selector: change.selector,
+            timestamp: new Date().toISOString()
+          }
+        })
+      }
+    } catch {
+      // Invalid selector — let the SDK plugin surface that as its own error.
     }
   }
 

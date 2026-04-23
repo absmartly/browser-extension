@@ -55,10 +55,22 @@ async function globalSetup(config: FullConfig) {
       // Set environment variable to disable shadow DOM for tests
       process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM = 'true'
 
+      // Pass NODE_ENV=development explicitly: `plasmo build` defaults to
+      // production, which in turn makes src/utils/debug.ts strip every
+      // debugLog/debugWarn call. Several e2e specs (ai-session-image,
+      // ai-conversation-history, ...) assert on specific console output
+      // the app emits via debugLog, so running them against a production
+      // bundle drops those messages and the assertions fail with
+      // "Expected > 0, Received 0". `--tag=dev` on its own only namespaces
+      // the output directory; it doesn't change NODE_ENV.
       execSync('plasmo build --tag=dev --src-path=.', {
         cwd: rootDir,
         stdio: 'inherit',
-        env: { ...process.env, PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true' }
+        env: {
+          ...process.env,
+          NODE_ENV: 'development',
+          PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true'
+        }
       })
       console.log('✅ Extension built successfully in DEV mode (with shadow DOM disabled for tests)')
     } catch (error) {
@@ -68,6 +80,24 @@ async function globalSetup(config: FullConfig) {
   } else {
     console.log('✅ Extension already built')
     console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.')
+  }
+
+  // `plasmo build` wipes the build directory before re-emitting files, so if
+  // it runs (either because the build is missing or because an mtime check
+  // triggered it), the SDK bridge bundle that `scripts/build-dev-once.sh`
+  // copied in `bun run build:dev` is lost. Re-copy it here so tests that
+  // inject `chrome-extension://.../absmartly-sdk-bridge.bundle.js` (e.g.
+  // csp-js-preview-fixture.spec.ts) don't hit ERR_FILE_NOT_FOUND.
+  const sdkBridgeBundleSrc = path.join(rootDir, 'public', 'absmartly-sdk-bridge.bundle.js')
+  const sdkBridgeBundleDest = path.join(buildDir, 'absmartly-sdk-bridge.bundle.js')
+  if (fs.existsSync(sdkBridgeBundleSrc) && fs.existsSync(buildDir)) {
+    fs.copyFileSync(sdkBridgeBundleSrc, sdkBridgeBundleDest)
+    const sdkBridgeBundleMapSrc = `${sdkBridgeBundleSrc}.map`
+    const sdkBridgeBundleMapDest = `${sdkBridgeBundleDest}.map`
+    if (fs.existsSync(sdkBridgeBundleMapSrc)) {
+      fs.copyFileSync(sdkBridgeBundleMapSrc, sdkBridgeBundleMapDest)
+    }
+    console.log('✅ Ensured absmartly-sdk-bridge.bundle.js is present in build directory')
   }
 
   // 2. Copy test files to build directory

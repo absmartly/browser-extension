@@ -96,4 +96,115 @@ describe('DOMChangeList', () => {
     render(<DOMChangeList changes={changes} {...defaultProps} />)
     expect(screen.queryByText('No DOM changes configured')).not.toBeInTheDocument()
   })
+
+  describe('JS diagnostic badges', () => {
+    const jsChange: DOMChange = {
+      selector: '.hero',
+      type: 'javascript',
+      value: 'element.textContent = "x"'
+    }
+    const experimentName = 'exp_1'
+    const getChangeKey = (name: string | undefined, selector: string) =>
+      `${name || '__preview__'}::${selector}`
+
+    it('renders a CSP badge for a javascript change with reason=csp', () => {
+      render(
+        <DOMChangeList
+          changes={[jsChange]}
+          experimentName={experimentName}
+          getChangeKey={getChangeKey}
+          changeDiagnostics={{
+            [getChangeKey(experimentName, '.hero')]: {
+              reason: 'csp',
+              message: 'Refused to evaluate',
+              timestamp: 't'
+            }
+          }}
+          {...defaultProps}
+        />
+      )
+      expect(screen.getByText('Blocked by page CSP')).toBeInTheDocument()
+      expect(screen.getByText('Refused to evaluate')).toBeInTheDocument()
+    })
+
+    it('renders a runtime badge for a javascript change with reason=runtime', () => {
+      render(
+        <DOMChangeList
+          changes={[jsChange]}
+          experimentName={experimentName}
+          getChangeKey={getChangeKey}
+          changeDiagnostics={{
+            [getChangeKey(experimentName, '.hero')]: {
+              reason: 'runtime',
+              message: 'TypeError: x is not a function',
+              timestamp: 't'
+            }
+          }}
+          {...defaultProps}
+        />
+      )
+      expect(screen.getByText('JavaScript runtime error')).toBeInTheDocument()
+      expect(screen.getByText('TypeError: x is not a function')).toBeInTheDocument()
+    })
+
+    it('renders a pending badge with status role for a javascript change with reason=pending', () => {
+      render(
+        <DOMChangeList
+          changes={[jsChange]}
+          experimentName={experimentName}
+          getChangeKey={getChangeKey}
+          changeDiagnostics={{
+            [getChangeKey(experimentName, '.hero')]: {
+              reason: 'pending',
+              message: 'Waiting for selector to appear on the page',
+              timestamp: 't'
+            }
+          }}
+          {...defaultProps}
+        />
+      )
+      const badge = screen.getByRole('status')
+      expect(badge).toHaveTextContent('Waiting for selector')
+    })
+
+    it('does not render a diagnostic badge for non-javascript change types', () => {
+      const textChange: DOMChange = { selector: '.hero', type: 'text', value: 'hi' }
+      render(
+        <DOMChangeList
+          changes={[textChange]}
+          experimentName={experimentName}
+          getChangeKey={getChangeKey}
+          changeDiagnostics={{
+            [getChangeKey(experimentName, '.hero')]: {
+              reason: 'csp',
+              message: 'should be ignored for text changes',
+              timestamp: 't'
+            }
+          }}
+          {...defaultProps}
+        />
+      )
+      expect(screen.queryByText('Blocked by page CSP')).not.toBeInTheDocument()
+      expect(screen.queryByText('should be ignored for text changes')).not.toBeInTheDocument()
+    })
+
+    it('does not render a badge when no diagnostic exists for the change selector', () => {
+      render(
+        <DOMChangeList
+          changes={[jsChange]}
+          experimentName={experimentName}
+          getChangeKey={getChangeKey}
+          changeDiagnostics={{
+            [getChangeKey(experimentName, '.other')]: {
+              reason: 'csp',
+              message: 'different selector',
+              timestamp: 't'
+            }
+          }}
+          {...defaultProps}
+        />
+      )
+      expect(screen.queryByText('Blocked by page CSP')).not.toBeInTheDocument()
+    })
+  })
 })

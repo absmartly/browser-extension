@@ -135,6 +135,19 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
     debugLog('[AIDOMChangesPage] handleGenerate called, prompt:', prompt, 'images:', attachedImages.length)
     debugLog('[AIDOMChangesPage] Current session:', conversationSession?.id)
 
+    // Expose the in-flight conversation session id on `window` so E2E
+    // tests can read it via Playwright's `frame.evaluate` without needing
+    // to sniff console logs (which Playwright does not reliably forward
+    // from chrome-extension:// iframes to the parent page). Stored as
+    // plain data; no behaviour depends on it.
+    if (typeof window !== 'undefined') {
+      ;(window as any).__absmartlyConversationSession = {
+        id: conversationSession?.id ?? null,
+        conversationId: conversationSession?.conversationId ?? null,
+        timestamp: Date.now()
+      }
+    }
+
     if (!prompt.trim() && attachedImages.length === 0) {
       debugLog('[AIDOMChangesPage] Empty prompt and no images')
       const message = 'Please enter a prompt or attach an image'

@@ -51,6 +51,27 @@ export function setupWindowMessageListener(
               err
             )
           })
+      } else if (
+        event.data.type === "PREVIEW_JS_ERROR" ||
+        event.data.type === "PREVIEW_CSP_PROBE" ||
+        event.data.type === "PREVIEW_JS_PENDING"
+      ) {
+        chrome.runtime
+          .sendMessage({
+            type: event.data.type,
+            payload: event.data.payload
+          })
+          .catch((err) => {
+            if (
+              !err?.message?.includes("Receiving end does not exist") &&
+              !err?.message?.includes("message port closed")
+            ) {
+              debugError(
+                `[Content Script] Failed to forward ${event.data.type} to background:`,
+                err
+              )
+            }
+          })
       }
     }
   })

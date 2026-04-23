@@ -8,6 +8,28 @@ const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-t
 
 const SLOW_MODE = process.env.SLOW === '1'
 
+/**
+ * Read the conversation session id that AIDOMChangesPage stashes on its
+ * `window` each time handleGenerate runs. The sidebar is in a
+ * chrome-extension:// iframe; Playwright doesn't forward console logs
+ * from cross-origin iframes to the parent page's `page.on('console')`
+ * listener, so the previous version of this test couldn't observe
+ * [AIDOMChangesPage] logs at all. Reading the global via frame.evaluate
+ * works because Playwright's CDP session attaches to every frame.
+ */
+async function readConversationSessionId(testPage: Page): Promise<string | null> {
+  const frame = testPage.frames().find(f => f.url().includes('sidebar'))
+  if (!frame) return null
+  try {
+    return await frame.evaluate(() => {
+      const s = (window as any).__absmartlyConversationSession
+      return s?.id ?? null
+    })
+  } catch {
+    return null
+  }
+}
+
 test.describe('AI Session & Image Handling', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
@@ -158,30 +180,22 @@ test.describe('AI Session & Image Handling', () => {
         console.log(`Found ${imageMessages.length} messages about sending images`)
       }
 
-      const sessionMsg = allConsoleMessages.find(msg =>
-        msg.text.includes('[AIDOMChangesPage] Current session:')
-      )
-      if (sessionMsg) {
-        const match = sessionMsg.text.match(/Current session: ([a-f0-9-]+)/)
-        if (match) {
-          firstSessionId = match[1]
-          console.log(`Captured session ID: ${firstSessionId}`)
-        }
-      }
-      if (!firstSessionId) {
+      const sessionId = await readConversationSessionId(testPage)
+      if (sessionId) {
+        firstSessionId = sessionId
+        console.log(`Captured session ID: ${firstSessionId}`)
+      } else {
         firstSessionId = 'unknown'
-        console.log('Could not capture session ID from logs')
+        console.log('Could not read session ID from window.__absmartlyConversationSession')
       }
     })
 
     await test.step('Verify session ID is consistent', async () => {
       console.log('\n STEP 5: Verifying session is active')
 
-      const sessionMessages = allConsoleMessages.filter(msg =>
-        msg.text.includes('[AIDOMChangesPage] Current session:')
-      )
-      expect(sessionMessages.length).toBeGreaterThan(0)
-      console.log(`Found ${sessionMessages.length} session messages`)
+      const sessionId = await readConversationSessionId(testPage)
+      expect(sessionId).toBeTruthy()
+      console.log(`Session active: ${sessionId}`)
     })
 
     await test.step('Send second message without image', async () => {
@@ -196,11 +210,8 @@ test.describe('AI Session & Image Handling', () => {
       await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
       console.log('Second response received')
 
-      const sessionMessages = allConsoleMessages.filter(msg =>
-        msg.text.includes('[AIDOMChangesPage] Current session:') && msg.text.includes(firstSessionId)
-      )
-
-      expect(sessionMessages.length).toBeGreaterThan(0)
+      const sessionId = await readConversationSessionId(testPage)
+      expect(sessionId).toBe(firstSessionId)
       console.log(`Same session ${firstSessionId} used for second message`)
     })
 
@@ -233,18 +244,12 @@ test.describe('AI Session & Image Handling', () => {
       await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
       console.log('Response received in new session')
 
-      const sessionMsgs = allConsoleMessages.filter(msg =>
-        msg.text.includes('[AIDOMChangesPage] Current session:')
-      )
-
-      expect(sessionMsgs.length).toBeGreaterThanOrEqual(2)
-      const lastSessionMsg = sessionMsgs[sessionMsgs.length - 1]
-      const match = lastSessionMsg.text.match(/Current session: ([a-f0-9-]+)/)
-      if (match) {
-        secondSessionId = match[1]
-        console.log(`New session ID: ${secondSessionId}`)
-        console.log(`Previous session ID: ${firstSessionId}`)
-      }
+      const newSessionId = await readConversationSessionId(testPage)
+      expect(newSessionId).toBeTruthy()
+      expect(newSessionId).not.toBe(firstSessionId)
+      secondSessionId = newSessionId as string
+      console.log(`New session ID: ${secondSessionId}`)
+      console.log(`Previous session ID: ${firstSessionId}`)
     })
 
     console.log('\n All steps completed successfully!')

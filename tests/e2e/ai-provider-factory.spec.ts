@@ -79,7 +79,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should show schema is passed to bridge correctly', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(20000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -92,24 +92,36 @@ test.describe('AI Provider Factory E2E', () => {
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
-    const bridgeInstructions = page.locator('#claude-subscription-instructions')
+    // After switching to claude-subscription the bridge client transitions
+    // through NOT_CONFIGURED → CHECKING → (CONNECTED | DISCONNECTED). The
+    // status text shows "Not Connected" for both the initial NOT_CONFIGURED
+    // state AND the final DISCONNECTED state, so waiting on text alone lets
+    // the test sample "Not Connected" before the attempt has even started,
+    // read #claude-subscription-instructions as visible, then race the
+    // CONNECTED transition that unmounts #bridge-start-command.
+    //
+    // Wait for the connection attempt to both START (status flips to
+    // Checking / Connecting) AND FINISH (back to a terminal state), so we're
+    // sampling a post-attempt stable state.
     const bridgeStatus = page.locator('#bridge-connection-status')
+    await bridgeStatus.waitFor({ state: 'visible', timeout: 5000 })
+    await expect(bridgeStatus).toHaveText(/Checking|Connecting/i, { timeout: 5000 }).catch(() => {
+      // Bridge client may transition through checking too fast to observe;
+      // the subsequent wait-for-terminal-state check still holds.
+    })
+    await expect(bridgeStatus).not.toHaveText(/Checking|Connecting/i, { timeout: 10000 })
+
+    const bridgeInstructions = page.locator('#claude-subscription-instructions')
     const instructionsVisible = await bridgeInstructions.isVisible().catch(() => false)
-    const statusVisible = await bridgeStatus.isVisible().catch(() => false)
 
     if (instructionsVisible) {
-      const loginCommand = page.locator('#claude-login-command')
-      await expect(loginCommand).toBeVisible()
-
-      const bridgeCommand = page.locator('#bridge-start-command')
-      await expect(bridgeCommand).toBeVisible()
-
+      await expect(page.locator('#claude-login-command')).toBeVisible({ timeout: 3000 })
+      await expect(page.locator('#bridge-start-command')).toBeVisible({ timeout: 3000 })
       console.log('✓ Bridge instructions displayed (bridge not connected)')
-    } else if (statusVisible) {
+    } else {
       console.log('✓ Bridge connected, instructions hidden as expected')
     }
 
-    expect(instructionsVisible || statusVisible).toBe(true)
     console.log('✓ Bridge UI displayed correctly')
   })
 

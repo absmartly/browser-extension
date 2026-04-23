@@ -36,6 +36,11 @@ import {
 } from './handlers/event-buffer'
 
 import {
+  isPreviewDiagnosticMessage,
+  broadcastPreviewDiagnostic
+} from './handlers/preview-diagnostic-relay'
+
+import {
   initializeInjectionHandler
 } from './handlers/injection-handler'
 
@@ -293,6 +298,10 @@ export function initializeBackgroundScript() {
           debugError('[Background] Failed to buffer event:', error)
           sendResponse({ success: false, error: error.message })
         })
+      return true
+    } else if (isPreviewDiagnosticMessage(message.type)) {
+      broadcastPreviewDiagnostic({ type: message.type, payload: message.payload })
+      sendResponse({ success: true })
       return true
     } else if (message.type === 'GET_BUFFERED_EVENTS') {
       getBufferedEvents()

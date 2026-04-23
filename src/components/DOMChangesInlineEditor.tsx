@@ -7,6 +7,8 @@ import { DOMChangeList } from './dom-editor'
 import { useDOMChangesEditor } from '~src/hooks/useDOMChangesEditor'
 import { useVisualEditorCoordination } from '~src/hooks/useVisualEditorCoordination'
 import { useEditorStateRestoration } from '~src/hooks/useEditorStateRestoration'
+import { useJsPreviewDiagnostics } from '~src/hooks/useJsPreviewDiagnostics'
+import { JsPreviewWarnings } from './JsPreviewWarnings'
 import {
   PlusIcon,
   PaintBrushIcon,
@@ -59,6 +61,16 @@ export function DOMChangesInlineEditor({
   useEffect(() => {
     changesRef.current = changes
   }, [changes])
+
+  const { pageWarning, changeDiagnostics, clear: clearDiagnostics, getChangeKey } = useJsPreviewDiagnostics()
+
+  useEffect(() => {
+    if (!previewEnabled) {
+      clearDiagnostics()
+    }
+  }, [previewEnabled, clearDiagnostics])
+
+  const hasJavascriptChanges = changes.some(c => c.type === 'javascript')
 
   const {
     editingChange,
@@ -283,8 +295,16 @@ export function DOMChangesInlineEditor({
       </div>
 
       <div className="space-y-2">
+        <JsPreviewWarnings
+          pageWarning={pageWarning}
+          hasJavascriptChanges={hasJavascriptChanges}
+          variantIndex={variantIndex}
+        />
         <DOMChangeList
           changes={changes}
+          experimentName={experimentName}
+          changeDiagnostics={changeDiagnostics}
+          getChangeKey={getChangeKey}
           onEdit={handleEditChange}
           onDelete={handleDeleteChange}
           onToggle={handleToggleChange}

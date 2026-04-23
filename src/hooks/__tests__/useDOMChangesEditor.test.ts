@@ -211,6 +211,108 @@ describe('useDOMChangesEditor', () => {
       const savedChange = onChange.mock.calls[0][0][0]
       expect(savedChange).not.toHaveProperty('css')
     })
+
+    it('should preserve persistStyle when saving style change', () => {
+      const onChange = jest.fn()
+      const styleChange: DOMChange = {
+        selector: '.button',
+        type: 'style',
+        value: { backgroundColor: '#16a34a' },
+        persistStyle: true
+      } as DOMChange
+
+      const { result } = renderHook(() =>
+        useDOMChangesEditor({ ...defaultProps, changes: [styleChange], onChange })
+      )
+
+      act(() => {
+        result.current.handleEditChange(0)
+      })
+
+      expect(result.current.editingChange!.persistStyle).toBe(true)
+
+      act(() => {
+        result.current.handleSaveChange(result.current.editingChange!)
+      })
+
+      const savedChange = onChange.mock.calls[0][0][0]
+      expect(savedChange.persistStyle).toBe(true)
+    })
+
+    it('should preserve persistAttribute when saving attribute change', () => {
+      const onChange = jest.fn()
+      const attrChange: DOMChange = {
+        selector: '.link',
+        type: 'attribute',
+        value: { href: '/new-page' },
+        persistAttribute: true
+      } as DOMChange
+
+      const { result } = renderHook(() =>
+        useDOMChangesEditor({ ...defaultProps, changes: [attrChange], onChange })
+      )
+
+      act(() => {
+        result.current.handleEditChange(0)
+      })
+
+      expect(result.current.editingChange!.persistAttribute).toBe(true)
+
+      act(() => {
+        result.current.handleSaveChange(result.current.editingChange!)
+      })
+
+      const savedChange = onChange.mock.calls[0][0][0]
+      expect(savedChange.persistAttribute).toBe(true)
+    })
+
+    it('should not include persistStyle when it is undefined', () => {
+      const onChange = jest.fn()
+      const styleChange: DOMChange = {
+        selector: '.button',
+        type: 'style',
+        value: { color: 'red' }
+      }
+
+      const { result } = renderHook(() =>
+        useDOMChangesEditor({ ...defaultProps, changes: [styleChange], onChange })
+      )
+
+      act(() => {
+        result.current.handleEditChange(0)
+      })
+
+      act(() => {
+        result.current.handleSaveChange(result.current.editingChange!)
+      })
+
+      const savedChange = onChange.mock.calls[0][0][0]
+      expect(savedChange.persistStyle).toBeUndefined()
+    })
+
+    it('should not include persistAttribute when it is undefined', () => {
+      const onChange = jest.fn()
+      const attrChange: DOMChange = {
+        selector: '.link',
+        type: 'attribute',
+        value: { href: '/page' }
+      }
+
+      const { result } = renderHook(() =>
+        useDOMChangesEditor({ ...defaultProps, changes: [attrChange], onChange })
+      )
+
+      act(() => {
+        result.current.handleEditChange(0)
+      })
+
+      act(() => {
+        result.current.handleSaveChange(result.current.editingChange!)
+      })
+
+      const savedChange = onChange.mock.calls[0][0][0]
+      expect(savedChange.persistAttribute).toBeUndefined()
+    })
   })
 
   describe('handleCancelEdit', () => {

@@ -6,12 +6,16 @@ test.describe('Extension AI Integration (Anthropic API)', () => {
   test('extension generates DOM changes via Anthropic API', async ({ context, extensionUrl, seedStorage }) => {
     test.setTimeout(180000)
 
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY
-    if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY or PLASMO_PUBLIC_ANTHROPIC_API_KEY environment variable is required')
-    }
-
+    // Prefer the proxy-specific key when the endpoint is the internal proxy;
+    // otherwise use the direct Anthropic key.
     const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
+    const anthropicApiKey = anthropicEndpoint
+      ? (process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)
+      : (process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY)
+    test.skip(
+      !anthropicApiKey,
+      'ANTHROPIC_API_KEY / PLASMO_PUBLIC_ANTHROPIC_API_KEY required; test hits the real Anthropic API'
+    )
 
     const config = {
       apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
@@ -20,6 +24,10 @@ test.describe('Extension AI Integration (Anthropic API)', () => {
       aiProvider: 'anthropic-api',
       aiApiKey: '',
       vibeStudioEnabled: true,
+      // Proxy expects model aliases (no date suffix); aliases also work
+      // against api.anthropic.com.
+      llmModel: 'claude-sonnet-4-5',
+      providerModels: { 'anthropic-api': 'claude-sonnet-4-5' },
       providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
     }
 

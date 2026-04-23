@@ -144,6 +144,7 @@ export function ExperimentFilter({
       <div className="px-4 py-1">
         <div className="flex items-center gap-2">
           <Input
+            id="filter-search-input"
             placeholder="Search experiments..."
             value={searchDebounce}
             onChange={(e) => setSearchDebounce(e.target.value)}
@@ -187,6 +188,7 @@ export function ExperimentFilter({
               {experimentStates.map(state => (
                 <button
                   key={state.value}
+                  id={`filter-state-${state.value}`}
                   type="button"
                   onClick={(e) => {
                     e.preventDefault()
@@ -214,6 +216,7 @@ export function ExperimentFilter({
               {significanceOptions.map(sig => (
                 <button
                   key={sig.value}
+                  id={`filter-significance-${sig.value}`}
                   type="button"
                   onClick={(e) => {
                     e.preventDefault()
@@ -326,6 +329,7 @@ export function ExperimentFilter({
               ].map(filter => (
                 <label key={filter.key} className="flex items-center gap-1">
                   <input
+                    id={`filter-alert-${filter.key}`}
                     type="checkbox"
                     checked={filters[filter.key as keyof FilterState] === true}
                     onChange={(e) => updateFilter(filter.key as keyof FilterState, e.target.checked || undefined)}
@@ -341,6 +345,7 @@ export function ExperimentFilter({
           {activeFilterCount > 0 && (
             <div className="pt-2">
               <Button
+                id="filter-clear-all"
                 onClick={clearFilters}
                 size="sm"
                 variant="secondary"
