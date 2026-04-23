@@ -70,6 +70,24 @@ async function globalSetup(config: FullConfig) {
     console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.')
   }
 
+  // `plasmo build` wipes the build directory before re-emitting files, so if
+  // it runs (either because the build is missing or because an mtime check
+  // triggered it), the SDK bridge bundle that `scripts/build-dev-once.sh`
+  // copied in `bun run build:dev` is lost. Re-copy it here so tests that
+  // inject `chrome-extension://.../absmartly-sdk-bridge.bundle.js` (e.g.
+  // csp-js-preview-fixture.spec.ts) don't hit ERR_FILE_NOT_FOUND.
+  const sdkBridgeBundleSrc = path.join(rootDir, 'public', 'absmartly-sdk-bridge.bundle.js')
+  const sdkBridgeBundleDest = path.join(buildDir, 'absmartly-sdk-bridge.bundle.js')
+  if (fs.existsSync(sdkBridgeBundleSrc) && fs.existsSync(buildDir)) {
+    fs.copyFileSync(sdkBridgeBundleSrc, sdkBridgeBundleDest)
+    const sdkBridgeBundleMapSrc = `${sdkBridgeBundleSrc}.map`
+    const sdkBridgeBundleMapDest = `${sdkBridgeBundleDest}.map`
+    if (fs.existsSync(sdkBridgeBundleMapSrc)) {
+      fs.copyFileSync(sdkBridgeBundleMapSrc, sdkBridgeBundleMapDest)
+    }
+    console.log('✅ Ensured absmartly-sdk-bridge.bundle.js is present in build directory')
+  }
+
   // 2. Copy test files to build directory
   const testsDir = path.join(buildDir, 'tests')
   if (!fs.existsSync(testsDir)) {
