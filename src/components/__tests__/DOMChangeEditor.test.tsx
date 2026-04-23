@@ -550,6 +550,76 @@ describe('DOMChangeEditor', () => {
     })
   })
 
+  describe('Element Picker updates', () => {
+    it('should preserve user-selected type when parent updates selector via picker', () => {
+      const initial = { ...createEmptyChange() }
+
+      const { container, rerender } = render(
+        <DOMChangeEditor
+          editingChange={initial}
+          variantIndex={0}
+          onSave={mockOnSave}
+          onCancel={mockOnCancel}
+          onStartPicker={mockOnStartPicker}
+        />
+      )
+
+      const typeSelect = container.querySelector('#dom-change-type-0-new') as HTMLSelectElement
+      fireEvent.change(typeSelect, { target: { value: 'styleRules' } })
+      expect(typeSelect.value).toBe('styleRules')
+
+      // Parent learns about picked selector and re-renders with a NEW
+      // editingChange object. Parent only knows the stale type ('style'),
+      // because the type dropdown change never propagated up.
+      const updatedFromParent = { ...initial, selector: '.picked-element' }
+      rerender(
+        <DOMChangeEditor
+          editingChange={updatedFromParent}
+          variantIndex={0}
+          onSave={mockOnSave}
+          onCancel={mockOnCancel}
+          onStartPicker={mockOnStartPicker}
+        />
+      )
+
+      const typeAfter = container.querySelector('#dom-change-type-0-new') as HTMLSelectElement
+      const selectorAfter = container.querySelector('#dom-change-selector-0-new') as HTMLInputElement
+      expect(typeAfter.value).toBe('styleRules')
+      expect(selectorAfter.value).toBe('.picked-element')
+    })
+
+    it('should replace state fully when switching to a different change', () => {
+      const first = { ...createEmptyChange(), index: 0, selector: '.a' }
+
+      const { container, rerender } = render(
+        <DOMChangeEditor
+          editingChange={first}
+          variantIndex={0}
+          onSave={mockOnSave}
+          onCancel={mockOnCancel}
+          onStartPicker={mockOnStartPicker}
+        />
+      )
+
+      const typeSelect = container.querySelector('#dom-change-type-0-0') as HTMLSelectElement
+      fireEvent.change(typeSelect, { target: { value: 'styleRules' } })
+
+      const second = { ...createEmptyChange(), index: 1, selector: '.b', type: 'text' as DOMChangeType, textValue: 'hi' }
+      rerender(
+        <DOMChangeEditor
+          editingChange={second}
+          variantIndex={0}
+          onSave={mockOnSave}
+          onCancel={mockOnCancel}
+          onStartPicker={mockOnStartPicker}
+        />
+      )
+
+      const typeAfter = container.querySelector('#dom-change-type-0-1') as HTMLSelectElement
+      expect(typeAfter.value).toBe('text')
+    })
+  })
+
   describe('Options Section', () => {
     it('should not render options for styleRules type', () => {
       const editingChange = { ...createEmptyChange(), type: 'styleRules' as DOMChangeType }
