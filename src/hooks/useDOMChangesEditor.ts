@@ -143,6 +143,7 @@ export function useDOMChangesEditor({
           mode: changeToSave.mode || 'merge',
           waitForElement: changeToSave.waitForElement,
           triggerOnView: changeToSave.triggerOnView,
+          persistStyle: changeToSave.persistStyle,
           observerRoot: changeToSave.observerRoot
         }
         break
@@ -169,6 +170,7 @@ export function useDOMChangesEditor({
           mode: changeToSave.mode || 'merge',
           waitForElement: changeToSave.waitForElement,
           triggerOnView: changeToSave.triggerOnView,
+          persistAttribute: changeToSave.persistAttribute,
           observerRoot: changeToSave.observerRoot
         }
         break
