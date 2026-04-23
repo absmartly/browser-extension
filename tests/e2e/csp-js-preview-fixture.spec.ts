@@ -1,29 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
-import * as fs from 'fs'
-import * as path from 'path'
 
 const TARGET_URL = 'https://example.com/absmartly-csp-preview-test'
-
-/**
- * The CSP fallback path (inline <script> injection with a sentinel check,
- * plus `absmartly:js-error` CustomEvent dispatch) lives in
- * `@absmartly/sdk-plugins` and is only available once a release with the
- * new executeUserJavaScript helper is on npm. The extension's bundled SDK
- * bridge is in public/absmartly-sdk-bridge.bundle.js; peek at it to
- * decide whether the installed plugin supports the fallback so tests that
- * depend on it skip cleanly instead of failing on older installs.
- */
-function sdkBridgeSupportsCspFallback(): boolean {
-  try {
-    const bundlePath = path.resolve(__dirname, '..', '..', 'public', 'absmartly-sdk-bridge.bundle.js')
-    if (!fs.existsSync(bundlePath)) return false
-    const contents = fs.readFileSync(bundlePath, 'utf8')
-    return contents.includes('executeUserJavaScript') && contents.includes('absmartly:js-error')
-  } catch {
-    return false
-  }
-}
 
 const fixturePage = () => `
 <!doctype html>
@@ -186,10 +164,6 @@ test.describe('JS DOM-change preview under various host-page CSPs', () => {
   })
 
   test('falls back to inline <script> injection when unsafe-eval is blocked but unsafe-inline is allowed', async ({ context, extensionUrl }) => {
-    test.skip(
-      !sdkBridgeSupportsCspFallback(),
-      'Requires @absmartly/sdk-plugins with executeUserJavaScript + absmartly:js-error dispatch (unreleased as of 1.3.1). Re-enable once the plugin release ships.'
-    )
     const page = await context.newPage()
 
     await servePageWithCsp(
@@ -215,10 +189,6 @@ test.describe('JS DOM-change preview under various host-page CSPs', () => {
   })
 
   test('broadcasts PREVIEW_JS_ERROR with reason=csp when both eval and inline are blocked', async ({ context, extensionUrl }) => {
-    test.skip(
-      !sdkBridgeSupportsCspFallback(),
-      'Requires @absmartly/sdk-plugins with executeUserJavaScript + absmartly:js-error dispatch (unreleased as of 1.3.1). Re-enable once the plugin release ships.'
-    )
     const page = await context.newPage()
 
     await servePageWithCsp(
