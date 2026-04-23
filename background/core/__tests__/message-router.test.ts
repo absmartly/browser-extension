@@ -32,7 +32,7 @@ describe('message-router', () => {
   })
 
   describe('validateSender', () => {
-    it('should accept valid sender from same extension', () => {
+    it('accepts a sender with the matching extension id (chrome-extension URL)', () => {
       const sender: chrome.runtime.MessageSender = {
         id: 'test-extension-id',
         url: 'chrome-extension://test-extension-id/index.html'
@@ -41,7 +41,22 @@ describe('message-router', () => {
       expect(validateSender(sender)).toBe(true)
     })
 
-    it('should accept sender from localhost', () => {
+    it('accepts content-script senders on arbitrary third-party tab URLs', () => {
+      // The extension is designed to run on any site the user visits
+      // (visual editor, preview, DOM-change injection). Once the user
+      // has granted per-site host permission via Chrome's native prompt,
+      // content-script messages from that tab must be accepted.
+      const sender: chrome.runtime.MessageSender = {
+        id: 'test-extension-id',
+        tab: { id: 42 } as chrome.tabs.Tab,
+        frameId: 0,
+        url: 'https://example.com/some/path?q=1'
+      }
+
+      expect(validateSender(sender)).toBe(true)
+    })
+
+    it('accepts senders on localhost (dev environment)', () => {
       const sender: chrome.runtime.MessageSender = {
         id: 'test-extension-id',
         url: 'http://localhost:3000'
@@ -50,52 +65,17 @@ describe('message-router', () => {
       expect(validateSender(sender)).toBe(true)
     })
 
-    it('should accept sender from 127.0.0.1', () => {
+    it('accepts iframe senders at any depth when the extension id matches', () => {
       const sender: chrome.runtime.MessageSender = {
         id: 'test-extension-id',
-        url: 'http://127.0.0.1:8080'
+        frameId: 4,
+        url: 'https://sub.example.com/iframe.html'
       }
 
       expect(validateSender(sender)).toBe(true)
     })
 
-    it('should accept sender from absmartly.com domain', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        url: 'https://app.absmartly.com'
-      }
-
-      expect(validateSender(sender)).toBe(true)
-    })
-
-    it('should accept sender from absmartly.io domain', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        url: 'https://api.absmartly.io'
-      }
-
-      expect(validateSender(sender)).toBe(true)
-    })
-
-    it('should reject sender with invalid URL format', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        url: 'not-a-valid-url'
-      }
-
-      expect(validateSender(sender)).toBe(false)
-    })
-
-    it('should reject sender from unauthorized domain', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        url: 'https://malicious-site.com'
-      }
-
-      expect(validateSender(sender)).toBe(false)
-    })
-
-    it('should reject sender with different extension ID', () => {
+    it('rejects senders with a different extension id', () => {
       const sender: chrome.runtime.MessageSender = {
         id: 'different-extension-id',
         url: 'chrome-extension://different-extension-id/index.html'
@@ -104,50 +84,12 @@ describe('message-router', () => {
       expect(validateSender(sender)).toBe(false)
     })
 
-    it('should reject sender without ID', () => {
+    it('rejects senders without an id', () => {
       const sender: chrome.runtime.MessageSender = {
         url: 'https://example.com'
       }
 
       expect(validateSender(sender)).toBe(false)
-    })
-
-    it('should reject iframe from unauthorized origin', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        frameId: 1,
-        url: 'https://malicious-site.com'
-      }
-
-      expect(validateSender(sender)).toBe(false)
-    })
-
-    it('should reject iframe without URL', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        frameId: 1
-      }
-
-      expect(validateSender(sender)).toBe(false)
-    })
-
-    it('should accept iframe from authorized origin', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        frameId: 1,
-        url: 'https://app.absmartly.com'
-      }
-
-      expect(validateSender(sender)).toBe(true)
-    })
-
-    it('should accept main frame (frameId = 0) without URL validation', () => {
-      const sender: chrome.runtime.MessageSender = {
-        id: 'test-extension-id',
-        frameId: 0
-      }
-
-      expect(validateSender(sender)).toBe(true)
     })
   })
 

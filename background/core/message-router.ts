@@ -6,47 +6,25 @@ export interface RouteResult {
   async: boolean
 }
 
-function isValidSenderUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url)
-
-    if (parsed.protocol === 'chrome-extension:') {
-      return true
-    }
-
-    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-      return true
-    }
-
-    if (parsed.hostname.endsWith('absmartly.com') || parsed.hostname.endsWith('absmartly.io')) {
-      return true
-    }
-
-    debugWarn('[Router] Rejected sender URL with invalid origin:', url)
-    return false
-  } catch (error) {
-    debugWarn('[Router] Invalid sender URL format:', url)
-    return false
-  }
-}
-
+/**
+ * Accept messages whose `sender.id` matches our extension id. That check
+ * alone is sufficient — `chrome.runtime.onMessage` only delivers messages
+ * sent via `chrome.runtime.sendMessage` from code running under the same
+ * extension id, and web pages cannot address the extension unless the
+ * manifest opts in via `externally_connectable` (we do not). The extension
+ * deliberately runs on arbitrary third-party sites (visual editor, preview,
+ * DOM-change injection), so any extra per-origin allowlist here blocks
+ * legitimate content-script traffic on every site the user visits.
+ *
+ * Origin enforcement for which *pages* the extension is allowed to touch is
+ * the job of Chrome's host permissions (see `host_permissions` /
+ * `optional_host_permissions` in the manifest) — the user grants or denies
+ * per-site access via Chrome's native permission prompt, and the browser
+ * enforces it before our content scripts are injected.
+ */
 export function validateSender(sender: chrome.runtime.MessageSender): boolean {
   if (!sender.id || sender.id !== chrome.runtime.id) {
     debugWarn('[Router] Rejected message from unauthorized extension ID:', sender.id)
-    return false
-  }
-
-  if (sender.frameId !== undefined && sender.frameId !== 0) {
-    if (!sender.url || !isValidSenderUrl(sender.url)) {
-      debugWarn('[Router] Rejected message from iframe with invalid origin:', {
-        frameId: sender.frameId,
-        url: sender.url
-      })
-      return false
-    }
-  }
-
-  if (sender.url && !isValidSenderUrl(sender.url)) {
     return false
   }
 

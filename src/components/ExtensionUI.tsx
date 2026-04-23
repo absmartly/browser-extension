@@ -12,6 +12,8 @@ import { AIDOMChangesView } from "~src/components/views/AIDOMChangesView"
 import { NotificationProvider } from "~src/contexts/NotificationContext"
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import { usePermissions } from "~src/hooks/usePermissions"
+import { useActiveSitePermission } from "~src/hooks/useActiveSitePermission"
+import { SitePermissionBanner } from "./SitePermissionBanner"
 import { useExperimentFilters } from "~src/hooks/useExperimentFilters"
 import { useExperimentLoading } from "~src/hooks/useExperimentLoading"
 import { useEditorResources } from "~src/hooks/useEditorResources"
@@ -59,6 +61,8 @@ function SidebarContent() {
     handleGrantPermissions,
     handleDenyPermissions
   } = usePermissions(config)
+
+  const activeSitePermission = useActiveSitePermission()
 
   const {
     view,
@@ -330,6 +334,7 @@ function SidebarContent() {
 
   return (
     <div className="w-full h-screen bg-white flex flex-col">
+      <SitePermissionBanner permission={activeSitePermission} />
       {view === 'list' && (
         <ListView
           config={config}
