@@ -444,7 +444,7 @@ export const DOMChangeEditor = ({
               id={`dom-change-js-${idSuffix}`}
               value={localChange.jsValue || ''}
               onChange={(e) => setLocalChange({ ...localChange, jsValue: e.target.value })}
-              placeholder="// JavaScript code to execute
+              placeholder={`// JavaScript code to execute
 // Available context:
 // - element: The selected element
 // - document: Page document
@@ -452,7 +452,7 @@ export const DOMChangeEditor = ({
 // - console: For logging
 // - experimentName: Experiment identifier
 
-debugLog('Hello from experiment:', experimentName);"
+debugLog('Hello from experiment:', experimentName);`}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
               rows={6}
             />
