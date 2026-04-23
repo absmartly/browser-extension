@@ -286,14 +286,20 @@ test.describe('AI Conversation History', () => {
       const deleteButtons = sidebar.locator('[id^="delete-conversation-"]')
       const secondDeleteButton = deleteButtons.nth(1)
       await secondDeleteButton.click()
-      await debugWait(1000)
       log('✓ Delete button clicked and dialog accepted')
 
       const remainingConversations = sidebar.locator('[id^="conversation-"]:not(#conversation-history-title)')
-      const remainingCount = await remainingConversations.count()
+      // Deletion flows through a browser-level confirm dialog handled
+      // asynchronously by the test's page.on('dialog') listener, then a
+      // storage write, then a React re-render. Poll the count instead of
+      // sleeping a fixed interval so the assertion doesn't race on slow
+      // CI runners.
+      await expect.poll(async () => remainingConversations.count(), {
+        timeout: 10000,
+        message: `expected conversation count to drop from ${countBefore} to ${countBefore - 1} after deleting one`
+      }).toBe(countBefore - 1)
+      const remainingCount = countBefore - 1
       log(`Remaining conversations: ${remainingCount}`)
-
-      expect(remainingCount).toBe(countBefore - 1)
       log('✅ Conversation deleted successfully')
 
       const headerText = await sidebar.locator('.border-b').first().textContent()

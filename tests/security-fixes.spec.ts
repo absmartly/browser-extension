@@ -7,7 +7,13 @@ import { test, expect } from '@playwright/test'
 import path from 'path'
 
 const EXTENSION_PATH = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
-const TEST_URL = 'http://localhost:3000'
+// The security tests navigate to any loadable URL and then execute their
+// assertions via `page.evaluate` — nothing on the page actually matters.
+// Previously this pointed at :3000 (the optional claude-code-bridge), which
+// is disabled on CI via playwright.config, causing every test to fail with
+// ERR_CONNECTION_REFUSED. Use the always-running tests/test-pages
+// http-server on :3456 instead.
+const TEST_URL = 'http://localhost:3456/visual-editor-test.html'
 
 test.describe('Security Fixes E2E Tests', () => {
   test.describe('Fix #1: innerHTML XSS Protection', () => {

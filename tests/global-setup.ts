@@ -55,10 +55,22 @@ async function globalSetup(config: FullConfig) {
       // Set environment variable to disable shadow DOM for tests
       process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM = 'true'
 
+      // Pass NODE_ENV=development explicitly: `plasmo build` defaults to
+      // production, which in turn makes src/utils/debug.ts strip every
+      // debugLog/debugWarn call. Several e2e specs (ai-session-image,
+      // ai-conversation-history, ...) assert on specific console output
+      // the app emits via debugLog, so running them against a production
+      // bundle drops those messages and the assertions fail with
+      // "Expected > 0, Received 0". `--tag=dev` on its own only namespaces
+      // the output directory; it doesn't change NODE_ENV.
       execSync('plasmo build --tag=dev --src-path=.', {
         cwd: rootDir,
         stdio: 'inherit',
-        env: { ...process.env, PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true' }
+        env: {
+          ...process.env,
+          NODE_ENV: 'development',
+          PLASMO_PUBLIC_DISABLE_SHADOW_DOM: 'true'
+        }
       })
       console.log('✅ Extension built successfully in DEV mode (with shadow DOM disabled for tests)')
     } catch (error) {

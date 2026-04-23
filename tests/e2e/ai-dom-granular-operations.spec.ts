@@ -220,7 +220,25 @@ test.describe('AI DOM Granular Operations', () => {
   test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
     initializeTestLogging()
 
-    log('Configuring extension (bridge client will auto-detect ports 3000-3004)')
+    // These tests verify AI action-handling semantics (append /
+    // replace_all / replace_specific / remove_specific) rather than a
+    // specific provider's wire protocol. The test fixture previously
+    // seeded `aiProvider: 'claude-subscription'` and relied on a local
+    // claude-code-bridge binary that CI doesn't have. Switch to the
+    // anthropic-api provider and pair its key with its endpoint the
+    // same way the shared extension fixture does: when a proxy endpoint
+    // is configured (e.g. llmproxy.absmartly-dev.com) use the
+    // PLASMO_PUBLIC_ANTHROPIC_API_KEY (llmp_sk_...), otherwise fall
+    // back to the direct ANTHROPIC_API_KEY (sk-ant-...).
+    const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
+    const anthropicApiKey = anthropicEndpoint
+      ? (process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '')
+      : (process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || '')
+
+    test.skip(
+      !anthropicApiKey,
+      'ANTHROPIC_API_KEY / PLASMO_PUBLIC_ANTHROPIC_API_KEY required; these tests hit the AI provider to exercise real action handling.'
+    )
 
     await seedStorage({
       'absmartly-config': {
@@ -228,9 +246,15 @@ test.describe('AI DOM Granular Operations', () => {
         apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
         authMethod: 'apikey',
         domChangesFieldName: '__dom_changes',
-        aiProvider: 'claude-subscription',
-        vibeStudioEnabled: true
-      }
+        aiProvider: 'anthropic-api',
+        aiApiKey: anthropicApiKey,
+        vibeStudioEnabled: true,
+        llmModel: 'claude-sonnet-4-5',
+        providerModels: { 'anthropic-api': 'claude-sonnet-4-5' },
+        providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
+      },
+      'ai-apikey': anthropicApiKey,
+      'plasmo:ai-apikey': anthropicApiKey
     })
 
     testPage = await context.newPage()
@@ -295,7 +319,9 @@ test.describe('AI DOM Granular Operations', () => {
 
     await test.step('Setup and generate initial changes', async () => {
       sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(sidebar, 'Make all buttons orange')
+      // Explicit phrasing so the live model produces DOM changes rather
+      // than asking a clarifying question.
+      await generateAndWait(sidebar, 'Make all buttons have an orange background')
     })
 
     await test.step('Verify initial changes', async () => {
@@ -323,7 +349,7 @@ test.describe('AI DOM Granular Operations', () => {
 
     await test.step('Setup and generate multiple changes', async () => {
       sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(sidebar, 'Make buttons orange and headings blue')
+      await generateAndWait(sidebar, 'Make all buttons orange and all headings blue')
     })
 
     await test.step('Verify initial changes', async () => {
@@ -379,7 +405,11 @@ test.describe('AI DOM Granular Operations', () => {
 
     await test.step('Setup and generate initial changes', async () => {
       sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(sidebar, 'Make buttons orange')
+      // Use the fuller, explicit phrasing that the passing "append" test
+      // uses — short prompts like "Make buttons orange" sometimes get
+      // answered conversationally by the real model instead of producing
+      // DOM changes, which makes the setup for this test flaky.
+      await generateAndWait(sidebar, 'Make all buttons have an orange background')
     })
 
     await test.step('Verify initial changes exist', async () => {
@@ -412,7 +442,9 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Step 1: Create initial changes', async () => {
-      await generateAndWait(sidebar!, 'Make buttons orange')
+      // Prefer explicit phrasing so the live model reliably produces
+      // changes rather than asking a clarifying question.
+      await generateAndWait(sidebar!, 'Make all buttons have an orange background')
 
       const changes = await getLatestChanges(testPage)
       expect(changes.length).toBeGreaterThan(0)
@@ -420,7 +452,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Step 2: Append heading changes', async () => {
-      await generateAndWait(sidebar!, 'Also make headings blue')
+      await generateAndWait(sidebar!, 'Also make all headings blue and bold')
 
       const changes = await getLatestChanges(testPage)
       expect(changes.length).toBeGreaterThan(0)
@@ -433,7 +465,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Step 4: Replace button color', async () => {
-      await generateAndWait(sidebar!, 'Change buttons to red')
+      await generateAndWait(sidebar!, 'Change buttons to red instead of orange')
 
       const changes = await getLatestChanges(testPage)
       expect(changes.length).toBeGreaterThan(0)
