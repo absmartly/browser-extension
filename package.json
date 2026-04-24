@@ -6,7 +6,7 @@
   "author": "Jonas Alves",
   "private": true,
   "scripts": {
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && node scripts/setup-git-hooks.js",
     "format": "prettier --write \"src/**/*.{js,ts,tsx}\"",
     "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
     "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'bun run build:sdk-bridge'",

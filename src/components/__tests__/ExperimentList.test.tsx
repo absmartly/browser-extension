@@ -202,7 +202,6 @@ describe("ExperimentList", () => {
       ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({
         experiment_1: 1
       })
-
       ;(sdkBridge.getCurrentVariantAssignments as jest.Mock).mockResolvedValue({
         assignments: { experiment_1: 0 },
         experimentsInContext: ["experiment_1"]
@@ -223,7 +222,6 @@ describe("ExperimentList", () => {
       ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({
         experiment_1: 1
       })
-
       ;(sdkBridge.getCurrentVariantAssignments as jest.Mock).mockResolvedValue({
         assignments: { experiment_1: 0 },
         experimentsInContext: ["experiment_1"]
@@ -244,7 +242,6 @@ describe("ExperimentList", () => {
       ;(overrides.initializeOverrides as jest.Mock).mockResolvedValue({
         experiment_1: 1
       })
-
       ;(sdkBridge.getCurrentVariantAssignments as jest.Mock).mockResolvedValue({
         assignments: { experiment_1: 0 },
         experimentsInContext: ["experiment_1"]

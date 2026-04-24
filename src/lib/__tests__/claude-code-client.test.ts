@@ -641,13 +641,11 @@ describe("ClaudeCodeBridgeClient", () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest
-          .fn()
-          .mockResolvedValue({
-            ok: true,
-            authenticated: true,
-            subscriptionType: "free"
-          })
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          authenticated: true,
+          subscriptionType: "free"
+        })
       } as any)
 
       const connection = await client.connect()
@@ -1188,13 +1186,11 @@ describe("ClaudeCodeBridgeClient", () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest
-          .fn()
-          .mockResolvedValue({
-            ok: true,
-            authenticated: true,
-            subscriptionType: "pro"
-          })
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          authenticated: true,
+          subscriptionType: "pro"
+        })
       } as any)
 
       const connection = await client.connect()
