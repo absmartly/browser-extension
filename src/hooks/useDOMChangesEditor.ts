@@ -56,11 +56,11 @@ export function useDOMChangesEditor({
       styleProperties: change.type === 'style'
         ? Object.entries(styleValue).map(([key, value]) => ({
             key,
-            value: String(value).replace(/ !important$/i, '')
+            value: String(value)
           }))
         : [{ key: '', value: '' }],
       styleImportant: change.type === 'style'
-        ? Object.values(styleValue).some(v => String(v).includes('!important'))
+        ? (change as any).important === true
         : false,
       styleRulesStates: change.type === 'styleRules' ? (change as any).states : undefined,
       styleRulesImportant: change.type === 'styleRules' ? (change as any).important : undefined,
@@ -130,16 +130,14 @@ export function useDOMChangesEditor({
         const styleValue: Record<string, string> = {}
         changeToSave.styleProperties?.forEach(({ key, value }) => {
           if (key && value) {
-            const finalValue = changeToSave.styleImportant && !value.includes('!important')
-              ? `${value} !important`
-              : value
-            styleValue[key] = finalValue
+            styleValue[key] = value
           }
         })
         domChange = {
           selector: changeToSave.selector,
           type: 'style',
           value: styleValue,
+          important: changeToSave.styleImportant,
           mode: changeToSave.mode || 'merge',
           waitForElement: changeToSave.waitForElement,
           triggerOnView: changeToSave.triggerOnView,

@@ -84,15 +84,16 @@ describe('useDOMChangesEditor', () => {
       expect(result.current.editingChange!.styleProperties).toEqual([])
     })
 
-    it('should handle !important in style values', () => {
-      const changeWithImportant: DOMChange = {
+    it('should treat style important flag as important even when values are clean', () => {
+      const importantStyleChange: DOMChange = {
         selector: '.button',
         type: 'style',
-        value: { color: 'red !important', fontSize: '14px' }
+        value: { color: 'red', fontSize: '14px' },
+        important: true
       }
 
       const { result } = renderHook(() =>
-        useDOMChangesEditor({ ...defaultProps, changes: [changeWithImportant] })
+        useDOMChangesEditor({ ...defaultProps, changes: [importantStyleChange] })
       )
 
       act(() => {
@@ -237,6 +238,36 @@ describe('useDOMChangesEditor', () => {
 
       const savedChange = onChange.mock.calls[0][0][0]
       expect(savedChange.persistStyle).toBe(true)
+    })
+
+    it('should save inline style important flag separately from the style values', () => {
+      const onChange = jest.fn()
+      const styleChange: DOMChange = {
+        selector: '.button',
+        type: 'style',
+        value: { color: 'red' },
+        important: true
+      }
+
+      const { result } = renderHook(() =>
+        useDOMChangesEditor({ ...defaultProps, changes: [styleChange], onChange })
+      )
+
+      act(() => {
+        result.current.handleEditChange(0)
+      })
+
+      act(() => {
+        result.current.handleSaveChange(result.current.editingChange!)
+      })
+
+      expect(onChange).toHaveBeenCalledWith([
+        expect.objectContaining({
+          type: 'style',
+          value: { color: 'red' },
+          important: true
+        })
+      ])
     })
 
     it('should preserve persistAttribute when saving attribute change', () => {
