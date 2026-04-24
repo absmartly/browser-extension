@@ -3,12 +3,22 @@
  * Displays SDK event data in a modal with syntax highlighting
  */
 
-import { EditorView, keymap, highlightActiveLine, highlightActiveLineGutter, lineNumbers } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
-import { searchKeymap } from '@codemirror/search'
+import { json } from "@codemirror/lang-json"
+import {
+  defaultHighlightStyle,
+  foldGutter,
+  syntaxHighlighting
+} from "@codemirror/language"
+import { searchKeymap } from "@codemirror/search"
+import { EditorState } from "@codemirror/state"
+import { oneDark } from "@codemirror/theme-one-dark"
+import {
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  lineNumbers
+} from "@codemirror/view"
 
 export class EventViewer {
   private viewerHost: HTMLElement | null = null
@@ -17,8 +27,8 @@ export class EventViewer {
 
   show(eventName: string, timestamp: string, jsonData: string): void {
     // Create viewer host with Shadow DOM to avoid CSP issues
-    this.viewerHost = document.createElement('div')
-    this.viewerHost.id = 'absmartly-event-viewer-host'
+    this.viewerHost = document.createElement("div")
+    this.viewerHost.id = "absmartly-event-viewer-host"
     this.viewerHost.style.cssText = `
       position: fixed;
       top: 0;
@@ -30,54 +40,54 @@ export class EventViewer {
     `
 
     // Create Shadow DOM to isolate from page's CSP
-    this.shadowRoot = this.viewerHost.attachShadow({ mode: 'open' })
+    this.shadowRoot = this.viewerHost.attachShadow({ mode: "open" })
 
     // Add styles directly to Shadow DOM (no CSP issues)
-    const viewerStyle = document.createElement('style')
+    const viewerStyle = document.createElement("style")
     viewerStyle.textContent = this.getViewerStyles()
     this.shadowRoot.appendChild(viewerStyle)
 
     // Create viewer elements
-    const backdrop = document.createElement('div')
-    backdrop.className = 'event-viewer-backdrop'
+    const backdrop = document.createElement("div")
+    backdrop.className = "event-viewer-backdrop"
 
-    const container = document.createElement('div')
-    container.className = 'event-viewer-container'
+    const container = document.createElement("div")
+    container.className = "event-viewer-container"
 
-    const header = document.createElement('div')
-    header.className = 'event-viewer-header'
+    const header = document.createElement("div")
+    header.className = "event-viewer-header"
 
-    const titleEl = document.createElement('h3')
-    titleEl.className = 'event-viewer-title'
-    titleEl.textContent = 'Event Details'
+    const titleEl = document.createElement("h3")
+    titleEl.className = "event-viewer-title"
+    titleEl.textContent = "Event Details"
 
     header.appendChild(titleEl)
 
     // Create metadata section
-    const metadataSection = document.createElement('div')
-    metadataSection.className = 'event-viewer-metadata'
+    const metadataSection = document.createElement("div")
+    metadataSection.className = "event-viewer-metadata"
 
     // Event Type
-    const eventTypeContainer = document.createElement('div')
-    eventTypeContainer.className = 'event-viewer-field'
-    const eventTypeLabel = document.createElement('label')
-    eventTypeLabel.textContent = 'Event Type'
-    eventTypeLabel.className = 'event-viewer-label'
-    const eventTypeValue = document.createElement('div')
+    const eventTypeContainer = document.createElement("div")
+    eventTypeContainer.className = "event-viewer-field"
+    const eventTypeLabel = document.createElement("label")
+    eventTypeLabel.textContent = "Event Type"
+    eventTypeLabel.className = "event-viewer-label"
+    const eventTypeValue = document.createElement("div")
     eventTypeValue.textContent = eventName
-    eventTypeValue.className = 'event-viewer-value'
+    eventTypeValue.className = "event-viewer-value"
     eventTypeContainer.appendChild(eventTypeLabel)
     eventTypeContainer.appendChild(eventTypeValue)
 
     // Timestamp
-    const timestampContainer = document.createElement('div')
-    timestampContainer.className = 'event-viewer-field'
-    const timestampLabel = document.createElement('label')
-    timestampLabel.textContent = 'Timestamp'
-    timestampLabel.className = 'event-viewer-label'
-    const timestampValue = document.createElement('div')
+    const timestampContainer = document.createElement("div")
+    timestampContainer.className = "event-viewer-field"
+    const timestampLabel = document.createElement("label")
+    timestampLabel.textContent = "Timestamp"
+    timestampLabel.className = "event-viewer-label"
+    const timestampValue = document.createElement("div")
     timestampValue.textContent = timestamp
-    timestampValue.className = 'event-viewer-value'
+    timestampValue.className = "event-viewer-value"
     timestampContainer.appendChild(timestampLabel)
     timestampContainer.appendChild(timestampValue)
 
@@ -85,29 +95,29 @@ export class EventViewer {
     metadataSection.appendChild(timestampContainer)
 
     // Event Data Label
-    const dataLabelContainer = document.createElement('div')
-    dataLabelContainer.className = 'event-viewer-data-label'
-    const dataLabel = document.createElement('label')
-    dataLabel.textContent = 'Event Data'
-    dataLabel.className = 'event-viewer-label'
+    const dataLabelContainer = document.createElement("div")
+    dataLabelContainer.className = "event-viewer-data-label"
+    const dataLabel = document.createElement("label")
+    dataLabel.textContent = "Event Data"
+    dataLabel.className = "event-viewer-label"
     dataLabelContainer.appendChild(dataLabel)
 
     // Create viewer container
-    const viewerContainer = document.createElement('div')
-    viewerContainer.id = 'event-codemirror-container'
-    viewerContainer.className = 'event-viewer-codemirror-container'
+    const viewerContainer = document.createElement("div")
+    viewerContainer.id = "event-codemirror-container"
+    viewerContainer.className = "event-viewer-codemirror-container"
 
     // Create buttons
-    const buttonContainer = document.createElement('div')
-    buttonContainer.className = 'event-viewer-buttons'
+    const buttonContainer = document.createElement("div")
+    buttonContainer.className = "event-viewer-buttons"
 
-    const copyBtn = document.createElement('button')
-    copyBtn.className = 'event-viewer-button event-viewer-button-copy'
-    copyBtn.innerHTML = '<span>📋</span> Copy'
+    const copyBtn = document.createElement("button")
+    copyBtn.className = "event-viewer-button event-viewer-button-copy"
+    copyBtn.innerHTML = "<span>📋</span> Copy"
 
-    const closeBtn = document.createElement('button')
-    closeBtn.className = 'event-viewer-button event-viewer-button-close'
-    closeBtn.innerHTML = '<span>✕</span> Close'
+    const closeBtn = document.createElement("button")
+    closeBtn.className = "event-viewer-button event-viewer-button-close"
+    closeBtn.innerHTML = "<span>✕</span> Close"
 
     buttonContainer.appendChild(copyBtn)
     buttonContainer.appendChild(closeBtn)
@@ -140,7 +150,7 @@ export class EventViewer {
           oneDark,
           EditorView.lineWrapping,
           EditorView.editable.of(false), // Read-only mode
-          EditorState.readOnly.of(true)  // Read-only state
+          EditorState.readOnly.of(true) // Read-only state
         ]
       })
 
@@ -150,21 +160,21 @@ export class EventViewer {
       })
 
       // Set up copy handler
-      copyBtn.addEventListener('click', async () => {
+      copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(jsonData)
           const originalHTML = copyBtn.innerHTML
-          copyBtn.innerHTML = '<span>✓</span> Copied!'
-          copyBtn.classList.add('event-viewer-button-success')
+          copyBtn.innerHTML = "<span>✓</span> Copied!"
+          copyBtn.classList.add("event-viewer-button-success")
 
           setTimeout(() => {
             copyBtn.innerHTML = originalHTML
-            copyBtn.classList.remove('event-viewer-button-success')
+            copyBtn.classList.remove("event-viewer-button-success")
           }, 2000)
         } catch (err) {
-          console.error('Failed to copy:', err)
+          console.error("Failed to copy:", err)
           const originalHTML = copyBtn.innerHTML
-          copyBtn.innerHTML = '<span>✗</span> Failed'
+          copyBtn.innerHTML = "<span>✗</span> Failed"
 
           setTimeout(() => {
             copyBtn.innerHTML = originalHTML
@@ -173,11 +183,11 @@ export class EventViewer {
       })
 
       // Set up close handlers
-      closeBtn.addEventListener('click', () => {
+      closeBtn.addEventListener("click", () => {
         this.close()
       })
 
-      backdrop.addEventListener('click', (e) => {
+      backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) {
           this.close()
         }
@@ -185,11 +195,11 @@ export class EventViewer {
 
       // Escape key to close
       const handleKeydown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
+        if (e.key === "Escape") {
           this.close()
         }
       }
-      document.addEventListener('keydown', handleKeydown)
+      document.addEventListener("keydown", handleKeydown)
 
       // Store handler for cleanup
       ;(this.viewerHost as any)._keydownHandler = handleKeydown
@@ -206,7 +216,7 @@ export class EventViewer {
       // Remove keydown handler
       const handler = (this.viewerHost as any)._keydownHandler
       if (handler) {
-        document.removeEventListener('keydown', handler)
+        document.removeEventListener("keydown", handler)
       }
 
       this.viewerHost.remove()
@@ -217,7 +227,7 @@ export class EventViewer {
     // No need to remove style from head anymore - it's in shadow root
 
     // Notify extension that viewer was closed
-    chrome.runtime.sendMessage({ type: 'EVENT_VIEWER_CLOSE' })
+    chrome.runtime.sendMessage({ type: "EVENT_VIEWER_CLOSE" })
   }
 
   private getViewerStyles(): string {

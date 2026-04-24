@@ -1,6 +1,6 @@
-import { detectPluginStatusInPage } from '../../background/main'
+import { detectPluginStatusInPage } from "../../background/main"
 
-describe('detectPluginStatusInPage', () => {
+describe("detectPluginStatusInPage", () => {
   beforeEach(() => {
     delete (window as any).__ABSMARTLY_PLUGINS__
     delete (window as any).__absmartlyPlugin
@@ -14,16 +14,16 @@ describe('detectPluginStatusInPage', () => {
     delete (window as any).context
     delete (window as any).absmartlyContext
     delete (window as any).__context
-    document.body.innerHTML = ''
+    document.body.innerHTML = ""
   })
 
-  it('detects plugin via context.__domPlugin registration', () => {
+  it("detects plugin via context.__domPlugin registration", () => {
     ;(window as any).ABsmartlyContext = {
-      treatment: () => 'A',
+      treatment: () => "A",
       __domPlugin: {
         initialized: true,
-        version: '1.2.3',
-        instance: { name: 'dom' }
+        version: "1.2.3",
+        instance: { name: "dom" }
       }
     }
 
@@ -31,12 +31,12 @@ describe('detectPluginStatusInPage', () => {
 
     expect(result.pluginDetected).toBe(true)
     expect(result.hasContextDomPlugin).toBe(true)
-    expect(result.contextPath).toBe('ABsmartlyContext')
+    expect(result.contextPath).toBe("ABsmartlyContext")
   })
 
-  it('detects plugin via DOM artifacts even without context', () => {
-    const marker = document.createElement('div')
-    marker.setAttribute('data-absmartly-modified', 'true')
+  it("detects plugin via DOM artifacts even without context", () => {
+    const marker = document.createElement("div")
+    marker.setAttribute("data-absmartly-modified", "true")
     document.body.appendChild(marker)
 
     const result = detectPluginStatusInPage()

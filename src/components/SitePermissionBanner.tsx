@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
-import { Button } from './ui/Button'
-import { ShieldExclamationIcon } from '@heroicons/react/24/outline'
-import type { ActiveSitePermissionState } from '~src/hooks/useActiveSitePermission'
+import { ShieldExclamationIcon } from "@heroicons/react/24/outline"
+import React, { useState } from "react"
+
+import type { ActiveSitePermissionState } from "~src/hooks/useActiveSitePermission"
+
+import { Button } from "./ui/Button"
 
 interface Props {
   permission: ActiveSitePermissionState
@@ -27,7 +29,9 @@ export function SitePermissionBanner({ permission }: Props) {
     try {
       const granted = await requestPermission()
       if (!granted) {
-        setError('Permission was not granted. The extension needs access to this site to preview and edit experiments here.')
+        setError(
+          "Permission was not granted. The extension needs access to this site to preview and edit experiments here."
+        )
       }
     } finally {
       setRequesting(false)
@@ -38,28 +42,25 @@ export function SitePermissionBanner({ permission }: Props) {
     <div
       id="site-permission-banner"
       role="alert"
-      className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-    >
+      className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <div className="flex items-start gap-2">
         <ShieldExclamationIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
         <div className="flex-1 min-w-0">
           <div className="font-medium">Grant access to {host}</div>
           <p className="mt-0.5 text-xs text-amber-800">
-            The extension can't interact with this site until you allow it. Click the button below — Chrome will
-            show a native prompt to confirm.
+            The extension can't interact with this site until you allow it.
+            Click the button below — Chrome will show a native prompt to
+            confirm.
           </p>
-          {error && (
-            <p className="mt-1 text-xs text-red-700">{error}</p>
-          )}
+          {error && <p className="mt-1 text-xs text-red-700">{error}</p>}
         </div>
         <Button
           id="site-permission-grant-button"
           size="sm"
           variant="primary"
           onClick={handleClick}
-          disabled={requesting}
-        >
-          {requesting ? 'Requesting…' : 'Grant access'}
+          disabled={requesting}>
+          {requesting ? "Requesting…" : "Grant access"}
         </Button>
       </div>
     </div>

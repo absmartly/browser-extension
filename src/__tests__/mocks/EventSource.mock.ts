@@ -17,7 +17,7 @@ export class MockEventSource {
     // Simulate successful connection
     setTimeout(() => {
       if (this.onopen) {
-        this.onopen({ type: 'open' })
+        this.onopen({ type: "open" })
       }
     }, 10)
   }
@@ -30,8 +30,8 @@ export class MockEventSource {
   simulateMessage(data: any) {
     if (this.onmessage) {
       this.onmessage({
-        type: 'message',
-        data: typeof data === 'string' ? data : JSON.stringify(data)
+        type: "message",
+        data: typeof data === "string" ? data : JSON.stringify(data)
       })
     }
   }
@@ -40,8 +40,8 @@ export class MockEventSource {
   simulateError(error: any) {
     if (this.onerror) {
       this.onerror({
-        type: 'error',
-        message: error.message || 'Connection error',
+        type: "error",
+        message: error.message || "Connection error",
         ...error
       })
     }

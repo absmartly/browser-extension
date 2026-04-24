@@ -1,4 +1,4 @@
-import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
 
 export function applyDOMChangeAction(
   currentChanges: DOMChange[],
@@ -7,15 +7,17 @@ export function applyDOMChangeAction(
   const { domChanges, action, targetSelectors } = result
 
   switch (action) {
-    case 'append':
+    case "append":
       return [...currentChanges, ...domChanges]
 
-    case 'replace_all':
+    case "replace_all":
       return domChanges
 
-    case 'replace_specific': {
+    case "replace_specific": {
       if (!targetSelectors || targetSelectors.length === 0) {
-        throw new Error('replace_specific action requires targetSelectors array')
+        throw new Error(
+          "replace_specific action requires targetSelectors array"
+        )
       }
 
       const withoutTargets = currentChanges.filter(
@@ -25,9 +27,9 @@ export function applyDOMChangeAction(
       return [...withoutTargets, ...domChanges]
     }
 
-    case 'remove_specific': {
+    case "remove_specific": {
       if (!targetSelectors || targetSelectors.length === 0) {
-        throw new Error('remove_specific action requires targetSelectors array')
+        throw new Error("remove_specific action requires targetSelectors array")
       }
 
       return currentChanges.filter(
@@ -35,7 +37,7 @@ export function applyDOMChangeAction(
       )
     }
 
-    case 'none':
+    case "none":
       return currentChanges
 
     default: {

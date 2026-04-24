@@ -1,29 +1,29 @@
-import { createAIProvider } from '../factory'
-import { AnthropicProvider } from '../anthropic'
-import { OpenAIProvider } from '../openai'
-import { BridgeProvider } from '../bridge'
-import type { AIProviderConfig } from '../base'
+import { AnthropicProvider } from "../anthropic"
+import type { AIProviderConfig } from "../base"
+import { BridgeProvider } from "../bridge"
+import { createAIProvider } from "../factory"
+import { OpenAIProvider } from "../openai"
 
-jest.mock('../anthropic')
-jest.mock('../openai')
-jest.mock('../bridge')
+jest.mock("../anthropic")
+jest.mock("../openai")
+jest.mock("../bridge")
 
-describe('AI Provider Factory', () => {
+describe("AI Provider Factory", () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    jest.spyOn(console, 'log').mockImplementation()
-    jest.spyOn(console, 'warn').mockImplementation()
+    jest.spyOn(console, "log").mockImplementation()
+    jest.spyOn(console, "warn").mockImplementation()
   })
 
   afterEach(() => {
     jest.restoreAllMocks()
   })
 
-  describe('createAIProvider', () => {
-    it('should create AnthropicProvider for anthropic-api', () => {
+  describe("createAIProvider", () => {
+    it("should create AnthropicProvider for anthropic-api", () => {
       const config: AIProviderConfig = {
-        apiKey: 'sk-ant-test-key',
-        aiProvider: 'anthropic-api'
+        apiKey: "sk-ant-test-key",
+        aiProvider: "anthropic-api"
       }
 
       createAIProvider(config)
@@ -32,13 +32,16 @@ describe('AI Provider Factory', () => {
       expect(AnthropicProvider).toHaveBeenCalledTimes(1)
       expect(OpenAIProvider).not.toHaveBeenCalled()
       expect(BridgeProvider).not.toHaveBeenCalled()
-      expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'anthropic-api')
+      expect(console.log).toHaveBeenCalledWith(
+        "[Factory] Creating AI provider:",
+        "anthropic-api"
+      )
     })
 
-    it('should create OpenAIProvider for openai-api', () => {
+    it("should create OpenAIProvider for openai-api", () => {
       const config: AIProviderConfig = {
-        apiKey: 'sk-openai-test-key',
-        aiProvider: 'openai-api'
+        apiKey: "sk-openai-test-key",
+        aiProvider: "openai-api"
       }
 
       createAIProvider(config)
@@ -47,12 +50,15 @@ describe('AI Provider Factory', () => {
       expect(OpenAIProvider).toHaveBeenCalledTimes(1)
       expect(AnthropicProvider).not.toHaveBeenCalled()
       expect(BridgeProvider).not.toHaveBeenCalled()
-      expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'openai-api')
+      expect(console.log).toHaveBeenCalledWith(
+        "[Factory] Creating AI provider:",
+        "openai-api"
+      )
     })
 
-    it('should create BridgeProvider for claude-subscription', () => {
+    it("should create BridgeProvider for claude-subscription", () => {
       const config: AIProviderConfig = {
-        aiProvider: 'claude-subscription'
+        aiProvider: "claude-subscription"
       }
 
       createAIProvider(config)
@@ -61,12 +67,15 @@ describe('AI Provider Factory', () => {
       expect(BridgeProvider).toHaveBeenCalledTimes(1)
       expect(AnthropicProvider).not.toHaveBeenCalled()
       expect(OpenAIProvider).not.toHaveBeenCalled()
-      expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'claude-subscription')
+      expect(console.log).toHaveBeenCalledWith(
+        "[Factory] Creating AI provider:",
+        "claude-subscription"
+      )
     })
 
-    it('should create BridgeProvider for codex', () => {
+    it("should create BridgeProvider for codex", () => {
       const config: AIProviderConfig = {
-        aiProvider: 'codex'
+        aiProvider: "codex"
       }
 
       createAIProvider(config)
@@ -75,14 +84,17 @@ describe('AI Provider Factory', () => {
       expect(BridgeProvider).toHaveBeenCalledTimes(1)
       expect(AnthropicProvider).not.toHaveBeenCalled()
       expect(OpenAIProvider).not.toHaveBeenCalled()
-      expect(console.log).toHaveBeenCalledWith('[Factory] Creating AI provider:', 'codex')
+      expect(console.log).toHaveBeenCalledWith(
+        "[Factory] Creating AI provider:",
+        "codex"
+      )
     })
 
-    it('should preserve all config properties when creating provider', () => {
+    it("should preserve all config properties when creating provider", () => {
       const config: AIProviderConfig = {
-        apiKey: 'test-key',
-        aiProvider: 'anthropic-api',
-        llmModel: 'claude-sonnet-4-5-20250514'
+        apiKey: "test-key",
+        aiProvider: "anthropic-api",
+        llmModel: "claude-sonnet-4-5-20250514"
       }
 
       createAIProvider(config)
@@ -90,22 +102,22 @@ describe('AI Provider Factory', () => {
       expect(AnthropicProvider).toHaveBeenCalledWith(config)
       expect(AnthropicProvider).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKey: 'test-key',
-          aiProvider: 'anthropic-api',
-          llmModel: 'claude-sonnet-4-5-20250514'
+          apiKey: "test-key",
+          aiProvider: "anthropic-api",
+          llmModel: "claude-sonnet-4-5-20250514"
         })
       )
     })
 
-    it('should create different providers for different calls', () => {
+    it("should create different providers for different calls", () => {
       const config1: AIProviderConfig = {
-        apiKey: 'key1',
-        aiProvider: 'anthropic-api'
+        apiKey: "key1",
+        aiProvider: "anthropic-api"
       }
 
       const config2: AIProviderConfig = {
-        apiKey: 'key2',
-        aiProvider: 'openai-api'
+        apiKey: "key2",
+        aiProvider: "openai-api"
       }
 
       createAIProvider(config1)
@@ -117,10 +129,10 @@ describe('AI Provider Factory', () => {
       expect(OpenAIProvider).toHaveBeenCalledWith(config2)
     })
 
-    it('should handle rapid successive calls', () => {
+    it("should handle rapid successive calls", () => {
       const config: AIProviderConfig = {
-        apiKey: 'test-key',
-        aiProvider: 'anthropic-api'
+        apiKey: "test-key",
+        aiProvider: "anthropic-api"
       }
 
       createAIProvider(config)
@@ -132,16 +144,16 @@ describe('AI Provider Factory', () => {
     })
   })
 
-  describe('Provider exports', () => {
-    it('should export AnthropicProvider class', () => {
+  describe("Provider exports", () => {
+    it("should export AnthropicProvider class", () => {
       expect(AnthropicProvider).toBeDefined()
     })
 
-    it('should export OpenAIProvider class', () => {
+    it("should export OpenAIProvider class", () => {
       expect(OpenAIProvider).toBeDefined()
     })
 
-    it('should export BridgeProvider class', () => {
+    it("should export BridgeProvider class", () => {
       expect(BridgeProvider).toBeDefined()
     })
   })

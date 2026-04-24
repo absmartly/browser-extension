@@ -6,12 +6,14 @@
  * @module PreviewManager
  */
 
-import type { DOMChange } from '~src/types/dom-changes'
-import { ElementStateManager, type ElementState } from './element-state'
-import { sanitizeHTML } from '../utils/html-sanitizer'
-import { Logger } from '../utils/logger'
-import { DOMManipulatorLite as DOMManipulator } from '@absmartly/sdk-plugins/core/dom-manipulator'
-import { StyleSheetManager } from '@absmartly/sdk-plugins/core/style-sheet-manager'
+import { DOMManipulatorLite as DOMManipulator } from "@absmartly/sdk-plugins/core/dom-manipulator"
+import { StyleSheetManager } from "@absmartly/sdk-plugins/core/style-sheet-manager"
+
+import type { DOMChange } from "~src/types/dom-changes"
+
+import { sanitizeHTML } from "../utils/html-sanitizer"
+import { Logger } from "../utils/logger"
+import { ElementStateManager, type ElementState } from "./element-state"
 
 interface PreviewState {
   experimentName: string
@@ -34,7 +36,10 @@ export class PreviewManager {
       reapplyingElements: new Set(),
       getStyleManager: (experimentName: string) => {
         if (!this.styleManagers.has(experimentName)) {
-          this.styleManagers.set(experimentName, new StyleSheetManager(`absmartly-styles-${experimentName}`, true))
+          this.styleManagers.set(
+            experimentName,
+            new StyleSheetManager(`absmartly-styles-${experimentName}`, true)
+          )
         }
         return this.styleManagers.get(experimentName)
       },
@@ -46,23 +51,41 @@ export class PreviewManager {
     this.domManipulator = new DOMManipulator(true, mockPlugin)
   }
 
-  private buildStateRules(selector: string, states: any, important = true): string {
+  private buildStateRules(
+    selector: string,
+    states: any,
+    important = true
+  ): string {
     const rules: string[] = []
-    if (states.normal) rules.push(this.buildCssRule(selector, states.normal, important))
-    if (states.hover) rules.push(this.buildCssRule(`${selector}:hover`, states.hover, important))
-    if (states.active) rules.push(this.buildCssRule(`${selector}:active`, states.active, important))
-    if (states.focus) rules.push(this.buildCssRule(`${selector}:focus`, states.focus, important))
-    return rules.join('\n\n')
+    if (states.normal)
+      rules.push(this.buildCssRule(selector, states.normal, important))
+    if (states.hover)
+      rules.push(
+        this.buildCssRule(`${selector}:hover`, states.hover, important)
+      )
+    if (states.active)
+      rules.push(
+        this.buildCssRule(`${selector}:active`, states.active, important)
+      )
+    if (states.focus)
+      rules.push(
+        this.buildCssRule(`${selector}:focus`, states.focus, important)
+      )
+    return rules.join("\n\n")
   }
 
-  private buildCssRule(selector: string, properties: Record<string, any>, important = true): string {
+  private buildCssRule(
+    selector: string,
+    properties: Record<string, any>,
+    important = true
+  ): string {
     const declarations = Object.entries(properties)
       .map(([prop, value]) => {
-        const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase()
-        const bang = important ? ' !important' : ''
+        const cssProp = prop.replace(/([A-Z])/g, "-$1").toLowerCase()
+        const bang = important ? " !important" : ""
         return `  ${cssProp}: ${value}${bang};`
       })
-      .join('\n')
+      .join("\n")
     return `${selector} {\n${declarations}\n}`
   }
 
@@ -71,21 +94,29 @@ export class PreviewManager {
    */
   applyPreviewChange(change: DOMChange, experimentName: string): boolean {
     // Skip disabled changes
-    if (('disabled' in change && change.disabled) || ('enabled' in change && change.enabled === false)) {
-      Logger.log('Skipping disabled change:', change.selector)
+    if (
+      ("disabled" in change && change.disabled) ||
+      ("enabled" in change && change.enabled === false)
+    ) {
+      Logger.log("Skipping disabled change:", change.selector)
       return false
     }
 
     // Capture original state BEFORE applying (for undo functionality)
-    if (change.type !== 'styleRules') {
+    if (change.type !== "styleRules") {
       try {
         const elements = document.querySelectorAll(change.selector)
-        const filtered = Array.from(elements).filter(el => !this.isExtensionElement(el))
+        const filtered = Array.from(elements).filter(
+          (el) => !this.isExtensionElement(el)
+        )
 
         for (const element of filtered) {
-          if (!this.previewStateMap.has(element) ||
-              this.previewStateMap.get(element)!.experimentName !== experimentName) {
-            const originalState = ElementStateManager.captureElementState(element)
+          if (
+            !this.previewStateMap.has(element) ||
+            this.previewStateMap.get(element)!.experimentName !== experimentName
+          ) {
+            const originalState =
+              ElementStateManager.captureElementState(element)
             this.previewStateMap.set(element, {
               experimentName,
               originalState,
@@ -104,14 +135,16 @@ export class PreviewManager {
     const success = this.domManipulator.applyChange(change, experimentName)
 
     // Mark applied elements AFTER for undo tracking (for non-styleRules)
-    if (success && change.type !== 'styleRules') {
+    if (success && change.type !== "styleRules") {
       try {
         const elements = document.querySelectorAll(change.selector)
-        const filtered = Array.from(elements).filter(el => !this.isExtensionElement(el))
+        const filtered = Array.from(elements).filter(
+          (el) => !this.isExtensionElement(el)
+        )
 
         for (const element of filtered) {
-          element.setAttribute('data-absmartly-experiment', experimentName)
-          element.setAttribute('data-absmartly-modified', 'true')
+          element.setAttribute("data-absmartly-experiment", experimentName)
+          element.setAttribute("data-absmartly-modified", "true")
         }
       } catch (err) {
         // Ignore - elements might appear later via waitForElement
@@ -121,12 +154,11 @@ export class PreviewManager {
     return success
   }
 
-
   /**
    * Remove all preview changes for an experiment
    */
   removePreviewChanges(experimentName: string): boolean {
-    Logger.log('Removing preview changes for experiment:', experimentName)
+    Logger.log("Removing preview changes for experiment:", experimentName)
 
     let restoredCount = 0
     const elementsToRemove: Element[] = []
@@ -150,12 +182,12 @@ export class PreviewManager {
       `[data-absmartly-experiment="${experimentName}"], [data-absmartly-experiment="__preview__"]`
     )
     for (const element of markedElements) {
-      if (element.hasAttribute('data-absmartly-original')) {
+      if (element.hasAttribute("data-absmartly-original")) {
         try {
           const originalData = JSON.parse(
-            element.getAttribute('data-absmartly-original') || '{}'
+            element.getAttribute("data-absmartly-original") || "{}"
           )
-          Logger.log('Original data for element:', {
+          Logger.log("Original data for element:", {
             tagName: element.tagName,
             id: element.id,
             textContent: originalData.textContent?.substring(0, 100),
@@ -166,11 +198,11 @@ export class PreviewManager {
           // Restore innerHTML (which also restores textContent)
           if (originalData.innerHTML !== undefined) {
             element.innerHTML = sanitizeHTML(originalData.innerHTML)
-            Logger.log('Restored innerHTML from VE original')
+            Logger.log("Restored innerHTML from VE original")
           } else if (originalData.textContent !== undefined) {
             // Fallback to textContent if innerHTML not available
             element.textContent = originalData.textContent
-            Logger.log('Restored text content from VE original')
+            Logger.log("Restored text content from VE original")
           }
 
           // Restore styles
@@ -179,7 +211,7 @@ export class PreviewManager {
             for (const prop of Object.keys(originalData.styles)) {
               htmlElement.style[prop as any] = originalData.styles[prop]
             }
-            Logger.log('Restored styles from VE original')
+            Logger.log("Restored styles from VE original")
           }
 
           // Restore attributes
@@ -191,18 +223,21 @@ export class PreviewManager {
                 element.removeAttribute(attr)
               }
             }
-            Logger.log('Restored attributes from VE original')
+            Logger.log("Restored attributes from VE original")
           }
         } catch (e) {
-          Logger.warn('Failed to restore element from data-absmartly-original:', e)
+          Logger.warn(
+            "Failed to restore element from data-absmartly-original:",
+            e
+          )
         }
 
         // Remove the original data attribute - we're back at original state now
-        element.removeAttribute('data-absmartly-original')
+        element.removeAttribute("data-absmartly-original")
       }
 
-      element.removeAttribute('data-absmartly-experiment')
-      element.removeAttribute('data-absmartly-modified')
+      element.removeAttribute("data-absmartly-experiment")
+      element.removeAttribute("data-absmartly-modified")
       restoredCount++
     }
 
@@ -211,7 +246,10 @@ export class PreviewManager {
     if (styleManager) {
       styleManager.destroy()
       this.styleManagers.delete(experimentName)
-      Logger.log(`[PreviewManager] Destroyed stylesheet for experiment:`, experimentName)
+      Logger.log(
+        `[PreviewManager] Destroyed stylesheet for experiment:`,
+        experimentName
+      )
     }
 
     // Remove the style element for this experiment (same ID format as SDK plugin)
@@ -219,7 +257,7 @@ export class PreviewManager {
     const styleElement = document.getElementById(styleId)
     if (styleElement) {
       styleElement.remove()
-      Logger.log('[PreviewManager] Destroyed stylesheet:', styleId)
+      Logger.log("[PreviewManager] Destroyed stylesheet:", styleId)
       restoredCount++
     }
 
@@ -254,10 +292,10 @@ export class PreviewManager {
    */
   private isExtensionElement(element: Element): boolean {
     const extensionIds = [
-      'absmartly-sidebar-root',
-      'absmartly-sidebar-iframe',
-      'absmartly-preview-header-host',        // Shadow host for preview toolbar
-      'absmartly-visual-editor-toolbar-host'  // Shadow host for VE toolbar
+      "absmartly-sidebar-root",
+      "absmartly-sidebar-iframe",
+      "absmartly-preview-header-host", // Shadow host for preview toolbar
+      "absmartly-visual-editor-toolbar-host" // Shadow host for VE toolbar
     ]
 
     // Check if this element IS an extension container

@@ -4,12 +4,12 @@
  * Tests the buildConfig() functionality to ensure models are stored per provider
  */
 
-describe('useSettingsForm - Per-Provider Model Selection (buildConfig)', () => {
-  it('should store model per provider when buildConfig is called', () => {
+describe("useSettingsForm - Per-Provider Model Selection (buildConfig)", () => {
+  it("should store model per provider when buildConfig is called", () => {
     // Test the core logic: buildConfig should update providerModels with current provider's model
     const providerModels = {}
-    const aiProvider = 'openrouter-api'
-    const llmModel = 'moonshotai/kimi-k2.5'
+    const aiProvider = "openrouter-api"
+    const llmModel = "moonshotai/kimi-k2.5"
 
     const updatedProviderModels = {
       ...providerModels,
@@ -17,17 +17,17 @@ describe('useSettingsForm - Per-Provider Model Selection (buildConfig)', () => {
     }
 
     expect(updatedProviderModels).toEqual({
-      'openrouter-api': 'moonshotai/kimi-k2.5'
+      "openrouter-api": "moonshotai/kimi-k2.5"
     })
   })
 
-  it('should preserve models for other providers', () => {
+  it("should preserve models for other providers", () => {
     const providerModels = {
-      'openrouter-api': 'moonshotai/kimi-k2.5',
-      'anthropic-api': 'claude-sonnet-4-5-20250514'
+      "openrouter-api": "moonshotai/kimi-k2.5",
+      "anthropic-api": "claude-sonnet-4-5-20250514"
     }
-    const aiProvider = 'claude-subscription'
-    const llmModel = 'opus'
+    const aiProvider = "claude-subscription"
+    const llmModel = "opus"
 
     const updatedProviderModels = {
       ...providerModels,
@@ -35,16 +35,16 @@ describe('useSettingsForm - Per-Provider Model Selection (buildConfig)', () => {
     }
 
     expect(updatedProviderModels).toEqual({
-      'openrouter-api': 'moonshotai/kimi-k2.5',
-      'anthropic-api': 'claude-sonnet-4-5-20250514',
-      'claude-subscription': 'opus'
+      "openrouter-api": "moonshotai/kimi-k2.5",
+      "anthropic-api": "claude-sonnet-4-5-20250514",
+      "claude-subscription": "opus"
     })
   })
 
-  it('should handle model migration from old llmModel field', () => {
+  it("should handle model migration from old llmModel field", () => {
     const config = {
-      aiProvider: 'claude-subscription',
-      llmModel: 'opus'
+      aiProvider: "claude-subscription",
+      llmModel: "opus"
     }
     const loadedProviderModels = {}
 
@@ -54,31 +54,31 @@ describe('useSettingsForm - Per-Provider Model Selection (buildConfig)', () => {
     }
 
     expect(loadedProviderModels).toEqual({
-      'claude-subscription': 'opus'
+      "claude-subscription": "opus"
     })
   })
 
-  it('should use default model when provider has no saved model', () => {
+  it("should use default model when provider has no saved model", () => {
     const loadedProviderModels = {
-      'openrouter-api': 'moonshotai/kimi-k2.5'
+      "openrouter-api": "moonshotai/kimi-k2.5"
     }
-    const loadedAiProvider = 'claude-subscription'
+    const loadedAiProvider = "claude-subscription"
 
     // Get model for current provider, default to 'sonnet' if not found
-    const loadedLlmModel = loadedProviderModels[loadedAiProvider] || 'sonnet'
+    const loadedLlmModel = loadedProviderModels[loadedAiProvider] || "sonnet"
 
-    expect(loadedLlmModel).toBe('sonnet')
+    expect(loadedLlmModel).toBe("sonnet")
   })
 
-  it('should load saved model when switching back to provider', () => {
+  it("should load saved model when switching back to provider", () => {
     const loadedProviderModels = {
-      'openrouter-api': 'moonshotai/kimi-k2.5',
-      'claude-subscription': 'opus'
+      "openrouter-api": "moonshotai/kimi-k2.5",
+      "claude-subscription": "opus"
     }
-    const loadedAiProvider = 'openrouter-api'
+    const loadedAiProvider = "openrouter-api"
 
-    const loadedLlmModel = loadedProviderModels[loadedAiProvider] || 'sonnet'
+    const loadedLlmModel = loadedProviderModels[loadedAiProvider] || "sonnet"
 
-    expect(loadedLlmModel).toBe('moonshotai/kimi-k2.5')
+    expect(loadedLlmModel).toBe("moonshotai/kimi-k2.5")
   })
 })

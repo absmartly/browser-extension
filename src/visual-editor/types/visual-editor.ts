@@ -3,8 +3,9 @@
  */
 
 // Re-export DOMChange types from the main types
-import type { DOMChange, DOMChangeType } from '../../types/dom-changes'
-export type { DOMChange, DOMChangeType } from '../../types/dom-changes'
+import type { DOMChange, DOMChangeType } from "../../types/dom-changes"
+
+export type { DOMChange, DOMChangeType } from "../../types/dom-changes"
 
 // Visual Editor configuration
 export interface VisualEditorConfig {
@@ -56,10 +57,10 @@ export interface SelectorOptions {
 }
 
 // Edit mode types
-export type EditMode = 'select' | 'rearrange' | 'resize' | 'edit' | 'inactive'
+export type EditMode = "select" | "rearrange" | "resize" | "edit" | "inactive"
 
 // Notification types
-export type NotificationType = 'success' | 'error' | 'info' | 'warning'
+export type NotificationType = "success" | "error" | "info" | "warning"
 
 // Event handler types
 export interface EventHandlerCallbacks {
@@ -97,7 +98,7 @@ export interface ResizeState {
     width: string
     height: string
   } | null
-  resizeHandle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w' | null
+  resizeHandle: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w" | null
 }
 
 // Visual Editor API interface
@@ -124,8 +125,11 @@ export interface VisualEditorAPI {
 
 // Message types for communication
 export interface VisualEditorMessage {
-  source?: 'absmartly-visual-editor'
-  type: 'ABSMARTLY_VISUAL_EDITOR_SAVE' | 'ABSMARTLY_VISUAL_EDITOR_EXIT' | 'ABSMARTLY_VISUAL_EDITOR_READY'
+  source?: "absmartly-visual-editor"
+  type:
+    | "ABSMARTLY_VISUAL_EDITOR_SAVE"
+    | "ABSMARTLY_VISUAL_EDITOR_EXIT"
+    | "ABSMARTLY_VISUAL_EDITOR_READY"
   changes?: DOMChange[]
   experimentName?: string
   variantName?: string
@@ -134,9 +138,12 @@ export interface VisualEditorMessage {
 
 // Error types
 export class VisualEditorError extends Error {
-  constructor(message: string, public code?: string) {
+  constructor(
+    message: string,
+    public code?: string
+  ) {
     super(message)
-    this.name = 'VisualEditorError'
+    this.name = "VisualEditorError"
   }
 }
 

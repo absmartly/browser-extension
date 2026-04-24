@@ -1,1 +1,1 @@
-export { DOMChangeList } from './DOMChangeList'
+export { DOMChangeList } from "./DOMChangeList"

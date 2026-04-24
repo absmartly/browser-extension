@@ -3,10 +3,11 @@
  * Handles notifications, dialogs, and banner UI
  */
 
-import StateManager from '../core/state-manager'
-import HtmlEditor from './html-editor'
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import StateManager from "../core/state-manager"
+import HtmlEditor from "./html-editor"
+
 export class UIComponents {
   private stateManager: StateManager
   private htmlEditor: HtmlEditor
@@ -25,18 +26,20 @@ export class UIComponents {
     const canUndo = sessionChangesCount > 0
     const canRedo = state.redoStack?.length > 0
 
-    debugLog('[UIComponents] Creating banner with initial state:', {
+    debugLog("[UIComponents] Creating banner with initial state:", {
       sessionChangesCount,
       canUndo,
       canRedo
     })
 
     // Create visual editor banner with Shadow DOM
-    const existingBanner = document.getElementById('absmartly-visual-editor-banner-host')
+    const existingBanner = document.getElementById(
+      "absmartly-visual-editor-banner-host"
+    )
     if (existingBanner) existingBanner.remove()
 
-    const bannerHost = document.createElement('div')
-    bannerHost.id = 'absmartly-visual-editor-banner-host'
+    const bannerHost = document.createElement("div")
+    bannerHost.id = "absmartly-visual-editor-banner-host"
     bannerHost.style.cssText = `
       position: fixed;
       top: 16px;
@@ -48,25 +51,27 @@ export class UIComponents {
 
     // Check query string for shadow DOM override (for testing)
     const urlParams = new URLSearchParams(window.location.search)
-    const shadowDOMParam = urlParams.get('use_shadow_dom_for_visual_editor_context_menu')
-    const useShadowDOM = shadowDOMParam !== '0'
+    const shadowDOMParam = urlParams.get(
+      "use_shadow_dom_for_visual_editor_context_menu"
+    )
+    const useShadowDOM = shadowDOMParam !== "0"
 
     let bannerContainer: HTMLElement | ShadowRoot
     if (useShadowDOM) {
-      const bannerShadow = bannerHost.attachShadow({ mode: 'closed' })
+      const bannerShadow = bannerHost.attachShadow({ mode: "closed" })
       // Store reference to shadow root for updates
       this.bannerShadowRoot = bannerShadow
       bannerContainer = bannerShadow
-      debugLog('🔍 Banner - Using Shadow DOM')
+      debugLog("🔍 Banner - Using Shadow DOM")
     } else {
       // For testing, append directly without shadow DOM
       // Store reference to banner host for updates
       this.bannerShadowRoot = bannerHost as any
       bannerContainer = bannerHost
-      debugLog('🔍 Banner - NOT using Shadow DOM (test mode)')
+      debugLog("🔍 Banner - NOT using Shadow DOM (test mode)")
     }
 
-    const bannerStyle = document.createElement('style')
+    const bannerStyle = document.createElement("style")
     bannerStyle.textContent = `
       .banner {
         background: rgba(0, 0, 0, 0.85);
@@ -143,33 +148,33 @@ export class UIComponents {
       }
     `
 
-    const banner = document.createElement('div')
-    banner.className = 'banner'
+    const banner = document.createElement("div")
+    banner.className = "banner"
 
     // Left section - Undo/Redo buttons and changes counter
-    const leftSection = document.createElement('div')
-    leftSection.className = 'banner-actions'
-    leftSection.style.cssText = 'display: flex; gap: 10px; align-items: center;'
+    const leftSection = document.createElement("div")
+    leftSection.className = "banner-actions"
+    leftSection.style.cssText = "display: flex; gap: 10px; align-items: center;"
 
     // Undo button
-    const undoBtn = document.createElement('button')
-    undoBtn.className = 'banner-button'
-    undoBtn.dataset.action = 'undo'
-    undoBtn.title = 'Undo'
+    const undoBtn = document.createElement("button")
+    undoBtn.className = "banner-button"
+    undoBtn.dataset.action = "undo"
+    undoBtn.title = "Undo"
     undoBtn.disabled = !canUndo
     undoBtn.innerHTML = '<span class="banner-button-icon">↶</span>Undo'
 
     // Redo button
-    const redoBtn = document.createElement('button')
-    redoBtn.className = 'banner-button'
-    redoBtn.dataset.action = 'redo'
-    redoBtn.title = 'Redo'
+    const redoBtn = document.createElement("button")
+    redoBtn.className = "banner-button"
+    redoBtn.dataset.action = "redo"
+    redoBtn.title = "Redo"
     redoBtn.disabled = !canRedo
     redoBtn.innerHTML = '<span class="banner-button-icon">↷</span>Redo'
 
     // Changes counter (shows session changes that can be undone)
-    const changesCounter = document.createElement('span')
-    changesCounter.className = 'changes-counter'
+    const changesCounter = document.createElement("span")
+    changesCounter.className = "changes-counter"
     changesCounter.textContent = `${sessionChangesCount} changes`
 
     leftSection.appendChild(undoBtn)
@@ -177,49 +182,52 @@ export class UIComponents {
     leftSection.appendChild(changesCounter)
 
     // Center section - Logo and title
-    const centerSection = document.createElement('div')
-    centerSection.className = 'banner-content'
-    centerSection.style.cssText = 'display: flex; flex-direction: column; align-items: center;'
+    const centerSection = document.createElement("div")
+    centerSection.className = "banner-content"
+    centerSection.style.cssText =
+      "display: flex; flex-direction: column; align-items: center;"
 
-    const logoAndTitle = document.createElement('div')
-    logoAndTitle.style.cssText = 'display: flex; align-items: center; gap: 10px;'
+    const logoAndTitle = document.createElement("div")
+    logoAndTitle.style.cssText =
+      "display: flex; align-items: center; gap: 10px;"
 
-    const logo = document.createElement('img')
+    const logo = document.createElement("img")
     logo.src = config.logoUrl
-    logo.style.cssText = 'width: 24px; height: 24px;'
-    logo.alt = 'ABsmartly'
+    logo.style.cssText = "width: 24px; height: 24px;"
+    logo.alt = "ABsmartly"
 
-    const title = document.createElement('div')
-    title.className = 'banner-title'
+    const title = document.createElement("div")
+    title.className = "banner-title"
     title.textContent = `Visual Editor - ${config.experimentName}`
 
     logoAndTitle.appendChild(logo)
     logoAndTitle.appendChild(title)
 
-    const subtitle = document.createElement('div')
-    subtitle.className = 'banner-subtitle'
+    const subtitle = document.createElement("div")
+    subtitle.className = "banner-subtitle"
     subtitle.textContent = `Variant: ${config.variantName} • Click elements to edit`
 
     centerSection.appendChild(logoAndTitle)
     centerSection.appendChild(subtitle)
 
     // Right section - Save and Exit buttons
-    const rightSection = document.createElement('div')
-    rightSection.className = 'banner-actions'
-    rightSection.style.cssText = 'display: flex; gap: 10px; align-items: center;'
+    const rightSection = document.createElement("div")
+    rightSection.className = "banner-actions"
+    rightSection.style.cssText =
+      "display: flex; gap: 10px; align-items: center;"
 
     // Save button
-    const saveBtn = document.createElement('button')
-    saveBtn.className = 'banner-button'
-    saveBtn.dataset.action = 'save'
-    saveBtn.title = 'Save changes'
+    const saveBtn = document.createElement("button")
+    saveBtn.className = "banner-button"
+    saveBtn.dataset.action = "save"
+    saveBtn.title = "Save changes"
     saveBtn.innerHTML = '<span class="banner-button-icon">💾</span>Save'
 
     // Exit button
-    const exitBtn = document.createElement('button')
-    exitBtn.className = 'banner-button'
-    exitBtn.dataset.action = 'exit'
-    exitBtn.title = 'Exit visual editor'
+    const exitBtn = document.createElement("button")
+    exitBtn.className = "banner-button"
+    exitBtn.dataset.action = "exit"
+    exitBtn.title = "Exit visual editor"
     exitBtn.innerHTML = '<span class="banner-button-icon">✕</span>Exit'
 
     rightSection.appendChild(saveBtn)
@@ -242,46 +250,46 @@ export class UIComponents {
     let initialX = 0
     let initialY = 0
 
-    banner.style.cursor = 'grab'
+    banner.style.cursor = "grab"
 
-    banner.addEventListener('mousedown', (e) => {
+    banner.addEventListener("mousedown", (e) => {
       // Don't start drag if clicking on a button
-      if ((e.target as HTMLElement).closest('.banner-button')) {
+      if ((e.target as HTMLElement).closest(".banner-button")) {
         return
       }
 
       isDragging = true
-      banner.style.cursor = 'grabbing'
-      
+      banner.style.cursor = "grabbing"
+
       initialX = e.clientX - currentX
       initialY = e.clientY - currentY
     })
 
-    document.addEventListener('mousemove', (e) => {
+    document.addEventListener("mousemove", (e) => {
       if (!isDragging) return
 
       e.preventDefault()
-      
+
       currentX = e.clientX - initialX
       currentY = e.clientY - initialY
 
       // Update position
-      bannerHost.style.left = '0'
-      bannerHost.style.transform = 'none'
+      bannerHost.style.left = "0"
+      bannerHost.style.transform = "none"
       banner.style.transform = `translate(${currentX}px, ${currentY}px)`
     })
 
-    document.addEventListener('mouseup', () => {
+    document.addEventListener("mouseup", () => {
       if (isDragging) {
         isDragging = false
-        banner.style.cursor = 'grab'
+        banner.style.cursor = "grab"
       }
     })
 
     // Add event listeners for banner actions
-    banner.addEventListener('click', (e) => {
+    banner.addEventListener("click", (e) => {
       const target = e.target as HTMLElement
-      const button = target.closest('[data-action]') as HTMLElement
+      const button = target.closest("[data-action]") as HTMLElement
       if (button) {
         const action = button.dataset.action
         this.handleBannerAction(action!)
@@ -289,18 +297,21 @@ export class UIComponents {
     })
   }
 
-  showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+  showNotification(
+    message: string,
+    type: "success" | "error" | "info" = "info"
+  ): void {
     // Remove existing notification
-    const existing = document.getElementById('absmartly-notification')
+    const existing = document.getElementById("absmartly-notification")
     if (existing) existing.remove()
 
-    const notification = document.createElement('div')
-    notification.id = 'absmartly-notification'
+    const notification = document.createElement("div")
+    notification.id = "absmartly-notification"
     notification.style.cssText = `
       position: fixed;
       top: 80px;
       right: 20px;
-      background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+      background: ${type === "success" ? "#10b981" : type === "error" ? "#ef4444" : "#3b82f6"};
       color: white;
       padding: 12px 16px;
       border-radius: 6px;
@@ -315,7 +326,7 @@ export class UIComponents {
     `
 
     // Add slide-in animation
-    const style = document.createElement('style')
+    const style = document.createElement("style")
     style.textContent = `
       @keyframes slideIn {
         from {
@@ -336,7 +347,7 @@ export class UIComponents {
     // Auto-remove after 3 seconds
     setTimeout(() => {
       if (notification.parentNode) {
-        notification.style.animation = 'slideIn 0.3s ease-out reverse'
+        notification.style.animation = "slideIn 0.3s ease-out reverse"
         setTimeout(() => {
           notification.remove()
           style.remove()
@@ -345,97 +356,123 @@ export class UIComponents {
     }, 3000)
   }
 
-  createHtmlEditor(element: Element, currentHtml: string): Promise<string | null> {
+  createHtmlEditor(
+    element: Element,
+    currentHtml: string
+  ): Promise<string | null> {
     // Delegate to the new Monaco-based HTML editor
     return this.htmlEditor.show(element, currentHtml)
   }
 
   // These will be set by the main visual editor
-  onUndo: () => void = () => debugLog('[ABSmartly] Undo callback not set')
-  onRedo: () => void = () => debugLog('[ABSmartly] Redo callback not set')
-  onClear: () => void = () => debugLog('[ABSmartly] Clear callback not set')
-  onSave: () => void = () => debugLog('[ABSmartly] Save callback not set')
-  onExit: () => void = () => debugLog('[ABSmartly] Exit callback not set')
+  onUndo: () => void = () => debugLog("[ABSmartly] Undo callback not set")
+  onRedo: () => void = () => debugLog("[ABSmartly] Redo callback not set")
+  onClear: () => void = () => debugLog("[ABSmartly] Clear callback not set")
+  onSave: () => void = () => debugLog("[ABSmartly] Save callback not set")
+  onExit: () => void = () => debugLog("[ABSmartly] Exit callback not set")
 
   private handleBannerAction(action: string): void {
     switch (action) {
-      case 'undo':
+      case "undo":
         this.onUndo()
         break
 
-      case 'redo':
+      case "redo":
         this.onRedo()
         break
 
-      case 'save':
+      case "save":
         this.onSave()
         break
 
-      case 'exit':
+      case "exit":
         this.onExit()
         break
     }
   }
 
-  updateBanner(options: { changesCount?: number; canUndo?: boolean; canRedo?: boolean }): void {
-    debugLog('[UIComponents] updateBanner called with:', options)
+  updateBanner(options: {
+    changesCount?: number
+    canUndo?: boolean
+    canRedo?: boolean
+  }): void {
+    debugLog("[UIComponents] updateBanner called with:", options)
 
     // Use stored shadow root reference
     if (!this.bannerShadowRoot) {
-      debugLog('[UIComponents] Banner shadow root reference not found')
+      debugLog("[UIComponents] Banner shadow root reference not found")
       return
     }
 
     const shadowRoot = this.bannerShadowRoot
 
     if (options.changesCount !== undefined) {
-      const counter = shadowRoot.querySelector('.changes-counter')
+      const counter = shadowRoot.querySelector(".changes-counter")
       if (counter) {
         counter.textContent = `${options.changesCount} changes`
-        debugLog('[UIComponents] Updated changes counter to:', options.changesCount)
+        debugLog(
+          "[UIComponents] Updated changes counter to:",
+          options.changesCount
+        )
       } else {
-        debugLog('[UIComponents] Changes counter element not found')
+        debugLog("[UIComponents] Changes counter element not found")
       }
     }
 
     if (options.canUndo !== undefined) {
-      const undoBtn = shadowRoot.querySelector('[data-action="undo"]') as HTMLButtonElement
+      const undoBtn = shadowRoot.querySelector(
+        '[data-action="undo"]'
+      ) as HTMLButtonElement
       if (undoBtn) {
         undoBtn.disabled = !options.canUndo
-        debugLog('[UIComponents] Updated undo button disabled to:', !options.canUndo)
+        debugLog(
+          "[UIComponents] Updated undo button disabled to:",
+          !options.canUndo
+        )
       } else {
-        debugLog('[UIComponents] Undo button not found')
+        debugLog("[UIComponents] Undo button not found")
       }
     }
 
     if (options.canRedo !== undefined) {
-      const redoBtn = shadowRoot.querySelector('[data-action="redo"]') as HTMLButtonElement
+      const redoBtn = shadowRoot.querySelector(
+        '[data-action="redo"]'
+      ) as HTMLButtonElement
       if (redoBtn) {
         redoBtn.disabled = !options.canRedo
-        debugLog('[UIComponents] Updated redo button disabled to:', !options.canRedo)
+        debugLog(
+          "[UIComponents] Updated redo button disabled to:",
+          !options.canRedo
+        )
       } else {
-        debugLog('[UIComponents] Redo button not found')
+        debugLog("[UIComponents] Redo button not found")
       }
     }
   }
 
   removeBanner(): void {
-    const banner = document.getElementById('absmartly-visual-editor-banner-host')
+    const banner = document.getElementById(
+      "absmartly-visual-editor-banner-host"
+    )
     if (banner) banner.remove()
     this.bannerShadowRoot = null
   }
 
   hideToolbar(): void {
-    const banner = document.getElementById('absmartly-visual-editor-banner-host')
+    const banner = document.getElementById(
+      "absmartly-visual-editor-banner-host"
+    )
     if (banner) {
-      banner.style.display = 'none'
+      banner.style.display = "none"
     }
   }
 
   showToolbar(): void {
-    const banner = document.getElementById('absmartly-visual-editor-banner-host')
+    const banner = document.getElementById(
+      "absmartly-visual-editor-banner-host"
+    )
     if (banner) {
-      banner.style.display = ''
+      banner.style.display = ""
     }
   }
 }

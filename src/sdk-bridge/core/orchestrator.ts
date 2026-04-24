@@ -1,9 +1,9 @@
-import { Logger } from '../utils/logger'
-import { SDKDetector } from '../sdk/sdk-detector'
-import { PluginDetector } from '../sdk/plugin-detector'
-import { SDKInterceptor } from '../sdk/sdk-interceptor'
-import { OverrideManager } from '../experiment/override-manager'
-import { PreviewManager } from '../dom/preview-manager'
+import { PreviewManager } from "../dom/preview-manager"
+import { OverrideManager } from "../experiment/override-manager"
+import { PluginDetector } from "../sdk/plugin-detector"
+import { SDKDetector } from "../sdk/sdk-detector"
+import { SDKInterceptor } from "../sdk/sdk-interceptor"
+import { Logger } from "../utils/logger"
 
 export interface OrchestratorConfig {
   maxAttempts?: number
@@ -56,12 +56,12 @@ export class Orchestrator {
    * and forward them to the extension sidebar so the user sees which change failed and why.
    */
   private installJsErrorListener(): void {
-    document.addEventListener('absmartly:js-error', (event: Event) => {
+    document.addEventListener("absmartly:js-error", (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
-      Logger.warn('[ABsmartly Page] JavaScript change failed:', detail)
+      Logger.warn("[ABsmartly Page] JavaScript change failed:", detail)
       this.sendMessageToExtension({
-        source: 'absmartly-page',
-        type: 'PREVIEW_JS_ERROR',
+        source: "absmartly-page",
+        type: "PREVIEW_JS_ERROR",
         payload: {
           experimentName: detail.experimentName,
           selector: detail.selector,
@@ -87,7 +87,7 @@ export class Orchestrator {
     let inlineError: string | undefined
 
     try {
-      new Function('return 1')()
+      new Function("return 1")()
     } catch (err) {
       evalAllowed = false
       evalError = err instanceof Error ? err.message : String(err)
@@ -96,15 +96,20 @@ export class Orchestrator {
     try {
       const probeId = `__absmartly_csp_probe_${Date.now()}`
       ;(window as any)[probeId] = false
-      const script = document.createElement('script')
+      const script = document.createElement("script")
       script.textContent = `window['${probeId}'] = true;`
       const parent = document.head || document.documentElement
       parent.appendChild(script)
       script.remove()
       inlineAllowed = (window as any)[probeId] === true
-      try { delete (window as any)[probeId] } catch { (window as any)[probeId] = undefined }
+      try {
+        delete (window as any)[probeId]
+      } catch {
+        ;(window as any)[probeId] = undefined
+      }
       if (!inlineAllowed) {
-        inlineError = 'inline <script> did not execute (likely blocked by CSP script-src)'
+        inlineError =
+          "inline <script> did not execute (likely blocked by CSP script-src)"
       }
     } catch (err) {
       inlineAllowed = false
@@ -114,8 +119,8 @@ export class Orchestrator {
     const jsBlocked = !evalAllowed && !inlineAllowed
     if (jsBlocked || !evalAllowed) {
       this.sendMessageToExtension({
-        source: 'absmartly-page',
-        type: 'PREVIEW_CSP_PROBE',
+        source: "absmartly-page",
+        type: "PREVIEW_CSP_PROBE",
         payload: {
           evalAllowed,
           inlineAllowed,
@@ -132,8 +137,10 @@ export class Orchestrator {
    * Start the initialization process
    */
   start(): void {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.waitForSDKAndInitialize())
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () =>
+        this.waitForSDKAndInitialize()
+      )
     } else {
       // Give the page a moment to initialize its SDK
       setTimeout(() => this.waitForSDKAndInitialize(), 100)
@@ -144,38 +151,61 @@ export class Orchestrator {
    * Wait for SDK and initialize
    */
   private waitForSDKAndInitialize(): void {
-    Logger.log('[ABsmartly Extension] \u{1F680} waitForSDKAndInitialize started')
+    Logger.log(
+      "[ABsmartly Extension] \u{1F680} waitForSDKAndInitialize started"
+    )
 
     let attempts = 0
 
     const checkAndInit = (): void => {
       attempts++
-      Logger.log(`[ABsmartly Extension] \u{1F50D} Check attempt ${attempts}/${this.config.maxAttempts}`)
+      Logger.log(
+        `[ABsmartly Extension] \u{1F50D} Check attempt ${attempts}/${this.config.maxAttempts}`
+      )
 
       // Detect context only once
       if (!this.state.cachedContext) {
-        Logger.log('[ABsmartly Extension] \u{1F50E} No cached context, detecting SDK...')
+        Logger.log(
+          "[ABsmartly Extension] \u{1F50E} No cached context, detecting SDK..."
+        )
         this.detectAndCacheContext()
       } else {
-        Logger.log('[ABsmartly Extension] \u2705 Using cached context')
+        Logger.log("[ABsmartly Extension] \u2705 Using cached context")
       }
 
       // Log context data when found (but only if context is ready)
-      if (this.state.cachedContext && this.state.cachedContext.data && typeof this.state.cachedContext.data === 'function') {
+      if (
+        this.state.cachedContext &&
+        this.state.cachedContext.data &&
+        typeof this.state.cachedContext.data === "function"
+      ) {
         // Use ready() promise to wait for context to be ready before accessing data
-        if (this.state.cachedContext.ready && typeof this.state.cachedContext.ready === 'function') {
-          this.state.cachedContext.ready()
+        if (
+          this.state.cachedContext.ready &&
+          typeof this.state.cachedContext.ready === "function"
+        ) {
+          this.state.cachedContext
+            .ready()
             .then(() => {
               try {
                 const data = this.state.cachedContext.data()
-                Logger.log('[ABsmartly Extension] Context data on init:', data)
-                Logger.log('[ABsmartly Extension] Experiments available:', data?.experiments ? Object.keys(data.experiments) : 'none')
+                Logger.log("[ABsmartly Extension] Context data on init:", data)
+                Logger.log(
+                  "[ABsmartly Extension] Experiments available:",
+                  data?.experiments ? Object.keys(data.experiments) : "none"
+                )
               } catch (error: any) {
-                Logger.log('[ABsmartly Extension] Error accessing context data:', error.message)
+                Logger.log(
+                  "[ABsmartly Extension] Error accessing context data:",
+                  error.message
+                )
               }
             })
             .catch((error: any) => {
-              Logger.log('[ABsmartly Extension] Context ready() failed:', error.message)
+              Logger.log(
+                "[ABsmartly Extension] Context ready() failed:",
+                error.message
+              )
             })
         }
       }
@@ -183,27 +213,47 @@ export class Orchestrator {
       const context = this.state.cachedContext
 
       if (context) {
-        Logger.log('[ABsmartly Extension] SDK context found')
+        Logger.log("[ABsmartly Extension] SDK context found")
 
         // Check if context needs to be ready
-        if (context.ready && typeof context.ready === 'function' && context.pending && context.pending()) {
-          Logger.log('[ABsmartly Extension] Context is pending, waiting for it to be ready...')
-          context.ready()
+        if (
+          context.ready &&
+          typeof context.ready === "function" &&
+          context.pending &&
+          context.pending()
+        ) {
+          Logger.log(
+            "[ABsmartly Extension] Context is pending, waiting for it to be ready..."
+          )
+          context
+            .ready()
             .then(() => {
-              Logger.log('[ABsmartly Extension] Context is now ready after waiting')
+              Logger.log(
+                "[ABsmartly Extension] Context is now ready after waiting"
+              )
               const data = context.data ? context.data() : null
-              Logger.log('[ABsmartly Extension] Context data after ready:', data)
-              Logger.log('[ABsmartly Extension] Experiments after ready:', data?.experiments ? Object.keys(data.experiments) : 'none')
+              Logger.log(
+                "[ABsmartly Extension] Context data after ready:",
+                data
+              )
+              Logger.log(
+                "[ABsmartly Extension] Experiments after ready:",
+                data?.experiments ? Object.keys(data.experiments) : "none"
+              )
             })
             .catch((err: any) => {
-              Logger.error('[ABsmartly Extension] Error waiting for context:', err)
+              Logger.error(
+                "[ABsmartly Extension] Error waiting for context:",
+                err
+              )
             })
         }
-
       } else if (attempts < this.config.maxAttempts) {
         setTimeout(checkAndInit, this.config.attemptInterval)
       } else {
-        Logger.log(`[ABsmartly Extension] No ABsmartly SDK found after ${this.config.maxAttempts} attempts (${(this.config.maxAttempts * this.config.attemptInterval) / 1000}s)`)
+        Logger.log(
+          `[ABsmartly Extension] No ABsmartly SDK found after ${this.config.maxAttempts} attempts (${(this.config.maxAttempts * this.config.attemptInterval) / 1000}s)`
+        )
       }
     }
 
@@ -219,10 +269,13 @@ export class Orchestrator {
 
     if (detection.context && !this.state.cachedContext) {
       this.state.cachedContext = detection.context
-      this.state.contextPropertyPath = detection.contextPath || 'unknown'
+      this.state.contextPropertyPath = detection.contextPath || "unknown"
 
-      Logger.log('[ABsmartly Extension] \u2705 Context found and cached at:', this.state.contextPropertyPath)
-      Logger.log('[ABsmartly Extension] \u{1F4CA} Context details:', {
+      Logger.log(
+        "[ABsmartly Extension] \u2705 Context found and cached at:",
+        this.state.contextPropertyPath
+      )
+      Logger.log("[ABsmartly Extension] \u{1F4CA} Context details:", {
         hasTreatment: !!detection.context.treatment,
         hasPeek: !!detection.context.peek,
         hasData: !!detection.context.data,
@@ -237,7 +290,9 @@ export class Orchestrator {
       // Check and apply any persisted overrides on initial context load
       this.overrideManager.checkOverridesCookie()
     } else if (!detection.context) {
-      Logger.warn('[ABsmartly Extension] \u26A0\uFE0F No context found after detection')
+      Logger.warn(
+        "[ABsmartly Extension] \u26A0\uFE0F No context found after detection"
+      )
     }
   }
 
@@ -250,26 +305,34 @@ export class Orchestrator {
     }
 
     this.messageListenerSet = true
-    Logger.log('[ABsmartly Extension] Setting up message listener for extension messages')
+    Logger.log(
+      "[ABsmartly Extension] Setting up message listener for extension messages"
+    )
 
-    window.addEventListener('message', (event) => {
+    window.addEventListener("message", (event) => {
       if (event.source !== window) {
         return
       }
 
       // SECURITY: Validate origin to prevent malicious iframes from intercepting
       const isFileProtocol =
-        window.location.protocol === 'file:' || event.origin === 'null'
+        window.location.protocol === "file:" || event.origin === "null"
       if (!isFileProtocol && event.origin !== window.location.origin) {
-        Logger.warn('[Security] Rejected message from invalid origin:', event.origin)
+        Logger.warn(
+          "[Security] Rejected message from invalid origin:",
+          event.origin
+        )
         return
       }
 
-      if (!event.data || event.data.source !== 'absmartly-extension') {
+      if (!event.data || event.data.source !== "absmartly-extension") {
         return
       }
 
-      Logger.log('[ABsmartly Page] Received message from extension:', event.data)
+      Logger.log(
+        "[ABsmartly Page] Received message from extension:",
+        event.data
+      )
 
       this.handleExtensionMessage(event.data)
     })
@@ -282,32 +345,32 @@ export class Orchestrator {
     const { type, payload } = message
 
     switch (type) {
-      case 'APPLY_OVERRIDES':
+      case "APPLY_OVERRIDES":
         this.handleApplyOverrides(payload)
         break
 
-      case 'ABSMARTLY_PREVIEW':
-        if (payload?.action === 'apply') {
+      case "ABSMARTLY_PREVIEW":
+        if (payload?.action === "apply") {
           this.handlePreviewChanges(payload)
-        } else if (payload?.action === 'remove') {
+        } else if (payload?.action === "remove") {
           this.handleRemovePreview(payload)
         }
         break
 
-      case 'PREVIEW_CHANGES':
+      case "PREVIEW_CHANGES":
         this.handlePreviewChanges(payload)
         break
 
-      case 'REMOVE_PREVIEW':
+      case "REMOVE_PREVIEW":
         this.handleRemovePreview(payload)
         break
 
-      case 'CHECK_PLUGIN_STATUS':
+      case "CHECK_PLUGIN_STATUS":
         this.handleCheckPluginStatus()
         break
 
       default:
-        Logger.warn('[ABsmartly Extension] Unknown message type:', type)
+        Logger.warn("[ABsmartly Extension] Unknown message type:", type)
     }
   }
 
@@ -315,12 +378,12 @@ export class Orchestrator {
    * Handle apply overrides message
    */
   private handleApplyOverrides(payload: any): void {
-    Logger.log('[ABsmartly Page] Applying overrides dynamically')
+    Logger.log("[ABsmartly Page] Applying overrides dynamically")
     const { overrides } = payload || {}
 
     if (overrides) {
       this.overrideManager.checkOverridesCookie()
-      Logger.log('[ABsmartly Page] Override metadata updated.')
+      Logger.log("[ABsmartly Page] Override metadata updated.")
     }
   }
 
@@ -328,44 +391,54 @@ export class Orchestrator {
    * Handle preview changes message (applies changes directly using PreviewManager)
    */
   private handlePreviewChanges(payload: any): void {
-    Logger.log('[ABsmartly Page] Handling PREVIEW_CHANGES message')
+    Logger.log("[ABsmartly Page] Handling PREVIEW_CHANGES message")
     const { changes, experimentName, variantName, updateMode } = payload || {}
-    const expName = experimentName || '__preview__'
+    const expName = experimentName || "__preview__"
 
-    Logger.log('[ABsmartly Page] Preview changes received for experiment:', expName)
-    Logger.log('[ABsmartly Page] Variant name:', variantName)
-    Logger.log('[ABsmartly Page] Update mode:', updateMode)
-    Logger.log('[ABsmartly Page] Changes to apply:', changes)
+    Logger.log(
+      "[ABsmartly Page] Preview changes received for experiment:",
+      expName
+    )
+    Logger.log("[ABsmartly Page] Variant name:", variantName)
+    Logger.log("[ABsmartly Page] Update mode:", updateMode)
+    Logger.log("[ABsmartly Page] Changes to apply:", changes)
 
-    if (Array.isArray(changes) && changes.some((c: any) => c?.type === 'javascript')) {
+    if (
+      Array.isArray(changes) &&
+      changes.some((c: any) => c?.type === "javascript")
+    ) {
       this.probeCspAndReport()
     }
 
     // If updateMode is 'replace', remove all existing changes first
-    if (updateMode === 'replace') {
-      Logger.log('[ABsmartly Page] Replace mode: removing existing changes first')
+    if (updateMode === "replace") {
+      Logger.log(
+        "[ABsmartly Page] Replace mode: removing existing changes first"
+      )
       this.previewManager.removePreviewChanges(expName)
     }
 
     if (!changes || changes.length === 0) {
-      Logger.warn('[ABsmartly Page] No changes to apply')
+      Logger.warn("[ABsmartly Page] No changes to apply")
       return
     }
 
     // Apply changes using the PreviewManager
     try {
-      Logger.log('[ABsmartly Page] Applying changes via PreviewManager')
+      Logger.log("[ABsmartly Page] Applying changes via PreviewManager")
       let appliedCount = 0
       changes.forEach((change: any) => {
-        if (change?.type === 'javascript' && change?.selector) {
+        if (change?.type === "javascript" && change?.selector) {
           this.reportPendingIfSelectorMissing(change, expName)
         }
         const success = this.previewManager.applyPreviewChange(change, expName)
         if (success) appliedCount++
       })
-      Logger.log(`[ABsmartly Page] Applied ${appliedCount}/${changes.length} changes successfully`)
+      Logger.log(
+        `[ABsmartly Page] Applied ${appliedCount}/${changes.length} changes successfully`
+      )
     } catch (error) {
-      Logger.error('[ABsmartly Page] Error applying preview changes:', error)
+      Logger.error("[ABsmartly Page] Error applying preview changes:", error)
     }
   }
 
@@ -375,13 +448,16 @@ export class Orchestrator {
    * `PREVIEW_JS_PENDING` signal to the sidebar so the user can tell
    * timing-deferred changes apart from CSP failures.
    */
-  private reportPendingIfSelectorMissing(change: any, experimentName: string): void {
+  private reportPendingIfSelectorMissing(
+    change: any,
+    experimentName: string
+  ): void {
     try {
       const match = document.querySelector(change.selector)
       if (!match) {
         this.sendMessageToExtension({
-          source: 'absmartly-page',
-          type: 'PREVIEW_JS_PENDING',
+          source: "absmartly-page",
+          type: "PREVIEW_JS_PENDING",
           payload: {
             experimentName,
             selector: change.selector,
@@ -398,23 +474,28 @@ export class Orchestrator {
    * Handle remove preview message (removes changes directly using PreviewManager)
    */
   private handleRemovePreview(payload: any): void {
-    Logger.log('[ABsmartly Page] Handling REMOVE_PREVIEW message')
+    Logger.log("[ABsmartly Page] Handling REMOVE_PREVIEW message")
     const { experimentName } = payload || {}
-    const expName = experimentName || '__preview__'
+    const expName = experimentName || "__preview__"
 
-    Logger.log('[ABsmartly Page] Removing preview changes for experiment:', expName)
+    Logger.log(
+      "[ABsmartly Page] Removing preview changes for experiment:",
+      expName
+    )
 
     // Remove changes using the PreviewManager
     try {
-      Logger.log('[ABsmartly Page] Removing changes via PreviewManager')
+      Logger.log("[ABsmartly Page] Removing changes via PreviewManager")
       const success = this.previewManager.removePreviewChanges(expName)
       if (success) {
-        Logger.log('[ABsmartly Page] Changes removed successfully')
+        Logger.log("[ABsmartly Page] Changes removed successfully")
       } else {
-        Logger.warn('[ABsmartly Page] No changes were removed (no elements found)')
+        Logger.warn(
+          "[ABsmartly Page] No changes were removed (no elements found)"
+        )
       }
     } catch (error) {
-      Logger.error('[ABsmartly Page] Error removing preview changes:', error)
+      Logger.error("[ABsmartly Page] Error removing preview changes:", error)
     }
   }
 
@@ -422,24 +503,30 @@ export class Orchestrator {
    * Handle plugin status check from extension
    */
   private handleCheckPluginStatus(): void {
-    const context = this.state.cachedContext || this.sdkDetector.detectSDK().context
+    const context =
+      this.state.cachedContext || this.sdkDetector.detectSDK().context
     const detection = this.pluginDetector.detectPlugin(context)
     const registry = (window as any).__ABSMARTLY_PLUGINS__
     const registryDetected = !!(
-      registry && (
-        (registry.dom && registry.dom.initialized) ||
-        (registry.overrides && registry.overrides.initialized)
-      )
+      registry &&
+      ((registry.dom && registry.dom.initialized) ||
+        (registry.overrides && registry.overrides.initialized))
     )
-    const pluginDetected = this.pluginDetector.isPluginActive(detection) || registryDetected
+    const pluginDetected =
+      this.pluginDetector.isPluginActive(detection) || registryDetected
 
     this.sendMessageToExtension({
-      source: 'absmartly-page',
-      type: 'PLUGIN_STATUS_RESPONSE',
+      source: "absmartly-page",
+      type: "PLUGIN_STATUS_RESPONSE",
       payload: {
         pluginDetected,
         registry: registry || {},
-        detection: detection === 'active-but-inaccessible' ? 'active-but-inaccessible' : detection ? 'instance' : null,
+        detection:
+          detection === "active-but-inaccessible"
+            ? "active-but-inaccessible"
+            : detection
+              ? "instance"
+              : null,
         timestamp: Date.now()
       }
     })
@@ -449,12 +536,15 @@ export class Orchestrator {
    * Handle SDK event
    */
   private handleSDKEvent(eventName: string, data: any): void {
-    Logger.log('[ABsmartly Extension] \u{1F514} SDK Event:', { eventName, data })
+    Logger.log("[ABsmartly Extension] \u{1F514} SDK Event:", {
+      eventName,
+      data
+    })
 
     // Send to extension
     this.sendMessageToExtension({
-      source: 'absmartly-page',
-      type: 'SDK_EVENT',
+      source: "absmartly-page",
+      type: "SDK_EVENT",
       payload: {
         eventName,
         data,
@@ -470,7 +560,7 @@ export class Orchestrator {
     // SECURITY: Use same-origin only, not wildcard
     const origin = window.location.origin
     const targetOrigin =
-      origin === 'null' || window.location.protocol === 'file:' ? '*' : origin
+      origin === "null" || window.location.protocol === "file:" ? "*" : origin
     window.postMessage(message, targetOrigin)
   }
 
@@ -492,28 +582,39 @@ export class Orchestrator {
    * Expose variant assignments getter for extension
    */
   exposeVariantAssignments(): void {
-    (window as any).__absmartlyGetVariantAssignments = async (experimentNames: string[]) => {
-      Logger.log('[ABsmartly Extension] Getting variant assignments for:', experimentNames)
+    ;(window as any).__absmartlyGetVariantAssignments = async (
+      experimentNames: string[]
+    ) => {
+      Logger.log(
+        "[ABsmartly Extension] Getting variant assignments for:",
+        experimentNames
+      )
 
-      const context = this.state.cachedContext || this.sdkDetector.detectSDK().context
+      const context =
+        this.state.cachedContext || this.sdkDetector.detectSDK().context
 
       if (!context) {
-        Logger.warn('[ABsmartly Extension] No context available for getting variants')
+        Logger.warn(
+          "[ABsmartly Extension] No context available for getting variants"
+        )
         return { assignments: {}, experimentsInContext: [] }
       }
 
       // Check if context is ready, if not wait for it
-      if (context.ready && typeof context.ready === 'function') {
+      if (context.ready && typeof context.ready === "function") {
         try {
           await context.ready()
         } catch (error) {
-          Logger.warn('[ABsmartly Extension] Error waiting for context ready:', error)
+          Logger.warn(
+            "[ABsmartly Extension] Error waiting for context ready:",
+            error
+          )
         }
       }
 
       // Get experiments that exist in the context data
       let experimentsInContext: string[] = []
-      if (context.data && typeof context.data === 'function') {
+      if (context.data && typeof context.data === "function") {
         const contextData = context.data()
         if (contextData?.experiments) {
           experimentsInContext = Object.keys(contextData.experiments)
@@ -523,7 +624,7 @@ export class Orchestrator {
       const assignments: Record<string, number> = {}
       for (const expName of experimentNames) {
         try {
-          if (typeof context.peek === 'function') {
+          if (typeof context.peek === "function") {
             const variant = context.peek(expName)
 
             // Only include valid variant assignments (not -1, null, or undefined)
@@ -533,7 +634,10 @@ export class Orchestrator {
             }
           }
         } catch (error) {
-          Logger.warn(`[ABsmartly Extension] Failed to peek experiment ${expName}:`, error)
+          Logger.warn(
+            `[ABsmartly Extension] Failed to peek experiment ${expName}:`,
+            error
+          )
         }
       }
 
@@ -545,7 +649,7 @@ export class Orchestrator {
    * Expose context path getter for extension
    */
   exposeContextPath(): void {
-    (window as any).__absmartlyGetContextPath = () => {
+    ;(window as any).__absmartlyGetContextPath = () => {
       // First detect SDK if not already cached
       if (!this.state.cachedContext) {
         this.detectAndCacheContext()
@@ -555,8 +659,14 @@ export class Orchestrator {
         found: !!this.state.cachedContext,
         path: this.state.contextPropertyPath || null,
         hasContext: !!this.state.cachedContext,
-        hasPeek: !!(this.state.cachedContext && typeof this.state.cachedContext.peek === 'function'),
-        hasTreatment: !!(this.state.cachedContext && typeof this.state.cachedContext.treatment === 'function')
+        hasPeek: !!(
+          this.state.cachedContext &&
+          typeof this.state.cachedContext.peek === "function"
+        ),
+        hasTreatment: !!(
+          this.state.cachedContext &&
+          typeof this.state.cachedContext.treatment === "function"
+        )
       }
     }
   }

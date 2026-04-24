@@ -2,12 +2,12 @@
  * SDK Detector Unit Tests
  */
 
-import { SDKDetector } from '../../sdk/sdk-detector'
-import { Logger } from '../../utils/logger'
+import { SDKDetector } from "../../sdk/sdk-detector"
+import { Logger } from "../../utils/logger"
 
-jest.mock('../../utils/logger')
+jest.mock("../../utils/logger")
 
-describe('SDKDetector', () => {
+describe("SDKDetector", () => {
   let detector: SDKDetector
   let mockWindow: any
 
@@ -27,8 +27,8 @@ describe('SDKDetector', () => {
     jest.clearAllMocks()
   })
 
-  describe('detectSDK', () => {
-    it('should return null when no SDK or context is found', () => {
+  describe("detectSDK", () => {
+    it("should return null when no SDK or context is found", () => {
       const result = detector.detectSDK()
 
       expect(result).toEqual({
@@ -37,11 +37,11 @@ describe('SDKDetector', () => {
         contextPath: null
       })
       expect(Logger.warn).toHaveBeenCalledWith(
-        '[ABsmartly Extension] ⚠️ No context found after detection'
+        "[ABsmartly Extension] ⚠️ No context found after detection"
       )
     })
 
-    it('should detect SDK instance with createContext method', () => {
+    it("should detect SDK instance with createContext method", () => {
       const mockSDK = {
         createContext: jest.fn()
       }
@@ -50,10 +50,12 @@ describe('SDKDetector', () => {
       const result = detector.detectSDK()
 
       expect(result.sdk).toBe(mockSDK)
-      expect(Logger.log).toHaveBeenCalledWith('[ABsmartly Extension] SDK instance found')
+      expect(Logger.log).toHaveBeenCalledWith(
+        "[ABsmartly Extension] SDK instance found"
+      )
     })
 
-    it('should detect context at window.ABsmartlyContext', () => {
+    it("should detect context at window.ABsmartlyContext", () => {
       const mockContext = {
         treatment: jest.fn(),
         peek: jest.fn(),
@@ -64,14 +66,14 @@ describe('SDKDetector', () => {
       const result = detector.detectSDK()
 
       expect(result.context).toBe(mockContext)
-      expect(result.contextPath).toBe('ABsmartlyContext')
+      expect(result.contextPath).toBe("ABsmartlyContext")
       expect(Logger.log).toHaveBeenCalledWith(
-        '[ABsmartly Extension] ✅ Context found and cached at:',
-        'ABsmartlyContext'
+        "[ABsmartly Extension] ✅ Context found and cached at:",
+        "ABsmartlyContext"
       )
     })
 
-    it('should detect context at window.absmartly', () => {
+    it("should detect context at window.absmartly", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -80,10 +82,10 @@ describe('SDKDetector', () => {
       const result = detector.detectSDK()
 
       expect(result.context).toBe(mockContext)
-      expect(result.contextPath).toBe('absmartly')
+      expect(result.contextPath).toBe("absmartly")
     })
 
-    it('should detect context at window.sdk.context', () => {
+    it("should detect context at window.sdk.context", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -94,10 +96,10 @@ describe('SDKDetector', () => {
       const result = detector.detectSDK()
 
       expect(result.context).toBe(mockContext)
-      expect(result.contextPath).toBe('sdk.context')
+      expect(result.contextPath).toBe("sdk.context")
     })
 
-    it('should detect context with context property', () => {
+    it("should detect context with context property", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -108,10 +110,10 @@ describe('SDKDetector', () => {
       const result = detector.detectSDK()
 
       expect(result.context).toBe(mockContext)
-      expect(result.contextPath).toBe('unknown')
+      expect(result.contextPath).toBe("unknown")
     })
 
-    it('should detect context from contexts array', () => {
+    it("should detect context from contexts array", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -124,17 +126,12 @@ describe('SDKDetector', () => {
       expect(result.context).toBe(mockContext)
     })
 
-    it('should skip invalid contexts in array', () => {
+    it("should skip invalid contexts in array", () => {
       const mockContext = {
         treatment: jest.fn()
       }
       mockWindow.absmartly = {
-        contexts: [
-          null,
-          {},
-          { noTreatment: true },
-          mockContext
-        ]
+        contexts: [null, {}, { noTreatment: true }, mockContext]
       }
 
       const result = detector.detectSDK()
@@ -142,7 +139,7 @@ describe('SDKDetector', () => {
       expect(result.context).toBe(mockContext)
     })
 
-    it('should log context details when found', () => {
+    it("should log context details when found", () => {
       const mockContext = {
         treatment: jest.fn(),
         peek: jest.fn(),
@@ -154,17 +151,20 @@ describe('SDKDetector', () => {
 
       detector.detectSDK()
 
-      expect(Logger.log).toHaveBeenCalledWith('[ABsmartly Extension] 📊 Context details:', {
-        hasTreatment: true,
-        hasPeek: true,
-        hasData: true,
-        hasEventLogger: true,
-        has_eventLogger: true,
-        contextType: 'object'
-      })
+      expect(Logger.log).toHaveBeenCalledWith(
+        "[ABsmartly Extension] 📊 Context details:",
+        {
+          hasTreatment: true,
+          hasPeek: true,
+          hasData: true,
+          hasEventLogger: true,
+          has_eventLogger: true,
+          contextType: "object"
+        }
+      )
     })
 
-    it('should return cached context on subsequent calls', () => {
+    it("should return cached context on subsequent calls", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -178,7 +178,7 @@ describe('SDKDetector', () => {
       expect(result1).toEqual(result2)
     })
 
-    it('should prioritize SDK locations in order', () => {
+    it("should prioritize SDK locations in order", () => {
       const mockSDK1 = { createContext: jest.fn() }
       const mockSDK2 = { createContext: jest.fn() }
 
@@ -190,7 +190,7 @@ describe('SDKDetector', () => {
       expect(result.sdk).toBe(mockSDK1)
     })
 
-    it('should prioritize context locations in order', () => {
+    it("should prioritize context locations in order", () => {
       const mockContext1 = { treatment: jest.fn() }
       const mockContext2 = { treatment: jest.fn() }
 
@@ -203,12 +203,12 @@ describe('SDKDetector', () => {
     })
   })
 
-  describe('getCachedContext', () => {
-    it('should return null when no context is cached', () => {
+  describe("getCachedContext", () => {
+    it("should return null when no context is cached", () => {
       expect(detector.getCachedContext()).toBeNull()
     })
 
-    it('should return cached context after detection', () => {
+    it("should return cached context after detection", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -220,12 +220,12 @@ describe('SDKDetector', () => {
     })
   })
 
-  describe('getContextPath', () => {
-    it('should return null when no context is cached', () => {
+  describe("getContextPath", () => {
+    it("should return null when no context is cached", () => {
       expect(detector.getContextPath()).toBeNull()
     })
 
-    it('should return context path after detection', () => {
+    it("should return context path after detection", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -233,12 +233,12 @@ describe('SDKDetector', () => {
 
       detector.detectSDK()
 
-      expect(detector.getContextPath()).toBe('absmartly')
+      expect(detector.getContextPath()).toBe("absmartly")
     })
   })
 
-  describe('clearCache', () => {
-    it('should clear cached context and path', () => {
+  describe("clearCache", () => {
+    it("should clear cached context and path", () => {
       const mockContext = {
         treatment: jest.fn()
       }
@@ -246,7 +246,7 @@ describe('SDKDetector', () => {
 
       detector.detectSDK()
       expect(detector.getCachedContext()).toBe(mockContext)
-      expect(detector.getContextPath()).toBe('ABsmartlyContext')
+      expect(detector.getContextPath()).toBe("ABsmartlyContext")
 
       detector.clearCache()
 
@@ -254,7 +254,7 @@ describe('SDKDetector', () => {
       expect(detector.getContextPath()).toBeNull()
     })
 
-    it('should allow re-detection after clearing cache', () => {
+    it("should allow re-detection after clearing cache", () => {
       const mockContext1 = {
         treatment: jest.fn()
       }
@@ -272,7 +272,7 @@ describe('SDKDetector', () => {
 
       detector.detectSDK()
       expect(detector.getCachedContext()).toBe(mockContext2)
-      expect(detector.getContextPath()).toBe('absmartly')
+      expect(detector.getContextPath()).toBe("absmartly")
     })
   })
 })

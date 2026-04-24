@@ -1,20 +1,30 @@
-import { z } from 'zod'
-import type { Experiment, Variant } from '~src/types/absmartly'
+import { z } from "zod"
+
+import type { Experiment, Variant } from "~src/types/absmartly"
 
 const ExperimentStateSchema = z.enum([
-  'created',
-  'ready',
-  'running',
-  'development',
-  'full_on',
-  'stopped',
-  'archived',
-  'scheduled'
+  "created",
+  "ready",
+  "running",
+  "development",
+  "full_on",
+  "stopped",
+  "archived",
+  "scheduled"
 ])
 
-const ExperimentStatusSchema = z.enum(['draft', 'running', 'stopped', 'archived'])
+const ExperimentStatusSchema = z.enum([
+  "draft",
+  "running",
+  "stopped",
+  "archived"
+])
 
-const ExperimentTypeSchema = z.enum(['group_sequential', 'fixed_horizon', 'test'])
+const ExperimentTypeSchema = z.enum([
+  "group_sequential",
+  "fixed_horizon",
+  "test"
+])
 
 const ExperimentUserSchema = z.object({
   user_id: z.number().int().positive().optional(),
@@ -120,7 +130,10 @@ export const ExperimentSchema = z.object({
   type: ExperimentTypeSchema.optional(),
   favorite: z.boolean().optional(),
   custom_section_field_values: z
-    .union([z.array(ExperimentCustomSectionFieldValueSchema), z.record(z.string(), z.unknown())])
+    .union([
+      z.array(ExperimentCustomSectionFieldValueSchema),
+      z.record(z.string(), z.unknown())
+    ])
     .optional()
 })
 
@@ -139,17 +152,17 @@ const CachedExperimentSchema = z.object({
 })
 
 export const DOMChangeActionSchema = z.enum([
-  'text',
-  'style',
-  'styleRules',
-  'class',
-  'attribute',
-  'html',
-  'javascript',
-  'move',
-  'remove',
-  'insert',
-  'create'
+  "text",
+  "style",
+  "styleRules",
+  "class",
+  "attribute",
+  "html",
+  "javascript",
+  "move",
+  "remove",
+  "insert",
+  "create"
 ])
 
 const BaseDOMChangeSchema = z.object({
@@ -161,15 +174,15 @@ const BaseDOMChangeSchema = z.object({
 })
 
 const DOMChangeStyleSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('style'),
+  type: z.literal("style"),
   value: z.record(z.string(), z.string()),
   important: z.boolean().optional(),
-  mode: z.enum(['replace', 'merge']).optional(),
+  mode: z.enum(["replace", "merge"]).optional(),
   persistStyle: z.boolean().optional()
 })
 
 const DOMChangeStyleRulesSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('styleRules'),
+  type: z.literal("styleRules"),
   value: z.string().optional(),
   states: z
     .object({
@@ -184,61 +197,61 @@ const DOMChangeStyleRulesSchema = BaseDOMChangeSchema.extend({
 })
 
 const DOMChangeTextSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('text'),
+  type: z.literal("text"),
   value: z.string(),
   originalText: z.string().optional()
 })
 
 const DOMChangeClassSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('class'),
+  type: z.literal("class"),
   add: z.array(z.string()).optional(),
   remove: z.array(z.string()).optional(),
-  mode: z.enum(['replace', 'merge']).optional()
+  mode: z.enum(["replace", "merge"]).optional()
 })
 
 const DOMChangeAttributeSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('attribute'),
+  type: z.literal("attribute"),
   value: z.record(z.string(), z.string()),
-  mode: z.enum(['replace', 'merge']).optional(),
+  mode: z.enum(["replace", "merge"]).optional(),
   persistAttribute: z.boolean().optional()
 })
 
 const DOMChangeHTMLSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('html'),
+  type: z.literal("html"),
   value: z.string(),
   originalHtml: z.string().optional()
 })
 
 const DOMChangeJavaScriptSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('javascript'),
+  type: z.literal("javascript"),
   value: z.string(),
   persistScript: z.boolean().optional()
 })
 
 const DOMChangeMoveSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('move'),
+  type: z.literal("move"),
   targetSelector: z.string().min(1),
-  position: z.enum(['before', 'after', 'firstChild', 'lastChild'])
+  position: z.enum(["before", "after", "firstChild", "lastChild"])
 })
 
 const DOMChangeRemoveSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('remove')
+  type: z.literal("remove")
 })
 
 const DOMChangeInsertSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('insert'),
+  type: z.literal("insert"),
   html: z.string(),
-  position: z.enum(['before', 'after', 'firstChild', 'lastChild'])
+  position: z.enum(["before", "after", "firstChild", "lastChild"])
 })
 
 const DOMChangeCreateSchema = BaseDOMChangeSchema.extend({
-  type: z.literal('create'),
+  type: z.literal("create"),
   element: z.string(),
   targetSelector: z.string().min(1),
-  position: z.enum(['before', 'after', 'firstChild', 'lastChild'])
+  position: z.enum(["before", "after", "firstChild", "lastChild"])
 })
 
-export const DOMChangeSchema = z.discriminatedUnion('type', [
+export const DOMChangeSchema = z.discriminatedUnion("type", [
   DOMChangeStyleSchema,
   DOMChangeStyleRulesSchema,
   DOMChangeTextSchema,
@@ -255,11 +268,15 @@ export const DOMChangeSchema = z.discriminatedUnion('type', [
 export const URLFilterConfigSchema = z.object({
   include: z.array(z.string()).optional(),
   exclude: z.array(z.string()).optional(),
-  mode: z.enum(['simple', 'regex']).optional(),
-  matchType: z.enum(['full-url', 'path', 'domain', 'query', 'hash']).optional()
+  mode: z.enum(["simple", "regex"]).optional(),
+  matchType: z.enum(["full-url", "path", "domain", "query", "hash"]).optional()
 })
 
-export const URLFilterSchema = z.union([z.string(), z.array(z.string()), URLFilterConfigSchema])
+export const URLFilterSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+  URLFilterConfigSchema
+])
 
 export const DOMChangesConfigSchema = z.object({
   changes: z.array(DOMChangeSchema),
@@ -270,11 +287,16 @@ export const DOMChangesConfigSchema = z.object({
   observerRoot: z.string().optional()
 })
 
-export const DOMChangesDataSchema = z.union([z.array(DOMChangeSchema), DOMChangesConfigSchema])
+export const DOMChangesDataSchema = z.union([
+  z.array(DOMChangeSchema),
+  DOMChangesConfigSchema
+])
 
-export const VariantConfigSchema = z.object({
-  __dom_changes: DOMChangesDataSchema.optional()
-}).passthrough()
+export const VariantConfigSchema = z
+  .object({
+    __dom_changes: DOMChangesDataSchema.optional()
+  })
+  .passthrough()
 
 export const ExperimentsCacheSchema = z.object({
   version: z.number().int().positive(),
@@ -287,8 +309,10 @@ export function parseExperiment(data: unknown): Experiment {
     return ExperimentSchema.parse(data) as unknown as Experiment
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[Validation] Experiment validation failed:', error.issues)
-      throw new Error(`Invalid experiment data: ${error.issues[0].path.join('.')}: ${error.issues[0].message}`)
+      console.error("[Validation] Experiment validation failed:", error.issues)
+      throw new Error(
+        `Invalid experiment data: ${error.issues[0].path.join(".")}: ${error.issues[0].message}`
+      )
     }
     throw error
   }
@@ -299,16 +323,21 @@ export function parseExperiments(data: unknown): Experiment[] {
     return z.array(ExperimentSchema).parse(data) as unknown as Experiment[]
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[Validation] Experiments array validation failed:', error.issues)
+      console.error(
+        "[Validation] Experiments array validation failed:",
+        error.issues
+      )
       throw new Error(
-        `Invalid experiments array: ${error.issues[0].path.join('.')}: ${error.issues[0].message}`
+        `Invalid experiments array: ${error.issues[0].path.join(".")}: ${error.issues[0].message}`
       )
     }
     throw error
   }
 }
 
-export function safeParseExperiments(data: unknown): { success: true; data: Experiment[] } | { success: false; error: string } {
+export function safeParseExperiments(
+  data: unknown
+): { success: true; data: Experiment[] } | { success: false; error: string } {
   try {
     const result = z.array(ExperimentSchema).safeParse(data)
     if (result.success) {
@@ -317,7 +346,7 @@ export function safeParseExperiments(data: unknown): { success: true; data: Expe
       const firstError = result.error.issues[0]
       return {
         success: false,
-        error: `${firstError.path.join('.')}: ${firstError.message}`
+        error: `${firstError.path.join(".")}: ${firstError.message}`
       }
     }
   } catch (error) {
@@ -337,8 +366,13 @@ export function parseVariantConfig(configStr: string): unknown {
     return parsed
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[Validation] Variant config validation failed:', error.issues)
-      throw new Error(`Invalid variant config: ${error.issues[0].path.join('.')}: ${error.issues[0].message}`)
+      console.error(
+        "[Validation] Variant config validation failed:",
+        error.issues
+      )
+      throw new Error(
+        `Invalid variant config: ${error.issues[0].path.join(".")}: ${error.issues[0].message}`
+      )
     }
 
     if (error instanceof SyntaxError) {
@@ -349,7 +383,9 @@ export function parseVariantConfig(configStr: string): unknown {
   }
 }
 
-export function safeParseVariantConfig(configStr: string): { success: true; data: unknown } | { success: false; error: string } {
+export function safeParseVariantConfig(
+  configStr: string
+): { success: true; data: unknown } | { success: false; error: string } {
   try {
     const parsed = JSON.parse(configStr)
 
@@ -361,7 +397,7 @@ export function safeParseVariantConfig(configStr: string): { success: true; data
         const firstError = result.error.issues[0]
         return {
           success: false,
-          error: `${firstError.path.join('.')}: ${firstError.message}`
+          error: `${firstError.path.join(".")}: ${firstError.message}`
         }
       }
     }
@@ -375,22 +411,34 @@ export function safeParseVariantConfig(configStr: string): { success: true; data
   }
 }
 
-export function parseExperimentsCache(data: unknown): { experiments: z.infer<typeof CachedExperimentSchema>[]; timestamp: number } {
+export function parseExperimentsCache(data: unknown): {
+  experiments: z.infer<typeof CachedExperimentSchema>[]
+  timestamp: number
+} {
   try {
     const validated = ExperimentsCacheSchema.parse(data)
-    return validated as unknown as { experiments: z.infer<typeof CachedExperimentSchema>[]; timestamp: number }
+    return validated as unknown as {
+      experiments: z.infer<typeof CachedExperimentSchema>[]
+      timestamp: number
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[Validation] Experiments cache validation failed:', error.issues)
+      console.error(
+        "[Validation] Experiments cache validation failed:",
+        error.issues
+      )
       throw new Error(
-        `Invalid experiments cache: ${error.issues[0].path.join('.')}: ${error.issues[0].message}`
+        `Invalid experiments cache: ${error.issues[0].path.join(".")}: ${error.issues[0].message}`
       )
     }
     throw error
   }
 }
 
-export function safeParseJSON<T = unknown>(jsonStr: string, schema?: z.ZodSchema<T>): { success: true; data: T } | { success: false; error: string } {
+export function safeParseJSON<T = unknown>(
+  jsonStr: string,
+  schema?: z.ZodSchema<T>
+): { success: true; data: T } | { success: false; error: string } {
   try {
     const parsed = JSON.parse(jsonStr)
 
@@ -402,7 +450,7 @@ export function safeParseJSON<T = unknown>(jsonStr: string, schema?: z.ZodSchema
         const firstError = result.error.issues[0]
         return {
           success: false,
-          error: `Validation failed: ${firstError.path.join('.')}: ${firstError.message}`
+          error: `Validation failed: ${firstError.path.join(".")}: ${firstError.message}`
         }
       }
     }

@@ -1,31 +1,33 @@
-import { renderHook, waitFor, act } from '@testing-library/react'
-import { useVariantPreview } from '../useVariantPreview'
-import * as messaging from '~src/lib/messaging'
-import type { DOMChange } from '~src/types/dom-changes'
+import { act, renderHook, waitFor } from "@testing-library/react"
 
-jest.mock('~src/lib/messaging')
-jest.mock('~src/utils/debug', () => ({
+import * as messaging from "~src/lib/messaging"
+import type { DOMChange } from "~src/types/dom-changes"
+
+import { useVariantPreview } from "../useVariantPreview"
+
+jest.mock("~src/lib/messaging")
+jest.mock("~src/utils/debug", () => ({
   debugLog: jest.fn(),
   debugError: jest.fn()
 }))
 
-describe('useVariantPreview', () => {
+describe("useVariantPreview", () => {
   let mockSendToContent: jest.Mock
 
   const mockVariants = [
     {
-      name: 'Control',
+      name: "Control",
       config: {
         __dom_changes: [
-          { selector: '.control', type: 'text', value: 'Control text' }
+          { selector: ".control", type: "text", value: "Control text" }
         ]
       }
     },
     {
-      name: 'Variant A',
+      name: "Variant A",
       config: {
         __dom_changes: [
-          { selector: '.variant-a', type: 'text', value: 'Variant A text' }
+          { selector: ".variant-a", type: "text", value: "Variant A text" }
         ]
       }
     }
@@ -33,8 +35,8 @@ describe('useVariantPreview', () => {
 
   const defaultOptions = {
     variants: mockVariants,
-    experimentName: 'test-experiment',
-    domFieldName: '__dom_changes',
+    experimentName: "test-experiment",
+    domFieldName: "__dom_changes",
     activeVEVariant: null
   }
 
@@ -44,7 +46,6 @@ describe('useVariantPreview', () => {
 
     mockSendToContent = jest.fn().mockResolvedValue(undefined)
     ;(messaging.sendToContent as jest.Mock) = mockSendToContent
-
     ;(global as any).chrome = {
       runtime: {
         onMessage: {
@@ -61,8 +62,8 @@ describe('useVariantPreview', () => {
     jest.clearAllMocks()
   })
 
-  describe('handlePreviewToggle', () => {
-    it('should enable preview and send changes to content script', async () => {
+  describe("handlePreviewToggle", () => {
+    it("should enable preview and send changes to content script", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -77,15 +78,17 @@ describe('useVariantPreview', () => {
 
       expect(result.current.activePreviewVariant).toBe(0)
       expect(mockSendToContent).toHaveBeenCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'apply',
-        changes: [{ selector: '.control', type: 'text', value: 'Control text' }],
-        experimentName: 'test-experiment',
-        variantName: 'Control'
+        type: "ABSMARTLY_PREVIEW",
+        action: "apply",
+        changes: [
+          { selector: ".control", type: "text", value: "Control text" }
+        ],
+        experimentName: "test-experiment",
+        variantName: "Control"
       })
     })
 
-    it('should disable preview and send remove message', async () => {
+    it("should disable preview and send remove message", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -106,20 +109,25 @@ describe('useVariantPreview', () => {
 
       expect(result.current.activePreviewVariant).toBeNull()
       expect(mockSendToContent).toHaveBeenLastCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'remove',
-        experimentName: 'test-experiment'
+        type: "ABSMARTLY_PREVIEW",
+        action: "remove",
+        experimentName: "test-experiment"
       })
     })
 
-    it('should filter disabled changes when applying preview', async () => {
+    it("should filter disabled changes when applying preview", async () => {
       const variantsWithDisabled = [
         {
-          name: 'Test Variant',
+          name: "Test Variant",
           config: {
             __dom_changes: [
-              { selector: '.enabled', type: 'text' as const, value: 'Enabled' },
-              { selector: '.disabled', type: 'text' as const, value: 'Disabled', disabled: true }
+              { selector: ".enabled", type: "text" as const, value: "Enabled" },
+              {
+                selector: ".disabled",
+                type: "text" as const,
+                value: "Disabled",
+                disabled: true
+              }
             ]
           }
         }
@@ -140,15 +148,15 @@ describe('useVariantPreview', () => {
       })
 
       expect(mockSendToContent).toHaveBeenCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'apply',
-        changes: [{ selector: '.enabled', type: 'text', value: 'Enabled' }],
-        experimentName: 'test-experiment',
-        variantName: 'Test Variant'
+        type: "ABSMARTLY_PREVIEW",
+        action: "apply",
+        changes: [{ selector: ".enabled", type: "text", value: "Enabled" }],
+        experimentName: "test-experiment",
+        variantName: "Test Variant"
       })
     })
 
-    it('should handle preview toggle race conditions', async () => {
+    it("should handle preview toggle race conditions", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -167,8 +175,8 @@ describe('useVariantPreview', () => {
       expect(result.current.activePreviewVariant).toBe(1)
     })
 
-    it('should handle sendToContent errors gracefully', async () => {
-      mockSendToContent.mockRejectedValue(new Error('No active tab'))
+    it("should handle sendToContent errors gracefully", async () => {
+      mockSendToContent.mockRejectedValue(new Error("No active tab"))
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
@@ -181,10 +189,14 @@ describe('useVariantPreview', () => {
     })
   })
 
-  describe('handlePreviewWithChanges', () => {
-    it('should apply preview with provided changes', async () => {
+  describe("handlePreviewWithChanges", () => {
+    it("should apply preview with provided changes", async () => {
       const customChanges: DOMChange[] = [
-        { selector: '.custom', type: 'html' as const, value: '<span>Custom</span>' }
+        {
+          selector: ".custom",
+          type: "html" as const,
+          value: "<span>Custom</span>"
+        }
       ]
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
@@ -196,36 +208,45 @@ describe('useVariantPreview', () => {
       expect(result.current.previewEnabled).toBe(true)
       expect(result.current.activePreviewVariant).toBe(0)
       expect(mockSendToContent).toHaveBeenCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'apply',
+        type: "ABSMARTLY_PREVIEW",
+        action: "apply",
         changes: customChanges,
-        experimentName: 'test-experiment',
-        variantName: 'Control'
+        experimentName: "test-experiment",
+        variantName: "Control"
       })
     })
 
-    it('should filter disabled changes from provided changes', async () => {
+    it("should filter disabled changes from provided changes", async () => {
       const changesWithDisabled: DOMChange[] = [
-        { selector: '.enabled', type: 'text' as const, value: 'Enabled' },
-        { selector: '.disabled', type: 'text' as const, value: 'Disabled', disabled: true }
+        { selector: ".enabled", type: "text" as const, value: "Enabled" },
+        {
+          selector: ".disabled",
+          type: "text" as const,
+          value: "Disabled",
+          disabled: true
+        }
       ]
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
-        await result.current.handlePreviewWithChanges(true, 0, changesWithDisabled)
+        await result.current.handlePreviewWithChanges(
+          true,
+          0,
+          changesWithDisabled
+        )
       })
 
       expect(mockSendToContent).toHaveBeenCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'apply',
-        changes: [{ selector: '.enabled', type: 'text', value: 'Enabled' }],
-        experimentName: 'test-experiment',
-        variantName: 'Control'
+        type: "ABSMARTLY_PREVIEW",
+        action: "apply",
+        changes: [{ selector: ".enabled", type: "text", value: "Enabled" }],
+        experimentName: "test-experiment",
+        variantName: "Control"
       })
     })
 
-    it('should not send message when disabled', async () => {
+    it("should not send message when disabled", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -237,8 +258,8 @@ describe('useVariantPreview', () => {
     })
   })
 
-  describe('handlePreviewRefresh', () => {
-    it('should refresh active preview with latest changes', async () => {
+  describe("handlePreviewRefresh", () => {
+    it("should refresh active preview with latest changes", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -252,15 +273,17 @@ describe('useVariantPreview', () => {
       })
 
       expect(mockSendToContent).toHaveBeenCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'update',
-        changes: [{ selector: '.control', type: 'text', value: 'Control text' }],
-        experimentName: 'test-experiment',
-        variantName: 'Control'
+        type: "ABSMARTLY_PREVIEW",
+        action: "update",
+        changes: [
+          { selector: ".control", type: "text", value: "Control text" }
+        ],
+        experimentName: "test-experiment",
+        variantName: "Control"
       })
     })
 
-    it('should not refresh when preview is disabled', async () => {
+    it("should not refresh when preview is disabled", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -270,7 +293,7 @@ describe('useVariantPreview', () => {
       expect(mockSendToContent).not.toHaveBeenCalled()
     })
 
-    it('should not refresh when different variant is active', async () => {
+    it("should not refresh when different variant is active", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -286,8 +309,8 @@ describe('useVariantPreview', () => {
       expect(mockSendToContent).not.toHaveBeenCalled()
     })
 
-    it('should handle refresh errors gracefully', async () => {
-      mockSendToContent.mockRejectedValue(new Error('Tab closed'))
+    it("should handle refresh errors gracefully", async () => {
+      mockSendToContent.mockRejectedValue(new Error("Tab closed"))
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
@@ -303,8 +326,8 @@ describe('useVariantPreview', () => {
     })
   })
 
-  describe('Message listener', () => {
-    it('should add and remove message listener', () => {
+  describe("Message listener", () => {
+    it("should add and remove message listener", () => {
       const { unmount } = renderHook(() => useVariantPreview(defaultOptions))
 
       expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled()
@@ -314,12 +337,14 @@ describe('useVariantPreview', () => {
       expect(chrome.runtime.onMessage.removeListener).toHaveBeenCalled()
     })
 
-    it('should handle PREVIEW_STATE_CHANGED message', async () => {
+    it("should handle PREVIEW_STATE_CHANGED message", async () => {
       let messageHandler: (message: any) => void = () => {}
 
-      ;(chrome.runtime.onMessage.addListener as jest.Mock).mockImplementation((handler) => {
-        messageHandler = handler
-      })
+      ;(chrome.runtime.onMessage.addListener as jest.Mock).mockImplementation(
+        (handler) => {
+          messageHandler = handler
+        }
+      )
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
@@ -332,79 +357,85 @@ describe('useVariantPreview', () => {
       mockSendToContent.mockClear()
 
       act(() => {
-        messageHandler({ type: 'PREVIEW_STATE_CHANGED', enabled: false })
+        messageHandler({ type: "PREVIEW_STATE_CHANGED", enabled: false })
       })
 
       await waitFor(() => {
         expect(mockSendToContent).toHaveBeenCalledWith({
-          type: 'ABSMARTLY_PREVIEW',
-          action: 'remove',
-          experimentName: 'test-experiment'
+          type: "ABSMARTLY_PREVIEW",
+          action: "remove",
+          experimentName: "test-experiment"
         })
       })
     })
 
-    it('should ignore message when preview already disabled', () => {
+    it("should ignore message when preview already disabled", () => {
       let messageHandler: (message: any) => void = () => {}
 
-      ;(chrome.runtime.onMessage.addListener as jest.Mock).mockImplementation((handler) => {
-        messageHandler = handler
-      })
+      ;(chrome.runtime.onMessage.addListener as jest.Mock).mockImplementation(
+        (handler) => {
+          messageHandler = handler
+        }
+      )
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       expect(result.current.previewEnabled).toBe(false)
 
       act(() => {
-        messageHandler({ type: 'PREVIEW_STATE_CHANGED', enabled: false })
+        messageHandler({ type: "PREVIEW_STATE_CHANGED", enabled: false })
       })
 
       expect(mockSendToContent).not.toHaveBeenCalled()
     })
 
-    it('should handle malformed messages gracefully', () => {
+    it("should handle malformed messages gracefully", () => {
       let messageHandler: (message: any) => void = () => {}
 
-      ;(chrome.runtime.onMessage.addListener as jest.Mock).mockImplementation((handler) => {
-        messageHandler = handler
-      })
+      ;(chrome.runtime.onMessage.addListener as jest.Mock).mockImplementation(
+        (handler) => {
+          messageHandler = handler
+        }
+      )
 
       renderHook(() => useVariantPreview(defaultOptions))
 
       expect(() => {
         messageHandler(null)
         messageHandler(undefined)
-        messageHandler({ type: 'UNKNOWN' })
+        messageHandler({ type: "UNKNOWN" })
         messageHandler({ enabled: false })
       }).not.toThrow()
     })
   })
 
-  describe('Cleanup on unmount', () => {
-    it('should send remove message on unmount', async () => {
+  describe("Cleanup on unmount", () => {
+    it("should send remove message on unmount", async () => {
       const { unmount } = renderHook(() => useVariantPreview(defaultOptions))
 
       unmount()
 
       await waitFor(() => {
         expect(mockSendToContent).toHaveBeenCalledWith({
-          type: 'ABSMARTLY_PREVIEW',
-          action: 'remove',
-          experimentName: 'test-experiment'
+          type: "ABSMARTLY_PREVIEW",
+          action: "remove",
+          experimentName: "test-experiment"
         })
       })
     })
 
-    it('should handle cleanup errors silently', async () => {
-      mockSendToContent.mockRejectedValue(new Error('Tab closed'))
+    it("should handle cleanup errors silently", async () => {
+      mockSendToContent.mockRejectedValue(new Error("Tab closed"))
 
       const { unmount } = renderHook(() => useVariantPreview(defaultOptions))
 
       expect(() => unmount()).not.toThrow()
     })
 
-    it('should cleanup preview on unmount even if preview active', async () => {
-      const { result, unmount } = renderHook(() => useVariantPreview(defaultOptions))
+    it("should cleanup preview on unmount even if preview active", async () => {
+      const { result, unmount } = renderHook(() =>
+        useVariantPreview(defaultOptions)
+      )
 
       await act(async () => {
         await result.current.handlePreviewToggle(true, 0)
@@ -420,8 +451,8 @@ describe('useVariantPreview', () => {
     })
   })
 
-  describe('DOM mutation during active preview', () => {
-    it('should handle variant config changes while preview active', async () => {
+  describe("DOM mutation during active preview", () => {
+    it("should handle variant config changes while preview active", async () => {
       const { result, rerender } = renderHook(
         (props) => useVariantPreview(props),
         { initialProps: defaultOptions }
@@ -433,10 +464,14 @@ describe('useVariantPreview', () => {
 
       const updatedVariants = [
         {
-          name: 'Control',
+          name: "Control",
           config: {
             __dom_changes: [
-              { selector: '.control-updated', type: 'text', value: 'Updated text' }
+              {
+                selector: ".control-updated",
+                type: "text",
+                value: "Updated text"
+              }
             ]
           }
         }
@@ -449,17 +484,19 @@ describe('useVariantPreview', () => {
       })
 
       expect(mockSendToContent).toHaveBeenLastCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'update',
-        changes: [{ selector: '.control-updated', type: 'text', value: 'Updated text' }],
-        experimentName: 'test-experiment',
-        variantName: 'Control'
+        type: "ABSMARTLY_PREVIEW",
+        action: "update",
+        changes: [
+          { selector: ".control-updated", type: "text", value: "Updated text" }
+        ],
+        experimentName: "test-experiment",
+        variantName: "Control"
       })
     })
   })
 
-  describe('Multiple preview toggles rapidly', () => {
-    it('should handle rapid enable/disable cycles', async () => {
+  describe("Multiple preview toggles rapidly", () => {
+    it("should handle rapid enable/disable cycles", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -472,7 +509,7 @@ describe('useVariantPreview', () => {
       expect(result.current.activePreviewVariant).toBeNull()
     })
 
-    it('should handle rapid variant switches', async () => {
+    it("should handle rapid variant switches", async () => {
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
       await act(async () => {
@@ -493,18 +530,20 @@ describe('useVariantPreview', () => {
       })
 
       expect(mockSendToContent).toHaveBeenLastCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'apply',
-        changes: [{ selector: '.variant-a', type: 'text', value: 'Variant A text' }],
-        experimentName: 'test-experiment',
-        variantName: 'Variant A'
+        type: "ABSMARTLY_PREVIEW",
+        action: "apply",
+        changes: [
+          { selector: ".variant-a", type: "text", value: "Variant A text" }
+        ],
+        experimentName: "test-experiment",
+        variantName: "Variant A"
       })
     })
   })
 
-  describe('Preview state sync issues', () => {
-    it('should maintain correct state when sendToContent fails', async () => {
-      mockSendToContent.mockRejectedValueOnce(new Error('Network error'))
+  describe("Preview state sync issues", () => {
+    it("should maintain correct state when sendToContent fails", async () => {
+      mockSendToContent.mockRejectedValueOnce(new Error("Network error"))
 
       const { result } = renderHook(() => useVariantPreview(defaultOptions))
 
@@ -516,7 +555,7 @@ describe('useVariantPreview', () => {
       expect(result.current.activePreviewVariant).toBe(0)
     })
 
-    it('should handle state updates when no variants available', async () => {
+    it("should handle state updates when no variants available", async () => {
       const { result } = renderHook(() =>
         useVariantPreview({ ...defaultOptions, variants: [] })
       )
@@ -527,9 +566,9 @@ describe('useVariantPreview', () => {
 
       expect(result.current.previewEnabled).toBe(true)
       expect(mockSendToContent).toHaveBeenCalledWith({
-        type: 'ABSMARTLY_PREVIEW',
-        action: 'remove',
-        experimentName: 'test-experiment'
+        type: "ABSMARTLY_PREVIEW",
+        action: "remove",
+        experimentName: "test-experiment"
       })
     })
   })

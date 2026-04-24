@@ -1,14 +1,15 @@
+import { Storage } from "@plasmohq/storage"
+
+import { secureStorage, sessionStorage, storage } from "../storage-instances"
+
 const constructorCalls: any[] = []
 
 jest.mock("@plasmohq/storage", () => ({
   Storage: jest.fn().mockImplementation((config?: any) => {
     constructorCalls.push(config ?? "__no_args__")
     return { _config: config, get: jest.fn(), set: jest.fn() }
-  }),
+  })
 }))
-
-import { storage, secureStorage, sessionStorage } from "../storage-instances"
-import { Storage } from "@plasmohq/storage"
 
 describe("storage-instances", () => {
   it("creates exactly three storage instances", () => {
@@ -27,9 +28,7 @@ describe("storage-instances", () => {
   })
 
   it("creates sessionStorage with area=session", () => {
-    const sessionCall = constructorCalls.find(
-      (c) => c && c.area === "session"
-    )
+    const sessionCall = constructorCalls.find((c) => c && c.area === "session")
     expect(sessionCall).toBeDefined()
   })
 

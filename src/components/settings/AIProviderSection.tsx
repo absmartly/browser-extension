@@ -1,14 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { Select } from '../ui/Select'
-import { Input } from '../ui/Input'
-import { Button } from '../ui/Button'
-import { Alert, AlertDescription } from '../ui/Alert'
-import { ClaudeCodeBridgeClient, ConnectionState, getConnectionStateMessage } from '~src/lib/claude-code-client'
-import { ModelFetcher, type ModelInfo, type GroupedModels } from '~src/lib/model-fetcher'
-import { PROVIDER_REGISTRY, ensureProviderPermissions, hasProviderPermissions } from '~src/lib/ai-providers'
-import type { AIProviderType } from '~src/lib/ai-providers'
+import React, { useCallback, useEffect, useState } from "react"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import {
+  ensureProviderPermissions,
+  hasProviderPermissions,
+  PROVIDER_REGISTRY
+} from "~src/lib/ai-providers"
+import type { AIProviderType } from "~src/lib/ai-providers"
+import {
+  ClaudeCodeBridgeClient,
+  ConnectionState,
+  getConnectionStateMessage
+} from "~src/lib/claude-code-client"
+import {
+  ModelFetcher,
+  type GroupedModels,
+  type ModelInfo
+} from "~src/lib/model-fetcher"
+import { debugLog, debugWarn } from "~src/utils/debug"
+
+import { Alert, AlertDescription } from "../ui/Alert"
+import { Button } from "../ui/Button"
+import { Input } from "../ui/Input"
+import { Select } from "../ui/Select"
+
 interface AIProviderSectionProps {
   aiProvider: AIProviderType
   aiApiKey: string
@@ -39,11 +53,15 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   onProviderEndpointsChange
 }: AIProviderSectionProps) {
   const [bridgeClient] = useState(() => new ClaudeCodeBridgeClient())
-  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NOT_CONFIGURED)
+  const [connectionState, setConnectionState] = useState<ConnectionState>(
+    ConnectionState.NOT_CONFIGURED
+  )
   const [testingConnection, setTestingConnection] = useState(false)
   const [bridgePort, setBridgePort] = useState<number | null>(null)
-  const [subscriptionType, setSubscriptionType] = useState<string | undefined>(undefined)
-  const [customBridgeEndpoint, setCustomBridgeEndpoint] = useState('')
+  const [subscriptionType, setSubscriptionType] = useState<string | undefined>(
+    undefined
+  )
+  const [customBridgeEndpoint, setCustomBridgeEndpoint] = useState("")
 
   const [models, setModels] = useState<ModelInfo[]>([])
   const [groupedModels, setGroupedModels] = useState<GroupedModels>({})
@@ -60,7 +78,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   }, [aiProvider])
 
   useEffect(() => {
-    const savedEndpoint = providerEndpoints[aiProvider] || ''
+    const savedEndpoint = providerEndpoints[aiProvider] || ""
     onCustomEndpointChange(savedEndpoint)
 
     const savedModel = providerModels[aiProvider]
@@ -80,9 +98,12 @@ export const AIProviderSection = React.memo(function AIProviderSection({
 
   useEffect(() => {
     if (!llmModel || !providerModels[aiProvider]) {
-      if (meta.modelDisplayType === 'simple' && models.length > 0) {
+      if (meta.modelDisplayType === "simple" && models.length > 0) {
         onLlmModelChange(models[0].id)
-      } else if (meta.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
+      } else if (
+        meta.modelDisplayType === "grouped" &&
+        Object.keys(groupedModels).length > 0
+      ) {
         const firstProvider = Object.keys(groupedModels)[0]
         const firstModel = groupedModels[firstProvider][0]
         if (firstModel) {
@@ -99,8 +120,11 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     setModelsFetchError(null)
 
     try {
-      const result = await meta.fetchModels(aiApiKey, customEndpoint || undefined)
-      if (meta.modelDisplayType === 'grouped') {
+      const result = await meta.fetchModels(
+        aiApiKey,
+        customEndpoint || undefined
+      )
+      if (meta.modelDisplayType === "grouped") {
         setGroupedModels(result as GroupedModels)
         setModels([])
       } else {
@@ -109,8 +133,10 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       }
       setModelsFetched(true)
     } catch (error) {
-      console.error('Error fetching models:', error)
-      setModelsFetchError(error instanceof Error ? error.message : 'Failed to fetch models')
+      console.error("Error fetching models:", error)
+      setModelsFetchError(
+        error instanceof Error ? error.message : "Failed to fetch models"
+      )
       setModels([])
       setGroupedModels({})
     } finally {
@@ -119,53 +145,75 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   }, [aiApiKey, aiProvider, customEndpoint, meta])
 
   const handleModelDropdownFocus = useCallback(async () => {
-    if (modelsFetched || fetchingModels || !aiApiKey || !meta.fetchModels) return
+    if (modelsFetched || fetchingModels || !aiApiKey || !meta.fetchModels)
+      return
 
-    const hasPerms = await hasProviderPermissions(aiProvider, customEndpoint || undefined)
+    const hasPerms = await hasProviderPermissions(
+      aiProvider,
+      customEndpoint || undefined
+    )
     if (hasPerms) {
       ModelFetcher.clearCache()
       fetchModels()
       return
     }
 
-    const granted = await ensureProviderPermissions(aiProvider, customEndpoint || undefined)
+    const granted = await ensureProviderPermissions(
+      aiProvider,
+      customEndpoint || undefined
+    )
     if (granted) {
       ModelFetcher.clearCache()
       fetchModels()
     }
-  }, [modelsFetched, fetchingModels, aiApiKey, aiProvider, customEndpoint, meta, fetchModels])
+  }, [
+    modelsFetched,
+    fetchingModels,
+    aiApiKey,
+    aiProvider,
+    customEndpoint,
+    meta,
+    fetchModels
+  ])
 
   // Auto-fetch when endpoint or API key changes and we have permission
   useEffect(() => {
     if (!aiApiKey || !meta.fetchModels) return
     setModelsFetched(false)
 
-    hasProviderPermissions(aiProvider, customEndpoint || undefined).then(has => {
-      if (has) {
-        ModelFetcher.clearCache()
-        fetchModels()
+    hasProviderPermissions(aiProvider, customEndpoint || undefined).then(
+      (has) => {
+        if (has) {
+          ModelFetcher.clearCache()
+          fetchModels()
+        }
       }
-    })
+    )
   }, [customEndpoint, aiApiKey])
 
   const checkBridgeConnection = async () => {
-    debugLog('[AIProviderSection] Starting bridge connection check...')
+    debugLog("[AIProviderSection] Starting bridge connection check...")
     setConnectionState(ConnectionState.CONNECTING)
     try {
       await bridgeClient.connect()
       const connection = bridgeClient.getConnection()
-      debugLog('[AIProviderSection] Bridge connection result:', connection)
+      debugLog("[AIProviderSection] Bridge connection result:", connection)
       if (connection) {
         setBridgePort(connection.port)
         setSubscriptionType(connection.subscriptionType)
         setConnectionState(ConnectionState.CONNECTED)
-        debugLog('[AIProviderSection] Bridge connected successfully on port', connection.port)
+        debugLog(
+          "[AIProviderSection] Bridge connected successfully on port",
+          connection.port
+        )
       } else {
-        debugWarn('[AIProviderSection] Bridge connect succeeded but no connection object returned')
+        debugWarn(
+          "[AIProviderSection] Bridge connect succeeded but no connection object returned"
+        )
         setConnectionState(ConnectionState.SERVER_NOT_FOUND)
       }
     } catch (error) {
-      console.error('[AIProviderSection] Bridge connection failed:', error)
+      console.error("[AIProviderSection] Bridge connection failed:", error)
       setConnectionState(ConnectionState.SERVER_NOT_FOUND)
     }
   }
@@ -196,14 +244,14 @@ export const AIProviderSection = React.memo(function AIProviderSection({
   const getStatusColor = (state: ConnectionState) => {
     switch (state) {
       case ConnectionState.CONNECTED:
-        return 'bg-green-500'
+        return "bg-green-500"
       case ConnectionState.CONNECTING:
-        return 'bg-yellow-500'
+        return "bg-yellow-500"
       case ConnectionState.CONNECTION_FAILED:
       case ConnectionState.SERVER_NOT_FOUND:
-        return 'bg-red-500'
+        return "bg-red-500"
       default:
-        return 'bg-gray-400'
+        return "bg-gray-400"
     }
   }
 
@@ -221,9 +269,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
           onChange={(e) => onCustomEndpointChange(e.target.value)}
           placeholder={meta.defaultEndpoint}
         />
-        <p className="text-xs text-gray-500">
-          {meta.endpointDescription}
-        </p>
+        <p className="text-xs text-gray-500">{meta.endpointDescription}</p>
       </div>
     </details>
   )
@@ -232,7 +278,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     <>
       <Input
         id="ai-api-key"
-        label={`${meta.label.replace(' API Key', '')} API Key`}
+        label={`${meta.label.replace(" API Key", "")} API Key`}
         type="password"
         value={aiApiKey}
         onChange={(e) => onAiApiKeyChange(e.target.value)}
@@ -240,13 +286,12 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         showPasswordToggle={true}
       />
       <p className="mt-1 text-xs text-gray-500">
-        Get your API key from{' '}
+        Get your API key from{" "}
         <a
           href={meta.apiKeyHelpLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline"
-        >
+          className="text-blue-600 hover:underline">
           {meta.apiKeyHelpText}
         </a>
       </p>
@@ -273,16 +318,16 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       )
     }
 
-    if (meta.modelDisplayType === 'static' && meta.getStaticModels) {
+    if (meta.modelDisplayType === "static" && meta.getStaticModels) {
       const staticModels = meta.getStaticModels()
       return (
         <>
           <Select
             id={`${aiProvider}-model-select`}
-            label={meta.modelLabel || 'Model'}
-            value={llmModel || ''}
+            label={meta.modelLabel || "Model"}
+            value={llmModel || ""}
             onChange={(e) => onLlmModelChange(e.target.value)}
-            options={staticModels.map(m => ({
+            options={staticModels.map((m) => ({
               value: m.id,
               label: m.name
             }))}
@@ -294,26 +339,31 @@ export const AIProviderSection = React.memo(function AIProviderSection({
       )
     }
 
-    if (meta.modelDisplayType === 'grouped' && Object.keys(groupedModels).length > 0) {
+    if (
+      meta.modelDisplayType === "grouped" &&
+      Object.keys(groupedModels).length > 0
+    ) {
       return (
         <>
-          <label htmlFor={`${aiProvider}-model-select`} className="block text-sm font-medium text-gray-700 mb-1">
-            {meta.modelLabel || 'Model'}
+          <label
+            htmlFor={`${aiProvider}-model-select`}
+            className="block text-sm font-medium text-gray-700 mb-1">
+            {meta.modelLabel || "Model"}
           </label>
           <select
             id={`${aiProvider}-model-select`}
-            value={llmModel || ''}
+            value={llmModel || ""}
             onChange={(e) => onLlmModelChange(e.target.value)}
             onFocus={handleModelDropdownFocus}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          >
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
             <option value="">Select a model...</option>
             {Object.entries(groupedModels).map(([provider, providerModels]) => (
               <optgroup key={provider} label={provider}>
                 {providerModels.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
-                    {model.pricing && ` ($${model.pricing.input.toFixed(2)}/$${model.pricing.output.toFixed(2)} per 1M)`}
+                    {model.pricing &&
+                      ` ($${model.pricing.input.toFixed(2)}/$${model.pricing.output.toFixed(2)} per 1M)`}
                   </option>
                 ))}
               </optgroup>
@@ -327,17 +377,18 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     }
 
     // Simple model list - show fetched models or static fallback
-    const displayModels = models.length > 0 ? models : (meta.getStaticModels?.() || [])
-    if (meta.modelDisplayType === 'simple' && displayModels.length > 0) {
+    const displayModels =
+      models.length > 0 ? models : meta.getStaticModels?.() || []
+    if (meta.modelDisplayType === "simple" && displayModels.length > 0) {
       return (
         <>
           <Select
             id={`${aiProvider}-model-select`}
-            label={meta.modelLabel || 'Model'}
-            value={llmModel || ''}
+            label={meta.modelLabel || "Model"}
+            value={llmModel || ""}
             onChange={(e) => onLlmModelChange(e.target.value)}
             onFocus={handleModelDropdownFocus}
-            options={displayModels.map(m => ({
+            options={displayModels.map((m) => ({
               value: m.id,
               label: m.contextWindow
                 ? `${m.name} (${(m.contextWindow / 1024).toFixed(0)}K context)`
@@ -367,12 +418,13 @@ export const AIProviderSection = React.memo(function AIProviderSection({
         }))}
       />
       <p className="mt-1 text-xs text-gray-500">
-        Choose how to generate AI-powered DOM changes. Claude and Codex use a local bridge server. OpenRouter provides access to 100+ models.
+        Choose how to generate AI-powered DOM changes. Claude and Codex use a
+        local bridge server. OpenRouter provides access to 100+ models.
       </p>
 
       {meta.isBridge && (
         <div className="mt-4 space-y-3">
-          {aiProvider === 'claude-subscription' && (
+          {aiProvider === "claude-subscription" && (
             <>
               <Select
                 id="llm-model-select"
@@ -381,19 +433,20 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                 onChange={(e) => onLlmModelChange(e.target.value)}
                 placeholder=""
                 options={[
-                  { value: '', label: 'Default (Let CLI choose)' },
-                  { value: 'sonnet', label: 'Claude Sonnet' },
-                  { value: 'opus', label: 'Claude Opus' },
-                  { value: 'haiku', label: 'Claude Haiku' }
+                  { value: "", label: "Default (Let CLI choose)" },
+                  { value: "sonnet", label: "Claude Sonnet" },
+                  { value: "opus", label: "Claude Opus" },
+                  { value: "haiku", label: "Claude Haiku" }
                 ]}
               />
               <p className="text-xs text-gray-500">
-                Default lets the CLI choose the best model. Select a specific model to override.
+                Default lets the CLI choose the best model. Select a specific
+                model to override.
               </p>
             </>
           )}
 
-          {aiProvider === 'codex' && (
+          {aiProvider === "codex" && (
             <>
               <Select
                 id="codex-model-select"
@@ -402,16 +455,17 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                 onChange={(e) => onLlmModelChange(e.target.value)}
                 placeholder=""
                 options={[
-                  { value: '', label: 'Default (Let CLI choose)' },
-                  { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
-                  { value: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
-                  { value: 'gpt-5.1-codex-mini', label: 'GPT-5.1 Codex Mini' },
-                  { value: 'gpt-5.1-codex-max', label: 'GPT-5.1 Codex Max' },
-                  { value: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
+                  { value: "", label: "Default (Let CLI choose)" },
+                  { value: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+                  { value: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+                  { value: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini" },
+                  { value: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" },
+                  { value: "gpt-5.1-codex", label: "GPT-5.1 Codex" }
                 ]}
               />
               <p className="text-xs text-gray-500">
-                Default lets the CLI choose the best model. Select a specific model to override.
+                Default lets the CLI choose the best model. Select a specific
+                model to override.
               </p>
             </>
           )}
@@ -420,17 +474,22 @@ export const AIProviderSection = React.memo(function AIProviderSection({
 
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(connectionState)}`} />
+              <div
+                className={`w-3 h-3 rounded-full ${getStatusColor(connectionState)}`}
+              />
               <div>
-                <p id="bridge-connection-status" className="text-sm font-medium">
+                <p
+                  id="bridge-connection-status"
+                  className="text-sm font-medium">
                   {connectionState === ConnectionState.CONNECTED
                     ? bridgePort
                       ? `Connected (port ${bridgePort})`
-                      : `Connected (${bridgeClient.getConnection()?.url || 'custom endpoint'})`
-                    : 'Not Connected'}
+                      : `Connected (${bridgeClient.getConnection()?.url || "custom endpoint"})`
+                    : "Not Connected"}
                 </p>
                 <p className="text-xs text-gray-600">
-                  {connectionState === ConnectionState.CONNECTED && subscriptionType
+                  {connectionState === ConnectionState.CONNECTED &&
+                  subscriptionType
                     ? `${getConnectionStateMessage(connectionState)} • ${subscriptionType}`
                     : getConnectionStateMessage(connectionState)}
                 </p>
@@ -440,74 +499,95 @@ export const AIProviderSection = React.memo(function AIProviderSection({
               id="test-bridge-connection"
               onClick={handleTestConnection}
               variant="secondary"
-              disabled={testingConnection}
-            >
-              {testingConnection ? 'Testing...' : 'Test Connection'}
+              disabled={testingConnection}>
+              {testingConnection ? "Testing..." : "Test Connection"}
             </Button>
           </div>
 
-          {connectionState !== ConnectionState.CONNECTED && aiProvider === 'claude-subscription' && (
-            <Alert className="mt-3">
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p id="claude-subscription-instructions" className="font-medium">Claude Subscription requires a local bridge server:</p>
+          {connectionState !== ConnectionState.CONNECTED &&
+            aiProvider === "claude-subscription" && (
+              <Alert className="mt-3">
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <p
+                      id="claude-subscription-instructions"
+                      className="font-medium">
+                      Claude Subscription requires a local bridge server:
+                    </p>
 
-                  <div className="pl-4 space-y-2">
-                    <div>
-                      <p className="font-medium text-xs">1. Login to Claude CLI (one-time setup):</p>
-                      <code id="claude-login-command" className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
-                        npx @anthropic-ai/claude-code /login
-                      </code>
+                    <div className="pl-4 space-y-2">
+                      <div>
+                        <p className="font-medium text-xs">
+                          1. Login to Claude CLI (one-time setup):
+                        </p>
+                        <code
+                          id="claude-login-command"
+                          className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                          npx @anthropic-ai/claude-code /login
+                        </code>
+                      </div>
+
+                      <div>
+                        <p className="font-medium text-xs">
+                          2. Start the bridge server:
+                        </p>
+                        <code
+                          id="bridge-start-command"
+                          className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                          npx @absmartly/ai-cli-bridge --claude
+                        </code>
+                      </div>
                     </div>
 
-                    <div>
-                      <p className="font-medium text-xs">2. Start the bridge server:</p>
-                      <code id="bridge-start-command" className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
-                        npx @absmartly/ai-cli-bridge --claude
-                      </code>
-                    </div>
+                    <p className="text-xs italic">
+                      Leave the terminal open while using the extension.
+                    </p>
                   </div>
+                </AlertDescription>
+              </Alert>
+            )}
 
-                  <p className="text-xs italic">
-                    Leave the terminal open while using the extension.
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+          {connectionState !== ConnectionState.CONNECTED &&
+            aiProvider === "codex" && (
+              <Alert className="mt-3">
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <p className="font-medium">
+                      Codex requires a local bridge server:
+                    </p>
 
-          {connectionState !== ConnectionState.CONNECTED && aiProvider === 'codex' && (
-            <Alert className="mt-3">
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p className="font-medium">Codex requires a local bridge server:</p>
+                    <div className="pl-4 space-y-2">
+                      <div>
+                        <p className="font-medium text-xs">
+                          1. Login to Codex (one-time setup):
+                        </p>
+                        <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                          codex login
+                        </code>
+                      </div>
 
-                  <div className="pl-4 space-y-2">
-                    <div>
-                      <p className="font-medium text-xs">1. Login to Codex (one-time setup):</p>
-                      <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
-                        codex login
-                      </code>
+                      <div>
+                        <p className="font-medium text-xs">
+                          2. Start the bridge server with Codex provider:
+                        </p>
+                        <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
+                          npx @absmartly/ai-cli-bridge --codex
+                        </code>
+                      </div>
                     </div>
 
-                    <div>
-                      <p className="font-medium text-xs">2. Start the bridge server with Codex provider:</p>
-                      <code className="block bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs mt-1">
-                        npx @absmartly/ai-cli-bridge --codex
-                      </code>
-                    </div>
+                    <p className="text-xs italic">
+                      Leave the terminal open while using the extension.
+                    </p>
                   </div>
-
-                  <p className="text-xs italic">
-                    Leave the terminal open while using the extension.
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+                </AlertDescription>
+              </Alert>
+            )}
 
           <details className="text-sm">
-            <summary id="advanced-endpoint-config-summary" className="cursor-pointer text-gray-700 hover:text-gray-900">
+            <summary
+              id="advanced-endpoint-config-summary"
+              className="cursor-pointer text-gray-700 hover:text-gray-900">
               Advanced: Custom Bridge Endpoint
             </summary>
             <div className="mt-2 space-y-2">
@@ -520,7 +600,8 @@ export const AIProviderSection = React.memo(function AIProviderSection({
                 placeholder="http://localhost:3000"
               />
               <p className="text-xs text-gray-500">
-                Leave blank to auto-detect locally (ports 3000-3004). Set a full URL to connect to a remote bridge server.
+                Leave blank to auto-detect locally (ports 3000-3004). Set a full
+                URL to connect to a remote bridge server.
               </p>
             </div>
           </details>

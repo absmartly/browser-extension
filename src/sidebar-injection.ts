@@ -1,30 +1,33 @@
 // This file contains the sidebar injection code that will be executed in the content script context
-import { debugLog, debugError, debugWarn } from '~src/utils/debug'
+import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 
 let sidebarVisible = false
 let sidebarMinimized = false
 
 export const injectSidebar = () => {
-  const existingContainer = document.getElementById('absmartly-sidebar-root')
+  const existingContainer = document.getElementById("absmartly-sidebar-root")
   if (existingContainer) {
-    debugLog('🔵 ABSmartly Extension: Sidebar already exists, toggling visibility')
+    debugLog(
+      "🔵 ABSmartly Extension: Sidebar already exists, toggling visibility"
+    )
     const currentTransform = existingContainer.style.transform
-    const isCurrentlyVisible = currentTransform === 'translateX(0)' || currentTransform === ''
+    const isCurrentlyVisible =
+      currentTransform === "translateX(0)" || currentTransform === ""
 
     if (isCurrentlyVisible) {
-      existingContainer.style.transform = 'translateX(100%)'
+      existingContainer.style.transform = "translateX(100%)"
       sidebarVisible = false
     } else {
-      existingContainer.style.transform = 'translateX(0)'
+      existingContainer.style.transform = "translateX(0)"
       sidebarVisible = true
     }
     return
   }
 
-  debugLog('🔵 ABSmartly Extension: Injecting sidebar')
+  debugLog("🔵 ABSmartly Extension: Injecting sidebar")
 
-  const container = document.createElement('div')
-  container.id = 'absmartly-sidebar-root'
+  const container = document.createElement("div")
+  container.id = "absmartly-sidebar-root"
   container.style.cssText = `
     position: fixed;
     top: 0;
@@ -37,9 +40,9 @@ export const injectSidebar = () => {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   `
 
-  const shadowRoot = container.attachShadow({ mode: 'open' })
+  const shadowRoot = container.attachShadow({ mode: "open" })
 
-  const shadowStyles = document.createElement('style')
+  const shadowStyles = document.createElement("style")
   shadowStyles.textContent = `
     :host {
       all: initial;
@@ -144,92 +147,94 @@ export const injectSidebar = () => {
   `
   shadowRoot.appendChild(shadowStyles)
 
-  const sidebarContainer = document.createElement('div')
-  sidebarContainer.className = 'sidebar-container'
+  const sidebarContainer = document.createElement("div")
+  sidebarContainer.className = "sidebar-container"
 
-  const header = document.createElement('div')
-  header.className = 'sidebar-header'
-  
+  const header = document.createElement("div")
+  header.className = "sidebar-header"
+
   const updateSidebar = () => {
-    container.style.width = sidebarMinimized ? '48px' : '384px'
-    
-    header.innerHTML = ''
-    header.className = sidebarMinimized ? 'sidebar-header minimized' : 'sidebar-header'
-    
+    container.style.width = sidebarMinimized ? "48px" : "384px"
+
+    header.innerHTML = ""
+    header.className = sidebarMinimized
+      ? "sidebar-header minimized"
+      : "sidebar-header"
+
     if (sidebarMinimized) {
       // Minimized header - vertical layout
-      const expandBtn = document.createElement('button')
-      expandBtn.className = 'expand-btn'
-      expandBtn.innerHTML = '←'
-      expandBtn.title = 'Expand sidebar'
+      const expandBtn = document.createElement("button")
+      expandBtn.className = "expand-btn"
+      expandBtn.innerHTML = "←"
+      expandBtn.title = "Expand sidebar"
       expandBtn.onclick = () => {
         sidebarMinimized = false
         updateSidebar()
         chrome.storage.local.set({ sidebarMinimized: false })
       }
-      
-      const text = document.createElement('div')
-      text.className = 'vertical-text'
-      text.innerText = 'ABSmartly'
-      
+
+      const text = document.createElement("div")
+      text.className = "vertical-text"
+      text.innerText = "ABSmartly"
+
       header.appendChild(expandBtn)
       header.appendChild(text)
     } else {
       // Full header
-      const logoContainer = document.createElement('div')
-      logoContainer.className = 'logo-container'
-      
-      const logo = document.createElement('img')
-      logo.src = chrome.runtime.getURL('assets/absmartly-logo-white.svg')
-      logo.alt = 'ABSmartly'
-      logo.className = 'logo'
-      
-      const title = document.createElement('span')
-      title.className = 'title'
-      title.innerText = 'ABSmartly'
-      
+      const logoContainer = document.createElement("div")
+      logoContainer.className = "logo-container"
+
+      const logo = document.createElement("img")
+      logo.src = chrome.runtime.getURL("assets/absmartly-logo-white.svg")
+      logo.alt = "ABSmartly"
+      logo.className = "logo"
+
+      const title = document.createElement("span")
+      title.className = "title"
+      title.innerText = "ABSmartly"
+
       logoContainer.appendChild(logo)
       logoContainer.appendChild(title)
-      
-      const buttonsContainer = document.createElement('div')
-      buttonsContainer.className = 'buttons-container'
-      
-      const minimizeBtn = document.createElement('button')
-      minimizeBtn.className = 'btn'
-      minimizeBtn.innerHTML = '→'
-      minimizeBtn.title = 'Minimize sidebar'
+
+      const buttonsContainer = document.createElement("div")
+      buttonsContainer.className = "buttons-container"
+
+      const minimizeBtn = document.createElement("button")
+      minimizeBtn.className = "btn"
+      minimizeBtn.innerHTML = "→"
+      minimizeBtn.title = "Minimize sidebar"
       minimizeBtn.onclick = () => {
         sidebarMinimized = true
         updateSidebar()
         chrome.storage.local.set({ sidebarMinimized: true })
       }
-      
-      const closeBtn = document.createElement('button')
-      closeBtn.className = 'btn'
-      closeBtn.innerHTML = '✕'
-      closeBtn.title = 'Close sidebar'
+
+      const closeBtn = document.createElement("button")
+      closeBtn.className = "btn"
+      closeBtn.innerHTML = "✕"
+      closeBtn.title = "Close sidebar"
       closeBtn.onclick = () => {
         sidebarVisible = false
-        container.style.transform = 'translateX(100%)'
+        container.style.transform = "translateX(100%)"
       }
-      
+
       buttonsContainer.appendChild(minimizeBtn)
       buttonsContainer.appendChild(closeBtn)
-      
+
       header.appendChild(logoContainer)
       header.appendChild(buttonsContainer)
     }
   }
 
-  const body = document.createElement('div')
-  body.className = 'sidebar-body'
-  body.id = 'extension-ui-root'
+  const body = document.createElement("div")
+  body.className = "sidebar-body"
+  body.id = "extension-ui-root"
 
   sidebarContainer.appendChild(header)
   sidebarContainer.appendChild(body)
   shadowRoot.appendChild(sidebarContainer)
 
-  chrome.storage.local.get(['sidebarMinimized'], (result) => {
+  chrome.storage.local.get(["sidebarMinimized"], (result) => {
     if (result.sidebarMinimized !== undefined) {
       sidebarMinimized = result.sidebarMinimized
     }
@@ -240,12 +245,12 @@ export const injectSidebar = () => {
 
   sidebarVisible = true
   requestAnimationFrame(() => {
-    container.style.transform = 'translateX(0)'
+    container.style.transform = "translateX(0)"
   })
 
-  import('~src/components/ExtensionUI').then(({ default: ExtensionUI }) => {
-    import('react').then(({ default: React }) => {
-      import('react-dom/client').then(({ createRoot }) => {
+  import("~src/components/ExtensionUI").then(({ default: ExtensionUI }) => {
+    import("react").then(({ default: React }) => {
+      import("react-dom/client").then(({ createRoot }) => {
         const root = createRoot(body)
         root.render(React.createElement(ExtensionUI))
       })
@@ -253,12 +258,14 @@ export const injectSidebar = () => {
   })
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'VISUAL_EDITOR_CHANGES_COMPLETE') {
-      debugLog('🔵 ABSmartly Extension: Relaying visual editor changes to sidebar')
+    if (message.type === "VISUAL_EDITOR_CHANGES_COMPLETE") {
+      debugLog(
+        "🔵 ABSmartly Extension: Relaying visual editor changes to sidebar"
+      )
       // The React components inside ExtensionUI will receive this through their own listeners
       // This just ensures the message gets to the content script context
     }
   })
-  
-  debugLog('🔵 ABSmartly Extension: Sidebar injected successfully')
+
+  debugLog("🔵 ABSmartly Extension: Sidebar injected successfully")
 }

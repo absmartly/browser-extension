@@ -1,12 +1,21 @@
-import type { AIDOMGenerationResult, DOMChange } from '~src/types/dom-changes'
-import type { ConversationSession } from '~src/types/absmartly'
-import type { GenerateOptions } from './base'
-import { validateAIDOMGenerationResult, type ValidationError } from './validation'
-import { handleCssQuery, handleXPathQuery } from './tool-handlers'
-import { MAX_TOOL_ITERATIONS } from './constants'
-import { getSystemPrompt, buildUserMessage, buildSystemPromptWithDOMStructure, createSession } from './utils'
-import { API_CHUNK_RETRIEVAL_PROMPT } from './chunk-retrieval-prompts'
-import { debugLog } from '~src/utils/debug'
+import type { ConversationSession } from "~src/types/absmartly"
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
+import { debugLog } from "~src/utils/debug"
+
+import type { GenerateOptions } from "./base"
+import { API_CHUNK_RETRIEVAL_PROMPT } from "./chunk-retrieval-prompts"
+import { MAX_TOOL_ITERATIONS } from "./constants"
+import { handleCssQuery, handleXPathQuery } from "./tool-handlers"
+import {
+  buildSystemPromptWithDOMStructure,
+  buildUserMessage,
+  createSession,
+  getSystemPrompt
+} from "./utils"
+import {
+  validateAIDOMGenerationResult,
+  type ValidationError
+} from "./validation"
 
 export interface ToolCall {
   name: string
@@ -15,17 +24,17 @@ export interface ToolCall {
 }
 
 type FinalResult = {
-  type: 'final'
+  type: "final"
   result: AIDOMGenerationResult
 }
 
 type ContinueResult = {
-  type: 'continue'
+  type: "continue"
   results: Array<{ id: string; content: string }>
 }
 
 type ConversationalResult = {
-  type: 'conversational'
+  type: "conversational"
   text: string
 }
 
@@ -50,33 +59,52 @@ async function processToolCallsInternal(
     const input = parseInput ? parseInput(tool.input) : tool.input
     debugLog(`[${providerName}] Tool call: ${tool.name}`)
 
-    if (tool.name === 'dom_changes_generator') {
+    if (tool.name === "dom_changes_generator") {
       const validation = validateAIDOMGenerationResult(JSON.stringify(input))
 
       if (!validation.isValid) {
         const errorValidation = validation as ValidationError
-        console.error(`[${providerName}] Tool call validation failed:`, errorValidation.errors)
-        throw new Error(`Tool call validation failed: ${errorValidation.errors.join(', ')}`)
+        console.error(
+          `[${providerName}] Tool call validation failed:`,
+          errorValidation.errors
+        )
+        throw new Error(
+          `Tool call validation failed: ${errorValidation.errors.join(", ")}`
+        )
       }
 
-      debugLog(`[${providerName}] Generated`, validation.result.domChanges.length, 'DOM changes with action:', validation.result.action)
+      debugLog(
+        `[${providerName}] Generated`,
+        validation.result.domChanges.length,
+        "DOM changes with action:",
+        validation.result.action
+      )
 
-      return { type: 'final', result: validation.result }
-    } else if (tool.name === 'css_query') {
+      return { type: "final", result: validation.result }
+    } else if (tool.name === "css_query") {
       const selectors = input.selectors as string[]
       const result = await handleCssQuery(selectors)
-      toolResults.push({ id: tool.id, content: result.error || result.result || '' })
-    } else if (tool.name === 'xpath_query') {
+      toolResults.push({
+        id: tool.id,
+        content: result.error || result.result || ""
+      })
+    } else if (tool.name === "xpath_query") {
       const xpath = input.xpath as string
       const maxResults = (input.maxResults as number) || 10
       const result = await handleXPathQuery(xpath, maxResults)
-      toolResults.push({ id: tool.id, content: result.error || result.result || '' })
+      toolResults.push({
+        id: tool.id,
+        content: result.error || result.result || ""
+      })
     } else {
-      toolResults.push({ id: tool.id, content: `Error: Unknown tool "${tool.name}"` })
+      toolResults.push({
+        id: tool.id,
+        content: `Error: Unknown tool "${tool.name}"`
+      })
     }
   }
 
-  return { type: 'continue', results: toolResults }
+  return { type: "continue", results: toolResults }
 }
 
 export interface SessionSetup {
@@ -98,10 +126,16 @@ export async function prepareSession(
 
   if (!session.htmlSent) {
     if (!html && !options.domStructure) {
-      throw new Error('HTML or DOM structure is required for first message in conversation')
+      throw new Error(
+        "HTML or DOM structure is required for first message in conversation"
+      )
     }
 
-    systemPrompt = buildSystemPromptWithDOMStructure(systemPrompt, options.domStructure, providerName)
+    systemPrompt = buildSystemPromptWithDOMStructure(
+      systemPrompt,
+      options.domStructure,
+      providerName
+    )
     session.htmlSent = true
   }
 
@@ -120,11 +154,11 @@ export function makeConversationalResponse(
   text: string,
   session: ConversationSession
 ): AIDOMGenerationResult & { session: ConversationSession } {
-  session.messages.push({ role: 'assistant', content: text })
+  session.messages.push({ role: "assistant", content: text })
   return {
     domChanges: [],
     response: text,
-    action: 'none' as const,
+    action: "none" as const,
     session
   }
 }
@@ -133,7 +167,7 @@ export function makeFinalResponse(
   result: AIDOMGenerationResult,
   session: ConversationSession
 ): AIDOMGenerationResult & { session: ConversationSession } {
-  session.messages.push({ role: 'assistant', content: result.response })
+  session.messages.push({ role: "assistant", content: result.response })
   return { ...result, session }
 }
 

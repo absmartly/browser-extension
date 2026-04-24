@@ -1,6 +1,12 @@
-import React, { useRef, useState } from 'react'
-import { Button } from '../ui/Button'
-import { SparklesIcon, PhotoIcon, XMarkIcon, EyeIcon } from '@heroicons/react/24/outline'
+import {
+  EyeIcon,
+  PhotoIcon,
+  SparklesIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline"
+import React, { useRef, useState } from "react"
+
+import { Button } from "../ui/Button"
 
 interface ChatInputProps {
   prompt: string
@@ -30,9 +36,11 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageFiles = async (files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith("image/")
+    )
 
-    const imagePromises = imageFiles.map(file => {
+    const imagePromises = imageFiles.map((file) => {
       return new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = (e) => resolve(e.target?.result as string)
@@ -45,7 +53,7 @@ export function ChatInput({
       const newImages = await Promise.all(imagePromises)
       onImagesChange([...images, ...newImages])
     } catch (err) {
-      console.error('Failed to load images:', err)
+      console.error("Failed to load images:", err)
     }
   }
 
@@ -53,12 +61,16 @@ export function ChatInput({
     const items = e.clipboardData?.items
     if (!items) return
 
-    const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'))
+    const imageItems = Array.from(items).filter((item) =>
+      item.type.startsWith("image/")
+    )
     if (imageItems.length === 0) return
 
     e.preventDefault()
 
-    const files = imageItems.map(item => item.getAsFile()).filter((f): f is File => f !== null)
+    const files = imageItems
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null)
     await handleImageFiles(files)
   }
 
@@ -87,7 +99,7 @@ export function ChatInput({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       onSubmit()
     }
@@ -95,11 +107,10 @@ export function ChatInput({
 
   return (
     <div
-      className={`border-t border-gray-200 p-4 bg-gray-50 ${isDragging ? 'bg-purple-50 border-purple-300' : ''}`}
+      className={`border-t border-gray-200 p-4 bg-gray-50 ${isDragging ? "bg-purple-50 border-purple-300" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+      onDrop={handleDrop}>
       {isDragging && (
         <div className="absolute inset-0 bg-purple-100/90 border-2 border-dashed border-purple-400 rounded-lg flex items-center justify-center z-10 pointer-events-none">
           <div className="text-center">
@@ -121,8 +132,7 @@ export function ChatInput({
               <button
                 onClick={() => removeImage(index)}
                 className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove image"
-              >
+                title="Remove image">
                 <XMarkIcon className="h-3 w-3" />
               </button>
             </div>
@@ -131,7 +141,9 @@ export function ChatInput({
       )}
 
       <div className="mb-3">
-        <label htmlFor="ai-prompt" className="block text-sm font-medium text-gray-700 mb-2">
+        <label
+          htmlFor="ai-prompt"
+          className="block text-sm font-medium text-gray-700 mb-2">
           What would you like to change?
         </label>
         <textarea
@@ -147,7 +159,8 @@ export function ChatInput({
         />
         <div className="mt-1 flex items-center justify-between">
           <p className="text-xs text-gray-500">
-            Press Enter to send • Shift+Enter for new line • Paste or drag images
+            Press Enter to send • Shift+Enter for new line • Paste or drag
+            images
           </p>
           <input
             ref={fileInputRef}
@@ -159,8 +172,7 @@ export function ChatInput({
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="text-xs text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1"
-          >
+            className="text-xs text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1">
             <PhotoIcon className="h-4 w-4" />
             Add Image
           </button>
@@ -178,9 +190,8 @@ export function ChatInput({
           id="ai-generate-button"
           onClick={onSubmit}
           disabled={loading || (!prompt.trim() && images.length === 0)}
-          data-loading={loading ? 'true' : 'false'}
-          className="flex-1"
-        >
+          data-loading={loading ? "true" : "false"}
+          className="flex-1">
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -198,13 +209,12 @@ export function ChatInput({
           onClick={onPreviewToggle}
           className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
             isPreviewEnabled
-              ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              ? "bg-green-600 text-white hover:bg-green-700"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
-          title={isPreviewEnabled ? 'Preview is ON' : 'Preview is OFF'}
-        >
+          title={isPreviewEnabled ? "Preview is ON" : "Preview is OFF"}>
           <EyeIcon className="h-4 w-4" />
-          {isPreviewEnabled ? 'ON' : 'OFF'}
+          {isPreviewEnabled ? "ON" : "OFF"}
         </button>
       </div>
     </div>

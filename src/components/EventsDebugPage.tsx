@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from "react"
-import { debugLog, debugWarn } from '~src/utils/debug'
 import {
-  TrashIcon,
+  ArrowPathIcon,
   PauseIcon,
   PlayIcon,
-  ArrowPathIcon
+  TrashIcon
 } from "@heroicons/react/24/outline"
+import React, { useEffect, useState } from "react"
+
+import { sendToBackground, sendToContent } from "~src/lib/messaging"
+import { debugLog, debugWarn } from "~src/utils/debug"
+
 import { Header } from "./Header"
-import { sendToContent, sendToBackground } from "~src/lib/messaging"
 
 interface SDKEvent {
   id: string
@@ -32,22 +34,25 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   }, [isPaused])
 
   useEffect(() => {
-    debugLog('[EventsDebugPage] Component mounted, fetching buffered events...')
+    debugLog("[EventsDebugPage] Component mounted, fetching buffered events...")
 
     // Fetch buffered events on mount
     const fetchBufferedEvents = async () => {
       try {
-        const response = await sendToBackground({ type: 'GET_BUFFERED_EVENTS' })
-        debugLog('[EventsDebugPage] GET_BUFFERED_EVENTS response:', response)
+        const response = await sendToBackground({ type: "GET_BUFFERED_EVENTS" })
+        debugLog("[EventsDebugPage] GET_BUFFERED_EVENTS response:", response)
         const events = response?.events as SDKEvent[] | undefined
         if (response?.success && events) {
-          debugLog('[EventsDebugPage] Loaded', events.length, 'buffered events')
+          debugLog("[EventsDebugPage] Loaded", events.length, "buffered events")
           setEvents(events)
         } else {
-          debugLog('[EventsDebugPage] No buffered events found')
+          debugLog("[EventsDebugPage] No buffered events found")
         }
       } catch (error) {
-        console.error('[EventsDebugPage] Error fetching buffered events:', error)
+        console.error(
+          "[EventsDebugPage] Error fetching buffered events:",
+          error
+        )
       }
     }
 
@@ -59,10 +64,17 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
       sender?: chrome.runtime.MessageSender,
       sendResponse?: (response?: any) => void
     ) => {
-      debugLog('[EventsDebugPage] Received runtime message:', message.type, message)
-      if (message.type === 'SDK_EVENT_BROADCAST') {
+      debugLog(
+        "[EventsDebugPage] Received runtime message:",
+        message.type,
+        message
+      )
+      if (message.type === "SDK_EVENT_BROADCAST") {
         if (!isPausedRef.current) {
-          debugLog('[EventsDebugPage] SDK_EVENT_BROADCAST received, adding event:', message.payload)
+          debugLog(
+            "[EventsDebugPage] SDK_EVENT_BROADCAST received, adding event:",
+            message.payload
+          )
           const sdkEvent: SDKEvent = {
             id: `${Date.now()}-${Math.random()}`,
             eventName: message.payload.eventName,
@@ -71,20 +83,27 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
           }
           // Events are now stored newest-last, so append to end
           setEvents((prev) => {
-            debugLog('[EventsDebugPage] Adding event to list. Current count:', prev.length, 'New count:', prev.length + 1)
+            debugLog(
+              "[EventsDebugPage] Adding event to list. Current count:",
+              prev.length,
+              "New count:",
+              prev.length + 1
+            )
             return [...prev, sdkEvent]
           })
         } else {
-          debugLog('[EventsDebugPage] SDK_EVENT_BROADCAST received but capture is paused')
+          debugLog(
+            "[EventsDebugPage] SDK_EVENT_BROADCAST received but capture is paused"
+          )
         }
       }
     }
 
-    debugLog('[EventsDebugPage] Registered message listeners')
+    debugLog("[EventsDebugPage] Registered message listeners")
     chrome.runtime.onMessage.addListener(handleRuntimeMessage)
 
     return () => {
-      debugLog('[EventsDebugPage] Removing message listeners')
+      debugLog("[EventsDebugPage] Removing message listeners")
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
     }
   }, [])
@@ -96,9 +115,9 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   const confirmClearEvents = async () => {
     setEvents([])
     try {
-      await sendToBackground({ type: 'CLEAR_BUFFERED_EVENTS' })
+      await sendToBackground({ type: "CLEAR_BUFFERED_EVENTS" })
     } catch (error) {
-      console.error('[EventsDebugPage] Error clearing buffered events:', error)
+      console.error("[EventsDebugPage] Error clearing buffered events:", error)
     }
     setShowClearConfirm(false)
   }
@@ -111,15 +130,15 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
     // Send message to content script to open event viewer (outside sidebar)
     try {
       await sendToContent({
-        type: 'OPEN_EVENT_VIEWER',
+        type: "OPEN_EVENT_VIEWER",
         data: {
           eventName: event.eventName,
           timestamp: new Date(event.timestamp).toLocaleString(),
-          value: event.data ? JSON.stringify(event.data, null, 2) : 'null'
+          value: event.data ? JSON.stringify(event.data, null, 2) : "null"
         }
       })
     } catch (error) {
-      console.error('[EventsDebugPage] Error opening event viewer:', error)
+      console.error("[EventsDebugPage] Error opening event viewer:", error)
     }
   }
 
@@ -179,10 +198,10 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <ArrowPathIcon className="w-12 h-12 mb-2 opacity-50" />
-            <p id="events-debug-empty-state" className="font-medium">No events captured yet</p>
-            <p className="text-sm">
-              SDK events will appear here in real-time
+            <p id="events-debug-empty-state" className="font-medium">
+              No events captured yet
             </p>
+            <p className="text-sm">SDK events will appear here in real-time</p>
           </div>
         ) : (
           <div className="p-4 space-y-2">
@@ -206,7 +225,9 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
                         )}`}>
                         {event.eventName}
                       </span>
-                      <span data-testid="event-timestamp" className="text-xs text-gray-500 whitespace-nowrap">
+                      <span
+                        data-testid="event-timestamp"
+                        className="text-xs text-gray-500 whitespace-nowrap">
                         {formatTimestamp(event.timestamp)}
                       </span>
                     </div>
@@ -215,7 +236,9 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
                         <div className="truncate">
                           {typeof event.data === "object"
                             ? JSON.stringify(event.data).substring(0, 100) +
-                              (JSON.stringify(event.data).length > 100 ? "..." : "")
+                              (JSON.stringify(event.data).length > 100
+                                ? "..."
+                                : "")
                             : String(event.data).substring(0, 100) +
                               (String(event.data).length > 100 ? "..." : "")}
                         </div>
@@ -232,12 +255,16 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
 
       {/* Status Bar */}
       {isPaused && (
-        <div id="events-debug-pause-status" className="p-2 bg-yellow-50 text-yellow-800 text-sm text-center border-t border-yellow-200">
+        <div
+          id="events-debug-pause-status"
+          className="p-2 bg-yellow-50 text-yellow-800 text-sm text-center border-t border-yellow-200">
           Event capture paused
         </div>
       )}
 
-      <div id="events-debug-event-count" className="p-2 bg-gray-50 text-gray-600 text-sm text-center border-t border-gray-200">
+      <div
+        id="events-debug-event-count"
+        className="p-2 bg-gray-50 text-gray-600 text-sm text-center border-t border-gray-200">
         {events.length} event{events.length !== 1 ? "s" : ""} captured
       </div>
 
@@ -249,7 +276,9 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
               Clear All Events?
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              This will clear all {events.length} captured event{events.length !== 1 ? "s" : ""} from the list. This action cannot be undone.
+              This will clear all {events.length} captured event
+              {events.length !== 1 ? "s" : ""} from the list. This action cannot
+              be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button

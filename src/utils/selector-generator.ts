@@ -1,23 +1,37 @@
 // Patterns that indicate auto-generated or framework-specific classes
 const AUTO_GENERATED_PATTERNS = [
-  /^framer-[a-zA-Z0-9]+$/,  // Framer classes like framer-F46SA
-  /^css-[a-z0-9]+$/i,  // CSS modules
-  /^sc-[a-zA-Z0-9]+$/,  // Styled-components
-  /^v-[a-f0-9]{8}$/,  // Vue scoped classes
-  /^svelte-[a-z0-9]+$/,  // Svelte classes
-  /^emotion-[0-9]+$/,  // Emotion CSS
-  /^chakra-[a-z]+__[a-z]+-[a-z0-9]+$/,  // Chakra UI
-  /^MuiBox-root-[0-9]+$/,  // Material-UI
-  /^[a-f0-9]{8,}$/i,  // Hex strings (UUIDs, hashes)
-  /_[a-f0-9]{6,}$/i,  // Ending with hex strings
+  /^framer-[a-zA-Z0-9]+$/, // Framer classes like framer-F46SA
+  /^css-[a-z0-9]+$/i, // CSS modules
+  /^sc-[a-zA-Z0-9]+$/, // Styled-components
+  /^v-[a-f0-9]{8}$/, // Vue scoped classes
+  /^svelte-[a-z0-9]+$/, // Svelte classes
+  /^emotion-[0-9]+$/, // Emotion CSS
+  /^chakra-[a-z]+__[a-z]+-[a-z0-9]+$/, // Chakra UI
+  /^MuiBox-root-[0-9]+$/, // Material-UI
+  /^[a-f0-9]{8,}$/i, // Hex strings (UUIDs, hashes)
+  /_[a-f0-9]{6,}$/i // Ending with hex strings
 ]
 
 // Temporary state classes (already defined in selector-cleaner, but repeated for clarity)
 const TEMPORARY_CLASSES = [
-  'hover', 'active', 'focus', 'focused', 'selected', 'disabled',
-  'loading', 'animating', 'transitioning', 'entering', 'leaving',
-  'is-hovered', 'is-active', 'is-focused', 'is-selected',
-  'framer-hover', 'framer-active', 'framer-v-hover'
+  "hover",
+  "active",
+  "focus",
+  "focused",
+  "selected",
+  "disabled",
+  "loading",
+  "animating",
+  "transitioning",
+  "entering",
+  "leaving",
+  "is-hovered",
+  "is-active",
+  "is-focused",
+  "is-selected",
+  "framer-hover",
+  "framer-active",
+  "framer-v-hover"
 ]
 
 // Semantic class patterns that are likely stable
@@ -30,7 +44,7 @@ const SEMANTIC_PATTERNS = [
   /^(title|heading|text|content)/i,
   /^(primary|secondary|success|warning|error|info)/i,
   /^(large|medium|small|lg|md|sm|xs)/i,
-  /^(container|wrapper|section|row|col)/i,
+  /^(container|wrapper|section|row|col)/i
 ]
 
 interface SelectorOptions {
@@ -42,16 +56,18 @@ interface SelectorOptions {
 }
 
 function escapeIdForSelector(id: string): string {
-  if (!id) return ''
-  
+  if (!id) return ""
+
   // If ID starts with a digit, we need to escape it
   if (/^\d/.test(id)) {
     // CSS escape for leading digit: \3x where x is the digit
-    return '#\\3' + id.charAt(0) + ' ' + id.slice(1).replace(/([^\w-])/g, '\\$1')
+    return (
+      "#\\3" + id.charAt(0) + " " + id.slice(1).replace(/([^\w-])/g, "\\$1")
+    )
   }
-  
+
   // Escape special characters
-  return '#' + id.replace(/([^\w-])/g, '\\$1')
+  return "#" + id.replace(/([^\w-])/g, "\\$1")
 }
 
 function isValidCssId(id: string): boolean {
@@ -81,8 +97,8 @@ export function generateRobustSelector(
   } = options || {}
 
   // Store debug flag globally so helper functions can access it
-  if (typeof window !== 'undefined') {
-    (window as any).__selectorDebug = debug
+  if (typeof window !== "undefined") {
+    ;(window as any).__selectorDebug = debug
   }
 
   // 1. Try ID (if not auto-generated and valid)
@@ -93,7 +109,7 @@ export function generateRobustSelector(
     } else {
       // If ID starts with number or has special chars, skip it
       // We could escape it, but these are often auto-generated anyway
-      console.log('Skipping invalid CSS ID:', element.id)
+      console.log("Skipping invalid CSS ID:", element.id)
     }
   }
 
@@ -113,15 +129,15 @@ export function generateRobustSelector(
   const semanticClasses = getSemanticClasses(element)
   if (semanticClasses.length > 0) {
     const tagName = element.tagName.toLowerCase()
-    const classSelector = `${tagName}.${semanticClasses.join('.')}`
-    
+    const classSelector = `${tagName}.${semanticClasses.join(".")}`
+
     // Validate selector before using it
     try {
       const matches = document.querySelectorAll(classSelector)
       if (matches.length === 1) {
         return classSelector
       }
-      
+
       // If not unique but we have semantic classes, try with parent context
       if (includeParentContext && matches.length > 1) {
         const parentSelector = getParentContext(element, maxParentLevels)
@@ -132,12 +148,12 @@ export function generateRobustSelector(
               return contextualSelector
             }
           } catch (e) {
-            console.log('Invalid contextual selector:', contextualSelector, e)
+            console.log("Invalid contextual selector:", contextualSelector, e)
           }
         }
       }
     } catch (e) {
-      console.log('Invalid selector generated:', classSelector, e)
+      console.log("Invalid selector generated:", classSelector, e)
     }
   }
 
@@ -156,7 +172,10 @@ export function generateRobustSelector(
     if (contextSelector) {
       // Clean up any auto-generated classes from the final selector
       // This handles cases like "div > div > a.framer-v-4yns67"
-      const cleanedSelector = contextSelector.replace(/\.(framer-[a-zA-Z0-9-]+|css-[a-z0-9]+|sc-[a-zA-Z0-9]+)/g, '')
+      const cleanedSelector = contextSelector.replace(
+        /\.(framer-[a-zA-Z0-9-]+|css-[a-z0-9]+|sc-[a-zA-Z0-9]+)/g,
+        ""
+      )
       return cleanedSelector
     }
   }
@@ -197,7 +216,7 @@ function calculateEntropy(str: string): number {
  */
 function hasLongConsonantCluster(str: string): boolean {
   // Remove digits and check for 4+ non-vowel letters in a row
-  const lettersOnly = str.replace(/[0-9]/g, '')
+  const lettersOnly = str.replace(/[0-9]/g, "")
   return /[^aeiouAEIOU]{4,}/.test(lettersOnly)
 }
 
@@ -208,7 +227,7 @@ export function isAutoGenerated(str: string): boolean {
   }
 
   // 2. Check for framework-specific patterns
-  if (AUTO_GENERATED_PATTERNS.some(pattern => pattern.test(str))) {
+  if (AUTO_GENERATED_PATTERNS.some((pattern) => pattern.test(str))) {
     return true
   }
 
@@ -271,7 +290,7 @@ function isDynamicValue(value: string): boolean {
   // Skip values that are dynamic or unsuitable for CSS selectors
 
   // Check if it's JSON
-  if (value.startsWith('{') || value.startsWith('[')) {
+  if (value.startsWith("{") || value.startsWith("[")) {
     try {
       JSON.parse(value)
       return true // It's valid JSON, skip it
@@ -284,7 +303,11 @@ function isDynamicValue(value: string): boolean {
   }
 
   // Check if it's a URL
-  if (value.includes('://') || value.startsWith('http') || value.startsWith('//')) {
+  if (
+    value.includes("://") ||
+    value.startsWith("http") ||
+    value.startsWith("//")
+  ) {
     return true
   }
 
@@ -294,12 +317,12 @@ function isDynamicValue(value: string): boolean {
   }
 
   // Check if it's base64 encoded data
-  if (value.startsWith('data:') || /^[A-Za-z0-9+/]{50,}={0,2}$/.test(value)) {
+  if (value.startsWith("data:") || /^[A-Za-z0-9+/]{50,}={0,2}$/.test(value)) {
     return true
   }
 
   // Check if it contains special characters that might break selectors
-  if (value.includes('\n') || value.includes('\r') || value.includes('\t')) {
+  if (value.includes("\n") || value.includes("\r") || value.includes("\t")) {
     return true
   }
 
@@ -312,59 +335,62 @@ function isDynamicValue(value: string): boolean {
 }
 
 function isTemporaryClass(className: string): boolean {
-  return TEMPORARY_CLASSES.includes(className) || 
-         /^(hover|active|focus)[-_]/i.test(className)
+  return (
+    TEMPORARY_CLASSES.includes(className) ||
+    /^(hover|active|focus)[-_]/i.test(className)
+  )
 }
 
 function isSemanticClass(className: string): boolean {
-  return SEMANTIC_PATTERNS.some(pattern => pattern.test(className))
+  return SEMANTIC_PATTERNS.some((pattern) => pattern.test(className))
 }
 
 function getSemanticClasses(element: Element): string[] {
-  if (!element.className || typeof element.className !== 'string') {
+  if (!element.className || typeof element.className !== "string") {
     return []
   }
 
   return element.className
     .trim()
     .split(/\s+/)
-    .filter(cls =>
-      cls &&
-      !cls.includes('absmartly') && // Skip ABSmartly-added classes
-      !isTemporaryClass(cls) &&
-      !isAutoGenerated(cls) &&
-      (isSemanticClass(cls) || cls.length < 20) // Prefer shorter, likely human-readable classes
+    .filter(
+      (cls) =>
+        cls &&
+        !cls.includes("absmartly") && // Skip ABSmartly-added classes
+        !isTemporaryClass(cls) &&
+        !isAutoGenerated(cls) &&
+        (isSemanticClass(cls) || cls.length < 20) // Prefer shorter, likely human-readable classes
     )
 }
 
 function getDataAttributeSelector(element: Element): string | null {
-  const dataAttrs = Array.from(element.attributes)
-    .filter(attr => {
-      // Skip non-data attributes
-      if (!attr.name.startsWith('data-')) return false
+  const dataAttrs = Array.from(element.attributes).filter((attr) => {
+    // Skip non-data attributes
+    if (!attr.name.startsWith("data-")) return false
 
-      // CRITICAL: Skip ABSmartly-added attributes to avoid circular dependencies
-      if (attr.name.startsWith('data-absmartly')) return false
+    // CRITICAL: Skip ABSmartly-added attributes to avoid circular dependencies
+    if (attr.name.startsWith("data-absmartly")) return false
 
-      // Skip if the value looks auto-generated, dynamic, or unsuitable
-      // Filter on VALUE, not attribute name
-      if (attr.value && (
-        /^\d/.test(attr.value) || // Starts with number
+    // Skip if the value looks auto-generated, dynamic, or unsuitable
+    // Filter on VALUE, not attribute name
+    if (
+      attr.value &&
+      (/^\d/.test(attr.value) || // Starts with number
         /^[a-f0-9]{6,}$/i.test(attr.value) || // Hex string
         isAutoGenerated(attr.value) || // Use our existing check
-        isDynamicValue(attr.value) // Skip dynamic/complex values
-      )) {
-        return false
-      }
+        isDynamicValue(attr.value)) // Skip dynamic/complex values
+    ) {
+      return false
+    }
 
-      return true
-    })
+    return true
+  })
 
   if (dataAttrs.length === 0) return null
 
   // Prefer attributes with "name" or "id" in the attribute name (more semantic)
-  const preferred = dataAttrs.find(attr =>
-    attr.name.includes('name') || attr.name.includes('id')
+  const preferred = dataAttrs.find(
+    (attr) => attr.name.includes("name") || attr.name.includes("id")
   )
 
   if (preferred) {
@@ -382,13 +408,18 @@ function getDataAttributeSelector(element: Element): string | null {
 }
 
 function getAriaSelector(element: Element): string | null {
-  const ariaLabel = element.getAttribute('aria-label')
+  const ariaLabel = element.getAttribute("aria-label")
   if (ariaLabel && !isDynamicValue(ariaLabel)) {
     return `[aria-label="${CSS.escape(ariaLabel)}"]`
   }
 
-  const role = element.getAttribute('role')
-  if (role && role !== 'presentation' && role !== 'none' && !isDynamicValue(role)) {
+  const role = element.getAttribute("role")
+  if (
+    role &&
+    role !== "presentation" &&
+    role !== "none" &&
+    !isDynamicValue(role)
+  ) {
     const tagName = element.tagName.toLowerCase()
     return `${tagName}[role="${CSS.escape(role)}"]`
   }
@@ -425,27 +456,35 @@ function getParentContext(element: Element, maxLevels: number): string | null {
     level++
   }
 
-  return contextParts.length > 0 ? contextParts.join(' ') : null
+  return contextParts.length > 0 ? contextParts.join(" ") : null
 }
 
 function getSemanticScore(element: Element): number {
   let score = 0
 
   // High-value attributes (most stable and unique)
-  if (element.hasAttribute('data-testid')) score += 100
-  if (element.hasAttribute('data-name')) score += 80
+  if (element.hasAttribute("data-testid")) score += 100
+  if (element.hasAttribute("data-name")) score += 80
 
   // Medium-value attributes (data-framer-name)
-  const dataFramerName = element.getAttribute('data-framer-name')
+  const dataFramerName = element.getAttribute("data-framer-name")
   if (dataFramerName && !isAutoGenerated(dataFramerName)) {
     // Prefer section/page-level names (most stable, higher in tree)
     const lowerName = dataFramerName.toLowerCase()
-    if (lowerName.includes('section') || lowerName.includes('page') || lowerName.includes('hero')) {
-      score += 70  // Much higher score for section-level names
-    } else if (lowerName.includes('highlight') || lowerName.includes('feature') || lowerName.includes('product')) {
+    if (
+      lowerName.includes("section") ||
+      lowerName.includes("page") ||
+      lowerName.includes("hero")
+    ) {
+      score += 70 // Much higher score for section-level names
+    } else if (
+      lowerName.includes("highlight") ||
+      lowerName.includes("feature") ||
+      lowerName.includes("product")
+    ) {
       // Domain-specific semantic names (Product Highlights, Features, etc.)
       score += 60
-    } else if (lowerName === 'content' || lowerName === 'wrapper') {
+    } else if (lowerName === "content" || lowerName === "wrapper") {
       // Generic structural names - lower priority
       score += 40
     } else {
@@ -454,41 +493,60 @@ function getSemanticScore(element: Element): number {
   }
 
   // Other data attributes that might be semantic
-  const dataRole = element.getAttribute('data-role')
+  const dataRole = element.getAttribute("data-role")
   if (dataRole && !isAutoGenerated(dataRole)) score += 40
 
   return score
 }
 
-function buildContextualSelector(element: Element, maxParentLevels: number): string | null {
-  const debug = typeof window !== 'undefined' ? (window as any).__selectorDebug : false
+function buildContextualSelector(
+  element: Element,
+  maxParentLevels: number
+): string | null {
+  const debug =
+    typeof window !== "undefined" ? (window as any).__selectorDebug : false
   const targetPart = getSelectorPart(element, true)
   const targetTag = element.tagName.toLowerCase()
 
   if (debug) {
-    console.log(`[buildContextualSelector] ===== STARTING SCAN for ${targetTag} =====`)
+    console.log(
+      `[buildContextualSelector] ===== STARTING SCAN for ${targetTag} =====`
+    )
     console.log(`[buildContextualSelector] Target element:`, element)
     console.log(`[buildContextualSelector] Target part: "${targetPart}"`)
   }
 
   // Try just the target element first
   if (targetPart && document.querySelectorAll(targetPart).length === 1) {
-    if (debug) console.log(`[buildContextualSelector] ✓ Target part is unique: ${targetPart}`)
+    if (debug)
+      console.log(
+        `[buildContextualSelector] ✓ Target part is unique: ${targetPart}`
+      )
     return targetPart
   }
 
   // Collect all ancestors with semantic attributes
-  const semanticAncestors: Array<{element: Element, depth: number, score: number}> = []
+  const semanticAncestors: Array<{
+    element: Element
+    depth: number
+    score: number
+  }> = []
   let current = element.parentElement
   let depth = 1
 
-  if (debug) console.log(`[buildContextualSelector] Scanning up to ${maxParentLevels} parent levels...`)
+  if (debug)
+    console.log(
+      `[buildContextualSelector] Scanning up to ${maxParentLevels} parent levels...`
+    )
   while (current && depth <= maxParentLevels) {
     if (debug) {
-      console.log(`[buildContextualSelector] Depth ${depth}: ${current.tagName}`, {
-        'data-framer-name': current.getAttribute('data-framer-name'),
-        id: current.id || 'none'
-      })
+      console.log(
+        `[buildContextualSelector] Depth ${depth}: ${current.tagName}`,
+        {
+          "data-framer-name": current.getAttribute("data-framer-name"),
+          id: current.id || "none"
+        }
+      )
     }
     const score = getSemanticScore(current)
     if (score > 0) {
@@ -502,22 +560,28 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
   // Closer ancestors are more specific and produce shorter selectors
   semanticAncestors.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
-    return a.depth - b.depth  // prefer closer (smaller depth = closer to target)
+    return a.depth - b.depth // prefer closer (smaller depth = closer to target)
   })
 
   if (debug) {
-    console.log('[buildContextualSelector] Found semantic ancestors:', semanticAncestors.map(a => ({
-      depth: a.depth,
-      score: a.score,
-      tag: a.element.tagName,
-      dataFramerName: a.element.getAttribute('data-framer-name')
-    })))
+    console.log(
+      "[buildContextualSelector] Found semantic ancestors:",
+      semanticAncestors.map((a) => ({
+        depth: a.depth,
+        score: a.score,
+        tag: a.element.tagName,
+        dataFramerName: a.element.getAttribute("data-framer-name")
+      }))
+    )
   }
 
   // Special case: If target has semantic attributes but they're not unique,
   // and there are no semantic ancestors, try using positional ancestors
   if (semanticAncestors.length === 0 && targetPart) {
-    if (debug) console.log('[buildContextualSelector] Target has semantic attributes but no semantic ancestors - using positional disambiguation')
+    if (debug)
+      console.log(
+        "[buildContextualSelector] Target has semantic attributes but no semantic ancestors - using positional disambiguation"
+      )
 
     // Try adding positional parent selectors to disambiguate
     let parent = element.parentElement
@@ -527,9 +591,11 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
 
     while (parent && depth <= maxAttempts) {
       // Get parent selector (positional if needed)
-      const siblings = parent.parentElement ? Array.from(parent.parentElement.children).filter(
-        child => child.tagName === parent.tagName
-      ) : []
+      const siblings = parent.parentElement
+        ? Array.from(parent.parentElement.children).filter(
+            (child) => child.tagName === parent.tagName
+          )
+        : []
 
       const parentTag = parent.tagName.toLowerCase()
       let parentSelector: string
@@ -545,10 +611,16 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
       disambiguatedSelector = `${parentSelector} > ${disambiguatedSelector}`
       const matches = document.querySelectorAll(disambiguatedSelector)
 
-      if (debug) console.log(`  Trying with parent depth ${depth}: "${disambiguatedSelector}" matches ${matches.length}`)
+      if (debug)
+        console.log(
+          `  Trying with parent depth ${depth}: "${disambiguatedSelector}" matches ${matches.length}`
+        )
 
       if (matches.length === 1 && matches[0] === element) {
-        if (debug) console.log(`[buildContextualSelector] ✓ Found unique selector with positional ancestors: ${disambiguatedSelector}`)
+        if (debug)
+          console.log(
+            `[buildContextualSelector] ✓ Found unique selector with positional ancestors: ${disambiguatedSelector}`
+          )
         return disambiguatedSelector
       }
 
@@ -558,23 +630,32 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
   }
 
   // Try each semantic ancestor from highest scored to lowest
-  for (const {element: ancestor, depth: ancestorDepth} of semanticAncestors) {
+  for (const { element: ancestor, depth: ancestorDepth } of semanticAncestors) {
     const parentPart = getSelectorPart(ancestor, false)
     if (!parentPart) continue
 
     const selector = `${parentPart} ${targetPart || targetTag}`
     const matches = document.querySelectorAll(selector)
 
-    if (debug) console.log(`[buildContextualSelector] Trying "${selector}" (ancestor depth ${ancestorDepth}): ${matches.length} matches`)
+    if (debug)
+      console.log(
+        `[buildContextualSelector] Trying "${selector}" (ancestor depth ${ancestorDepth}): ${matches.length} matches`
+      )
 
     if (matches.length === 1 && matches[0] === element) {
-      if (debug) console.log(`[buildContextualSelector] ✓ Found unique selector: ${selector}`)
+      if (debug)
+        console.log(
+          `[buildContextualSelector] ✓ Found unique selector: ${selector}`
+        )
       return selector
     }
 
     // If this selector matches multiple elements, find the disambiguating ancestor
     if (matches.length > 1) {
-      if (debug) console.log(`[buildContextualSelector] Selector matched ${matches.length} elements, finding disambiguating parent...`)
+      if (debug)
+        console.log(
+          `[buildContextualSelector] Selector matched ${matches.length} elements, finding disambiguating parent...`
+        )
 
       const matchingElements = Array.from(matches)
 
@@ -585,7 +666,7 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
 
       while (checkDepth <= maxCheckDepth) {
         // For each matching element, get its ancestor at this depth
-        const ancestorsAtDepth = matchingElements.map(match => {
+        const ancestorsAtDepth = matchingElements.map((match) => {
           let current = match as Element
           for (let d = 0; d < checkDepth && current.parentElement; d++) {
             current = current.parentElement
@@ -600,29 +681,38 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
         }
 
         if (debug) {
-          const otherAncestorInfo = ancestorsAtDepth.map(a => ({
+          const otherAncestorInfo = ancestorsAtDepth.map((a) => ({
             tag: a.tagName,
-            attr: a.getAttribute('data-framer-name'),
+            attr: a.getAttribute("data-framer-name"),
             isSame: a === ourAncestor
           }))
           console.log(`[buildContextualSelector] Checking depth ${checkDepth}:`)
-          console.log(`  Our ancestor: ${ourAncestor.tagName}[data-framer-name="${ourAncestor.getAttribute('data-framer-name')}"]`)
-          console.log(`  Other matching elements' ancestors:`, otherAncestorInfo)
+          console.log(
+            `  Our ancestor: ${ourAncestor.tagName}[data-framer-name="${ourAncestor.getAttribute("data-framer-name")}"]`
+          )
+          console.log(
+            `  Other matching elements' ancestors:`,
+            otherAncestorInfo
+          )
         }
 
         // Check if this ancestor has a semantic attribute that disambiguates
-        const semanticAttr = ourAncestor.getAttribute('data-framer-name') || ourAncestor.getAttribute('data-name')
+        const semanticAttr =
+          ourAncestor.getAttribute("data-framer-name") ||
+          ourAncestor.getAttribute("data-name")
         if (semanticAttr && !isAutoGenerated(semanticAttr)) {
           // Check if ALL other matching elements have DIFFERENT semantic attribute values
           // Not just different element instances, but different attribute values!
-          const otherAttrValues = ancestorsAtDepth.map(a => {
-            const attr = a.getAttribute('data-framer-name') || a.getAttribute('data-name')
+          const otherAttrValues = ancestorsAtDepth.map((a) => {
+            const attr =
+              a.getAttribute("data-framer-name") || a.getAttribute("data-name")
             return { isSameElement: a === ourAncestor, attrValue: attr }
           })
 
-          const otherHaveDifferentValues = ancestorsAtDepth.every(a => {
+          const otherHaveDifferentValues = ancestorsAtDepth.every((a) => {
             if (a === ourAncestor) return true // Same element is fine (it's our target's match)
-            const otherAttr = a.getAttribute('data-framer-name') || a.getAttribute('data-name')
+            const otherAttr =
+              a.getAttribute("data-framer-name") || a.getAttribute("data-name")
             return otherAttr !== semanticAttr // Different attribute value
           })
 
@@ -649,7 +739,9 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
               })()
 
               if (debug) {
-                console.log(`  Disambiguating ancestor "${disambiguatingPart}" is ${isDisambiguatingAboveSemanticParent ? 'ABOVE' : 'BELOW'} semantic parent "${parentPart}"`)
+                console.log(
+                  `  Disambiguating ancestor "${disambiguatingPart}" is ${isDisambiguatingAboveSemanticParent ? "ABOVE" : "BELOW"} semantic parent "${parentPart}"`
+                )
               }
 
               // Strategy 1: Try combining in correct DOM order
@@ -662,12 +754,22 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
                 withSemanticParent = `${parentPart} ${disambiguatingPart} ${targetPart || targetTag}`
               }
 
-              const semanticMatches = document.querySelectorAll(withSemanticParent)
+              const semanticMatches =
+                document.querySelectorAll(withSemanticParent)
 
-              if (debug) console.log(`  Testing with intermediate: "${withSemanticParent}": ${semanticMatches.length} matches`)
+              if (debug)
+                console.log(
+                  `  Testing with intermediate: "${withSemanticParent}": ${semanticMatches.length} matches`
+                )
 
-              if (semanticMatches.length === 1 && semanticMatches[0] === element) {
-                if (debug) console.log(`[buildContextualSelector] ✓ Found unique selector combining ancestors in correct DOM order`)
+              if (
+                semanticMatches.length === 1 &&
+                semanticMatches[0] === element
+              ) {
+                if (debug)
+                  console.log(
+                    `[buildContextualSelector] ✓ Found unique selector combining ancestors in correct DOM order`
+                  )
                 return withSemanticParent
               }
 
@@ -686,7 +788,10 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
                 }
 
                 if (chainPath.length > 0) {
-                  if (debug) console.log(`  Building precise chain from "${parentPart}" through ${chainPath.length} elements`)
+                  if (debug)
+                    console.log(
+                      `  Building precise chain from "${parentPart}" through ${chainPath.length} elements`
+                    )
 
                   // Build selector incrementally with child combinators for precision
                   for (let i = 0; i < chainPath.length; i++) {
@@ -703,17 +808,23 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
                     if (hasSemantic) {
                       // Has semantic attributes - use child combinator for precision
                       preciseChain = `${preciseChain} > ${semanticPart}`
-                      if (debug) console.log(`    [${i}] Added semantic with >: ${semanticPart}`)
+                      if (debug)
+                        console.log(
+                          `    [${i}] Added semantic with >: ${semanticPart}`
+                        )
                     } else {
                       // No semantic attributes, use tag + :nth-of-type() with child combinator
                       const siblings = Array.from(parent.children).filter(
-                        child => child.tagName === pathElement.tagName
+                        (child) => child.tagName === pathElement.tagName
                       )
 
                       if (siblings.length > 1) {
                         const index = siblings.indexOf(pathElement) + 1
                         preciseChain = `${preciseChain} > ${tag}:nth-of-type(${index})`
-                        if (debug) console.log(`    [${i}] Added with nth: ${tag}:nth-of-type(${index})`)
+                        if (debug)
+                          console.log(
+                            `    [${i}] Added with nth: ${tag}:nth-of-type(${index})`
+                          )
                       } else {
                         preciseChain = `${preciseChain} > ${tag}`
                         if (debug) console.log(`    [${i}] Added: ${tag}`)
@@ -723,10 +834,19 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
 
                   const preciseMatches = document.querySelectorAll(preciseChain)
 
-                  if (debug) console.log(`  Testing precise chain: "${preciseChain}": ${preciseMatches.length} matches`)
+                  if (debug)
+                    console.log(
+                      `  Testing precise chain: "${preciseChain}": ${preciseMatches.length} matches`
+                    )
 
-                  if (preciseMatches.length === 1 && preciseMatches[0] === element) {
-                    if (debug) console.log(`[buildContextualSelector] ✓ Found unique selector with precise chain from semantic parent`)
+                  if (
+                    preciseMatches.length === 1 &&
+                    preciseMatches[0] === element
+                  ) {
+                    if (debug)
+                      console.log(
+                        `[buildContextualSelector] ✓ Found unique selector with precise chain from semantic parent`
+                      )
                     return preciseChain
                   }
                 }
@@ -736,12 +856,19 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
               // This is: disambiguatingAncestor target
               // Example: "div[data-framer-name="Product Highlights"] p"
               const withoutIntermediate = `${disambiguatingPart} ${targetPart || targetTag}`
-              const directMatches = document.querySelectorAll(withoutIntermediate)
+              const directMatches =
+                document.querySelectorAll(withoutIntermediate)
 
-              if (debug) console.log(`  Testing without intermediate: "${withoutIntermediate}": ${directMatches.length} matches`)
+              if (debug)
+                console.log(
+                  `  Testing without intermediate: "${withoutIntermediate}": ${directMatches.length} matches`
+                )
 
               if (directMatches.length === 1 && directMatches[0] === element) {
-                if (debug) console.log(`[buildContextualSelector] ✓ Found unique selector using disambiguating ancestor directly`)
+                if (debug)
+                  console.log(
+                    `[buildContextualSelector] ✓ Found unique selector using disambiguating ancestor directly`
+                  )
                 return withoutIntermediate
               }
 
@@ -757,7 +884,10 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
   }
 
   // Last resort: Build full positional chain from semantic parent
-  if (debug) console.log(`[buildContextualSelector] No unique combination found, trying full chain from best semantic parent`)
+  if (debug)
+    console.log(
+      `[buildContextualSelector] No unique combination found, trying full chain from best semantic parent`
+    )
 
   for (const { element: semanticAncestor } of semanticAncestors) {
     const parentPart = getSelectorPart(semanticAncestor, false)
@@ -776,7 +906,10 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
 
     if (pathToTarget.length === 0) continue
 
-    if (debug) console.log(`  Building full chain from "${parentPart}" through ${pathToTarget.length} elements to target`)
+    if (debug)
+      console.log(
+        `  Building full chain from "${parentPart}" through ${pathToTarget.length} elements to target`
+      )
 
     // Build selector incrementally
     for (let i = 0; i < pathToTarget.length; i++) {
@@ -797,13 +930,16 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
       } else {
         // No semantic attributes, use tag + :nth-of-type() with child combinator
         const siblings = Array.from(parent.children).filter(
-          child => child.tagName === pathElement.tagName
+          (child) => child.tagName === pathElement.tagName
         )
 
         if (siblings.length > 1) {
           const index = siblings.indexOf(pathElement) + 1
           currentSelector = `${currentSelector} > ${tag}:nth-of-type(${index})`
-          if (debug) console.log(`    [${i}] Added with nth: ${tag}:nth-of-type(${index})`)
+          if (debug)
+            console.log(
+              `    [${i}] Added with nth: ${tag}:nth-of-type(${index})`
+            )
         } else {
           currentSelector = `${currentSelector} > ${tag}`
           if (debug) console.log(`    [${i}] Added without nth: ${tag}`)
@@ -813,10 +949,16 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
 
     const chainedMatches = document.querySelectorAll(currentSelector)
 
-    if (debug) console.log(`  Testing full chain: "${currentSelector}": ${chainedMatches.length} matches`)
+    if (debug)
+      console.log(
+        `  Testing full chain: "${currentSelector}": ${chainedMatches.length} matches`
+      )
 
     if (chainedMatches.length === 1 && chainedMatches[0] === element) {
-      if (debug) console.log(`[buildContextualSelector] ✓ Found unique selector with full chained path from semantic parent`)
+      if (debug)
+        console.log(
+          `[buildContextualSelector] ✓ Found unique selector with full chained path from semantic parent`
+        )
       return currentSelector
     }
   }
@@ -855,50 +997,51 @@ function buildContextualSelector(element: Element, maxParentLevels: number): str
 function getSelectorPart(element: Element, isTarget: boolean): string {
   const tagName = element.tagName.toLowerCase()
   const attributes: string[] = []
-  
+
   // Check for name attribute (commonly used in visual tools)
-  const nameAttr = element.getAttribute('name')
+  const nameAttr = element.getAttribute("name")
   if (nameAttr && !isAutoGenerated(nameAttr)) {
     attributes.push(`[name="${nameAttr}"]`)
   }
-  
+
   // Check for data-*name* attributes (data-name, data-component-name, etc.)
-  const dataNameAttrs = Array.from(element.attributes)
-    .filter(attr => 
-      attr.name.startsWith('data-') && 
-      attr.name.toLowerCase().includes('name') &&
+  const dataNameAttrs = Array.from(element.attributes).filter(
+    (attr) =>
+      attr.name.startsWith("data-") &&
+      attr.name.toLowerCase().includes("name") &&
       attr.value &&
       !isAutoGenerated(attr.value)
-    )
-  
-  dataNameAttrs.forEach(attr => {
+  )
+
+  dataNameAttrs.forEach((attr) => {
     attributes.push(`[${attr.name}="${attr.value}"]`)
   })
-  
+
   // For the target element, try to be more specific
   if (isTarget) {
     const semanticClasses = getSemanticClasses(element)
-    
+
     // Build selector with tag + attributes + classes
     let selector = tagName
-    
+
     // Add attributes first (more specific than classes)
     if (attributes.length > 0) {
-      selector += attributes.join('')
+      selector += attributes.join("")
     }
-    
+
     // Add semantic classes
     if (semanticClasses.length > 0) {
-      selector += `.${semanticClasses.join('.')}`
+      selector += `.${semanticClasses.join(".")}`
     }
-    
+
     // If we have some identifying features, check if they're unique among siblings
     if (attributes.length > 0 || semanticClasses.length > 0) {
       // Check if this selector is unique among siblings
       if (element.parentElement) {
         const siblings = Array.from(element.parentElement.children)
-        const matchingSiblings = siblings.filter(sibling => {
-          if (sibling === element || sibling.tagName !== element.tagName) return false
+        const matchingSiblings = siblings.filter((sibling) => {
+          if (sibling === element || sibling.tagName !== element.tagName)
+            return false
 
           // Check if any of our attributes match
           for (const attr of attributes) {
@@ -912,7 +1055,8 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
           // Check if any of our classes match
           if (semanticClasses.length > 0 && sibling.className) {
             const siblingClasses = sibling.className.toString().split(/\s+/)
-            if (semanticClasses.some(cls => siblingClasses.includes(cls))) return true
+            if (semanticClasses.some((cls) => siblingClasses.includes(cls)))
+              return true
           }
 
           return false
@@ -920,7 +1064,9 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
 
         // If we have siblings with same attributes/classes, add position for disambiguation
         if (matchingSiblings.length > 0) {
-          const sameTagSiblings = siblings.filter(child => child.tagName === element.tagName)
+          const sameTagSiblings = siblings.filter(
+            (child) => child.tagName === element.tagName
+          )
           const index = sameTagSiblings.indexOf(element) + 1
           return `${selector}:nth-of-type(${index})`
         }
@@ -934,24 +1080,25 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
     if (dataSelector) {
       return `${tagName}${dataSelector}`
     }
-    
+
     // If no semantic classes or data attributes, use positional selector
     // This is crucial for Framer sites where all classes are auto-generated
     if (element.parentElement) {
-      const siblings = Array.from(element.parentElement.children)
-        .filter(child => child.tagName === element.tagName)
+      const siblings = Array.from(element.parentElement.children).filter(
+        (child) => child.tagName === element.tagName
+      )
       if (siblings.length > 1) {
         const index = siblings.indexOf(element) + 1
         // Add any name attributes even with positional selector
         if (attributes.length > 0) {
-          return `${tagName}:nth-of-type(${index})${attributes.join('')}`
+          return `${tagName}:nth-of-type(${index})${attributes.join("")}`
         }
         return `${tagName}:nth-of-type(${index})`
       }
     }
-    
+
     // Return tag with any attributes we found
-    return attributes.length > 0 ? `${tagName}${attributes.join('')}` : tagName
+    return attributes.length > 0 ? `${tagName}${attributes.join("")}` : tagName
   }
 
   // For parent elements, be less specific but still include name attributes
@@ -975,17 +1122,20 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
       const [, attrName, attrValue] = attrMatch
 
       // Check if siblings have the same attribute value
-      const siblingsWithSameAttr = Array.from(element.parentElement.children)
-        .filter(s =>
+      const siblingsWithSameAttr = Array.from(
+        element.parentElement.children
+      ).filter(
+        (s) =>
           s !== element &&
           s.tagName === element.tagName &&
           s.getAttribute(attrName) === attrValue
-        )
+      )
 
       if (siblingsWithSameAttr.length > 0) {
         // Need nth-of-type for disambiguation
-        const allSameTagSiblings = Array.from(element.parentElement.children)
-          .filter(s => s.tagName === element.tagName)
+        const allSameTagSiblings = Array.from(
+          element.parentElement.children
+        ).filter((s) => s.tagName === element.tagName)
         const index = allSameTagSiblings.indexOf(element) + 1
         return `${selector}:nth-of-type(${index})`
       }
@@ -1003,8 +1153,9 @@ function buildPositionalSelector(element: Element): string {
     const tagName = current.tagName.toLowerCase()
 
     if (current.parentElement) {
-      const siblings = Array.from(current.parentElement.children)
-        .filter(child => child.tagName === current!.tagName)
+      const siblings = Array.from(current.parentElement.children).filter(
+        (child) => child.tagName === current!.tagName
+      )
 
       if (siblings.length > 1) {
         const index = siblings.indexOf(current) + 1
@@ -1024,16 +1175,16 @@ function buildPositionalSelector(element: Element): string {
     current = current.parentElement
   }
 
-  return parts.join(' ')
+  return parts.join(" ")
 }
 
 export function improveSelector(selector: string): string {
   // This function can be used to improve existing selectors
   // by removing auto-generated classes and adding parent context
-  
+
   // Parse the selector and try to improve it
   // This is a simplified version - a full implementation would need a CSS selector parser
-  
+
   try {
     const elements = document.querySelectorAll(selector)
     if (elements.length === 1) {

@@ -4,11 +4,11 @@
  * Displays as a true fullscreen overlay on the page
  */
 
-import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { javascript } from '@codemirror/lang-javascript'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { basicSetup } from 'codemirror'
+import { javascript } from "@codemirror/lang-javascript"
+import { EditorState } from "@codemirror/state"
+import { oneDark } from "@codemirror/theme-one-dark"
+import { EditorView } from "@codemirror/view"
+import { basicSetup } from "codemirror"
 
 export class JavaScriptEditor {
   private editorHost: HTMLElement | null = null
@@ -17,8 +17,8 @@ export class JavaScriptEditor {
   async show(title: string, currentCode: string): Promise<string | null> {
     return new Promise((resolve) => {
       // Create editor host in regular DOM (page body, not sidebar)
-      this.editorHost = document.createElement('div')
-      this.editorHost.id = 'absmartly-javascript-editor-host'
+      this.editorHost = document.createElement("div")
+      this.editorHost.id = "absmartly-javascript-editor-host"
       this.editorHost.style.cssText = `
         position: fixed;
         top: 0;
@@ -29,43 +29,43 @@ export class JavaScriptEditor {
         pointer-events: auto;
       `
 
-      const editorStyle = document.createElement('style')
-      editorStyle.id = 'absmartly-javascript-editor-styles'
+      const editorStyle = document.createElement("style")
+      editorStyle.id = "absmartly-javascript-editor-styles"
       editorStyle.textContent = this.getEditorStyles()
       document.head.appendChild(editorStyle)
 
       // Create editor elements
-      const backdrop = document.createElement('div')
-      backdrop.className = 'js-editor-backdrop'
+      const backdrop = document.createElement("div")
+      backdrop.className = "js-editor-backdrop"
 
-      const container = document.createElement('div')
-      container.className = 'js-editor-container'
+      const container = document.createElement("div")
+      container.className = "js-editor-container"
 
-      const header = document.createElement('div')
-      header.className = 'js-editor-header'
+      const header = document.createElement("div")
+      header.className = "js-editor-header"
 
-      const titleEl = document.createElement('h3')
-      titleEl.className = 'js-editor-title'
+      const titleEl = document.createElement("h3")
+      titleEl.className = "js-editor-title"
       titleEl.textContent = title
 
-      const statusEl = document.createElement('span')
-      statusEl.className = 'js-editor-status'
-      statusEl.id = 'js-editor-status'
-      statusEl.textContent = '✓ Ready'
+      const statusEl = document.createElement("span")
+      statusEl.className = "js-editor-status"
+      statusEl.id = "js-editor-status"
+      statusEl.textContent = "✓ Ready"
 
       header.appendChild(titleEl)
       header.appendChild(statusEl)
 
       // Create editor container
-      const editorContainer = document.createElement('div')
-      editorContainer.id = 'js-codemirror-container'
-      editorContainer.className = 'js-editor-codemirror-container'
+      const editorContainer = document.createElement("div")
+      editorContainer.id = "js-codemirror-container"
+      editorContainer.className = "js-editor-codemirror-container"
 
-      const toolbar = document.createElement('div')
-      toolbar.className = 'js-editor-toolbar'
+      const toolbar = document.createElement("div")
+      toolbar.className = "js-editor-toolbar"
 
-      const tipsEl = document.createElement('div')
-      tipsEl.className = 'js-editor-tips'
+      const tipsEl = document.createElement("div")
+      tipsEl.className = "js-editor-tips"
       tipsEl.innerHTML = `
         <div style="font-size: 11px; color: #858585;">
           <strong>Available context:</strong>
@@ -79,16 +79,16 @@ export class JavaScriptEditor {
 
       toolbar.appendChild(tipsEl)
 
-      const buttons = document.createElement('div')
-      buttons.className = 'js-editor-buttons'
+      const buttons = document.createElement("div")
+      buttons.className = "js-editor-buttons"
 
-      const cancelBtn = document.createElement('button')
-      cancelBtn.className = 'js-editor-button js-editor-button-cancel'
-      cancelBtn.innerHTML = '<span>✕</span> Cancel'
+      const cancelBtn = document.createElement("button")
+      cancelBtn.className = "js-editor-button js-editor-button-cancel"
+      cancelBtn.innerHTML = "<span>✕</span> Cancel"
 
-      const saveBtn = document.createElement('button')
-      saveBtn.className = 'js-editor-button js-editor-button-save'
-      saveBtn.innerHTML = '<span>✓</span> Save Code'
+      const saveBtn = document.createElement("button")
+      saveBtn.className = "js-editor-button js-editor-button-save"
+      saveBtn.innerHTML = "<span>✓</span> Save Code"
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -125,47 +125,47 @@ export class JavaScriptEditor {
       }, 10)
 
       // Handle button clicks
-      cancelBtn.addEventListener('click', (e) => {
+      cancelBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
         this.cleanup()
         resolve(null)
       })
 
-      saveBtn.addEventListener('click', (e) => {
+      saveBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
 
-        const newCode = this.editorView?.state.doc.toString() || ''
+        const newCode = this.editorView?.state.doc.toString() || ""
         this.cleanup()
         resolve(newCode)
       })
 
       // Handle ESC key
       const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && this.editorHost) {
-          document.removeEventListener('keydown', escapeHandler)
+        if (e.key === "Escape" && this.editorHost) {
+          document.removeEventListener("keydown", escapeHandler)
           this.cleanup()
           resolve(null)
         }
       }
-      document.addEventListener('keydown', escapeHandler)
+      document.addEventListener("keydown", escapeHandler)
 
       // Prevent backdrop clicks from closing (only click outside container)
-      backdrop.addEventListener('click', (e) => {
+      backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) {
-          document.removeEventListener('keydown', escapeHandler)
+          document.removeEventListener("keydown", escapeHandler)
           this.cleanup()
           resolve(null)
         }
       })
 
       // Prevent clicks from propagating to the page
-      container.addEventListener('click', (e) => {
+      container.addEventListener("click", (e) => {
         e.stopPropagation()
       })
 
-      container.addEventListener('mousedown', (e) => {
+      container.addEventListener("mousedown", (e) => {
         e.stopPropagation()
       })
     })
@@ -182,7 +182,9 @@ export class JavaScriptEditor {
       this.editorHost = null
     }
 
-    const styleEl = document.getElementById('absmartly-javascript-editor-styles')
+    const styleEl = document.getElementById(
+      "absmartly-javascript-editor-styles"
+    )
     if (styleEl) {
       styleEl.remove()
     }

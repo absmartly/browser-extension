@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { Button } from './ui/Button'
-import { Input } from './ui/Input'
-import { Badge } from './ui/Badge'
-import { Select } from './ui/Select'
-import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline"
+import React, { useEffect, useState } from "react"
+
+import { Badge } from "./ui/Badge"
+import { Button } from "./ui/Button"
+import { Input } from "./ui/Input"
+import { Select } from "./ui/Select"
 
 interface FilterState {
   search?: string
@@ -36,22 +37,22 @@ interface ExperimentFilterProps {
 }
 
 const experimentStates = [
-  { value: 'created', label: 'Draft' },  // Match ABsmartly UI - "created" state shows as "Draft"
-  { value: 'ready', label: 'Ready' },
-  { value: 'running', label: 'Running' },
-  { value: 'development', label: 'Development' },
-  { value: 'full_on', label: 'Full On' },
-  { value: 'running_not_full_on', label: 'Running (Not Full On)' },
-  { value: 'stopped', label: 'Stopped' },
-  { value: 'archived', label: 'Archived' },
-  { value: 'scheduled', label: 'Scheduled' }
+  { value: "created", label: "Draft" }, // Match ABsmartly UI - "created" state shows as "Draft"
+  { value: "ready", label: "Ready" },
+  { value: "running", label: "Running" },
+  { value: "development", label: "Development" },
+  { value: "full_on", label: "Full On" },
+  { value: "running_not_full_on", label: "Running (Not Full On)" },
+  { value: "stopped", label: "Stopped" },
+  { value: "archived", label: "Archived" },
+  { value: "scheduled", label: "Scheduled" }
 ]
 
 const significanceOptions = [
-  { value: 'positive', label: 'Positive', color: 'success' },
-  { value: 'negative', label: 'Negative', color: 'danger' },
-  { value: 'neutral', label: 'Neutral', color: 'default' },
-  { value: 'inconclusive', label: 'Inconclusive', color: 'warning' }
+  { value: "positive", label: "Positive", color: "success" },
+  { value: "negative", label: "Negative", color: "danger" },
+  { value: "neutral", label: "Neutral", color: "default" },
+  { value: "inconclusive", label: "Inconclusive", color: "warning" }
 ]
 
 export function ExperimentFilter({
@@ -66,16 +67,18 @@ export function ExperimentFilter({
   const [isExpanded, setIsExpanded] = useState(false)
   const [filters, setFilters] = useState<FilterState>(
     initialFilters || {
-      state: ['created', 'ready']  // Default to Draft and Ready
+      state: ["created", "ready"] // Default to Draft and Ready
     }
   )
-  const [searchDebounce, setSearchDebounce] = useState(initialFilters?.search || '')
+  const [searchDebounce, setSearchDebounce] = useState(
+    initialFilters?.search || ""
+  )
 
   // Call onFilterChange with initial filters on mount
   useEffect(() => {
     if (initialFilters) {
       setFilters(initialFilters)
-      setSearchDebounce(initialFilters.search || '')
+      setSearchDebounce(initialFilters.search || "")
     }
     onFilterChange(filters)
   }, []) // Only run once on mount
@@ -84,7 +87,7 @@ export function ExperimentFilter({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchDebounce !== filters.search) {
-        updateFilter('search', searchDebounce)
+        updateFilter("search", searchDebounce)
       }
     }, 300)
     return () => clearTimeout(timer)
@@ -92,7 +95,11 @@ export function ExperimentFilter({
 
   const updateFilter = (key: keyof FilterState, value: any) => {
     const newFilters = { ...filters, [key]: value }
-    if (value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) {
+    if (
+      value === undefined ||
+      value === "" ||
+      (Array.isArray(value) && value.length === 0)
+    ) {
       delete newFilters[key]
     }
     setFilters(newFilters)
@@ -100,40 +107,45 @@ export function ExperimentFilter({
   }
 
   const toggleArrayFilter = (key: keyof FilterState, value: any) => {
-    const current = filters[key] as any[] || []
+    const current = (filters[key] as any[]) || []
     const newValue = current.includes(value)
-      ? current.filter(v => v !== value)
+      ? current.filter((v) => v !== value)
       : [...current, value]
     updateFilter(key, newValue)
   }
 
   const clearFilters = () => {
-    const defaultFilters = { state: ['created', 'ready'] }
+    const defaultFilters = { state: ["created", "ready"] }
     setFilters(defaultFilters)
-    setSearchDebounce('')
+    setSearchDebounce("")
     onFilterChange(defaultFilters)
     // Also clear from storage
     if ((window as any).chrome?.storage?.local) {
-      (window as any).chrome.storage.local.remove('experimentFilters')
+      ;(window as any).chrome.storage.local.remove("experimentFilters")
     }
   }
 
   // Calculate active filter count (excluding default state filter)
   const activeFilterCount = Object.keys(filters).reduce((count, key) => {
     // Skip if it's the default state filter
-    if (key === 'state') {
+    if (key === "state") {
       const stateFilters = filters.state || []
       // Check if it's exactly the default filters
-      if (stateFilters.length === 2 && 
-          stateFilters.includes('created') && 
-          stateFilters.includes('ready')) {
-        return count  // Don't count default state filter
+      if (
+        stateFilters.length === 2 &&
+        stateFilters.includes("created") &&
+        stateFilters.includes("ready")
+      ) {
+        return count // Don't count default state filter
       }
     }
     // Skip empty values
     const value = filters[key as keyof FilterState]
-    if (value === undefined || value === '' || 
-        (Array.isArray(value) && value.length === 0)) {
+    if (
+      value === undefined ||
+      value === "" ||
+      (Array.isArray(value) && value.length === 0)
+    ) {
       return count
     }
     return count + 1
@@ -159,16 +171,19 @@ export function ExperimentFilter({
                 setIsExpanded(!isExpanded)
               }}
               className={`p-2 rounded-md transition-colors cursor-pointer ${
-                isExpanded ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
+                isExpanded
+                  ? "bg-blue-50 text-blue-600"
+                  : "hover:bg-gray-100 text-gray-600"
               }`}
               aria-label="Toggle filters"
-              data-testid="filter-toggle"
-            >
+              data-testid="filter-toggle">
               <FunnelIcon className="h-5 w-5" />
             </button>
             {activeFilterCount > 0 && (
               <div className="absolute -top-1 -right-1 pointer-events-none">
-                <Badge variant="primary" className="h-5 w-5 flex items-center justify-center p-0 text-xs">
+                <Badge
+                  variant="primary"
+                  className="h-5 w-5 flex items-center justify-center p-0 text-xs">
                   {activeFilterCount}
                 </Badge>
               </div>
@@ -185,7 +200,7 @@ export function ExperimentFilter({
               Experiment State
             </label>
             <div className="flex flex-wrap gap-1">
-              {experimentStates.map(state => (
+              {experimentStates.map((state) => (
                 <button
                   key={state.value}
                   id={`filter-state-${state.value}`}
@@ -193,14 +208,13 @@ export function ExperimentFilter({
                   onClick={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    toggleArrayFilter('state', state.value)
+                    toggleArrayFilter("state", state.value)
                   }}
                   className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                     filters.state?.includes(state.value)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}>
                   {state.label}
                 </button>
               ))}
@@ -213,7 +227,7 @@ export function ExperimentFilter({
               Significance
             </label>
             <div className="flex flex-wrap gap-1">
-              {significanceOptions.map(sig => (
+              {significanceOptions.map((sig) => (
                 <button
                   key={sig.value}
                   id={`filter-significance-${sig.value}`}
@@ -221,14 +235,13 @@ export function ExperimentFilter({
                   onClick={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    toggleArrayFilter('significance', sig.value)
+                    toggleArrayFilter("significance", sig.value)
                   }}
                   className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                     filters.significance?.includes(sig.value)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}>
                   {sig.label}
                 </button>
               ))}
@@ -243,11 +256,13 @@ export function ExperimentFilter({
               className="text-xs"
               value={filters.owners?.map(String) || []}
               onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions, option => Number(option.value))
-                updateFilter('owners', selected)
-              }}
-            >
-              {users.map(user => (
+                const selected = Array.from(
+                  e.target.selectedOptions,
+                  (option) => Number(option.value)
+                )
+                updateFilter("owners", selected)
+              }}>
+              {users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.first_name} {user.last_name}
                 </option>
@@ -262,21 +277,20 @@ export function ExperimentFilter({
                 Tags
               </label>
               <div className="flex flex-wrap gap-1">
-                {tags.map(tag => (
+                {tags.map((tag) => (
                   <button
                     key={tag.id}
                     type="button"
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      toggleArrayFilter('tags', tag.id)
+                      toggleArrayFilter("tags", tag.id)
                     }}
                     className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                       filters.tags?.includes(tag.id)
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}>
                     {tag.tag}
                   </button>
                 ))}
@@ -291,21 +305,20 @@ export function ExperimentFilter({
                 Applications
               </label>
               <div className="flex flex-wrap gap-1">
-                {applications.map(app => (
+                {applications.map((app) => (
                   <button
                     key={app.id}
                     type="button"
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      toggleArrayFilter('applications', app.id)
+                      toggleArrayFilter("applications", app.id)
                     }}
                     className={`px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                       filters.applications?.includes(app.id)
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}>
                     {app.name}
                   </button>
                 ))}
@@ -320,19 +333,24 @@ export function ExperimentFilter({
             </label>
             <div className="grid grid-cols-2 gap-1">
               {[
-                { key: 'sample_ratio_mismatch', label: 'SRM' },
-                { key: 'cleanup_needed', label: 'Cleanup Needed' },
-                { key: 'audience_mismatch', label: 'Audience Mismatch' },
-                { key: 'sample_size_reached', label: 'Sample Size Reached' },
-                { key: 'experiments_interact', label: 'Interactions' },
-                { key: 'assignment_conflict', label: 'Assignment Conflict' }
-              ].map(filter => (
+                { key: "sample_ratio_mismatch", label: "SRM" },
+                { key: "cleanup_needed", label: "Cleanup Needed" },
+                { key: "audience_mismatch", label: "Audience Mismatch" },
+                { key: "sample_size_reached", label: "Sample Size Reached" },
+                { key: "experiments_interact", label: "Interactions" },
+                { key: "assignment_conflict", label: "Assignment Conflict" }
+              ].map((filter) => (
                 <label key={filter.key} className="flex items-center gap-1">
                   <input
                     id={`filter-alert-${filter.key}`}
                     type="checkbox"
                     checked={filters[filter.key as keyof FilterState] === true}
-                    onChange={(e) => updateFilter(filter.key as keyof FilterState, e.target.checked || undefined)}
+                    onChange={(e) =>
+                      updateFilter(
+                        filter.key as keyof FilterState,
+                        e.target.checked || undefined
+                      )
+                    }
                     className="h-3 w-3"
                   />
                   <span className="text-xs text-gray-700">{filter.label}</span>
@@ -349,8 +367,7 @@ export function ExperimentFilter({
                 onClick={clearFilters}
                 size="sm"
                 variant="secondary"
-                className="w-full"
-              >
+                className="w-full">
                 <XMarkIcon className="h-4 w-4 mr-1" />
                 Clear All Filters
               </Button>

@@ -1,11 +1,12 @@
-import { debugLog, debugWarn } from '~src/utils/debug'
 import type {
-  StoredConversation,
-  ConversationListItem
-} from '~src/types/absmartly'
-import type { IDBMetadataRecord } from '~src/types/indexeddb'
-import { STORE_CONVERSATIONS, STORE_METADATA } from '~src/types/indexeddb'
-import { openDatabase } from './indexeddb-connection'
+  ConversationListItem,
+  StoredConversation
+} from "~src/types/absmartly"
+import type { IDBMetadataRecord } from "~src/types/indexeddb"
+import { STORE_CONVERSATIONS, STORE_METADATA } from "~src/types/indexeddb"
+import { debugLog, debugWarn } from "~src/utils/debug"
+
+import { openDatabase } from "./indexeddb-connection"
 
 const MAX_CONVERSATIONS_PER_VARIANT = 10
 
@@ -13,9 +14,9 @@ export async function getConversations(
   variantName: string
 ): Promise<StoredConversation[]> {
   const db = await openDatabase()
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readonly')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readonly")
   const store = tx.objectStore(STORE_CONVERSATIONS)
-  const index = store.index('by-variant')
+  const index = store.index("by-variant")
 
   return new Promise((resolve, reject) => {
     const request = index.getAll(variantName)
@@ -23,9 +24,15 @@ export async function getConversations(
       resolve(request.result || [])
     }
     request.onerror = () => {
-      console.error('[IndexedDB] Error getting conversations:', request.error)
-      console.error('[IndexedDB] This may indicate database corruption or quota issues')
-      reject(new Error(`Database error: ${request.error?.message || 'Unknown error'}`))
+      console.error("[IndexedDB] Error getting conversations:", request.error)
+      console.error(
+        "[IndexedDB] This may indicate database corruption or quota issues"
+      )
+      reject(
+        new Error(
+          `Database error: ${request.error?.message || "Unknown error"}`
+        )
+      )
     }
   })
 }
@@ -35,7 +42,7 @@ export async function saveConversation(
 ): Promise<void> {
   const existing = await getConversations(conversation.variantName)
 
-  const existingIndex = existing.findIndex(c => c.id === conversation.id)
+  const existingIndex = existing.findIndex((c) => c.id === conversation.id)
   if (existingIndex >= 0) {
     conversation.updatedAt = Date.now()
   } else {
@@ -46,13 +53,16 @@ export async function saveConversation(
 
   if (existing.length > MAX_CONVERSATIONS_PER_VARIANT) {
     existing.sort((a, b) => a.createdAt - b.createdAt)
-    const toDelete = existing.splice(0, existing.length - MAX_CONVERSATIONS_PER_VARIANT)
+    const toDelete = existing.splice(
+      0,
+      existing.length - MAX_CONVERSATIONS_PER_VARIANT
+    )
 
-    await batchDeleteConversations(toDelete.map(c => c.id))
+    await batchDeleteConversations(toDelete.map((c) => c.id))
   }
 
   const db = await openDatabase()
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readwrite')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readwrite")
   const store = tx.objectStore(STORE_CONVERSATIONS)
 
   return new Promise((resolve, reject) => {
@@ -62,7 +72,7 @@ export async function saveConversation(
       resolve()
     }
     request.onerror = () => {
-      console.error('[IndexedDB] Error saving conversation:', request.error)
+      console.error("[IndexedDB] Error saving conversation:", request.error)
       reject(request.error)
     }
   })
@@ -73,7 +83,7 @@ export async function loadConversation(
   conversationId: string
 ): Promise<StoredConversation | null> {
   const db = await openDatabase()
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readonly')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readonly")
   const store = tx.objectStore(STORE_CONVERSATIONS)
 
   return new Promise((resolve, reject) => {
@@ -89,9 +99,15 @@ export async function loadConversation(
       }
     }
     request.onerror = () => {
-      console.error('[IndexedDB] Error loading conversation:', request.error)
-      console.error('[IndexedDB] This may indicate database corruption or access issues')
-      reject(new Error(`Database error loading conversation: ${request.error?.message || 'Unknown error'}`))
+      console.error("[IndexedDB] Error loading conversation:", request.error)
+      console.error(
+        "[IndexedDB] This may indicate database corruption or access issues"
+      )
+      reject(
+        new Error(
+          `Database error loading conversation: ${request.error?.message || "Unknown error"}`
+        )
+      )
     }
   })
 }
@@ -101,7 +117,7 @@ export async function deleteConversation(
   conversationId: string
 ): Promise<void> {
   const db = await openDatabase()
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readwrite')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readwrite")
   const store = tx.objectStore(STORE_CONVERSATIONS)
 
   return new Promise((resolve, reject) => {
@@ -111,7 +127,7 @@ export async function deleteConversation(
       resolve()
     }
     request.onerror = () => {
-      console.error('[IndexedDB] Error deleting conversation:', request.error)
+      console.error("[IndexedDB] Error deleting conversation:", request.error)
       reject(request.error)
     }
   })
@@ -121,9 +137,9 @@ export async function getConversationList(
   variantName: string
 ): Promise<ConversationListItem[]> {
   const db = await openDatabase()
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readonly')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readonly")
   const store = tx.objectStore(STORE_CONVERSATIONS)
-  const index = store.index('by-variant-updated')
+  const index = store.index("by-variant-updated")
 
   const range = IDBKeyRange.bound(
     [variantName, 0],
@@ -134,16 +150,16 @@ export async function getConversationList(
 
   return new Promise((resolve, reject) => {
     const conversations: ConversationListItem[] = []
-    const request = index.openCursor(range, 'prev')
+    const request = index.openCursor(range, "prev")
 
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest).result
       if (cursor) {
         const conv = cursor.value as StoredConversation
 
-        const firstScreenshot = conv.messages
-          .find(msg => msg.images && msg.images.length > 0)
-          ?.images?.[0]
+        const firstScreenshot = conv.messages.find(
+          (msg) => msg.images && msg.images.length > 0
+        )?.images?.[0]
 
         conversations.push({
           id: conv.id,
@@ -161,9 +177,18 @@ export async function getConversationList(
     }
 
     request.onerror = () => {
-      console.error('[IndexedDB] Error getting conversation list:', request.error)
-      console.error('[IndexedDB] This may indicate database corruption or quota issues')
-      reject(new Error(`Database error getting conversation list: ${request.error?.message || 'Unknown error'}`))
+      console.error(
+        "[IndexedDB] Error getting conversation list:",
+        request.error
+      )
+      console.error(
+        "[IndexedDB] This may indicate database corruption or quota issues"
+      )
+      reject(
+        new Error(
+          `Database error getting conversation list: ${request.error?.message || "Unknown error"}`
+        )
+      )
     }
   })
 }
@@ -175,10 +200,10 @@ export async function setActiveConversation(
   const db = await openDatabase()
   const conversations = await getConversations(variantName)
 
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readwrite')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readwrite")
   const store = tx.objectStore(STORE_CONVERSATIONS)
 
-  const updates = conversations.map(conv => {
+  const updates = conversations.map((conv) => {
     conv.isActive = conv.id === conversationId
     return new Promise((resolve, reject) => {
       const request = store.put(conv)
@@ -195,15 +220,16 @@ async function batchDeleteConversations(ids: string[]): Promise<void> {
   if (ids.length === 0) return
 
   const db = await openDatabase()
-  const tx = db.transaction(STORE_CONVERSATIONS, 'readwrite')
+  const tx = db.transaction(STORE_CONVERSATIONS, "readwrite")
   const store = tx.objectStore(STORE_CONVERSATIONS)
 
-  const promises = ids.map(id =>
-    new Promise((resolve, reject) => {
-      const request = store.delete(id)
-      request.onsuccess = () => resolve(true)
-      request.onerror = () => reject(request.error)
-    })
+  const promises = ids.map(
+    (id) =>
+      new Promise((resolve, reject) => {
+        const request = store.delete(id)
+        request.onsuccess = () => resolve(true)
+        request.onerror = () => reject(request.error)
+      })
   )
 
   await Promise.all(promises)
@@ -211,7 +237,7 @@ async function batchDeleteConversations(ids: string[]): Promise<void> {
 
 export async function getMetadata(key: string): Promise<any> {
   const db = await openDatabase()
-  const tx = db.transaction(STORE_METADATA, 'readonly')
+  const tx = db.transaction(STORE_METADATA, "readonly")
   const store = tx.objectStore(STORE_METADATA)
 
   return new Promise((resolve, reject) => {
@@ -223,7 +249,7 @@ export async function getMetadata(key: string): Promise<any> {
 
 export async function setMetadata(key: string, value: any): Promise<void> {
   const db = await openDatabase()
-  const tx = db.transaction(STORE_METADATA, 'readwrite')
+  const tx = db.transaction(STORE_METADATA, "readwrite")
   const store = tx.objectStore(STORE_METADATA)
 
   return new Promise((resolve, reject) => {

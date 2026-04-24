@@ -1,54 +1,65 @@
-import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
-import ExtensionUI from '../ExtensionUI'
-import type { Experiment } from '~src/types/absmartly'
-import { unsafeExperimentId } from '~src/types/branded'
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import React from "react"
 
-jest.mock('../views/ListView', () => ({
+import "@testing-library/jest-dom"
+
+import type { Experiment } from "~src/types/absmartly"
+import { unsafeExperimentId } from "~src/types/branded"
+
+import ExtensionUI from "../ExtensionUI"
+
+jest.mock("../views/ListView", () => ({
   ListView: () => <div data-testid="mock-list-view">Experiments List View</div>
 }))
 
-jest.mock('../ExperimentDetail', () => ({
-  ExperimentDetail: () => <div data-testid="mock-experiment-detail">Experiment Detail</div>
-}))
-
-jest.mock('../ExperimentEditor', () => ({
-  ExperimentEditor: () => <div data-testid="mock-experiment-editor">Experiment Editor</div>
-}))
-
-jest.mock('../SettingsView', () => ({
-  SettingsView: () => <div data-testid="mock-settings-view">Settings</div>
-}))
-
-jest.mock('../views/AIDOMChangesView', () => ({
-  AIDOMChangesView: () => <div data-testid="mock-ai-view">Vibe Studio</div>
-}))
-
-jest.mock('../EventsDebugPage', () => ({
-  default: () => <div data-testid="mock-events-debug">Events Debug</div>
-}))
-
-jest.mock('../Toast', () => ({
-  Toast: () => <div data-testid="mock-toast">Toast</div>
-}))
-
-jest.mock('../CookieConsentModal', () => ({
-  CookieConsentModal: () => <div data-testid="mock-cookie-consent">Cookie Consent</div>
-}))
-
-jest.mock('../ui/Button', () => ({
-  Button: ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>{children}</button>
+jest.mock("../ExperimentDetail", () => ({
+  ExperimentDetail: () => (
+    <div data-testid="mock-experiment-detail">Experiment Detail</div>
   )
 }))
 
-jest.mock('~src/hooks/useABsmartly', () => ({
+jest.mock("../ExperimentEditor", () => ({
+  ExperimentEditor: () => (
+    <div data-testid="mock-experiment-editor">Experiment Editor</div>
+  )
+}))
+
+jest.mock("../SettingsView", () => ({
+  SettingsView: () => <div data-testid="mock-settings-view">Settings</div>
+}))
+
+jest.mock("../views/AIDOMChangesView", () => ({
+  AIDOMChangesView: () => <div data-testid="mock-ai-view">Vibe Studio</div>
+}))
+
+jest.mock("../EventsDebugPage", () => ({
+  default: () => <div data-testid="mock-events-debug">Events Debug</div>
+}))
+
+jest.mock("../Toast", () => ({
+  Toast: () => <div data-testid="mock-toast">Toast</div>
+}))
+
+jest.mock("../CookieConsentModal", () => ({
+  CookieConsentModal: () => (
+    <div data-testid="mock-cookie-consent">Cookie Consent</div>
+  )
+}))
+
+jest.mock("../ui/Button", () => ({
+  Button: ({ children, onClick, ...props }: any) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
+  )
+}))
+
+jest.mock("~src/hooks/useABsmartly", () => ({
   useABsmartly: jest.fn(() => ({
     client: {},
     config: {
-      apiEndpoint: 'https://api.absmartly.com',
-      authMethod: 'jwt'
+      apiEndpoint: "https://api.absmartly.com",
+      authMethod: "jwt"
     },
     loading: false,
     user: null,
@@ -72,7 +83,7 @@ jest.mock('~src/hooks/useABsmartly', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useExperimentHandlers', () => ({
+jest.mock("~src/hooks/useExperimentHandlers", () => ({
   useExperimentHandlers: jest.fn(() => ({
     selectedExperiment: null,
     setSelectedExperiment: jest.fn(),
@@ -88,7 +99,7 @@ jest.mock('~src/hooks/useExperimentHandlers', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useExperimentLoading', () => ({
+jest.mock("~src/hooks/useExperimentLoading", () => ({
   useExperimentLoading: jest.fn(() => ({
     filteredExperiments: [],
     experimentsLoading: false,
@@ -104,7 +115,7 @@ jest.mock('~src/hooks/useExperimentLoading', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useFavorites', () => ({
+jest.mock("~src/hooks/useFavorites", () => ({
   useFavorites: jest.fn(() => ({
     favoriteExperiments: new Set(),
     loadFavorites: jest.fn(),
@@ -112,7 +123,7 @@ jest.mock('~src/hooks/useFavorites', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/usePermissions', () => ({
+jest.mock("~src/hooks/usePermissions", () => ({
   usePermissions: jest.fn(() => ({
     needsPermissions: false,
     requestPermissionsIfNeeded: jest.fn(),
@@ -121,7 +132,7 @@ jest.mock('~src/hooks/usePermissions', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useExperimentFilters', () => ({
+jest.mock("~src/hooks/useExperimentFilters", () => ({
   useExperimentFilters: jest.fn(() => ({
     filters: {},
     filtersLoaded: true,
@@ -130,7 +141,7 @@ jest.mock('~src/hooks/useExperimentFilters', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useEditorResources', () => ({
+jest.mock("~src/hooks/useEditorResources", () => ({
   useEditorResources: jest.fn(() => ({
     applications: [],
     unitTypes: [],
@@ -143,18 +154,18 @@ jest.mock('~src/hooks/useEditorResources', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useTemplates', () => ({
+jest.mock("~src/hooks/useTemplates", () => ({
   useTemplates: jest.fn(() => ({
     templates: [],
     templatesLoading: false,
-    templateSearchQuery: '',
+    templateSearchQuery: "",
     setTemplateSearchQuery: jest.fn()
   }))
 }))
 
-jest.mock('~src/hooks/useViewNavigation', () => ({
+jest.mock("~src/hooks/useViewNavigation", () => ({
   useViewNavigation: jest.fn(() => ({
-    view: 'list',
+    view: "list",
     setView: jest.fn(),
     aiDomContext: null,
     autoNavigateToAI: false,
@@ -164,11 +175,11 @@ jest.mock('~src/hooks/useViewNavigation', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useSidebarState', () => ({
+jest.mock("~src/hooks/useSidebarState", () => ({
   useSidebarState: jest.fn(() => ({}))
 }))
 
-jest.mock('~src/hooks/useExtensionState', () => ({
+jest.mock("~src/hooks/useExtensionState", () => ({
   useExtensionState: jest.fn(() => ({
     error: null,
     setError: jest.fn(),
@@ -183,24 +194,24 @@ jest.mock('~src/hooks/useExtensionState', () => ({
   }))
 }))
 
-jest.mock('~src/hooks/useExperimentInitialization', () => ({
+jest.mock("~src/hooks/useExperimentInitialization", () => ({
   useExperimentInitialization: jest.fn(() => ({}))
 }))
 
-jest.mock('~src/hooks/useLoginRedirect', () => ({
+jest.mock("~src/hooks/useLoginRedirect", () => ({
   useLoginRedirect: jest.fn(() => ({
     handleLoginRedirect: jest.fn()
   }))
 }))
 
-jest.mock('~src/lib/messaging', () => ({
+jest.mock("~src/lib/messaging", () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
   sendToBackground: jest.fn().mockResolvedValue({ success: true })
 }))
 
-jest.mock('~src/utils/storage', () => ({
+jest.mock("~src/utils/storage", () => ({
   getConfig: jest.fn().mockResolvedValue({
-    domChangesFieldName: '__dom_changes'
+    domChangesFieldName: "__dom_changes"
   }),
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
@@ -227,8 +238,8 @@ global.chrome = {
 const mockABsmartlyHook = (overrides = {}) => ({
   client: {},
   config: {
-    apiEndpoint: 'https://api.absmartly.com',
-    authMethod: 'jwt'
+    apiEndpoint: "https://api.absmartly.com",
+    authMethod: "jwt"
   },
   loading: false,
   user: null,
@@ -252,58 +263,63 @@ const mockABsmartlyHook = (overrides = {}) => ({
   ...overrides
 })
 
-describe('ExtensionUI', () => {
+describe("ExtensionUI", () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
+    const useABsmartly = require("~src/hooks/useABsmartly").useABsmartly
     useABsmartly.mockReturnValue(mockABsmartlyHook())
   })
 
-  describe('Root Component Rendering', () => {
-    it('should render extension UI', () => {
+  describe("Root Component Rendering", () => {
+    it("should render extension UI", () => {
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
 
-    it('should show loading state during initialization', () => {
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue(mockABsmartlyHook({
-        config: null,
-        loading: true,
-        isAuthenticated: false
-      }))
+    it("should show loading state during initialization", () => {
+      const useABsmartly = require("~src/hooks/useABsmartly").useABsmartly
+      useABsmartly.mockReturnValue(
+        mockABsmartlyHook({
+          config: null,
+          loading: true,
+          isAuthenticated: false
+        })
+      )
 
       const { container } = render(<ExtensionUI />)
 
       expect(container.querySelector('[role="status"]')).toBeInTheDocument()
     })
 
-    it('should show authentication view when not authenticated', () => {
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue(mockABsmartlyHook({
-        config: null,
-        isAuthenticated: false
-      }))
+    it("should show authentication view when not authenticated", () => {
+      const useABsmartly = require("~src/hooks/useABsmartly").useABsmartly
+      useABsmartly.mockReturnValue(
+        mockABsmartlyHook({
+          config: null,
+          isAuthenticated: false
+        })
+      )
 
       render(<ExtensionUI />)
 
-      expect(screen.getByText('Welcome to ABsmartly')).toBeInTheDocument()
+      expect(screen.getByText("Welcome to ABsmartly")).toBeInTheDocument()
     })
   })
 
-  describe('View Navigation', () => {
-    it('should navigate to experiment list by default', () => {
+  describe("View Navigation", () => {
+    it("should navigate to experiment list by default", () => {
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
 
-    it('should navigate to settings view', async () => {
-      const useViewNavigation = require('~src/hooks/useViewNavigation').useViewNavigation
+    it("should navigate to settings view", async () => {
+      const useViewNavigation =
+        require("~src/hooks/useViewNavigation").useViewNavigation
       useViewNavigation.mockReturnValue({
-        view: 'settings',
+        view: "settings",
         setView: jest.fn(),
         aiDomContext: null,
         autoNavigateToAI: false,
@@ -315,23 +331,26 @@ describe('ExtensionUI', () => {
       render(<ExtensionUI />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('mock-settings-view')).toBeInTheDocument()
+        expect(screen.getByTestId("mock-settings-view")).toBeInTheDocument()
       })
     })
 
-    it('should navigate to AI page', async () => {
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue(mockABsmartlyHook({
-        config: {
-          apiEndpoint: 'https://api.absmartly.com',
-          authMethod: 'jwt',
-          vibeStudioEnabled: true
-        }
-      }))
+    it("should navigate to AI page", async () => {
+      const useABsmartly = require("~src/hooks/useABsmartly").useABsmartly
+      useABsmartly.mockReturnValue(
+        mockABsmartlyHook({
+          config: {
+            apiEndpoint: "https://api.absmartly.com",
+            authMethod: "jwt",
+            vibeStudioEnabled: true
+          }
+        })
+      )
 
-      const useViewNavigation = require('~src/hooks/useViewNavigation').useViewNavigation
+      const useViewNavigation =
+        require("~src/hooks/useViewNavigation").useViewNavigation
       useViewNavigation.mockReturnValue({
-        view: 'ai-dom-changes',
+        view: "ai-dom-changes",
         setView: jest.fn(),
         aiDomContext: null,
         autoNavigateToAI: false,
@@ -343,20 +362,22 @@ describe('ExtensionUI', () => {
       render(<ExtensionUI />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('mock-ai-view')).toBeInTheDocument()
+        expect(screen.getByTestId("mock-ai-view")).toBeInTheDocument()
       })
     })
 
-    it('should navigate back from detail view', async () => {
-      const useViewNavigation = require('~src/hooks/useViewNavigation').useViewNavigation
-      const useExperimentHandlers = require('~src/hooks/useExperimentHandlers').useExperimentHandlers
+    it("should navigate back from detail view", async () => {
+      const useViewNavigation =
+        require("~src/hooks/useViewNavigation").useViewNavigation
+      const useExperimentHandlers =
+        require("~src/hooks/useExperimentHandlers").useExperimentHandlers
 
       const mockExperiment: Experiment = {
         id: unsafeExperimentId(1),
-        name: 'test_exp',
-        display_name: 'Test Experiment',
-        state: 'created',
-        created_at: '2024-01-01T00:00:00Z',
+        name: "test_exp",
+        display_name: "Test Experiment",
+        state: "created",
+        created_at: "2024-01-01T00:00:00Z",
         variants: [],
         applications: [],
         owners: [],
@@ -379,7 +400,7 @@ describe('ExtensionUI', () => {
       })
 
       useViewNavigation.mockReturnValue({
-        view: 'detail',
+        view: "detail",
         setView: jest.fn(),
         aiDomContext: null,
         autoNavigateToAI: false,
@@ -390,7 +411,7 @@ describe('ExtensionUI', () => {
 
       const { rerender } = render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-experiment-detail')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-experiment-detail")).toBeInTheDocument()
 
       useExperimentHandlers.mockReturnValue({
         selectedExperiment: null,
@@ -407,7 +428,7 @@ describe('ExtensionUI', () => {
       })
 
       useViewNavigation.mockReturnValue({
-        view: 'list',
+        view: "list",
         setView: jest.fn(),
         aiDomContext: null,
         autoNavigateToAI: false,
@@ -419,21 +440,22 @@ describe('ExtensionUI', () => {
       rerender(<ExtensionUI />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+        expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
       })
     })
   })
 
-  describe('ErrorBoundary Integration', () => {
-    it('should have error boundary protection', () => {
+  describe("ErrorBoundary Integration", () => {
+    it("should have error boundary protection", () => {
       render(<ExtensionUI />)
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
   })
 
-  describe('Loading States', () => {
-    it('should show loading indicator when fetching experiments', () => {
-      const useExperimentLoading = require('~src/hooks/useExperimentLoading').useExperimentLoading
+  describe("Loading States", () => {
+    it("should show loading indicator when fetching experiments", () => {
+      const useExperimentLoading =
+        require("~src/hooks/useExperimentLoading").useExperimentLoading
       useExperimentLoading.mockReturnValue({
         filteredExperiments: [],
         experimentsLoading: true,
@@ -450,11 +472,12 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
 
-    it('should show loading indicator when loading experiment detail', () => {
-      const useExperimentHandlers = require('~src/hooks/useExperimentHandlers').useExperimentHandlers
+    it("should show loading indicator when loading experiment detail", () => {
+      const useExperimentHandlers =
+        require("~src/hooks/useExperimentHandlers").useExperimentHandlers
       useExperimentHandlers.mockReturnValue({
         selectedExperiment: null,
         setSelectedExperiment: jest.fn(),
@@ -471,34 +494,37 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
   })
 
-  describe('Config Changes Propagation', () => {
-    it('should update view when config changes', async () => {
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
+  describe("Config Changes Propagation", () => {
+    it("should update view when config changes", async () => {
+      const useABsmartly = require("~src/hooks/useABsmartly").useABsmartly
 
       useABsmartly.mockReturnValue(mockABsmartlyHook())
 
       const { rerender } = render(<ExtensionUI />)
 
-      useABsmartly.mockReturnValue(mockABsmartlyHook({
-        config: {
-          apiEndpoint: 'https://new-api.absmartly.com',
-          authMethod: 'apikey'
-        }
-      }))
+      useABsmartly.mockReturnValue(
+        mockABsmartlyHook({
+          config: {
+            apiEndpoint: "https://new-api.absmartly.com",
+            authMethod: "apikey"
+          }
+        })
+      )
 
       rerender(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
   })
 
-  describe('Experiment Creation Flow', () => {
-    it('should open create experiment dialog', async () => {
-      const useExtensionState = require('~src/hooks/useExtensionState').useExtensionState
+  describe("Experiment Creation Flow", () => {
+    it("should open create experiment dialog", async () => {
+      const useExtensionState =
+        require("~src/hooks/useExtensionState").useExtensionState
       useExtensionState.mockReturnValue({
         error: null,
         setError: jest.fn(),
@@ -515,13 +541,14 @@ describe('ExtensionUI', () => {
       render(<ExtensionUI />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+        expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
       })
     })
 
-    it('should create experiment from scratch', async () => {
+    it("should create experiment from scratch", async () => {
       const mockHandleCreateExperiment = jest.fn()
-      const useExperimentHandlers = require('~src/hooks/useExperimentHandlers').useExperimentHandlers
+      const useExperimentHandlers =
+        require("~src/hooks/useExperimentHandlers").useExperimentHandlers
       useExperimentHandlers.mockReturnValue({
         handleExperimentClick: jest.fn(),
         handleCreateExperiment: mockHandleCreateExperiment,
@@ -531,7 +558,7 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      const createButton = screen.queryByRole('button', { name: /create/i })
+      const createButton = screen.queryByRole("button", { name: /create/i })
       if (createButton) {
         fireEvent.click(createButton)
 
@@ -545,9 +572,10 @@ describe('ExtensionUI', () => {
       }
     })
 
-    it('should create experiment from template', async () => {
+    it("should create experiment from template", async () => {
       const mockHandleCreateFromTemplate = jest.fn()
-      const useExperimentHandlers = require('~src/hooks/useExperimentHandlers').useExperimentHandlers
+      const useExperimentHandlers =
+        require("~src/hooks/useExperimentHandlers").useExperimentHandlers
       useExperimentHandlers.mockReturnValue({
         handleExperimentClick: jest.fn(),
         handleCreateExperiment: jest.fn(),
@@ -557,7 +585,7 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      const createButton = screen.queryByRole('button', { name: /create/i })
+      const createButton = screen.queryByRole("button", { name: /create/i })
       if (createButton) {
         fireEvent.click(createButton)
 
@@ -572,11 +600,12 @@ describe('ExtensionUI', () => {
     })
   })
 
-  describe('Error Handling', () => {
-    it('should display error message when API fails', async () => {
-      const useExtensionState = require('~src/hooks/useExtensionState').useExtensionState
+  describe("Error Handling", () => {
+    it("should display error message when API fails", async () => {
+      const useExtensionState =
+        require("~src/hooks/useExtensionState").useExtensionState
       useExtensionState.mockReturnValue({
-        error: 'Failed to fetch experiments',
+        error: "Failed to fetch experiments",
         setError: jest.fn(),
         setIsAuthExpired: jest.fn(),
         toast: null,
@@ -590,25 +619,27 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
 
-    it('should handle authentication errors', async () => {
-      const useABsmartly = require('~src/hooks/useABsmartly').useABsmartly
-      useABsmartly.mockReturnValue(mockABsmartlyHook({
-        isAuthenticated: false,
-        config: null
-      }))
+    it("should handle authentication errors", async () => {
+      const useABsmartly = require("~src/hooks/useABsmartly").useABsmartly
+      useABsmartly.mockReturnValue(
+        mockABsmartlyHook({
+          isAuthenticated: false,
+          config: null
+        })
+      )
 
       render(<ExtensionUI />)
 
-      expect(screen.getByText('Welcome to ABsmartly')).toBeInTheDocument()
+      expect(screen.getByText("Welcome to ABsmartly")).toBeInTheDocument()
     })
   })
 
-  describe('Favorites Integration', () => {
-    it('should display favorite experiments', () => {
-      const useFavorites = require('~src/hooks/useFavorites').useFavorites
+  describe("Favorites Integration", () => {
+    it("should display favorite experiments", () => {
+      const useFavorites = require("~src/hooks/useFavorites").useFavorites
       useFavorites.mockReturnValue({
         favoriteExperiments: new Set([1, 2]),
         loadFavorites: jest.fn(),
@@ -618,10 +649,10 @@ describe('ExtensionUI', () => {
       const mockExperiments: Experiment[] = [
         {
           id: unsafeExperimentId(1),
-          name: 'favorite_exp',
-          display_name: 'Favorite Experiment',
-          state: 'created',
-          created_at: '2024-01-01T00:00:00Z',
+          name: "favorite_exp",
+          display_name: "Favorite Experiment",
+          state: "created",
+          created_at: "2024-01-01T00:00:00Z",
           variants: [],
           applications: [],
           owners: [],
@@ -630,7 +661,8 @@ describe('ExtensionUI', () => {
         }
       ]
 
-      const useExperimentLoading = require('~src/hooks/useExperimentLoading').useExperimentLoading
+      const useExperimentLoading =
+        require("~src/hooks/useExperimentLoading").useExperimentLoading
       useExperimentLoading.mockReturnValue({
         filteredExperiments: mockExperiments,
         experimentsLoading: false,
@@ -647,12 +679,12 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
 
-    it('should toggle favorite status', async () => {
+    it("should toggle favorite status", async () => {
       const mockToggleFavorite = jest.fn()
-      const useFavorites = require('~src/hooks/useFavorites').useFavorites
+      const useFavorites = require("~src/hooks/useFavorites").useFavorites
       useFavorites.mockReturnValue({
         favoriteExperiments: new Set(),
         loadFavorites: jest.fn(),
@@ -661,7 +693,7 @@ describe('ExtensionUI', () => {
 
       render(<ExtensionUI />)
 
-      expect(screen.getByTestId('mock-list-view')).toBeInTheDocument()
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
   })
 })

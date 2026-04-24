@@ -1,5 +1,9 @@
-import React from 'react'
-import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
+import React from "react"
+
+import {
+  SearchableSelect,
+  type SearchableSelectOption
+} from "./SearchableSelect"
 
 // Re-export the option type for backward compatibility
 export type MultiSelectOption = SearchableSelectOption
@@ -12,10 +16,17 @@ interface MultiSelectProps {
   placeholder?: string
   loading?: boolean
   disabled?: boolean
-  renderOption?: (option: MultiSelectOption, isSelected: boolean, onSelect: () => void) => React.ReactNode
-  renderSelectedOption?: (option: MultiSelectOption, onRemove?: (e: React.MouseEvent) => void) => React.ReactNode
+  renderOption?: (
+    option: MultiSelectOption,
+    isSelected: boolean,
+    onSelect: () => void
+  ) => React.ReactNode
+  renderSelectedOption?: (
+    option: MultiSelectOption,
+    onRemove?: (e: React.MouseEvent) => void
+  ) => React.ReactNode
   showSearch?: boolean
-  'data-testid'?: string
+  "data-testid"?: string
   id?: string
 }
 
@@ -30,7 +41,7 @@ export function MultiSelect({
   renderOption,
   renderSelectedOption,
   showSearch,
-  'data-testid': dataTestId,
+  "data-testid": dataTestId,
   id
 }: MultiSelectProps) {
   return (

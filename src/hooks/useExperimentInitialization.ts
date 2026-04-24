@@ -1,9 +1,13 @@
 import { useEffect } from "react"
-import { debugLog, debugError } from '~src/utils/debug'
-import { localAreaStorage } from "~src/utils/storage"
-import { setExperimentsCache } from "~src/utils/storage"
-import type { ABsmartlyConfig, Application, UnitType } from "~src/types/absmartly"
+
+import type {
+  ABsmartlyConfig,
+  Application,
+  UnitType
+} from "~src/types/absmartly"
 import type { ExperimentFilters } from "~src/types/filters"
+import { debugError, debugLog } from "~src/utils/debug"
+import { localAreaStorage, setExperimentsCache } from "~src/utils/storage"
 
 interface UseExperimentInitializationProps {
   config: ABsmartlyConfig | null
@@ -20,7 +24,12 @@ interface UseExperimentInitializationProps {
   getApplications: () => Promise<Application[]>
   setApplications: (apps: Application[]) => void
   setFilters: (filters: ExperimentFilters) => void
-  loadExperiments: (force?: boolean, page?: number, pageSize?: number, filters?: ExperimentFilters) => Promise<void>
+  loadExperiments: (
+    force?: boolean,
+    page?: number,
+    pageSize?: number,
+    filters?: ExperimentFilters
+  ) => Promise<void>
   loadFavorites: () => Promise<void>
   loadEditorResources: () => Promise<void>
 }
@@ -45,69 +54,117 @@ export function useExperimentInitialization({
   loadEditorResources
 }: UseExperimentInitializationProps) {
   useEffect(() => {
-    if (config && isAuthenticated && view === 'list' && !hasInitialized && !experimentsLoading && filtersLoaded && filters) {
-      debugLog('Initializing experiments for this session with filters:', filters)
+    if (
+      config &&
+      isAuthenticated &&
+      view === "list" &&
+      !hasInitialized &&
+      !experimentsLoading &&
+      filtersLoaded &&
+      filters
+    ) {
+      debugLog(
+        "Initializing experiments for this session with filters:",
+        filters
+      )
       setHasInitialized(true)
 
       loadEditorResources()
 
-      getApplications().then(apps => {
-        if (apps && apps.length > 0) {
-          setApplications(apps)
+      getApplications()
+        .then((apps) => {
+          if (apps && apps.length > 0) {
+            setApplications(apps)
 
-          const storage = localAreaStorage
-          storage.get('pendingApplicationFilter').then(appName => {
-            if (appName) {
-              const app = apps.find(a => a.name === appName)
-              if (app) {
-                const appId = app.id ?? app.application_id
-                if (appId) {
-                  const newFilters = {
-                    ...filters,
-                    applications: [appId]
+            const storage = localAreaStorage
+            storage.get("pendingApplicationFilter").then((appName) => {
+              if (appName) {
+                const app = apps.find((a) => a.name === appName)
+                if (app) {
+                  const appId = app.id ?? app.application_id
+                  if (appId) {
+                    const newFilters = {
+                      ...filters,
+                      applications: [appId]
+                    }
+                    setFilters(newFilters)
+                    storage.set("experimentFilters", newFilters)
+                    storage.remove("pendingApplicationFilter")
+                    loadExperiments(false, 1, pageSize, newFilters)
+                  } else {
+                    loadExperiments(false, 1, pageSize, filters)
                   }
-                  setFilters(newFilters)
-                  storage.set('experimentFilters', newFilters)
-                  storage.remove('pendingApplicationFilter')
-                  loadExperiments(false, 1, pageSize, newFilters)
                 } else {
                   loadExperiments(false, 1, pageSize, filters)
                 }
               } else {
                 loadExperiments(false, 1, pageSize, filters)
               }
-            } else {
-              loadExperiments(false, 1, pageSize, filters)
-            }
-          })
-        } else {
+            })
+          } else {
+            loadExperiments(false, 1, pageSize, filters)
+          }
+        })
+        .catch((error) => {
+          debugError("Failed to load applications:", error)
           loadExperiments(false, 1, pageSize, filters)
-        }
-      }).catch(error => {
-        debugError('Failed to load applications:', error)
-        loadExperiments(false, 1, pageSize, filters)
-      })
+        })
 
       loadFavorites()
     }
-  }, [config, isAuthenticated, view, hasInitialized, experimentsLoading, filtersLoaded, filters, getApplications, loadExperiments, pageSize, loadFavorites, loadEditorResources, setApplications, setFilters, setHasInitialized])
+  }, [
+    config,
+    isAuthenticated,
+    view,
+    hasInitialized,
+    experimentsLoading,
+    filtersLoaded,
+    filters,
+    getApplications,
+    loadExperiments,
+    pageSize,
+    loadFavorites,
+    loadEditorResources,
+    setApplications,
+    setFilters,
+    setHasInitialized
+  ])
 
   useEffect(() => {
-    if (config && isAuthenticated && view === 'list' && applications.length === 0) {
-      debugLog('Loading applications for filter')
-      getApplications().then(apps => {
-        if (apps && apps.length > 0) {
-          setApplications(apps)
-        }
-      }).catch(error => {
-        debugError('Failed to load applications for filter:', error)
-      })
+    if (
+      config &&
+      isAuthenticated &&
+      view === "list" &&
+      applications.length === 0
+    ) {
+      debugLog("Loading applications for filter")
+      getApplications()
+        .then((apps) => {
+          if (apps && apps.length > 0) {
+            setApplications(apps)
+          }
+        })
+        .catch((error) => {
+          debugError("Failed to load applications for filter:", error)
+        })
     }
-  }, [config, isAuthenticated, view, applications.length, getApplications, setApplications])
+  }, [
+    config,
+    isAuthenticated,
+    view,
+    applications.length,
+    getApplications,
+    setApplications
+  ])
 
   useEffect(() => {
-    if ((view === 'create' || view === 'edit') && config && isAuthenticated && unitTypes.length === 0) {
-      debugLog('Loading editor resources for create/edit view')
+    if (
+      (view === "create" || view === "edit") &&
+      config &&
+      isAuthenticated &&
+      unitTypes.length === 0
+    ) {
+      debugLog("Loading editor resources for create/edit view")
       loadEditorResources()
     }
   }, [view, config, isAuthenticated, unitTypes.length, loadEditorResources])

@@ -1,9 +1,14 @@
-import React, { useState, useRef, useEffect } from "react"
-import { PlusCircleIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline"
+import {
+  ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
+  PlusCircleIcon
+} from "@heroicons/react/24/outline"
+import React, { useEffect, useRef, useState } from "react"
+
 import { useABsmartly } from "~src/hooks/useABsmartly"
 import { fetchAuthenticatedImage } from "~src/utils/auth"
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
 interface CreateExperimentDropdownProps {
   onCreateFromScratch: () => void
   onCreateFromTemplate?: (templateId: number) => void
@@ -44,22 +49,22 @@ function timeAgo(dateString: string): string {
   for (const [unit, secondsInUnit] of Object.entries(intervals)) {
     const interval = Math.floor(seconds / secondsInUnit)
     if (interval >= 1) {
-      return `${interval} ${unit}${interval > 1 ? 's' : ''} ago`
+      return `${interval} ${unit}${interval > 1 ? "s" : ""} ago`
     }
   }
 
-  return 'just now'
+  return "just now"
 }
 
-function getInitials(user: Template['created_by']): string {
-  if (!user) return '?'
+function getInitials(user: Template["created_by"]): string {
+  if (!user) return "?"
   if (user.first_name && user.last_name) {
     return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
   }
   if (user.first_name) return user.first_name[0].toUpperCase()
   if (user.last_name) return user.last_name[0].toUpperCase()
   if (user.email) return user.email[0].toUpperCase()
-  return '?'
+  return "?"
 }
 
 interface CreateExperimentDropdownPanelProps {
@@ -84,7 +89,9 @@ export function CreateExperimentDropdownPanel({
   config
 }: CreateExperimentDropdownPanelProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set())
-  const [avatarBlobUrls, setAvatarBlobUrls] = useState<Map<string, string>>(new Map())
+  const [avatarBlobUrls, setAvatarBlobUrls] = useState<Map<string, string>>(
+    new Map()
+  )
 
   // Fetch authenticated avatar images and convert to blob URLs
   useEffect(() => {
@@ -95,18 +102,21 @@ export function CreateExperimentDropdownPanel({
         const user = template.created_by
         if (!user?.avatar?.base_url) continue
 
-        const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+        const baseUrl = config.apiEndpoint
+          .replace(/\/+$/, "")
+          .replace(/\/v1$/, "")
         const avatarUrl = `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
 
         // Skip if already fetched or failed
-        if (avatarBlobUrls.has(avatarUrl) || failedImages.has(avatarUrl)) continue
+        if (avatarBlobUrls.has(avatarUrl) || failedImages.has(avatarUrl))
+          continue
 
         const blobUrl = await fetchAuthenticatedImage(avatarUrl, config)
 
         if (blobUrl) {
-          setAvatarBlobUrls(prev => new Map(prev).set(avatarUrl, blobUrl))
+          setAvatarBlobUrls((prev) => new Map(prev).set(avatarUrl, blobUrl))
         } else {
-          setFailedImages(prev => new Set(prev).add(avatarUrl))
+          setFailedImages((prev) => new Set(prev).add(avatarUrl))
         }
       }
     }
@@ -115,30 +125,30 @@ export function CreateExperimentDropdownPanel({
 
     // Cleanup blob URLs when component unmounts
     return () => {
-      avatarBlobUrls.forEach(blobUrl => URL.revokeObjectURL(blobUrl))
+      avatarBlobUrls.forEach((blobUrl) => URL.revokeObjectURL(blobUrl))
     }
   }, [isOpen, templates, config])
 
-  const filteredTemplates = templates.filter(template =>
+  const filteredTemplates = templates.filter((template) =>
     template.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const getAvatarUrl = (user: Template['created_by']) => {
+  const getAvatarUrl = (user: Template["created_by"]) => {
     if (!user?.avatar?.base_url || !config?.apiEndpoint) return null
 
-    const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    const baseUrl = config.apiEndpoint.replace(/\/+$/, "").replace(/\/v1$/, "")
     const avatarUrl = `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
 
     // Return blob URL if we have it, otherwise null (will show initials)
     return avatarBlobUrls.get(avatarUrl) || null
   }
 
-  const getUserName = (user: Template['created_by']) => {
-    if (!user) return 'Unknown'
+  const getUserName = (user: Template["created_by"]) => {
+    if (!user) return "Unknown"
     if (user.first_name || user.last_name) {
-      return `${user.first_name || ''} ${user.last_name || ''}`.trim()
+      return `${user.first_name || ""} ${user.last_name || ""}`.trim()
     }
-    return user.email || 'Unknown'
+    return user.email || "Unknown"
   }
 
   if (!isOpen) return null
@@ -146,8 +156,7 @@ export function CreateExperimentDropdownPanel({
   return (
     <div
       className="absolute left-0 right-0 top-[60px] bg-white border border-gray-200 shadow-lg z-50"
-      data-create-experiment-panel="true"
-    >
+      data-create-experiment-panel="true">
       {/* Warning message */}
       <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
         <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -161,8 +170,7 @@ export function CreateExperimentDropdownPanel({
         id="from-scratch-button"
         onClick={onCreateFromScratch}
         className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm font-medium text-blue-600 border-b border-gray-200"
-        role="menuitem"
-      >
+        role="menuitem">
         <PlusCircleIcon className="h-5 w-5" />
         Create from scratch
       </button>
@@ -188,8 +196,7 @@ export function CreateExperimentDropdownPanel({
               return (
                 <div
                   key={template.id}
-                  className="px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
-                >
+                  className="px-4 py-2 hover:bg-gray-50 flex items-center gap-3">
                   {avatarBlobUrl ? (
                     <img
                       src={avatarBlobUrl}
@@ -206,14 +213,14 @@ export function CreateExperimentDropdownPanel({
                       {template.name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Saved {timeAgo(template.updated_at || template.created_at)}
+                      Saved{" "}
+                      {timeAgo(template.updated_at || template.created_at)}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onTemplateSelect(template.id)}
-                    className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                  >
+                    className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors">
                     Load
                   </button>
                 </div>
@@ -253,7 +260,7 @@ export function CreateExperimentDropdown({
       const target = event.target as HTMLElement | null
       if (!target) return
 
-      if (target.closest('[data-create-experiment-panel]')) {
+      if (target.closest("[data-create-experiment-panel]")) {
         return
       }
 
@@ -280,11 +287,11 @@ export function CreateExperimentDropdown({
   const loadTemplates = async () => {
     setLoading(true)
     try {
-      const data = await getTemplates('test_template')
-      debugLog('Templates loaded:', data)
+      const data = await getTemplates("test_template")
+      debugLog("Templates loaded:", data)
       setTemplates(data)
     } catch (error) {
-      console.error('Failed to load templates:', error)
+      console.error("Failed to load templates:", error)
       setTemplates([])
     } finally {
       setLoading(false)
@@ -303,22 +310,22 @@ export function CreateExperimentDropdown({
     }
   }
 
-  const filteredTemplates = templates.filter(template =>
+  const filteredTemplates = templates.filter((template) =>
     template.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const getAvatarUrl = (user: Template['created_by']) => {
+  const getAvatarUrl = (user: Template["created_by"]) => {
     if (!user?.avatar?.base_url || !config?.apiEndpoint) return null
-    const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    const baseUrl = config.apiEndpoint.replace(/\/+$/, "").replace(/\/v1$/, "")
     return `${baseUrl}${user.avatar.base_url}/crop/32x32.webp`
   }
 
-  const getUserName = (user: Template['created_by']) => {
-    if (!user) return 'Unknown'
+  const getUserName = (user: Template["created_by"]) => {
+    if (!user) return "Unknown"
     if (user.first_name || user.last_name) {
-      return `${user.first_name || ''} ${user.last_name || ''}`.trim()
+      return `${user.first_name || ""} ${user.last_name || ""}`.trim()
     }
-    return user.email || 'Unknown'
+    return user.email || "Unknown"
   }
 
   return (
@@ -327,14 +334,12 @@ export function CreateExperimentDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 hover:bg-gray-100 rounded-md transition-colors"
         aria-label="Create Experiment"
-        title="Create New Experiment"
-      >
+        title="Create New Experiment">
         <svg
           className="h-5 w-5 text-gray-600"
           fill="none"
           viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
+          stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"

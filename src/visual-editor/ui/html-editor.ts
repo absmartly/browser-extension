@@ -3,15 +3,17 @@
  * Provides syntax highlighting, autocomplete, and full code editing features
  */
 
-import StateManager from '../core/state-manager'
-import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { html } from '@codemirror/lang-html'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { basicSetup } from 'codemirror'
-import DOMPurify from 'dompurify'
+import { html } from "@codemirror/lang-html"
+import { EditorState } from "@codemirror/state"
+import { oneDark } from "@codemirror/theme-one-dark"
+import { EditorView } from "@codemirror/view"
+import { basicSetup } from "codemirror"
+import DOMPurify from "dompurify"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { debugLog, debugWarn } from "~src/utils/debug"
+
+import StateManager from "../core/state-manager"
+
 export class HtmlEditor {
   private stateManager: StateManager
   private editorHost: HTMLElement | null = null
@@ -27,8 +29,8 @@ export class HtmlEditor {
       const originalHtml = element.innerHTML
 
       // Create editor host in regular DOM
-      this.editorHost = document.createElement('div')
-      this.editorHost.id = 'absmartly-html-editor-host'
+      this.editorHost = document.createElement("div")
+      this.editorHost.id = "absmartly-html-editor-host"
       this.editorHost.style.cssText = `
         position: fixed;
         top: 0;
@@ -39,29 +41,29 @@ export class HtmlEditor {
         pointer-events: auto;
       `
 
-      const editorStyle = document.createElement('style')
-      editorStyle.id = 'absmartly-html-editor-styles'
+      const editorStyle = document.createElement("style")
+      editorStyle.id = "absmartly-html-editor-styles"
       editorStyle.textContent = this.getEditorStyles()
       document.head.appendChild(editorStyle)
 
       // Create editor elements
-      const backdrop = document.createElement('div')
-      backdrop.className = 'editor-backdrop'
+      const backdrop = document.createElement("div")
+      backdrop.className = "editor-backdrop"
 
-      const container = document.createElement('div')
-      container.id = 'html-editor-dialog'
-      container.className = 'editor-container'
+      const container = document.createElement("div")
+      container.id = "html-editor-dialog"
+      container.className = "editor-container"
 
-      const header = document.createElement('div')
-      header.className = 'editor-header'
+      const header = document.createElement("div")
+      header.className = "editor-header"
 
-      const title = document.createElement('h3')
-      title.className = 'editor-title'
-      title.textContent = 'Edit HTML (Live Preview)'
+      const title = document.createElement("h3")
+      title.className = "editor-title"
+      title.textContent = "Edit HTML (Live Preview)"
 
-      const tagInfo = document.createElement('span')
-      tagInfo.className = 'editor-tag-info'
-      tagInfo.textContent = `<${element.tagName.toLowerCase()}${element.className ? `.${element.className.split(' ').join('.')}` : ''}>`
+      const tagInfo = document.createElement("span")
+      tagInfo.className = "editor-tag-info"
+      tagInfo.textContent = `<${element.tagName.toLowerCase()}${element.className ? `.${element.className.split(" ").join(".")}` : ""}>`
 
       header.appendChild(title)
       header.appendChild(tagInfo)
@@ -73,15 +75,15 @@ export class HtmlEditor {
       let initialX = 0
       let initialY = 0
 
-      header.style.cursor = 'move'
+      header.style.cursor = "move"
 
-      header.addEventListener('mousedown', (e) => {
+      header.addEventListener("mousedown", (e) => {
         isDragging = true
         initialX = e.clientX - currentX
         initialY = e.clientY - currentY
       })
 
-      document.addEventListener('mousemove', (e) => {
+      document.addEventListener("mousemove", (e) => {
         if (isDragging) {
           e.preventDefault()
           currentX = e.clientX - initialX
@@ -90,38 +92,38 @@ export class HtmlEditor {
         }
       })
 
-      document.addEventListener('mouseup', () => {
+      document.addEventListener("mouseup", () => {
         isDragging = false
       })
 
       // Create editor container
-      const editorContainer = document.createElement('div')
-      editorContainer.id = 'codemirror-container'
-      editorContainer.className = 'editor-codemirror-container'
+      const editorContainer = document.createElement("div")
+      editorContainer.id = "codemirror-container"
+      editorContainer.className = "editor-codemirror-container"
 
       // Create toolbar
-      const toolbar = document.createElement('div')
-      toolbar.className = 'editor-toolbar'
+      const toolbar = document.createElement("div")
+      toolbar.className = "editor-toolbar"
 
-      const formatBtn = document.createElement('button')
-      formatBtn.className = 'toolbar-button'
-      formatBtn.innerHTML = '⚡ Format'
-      formatBtn.title = 'Format HTML'
+      const formatBtn = document.createElement("button")
+      formatBtn.className = "toolbar-button"
+      formatBtn.innerHTML = "⚡ Format"
+      formatBtn.title = "Format HTML"
 
       toolbar.appendChild(formatBtn)
 
       // Create buttons
-      const buttons = document.createElement('div')
-      buttons.className = 'editor-buttons'
+      const buttons = document.createElement("div")
+      buttons.className = "editor-buttons"
 
-      const cancelBtn = document.createElement('button')
-      cancelBtn.className = 'editor-button editor-button-cancel'
-      cancelBtn.innerHTML = '<span>✕</span> Cancel'
+      const cancelBtn = document.createElement("button")
+      cancelBtn.className = "editor-button editor-button-cancel"
+      cancelBtn.innerHTML = "<span>✕</span> Cancel"
 
-      const saveBtn = document.createElement('button')
-      saveBtn.className = 'editor-button editor-button-save'
-      saveBtn.id = 'html-editor-apply-button'
-      saveBtn.innerHTML = '<span>✓</span> Apply Changes' // Static content, safe
+      const saveBtn = document.createElement("button")
+      saveBtn.className = "editor-button editor-button-save"
+      saveBtn.id = "html-editor-apply-button"
+      saveBtn.innerHTML = "<span>✓</span> Apply Changes" // Static content, safe
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -173,8 +175,8 @@ export class HtmlEditor {
       }, 10)
 
       // Handle button clicks
-      formatBtn.addEventListener('click', (e) => {
-        debugLog('[HtmlEditor] Format button clicked')
+      formatBtn.addEventListener("click", (e) => {
+        debugLog("[HtmlEditor] Format button clicked")
         e.stopPropagation()
         if (this.editorView) {
           const currentValue = this.editorView.state.doc.toString()
@@ -189,7 +191,7 @@ export class HtmlEditor {
         }
       })
 
-      cancelBtn.addEventListener('click', (e) => {
+      cancelBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
         // Restore original HTML
@@ -198,31 +200,31 @@ export class HtmlEditor {
         resolve(null)
       })
 
-      saveBtn.addEventListener('click', (e) => {
-        debugLog('[HtmlEditor] Save button clicked!')
+      saveBtn.addEventListener("click", (e) => {
+        debugLog("[HtmlEditor] Save button clicked!")
         e.stopPropagation()
         e.preventDefault()
-        const newHtml = this.editorView?.state.doc.toString() || ''
-        debugLog('[HtmlEditor] New HTML:', newHtml)
+        const newHtml = this.editorView?.state.doc.toString() || ""
+        debugLog("[HtmlEditor] New HTML:", newHtml)
         this.cleanup()
-        debugLog('[HtmlEditor] Cleanup done, resolving...')
+        debugLog("[HtmlEditor] Cleanup done, resolving...")
         resolve(newHtml)
       })
 
       // Handle ESC key
       const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && this.editorHost) {
-          document.removeEventListener('keydown', escapeHandler)
+        if (e.key === "Escape" && this.editorHost) {
+          document.removeEventListener("keydown", escapeHandler)
           // Restore original HTML
           element.innerHTML = originalHtml
           this.cleanup()
           resolve(null)
         }
       }
-      document.addEventListener('keydown', escapeHandler)
+      document.addEventListener("keydown", escapeHandler)
 
       // Prevent backdrop clicks from closing (only click outside container)
-      backdrop.addEventListener('click', (e) => {
+      backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) {
           // Restore original HTML
           element.innerHTML = originalHtml
@@ -232,11 +234,11 @@ export class HtmlEditor {
       })
 
       // Prevent clicks from propagating to the page
-      container.addEventListener('click', (e) => {
+      container.addEventListener("click", (e) => {
         e.stopPropagation()
       })
 
-      container.addEventListener('mousedown', (e) => {
+      container.addEventListener("mousedown", (e) => {
         e.stopPropagation()
       })
     })
@@ -244,33 +246,37 @@ export class HtmlEditor {
 
   private formatHtml(html: string): string {
     // Basic HTML formatting
-    let formatted = html
-      .replace(/></g, '>\n<')
-      .replace(/(\r\n|\n|\r)/gm, '\n')
+    let formatted = html.replace(/></g, ">\n<").replace(/(\r\n|\n|\r)/gm, "\n")
 
     // Add indentation
-    const lines = formatted.split('\n')
+    const lines = formatted.split("\n")
     let indentLevel = 0
     const indentSize = 2
 
-    return lines.map(line => {
-      const trimmedLine = line.trim()
+    return lines
+      .map((line) => {
+        const trimmedLine = line.trim()
 
-      // Decrease indent for closing tags
-      if (trimmedLine.startsWith('</')) {
-        indentLevel = Math.max(0, indentLevel - 1)
-      }
+        // Decrease indent for closing tags
+        if (trimmedLine.startsWith("</")) {
+          indentLevel = Math.max(0, indentLevel - 1)
+        }
 
-      const indentedLine = ' '.repeat(indentLevel * indentSize) + trimmedLine
+        const indentedLine = " ".repeat(indentLevel * indentSize) + trimmedLine
 
-      // Increase indent for opening tags (not self-closing)
-      if (trimmedLine.startsWith('<') && !trimmedLine.startsWith('</') &&
-          !trimmedLine.endsWith('/>') && !trimmedLine.includes('</')) {
-        indentLevel++
-      }
+        // Increase indent for opening tags (not self-closing)
+        if (
+          trimmedLine.startsWith("<") &&
+          !trimmedLine.startsWith("</") &&
+          !trimmedLine.endsWith("/>") &&
+          !trimmedLine.includes("</")
+        ) {
+          indentLevel++
+        }
 
-      return indentedLine
-    }).join('\n')
+        return indentedLine
+      })
+      .join("\n")
   }
 
   private cleanup(): void {
@@ -280,7 +286,7 @@ export class HtmlEditor {
     }
 
     // Remove styles from document head
-    const styleEl = document.getElementById('absmartly-html-editor-styles')
+    const styleEl = document.getElementById("absmartly-html-editor-styles")
     if (styleEl) {
       styleEl.remove()
     }

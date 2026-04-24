@@ -1,12 +1,12 @@
-import { debugLog, debugError } from '../utils/debug'
+import { debugError, debugLog } from "../utils/debug"
 
 /**
  * Extension message format with routing information
  */
 export interface ExtensionMessage {
   type: string
-  from?: 'sidebar' | 'content' | 'background'
-  to?: 'sidebar' | 'content' | 'background'
+  from?: "sidebar" | "content" | "background"
+  to?: "sidebar" | "content" | "background"
   payload?: Record<string, unknown>
   requestId?: string
   expectsResponse?: boolean
@@ -18,16 +18,18 @@ export interface ExtensionMessage {
  * @param message Message object to send
  * @returns Promise resolving to the response from content script
  */
-export async function sendToContent(message: ExtensionMessage): Promise<Record<string, unknown>> {
+export async function sendToContent(
+  message: ExtensionMessage
+): Promise<Record<string, unknown>> {
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tabs[0]?.id) {
-      throw new Error('No active tab found')
+      throw new Error("No active tab found")
     }
-    debugLog('[Messaging] Sending to content script:', message.type)
+    debugLog("[Messaging] Sending to content script:", message.type)
     return await chrome.tabs.sendMessage(tabs[0].id, message)
   } catch (error) {
-    debugError('[Messaging] Error sending to content:', error)
+    debugError("[Messaging] Error sending to content:", error)
     throw error
   }
 }
@@ -37,12 +39,14 @@ export async function sendToContent(message: ExtensionMessage): Promise<Record<s
  * @param message Message object to send
  * @returns Promise resolving to the response from background
  */
-export async function sendToBackground(message: ExtensionMessage): Promise<Record<string, unknown>> {
+export async function sendToBackground(
+  message: ExtensionMessage
+): Promise<Record<string, unknown>> {
   try {
-    debugLog('[Messaging] Sending to background:', message.type)
+    debugLog("[Messaging] Sending to background:", message.type)
     return await chrome.runtime.sendMessage(message)
   } catch (error) {
-    debugError('[Messaging] Error sending to background:', error)
+    debugError("[Messaging] Error sending to background:", error)
     throw error
   }
 }
@@ -51,11 +55,16 @@ export async function sendToBackground(message: ExtensionMessage): Promise<Recor
  * Broadcast message to all extension pages (sidebar, popups, etc.)
  * @param message Message object to broadcast
  */
-export async function broadcastToExtension(message: ExtensionMessage): Promise<void> {
+export async function broadcastToExtension(
+  message: ExtensionMessage
+): Promise<void> {
   try {
-    debugLog('[Messaging] Broadcasting to extension:', message.type)
+    debugLog("[Messaging] Broadcasting to extension:", message.type)
     await chrome.runtime.sendMessage(message)
   } catch (error) {
-    debugLog('[Messaging] No listeners for broadcast (normal when sidebar closed):', (error as Error)?.message)
+    debugLog(
+      "[Messaging] No listeners for broadcast (normal when sidebar closed):",
+      (error as Error)?.message
+    )
   }
 }

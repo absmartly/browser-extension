@@ -6,8 +6,8 @@
  * @module URLFilter
  */
 
-import type { URLFilter } from '../types/config'
-import { Logger } from './logger'
+import type { URLFilter } from "../types/config"
+import { Logger } from "./logger"
 
 export interface LocationLike {
   href: string
@@ -39,24 +39,24 @@ export class URLFilterMatcher {
     // Determine what to match against
     let matchTarget: string
     const matchType =
-      typeof urlFilter === 'object' && !Array.isArray(urlFilter)
-        ? urlFilter.matchType || 'path'
-        : 'path'
+      typeof urlFilter === "object" && !Array.isArray(urlFilter)
+        ? urlFilter.matchType || "path"
+        : "path"
 
     switch (matchType) {
-      case 'full-url':
+      case "full-url":
         matchTarget = currentUrl
         break
-      case 'domain':
+      case "domain":
         matchTarget = currentDomain
         break
-      case 'query':
+      case "query":
         matchTarget = currentQuery
         break
-      case 'hash':
+      case "hash":
         matchTarget = currentHash
         break
-      case 'path':
+      case "path":
       default:
         matchTarget = currentPath
     }
@@ -66,14 +66,14 @@ export class URLFilterMatcher {
     let excludePatterns: string[] = []
     let isRegex = false
 
-    if (typeof urlFilter === 'string') {
+    if (typeof urlFilter === "string") {
       includePatterns = [urlFilter]
     } else if (Array.isArray(urlFilter)) {
       includePatterns = urlFilter
     } else {
       includePatterns = urlFilter.include || []
       excludePatterns = urlFilter.exclude || []
-      isRegex = urlFilter.mode === 'regex'
+      isRegex = urlFilter.mode === "regex"
     }
 
     // Check exclude patterns first
@@ -93,9 +93,9 @@ export class URLFilterMatcher {
           // Simple wildcard matching
           // Escape special regex characters except * and ?
           const escapedPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-            .replace(/\*/g, '.*')
-            .replace(/\?/g, '.')
+            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+            .replace(/\*/g, ".*")
+            .replace(/\?/g, ".")
           const regex = new RegExp(`^${escapedPattern}$`)
           if (regex.test(matchTarget)) {
             Logger.log(`URL excluded by pattern: ${pattern}`)
@@ -125,9 +125,9 @@ export class URLFilterMatcher {
         // Simple wildcard matching
         // Escape special regex characters except * and ?
         const escapedPattern = pattern
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-          .replace(/\*/g, '.*')
-          .replace(/\?/g, '.')
+          .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+          .replace(/\*/g, ".*")
+          .replace(/\?/g, ".")
         const regex = new RegExp(`^${escapedPattern}$`)
         if (regex.test(matchTarget)) {
           Logger.log(`URL matched by pattern: ${pattern}`)

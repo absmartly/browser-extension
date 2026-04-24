@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "postinstall": "patch-package",
+    "format": "prettier --write \"src/**/*.{js,ts,tsx}\"",
     "build:sdk-bridge": "node scripts/build-sdk-bridge.js",
     "build:sdk-bridge:watch": "nodemon --watch src/sdk-bridge -e ts --exec 'bun run build:sdk-bridge'",
     "dev": "bun run build:sdk-bridge && NODE_ENV=development plasmo dev --src-path=. & node scripts/dev-build.js --watch",

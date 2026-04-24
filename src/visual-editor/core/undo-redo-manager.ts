@@ -10,11 +10,11 @@
  * - squashChanges() consolidates changes up to currentIndex for saving
  */
 
-import type { DOMChange } from '../types/visual-editor'
+import type { DOMChange } from "../types/visual-editor"
 
 export interface ChangeRecord {
-  change: DOMChange  // The DOM change with the new value
-  oldValue: any      // The previous value before this change
+  change: DOMChange // The DOM change with the new value
+  oldValue: any // The previous value before this change
 }
 
 export class UndoRedoManager {
@@ -92,7 +92,7 @@ export class UndoRedoManager {
 
     this.currentIndex++
     const record = this.changes[this.currentIndex]
-    
+
     // Return deep copy to prevent mutation
     return JSON.parse(JSON.stringify(record))
   }

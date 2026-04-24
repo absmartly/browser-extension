@@ -10,11 +10,11 @@ export class Styles {
    * Inject core visual editor styles
    */
   injectCoreStyles(): void {
-    if (this.injectedStyles.has('core')) return
+    if (this.injectedStyles.has("core")) return
 
-    const style = document.createElement('style')
-    style.id = 'absmartly-visual-editor-core-styles'
-    style.dataset.absmartly = 'true'
+    const style = document.createElement("style")
+    style.id = "absmartly-visual-editor-core-styles"
+    style.dataset.absmartly = "true"
     style.textContent = `
       /* Core element states */
       .absmartly-hover {
@@ -83,18 +83,18 @@ export class Styles {
       }
     `
     document.head.appendChild(style)
-    this.injectedStyles.add('core')
+    this.injectedStyles.add("core")
   }
 
   /**
    * Inject context menu styles
    */
   injectContextMenuStyles(): void {
-    if (this.injectedStyles.has('context-menu')) return
+    if (this.injectedStyles.has("context-menu")) return
 
-    const style = document.createElement('style')
-    style.id = 'absmartly-visual-editor-context-menu-styles'
-    style.dataset.absmartly = 'true'
+    const style = document.createElement("style")
+    style.id = "absmartly-visual-editor-context-menu-styles"
+    style.dataset.absmartly = "true"
     style.textContent = `
       .absmartly-context-menu {
         position: fixed !important;
@@ -134,18 +134,18 @@ export class Styles {
       }
     `
     document.head.appendChild(style)
-    this.injectedStyles.add('context-menu')
+    this.injectedStyles.add("context-menu")
   }
 
   /**
    * Inject toolbar styles
    */
   injectToolbarStyles(): void {
-    if (this.injectedStyles.has('toolbar')) return
+    if (this.injectedStyles.has("toolbar")) return
 
-    const style = document.createElement('style')
-    style.id = 'absmartly-visual-editor-toolbar-styles'
-    style.dataset.absmartly = 'true'
+    const style = document.createElement("style")
+    style.id = "absmartly-visual-editor-toolbar-styles"
+    style.dataset.absmartly = "true"
     style.textContent = `
       .absmartly-toolbar {
         position: fixed !important;
@@ -208,18 +208,18 @@ export class Styles {
       }
     `
     document.head.appendChild(style)
-    this.injectedStyles.add('toolbar')
+    this.injectedStyles.add("toolbar")
   }
 
   /**
    * Inject notification styles
    */
   injectNotificationStyles(): void {
-    if (this.injectedStyles.has('notifications')) return
+    if (this.injectedStyles.has("notifications")) return
 
-    const style = document.createElement('style')
-    style.id = 'absmartly-visual-editor-notification-styles'
-    style.dataset.absmartly = 'true'
+    const style = document.createElement("style")
+    style.id = "absmartly-visual-editor-notification-styles"
+    style.dataset.absmartly = "true"
     style.textContent = `
       .absmartly-notification {
         position: fixed !important;
@@ -262,18 +262,18 @@ export class Styles {
       }
     `
     document.head.appendChild(style)
-    this.injectedStyles.add('notifications')
+    this.injectedStyles.add("notifications")
   }
 
   /**
    * Inject dialog styles
    */
   injectDialogStyles(): void {
-    if (this.injectedStyles.has('dialogs')) return
+    if (this.injectedStyles.has("dialogs")) return
 
-    const style = document.createElement('style')
-    style.id = 'absmartly-visual-editor-dialog-styles'
-    style.dataset.absmartly = 'true'
+    const style = document.createElement("style")
+    style.id = "absmartly-visual-editor-dialog-styles"
+    style.dataset.absmartly = "true"
     style.textContent = `
       .absmartly-dialog-backdrop {
         position: fixed !important;
@@ -344,7 +344,7 @@ export class Styles {
       }
     `
     document.head.appendChild(style)
-    this.injectedStyles.add('dialogs')
+    this.injectedStyles.add("dialogs")
   }
 
   /**
@@ -362,9 +362,11 @@ export class Styles {
    * Remove all injected styles
    */
   removeAllStyles(): void {
-    document.querySelectorAll('style[data-absmartly="true"]').forEach(style => {
-      style.remove()
-    })
+    document
+      .querySelectorAll('style[data-absmartly="true"]')
+      .forEach((style) => {
+        style.remove()
+      })
     this.injectedStyles.clear()
   }
 
@@ -372,7 +374,9 @@ export class Styles {
    * Remove specific style set
    */
   removeStyles(type: string): void {
-    const style = document.getElementById(`absmartly-visual-editor-${type}-styles`)
+    const style = document.getElementById(
+      `absmartly-visual-editor-${type}-styles`
+    )
     if (style) {
       style.remove()
       this.injectedStyles.delete(type)

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import type { Experiment } from '~src/types/absmartly'
+import { useEffect, useState } from "react"
+
+import type { Experiment } from "~src/types/absmartly"
 
 interface UseTemplatesParams {
   getTemplates: (type: string) => Promise<Experiment[]>
@@ -19,10 +20,10 @@ export function useTemplates({
       const loadTemplates = async () => {
         setTemplatesLoading(true)
         try {
-          const data = await getTemplates('test_template')
+          const data = await getTemplates("test_template")
           setTemplates(data)
         } catch (error) {
-          console.error('Failed to load templates:', error)
+          console.error("Failed to load templates:", error)
           setTemplates([])
         } finally {
           setTemplatesLoading(false)

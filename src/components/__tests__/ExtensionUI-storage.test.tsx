@@ -1,17 +1,17 @@
-import { clearAllExperimentStorage } from '~src/utils/storage-cleanup'
+import { clearAllExperimentStorage } from "~src/utils/storage-cleanup"
 
 // Mock the storage-cleanup module
-jest.mock('~src/utils/storage-cleanup', () => ({
+jest.mock("~src/utils/storage-cleanup", () => ({
   clearAllExperimentStorage: jest.fn().mockResolvedValue(undefined)
 }))
 
-describe('ExtensionUI Storage Clearing', () => {
+describe("ExtensionUI Storage Clearing", () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
-  describe('handleCreateExperiment behavior', () => {
-    it('should clear storage for new experiments (experimentId: 0)', async () => {
+  describe("handleCreateExperiment behavior", () => {
+    it("should clear storage for new experiments (experimentId: 0)", async () => {
       // Simulating what handleCreateExperiment does:
       // const handleCreateExperiment = async () => {
       //   await clearAllExperimentStorage(0)
@@ -25,7 +25,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenCalledTimes(1)
     })
 
-    it('should not load saved DOM changes after clearing storage', async () => {
+    it("should not load saved DOM changes after clearing storage", async () => {
       // After calling clearAllExperimentStorage(0), no storage data should exist
       // This ensures that VariantList won't find any saved changes to load
       await clearAllExperimentStorage(0)
@@ -35,8 +35,8 @@ describe('ExtensionUI Storage Clearing', () => {
     })
   })
 
-  describe('handleCreateFromTemplate behavior', () => {
-    it('should clear storage before loading template', async () => {
+  describe("handleCreateFromTemplate behavior", () => {
+    it("should clear storage before loading template", async () => {
       // Simulating what handleCreateFromTemplate does:
       // const handleCreateFromTemplate = async (templateId: number) => {
       //   try {
@@ -51,7 +51,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenCalledWith(0)
     })
 
-    it('should use experimentId 0 when creating from template', async () => {
+    it("should use experimentId 0 when creating from template", async () => {
       // Templates are treated as new experiments, so they should use ID 0
       await clearAllExperimentStorage(0)
 
@@ -61,8 +61,8 @@ describe('ExtensionUI Storage Clearing', () => {
     })
   })
 
-  describe('handleEditExperiment behavior', () => {
-    it('should clear storage with the actual experiment ID', async () => {
+  describe("handleEditExperiment behavior", () => {
+    it("should clear storage with the actual experiment ID", async () => {
       // Simulating what handleEditExperiment does:
       // const handleEditExperiment = async (experiment: Experiment) => {
       //   await clearAllExperimentStorage(experiment.id)
@@ -76,7 +76,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenCalledWith(123)
     })
 
-    it('should clear storage for each different experiment being edited', async () => {
+    it("should clear storage for each different experiment being edited", async () => {
       await clearAllExperimentStorage(111)
       await clearAllExperimentStorage(222)
       await clearAllExperimentStorage(333)
@@ -87,7 +87,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenNthCalledWith(3, 333)
     })
 
-    it('should prevent loading stale data when switching between experiments', async () => {
+    it("should prevent loading stale data when switching between experiments", async () => {
       // Scenario: User edits experiment A, then clicks to edit experiment B
       // Storage for experiment A should be cleared when opening B
       const expA = 100
@@ -102,8 +102,8 @@ describe('ExtensionUI Storage Clearing', () => {
     })
   })
 
-  describe('handleExperimentClick behavior', () => {
-    it('should clear storage before loading experiment details', async () => {
+  describe("handleExperimentClick behavior", () => {
+    it("should clear storage before loading experiment details", async () => {
       // Simulating what handleExperimentClick does:
       // const handleExperimentClick = async (experiment: Experiment) => {
       //   await clearAllExperimentStorage(experiment.id)
@@ -119,7 +119,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenCalledWith(456)
     })
 
-    it('should clear storage for each different experiment being viewed', async () => {
+    it("should clear storage for each different experiment being viewed", async () => {
       await clearAllExperimentStorage(50)
       await clearAllExperimentStorage(60)
       await clearAllExperimentStorage(70)
@@ -131,8 +131,8 @@ describe('ExtensionUI Storage Clearing', () => {
     })
   })
 
-  describe('Storage clearing across different navigation actions', () => {
-    it('should clear with experimentId 0 for create actions', async () => {
+  describe("Storage clearing across different navigation actions", () => {
+    it("should clear with experimentId 0 for create actions", async () => {
       // Create experiment
       await clearAllExperimentStorage(0)
 
@@ -143,7 +143,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenCalledWith(0)
     })
 
-    it('should clear with actual ID for edit and detail actions', async () => {
+    it("should clear with actual ID for edit and detail actions", async () => {
       // Edit experiment
       await clearAllExperimentStorage(789)
 
@@ -154,7 +154,7 @@ describe('ExtensionUI Storage Clearing', () => {
       expect(clearAllExperimentStorage).toHaveBeenCalledWith(789)
     })
 
-    it('should clear storage independently for different navigation flows', async () => {
+    it("should clear storage independently for different navigation flows", async () => {
       // User creates a new experiment
       await clearAllExperimentStorage(0)
 
@@ -171,16 +171,18 @@ describe('ExtensionUI Storage Clearing', () => {
     })
   })
 
-  describe('Edge cases and error handling', () => {
-    it('should handle large experiment IDs', async () => {
+  describe("Edge cases and error handling", () => {
+    it("should handle large experiment IDs", async () => {
       const largeId = 999999999
       await clearAllExperimentStorage(largeId)
 
       expect(clearAllExperimentStorage).toHaveBeenCalledWith(largeId)
     })
 
-    it('should not throw if clearAllExperimentStorage rejects', async () => {
-      (clearAllExperimentStorage as jest.Mock).mockRejectedValueOnce(new Error('Storage error'))
+    it("should not throw if clearAllExperimentStorage rejects", async () => {
+      ;(clearAllExperimentStorage as jest.Mock).mockRejectedValueOnce(
+        new Error("Storage error")
+      )
 
       try {
         await clearAllExperimentStorage(0)

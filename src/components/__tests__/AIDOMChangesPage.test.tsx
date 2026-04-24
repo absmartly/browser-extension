@@ -1,17 +1,20 @@
-import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
-import { AIDOMChangesPage } from '../AIDOMChangesPage'
-import type { DOMChange } from '~src/types/dom-changes'
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import React from "react"
+
+import "@testing-library/jest-dom"
+
+import type { DOMChange } from "~src/types/dom-changes"
+
+import { AIDOMChangesPage } from "../AIDOMChangesPage"
 
 // Mock the messaging module
-jest.mock('~src/lib/messaging', () => ({
+jest.mock("~src/lib/messaging", () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
   sendToBackground: jest.fn().mockResolvedValue({ success: true })
 }))
 
 // Mock the storage module
-jest.mock('~src/utils/storage', () => ({
+jest.mock("~src/utils/storage", () => ({
   storage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
@@ -30,7 +33,7 @@ jest.mock('~src/utils/storage', () => ({
 }))
 
 // Mock the markdown module
-jest.mock('~src/utils/markdown', () => ({
+jest.mock("~src/utils/markdown", () => ({
   renderMarkdown: jest.fn((md: string) => md)
 }))
 
@@ -53,23 +56,23 @@ global.chrome = {
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = jest.fn()
 
-describe('AIDOMChangesPage - Preview Toggle', () => {
+describe("AIDOMChangesPage - Preview Toggle", () => {
   const mockChanges: DOMChange[] = [
     {
-      selector: '.test-button',
-      type: 'style',
-      value: { color: 'red' }
+      selector: ".test-button",
+      type: "style",
+      value: { color: "red" }
     }
   ]
 
   const defaultProps = {
-    variantName: 'Test Variant',
+    variantName: "Test Variant",
     currentChanges: mockChanges,
     onBack: jest.fn(),
     onGenerate: jest.fn().mockResolvedValue({
       domChanges: mockChanges,
-      response: 'Generated changes',
-      action: 'append' as const
+      response: "Generated changes",
+      action: "append" as const
     }),
     onRestoreChanges: jest.fn(),
     onPreviewToggle: jest.fn(),
@@ -81,7 +84,7 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     jest.clearAllMocks()
   })
 
-  it('should call onPreviewWithChanges when toggling preview ON', async () => {
+  it("should call onPreviewWithChanges when toggling preview ON", async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
     await waitFor(() => {
@@ -93,7 +96,9 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
 
     jest.clearAllMocks()
 
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
+    const toggleButton = document.querySelector(
+      "#vibe-studio-preview-toggle"
+    ) as HTMLElement
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
@@ -112,7 +117,7 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     })
   })
 
-  it('should call onPreviewToggle when toggling preview OFF', async () => {
+  it("should call onPreviewToggle when toggling preview OFF", async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
     await waitFor(() => {
@@ -125,7 +130,9 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     jest.clearAllMocks()
 
     // Toggle OFF
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
+    const toggleButton = document.querySelector(
+      "#vibe-studio-preview-toggle"
+    ) as HTMLElement
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
@@ -133,7 +140,7 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     })
   })
 
-  it('should reapply changes when toggling preview ON after being OFF', async () => {
+  it("should reapply changes when toggling preview ON after being OFF", async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
     await waitFor(() => {
@@ -145,7 +152,9 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
 
     jest.clearAllMocks()
 
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
+    const toggleButton = document.querySelector(
+      "#vibe-studio-preview-toggle"
+    ) as HTMLElement
 
     // Toggle OFF
     fireEvent.click(toggleButton)
@@ -167,27 +176,22 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     })
   })
 
-  it('should preserve changes after generating new ones and toggling', async () => {
+  it("should preserve changes after generating new ones and toggling", async () => {
     const newChanges: DOMChange[] = [
       {
-        selector: '.new-element',
-        type: 'text',
-        value: 'New text'
+        selector: ".new-element",
+        type: "text",
+        value: "New text"
       }
     ]
 
     const onGenerateMock = jest.fn().mockResolvedValue({
       domChanges: newChanges,
-      response: 'Generated new changes',
-      action: 'append' as const
+      response: "Generated new changes",
+      action: "append" as const
     })
 
-    render(
-      <AIDOMChangesPage
-        {...defaultProps}
-        onGenerate={onGenerateMock}
-      />
-    )
+    render(<AIDOMChangesPage {...defaultProps} onGenerate={onGenerateMock} />)
 
     await waitFor(() => {
       expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
@@ -200,9 +204,11 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
 
     // Generate new changes
     const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-    fireEvent.change(textarea, { target: { value: 'Make it red' } })
+    fireEvent.change(textarea, { target: { value: "Make it red" } })
 
-    const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+    const generateButton = screen.getByRole("button", {
+      name: /Generate DOM Changes/i
+    })
     fireEvent.click(generateButton)
 
     await waitFor(() => {
@@ -219,7 +225,9 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
 
     jest.clearAllMocks()
 
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
+    const toggleButton = document.querySelector(
+      "#vibe-studio-preview-toggle"
+    ) as HTMLElement
 
     // Toggle OFF
     fireEvent.click(toggleButton)
@@ -241,26 +249,28 @@ describe('AIDOMChangesPage - Preview Toggle', () => {
     })
   })
 
-  it('should update button text when toggling', async () => {
+  it("should update button text when toggling", async () => {
     render(<AIDOMChangesPage {...defaultProps} />)
 
-    const toggleButton = document.querySelector('#vibe-studio-preview-toggle') as HTMLElement
+    const toggleButton = document.querySelector(
+      "#vibe-studio-preview-toggle"
+    ) as HTMLElement
 
     // Initially ON
-    expect(toggleButton.textContent).toContain('ON')
+    expect(toggleButton.textContent).toContain("ON")
 
     // Toggle OFF
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
-      expect(toggleButton.textContent).toContain('OFF')
+      expect(toggleButton.textContent).toContain("OFF")
     })
 
     // Toggle ON
     fireEvent.click(toggleButton)
 
     await waitFor(() => {
-      expect(toggleButton.textContent).toContain('ON')
+      expect(toggleButton.textContent).toContain("ON")
     })
   })
 })

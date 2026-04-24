@@ -1,4 +1,4 @@
-import { capturePageHTML, type PageCaptureResult } from '../html-capture'
+import { capturePageHTML, type PageCaptureResult } from "../html-capture"
 
 // Mock chrome.tabs and chrome.scripting APIs
 const mockChrome = {
@@ -13,16 +13,16 @@ const mockChrome = {
 
 global.chrome = mockChrome as any
 
-describe('DOM Structure Generation', () => {
+describe("DOM Structure Generation", () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
-  describe('capturePageHTML', () => {
-    it('should generate DOM structure with classes and IDs', async () => {
+  describe("capturePageHTML", () => {
+    it("should generate DOM structure with classes and IDs", async () => {
       const mockTab = {
         id: 123,
-        url: 'https://example.com'
+        url: "https://example.com"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
@@ -34,7 +34,8 @@ describe('DOM Structure Generation', () => {
 │   └── nav.nav-class
 └── main#content.content-class`
 
-      const mockHTML = '<html><body><div id="header" class="header-class"><nav class="nav-class"></nav></div><main id="content" class="content-class"></main></body></html>'
+      const mockHTML =
+        '<html><body><div id="header" class="header-class"><nav class="nav-class"></nav></div><main id="content" class="content-class"></main></body></html>'
 
       // First call returns DOM structure, second returns HTML
       mockChrome.scripting.executeScript
@@ -45,17 +46,17 @@ describe('DOM Structure Generation', () => {
 
       expect(result).toEqual({
         html: mockHTML,
-        url: 'https://example.com',
+        url: "https://example.com",
         domStructure: mockDOMStructure
       })
 
       expect(mockChrome.scripting.executeScript).toHaveBeenCalledTimes(2)
     })
 
-    it('should include data attributes in structure', async () => {
+    it("should include data attributes in structure", async () => {
       const mockTab = {
         id: 123,
-        url: 'https://example.com'
+        url: "https://example.com"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
@@ -66,18 +67,18 @@ describe('DOM Structure Generation', () => {
 
       mockChrome.scripting.executeScript
         .mockResolvedValueOnce([{ result: mockDOMStructure }])
-        .mockResolvedValueOnce([{ result: '<html><body></body></html>' }])
+        .mockResolvedValueOnce([{ result: "<html><body></body></html>" }])
 
       const result = await capturePageHTML()
 
-      expect(result.domStructure).toContain('data-testid')
-      expect(result.domStructure).toContain('data-component')
+      expect(result.domStructure).toContain("data-testid")
+      expect(result.domStructure).toContain("data-component")
     })
 
-    it('should include aria-label and role attributes', async () => {
+    it("should include aria-label and role attributes", async () => {
       const mockTab = {
         id: 123,
-        url: 'https://example.com'
+        url: "https://example.com"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
@@ -88,18 +89,18 @@ describe('DOM Structure Generation', () => {
 
       mockChrome.scripting.executeScript
         .mockResolvedValueOnce([{ result: mockDOMStructure }])
-        .mockResolvedValueOnce([{ result: '<html><body></body></html>' }])
+        .mockResolvedValueOnce([{ result: "<html><body></body></html>" }])
 
       const result = await capturePageHTML()
 
       expect(result.domStructure).toContain('role="button"')
-      expect(result.domStructure).toContain('aria-label')
+      expect(result.domStructure).toContain("aria-label")
     })
 
-    it('should handle nested structures with proper indentation', async () => {
+    it("should handle nested structures with proper indentation", async () => {
       const mockTab = {
         id: 123,
-        url: 'https://example.com'
+        url: "https://example.com"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
@@ -115,19 +116,19 @@ describe('DOM Structure Generation', () => {
 
       mockChrome.scripting.executeScript
         .mockResolvedValueOnce([{ result: mockDOMStructure }])
-        .mockResolvedValueOnce([{ result: '<html><body></body></html>' }])
+        .mockResolvedValueOnce([{ result: "<html><body></body></html>" }])
 
       const result = await capturePageHTML()
 
-      expect(result.domStructure).toContain('├──')
-      expect(result.domStructure).toContain('└──')
-      expect(result.domStructure).toContain('│')
+      expect(result.domStructure).toContain("├──")
+      expect(result.domStructure).toContain("└──")
+      expect(result.domStructure).toContain("│")
     })
 
-    it('should provide fallback when structure generation fails', async () => {
+    it("should provide fallback when structure generation fails", async () => {
       const mockTab = {
         id: 123,
-        url: 'https://example.com'
+        url: "https://example.com"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
@@ -136,43 +137,45 @@ describe('DOM Structure Generation', () => {
       // First call returns null/undefined (structure failed)
       mockChrome.scripting.executeScript
         .mockResolvedValueOnce([{ result: null }])
-        .mockResolvedValueOnce([{ result: '<html><body></body></html>' }])
+        .mockResolvedValueOnce([{ result: "<html><body></body></html>" }])
 
       const result = await capturePageHTML()
 
-      expect(result.domStructure).toBe('body\n└── (structure unavailable)')
+      expect(result.domStructure).toBe("body\n└── (structure unavailable)")
     })
 
-    it('should reject chrome:// and extension pages', async () => {
+    it("should reject chrome:// and extension pages", async () => {
       const mockTab = {
         id: 123,
-        url: 'chrome://extensions'
+        url: "chrome://extensions"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
       mockChrome.tabs.get.mockResolvedValue(mockTab)
 
-      await expect(capturePageHTML()).rejects.toThrow('Please open the extension on a webpage')
+      await expect(capturePageHTML()).rejects.toThrow(
+        "Please open the extension on a webpage"
+      )
     })
 
-    it('should fall back to empty HTML for chrome-extension:// pages in non-production', async () => {
+    it("should fall back to empty HTML for chrome-extension:// pages in non-production", async () => {
       const mockTab = {
         id: 123,
-        url: 'chrome-extension://abcd1234/popup.html'
+        url: "chrome-extension://abcd1234/popup.html"
       }
 
       mockChrome.tabs.query.mockResolvedValue([mockTab])
       mockChrome.tabs.get.mockResolvedValue(mockTab)
 
       const result = await capturePageHTML()
-      expect(result.html).toBe('<html></html>')
-      expect(result.url).toBe('chrome-extension://abcd1234/popup.html')
-      expect(result.domStructure).toBe('body')
+      expect(result.html).toBe("<html></html>")
+      expect(result.url).toBe("chrome-extension://abcd1234/popup.html")
+      expect(result.domStructure).toBe("body")
     })
   })
 
-  describe('generateDOMStructureInPage function isolation', () => {
-    it('should work without external dependencies when serialized', () => {
+  describe("generateDOMStructureInPage function isolation", () => {
+    it("should work without external dependencies when serialized", () => {
       // This test ensures the function can be serialized and executed in a different context
       // (like chrome.scripting.executeScript does)
 
@@ -191,31 +194,31 @@ describe('DOM Structure Generation', () => {
       `
 
       const parser = new DOMParser()
-      const doc = parser.parseFromString(testHTML, 'text/html')
+      const doc = parser.parseFromString(testHTML, "text/html")
 
       // Simulate what happens when the function is serialized and executed
       const functionString = simulateStructureGeneration.toString()
 
       // Verify the function doesn't reference external variables
-      expect(functionString).toContain('const EXCLUDE_SELECTORS')
-      expect(functionString).toContain('const MAX_DEPTH')
-      expect(functionString).toContain('const MAX_CLASSES')
+      expect(functionString).toContain("const EXCLUDE_SELECTORS")
+      expect(functionString).toContain("const MAX_DEPTH")
+      expect(functionString).toContain("const MAX_CLASSES")
 
       // Run it
       const result = simulateStructureGeneration(doc.body)
 
       expect(result).toBeTruthy()
-      expect(result).toContain('body')
-      expect(result).toContain('div#main')
-      expect(result).toContain('header.site-header')
+      expect(result).toContain("body")
+      expect(result).toContain("div#main")
+      expect(result).toContain("header.site-header")
       expect(result).toContain('[role="navigation"]')
       expect(result).toContain('data-testid="header"')
-      expect(result).not.toContain('script')
+      expect(result).not.toContain("script")
     })
   })
 
-  describe('DOM Structure Function (Integration)', () => {
-    it('should compress consecutive duplicate elements', () => {
+  describe("DOM Structure Function (Integration)", () => {
+    it("should compress consecutive duplicate elements", () => {
       const testHTML = `
         <body>
           <div class="container">
@@ -234,16 +237,16 @@ describe('DOM Structure Generation', () => {
       `
 
       const parser = new DOMParser()
-      const doc = parser.parseFromString(testHTML, 'text/html')
+      const doc = parser.parseFromString(testHTML, "text/html")
       const result = simulateStructureGeneration(doc.body)
 
       // Should compress img (×3), button (×2), and div.item (×5)
-      expect(result).toContain('img (×3)')
+      expect(result).toContain("img (×3)")
       expect(result).toContain('button "Button 1" (×2)')
       expect(result).toContain('div.item "Item 1" (×5)')
     })
 
-    it('should generate valid structure from real-like DOM', () => {
+    it("should generate valid structure from real-like DOM", () => {
       // Create a test DOM
       const testHTML = `
         <body>
@@ -265,17 +268,17 @@ describe('DOM Structure Generation', () => {
 
       // Parse into DOM
       const parser = new DOMParser()
-      const doc = parser.parseFromString(testHTML, 'text/html')
+      const doc = parser.parseFromString(testHTML, "text/html")
 
       // Run the generation function logic (simulated)
       const result = simulateStructureGeneration(doc.body)
 
-      expect(result).toContain('div#header')
+      expect(result).toContain("div#header")
       expect(result).toContain('nav [role="navigation"]')
       expect(result).toContain('button [aria-label="Menu"]')
       expect(result).toContain('data-testid="header"')
-      expect(result).not.toContain('script')
-      expect(result).not.toContain('style')
+      expect(result).not.toContain("script")
+      expect(result).not.toContain("style")
     })
   })
 })
@@ -286,13 +289,13 @@ function simulateStructureGeneration(body: HTMLElement): string {
   const MAX_CLASSES = 5
 
   const EXCLUDE_SELECTORS = [
-    '#__plasmo',
-    '#__plasmo-loading__',
-    '[data-plasmo]',
-    'plasmo-csui',
-    'script',
-    'style',
-    'noscript',
+    "#__plasmo",
+    "#__plasmo-loading__",
+    "[data-plasmo]",
+    "plasmo-csui",
+    "script",
+    "style",
+    "noscript",
     'iframe[id^="absmartly-"]'
   ]
 
@@ -311,18 +314,23 @@ function simulateStructureGeneration(body: HTMLElement): string {
     let sig = el.tagName.toLowerCase()
     if (el.id) sig += `#${el.id}`
     const classes = Array.from(el.classList)
-      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .filter((c) => !c.startsWith("__") && !c.includes("plasmo"))
       .slice(0, MAX_CLASSES)
-    if (classes.length > 0) sig += '.' + classes.join('.')
+    if (classes.length > 0) sig += "." + classes.join(".")
     return sig
   }
 
-  function formatNode(el: Element, prefix: string, isLast: boolean, depth: number): string[] {
+  function formatNode(
+    el: Element,
+    prefix: string,
+    isLast: boolean,
+    depth: number
+  ): string[] {
     if (shouldExclude(el) || depth > MAX_DEPTH) return []
 
     const lines: string[] = []
-    const connector = isLast ? '└── ' : '├── '
-    const childPrefix = isLast ? '    ' : '│   '
+    const connector = isLast ? "└── " : "├── "
+    const childPrefix = isLast ? "    " : "│   "
 
     let label = el.tagName.toLowerCase()
 
@@ -331,36 +339,40 @@ function simulateStructureGeneration(body: HTMLElement): string {
     }
 
     const classes = Array.from(el.classList)
-      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .filter((c) => !c.startsWith("__") && !c.includes("plasmo"))
       .slice(0, MAX_CLASSES)
     if (classes.length > 0) {
-      label += '.' + classes.join('.')
+      label += "." + classes.join(".")
     }
 
-    const role = el.getAttribute('role')
+    const role = el.getAttribute("role")
     if (role) {
       label += ` [role="${role}"]`
     }
 
-    const ariaLabel = el.getAttribute('aria-label')
+    const ariaLabel = el.getAttribute("aria-label")
     if (ariaLabel) {
-      const short = ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + '...' : ariaLabel
+      const short =
+        ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + "..." : ariaLabel
       label += ` [aria-label="${short}"]`
     }
 
     const dataAttrs: string[] = []
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith('data-') && !attr.name.includes('plasmo')) {
-        const val = attr.value.length > 30 ? attr.value.slice(0, 30) + '...' : attr.value
+      if (attr.name.startsWith("data-") && !attr.name.includes("plasmo")) {
+        const val =
+          attr.value.length > 30 ? attr.value.slice(0, 30) + "..." : attr.value
         dataAttrs.push(`${attr.name}="${val}"`)
         if (dataAttrs.length >= 3) break
       }
     }
     if (dataAttrs.length > 0) {
-      label += ` {${dataAttrs.join(' ')}}`
+      label += ` {${dataAttrs.join(" ")}}`
     }
 
-    const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
+    const validChildren = Array.from(el.children).filter(
+      (c) => !shouldExclude(c)
+    )
     if (validChildren.length > 0 && depth >= MAX_DEPTH) {
       label += ` (${validChildren.length} children)`
     }
@@ -383,15 +395,22 @@ function simulateStructureGeneration(body: HTMLElement): string {
 
         // Count consecutive elements with same signature
         let count = 1
-        while (i + count < validChildren.length &&
-               getElementSignature(validChildren[i + count]) === childSig) {
+        while (
+          i + count < validChildren.length &&
+          getElementSignature(validChildren[i + count]) === childSig
+        ) {
           count++
         }
 
         if (count > 1) {
           // Show compressed format for duplicates
           const isChildLast = i + count >= validChildren.length
-          const childLines = formatNode(child, prefix + childPrefix, false, depth + 1)
+          const childLines = formatNode(
+            child,
+            prefix + childPrefix,
+            false,
+            depth + 1
+          )
 
           // Modify the first line to add count
           if (childLines.length > 0) {
@@ -407,7 +426,9 @@ function simulateStructureGeneration(body: HTMLElement): string {
         } else {
           // Show normally (single element)
           const isChildLast = i === validChildren.length - 1
-          lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+          lines.push(
+            ...formatNode(child, prefix + childPrefix, isChildLast, depth + 1)
+          )
           i++
         }
       }
@@ -416,13 +437,15 @@ function simulateStructureGeneration(body: HTMLElement): string {
     return lines
   }
 
-  const lines: string[] = ['body']
-  const bodyChildren = Array.from(body.children).filter(c => !shouldExclude(c))
+  const lines: string[] = ["body"]
+  const bodyChildren = Array.from(body.children).filter(
+    (c) => !shouldExclude(c)
+  )
   for (let i = 0; i < bodyChildren.length; i++) {
     const child = bodyChildren[i]
     const isLast = i === bodyChildren.length - 1
-    lines.push(...formatNode(child, '', isLast, 1))
+    lines.push(...formatNode(child, "", isLast, 1))
   }
 
-  return lines.join('\n')
+  return lines.join("\n")
 }

@@ -3,20 +3,24 @@
  * Provides syntax highlighting and full code editing features for Markdown
  */
 
-import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { markdown } from '@codemirror/lang-markdown'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { basicSetup } from 'codemirror'
+import { markdown } from "@codemirror/lang-markdown"
+import { EditorState } from "@codemirror/state"
+import { oneDark } from "@codemirror/theme-one-dark"
+import { EditorView } from "@codemirror/view"
+import { basicSetup } from "codemirror"
 
 export class MarkdownEditor {
   private editorHost: HTMLElement | null = null
   private editorView: EditorView | null = null
 
-  async show(title: string, currentMarkdown: string, defaultValue?: string): Promise<string | null> {
+  async show(
+    title: string,
+    currentMarkdown: string,
+    defaultValue?: string
+  ): Promise<string | null> {
     return new Promise((resolve) => {
-      this.editorHost = document.createElement('div')
-      this.editorHost.id = 'absmartly-markdown-editor-host'
+      this.editorHost = document.createElement("div")
+      this.editorHost.id = "absmartly-markdown-editor-host"
       this.editorHost.style.cssText = `
         position: fixed;
         top: 0;
@@ -27,41 +31,41 @@ export class MarkdownEditor {
         pointer-events: auto;
       `
 
-      const editorStyle = document.createElement('style')
-      editorStyle.id = 'absmartly-markdown-editor-styles'
+      const editorStyle = document.createElement("style")
+      editorStyle.id = "absmartly-markdown-editor-styles"
       editorStyle.textContent = this.getEditorStyles()
       document.head.appendChild(editorStyle)
 
-      const backdrop = document.createElement('div')
-      backdrop.className = 'markdown-editor-backdrop'
+      const backdrop = document.createElement("div")
+      backdrop.className = "markdown-editor-backdrop"
 
-      const container = document.createElement('div')
-      container.className = 'markdown-editor-container'
+      const container = document.createElement("div")
+      container.className = "markdown-editor-container"
 
-      const header = document.createElement('div')
-      header.className = 'markdown-editor-header'
+      const header = document.createElement("div")
+      header.className = "markdown-editor-header"
 
-      const titleEl = document.createElement('h3')
-      titleEl.className = 'markdown-editor-title'
+      const titleEl = document.createElement("h3")
+      titleEl.className = "markdown-editor-title"
       titleEl.textContent = title
 
-      const charCountEl = document.createElement('span')
-      charCountEl.className = 'markdown-editor-char-count'
-      charCountEl.id = 'markdown-editor-char-count'
+      const charCountEl = document.createElement("span")
+      charCountEl.className = "markdown-editor-char-count"
+      charCountEl.id = "markdown-editor-char-count"
       charCountEl.textContent = `${currentMarkdown.length} characters`
 
       header.appendChild(titleEl)
       header.appendChild(charCountEl)
 
-      const editorContainer = document.createElement('div')
-      editorContainer.id = 'markdown-codemirror-container'
-      editorContainer.className = 'markdown-editor-codemirror-container'
+      const editorContainer = document.createElement("div")
+      editorContainer.id = "markdown-codemirror-container"
+      editorContainer.className = "markdown-editor-codemirror-container"
 
-      const toolbar = document.createElement('div')
-      toolbar.className = 'markdown-editor-toolbar'
+      const toolbar = document.createElement("div")
+      toolbar.className = "markdown-editor-toolbar"
 
-      const tipsEl = document.createElement('div')
-      tipsEl.className = 'markdown-editor-tips'
+      const tipsEl = document.createElement("div")
+      tipsEl.className = "markdown-editor-tips"
       tipsEl.innerHTML = `
         <div style="font-size: 11px; color: #858585;">
           <strong>Tips:</strong>
@@ -73,16 +77,21 @@ export class MarkdownEditor {
       toolbar.appendChild(tipsEl)
 
       if (defaultValue !== undefined) {
-        const resetBtn = document.createElement('button')
-        resetBtn.id = 'reset-prompt-to-default-button'
-        resetBtn.className = 'markdown-editor-button markdown-editor-button-reset'
-        resetBtn.innerHTML = '<span>↺</span> Reset to Default'
+        const resetBtn = document.createElement("button")
+        resetBtn.id = "reset-prompt-to-default-button"
+        resetBtn.className =
+          "markdown-editor-button markdown-editor-button-reset"
+        resetBtn.innerHTML = "<span>↺</span> Reset to Default"
 
-        resetBtn.addEventListener('click', (e) => {
+        resetBtn.addEventListener("click", (e) => {
           e.stopPropagation()
           e.preventDefault()
 
-          if (confirm('Reset to default prompt? Your custom changes will be lost.')) {
+          if (
+            confirm(
+              "Reset to default prompt? Your custom changes will be lost."
+            )
+          ) {
             if (this.editorView) {
               this.editorView.dispatch({
                 changes: {
@@ -99,16 +108,17 @@ export class MarkdownEditor {
         toolbar.appendChild(resetBtn)
       }
 
-      const buttons = document.createElement('div')
-      buttons.className = 'markdown-editor-buttons'
+      const buttons = document.createElement("div")
+      buttons.className = "markdown-editor-buttons"
 
-      const cancelBtn = document.createElement('button')
-      cancelBtn.className = 'markdown-editor-button markdown-editor-button-cancel'
-      cancelBtn.innerHTML = '<span>✕</span> Cancel'
+      const cancelBtn = document.createElement("button")
+      cancelBtn.className =
+        "markdown-editor-button markdown-editor-button-cancel"
+      cancelBtn.innerHTML = "<span>✕</span> Cancel"
 
-      const saveBtn = document.createElement('button')
-      saveBtn.className = 'markdown-editor-button markdown-editor-button-save'
-      saveBtn.innerHTML = '<span>✓</span> Save Changes'
+      const saveBtn = document.createElement("button")
+      saveBtn.className = "markdown-editor-button markdown-editor-button-save"
+      saveBtn.innerHTML = "<span>✓</span> Save Changes"
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -147,43 +157,43 @@ export class MarkdownEditor {
         this.editorView.focus()
       }, 10)
 
-      cancelBtn.addEventListener('click', (e) => {
+      cancelBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
         this.cleanup()
         resolve(null)
       })
 
-      saveBtn.addEventListener('click', (e) => {
+      saveBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
 
-        const newMarkdown = this.editorView?.state.doc.toString() || ''
+        const newMarkdown = this.editorView?.state.doc.toString() || ""
         this.cleanup()
         resolve(newMarkdown)
       })
 
       const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && this.editorHost) {
-          document.removeEventListener('keydown', escapeHandler)
+        if (e.key === "Escape" && this.editorHost) {
+          document.removeEventListener("keydown", escapeHandler)
           this.cleanup()
           resolve(null)
         }
       }
-      document.addEventListener('keydown', escapeHandler)
+      document.addEventListener("keydown", escapeHandler)
 
-      backdrop.addEventListener('click', (e) => {
+      backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) {
           this.cleanup()
           resolve(null)
         }
       })
 
-      container.addEventListener('click', (e) => {
+      container.addEventListener("click", (e) => {
         e.stopPropagation()
       })
 
-      container.addEventListener('mousedown', (e) => {
+      container.addEventListener("mousedown", (e) => {
         e.stopPropagation()
       })
     })
@@ -195,7 +205,7 @@ export class MarkdownEditor {
       this.editorView = null
     }
 
-    const styleEl = document.getElementById('absmartly-markdown-editor-styles')
+    const styleEl = document.getElementById("absmartly-markdown-editor-styles")
     if (styleEl) {
       styleEl.remove()
     }

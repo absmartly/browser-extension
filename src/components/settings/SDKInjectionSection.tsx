@@ -1,5 +1,6 @@
-import React from 'react'
-import { Input } from '../ui/Input'
+import React from "react"
+
+import { Input } from "../ui/Input"
 
 interface SDKInjectionSectionProps {
   injectSDK: boolean
@@ -31,7 +32,8 @@ export const SDKInjectionSection = React.memo(function SDKInjectionSection({
         </label>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        When enabled, the extension will inject the ABsmartly SDK (including all plugins) on pages where it's not already present.
+        When enabled, the extension will inject the ABsmartly SDK (including all
+        plugins) on pages where it's not already present.
       </p>
 
       {injectSDK && (
@@ -44,7 +46,8 @@ export const SDKInjectionSection = React.memo(function SDKInjectionSection({
             placeholder="https://sdk.absmartly.com/sdk.js"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Custom URL for the SDK script. Leave empty to use the default SDK URL with current page's query parameters.
+            Custom URL for the SDK script. Leave empty to use the default SDK
+            URL with current page's query parameters.
           </p>
         </div>
       )}

@@ -1,14 +1,61 @@
-import React from 'react'
-import { KeyValueEditor } from './KeyValueEditor'
+import React from "react"
+
+import { KeyValueEditor } from "./KeyValueEditor"
 
 const commonAttributes = [
-  'href', 'src', 'alt', 'title', 'target', 'rel', 'role', 'aria-label', 'aria-describedby',
-  'aria-expanded', 'aria-hidden', 'aria-current', 'data-testid', 'id', 'name', 'type',
-  'value', 'placeholder', 'disabled', 'readonly', 'required', 'checked', 'selected',
-  'multiple', 'accept', 'autocomplete', 'autofocus', 'min', 'max', 'step', 'pattern',
-  'maxlength', 'minlength', 'size', 'rows', 'cols', 'wrap', 'for', 'form', 'action',
-  'method', 'enctype', 'novalidate', 'formnovalidate', 'tabindex', 'accesskey',
-  'contenteditable', 'draggable', 'spellcheck', 'translate', 'dir', 'lang', 'hidden'
+  "href",
+  "src",
+  "alt",
+  "title",
+  "target",
+  "rel",
+  "role",
+  "aria-label",
+  "aria-describedby",
+  "aria-expanded",
+  "aria-hidden",
+  "aria-current",
+  "data-testid",
+  "id",
+  "name",
+  "type",
+  "value",
+  "placeholder",
+  "disabled",
+  "readonly",
+  "required",
+  "checked",
+  "selected",
+  "multiple",
+  "accept",
+  "autocomplete",
+  "autofocus",
+  "min",
+  "max",
+  "step",
+  "pattern",
+  "maxlength",
+  "minlength",
+  "size",
+  "rows",
+  "cols",
+  "wrap",
+  "for",
+  "form",
+  "action",
+  "method",
+  "enctype",
+  "novalidate",
+  "formnovalidate",
+  "tabindex",
+  "accesskey",
+  "contenteditable",
+  "draggable",
+  "spellcheck",
+  "translate",
+  "dir",
+  "lang",
+  "hidden"
 ].sort()
 
 interface AttributeEditorProps {
@@ -28,13 +75,13 @@ export const AttributeEditor = ({
       onChange={onChange}
       config={{
         keySuggestions: commonAttributes,
-        keyPlaceholder: 'attribute',
-        valuePlaceholder: 'value',
-        headerText: 'element.attributes',
-        separatorBefore: '=',
+        keyPlaceholder: "attribute",
+        valuePlaceholder: "value",
+        headerText: "element.attributes",
+        separatorBefore: "=",
         separatorAfter: '"',
         separatorBeforeValue: '"',
-        addButtonText: '+ Add attribute...'
+        addButtonText: "+ Add attribute..."
       }}
       idSuffix={idSuffix}
     />

@@ -3,22 +3,24 @@
  * Extracted from visual-editor.ts to separate concerns
  */
 
-import { generateRobustSelector } from '../utils/selector-generator'
-import StateManager from './state-manager'
-import type { VisualEditorState } from './state-manager'
-import EventHandlers from './event-handlers'
-import ContextMenu from './context-menu'
-import UndoRedoManager from './undo-redo-manager'
-import UIComponents from '../ui/components'
-import EditModes from './edit-modes'
-import Cleanup from './cleanup'
-import { Notifications } from '../ui/notifications'
-import HtmlEditor from '../ui/html-editor'
-import ImageSourceDialog from '../ui/image-source-dialog'
-import type { DOMChange } from '../types/visual-editor'
-import DOMPurify from 'dompurify'
+import DOMPurify from "dompurify"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { debugLog, debugWarn } from "~src/utils/debug"
+
+import type { DOMChange } from "../types/visual-editor"
+import UIComponents from "../ui/components"
+import HtmlEditor from "../ui/html-editor"
+import ImageSourceDialog from "../ui/image-source-dialog"
+import { Notifications } from "../ui/notifications"
+import { generateRobustSelector } from "../utils/selector-generator"
+import Cleanup from "./cleanup"
+import ContextMenu from "./context-menu"
+import EditModes from "./edit-modes"
+import EventHandlers from "./event-handlers"
+import StateManager from "./state-manager"
+import type { VisualEditorState } from "./state-manager"
+import UndoRedoManager from "./undo-redo-manager"
+
 export interface EditorCoordinatorCallbacks {
   onChangesUpdate: (changes: DOMChange[]) => void
   removeStyles: () => void
@@ -27,7 +29,7 @@ export interface EditorCoordinatorCallbacks {
   deleteElement: () => void
   copyElement: () => void
   copySelectorPath: () => void
-  moveElement: (direction: 'up' | 'down') => void
+  moveElement: (direction: "up" | "down") => void
   insertNewBlock: () => void
   showRelativeElementSelector: () => void
   changeImageSource: () => void
@@ -87,7 +89,11 @@ export class EditorCoordinator {
 
   setupModuleIntegrations(): void {
     // Connect event handlers to context menu
-    this.eventHandlers.showContextMenu = (x: number, y: number, element: Element) => {
+    this.eventHandlers.showContextMenu = (
+      x: number,
+      y: number,
+      element: Element
+    ) => {
       this.contextMenu.show(x, y, element)
     }
 
@@ -95,7 +101,8 @@ export class EditorCoordinator {
     this.contextMenu.handleAction = (action: string, element: Element) => {
       // IMPORTANT: Always use the currently selected element from state, not the passed element
       // This ensures actions work on the element selected from the hierarchy panel
-      const currentSelected = this.stateManager.getState().selectedElement || element
+      const currentSelected =
+        this.stateManager.getState().selectedElement || element
       this.handleMenuAction(action, currentSelected)
     }
 
@@ -107,7 +114,9 @@ export class EditorCoordinator {
     this.uiComponents.onExit = () => this.callbacks.stop()
 
     // Register cleanup handlers
-    this.cleanup.registerEventHandler(() => this.eventHandlers.detachEventListeners())
+    this.cleanup.registerEventHandler(() =>
+      this.eventHandlers.detachEventListeners()
+    )
     this.cleanup.registerEventHandler(() => this.removeEventListeners())
     this.cleanup.registerEventHandler(() => this.stopMutationObserver())
     this.cleanup.registerEventHandler(() => this.makeElementsNonEditable())
@@ -134,13 +143,17 @@ export class EditorCoordinator {
       const undoCount = this.undoRedoManager.getUndoCount()
       const redoCount = this.undoRedoManager.getRedoCount()
 
-      if (changesLength !== previousChangesLength ||
-          undoCount !== previousUndoStackLength ||
-          redoCount !== previousRedoStackLength) {
-
-        debugLog('[EditorCoordinator] Changes/Undo/Redo updated - total changes:', changesLength)
-        debugLog('[EditorCoordinator] Session changes (undo count):', undoCount)
-        debugLog('[EditorCoordinator] Redo count:', redoCount)
+      if (
+        changesLength !== previousChangesLength ||
+        undoCount !== previousUndoStackLength ||
+        redoCount !== previousRedoStackLength
+      ) {
+        debugLog(
+          "[EditorCoordinator] Changes/Undo/Redo updated - total changes:",
+          changesLength
+        )
+        debugLog("[EditorCoordinator] Session changes (undo count):", undoCount)
+        debugLog("[EditorCoordinator] Redo count:", redoCount)
 
         // Update banner - changes counter shows session changes (undo count)
         this.uiComponents.updateBanner({
@@ -163,8 +176,8 @@ export class EditorCoordinator {
 
     // Note: keydown handling is done in setupKeyboardHandlers()
     // Add coordinator-specific event listeners
-    document.addEventListener('mousedown', this.handleMouseDown, true)
-    document.addEventListener('mouseup', this.handleMouseUp, true)
+    document.addEventListener("mousedown", this.handleMouseDown, true)
+    document.addEventListener("mouseup", this.handleMouseUp, true)
   }
 
   removeEventListeners(): void {
@@ -173,15 +186,15 @@ export class EditorCoordinator {
 
     // Note: keydown listener is removed in setupKeyboardHandlers cleanup
     // Remove coordinator-specific event listeners
-    document.removeEventListener('mousedown', this.handleMouseDown, true)
-    document.removeEventListener('mouseup', this.handleMouseUp, true)
+    document.removeEventListener("mousedown", this.handleMouseDown, true)
+    document.removeEventListener("mouseup", this.handleMouseUp, true)
     this.removeHoverTooltip()
   }
 
   setupKeyboardHandlers(): void {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Copy selector: Ctrl+Shift+C (Cmd+Shift+C on Mac)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'c') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "c") {
         e.preventDefault()
         const selectedElement = this.stateManager.getState().selectedElement
         if (selectedElement) {
@@ -192,67 +205,71 @@ export class EditorCoordinator {
             maxParentLevels: 3
           })
           navigator.clipboard.writeText(selector).then(() => {
-            this.notifications.show(`Selector copied: ${selector}`, '', 'success')
+            this.notifications.show(
+              `Selector copied: ${selector}`,
+              "",
+              "success"
+            )
           })
         }
       }
 
       // Undo: Ctrl+Z (Cmd+Z on Mac)
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
         e.preventDefault()
         this.callbacks.undo()
       }
 
       // Redo: Ctrl+Y (Cmd+Y on Mac) or Ctrl+Shift+Z (Cmd+Shift+Z on Mac)
       if (
-        ((e.ctrlKey || e.metaKey) && e.key === 'y') ||
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')
+        ((e.ctrlKey || e.metaKey) && e.key === "y") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "z")
       ) {
         e.preventDefault()
         this.callbacks.redo()
       }
 
       // Exit Visual Editor: Escape key
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         // Don't exit VE if we're editing text inline or if HTML editor is open
         if (this.eventHandlers.isEditingMode) {
           return
         }
-        
+
         e.preventDefault()
         e.stopPropagation()
-        
+
         // Call stop to properly exit the VE
-        if (this.callbacks.stop && typeof this.callbacks.stop === 'function') {
+        if (this.callbacks.stop && typeof this.callbacks.stop === "function") {
           this.callbacks.stop()
         }
         return
       }
 
       // Delete: Delete key
-      if (e.key === 'Delete') {
+      if (e.key === "Delete") {
         const selectedElement = this.stateManager.getState().selectedElement
         if (selectedElement && !this.eventHandlers.isEditingMode) {
           e.preventDefault()
           selectedElement.remove()
-          const selector = this.callbacks.getSelector(selectedElement as HTMLElement)
+          const selector = this.callbacks.getSelector(
+            selectedElement as HTMLElement
+          )
           const oldValue = selectedElement.outerHTML
           this.undoRedoManager.addChange(
             {
               selector,
-              type: 'remove'
+              type: "remove"
             },
             oldValue
           )
         }
       }
-
-
     }
 
-    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown)
     this.cleanup.registerEventHandler(() => {
-      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener("keydown", handleKeyDown)
     })
   }
 
@@ -261,34 +278,47 @@ export class EditorCoordinator {
       if (event.source !== window) return
 
       const isFileProtocol =
-        window.location.protocol === 'file:' || event.origin === 'null'
+        window.location.protocol === "file:" || event.origin === "null"
       if (!isFileProtocol && event.origin !== window.location.origin) {
         return
       }
 
-      if (event.data?.source !== 'absmartly-visual-editor') {
+      if (event.data?.source !== "absmartly-visual-editor") {
         return
       }
 
       switch (event.data.type) {
-        case 'ABSMARTLY_VISUAL_EDITOR_EXIT':
+        case "ABSMARTLY_VISUAL_EDITOR_EXIT":
           this.callbacks.stop()
           break
       }
     }
 
-    window.addEventListener('message', handleMessage)
+    window.addEventListener("message", handleMessage)
     this.cleanup.registerEventHandler(() => {
-      window.removeEventListener('message', handleMessage)
+      window.removeEventListener("message", handleMessage)
     })
   }
 
   handleMenuAction(action: string, element: Element): void {
-    debugLog('[handleMenuAction] START - action:', action)
-    debugLog('[handleMenuAction] Received element:', element)
-    debugLog('[handleMenuAction] Element details - tagName:', element.tagName, 'id:', element.id, 'className:', element.className)
-    debugLog('[handleMenuAction] Coordinator selectedElement:', this.selectedElement)
-    debugLog('[handleMenuAction] State selectedElement:', this.stateManager.getState().selectedElement)
+    debugLog("[handleMenuAction] START - action:", action)
+    debugLog("[handleMenuAction] Received element:", element)
+    debugLog(
+      "[handleMenuAction] Element details - tagName:",
+      element.tagName,
+      "id:",
+      element.id,
+      "className:",
+      element.className
+    )
+    debugLog(
+      "[handleMenuAction] Coordinator selectedElement:",
+      this.selectedElement
+    )
+    debugLog(
+      "[handleMenuAction] State selectedElement:",
+      this.stateManager.getState().selectedElement
+    )
 
     const originalState = {
       html: element.outerHTML,
@@ -299,80 +329,87 @@ export class EditorCoordinator {
     }
 
     switch (action) {
-      case 'edit':
-      case 'edit-element':
-        debugLog('[handleMenuAction] Handling edit action for:', element)
+      case "edit":
+      case "edit-element":
+        debugLog("[handleMenuAction] Handling edit action for:", element)
         this.handleEditAction(element, originalState)
         break
 
-      case 'editHtml':
-      case 'edit-html':
+      case "editHtml":
+      case "edit-html":
         this.handleEditHtmlAction(element, originalState)
         break
 
-      case 'rearrange':
+      case "rearrange":
         this.editModes.enableRearrangeMode(element)
         break
 
-      case 'resize':
+      case "resize":
         this.editModes.enableResizeMode(element)
         break
 
-      case 'hide':
+      case "hide":
         this.callbacks.hideElement()
         break
 
-      case 'delete':
+      case "delete":
         this.callbacks.deleteElement()
         break
 
-      case 'copy':
+      case "copy":
         this.callbacks.copyElement()
         break
 
-      case 'copy-selector':
-      case 'copySelector':
+      case "copy-selector":
+      case "copySelector":
         this.callbacks.copySelectorPath()
         break
 
-      case 'move-up':
-        this.callbacks.moveElement('up')
+      case "move-up":
+        this.callbacks.moveElement("up")
         break
 
-      case 'move-down':
-        this.callbacks.moveElement('down')
+      case "move-down":
+        this.callbacks.moveElement("down")
         break
 
-      case 'insert-block':
-        debugLog('[EditorCoordinator] insert-block action triggered')
+      case "insert-block":
+        debugLog("[EditorCoordinator] insert-block action triggered")
         this.callbacks.insertNewBlock()
-        debugLog('[EditorCoordinator] insertNewBlock callback called')
+        debugLog("[EditorCoordinator] insertNewBlock callback called")
         break
 
-      case 'select-relative':
-      case 'selectRelative':
-        debugLog('[handleMenuAction] Handling select-relative for element:', element)
+      case "select-relative":
+      case "selectRelative":
+        debugLog(
+          "[handleMenuAction] Handling select-relative for element:",
+          element
+        )
         this.handleSelectRelativeElement(element)
         break
 
-      case 'change-image-source':
+      case "change-image-source":
         this.handleChangeImageSource(element)
         break
 
       default:
-        debugLog('[ABSmartly] Action not yet implemented:', action)
-        this.notifications.show(`${action}: Coming soon!`, '', 'info')
+        debugLog("[ABSmartly] Action not yet implemented:", action)
+        this.notifications.show(`${action}: Coming soon!`, "", "info")
     }
   }
 
   handleEditAction(element: Element, originalState: any): void {
-    debugLog('[handleEditAction] START for element:', element)
-    debugLog('[handleEditAction] Element details:', element.tagName, element.id, element.className)
+    debugLog("[handleEditAction] START for element:", element)
+    debugLog(
+      "[handleEditAction] Element details:",
+      element.tagName,
+      element.id,
+      element.className
+    )
     this.removeContextMenu()
 
     this.eventHandlers.setEditing(true)
-
-    ;(element as HTMLElement).dataset.absmartlyModified = 'true'
+    ;(element as HTMLElement).dataset.absmartlyModified = "true"
 
     const preventDefault = (e: Event) => {
       if (this.eventHandlers.isEditingMode) {
@@ -380,11 +417,11 @@ export class EditorCoordinator {
         e.stopPropagation()
       }
     }
-    element.addEventListener('click', preventDefault, true)
+    element.addEventListener("click", preventDefault, true)
 
-    element.classList.remove('absmartly-selected')
-    element.classList.add('absmartly-editing')
-    ;(element as HTMLElement).contentEditable = 'true'
+    element.classList.remove("absmartly-selected")
+    element.classList.add("absmartly-editing")
+    ;(element as HTMLElement).contentEditable = "true"
     ;(element as HTMLElement).focus()
 
     const range = document.createRange()
@@ -396,13 +433,13 @@ export class EditorCoordinator {
     this.eventHandlers.setEditing(true)
 
     const handleBlur = () => {
-      ;(element as HTMLElement).contentEditable = 'false'
-      element.classList.remove('absmartly-editing')
-      element.classList.add('absmartly-selected')
+      ;(element as HTMLElement).contentEditable = "false"
+      element.classList.remove("absmartly-editing")
+      element.classList.add("absmartly-selected")
       this.eventHandlers.setEditing(false)
-      element.removeEventListener('blur', handleBlur)
-      element.removeEventListener('keydown', handleKeyPress)
-      element.removeEventListener('click', preventDefault, true)
+      element.removeEventListener("blur", handleBlur)
+      element.removeEventListener("keydown", handleKeyPress)
+      element.removeEventListener("click", preventDefault, true)
 
       // Check if element has child elements (not just text nodes)
       // If it has HTML children, save as HTML to preserve structure
@@ -416,7 +453,7 @@ export class EditorCoordinator {
         this.undoRedoManager.addChange(
           {
             selector,
-            type: 'html',
+            type: "html",
             value: newValue
           },
           oldValue
@@ -424,12 +461,12 @@ export class EditorCoordinator {
       } else {
         // Simple text node, save as text
         const selector = this.callbacks.getSelector(element as HTMLElement)
-        const newValue = element.textContent || ''
+        const newValue = element.textContent || ""
         const oldValue = originalState.textContent
         this.undoRedoManager.addChange(
           {
             selector,
-            type: 'text',
+            type: "text",
             value: newValue
           },
           oldValue
@@ -438,29 +475,32 @@ export class EditorCoordinator {
     }
 
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault()
         ;(element as HTMLElement).blur()
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         element.textContent = originalState.textContent
         ;(element as HTMLElement).blur()
       }
     }
 
-    element.addEventListener('blur', handleBlur)
-    element.addEventListener('keydown', handleKeyPress)
+    element.addEventListener("blur", handleBlur)
+    element.addEventListener("keydown", handleKeyPress)
   }
 
-  async handleEditHtmlAction(element: Element, originalState: any): Promise<void> {
+  async handleEditHtmlAction(
+    element: Element,
+    originalState: any
+  ): Promise<void> {
     this.removeContextMenu()
 
     // Prevent editing body or html elements to avoid page corruption
     if (element === document.body || element === document.documentElement) {
       this.notifications.show(
-        'Cannot edit page body or HTML element',
-        'Editing these elements could corrupt the page',
-        'warning'
+        "Cannot edit page body or HTML element",
+        "Editing these elements could corrupt the page",
+        "warning"
       )
       // Re-enable selection
       this.eventHandlers.setEditing(false)
@@ -481,13 +521,13 @@ export class EditorCoordinator {
       this.undoRedoManager.addChange(
         {
           selector,
-          type: 'html',
+          type: "html",
           value: newHtml
         },
         oldValue
       )
 
-      this.notifications.show('HTML updated successfully', '', 'success')
+      this.notifications.show("HTML updated successfully", "", "success")
     }
 
     // Clear editing mode and re-enable hover tooltips after HTML editor closes
@@ -496,12 +536,19 @@ export class EditorCoordinator {
   }
 
   handleSelectRelativeElement(element: Element): void {
-    debugLog('[handleSelectRelativeElement] Called with element:', element)
-    debugLog('[handleSelectRelativeElement] Element details:', element.tagName, element.id, element.className)
+    debugLog("[handleSelectRelativeElement] Called with element:", element)
+    debugLog(
+      "[handleSelectRelativeElement] Element details:",
+      element.tagName,
+      element.id,
+      element.className
+    )
 
     // Check if we already have a selector open to prevent recursion
-    if (document.getElementById('absmartly-relative-selector-host')) {
-      debugLog('[handleSelectRelativeElement] Selector already exists, returning')
+    if (document.getElementById("absmartly-relative-selector-host")) {
+      debugLog(
+        "[handleSelectRelativeElement] Selector already exists, returning"
+      )
       return
     }
 
@@ -510,21 +557,26 @@ export class EditorCoordinator {
   }
 
   async handleChangeImageSource(element: Element): Promise<void> {
-    debugLog('[handleChangeImageSource] Called with element:', element)
-    debugLog('[handleChangeImageSource] Element details:', element.tagName, element.id, element.className)
+    debugLog("[handleChangeImageSource] Called with element:", element)
+    debugLog(
+      "[handleChangeImageSource] Element details:",
+      element.tagName,
+      element.id,
+      element.className
+    )
 
     this.removeContextMenu()
 
-    const isImgTag = element.tagName.toLowerCase() === 'img'
+    const isImgTag = element.tagName.toLowerCase() === "img"
     const currentSrc = this.imageSourceDialog.getCurrentImageSource(element)
 
     const newSrc = await this.imageSourceDialog.show(element, currentSrc)
     if (!newSrc) {
-      debugLog('[handleChangeImageSource] User cancelled')
+      debugLog("[handleChangeImageSource] User cancelled")
       return
     }
 
-    debugLog('[handleChangeImageSource] New source:', newSrc)
+    debugLog("[handleChangeImageSource] New source:", newSrc)
 
     const selector = this.callbacks.getSelector(element as HTMLElement)
 
@@ -535,45 +587,52 @@ export class EditorCoordinator {
       this.undoRedoManager.addChange(
         {
           selector,
-          type: 'attribute',
+          type: "attribute",
           value: { src: newSrc },
-          mode: 'merge'
+          mode: "merge"
         },
         { src: oldSrc }
       )
 
-      debugLog('[handleChangeImageSource] Created attribute change for img element')
+      debugLog(
+        "[handleChangeImageSource] Created attribute change for img element"
+      )
     } else {
       const htmlElement = element as HTMLElement
-      const oldBgImage = htmlElement.style.backgroundImage ||
-                         window.getComputedStyle(htmlElement).backgroundImage
+      const oldBgImage =
+        htmlElement.style.backgroundImage ||
+        window.getComputedStyle(htmlElement).backgroundImage
 
       htmlElement.style.backgroundImage = `url('${newSrc}')`
 
       this.undoRedoManager.addChange(
         {
           selector,
-          type: 'style',
-          value: { 'background-image': `url('${newSrc}')` },
-          mode: 'merge'
+          type: "style",
+          value: { "background-image": `url('${newSrc}')` },
+          mode: "merge"
         },
-        { 'background-image': oldBgImage }
+        { "background-image": oldBgImage }
       )
 
-      debugLog('[handleChangeImageSource] Created style change for background-image')
+      debugLog(
+        "[handleChangeImageSource] Created style change for background-image"
+      )
     }
 
-    this.notifications.show('Image source updated', '', 'success')
+    this.notifications.show("Image source updated", "", "success")
   }
 
   showRelativeElementSelector(element: Element): void {
     // Remove any existing selector
-    const existingSelector = document.getElementById('absmartly-relative-selector-host')
+    const existingSelector = document.getElementById(
+      "absmartly-relative-selector-host"
+    )
     if (existingSelector) existingSelector.remove()
 
     // Create host element for shadow DOM
-    const selectorHost = document.createElement('div')
-    selectorHost.id = 'absmartly-relative-selector-host'
+    const selectorHost = document.createElement("div")
+    selectorHost.id = "absmartly-relative-selector-host"
     selectorHost.style.cssText = `
       position: fixed;
       top: 50%;
@@ -584,10 +643,10 @@ export class EditorCoordinator {
     `
 
     // Attach shadow root
-    const shadow = selectorHost.attachShadow({ mode: 'closed' })
+    const shadow = selectorHost.attachShadow({ mode: "closed" })
 
     // Create styles
-    const style = document.createElement('style')
+    const style = document.createElement("style")
     style.textContent = `
       * {
         box-sizing: border-box;
@@ -717,40 +776,44 @@ export class EditorCoordinator {
     shadow.appendChild(style)
 
     // Create backdrop
-    const backdrop = document.createElement('div')
-    backdrop.className = 'backdrop'
+    const backdrop = document.createElement("div")
+    backdrop.className = "backdrop"
 
     // Create panel
-    const panel = document.createElement('div')
-    panel.className = 'panel'
+    const panel = document.createElement("div")
+    panel.className = "panel"
 
     // Create title
-    const title = document.createElement('div')
-    title.className = 'title'
-    title.textContent = 'Select Element'
+    const title = document.createElement("div")
+    title.className = "title"
+    title.textContent = "Select Element"
 
     // Create close button
-    const closeBtn = document.createElement('button')
-    closeBtn.className = 'close-btn'
-    closeBtn.textContent = '✕'
+    const closeBtn = document.createElement("button")
+    closeBtn.className = "close-btn"
+    closeBtn.textContent = "✕"
     closeBtn.onclick = () => {
       // Clean up any temp highlights
-      document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
-        elem.classList.remove('absmartly-temp-highlight')
+      document.querySelectorAll(".absmartly-temp-highlight").forEach((elem) => {
+        elem.classList.remove("absmartly-temp-highlight")
       })
       // Clean up temp style
-      document.getElementById('absmartly-temp-highlight-style')?.remove()
+      document.getElementById("absmartly-temp-highlight-style")?.remove()
       selectorHost.remove()
     }
 
     // Create element tree
-    const elementTree = document.createElement('div')
-    elementTree.className = 'element-tree'
+    const elementTree = document.createElement("div")
+    elementTree.className = "element-tree"
 
     // Build parent hierarchy
     const parents: Element[] = []
     let currentEl: Element | null = element
-    while (currentEl && currentEl !== document.body && currentEl !== document.documentElement) {
+    while (
+      currentEl &&
+      currentEl !== document.body &&
+      currentEl !== document.documentElement
+    ) {
       parents.unshift(currentEl)
       currentEl = currentEl.parentElement
     }
@@ -762,47 +825,49 @@ export class EditorCoordinator {
 
     // Create element items
     parents.forEach((el, index) => {
-      const item = document.createElement('div')
-      item.className = 'element-item'
+      const item = document.createElement("div")
+      item.className = "element-item"
       if (el === element) {
-        item.classList.add('current')
+        item.classList.add("current")
       }
 
       // Add indentation based on level
-      const indent = document.createElement('span')
-      indent.className = 'indent'
+      const indent = document.createElement("span")
+      indent.className = "indent"
       indent.style.width = `${index * 20}px`
 
-      const info = document.createElement('div')
-      info.className = 'element-info'
+      const info = document.createElement("div")
+      info.className = "element-info"
       info.style.marginLeft = `${index * 20}px`
 
-      const tag = document.createElement('div')
-      tag.className = 'element-tag'
+      const tag = document.createElement("div")
+      tag.className = "element-tag"
       tag.textContent = el.tagName.toLowerCase()
 
       info.appendChild(tag)
 
       if (el.id) {
-        const id = document.createElement('div')
-        id.className = 'element-id'
+        const id = document.createElement("div")
+        id.className = "element-id"
         id.textContent = `#${el.id}`
         info.appendChild(id)
       }
 
-      if (el.className && typeof el.className === 'string') {
-        const classes = el.className.split(' ').filter(c => c && !c.startsWith('absmartly'))
+      if (el.className && typeof el.className === "string") {
+        const classes = el.className
+          .split(" ")
+          .filter((c) => c && !c.startsWith("absmartly"))
         if (classes.length > 0) {
-          const classDiv = document.createElement('div')
-          classDiv.className = 'element-class'
-          classDiv.textContent = `.${classes.join('.')}`
+          const classDiv = document.createElement("div")
+          classDiv.className = "element-class"
+          classDiv.textContent = `.${classes.join(".")}`
           info.appendChild(classDiv)
         }
       }
 
-      const level = document.createElement('div')
-      level.className = 'element-level'
-      level.textContent = el === element ? 'Current' : `Level ${index}`
+      const level = document.createElement("div")
+      level.className = "element-level"
+      level.textContent = el === element ? "Current" : `Level ${index}`
 
       item.appendChild(info)
       item.appendChild(level)
@@ -810,16 +875,18 @@ export class EditorCoordinator {
       // Add hover handler to highlight element on page
       item.onmouseenter = () => {
         // Remove any existing highlights
-        document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
-          elem.classList.remove('absmartly-temp-highlight')
-        })
+        document
+          .querySelectorAll(".absmartly-temp-highlight")
+          .forEach((elem) => {
+            elem.classList.remove("absmartly-temp-highlight")
+          })
         // Add highlight to hovered element
-        el.classList.add('absmartly-temp-highlight')
+        el.classList.add("absmartly-temp-highlight")
 
         // Add a temporary style if it doesn't exist
-        if (!document.getElementById('absmartly-temp-highlight-style')) {
-          const tempStyle = document.createElement('style')
-          tempStyle.id = 'absmartly-temp-highlight-style'
+        if (!document.getElementById("absmartly-temp-highlight-style")) {
+          const tempStyle = document.createElement("style")
+          tempStyle.id = "absmartly-temp-highlight-style"
           tempStyle.textContent = `
             .absmartly-temp-highlight {
               outline: 3px solid #3b82f6 !important;
@@ -833,7 +900,7 @@ export class EditorCoordinator {
 
       item.onmouseleave = () => {
         // Remove highlight when not hovering
-        el.classList.remove('absmartly-temp-highlight')
+        el.classList.remove("absmartly-temp-highlight")
       }
 
       // Add click handler
@@ -841,10 +908,12 @@ export class EditorCoordinator {
         e.stopPropagation()
 
         // Clean up any temp highlights and styles
-        document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
-          elem.classList.remove('absmartly-temp-highlight')
-        })
-        document.getElementById('absmartly-temp-highlight-style')?.remove()
+        document
+          .querySelectorAll(".absmartly-temp-highlight")
+          .forEach((elem) => {
+            elem.classList.remove("absmartly-temp-highlight")
+          })
+        document.getElementById("absmartly-temp-highlight-style")?.remove()
 
         // Remove the selector panel first
         selectorHost.remove()
@@ -852,24 +921,25 @@ export class EditorCoordinator {
         // Clear previous selection
         const currentSelected = this.stateManager.getState().selectedElement
         if (currentSelected) {
-          currentSelected.classList.remove('absmartly-selected')
+          currentSelected.classList.remove("absmartly-selected")
         }
 
         // Select the new element and update coordinator's state
 
         this.stateManager.setSelectedElement(el as HTMLElement)
-        this.selectedElement = el as HTMLElement  // Important: update coordinator's selectedElement
-        el.classList.add('absmartly-selected')
+        this.selectedElement = el as HTMLElement // Important: update coordinator's selectedElement
+        el.classList.add("absmartly-selected")
 
         // Store original values for the element (same as in event-handlers.ts)
         const config = this.stateManager.getConfig()
         if (!(el as HTMLElement).dataset.absmartlyOriginal) {
-          (el as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
+          ;(el as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
             textContent: el.textContent,
             innerHTML: el.innerHTML
             // Store both to support both text and HTML editing modes
           })
-          ;(el as HTMLElement).dataset.absmartlyExperiment = config.experimentName || '__preview__'
+          ;(el as HTMLElement).dataset.absmartlyExperiment =
+            config.experimentName || "__preview__"
         }
 
         // Get position near the selected element on the page (not the panel)
@@ -915,11 +985,11 @@ export class EditorCoordinator {
     // Close on backdrop click
     backdrop.onclick = () => {
       // Clean up any temp highlights
-      document.querySelectorAll('.absmartly-temp-highlight').forEach(elem => {
-        elem.classList.remove('absmartly-temp-highlight')
+      document.querySelectorAll(".absmartly-temp-highlight").forEach((elem) => {
+        elem.classList.remove("absmartly-temp-highlight")
       })
       // Clean up temp style
-      document.getElementById('absmartly-temp-highlight-style')?.remove()
+      document.getElementById("absmartly-temp-highlight-style")?.remove()
       selectorHost.remove()
     }
   }
@@ -934,8 +1004,8 @@ export class EditorCoordinator {
 
   removeContextMenu(): void {
     // Remove any context menu
-    document.getElementById('absmartly-menu-overlay')?.remove()
-    document.getElementById('absmartly-menu-container')?.remove()
+    document.getElementById("absmartly-menu-overlay")?.remove()
+    document.getElementById("absmartly-menu-container")?.remove()
   }
 
   startMutationObserver(): void {
@@ -959,24 +1029,23 @@ export class EditorCoordinator {
   }
 
   makeElementsEditable(): void {
-    document.querySelectorAll('*').forEach(el => {
+    document.querySelectorAll("*").forEach((el) => {
       const element = el as HTMLElement
       if (!this.isExtensionElement(element)) {
-        element.classList.add('absmartly-editable')
+        element.classList.add("absmartly-editable")
       }
     })
   }
 
   makeElementsNonEditable(): void {
-    document.querySelectorAll('.absmartly-editable').forEach(el => {
-      el.classList.remove('absmartly-editable')
-      el.classList.remove('absmartly-selected')
-      el.classList.remove('absmartly-editing')
+    document.querySelectorAll(".absmartly-editable").forEach((el) => {
+      el.classList.remove("absmartly-editable")
+      el.classList.remove("absmartly-selected")
+      el.classList.remove("absmartly-editing")
     })
   }
 
   // Event handlers bound to this class
-
 
   private handleKeyDown = (e: Event) => {
     // Key handling is done in setupKeyboardHandlers, this is just a placeholder
@@ -995,12 +1064,13 @@ export class EditorCoordinator {
   private isExtensionElement(element: HTMLElement): boolean {
     let current: HTMLElement | null = element
     while (current) {
-      const id = current.id || ''
-      const className = typeof current.className === 'string'
-        ? current.className
-        : (current.className as any)?.baseVal || ''
+      const id = current.id || ""
+      const className =
+        typeof current.className === "string"
+          ? current.className
+          : (current.className as any)?.baseVal || ""
 
-      if (id.includes('absmartly') || className.includes('absmartly')) {
+      if (id.includes("absmartly") || className.includes("absmartly")) {
         return true
       }
 
@@ -1017,7 +1087,7 @@ export class EditorCoordinator {
 
   // Setup all integrations and handlers
   setupAll(): void {
-    debugLog('[EditorCoordinator] setupAll called')
+    debugLog("[EditorCoordinator] setupAll called")
     this.setupModuleIntegrations()
     this.setupStateListeners()
     this.setupEventListeners()
@@ -1027,12 +1097,14 @@ export class EditorCoordinator {
     this.makeElementsEditable()
 
     // Banner is created in visual-editor.ts start() method
-    debugLog('[EditorCoordinator] setupAll completed')
+    debugLog("[EditorCoordinator] setupAll completed")
   }
 
   // Teardown all integrations and handlers
   teardownAll(restoreOriginalValues: boolean = true): void {
-    debugLog('[EditorCoordinator] Starting teardownAll', { restoreOriginalValues })
+    debugLog("[EditorCoordinator] Starting teardownAll", {
+      restoreOriginalValues
+    })
 
     // Call all registered cleanup handlers (includes removeBanner)
     this.cleanup.cleanupVisualEditor(restoreOriginalValues)
@@ -1045,6 +1117,6 @@ export class EditorCoordinator {
     // Explicitly remove banner in case it wasn't registered
     this.uiComponents.removeBanner()
 
-    debugLog('[EditorCoordinator] teardownAll completed')
+    debugLog("[EditorCoordinator] teardownAll completed")
   }
 }

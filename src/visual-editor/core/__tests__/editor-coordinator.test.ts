@@ -3,30 +3,30 @@
  * Comprehensive test suite for the EditorCoordinator class
  */
 
-import { EditorCoordinator } from '../editor-coordinator'
-import type { EditorCoordinatorCallbacks } from '../editor-coordinator'
-import StateManager from '../state-manager'
-import type { VisualEditorState } from '../state-manager'
-import EventHandlers from '../event-handlers'
-import ContextMenu from '../context-menu'
-import UndoRedoManager from '../undo-redo-manager'
-import UIComponents from '../../ui/components'
-import EditModes from '../edit-modes'
-import Cleanup from '../cleanup'
-import { Notifications } from '../../ui/notifications'
-import type { DOMChange } from '../../types/visual-editor'
+import type { DOMChange } from "../../types/visual-editor"
+import UIComponents from "../../ui/components"
+import { Notifications } from "../../ui/notifications"
+import Cleanup from "../cleanup"
+import ContextMenu from "../context-menu"
+import EditModes from "../edit-modes"
+import { EditorCoordinator } from "../editor-coordinator"
+import type { EditorCoordinatorCallbacks } from "../editor-coordinator"
+import EventHandlers from "../event-handlers"
+import StateManager from "../state-manager"
+import type { VisualEditorState } from "../state-manager"
+import UndoRedoManager from "../undo-redo-manager"
 
 // Mock all dependencies
-jest.mock('../state-manager')
-jest.mock('../event-handlers')
-jest.mock('../context-menu')
-jest.mock('../undo-redo-manager')
-jest.mock('../../ui/components')
-jest.mock('../edit-modes')
-jest.mock('../cleanup')
-jest.mock('../../ui/notifications')
-jest.mock('../../utils/selector-generator', () => ({
-  generateRobustSelector: jest.fn().mockReturnValue('.mock-selector')
+jest.mock("../state-manager")
+jest.mock("../event-handlers")
+jest.mock("../context-menu")
+jest.mock("../undo-redo-manager")
+jest.mock("../../ui/components")
+jest.mock("../edit-modes")
+jest.mock("../cleanup")
+jest.mock("../../ui/notifications")
+jest.mock("../../utils/selector-generator", () => ({
+  generateRobustSelector: jest.fn().mockReturnValue(".mock-selector")
 }))
 
 // Mock DOM APIs
@@ -52,7 +52,7 @@ const mockSelection = {
   focusOffset: 0,
   isCollapsed: true,
   rangeCount: 0,
-  type: 'None'
+  type: "None"
 } as any
 
 global.getSelection = jest.fn(() => mockSelection)
@@ -92,7 +92,7 @@ const mockRange = {
 
 global.document.createRange = jest.fn(() => mockRange)
 
-describe('EditorCoordinator', () => {
+describe("EditorCoordinator", () => {
   let coordinator: EditorCoordinator
   let mockStateManager: jest.Mocked<StateManager>
   let mockEventHandlers: jest.Mocked<EventHandlers>
@@ -113,31 +113,35 @@ describe('EditorCoordinator', () => {
     jest.clearAllMocks()
 
     // Create mock element
-    mockElement = document.createElement('div')
-    mockElement.textContent = 'Test content'
-    mockElement.id = 'test-element'
-    mockElement.className = 'test-class'
+    mockElement = document.createElement("div")
+    mockElement.textContent = "Test content"
+    mockElement.id = "test-element"
+    mockElement.className = "test-class"
 
-    mockSelectedElement = document.createElement('span')
-    mockSelectedElement.textContent = 'Selected content'
-    mockSelectedElement.id = 'selected-element'
+    mockSelectedElement = document.createElement("span")
+    mockSelectedElement.textContent = "Selected content"
+    mockSelectedElement.id = "selected-element"
 
     // Setup DOM mocks
-    document.body.innerHTML = ''
+    document.body.innerHTML = ""
     document.body.appendChild(mockElement)
     document.body.appendChild(mockSelectedElement)
 
     // Mock dependencies
     mockStateManager = new StateManager({
-      variantName: 'test',
-      experimentName: 'test',
-      logoUrl: 'test'
+      variantName: "test",
+      experimentName: "test",
+      logoUrl: "test"
     }) as jest.Mocked<StateManager>
 
-    mockEventHandlers = new EventHandlers(mockStateManager) as jest.Mocked<EventHandlers>
-    mockContextMenu = new ContextMenu(mockStateManager) as jest.Mocked<ContextMenu>
+    mockEventHandlers = new EventHandlers(
+      mockStateManager
+    ) as jest.Mocked<EventHandlers>
+    mockContextMenu = new ContextMenu(
+      mockStateManager
+    ) as jest.Mocked<ContextMenu>
     mockUndoRedoManager = new UndoRedoManager() as jest.Mocked<UndoRedoManager>
-    
+
     // Add spies on undo/redo methods
     mockUndoRedoManager.undo = jest.fn()
     mockUndoRedoManager.redo = jest.fn()
@@ -154,7 +158,7 @@ describe('EditorCoordinator', () => {
     mockCallbacks = {
       onChangesUpdate: jest.fn(),
       removeStyles: jest.fn(),
-      getSelector: jest.fn().mockReturnValue('.mock-selector'),
+      getSelector: jest.fn().mockReturnValue(".mock-selector"),
       hideElement: jest.fn(),
       deleteElement: jest.fn(),
       copyElement: jest.fn(),
@@ -218,42 +222,42 @@ describe('EditorCoordinator', () => {
   })
 
   afterEach(() => {
-    document.body.innerHTML = ''
+    document.body.innerHTML = ""
   })
 
-  describe('Constructor', () => {
-    it('should initialize with all dependencies', () => {
+  describe("Constructor", () => {
+    it("should initialize with all dependencies", () => {
       expect(coordinator).toBeInstanceOf(EditorCoordinator)
     })
 
-    it('should store all dependencies as instance properties', () => {
-      expect(coordinator['stateManager']).toBe(mockStateManager)
-      expect(coordinator['eventHandlers']).toBe(mockEventHandlers)
-      expect(coordinator['contextMenu']).toBe(mockContextMenu)
-      expect(coordinator['undoRedoManager']).toBe(mockUndoRedoManager)
-      expect(coordinator['uiComponents']).toBe(mockUIComponents)
-      expect(coordinator['editModes']).toBe(mockEditModes)
-      expect(coordinator['cleanup']).toBe(mockCleanup)
+    it("should store all dependencies as instance properties", () => {
+      expect(coordinator["stateManager"]).toBe(mockStateManager)
+      expect(coordinator["eventHandlers"]).toBe(mockEventHandlers)
+      expect(coordinator["contextMenu"]).toBe(mockContextMenu)
+      expect(coordinator["undoRedoManager"]).toBe(mockUndoRedoManager)
+      expect(coordinator["uiComponents"]).toBe(mockUIComponents)
+      expect(coordinator["editModes"]).toBe(mockEditModes)
+      expect(coordinator["cleanup"]).toBe(mockCleanup)
       // expect(coordinator['toolbar']).toBe(mockToolbar) // removed - using UIComponents banner
-      expect(coordinator['notifications']).toBe(mockNotifications)
-      expect(coordinator['callbacks']).toBe(mockCallbacks)
+      expect(coordinator["notifications"]).toBe(mockNotifications)
+      expect(coordinator["callbacks"]).toBe(mockCallbacks)
     })
 
-    it('should initialize internal state properties', () => {
-      expect(coordinator['selectedElement']).toBeNull()
-      expect(coordinator['hoveredElement']).toBeNull()
-      expect(coordinator['changes']).toEqual([])
-      expect(coordinator['mutationObserver']).toBeNull()
-      expect(coordinator['isInternalChange']).toBe(false)
+    it("should initialize internal state properties", () => {
+      expect(coordinator["selectedElement"]).toBeNull()
+      expect(coordinator["hoveredElement"]).toBeNull()
+      expect(coordinator["changes"]).toEqual([])
+      expect(coordinator["mutationObserver"]).toBeNull()
+      expect(coordinator["isInternalChange"]).toBe(false)
     })
   })
 
-  describe('setupModuleIntegrations', () => {
+  describe("setupModuleIntegrations", () => {
     beforeEach(() => {
       coordinator.setupModuleIntegrations()
     })
 
-    it('should connect event handlers to context menu', () => {
+    it("should connect event handlers to context menu", () => {
       expect(mockEventHandlers.showContextMenu).toBeDefined()
 
       // Test the connection
@@ -261,18 +265,21 @@ describe('EditorCoordinator', () => {
       expect(mockContextMenu.show).toHaveBeenCalledWith(100, 200, mockElement)
     })
 
-    it('should connect context menu to action handlers', () => {
+    it("should connect context menu to action handlers", () => {
       expect(mockContextMenu.handleAction).toBeDefined()
 
       // Mock handleMenuAction
-      const handleMenuActionSpy = jest.spyOn(coordinator, 'handleMenuAction')
+      const handleMenuActionSpy = jest.spyOn(coordinator, "handleMenuAction")
 
       // Test the connection - uses selectedElement from state
-      mockContextMenu.handleAction!('edit', mockSelectedElement)
-      expect(handleMenuActionSpy).toHaveBeenCalledWith('edit', mockSelectedElement)
+      mockContextMenu.handleAction!("edit", mockSelectedElement)
+      expect(handleMenuActionSpy).toHaveBeenCalledWith(
+        "edit",
+        mockSelectedElement
+      )
     })
 
-    it('should connect UI components to callbacks', () => {
+    it("should connect UI components to callbacks", () => {
       expect(mockUIComponents.onUndo).toBeDefined()
       expect(mockUIComponents.onRedo).toBeDefined()
       expect(mockUIComponents.onClear).toBeDefined()
@@ -300,7 +307,7 @@ describe('EditorCoordinator', () => {
       expect(mockCallbacks.stop).toHaveBeenCalled()
     })
 
-    it('should register cleanup handlers', () => {
+    it("should register cleanup handlers", () => {
       // 6 handlers: detachEventListeners, removeEventListeners, stopMutationObserver, makeElementsNonEditable, removeStyles, removeBanner
       expect(mockCleanup.registerEventHandler).toHaveBeenCalledTimes(6)
 
@@ -309,7 +316,7 @@ describe('EditorCoordinator', () => {
       expect(cleanupCalls).toHaveLength(6)
 
       // Test each cleanup handler
-      const handlers = cleanupCalls.map(call => call[0])
+      const handlers = cleanupCalls.map((call) => call[0])
 
       // Test event handlers cleanup (first handler)
       handlers[0]()
@@ -321,24 +328,39 @@ describe('EditorCoordinator', () => {
     })
   })
 
-  describe('setupStateListeners', () => {
-    it('should register state change listener', () => {
+  describe("setupStateListeners", () => {
+    it("should register state change listener", () => {
       coordinator.setupStateListeners()
-      expect(mockStateManager.onStateChange).toHaveBeenCalledWith(expect.any(Function))
+      expect(mockStateManager.onStateChange).toHaveBeenCalledWith(
+        expect.any(Function)
+      )
     })
 
-    it('should update local state when state changes', () => {
+    it("should update local state when state changes", () => {
       coordinator.setupStateListeners()
 
       // Get the callback function
-      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      const stateChangeCallback =
+        mockStateManager.onStateChange.mock.calls[0][0]
 
       const newState: VisualEditorState = {
         selectedElement: mockSelectedElement,
         hoveredElement: mockElement,
-        changes: [{ selector: '.test', type: 'text', value: 'test' }],
-        undoStack: [{ type: 'add', change: { selector: '.undo', type: 'text', value: 'undo' } as any, index: 0 }],
-        redoStack: [{ type: 'add', change: { selector: '.redo', type: 'text', value: 'redo' } as any, index: 0 }],
+        changes: [{ selector: ".test", type: "text", value: "test" }],
+        undoStack: [
+          {
+            type: "add",
+            change: { selector: ".undo", type: "text", value: "undo" } as any,
+            index: 0
+          }
+        ],
+        redoStack: [
+          {
+            type: "add",
+            change: { selector: ".redo", type: "text", value: "redo" } as any,
+            index: 0
+          }
+        ],
         originalValues: new Map(),
         isRearranging: false,
         isResizing: false,
@@ -350,21 +372,28 @@ describe('EditorCoordinator', () => {
       stateChangeCallback(newState)
 
       // Verify local state is updated
-      expect(coordinator['selectedElement']).toBe(mockSelectedElement)
-      expect(coordinator['hoveredElement']).toBe(mockElement)
-      expect(coordinator['changes']).toEqual(newState.changes)
+      expect(coordinator["selectedElement"]).toBe(mockSelectedElement)
+      expect(coordinator["hoveredElement"]).toBe(mockElement)
+      expect(coordinator["changes"]).toEqual(newState.changes)
     })
 
-    it('should update toolbar on state change', () => {
+    it("should update toolbar on state change", () => {
       coordinator.setupStateListeners()
 
-      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      const stateChangeCallback =
+        mockStateManager.onStateChange.mock.calls[0][0]
 
       const newState: VisualEditorState = {
         selectedElement: null,
         hoveredElement: null,
-        changes: [{ selector: '.test', type: 'text', value: 'test' }],
-        undoStack: [{ type: 'add', change: { selector: '.undo', type: 'text', value: 'undo' } as any, index: 0 }],
+        changes: [{ selector: ".test", type: "text", value: "test" }],
+        undoStack: [
+          {
+            type: "add",
+            change: { selector: ".undo", type: "text", value: "undo" } as any,
+            index: 0
+          }
+        ],
         redoStack: [],
         originalValues: new Map(),
         isRearranging: false,
@@ -377,20 +406,20 @@ describe('EditorCoordinator', () => {
 
       // Now uses UIComponents.updateBanner instead of toolbar methods
       expect(mockUIComponents.updateBanner).toHaveBeenCalledWith({
-        changesCount: 1,  // undoStack length
+        changesCount: 1, // undoStack length
         canUndo: true,
         canRedo: false
       })
     })
   })
 
-  describe('setupEventListeners & removeEventListeners', () => {
+  describe("setupEventListeners & removeEventListeners", () => {
     let addEventListenerSpy: jest.SpyInstance
     let removeEventListenerSpy: jest.SpyInstance
 
     beforeEach(() => {
-      addEventListenerSpy = jest.spyOn(document, 'addEventListener')
-      removeEventListenerSpy = jest.spyOn(document, 'removeEventListener')
+      addEventListenerSpy = jest.spyOn(document, "addEventListener")
+      removeEventListenerSpy = jest.spyOn(document, "removeEventListener")
     })
 
     afterEach(() => {
@@ -398,41 +427,57 @@ describe('EditorCoordinator', () => {
       removeEventListenerSpy.mockRestore()
     })
 
-    it('should setup all event listeners', () => {
+    it("should setup all event listeners", () => {
       coordinator.setupEventListeners()
 
       // Coordinator registers these - EventHandlers module handles click, mouseover, mouseout
       // Note: keydown is handled separately in setupKeyboardHandlers()
-      expect(addEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
-      expect(addEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
+      expect(addEventListenerSpy).toHaveBeenCalledWith(
+        "mousedown",
+        expect.any(Function),
+        true
+      )
+      expect(addEventListenerSpy).toHaveBeenCalledWith(
+        "mouseup",
+        expect.any(Function),
+        true
+      )
 
       // EventHandlers.attachEventListeners() is called but we're only testing coordinator's direct listeners
       expect(addEventListenerSpy).toHaveBeenCalledTimes(2)
     })
 
-    it('should remove all event listeners', () => {
+    it("should remove all event listeners", () => {
       coordinator.setupEventListeners()
       coordinator.removeEventListeners()
 
       // Coordinator removes its listeners - EventHandlers module handles the rest
       // Note: keydown is handled separately in setupKeyboardHandlers()
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true)
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function), true)
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        "mousedown",
+        expect.any(Function),
+        true
+      )
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        "mouseup",
+        expect.any(Function),
+        true
+      )
 
       // EventHandlers.detachEventListeners() is called but we're only testing coordinator's direct listeners
       expect(removeEventListenerSpy).toHaveBeenCalledTimes(2)
     })
 
-it('should handle placeholder events without errors', () => {
+    it("should handle placeholder events without errors", () => {
       coordinator.setupEventListeners()
 
-      const keyDownEvent = new KeyboardEvent('keydown')
-      const mouseDownEvent = new MouseEvent('mousedown')
-      const mouseUpEvent = new MouseEvent('mouseup')
+      const keyDownEvent = new KeyboardEvent("keydown")
+      const mouseDownEvent = new MouseEvent("mousedown")
+      const mouseUpEvent = new MouseEvent("mouseup")
 
-      const keyDownHandler = coordinator['handleKeyDown']
-      const mouseDownHandler = coordinator['handleMouseDown']
-      const mouseUpHandler = coordinator['handleMouseUp']
+      const keyDownHandler = coordinator["handleKeyDown"]
+      const mouseDownHandler = coordinator["handleMouseDown"]
+      const mouseUpHandler = coordinator["handleMouseUp"]
 
       // These should not throw errors (they are placeholder implementations)
       expect(() => keyDownHandler(keyDownEvent)).not.toThrow()
@@ -441,30 +486,35 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('setupKeyboardHandlers', () => {
+  describe("setupKeyboardHandlers", () => {
     let addEventListenerSpy: jest.SpyInstance
 
     beforeEach(() => {
-      addEventListenerSpy = jest.spyOn(document, 'addEventListener')
+      addEventListenerSpy = jest.spyOn(document, "addEventListener")
     })
 
     afterEach(() => {
       addEventListenerSpy.mockRestore()
     })
 
-    it('should setup keyboard event listener', () => {
+    it("should setup keyboard event listener", () => {
       coordinator.setupKeyboardHandlers()
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function))
-      expect(mockCleanup.registerEventHandler).toHaveBeenCalledWith(expect.any(Function))
+      expect(addEventListenerSpy).toHaveBeenCalledWith(
+        "keydown",
+        expect.any(Function)
+      )
+      expect(mockCleanup.registerEventHandler).toHaveBeenCalledWith(
+        expect.any(Function)
+      )
     })
 
-    it('should handle Ctrl+Z for undo', () => {
+    it("should handle Ctrl+Z for undo", () => {
       coordinator.setupKeyboardHandlers()
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", { key: "z", ctrlKey: true })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
@@ -472,12 +522,12 @@ it('should handle placeholder events without errors', () => {
       expect(mockCallbacks.undo).toHaveBeenCalled()
     })
 
-    it('should handle Cmd+Z for undo on Mac', () => {
+    it("should handle Cmd+Z for undo on Mac", () => {
       coordinator.setupKeyboardHandlers()
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'z', metaKey: true })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", { key: "z", metaKey: true })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
@@ -485,12 +535,12 @@ it('should handle placeholder events without errors', () => {
       expect(mockCallbacks.undo).toHaveBeenCalled()
     })
 
-    it('should handle Ctrl+Y for redo', () => {
+    it("should handle Ctrl+Y for redo", () => {
       coordinator.setupKeyboardHandlers()
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'y', ctrlKey: true })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", { key: "y", ctrlKey: true })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
@@ -498,12 +548,16 @@ it('should handle placeholder events without errors', () => {
       expect(mockCallbacks.redo).toHaveBeenCalled()
     })
 
-    it('should handle Ctrl+Shift+Z for redo', () => {
+    it("should handle Ctrl+Shift+Z for redo", () => {
       coordinator.setupKeyboardHandlers()
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", {
+        key: "z",
+        ctrlKey: true,
+        shiftKey: true
+      })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
@@ -511,36 +565,42 @@ it('should handle placeholder events without errors', () => {
       expect(mockCallbacks.redo).toHaveBeenCalled()
     })
 
-    it('should handle Ctrl+Shift+C for copy selector', async () => {
+    it("should handle Ctrl+Shift+C for copy selector", async () => {
       coordinator.setupKeyboardHandlers()
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, shiftKey: true })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", {
+        key: "c",
+        ctrlKey: true,
+        shiftKey: true
+      })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
       await Promise.resolve() // Wait for async clipboard operation
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('.mock-selector')
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        ".mock-selector"
+      )
       expect(mockNotifications.show).toHaveBeenCalledWith(
-        'Selector copied: .mock-selector',
-        '',
-        'success'
+        "Selector copied: .mock-selector",
+        "",
+        "success"
       )
     })
 
-    it('should handle Delete key for element deletion', () => {
+    it("should handle Delete key for element deletion", () => {
       coordinator.setupKeyboardHandlers()
-      Object.defineProperty(mockEventHandlers, 'isEditingMode', {
+      Object.defineProperty(mockEventHandlers, "isEditingMode", {
         get: jest.fn(() => false),
         configurable: true
       })
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'Delete' })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
-      const removeSpy = jest.spyOn(mockSelectedElement, 'remove')
+      const event = new KeyboardEvent("keydown", { key: "Delete" })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
+      const removeSpy = jest.spyOn(mockSelectedElement, "remove")
 
       keydownHandler(event)
 
@@ -549,16 +609,16 @@ it('should handle placeholder events without errors', () => {
       expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
     })
 
-    it('should not handle Delete key when in editing mode', () => {
+    it("should not handle Delete key when in editing mode", () => {
       coordinator.setupKeyboardHandlers()
-      Object.defineProperty(mockEventHandlers, 'isEditingMode', {
+      Object.defineProperty(mockEventHandlers, "isEditingMode", {
         get: jest.fn(() => true),
         configurable: true
       })
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'Delete' })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", { key: "Delete" })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
@@ -566,7 +626,7 @@ it('should handle placeholder events without errors', () => {
       expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
     })
 
-    it('should not handle shortcuts when no element is selected', () => {
+    it("should not handle shortcuts when no element is selected", () => {
       mockStateManager.getState = jest.fn().mockReturnValue({
         selectedElement: null,
         hoveredElement: null,
@@ -583,8 +643,8 @@ it('should handle placeholder events without errors', () => {
       coordinator.setupKeyboardHandlers()
 
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new KeyboardEvent('keydown', { key: 'Delete' })
-      const preventDefaultSpy = jest.spyOn(event, 'preventDefault')
+      const event = new KeyboardEvent("keydown", { key: "Delete" })
+      const preventDefaultSpy = jest.spyOn(event, "preventDefault")
 
       keydownHandler(event)
 
@@ -592,32 +652,40 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('setupMessageHandlers', () => {
+  describe("setupMessageHandlers", () => {
     let addEventListenerSpy: jest.SpyInstance
 
     beforeEach(() => {
-      addEventListenerSpy = jest.spyOn(window, 'addEventListener')
+      addEventListenerSpy = jest.spyOn(window, "addEventListener")
     })
 
     afterEach(() => {
       addEventListenerSpy.mockRestore()
     })
 
-    it('should setup message event listener', () => {
+    it("should setup message event listener", () => {
       coordinator.setupMessageHandlers()
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function))
-      expect(mockCleanup.registerEventHandler).toHaveBeenCalledWith(expect.any(Function))
+      expect(addEventListenerSpy).toHaveBeenCalledWith(
+        "message",
+        expect.any(Function)
+      )
+      expect(mockCleanup.registerEventHandler).toHaveBeenCalledWith(
+        expect.any(Function)
+      )
     })
 
-    it('should handle ABSMARTLY_VISUAL_EDITOR_EXIT message', () => {
+    it("should handle ABSMARTLY_VISUAL_EDITOR_EXIT message", () => {
       coordinator.setupMessageHandlers()
 
       const messageHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new MessageEvent('message', {
+      const event = new MessageEvent("message", {
         source: window,
         origin: window.location.origin,
-        data: { source: 'absmartly-visual-editor', type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' }
+        data: {
+          source: "absmartly-visual-editor",
+          type: "ABSMARTLY_VISUAL_EDITOR_EXIT"
+        }
       })
 
       messageHandler(event)
@@ -625,14 +693,17 @@ it('should handle placeholder events without errors', () => {
       expect(mockCallbacks.stop).toHaveBeenCalled()
     })
 
-    it('should ignore messages not from window', () => {
+    it("should ignore messages not from window", () => {
       coordinator.setupMessageHandlers()
 
       const messageHandler = addEventListenerSpy.mock.calls[0][1]
-      const event = new MessageEvent('message', {
+      const event = new MessageEvent("message", {
         source: null,
         origin: window.location.origin,
-        data: { source: 'absmartly-visual-editor', type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' }
+        data: {
+          source: "absmartly-visual-editor",
+          type: "ABSMARTLY_VISUAL_EDITOR_EXIT"
+        }
       })
 
       messageHandler(event)
@@ -641,112 +712,138 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('handleMenuAction', () => {
+  describe("handleMenuAction", () => {
     beforeEach(() => {
       // Mock methods used in handleMenuAction
-      jest.spyOn(coordinator, 'handleEditAction').mockImplementation()
-      jest.spyOn(coordinator, 'handleEditHtmlAction').mockImplementation()
-      jest.spyOn(coordinator, 'handleSelectRelativeElement').mockImplementation()
+      jest.spyOn(coordinator, "handleEditAction").mockImplementation()
+      jest.spyOn(coordinator, "handleEditHtmlAction").mockImplementation()
+      jest
+        .spyOn(coordinator, "handleSelectRelativeElement")
+        .mockImplementation()
     })
 
-    it('should handle edit action', () => {
-      coordinator.handleMenuAction('edit', mockElement)
-      expect(coordinator.handleEditAction).toHaveBeenCalledWith(mockElement, expect.any(Object))
+    it("should handle edit action", () => {
+      coordinator.handleMenuAction("edit", mockElement)
+      expect(coordinator.handleEditAction).toHaveBeenCalledWith(
+        mockElement,
+        expect.any(Object)
+      )
     })
 
-    it('should handle edit-element action', () => {
-      coordinator.handleMenuAction('edit-element', mockElement)
-      expect(coordinator.handleEditAction).toHaveBeenCalledWith(mockElement, expect.any(Object))
+    it("should handle edit-element action", () => {
+      coordinator.handleMenuAction("edit-element", mockElement)
+      expect(coordinator.handleEditAction).toHaveBeenCalledWith(
+        mockElement,
+        expect.any(Object)
+      )
     })
 
-    it('should handle editHtml action', () => {
-      coordinator.handleMenuAction('editHtml', mockElement)
-      expect(coordinator.handleEditHtmlAction).toHaveBeenCalledWith(mockElement, expect.any(Object))
+    it("should handle editHtml action", () => {
+      coordinator.handleMenuAction("editHtml", mockElement)
+      expect(coordinator.handleEditHtmlAction).toHaveBeenCalledWith(
+        mockElement,
+        expect.any(Object)
+      )
     })
 
-    it('should handle edit-html action', () => {
-      coordinator.handleMenuAction('edit-html', mockElement)
-      expect(coordinator.handleEditHtmlAction).toHaveBeenCalledWith(mockElement, expect.any(Object))
+    it("should handle edit-html action", () => {
+      coordinator.handleMenuAction("edit-html", mockElement)
+      expect(coordinator.handleEditHtmlAction).toHaveBeenCalledWith(
+        mockElement,
+        expect.any(Object)
+      )
     })
 
-    it('should handle rearrange action', () => {
-      coordinator.handleMenuAction('rearrange', mockElement)
-      expect(mockEditModes.enableRearrangeMode).toHaveBeenCalledWith(mockElement)
+    it("should handle rearrange action", () => {
+      coordinator.handleMenuAction("rearrange", mockElement)
+      expect(mockEditModes.enableRearrangeMode).toHaveBeenCalledWith(
+        mockElement
+      )
     })
 
-    it('should handle resize action', () => {
-      coordinator.handleMenuAction('resize', mockElement)
+    it("should handle resize action", () => {
+      coordinator.handleMenuAction("resize", mockElement)
       expect(mockEditModes.enableResizeMode).toHaveBeenCalledWith(mockElement)
     })
 
-    it('should handle select-relative action', () => {
-      coordinator.handleMenuAction('select-relative', mockElement)
-      expect(coordinator.handleSelectRelativeElement).toHaveBeenCalledWith(mockElement)
+    it("should handle select-relative action", () => {
+      coordinator.handleMenuAction("select-relative", mockElement)
+      expect(coordinator.handleSelectRelativeElement).toHaveBeenCalledWith(
+        mockElement
+      )
     })
 
-    it('should handle selectRelative action', () => {
-      coordinator.handleMenuAction('selectRelative', mockElement)
-      expect(coordinator.handleSelectRelativeElement).toHaveBeenCalledWith(mockElement)
+    it("should handle selectRelative action", () => {
+      coordinator.handleMenuAction("selectRelative", mockElement)
+      expect(coordinator.handleSelectRelativeElement).toHaveBeenCalledWith(
+        mockElement
+      )
     })
 
-    it('should handle hide action', () => {
-      coordinator.handleMenuAction('hide', mockElement)
+    it("should handle hide action", () => {
+      coordinator.handleMenuAction("hide", mockElement)
       expect(mockCallbacks.hideElement).toHaveBeenCalled()
     })
 
-    it('should handle delete action', () => {
-      coordinator.handleMenuAction('delete', mockElement)
+    it("should handle delete action", () => {
+      coordinator.handleMenuAction("delete", mockElement)
       expect(mockCallbacks.deleteElement).toHaveBeenCalled()
     })
 
-    it('should handle copy action', () => {
-      coordinator.handleMenuAction('copy', mockElement)
+    it("should handle copy action", () => {
+      coordinator.handleMenuAction("copy", mockElement)
       expect(mockCallbacks.copyElement).toHaveBeenCalled()
     })
 
-    it('should handle copy-selector action', () => {
-      coordinator.handleMenuAction('copy-selector', mockElement)
+    it("should handle copy-selector action", () => {
+      coordinator.handleMenuAction("copy-selector", mockElement)
       expect(mockCallbacks.copySelectorPath).toHaveBeenCalled()
     })
 
-    it('should handle copySelector action', () => {
-      coordinator.handleMenuAction('copySelector', mockElement)
+    it("should handle copySelector action", () => {
+      coordinator.handleMenuAction("copySelector", mockElement)
       expect(mockCallbacks.copySelectorPath).toHaveBeenCalled()
     })
 
-    it('should handle move-up action', () => {
-      coordinator.handleMenuAction('move-up', mockElement)
-      expect(mockCallbacks.moveElement).toHaveBeenCalledWith('up')
+    it("should handle move-up action", () => {
+      coordinator.handleMenuAction("move-up", mockElement)
+      expect(mockCallbacks.moveElement).toHaveBeenCalledWith("up")
     })
 
-    it('should handle move-down action', () => {
-      coordinator.handleMenuAction('move-down', mockElement)
-      expect(mockCallbacks.moveElement).toHaveBeenCalledWith('down')
+    it("should handle move-down action", () => {
+      coordinator.handleMenuAction("move-down", mockElement)
+      expect(mockCallbacks.moveElement).toHaveBeenCalledWith("down")
     })
 
-    it('should handle insert-block action', () => {
-      coordinator.handleMenuAction('insert-block', mockElement)
+    it("should handle insert-block action", () => {
+      coordinator.handleMenuAction("insert-block", mockElement)
       expect(mockCallbacks.insertNewBlock).toHaveBeenCalled()
     })
 
+    it("should handle unknown action with notification", () => {
+      const consoleLogSpy = jest.spyOn(console, "log").mockImplementation()
 
-    it('should handle unknown action with notification', () => {
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
+      coordinator.handleMenuAction("unknown-action", mockElement)
 
-      coordinator.handleMenuAction('unknown-action', mockElement)
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('[ABSmartly] Action not yet implemented:', 'unknown-action')
-      expect(mockNotifications.show).toHaveBeenCalledWith('unknown-action: Coming soon!', '', 'info')
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        "[ABSmartly] Action not yet implemented:",
+        "unknown-action"
+      )
+      expect(mockNotifications.show).toHaveBeenCalledWith(
+        "unknown-action: Coming soon!",
+        "",
+        "info"
+      )
 
       consoleLogSpy.mockRestore()
     })
 
-    it('should preserve original state for all actions', () => {
+    it("should preserve original state for all actions", () => {
       const originalHtml = mockElement.outerHTML
       const originalParent = mockElement.parentElement
       const originalTextContent = mockElement.textContent
 
-      coordinator.handleMenuAction('edit', mockElement)
+      coordinator.handleMenuAction("edit", mockElement)
 
       const callArgs = (coordinator.handleEditAction as jest.Mock).mock.calls[0]
       const originalState = callArgs[1]
@@ -757,14 +854,16 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('handleEditAction', () => {
+  describe("handleEditAction", () => {
     let mockRemoveContextMenu: jest.SpyInstance
 
     beforeEach(() => {
-      mockRemoveContextMenu = jest.spyOn(coordinator, 'removeContextMenu').mockImplementation()
+      mockRemoveContextMenu = jest
+        .spyOn(coordinator, "removeContextMenu")
+        .mockImplementation()
     })
 
-    it('should setup element for editing', () => {
+    it("should setup element for editing", () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
@@ -775,38 +874,38 @@ it('should handle placeholder events without errors', () => {
       coordinator.handleEditAction(mockElement, originalState)
 
       expect(mockRemoveContextMenu).toHaveBeenCalled()
-      expect(mockElement.dataset.absmartlyModified).toBe('true')
-      expect(mockElement.classList.contains('absmartly-editing')).toBe(true)
-      expect(mockElement.classList.contains('absmartly-selected')).toBe(false)
-      expect(mockElement.contentEditable).toBe('true')
+      expect(mockElement.dataset.absmartlyModified).toBe("true")
+      expect(mockElement.classList.contains("absmartly-editing")).toBe(true)
+      expect(mockElement.classList.contains("absmartly-selected")).toBe(false)
+      expect(mockElement.contentEditable).toBe("true")
       expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(true)
     })
 
-    it('should handle blur event and create change', () => {
+    it("should handle blur event and create change", () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
         nextSibling: mockElement.nextElementSibling,
-        textContent: 'Original content'
+        textContent: "Original content"
       }
 
       coordinator.handleEditAction(mockElement, originalState)
 
       // Simulate text change
-      mockElement.textContent = 'Modified content'
+      mockElement.textContent = "Modified content"
 
       // Trigger blur event
-      const blurEvent = new Event('blur')
+      const blurEvent = new Event("blur")
       mockElement.dispatchEvent(blurEvent)
 
-      expect(mockElement.contentEditable).toBe('false')
-      expect(mockElement.classList.contains('absmartly-editing')).toBe(false)
-      expect(mockElement.classList.contains('absmartly-selected')).toBe(true)
+      expect(mockElement.contentEditable).toBe("false")
+      expect(mockElement.classList.contains("absmartly-editing")).toBe(false)
+      expect(mockElement.classList.contains("absmartly-selected")).toBe(true)
       expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(false)
       expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
     })
 
-    it('should handle Enter key to finish editing', () => {
+    it("should handle Enter key to finish editing", () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
@@ -816,9 +915,9 @@ it('should handle placeholder events without errors', () => {
 
       coordinator.handleEditAction(mockElement, originalState)
 
-      const blurSpy = jest.spyOn(mockElement, 'blur')
-      const keydownEvent = new KeyboardEvent('keydown', { key: 'Enter' })
-      const preventDefaultSpy = jest.spyOn(keydownEvent, 'preventDefault')
+      const blurSpy = jest.spyOn(mockElement, "blur")
+      const keydownEvent = new KeyboardEvent("keydown", { key: "Enter" })
+      const preventDefaultSpy = jest.spyOn(keydownEvent, "preventDefault")
 
       mockElement.dispatchEvent(keydownEvent)
 
@@ -826,7 +925,7 @@ it('should handle placeholder events without errors', () => {
       expect(blurSpy).toHaveBeenCalled()
     })
 
-    it('should handle Shift+Enter without finishing editing', () => {
+    it("should handle Shift+Enter without finishing editing", () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
@@ -836,9 +935,12 @@ it('should handle placeholder events without errors', () => {
 
       coordinator.handleEditAction(mockElement, originalState)
 
-      const blurSpy = jest.spyOn(mockElement, 'blur')
-      const keydownEvent = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true })
-      const preventDefaultSpy = jest.spyOn(keydownEvent, 'preventDefault')
+      const blurSpy = jest.spyOn(mockElement, "blur")
+      const keydownEvent = new KeyboardEvent("keydown", {
+        key: "Enter",
+        shiftKey: true
+      })
+      const preventDefaultSpy = jest.spyOn(keydownEvent, "preventDefault")
 
       mockElement.dispatchEvent(keydownEvent)
 
@@ -846,29 +948,29 @@ it('should handle placeholder events without errors', () => {
       expect(blurSpy).not.toHaveBeenCalled()
     })
 
-    it('should handle Escape key to cancel editing', () => {
+    it("should handle Escape key to cancel editing", () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
         nextSibling: mockElement.nextElementSibling,
-        textContent: 'Original content'
+        textContent: "Original content"
       }
 
       coordinator.handleEditAction(mockElement, originalState)
 
       // Modify content
-      mockElement.textContent = 'Modified content'
+      mockElement.textContent = "Modified content"
 
-      const blurSpy = jest.spyOn(mockElement, 'blur')
-      const keydownEvent = new KeyboardEvent('keydown', { key: 'Escape' })
+      const blurSpy = jest.spyOn(mockElement, "blur")
+      const keydownEvent = new KeyboardEvent("keydown", { key: "Escape" })
 
       mockElement.dispatchEvent(keydownEvent)
 
-      expect(mockElement.textContent).toBe('Original content')
+      expect(mockElement.textContent).toBe("Original content")
       expect(blurSpy).toHaveBeenCalled()
     })
 
-    it('should prevent click events during editing', () => {
+    it("should prevent click events during editing", () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
@@ -877,16 +979,16 @@ it('should handle placeholder events without errors', () => {
       }
 
       // Mock editing mode
-      Object.defineProperty(mockEventHandlers, 'isEditingMode', {
+      Object.defineProperty(mockEventHandlers, "isEditingMode", {
         get: jest.fn(() => true),
         configurable: true
       })
 
       coordinator.handleEditAction(mockElement, originalState)
 
-      const clickEvent = new Event('click')
-      const preventDefaultSpy = jest.spyOn(clickEvent, 'preventDefault')
-      const stopPropagationSpy = jest.spyOn(clickEvent, 'stopPropagation')
+      const clickEvent = new Event("click")
+      const preventDefaultSpy = jest.spyOn(clickEvent, "preventDefault")
+      const stopPropagationSpy = jest.spyOn(clickEvent, "stopPropagation")
 
       mockElement.dispatchEvent(clickEvent)
 
@@ -895,8 +997,8 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('handleEditHtmlAction', () => {
-    it('should open HTML editor and handle changes', async () => {
+  describe("handleEditHtmlAction", () => {
+    it("should open HTML editor and handle changes", async () => {
       const originalState = {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
@@ -907,232 +1009,285 @@ it('should handle placeholder events without errors', () => {
 
       // Mock HTML editor to return modified HTML
       const mockHtmlEditor = {
-        show: jest.fn().mockResolvedValue('<div>Modified HTML</div>')
+        show: jest.fn().mockResolvedValue("<div>Modified HTML</div>")
       }
       ;(coordinator as any).htmlEditor = mockHtmlEditor
 
       await coordinator.handleEditHtmlAction(mockElement, originalState)
 
-      expect(mockHtmlEditor.show).toHaveBeenCalledWith(mockElement, 'Test content')
+      expect(mockHtmlEditor.show).toHaveBeenCalledWith(
+        mockElement,
+        "Test content"
+      )
       expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
       expect(mockNotifications.show).toHaveBeenCalledWith(
-        'HTML updated successfully',
-        '',
-        'success'
+        "HTML updated successfully",
+        "",
+        "success"
       )
     })
   })
 
-  describe('handleSelectRelativeElement', () => {
-    it('should show relative element selector panel', () => {
-      const showSelectorSpy = jest.spyOn(coordinator, 'showRelativeElementSelector')
+  describe("handleSelectRelativeElement", () => {
+    it("should show relative element selector panel", () => {
+      const showSelectorSpy = jest.spyOn(
+        coordinator,
+        "showRelativeElementSelector"
+      )
       coordinator.handleSelectRelativeElement(mockElement)
 
       expect(showSelectorSpy).toHaveBeenCalledWith(mockElement)
     })
 
-    it('should remove context menu before showing selector', () => {
-      const removeMenuSpy = jest.spyOn(coordinator, 'removeContextMenu')
+    it("should remove context menu before showing selector", () => {
+      const removeMenuSpy = jest.spyOn(coordinator, "removeContextMenu")
       coordinator.handleSelectRelativeElement(mockElement)
 
       expect(removeMenuSpy).toHaveBeenCalled()
     })
   })
 
-  describe('startMutationObserver & stopMutationObserver', () => {
-    it('should create and start mutation observer', () => {
+  describe("startMutationObserver & stopMutationObserver", () => {
+    it("should create and start mutation observer", () => {
       coordinator.startMutationObserver()
 
       expect(MutationObserver).toHaveBeenCalledWith(expect.any(Function))
-      expect(coordinator['mutationObserver']).toBeDefined()
-      expect(coordinator['mutationObserver']!.observe).toHaveBeenCalledWith(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeOldValue: true,
-        characterData: true,
-        characterDataOldValue: true
-      })
+      expect(coordinator["mutationObserver"]).toBeDefined()
+      expect(coordinator["mutationObserver"]!.observe).toHaveBeenCalledWith(
+        document.body,
+        {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeOldValue: true,
+          characterData: true,
+          characterDataOldValue: true
+        }
+      )
     })
 
-    it('should ignore mutations when isInternalChange is true', () => {
-      coordinator['isInternalChange'] = true
+    it("should ignore mutations when isInternalChange is true", () => {
+      coordinator["isInternalChange"] = true
       coordinator.startMutationObserver()
 
       const mutationCallback = (MutationObserver as jest.Mock).mock.calls[0][0]
-      const mutations = [{ type: 'childList' }]
+      const mutations = [{ type: "childList" }]
 
       // Should return early and not process mutations
       mutationCallback(mutations)
       // Test passes if no errors are thrown
     })
 
-    it('should stop and disconnect mutation observer', () => {
+    it("should stop and disconnect mutation observer", () => {
       coordinator.startMutationObserver()
-      const observer = coordinator['mutationObserver']!
+      const observer = coordinator["mutationObserver"]!
 
       coordinator.stopMutationObserver()
 
       expect(observer.disconnect).toHaveBeenCalled()
-      expect(coordinator['mutationObserver']).toBeNull()
+      expect(coordinator["mutationObserver"]).toBeNull()
     })
 
-    it('should handle stopMutationObserver when observer is null', () => {
-      coordinator['mutationObserver'] = null
+    it("should handle stopMutationObserver when observer is null", () => {
+      coordinator["mutationObserver"] = null
 
       // Should not throw error
       expect(() => coordinator.stopMutationObserver()).not.toThrow()
     })
   })
 
-  describe('makeElementsEditable & makeElementsNonEditable', () => {
+  describe("makeElementsEditable & makeElementsNonEditable", () => {
     let mockIsExtensionElement: jest.SpyInstance
 
     beforeEach(() => {
-      mockIsExtensionElement = jest.spyOn(coordinator as any, 'isExtensionElement')
+      mockIsExtensionElement = jest.spyOn(
+        coordinator as any,
+        "isExtensionElement"
+      )
 
       // Create test elements
-      const element1 = document.createElement('div')
-      element1.className = 'test-element-1'
-      const element2 = document.createElement('span')
-      element2.className = 'test-element-2'
-      const extensionElement = document.createElement('div')
-      extensionElement.id = 'absmartly-test'
+      const element1 = document.createElement("div")
+      element1.className = "test-element-1"
+      const element2 = document.createElement("span")
+      element2.className = "test-element-2"
+      const extensionElement = document.createElement("div")
+      extensionElement.id = "absmartly-test"
 
       document.body.appendChild(element1)
       document.body.appendChild(element2)
       document.body.appendChild(extensionElement)
     })
 
-    it('should make all non-extension elements editable', () => {
-      mockIsExtensionElement.mockImplementation((el: HTMLElement) =>
-        el.id.includes('absmartly') || el.className.includes('absmartly')
+    it("should make all non-extension elements editable", () => {
+      mockIsExtensionElement.mockImplementation(
+        (el: HTMLElement) =>
+          el.id.includes("absmartly") || el.className.includes("absmartly")
       )
 
       coordinator.makeElementsEditable()
 
-      const testElements = document.querySelectorAll('.test-element-1, .test-element-2')
-      testElements.forEach(el => {
-        expect(el.classList.contains('absmartly-editable')).toBe(true)
+      const testElements = document.querySelectorAll(
+        ".test-element-1, .test-element-2"
+      )
+      testElements.forEach((el) => {
+        expect(el.classList.contains("absmartly-editable")).toBe(true)
       })
 
-      const extensionElement = document.getElementById('absmartly-test')
-      expect(extensionElement!.classList.contains('absmartly-editable')).toBe(false)
+      const extensionElement = document.getElementById("absmartly-test")
+      expect(extensionElement!.classList.contains("absmartly-editable")).toBe(
+        false
+      )
     })
 
-    it('should make all elements non-editable', () => {
+    it("should make all elements non-editable", () => {
       // First make elements editable
-      const element1 = document.querySelector('.test-element-1')!
-      const element2 = document.querySelector('.test-element-2')!
+      const element1 = document.querySelector(".test-element-1")!
+      const element2 = document.querySelector(".test-element-2")!
 
-      element1.classList.add('absmartly-editable', 'absmartly-selected', 'absmartly-editing')
-      element2.classList.add('absmartly-editable', 'absmartly-selected', 'absmartly-editing')
+      element1.classList.add(
+        "absmartly-editable",
+        "absmartly-selected",
+        "absmartly-editing"
+      )
+      element2.classList.add(
+        "absmartly-editable",
+        "absmartly-selected",
+        "absmartly-editing"
+      )
 
       coordinator.makeElementsNonEditable()
 
-      expect(element1.classList.contains('absmartly-editable')).toBe(false)
-      expect(element1.classList.contains('absmartly-selected')).toBe(false)
-      expect(element1.classList.contains('absmartly-editing')).toBe(false)
+      expect(element1.classList.contains("absmartly-editable")).toBe(false)
+      expect(element1.classList.contains("absmartly-selected")).toBe(false)
+      expect(element1.classList.contains("absmartly-editing")).toBe(false)
 
-      expect(element2.classList.contains('absmartly-editable')).toBe(false)
-      expect(element2.classList.contains('absmartly-selected')).toBe(false)
-      expect(element2.classList.contains('absmartly-editing')).toBe(false)
+      expect(element2.classList.contains("absmartly-editable")).toBe(false)
+      expect(element2.classList.contains("absmartly-selected")).toBe(false)
+      expect(element2.classList.contains("absmartly-editing")).toBe(false)
     })
   })
 
-  describe('showContextMenu & removeContextMenu', () => {
+  describe("showContextMenu & removeContextMenu", () => {
     beforeEach(() => {
-      coordinator['selectedElement'] = mockSelectedElement
+      coordinator["selectedElement"] = mockSelectedElement
     })
 
-    it('should show context menu for selected element', () => {
+    it("should show context menu for selected element", () => {
       coordinator.showContextMenu(100, 200)
 
-      expect(mockContextMenu.show).toHaveBeenCalledWith(100, 200, mockSelectedElement)
+      expect(mockContextMenu.show).toHaveBeenCalledWith(
+        100,
+        200,
+        mockSelectedElement
+      )
     })
 
-    it('should not show context menu when no element is selected', () => {
-      coordinator['selectedElement'] = null
+    it("should not show context menu when no element is selected", () => {
+      coordinator["selectedElement"] = null
       coordinator.showContextMenu(100, 200)
 
       expect(mockContextMenu.show).not.toHaveBeenCalled()
     })
 
-    it('should remove context menu elements from DOM', () => {
+    it("should remove context menu elements from DOM", () => {
       // Create mock menu elements
-      const menuOverlay = document.createElement('div')
-      menuOverlay.id = 'absmartly-menu-overlay'
-      const menuContainer = document.createElement('div')
-      menuContainer.id = 'absmartly-menu-container'
+      const menuOverlay = document.createElement("div")
+      menuOverlay.id = "absmartly-menu-overlay"
+      const menuContainer = document.createElement("div")
+      menuContainer.id = "absmartly-menu-container"
 
       document.body.appendChild(menuOverlay)
       document.body.appendChild(menuContainer)
 
       coordinator.removeContextMenu()
 
-      expect(document.getElementById('absmartly-menu-overlay')).toBeNull()
-      expect(document.getElementById('absmartly-menu-container')).toBeNull()
+      expect(document.getElementById("absmartly-menu-overlay")).toBeNull()
+      expect(document.getElementById("absmartly-menu-container")).toBeNull()
     })
   })
 
-  describe('isExtensionElement', () => {
-    it('should identify elements with absmartly in id', () => {
-      const element = document.createElement('div')
-      element.id = 'absmartly-test-element'
+  describe("isExtensionElement", () => {
+    it("should identify elements with absmartly in id", () => {
+      const element = document.createElement("div")
+      element.id = "absmartly-test-element"
 
-      const result = coordinator['isExtensionElement'](element)
+      const result = coordinator["isExtensionElement"](element)
       expect(result).toBe(true)
     })
 
-    it('should identify elements with absmartly in className', () => {
-      const element = document.createElement('div')
-      element.className = 'test absmartly-class another'
+    it("should identify elements with absmartly in className", () => {
+      const element = document.createElement("div")
+      element.className = "test absmartly-class another"
 
-      const result = coordinator['isExtensionElement'](element)
+      const result = coordinator["isExtensionElement"](element)
       expect(result).toBe(true)
     })
 
-    it('should identify elements with absmartly parent', () => {
-      const parent = document.createElement('div')
-      parent.id = 'absmartly-parent'
-      const child = document.createElement('span')
+    it("should identify elements with absmartly parent", () => {
+      const parent = document.createElement("div")
+      parent.id = "absmartly-parent"
+      const child = document.createElement("span")
       parent.appendChild(child)
 
-      const result = coordinator['isExtensionElement'](child)
+      const result = coordinator["isExtensionElement"](child)
       expect(result).toBe(true)
     })
 
-    it('should handle SVG elements with baseVal className', () => {
-      const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    it("should handle SVG elements with baseVal className", () => {
+      const svgElement = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "rect"
+      )
       // Mock SVG className behavior
-      Object.defineProperty(svgElement, 'className', {
-        value: { baseVal: 'absmartly-svg-class' },
+      Object.defineProperty(svgElement, "className", {
+        value: { baseVal: "absmartly-svg-class" },
         writable: false
       })
 
-      const result = coordinator['isExtensionElement'](svgElement as any)
+      const result = coordinator["isExtensionElement"](svgElement as any)
       expect(result).toBe(true)
     })
 
-    it('should return false for non-extension elements', () => {
-      const element = document.createElement('div')
-      element.id = 'regular-element'
-      element.className = 'regular-class'
+    it("should return false for non-extension elements", () => {
+      const element = document.createElement("div")
+      element.id = "regular-element"
+      element.className = "regular-class"
 
-      const result = coordinator['isExtensionElement'](element)
+      const result = coordinator["isExtensionElement"](element)
       expect(result).toBe(false)
     })
   })
 
-  describe('setupAll', () => {
-    it('should call all setup methods in correct order', () => {
-      const setupModuleIntegrationsSpy = jest.spyOn(coordinator, 'setupModuleIntegrations')
-      const setupStateListenersSpy = jest.spyOn(coordinator, 'setupStateListeners')
-      const setupEventListenersSpy = jest.spyOn(coordinator, 'setupEventListeners')
-      const setupKeyboardHandlersSpy = jest.spyOn(coordinator, 'setupKeyboardHandlers')
-      const setupMessageHandlersSpy = jest.spyOn(coordinator, 'setupMessageHandlers')
-      const startMutationObserverSpy = jest.spyOn(coordinator, 'startMutationObserver')
-      const makeElementsEditableSpy = jest.spyOn(coordinator, 'makeElementsEditable')
+  describe("setupAll", () => {
+    it("should call all setup methods in correct order", () => {
+      const setupModuleIntegrationsSpy = jest.spyOn(
+        coordinator,
+        "setupModuleIntegrations"
+      )
+      const setupStateListenersSpy = jest.spyOn(
+        coordinator,
+        "setupStateListeners"
+      )
+      const setupEventListenersSpy = jest.spyOn(
+        coordinator,
+        "setupEventListeners"
+      )
+      const setupKeyboardHandlersSpy = jest.spyOn(
+        coordinator,
+        "setupKeyboardHandlers"
+      )
+      const setupMessageHandlersSpy = jest.spyOn(
+        coordinator,
+        "setupMessageHandlers"
+      )
+      const startMutationObserverSpy = jest.spyOn(
+        coordinator,
+        "startMutationObserver"
+      )
+      const makeElementsEditableSpy = jest.spyOn(
+        coordinator,
+        "makeElementsEditable"
+      )
 
       coordinator.setupAll()
 
@@ -1146,11 +1301,20 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('teardownAll', () => {
-    it('should call all teardown methods in correct order', () => {
-      const removeEventListenersSpy = jest.spyOn(coordinator, 'removeEventListeners')
-      const stopMutationObserverSpy = jest.spyOn(coordinator, 'stopMutationObserver')
-      const makeElementsNonEditableSpy = jest.spyOn(coordinator, 'makeElementsNonEditable')
+  describe("teardownAll", () => {
+    it("should call all teardown methods in correct order", () => {
+      const removeEventListenersSpy = jest.spyOn(
+        coordinator,
+        "removeEventListeners"
+      )
+      const stopMutationObserverSpy = jest.spyOn(
+        coordinator,
+        "stopMutationObserver"
+      )
+      const makeElementsNonEditableSpy = jest.spyOn(
+        coordinator,
+        "makeElementsNonEditable"
+      )
 
       coordinator.teardownAll()
 
@@ -1160,8 +1324,8 @@ it('should handle placeholder events without errors', () => {
     })
   })
 
-  describe('Integration Tests', () => {
-    it('should handle complete edit workflow', () => {
+  describe("Integration Tests", () => {
+    it("should handle complete edit workflow", () => {
       // Setup
       coordinator.setupAll()
 
@@ -1170,52 +1334,65 @@ it('should handle placeholder events without errors', () => {
         html: mockElement.outerHTML,
         parent: mockElement.parentElement,
         nextSibling: mockElement.nextElementSibling,
-        textContent: 'Original content'
+        textContent: "Original content"
       }
 
       coordinator.handleEditAction(mockElement, originalState)
 
       // Verify editing state
-      expect(mockElement.classList.contains('absmartly-editing')).toBe(true)
-      expect(mockElement.contentEditable).toBe('true')
+      expect(mockElement.classList.contains("absmartly-editing")).toBe(true)
+      expect(mockElement.contentEditable).toBe("true")
       expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(true)
 
       // Modify content and finish editing
-      mockElement.textContent = 'Modified content'
-      mockElement.dispatchEvent(new Event('blur'))
+      mockElement.textContent = "Modified content"
+      mockElement.dispatchEvent(new Event("blur"))
 
       // Verify change was created
       expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
 
       // Verify editing state is reset
-      expect(mockElement.contentEditable).toBe('false')
-      expect(mockElement.classList.contains('absmartly-editing')).toBe(false)
+      expect(mockElement.contentEditable).toBe("false")
+      expect(mockElement.classList.contains("absmartly-editing")).toBe(false)
       expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(false)
     })
 
-    it('should handle keyboard shortcuts integration', () => {
+    it("should handle keyboard shortcuts integration", () => {
       coordinator.setupKeyboardHandlers()
 
       // Test undo shortcut
-      const undoEvent = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true })
+      const undoEvent = new KeyboardEvent("keydown", {
+        key: "z",
+        ctrlKey: true
+      })
       document.dispatchEvent(undoEvent)
       expect(mockCallbacks.undo).toHaveBeenCalled()
 
       // Test redo shortcut
-      const redoEvent = new KeyboardEvent('keydown', { key: 'y', ctrlKey: true })
+      const redoEvent = new KeyboardEvent("keydown", {
+        key: "y",
+        ctrlKey: true
+      })
       document.dispatchEvent(redoEvent)
       expect(mockCallbacks.redo).toHaveBeenCalled()
     })
 
-    it('should handle state changes and update UI', () => {
+    it("should handle state changes and update UI", () => {
       coordinator.setupStateListeners()
 
-      const stateChangeCallback = mockStateManager.onStateChange.mock.calls[0][0]
+      const stateChangeCallback =
+        mockStateManager.onStateChange.mock.calls[0][0]
       const newState: VisualEditorState = {
         selectedElement: mockSelectedElement,
         hoveredElement: null,
-        changes: [{ selector: '.test', type: 'text', value: 'test' }],
-        undoStack: [{ type: 'add', change: { selector: '.undo', type: 'text', value: 'undo' } as any, index: 0 }],
+        changes: [{ selector: ".test", type: "text", value: "test" }],
+        undoStack: [
+          {
+            type: "add",
+            change: { selector: ".undo", type: "text", value: "undo" } as any,
+            index: 0
+          }
+        ],
         redoStack: [],
         originalValues: new Map(),
         isRearranging: false,
@@ -1226,19 +1403,19 @@ it('should handle placeholder events without errors', () => {
 
       stateChangeCallback(newState)
 
-      expect(coordinator['changes']).toEqual(newState.changes)
+      expect(coordinator["changes"]).toEqual(newState.changes)
       // Now uses UIComponents.updateBanner instead of toolbar methods
       expect(mockUIComponents.updateBanner).toHaveBeenCalledWith({
-        changesCount: 1,  // undoStack length
+        changesCount: 1, // undoStack length
         canUndo: true,
         canRedo: false
       })
     })
   })
 
-  describe('Event Cleanup', () => {
-    it('should register keydown event cleanup handler', () => {
-      const registerSpy = jest.spyOn(mockCleanup, 'registerEventHandler')
+  describe("Event Cleanup", () => {
+    it("should register keydown event cleanup handler", () => {
+      const registerSpy = jest.spyOn(mockCleanup, "registerEventHandler")
 
       coordinator.setupKeyboardHandlers()
 
@@ -1249,8 +1426,8 @@ it('should handle placeholder events without errors', () => {
       expect(() => cleanupHandler()).not.toThrow()
     })
 
-    it('should register message event cleanup handler', () => {
-      const registerSpy = jest.spyOn(mockCleanup, 'registerEventHandler')
+    it("should register message event cleanup handler", () => {
+      const registerSpy = jest.spyOn(mockCleanup, "registerEventHandler")
 
       coordinator.setupMessageHandlers()
 
@@ -1261,11 +1438,14 @@ it('should handle placeholder events without errors', () => {
       expect(() => cleanupHandler()).not.toThrow()
     })
 
-    it('should handle message event for visual editor exit', () => {
+    it("should handle message event for visual editor exit", () => {
       coordinator.setupMessageHandlers()
 
-      const messageEvent = new MessageEvent('message', {
-        data: { source: 'absmartly-visual-editor', type: 'ABSMARTLY_VISUAL_EDITOR_EXIT' },
+      const messageEvent = new MessageEvent("message", {
+        data: {
+          source: "absmartly-visual-editor",
+          type: "ABSMARTLY_VISUAL_EDITOR_EXIT"
+        },
         source: window,
         origin: window.location.origin
       })

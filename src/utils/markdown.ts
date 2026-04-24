@@ -1,18 +1,18 @@
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import DOMPurify from "dompurify"
+import { marked } from "marked"
 
 function cleanMarkdownContent(markdown: string): string {
   let cleaned = markdown
 
   // Remove code fences (```json, ```, etc.)
-  cleaned = cleaned.replace(/```json\s*/gi, '')
-  cleaned = cleaned.replace(/```\s*/g, '')
+  cleaned = cleaned.replace(/```json\s*/gi, "")
+  cleaned = cleaned.replace(/```\s*/g, "")
 
   // Remove duplicate consecutive paragraphs (simple deduplication)
   // Split by double newlines, remove exact duplicates, rejoin
   const paragraphs = cleaned.split(/\n\n+/)
   const uniqueParagraphs: string[] = []
-  let lastParagraph = ''
+  let lastParagraph = ""
 
   for (const para of paragraphs) {
     const trimmed = para.trim()
@@ -22,7 +22,7 @@ function cleanMarkdownContent(markdown: string): string {
     }
   }
 
-  cleaned = uniqueParagraphs.join('\n\n')
+  cleaned = uniqueParagraphs.join("\n\n")
 
   return cleaned
 }

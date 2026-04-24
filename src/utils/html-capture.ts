@@ -1,4 +1,4 @@
-import { debugLog, debugError, debugWarn } from './debug'
+import { debugError, debugLog, debugWarn } from "./debug"
 
 const generateSelectorInPage = (element: Element): string => {
   if (element.id) {
@@ -6,10 +6,12 @@ const generateSelectorInPage = (element: Element): string => {
   }
 
   const tagName = element.tagName.toLowerCase()
-  const classes = Array.from(element.classList).filter(c => c && !c.includes(':'))
+  const classes = Array.from(element.classList).filter(
+    (c) => c && !c.includes(":")
+  )
 
   if (classes.length > 0) {
-    const classSelector = `${tagName}.${classes.slice(0, 2).join('.')}`
+    const classSelector = `${tagName}.${classes.slice(0, 2).join(".")}`
     if (document.querySelectorAll(classSelector).length === 1) {
       return classSelector
     }
@@ -17,7 +19,9 @@ const generateSelectorInPage = (element: Element): string => {
 
   const parent = element.parentElement
   if (parent) {
-    const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName)
+    const siblings = Array.from(parent.children).filter(
+      (c) => c.tagName === element.tagName
+    )
     if (siblings.length > 1) {
       const index = siblings.indexOf(element) + 1
       const parentSelector = generateSelectorInPage(parent)
@@ -72,32 +76,57 @@ export interface XPathResults {
   error?: string
 }
 
-export async function captureHTMLChunk(selector: string): Promise<HTMLChunkResult> {
+export async function captureHTMLChunk(
+  selector: string
+): Promise<HTMLChunkResult> {
   const results = await captureHTMLChunks([selector])
   return results[0]
 }
 
-export async function captureHTMLChunks(selectors: string[], tabId?: number): Promise<HTMLChunkResult[]> {
-  debugLog('[HTML Capture] Capturing chunks for selectors:', selectors, 'tabId:', tabId)
+export async function captureHTMLChunks(
+  selectors: string[],
+  tabId?: number
+): Promise<HTMLChunkResult[]> {
+  debugLog(
+    "[HTML Capture] Capturing chunks for selectors:",
+    selectors,
+    "tabId:",
+    tabId
+  )
 
   try {
     if (!chrome?.tabs || !chrome?.scripting) {
-      console.error('[HTML Capture] chrome.tabs or chrome.scripting API not available!')
-      return selectors.map(sel => ({ selector: sel, html: '', found: false, error: 'chrome.scripting API not available' }))
+      console.error(
+        "[HTML Capture] chrome.tabs or chrome.scripting API not available!"
+      )
+      return selectors.map((sel) => ({
+        selector: sel,
+        html: "",
+        found: false,
+        error: "chrome.scripting API not available"
+      }))
     }
 
     let targetTabId = tabId
     if (!targetTabId) {
       // Try to find the active tab
-      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      const [activeTab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      })
       if (!activeTab?.id) {
         // Fallback: try to find any active tab in any window
         const [anyActiveTab] = await chrome.tabs.query({ active: true })
         if (!anyActiveTab?.id) {
-          return selectors.map(sel => ({ selector: sel, html: '', found: false, error: 'No active tab found' }))
+          return selectors.map((sel) => ({
+            selector: sel,
+            html: "",
+            found: false,
+            error: "No active tab found"
+          }))
         }
         targetTabId = anyActiveTab.id
-        debugLog('[HTML Capture] Using fallback active tab:', targetTabId)
+        debugLog("[HTML Capture] Using fallback active tab:", targetTabId)
       } else {
         targetTabId = activeTab.id
       }
@@ -106,23 +135,40 @@ export async function captureHTMLChunks(selectors: string[], tabId?: number): Pr
     // Validate the tab exists and is a valid webpage
     try {
       const tab = await chrome.tabs.get(targetTabId)
-      if (!tab.url ||
-          tab.url.startsWith('chrome-extension://') ||
-          tab.url.startsWith('chrome://') ||
-          tab.url.startsWith('about:')) {
-        return selectors.map(sel => ({ selector: sel, html: '', found: false, error: 'Tab is not a webpage' }))
+      if (
+        !tab.url ||
+        tab.url.startsWith("chrome-extension://") ||
+        tab.url.startsWith("chrome://") ||
+        tab.url.startsWith("about:")
+      ) {
+        return selectors.map((sel) => ({
+          selector: sel,
+          html: "",
+          found: false,
+          error: "Tab is not a webpage"
+        }))
       }
     } catch (e) {
-      return selectors.map(sel => ({ selector: sel, html: '', found: false, error: `Tab ${targetTabId} not found` }))
+      return selectors.map((sel) => ({
+        selector: sel,
+        html: "",
+        found: false,
+        error: `Tab ${targetTabId} not found`
+      }))
     }
 
     const results = await chrome.scripting.executeScript({
       target: { tabId: targetTabId },
       func: (sels: string[]) => {
-        return sels.map(sel => {
+        return sels.map((sel) => {
           const element = document.querySelector(sel)
           if (!element) {
-            return { selector: sel, html: '', found: false, error: `Element not found: ${sel}` }
+            return {
+              selector: sel,
+              html: "",
+              found: false,
+              error: `Element not found: ${sel}`
+            }
           }
           return { selector: sel, html: element.outerHTML, found: true }
         })
@@ -131,39 +177,78 @@ export async function captureHTMLChunks(selectors: string[], tabId?: number): Pr
     })
 
     if (!results || results.length === 0 || !results[0]?.result) {
-      return selectors.map(sel => ({ selector: sel, html: '', found: false, error: 'Failed to execute script' }))
+      return selectors.map((sel) => ({
+        selector: sel,
+        html: "",
+        found: false,
+        error: "Failed to execute script"
+      }))
     }
 
     const chunkResults = results[0].result as HTMLChunkResult[]
     for (const result of chunkResults) {
-      debugLog('[HTML Capture] Chunk result for', result.selector + ':', result.found ? `${result.html.length} chars` : result.error)
+      debugLog(
+        "[HTML Capture] Chunk result for",
+        result.selector + ":",
+        result.found ? `${result.html.length} chars` : result.error
+      )
     }
     return chunkResults
   } catch (error) {
-    console.error('[HTML Capture] Chunk error:', error)
-    return selectors.map(sel => ({ selector: sel, html: '', found: false, error: (error as Error).message }))
+    console.error("[HTML Capture] Chunk error:", error)
+    return selectors.map((sel) => ({
+      selector: sel,
+      html: "",
+      found: false,
+      error: (error as Error).message
+    }))
   }
 }
 
-export async function searchTextInPage(searchText: string, maxResults: number = 5): Promise<TextSearchResults> {
-  debugLog('[HTML Capture] Searching for text:', searchText)
+export async function searchTextInPage(
+  searchText: string,
+  maxResults: number = 5
+): Promise<TextSearchResults> {
+  debugLog("[HTML Capture] Searching for text:", searchText)
 
   try {
     if (!chrome?.tabs || !chrome?.scripting) {
-      console.error('[HTML Capture] chrome.tabs or chrome.scripting API not available!')
-      return { searchText, matches: [], found: false, error: 'chrome.scripting API not available' }
+      console.error(
+        "[HTML Capture] chrome.tabs or chrome.scripting API not available!"
+      )
+      return {
+        searchText,
+        matches: [],
+        found: false,
+        error: "chrome.scripting API not available"
+      }
     }
 
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    const [activeTab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    })
     if (!activeTab?.id) {
-      return { searchText, matches: [], found: false, error: 'No active tab found' }
+      return {
+        searchText,
+        matches: [],
+        found: false,
+        error: "No active tab found"
+      }
     }
 
-    if (!activeTab.url ||
-        activeTab.url.startsWith('chrome-extension://') ||
-        activeTab.url.startsWith('chrome://') ||
-        activeTab.url.startsWith('about:')) {
-      return { searchText, matches: [], found: false, error: 'Active tab is not a webpage' }
+    if (
+      !activeTab.url ||
+      activeTab.url.startsWith("chrome-extension://") ||
+      activeTab.url.startsWith("chrome://") ||
+      activeTab.url.startsWith("about:")
+    ) {
+      return {
+        searchText,
+        matches: [],
+        found: false,
+        error: "Active tab is not a webpage"
+      }
     }
 
     const results = await chrome.scripting.executeScript({
@@ -172,14 +257,19 @@ export async function searchTextInPage(searchText: string, maxResults: number = 
         const generateSelector = (element: Element): string => {
           if (element.id) return `#${element.id}`
           const tagName = element.tagName.toLowerCase()
-          const classes = Array.from(element.classList).filter(c => c && !c.includes(':'))
+          const classes = Array.from(element.classList).filter(
+            (c) => c && !c.includes(":")
+          )
           if (classes.length > 0) {
-            const classSelector = `${tagName}.${classes.slice(0, 2).join('.')}`
-            if (document.querySelectorAll(classSelector).length === 1) return classSelector
+            const classSelector = `${tagName}.${classes.slice(0, 2).join(".")}`
+            if (document.querySelectorAll(classSelector).length === 1)
+              return classSelector
           }
           const parent = element.parentElement
           if (parent) {
-            const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName)
+            const siblings = Array.from(parent.children).filter(
+              (c) => c.tagName === element.tagName
+            )
             if (siblings.length > 1) {
               const index = siblings.indexOf(element) + 1
               return `${generateSelector(parent)} > ${tagName}:nth-of-type(${index})`
@@ -189,7 +279,11 @@ export async function searchTextInPage(searchText: string, maxResults: number = 
           return tagName
         }
 
-        const matches: { selector: string; html: string; textContent: string }[] = []
+        const matches: {
+          selector: string
+          html: string
+          textContent: string
+        }[] = []
 
         try {
           const xpath = `//*[contains(text(), "${text.replace(/"/g, '\\"')}")]`
@@ -201,18 +295,22 @@ export async function searchTextInPage(searchText: string, maxResults: number = 
             null
           )
 
-          for (let i = 0; i < Math.min(xpathResult.snapshotLength, limit); i++) {
+          for (
+            let i = 0;
+            i < Math.min(xpathResult.snapshotLength, limit);
+            i++
+          ) {
             const node = xpathResult.snapshotItem(i) as Element
             if (node && node.outerHTML) {
               matches.push({
                 selector: generateSelector(node),
                 html: node.outerHTML,
-                textContent: node.textContent?.slice(0, 200) || ''
+                textContent: node.textContent?.slice(0, 200) || ""
               })
             }
           }
         } catch (xpathError) {
-          console.error('[HTML Capture] XPath error:', xpathError)
+          console.error("[HTML Capture] XPath error:", xpathError)
         }
 
         return matches
@@ -221,37 +319,67 @@ export async function searchTextInPage(searchText: string, maxResults: number = 
     })
 
     if (!results || results.length === 0 || !results[0]?.result) {
-      return { searchText, matches: [], found: false, error: 'Failed to execute search script' }
+      return {
+        searchText,
+        matches: [],
+        found: false,
+        error: "Failed to execute search script"
+      }
     }
 
     const matches = results[0].result as TextSearchMatch[]
-    debugLog('[HTML Capture] Text search found', matches.length, 'matches')
+    debugLog("[HTML Capture] Text search found", matches.length, "matches")
     return { searchText, matches, found: matches.length > 0 }
   } catch (error) {
-    console.error('[HTML Capture] Text search error:', error)
-    return { searchText, matches: [], found: false, error: (error as Error).message }
+    console.error("[HTML Capture] Text search error:", error)
+    return {
+      searchText,
+      matches: [],
+      found: false,
+      error: (error as Error).message
+    }
   }
 }
 
-export async function queryXPath(xpath: string, maxResults: number = 10): Promise<XPathResults> {
-  debugLog('[HTML Capture] Executing XPath query:', xpath)
+export async function queryXPath(
+  xpath: string,
+  maxResults: number = 10
+): Promise<XPathResults> {
+  debugLog("[HTML Capture] Executing XPath query:", xpath)
 
   try {
     if (!chrome?.tabs || !chrome?.scripting) {
-      console.error('[HTML Capture] chrome.tabs or chrome.scripting API not available!')
-      return { xpath, matches: [], found: false, error: 'chrome.scripting API not available' }
+      console.error(
+        "[HTML Capture] chrome.tabs or chrome.scripting API not available!"
+      )
+      return {
+        xpath,
+        matches: [],
+        found: false,
+        error: "chrome.scripting API not available"
+      }
     }
 
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    const [activeTab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    })
     if (!activeTab?.id) {
-      return { xpath, matches: [], found: false, error: 'No active tab found' }
+      return { xpath, matches: [], found: false, error: "No active tab found" }
     }
 
-    if (!activeTab.url ||
-        activeTab.url.startsWith('chrome-extension://') ||
-        activeTab.url.startsWith('chrome://') ||
-        activeTab.url.startsWith('about:')) {
-      return { xpath, matches: [], found: false, error: 'Active tab is not a webpage' }
+    if (
+      !activeTab.url ||
+      activeTab.url.startsWith("chrome-extension://") ||
+      activeTab.url.startsWith("chrome://") ||
+      activeTab.url.startsWith("about:")
+    ) {
+      return {
+        xpath,
+        matches: [],
+        found: false,
+        error: "Active tab is not a webpage"
+      }
     }
 
     const results = await chrome.scripting.executeScript({
@@ -260,14 +388,19 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
         const generateSelector = (element: Element): string => {
           if (element.id) return `#${element.id}`
           const tagName = element.tagName.toLowerCase()
-          const classes = Array.from(element.classList).filter(c => c && !c.includes(':'))
+          const classes = Array.from(element.classList).filter(
+            (c) => c && !c.includes(":")
+          )
           if (classes.length > 0) {
-            const classSelector = `${tagName}.${classes.slice(0, 2).join('.')}`
-            if (document.querySelectorAll(classSelector).length === 1) return classSelector
+            const classSelector = `${tagName}.${classes.slice(0, 2).join(".")}`
+            if (document.querySelectorAll(classSelector).length === 1)
+              return classSelector
           }
           const parent = element.parentElement
           if (parent) {
-            const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName)
+            const siblings = Array.from(parent.children).filter(
+              (c) => c.tagName === element.tagName
+            )
             if (siblings.length > 1) {
               const index = siblings.indexOf(element) + 1
               return `${generateSelector(parent)} > ${tagName}:nth-of-type(${index})`
@@ -277,7 +410,12 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
           return tagName
         }
 
-        const matches: { selector: string; html: string; textContent: string; nodeType: string }[] = []
+        const matches: {
+          selector: string
+          html: string
+          textContent: string
+          nodeType: string
+        }[] = []
 
         try {
           const xpathResult = document.evaluate(
@@ -288,7 +426,11 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
             null
           )
 
-          for (let i = 0; i < Math.min(xpathResult.snapshotLength, limit); i++) {
+          for (
+            let i = 0;
+            i < Math.min(xpathResult.snapshotLength, limit);
+            i++
+          ) {
             const node = xpathResult.snapshotItem(i)
             if (!node) continue
 
@@ -297,8 +439,8 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
               matches.push({
                 selector: generateSelector(element),
                 html: element.outerHTML.slice(0, 2000),
-                textContent: element.textContent?.slice(0, 200) || '',
-                nodeType: 'element'
+                textContent: element.textContent?.slice(0, 200) || "",
+                nodeType: "element"
               })
             } else if (node.nodeType === Node.TEXT_NODE) {
               const parentElement = node.parentElement
@@ -306,22 +448,22 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
                 matches.push({
                   selector: generateSelector(parentElement),
                   html: parentElement.outerHTML.slice(0, 2000),
-                  textContent: node.textContent?.slice(0, 200) || '',
-                  nodeType: 'text'
+                  textContent: node.textContent?.slice(0, 200) || "",
+                  nodeType: "text"
                 })
               }
             } else if (node.nodeType === Node.ATTRIBUTE_NODE) {
               const attr = node as Attr
               matches.push({
-                selector: '',
+                selector: "",
                 html: `${attr.name}="${attr.value}"`,
                 textContent: attr.value,
-                nodeType: 'attribute'
+                nodeType: "attribute"
               })
             }
           }
         } catch (xpathError: any) {
-          return { error: xpathError.message || 'Invalid XPath expression' }
+          return { error: xpathError.message || "Invalid XPath expression" }
         }
 
         return { matches }
@@ -330,20 +472,28 @@ export async function queryXPath(xpath: string, maxResults: number = 10): Promis
     })
 
     if (!results || results.length === 0 || !results[0]?.result) {
-      return { xpath, matches: [], found: false, error: 'Failed to execute XPath script' }
+      return {
+        xpath,
+        matches: [],
+        found: false,
+        error: "Failed to execute XPath script"
+      }
     }
 
-    const result = results[0].result as { matches?: XPathMatch[]; error?: string }
+    const result = results[0].result as {
+      matches?: XPathMatch[]
+      error?: string
+    }
 
     if (result.error) {
       return { xpath, matches: [], found: false, error: result.error }
     }
 
     const matches = result.matches || []
-    debugLog('[HTML Capture] XPath query found', matches.length, 'matches')
+    debugLog("[HTML Capture] XPath query found", matches.length, "matches")
     return { xpath, matches, found: matches.length > 0 }
   } catch (error) {
-    console.error('[HTML Capture] XPath query error:', error)
+    console.error("[HTML Capture] XPath query error:", error)
     return { xpath, matches: [], found: false, error: (error as Error).message }
   }
 }
@@ -367,13 +517,13 @@ function generateDOMStructureInPage(): string {
   const MAX_CLASSES = 5
 
   const EXCLUDE_SELECTORS = [
-    '#__plasmo',
-    '#__plasmo-loading__',
-    '[data-plasmo]',
-    'plasmo-csui',
-    'script',
-    'style',
-    'noscript',
+    "#__plasmo",
+    "#__plasmo-loading__",
+    "[data-plasmo]",
+    "plasmo-csui",
+    "script",
+    "style",
+    "noscript",
     'iframe[id^="absmartly-"]'
   ]
 
@@ -382,7 +532,7 @@ function generateDOMStructureInPage(): string {
       try {
         if (el.matches(sel)) return true
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'SyntaxError') {
+        if (error instanceof DOMException && error.name === "SyntaxError") {
           warn(`[HTML Capture] Invalid selector in EXCLUDE_SELECTORS: ${sel}`)
         }
       }
@@ -394,16 +544,16 @@ function generateDOMStructureInPage(): string {
     let sig = el.tagName.toLowerCase()
     if (el.id) sig += `#${el.id}`
     const classes = Array.from(el.classList)
-      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .filter((c) => !c.startsWith("__") && !c.includes("plasmo"))
       .slice(0, MAX_CLASSES)
-    if (classes.length > 0) sig += '.' + classes.join('.')
+    if (classes.length > 0) sig += "." + classes.join(".")
     return sig
   }
 
   function findVaryingClasses(elements: Element[]): Set<string> {
     if (elements.length <= 1) return new Set()
 
-    const allClassSets = elements.map(el => new Set(Array.from(el.classList)))
+    const allClassSets = elements.map((el) => new Set(Array.from(el.classList)))
     const firstClasses = allClassSets[0]
     const varying = new Set<string>()
 
@@ -440,8 +590,8 @@ function generateDOMStructureInPage(): string {
     if (shouldExclude(el) || depth > MAX_DEPTH) return []
 
     const lines: string[] = []
-    const connector = isLast ? '└── ' : '├── '
-    const childPrefix = isLast ? '    ' : '│   '
+    const connector = isLast ? "└── " : "├── "
+    const childPrefix = isLast ? "    " : "│   "
 
     let label = el.tagName.toLowerCase()
 
@@ -452,56 +602,60 @@ function generateDOMStructureInPage(): string {
     // Find which classes vary across all elements
     const varyingClasses = findVaryingClasses(allElements)
     const classes = Array.from(el.classList)
-      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .filter((c) => !c.startsWith("__") && !c.includes("plasmo"))
       .slice(0, MAX_CLASSES)
 
     if (classes.length > 0) {
-      const stableClasses = classes.filter(c => !varyingClasses.has(c))
+      const stableClasses = classes.filter((c) => !varyingClasses.has(c))
       if (stableClasses.length > 0) {
-        label += '.' + stableClasses.join('.')
+        label += "." + stableClasses.join(".")
       }
       if (varyingClasses.size > 0) {
-        const varyingList = classes.filter(c => varyingClasses.has(c))
+        const varyingList = classes.filter((c) => varyingClasses.has(c))
         if (varyingList.length > 0) {
-          label += '.[varies]'
+          label += ".[varies]"
         }
       }
     }
 
-    const role = el.getAttribute('role')
+    const role = el.getAttribute("role")
     if (role) {
       label += ` [role="${role}"]`
     }
 
-    const ariaLabel = el.getAttribute('aria-label')
+    const ariaLabel = el.getAttribute("aria-label")
     if (ariaLabel) {
-      const short = ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + '...' : ariaLabel
+      const short =
+        ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + "..." : ariaLabel
       label += ` [aria-label="${short}"]`
     }
 
     const dataAttrs: string[] = []
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith('data-') && !attr.name.includes('plasmo')) {
-        const val = attr.value.length > 30 ? attr.value.slice(0, 30) + '...' : attr.value
+      if (attr.name.startsWith("data-") && !attr.name.includes("plasmo")) {
+        const val =
+          attr.value.length > 30 ? attr.value.slice(0, 30) + "..." : attr.value
         dataAttrs.push(`${attr.name}="${val}"`)
         if (dataAttrs.length >= 3) break
       }
     }
     if (dataAttrs.length > 0) {
-      label += ` {${dataAttrs.join(' ')}}`
+      label += ` {${dataAttrs.join(" ")}}`
     }
 
     label += ` (×${count})`
 
-    const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
+    const validChildren = Array.from(el.children).filter(
+      (c) => !shouldExclude(c)
+    )
     if (validChildren.length > 0 && depth >= MAX_DEPTH) {
       // Show child signatures instead of just count
-      const childSigs = validChildren.map(c => getElementSignature(c))
+      const childSigs = validChildren.map((c) => getElementSignature(c))
       const uniqueSigs = Array.from(new Set(childSigs))
       if (uniqueSigs.length === 1) {
         label += ` (${validChildren.length} × ${uniqueSigs[0]})`
       } else if (uniqueSigs.length <= 3) {
-        label += ` (${validChildren.length} children: ${uniqueSigs.join(', ')})`
+        label += ` (${validChildren.length} children: ${uniqueSigs.join(", ")})`
       } else {
         label += ` (${validChildren.length} children)`
       }
@@ -526,8 +680,10 @@ function generateDOMStructureInPage(): string {
 
         // Count consecutive elements with same signature within first parent
         let childCount = 1
-        while (i + childCount < validChildren.length &&
-               getElementSignature(validChildren[i + childCount]) === childSig) {
+        while (
+          i + childCount < validChildren.length &&
+          getElementSignature(validChildren[i + childCount]) === childSig
+        ) {
           childCount++
         }
 
@@ -535,19 +691,27 @@ function generateDOMStructureInPage(): string {
 
         if (childCount > 1) {
           // Show compressed children
-          const childLines = formatNode(child, prefix + childPrefix, isChildLast, depth + 1)
+          const childLines = formatNode(
+            child,
+            prefix + childPrefix,
+            isChildLast,
+            depth + 1
+          )
           if (childLines.length > 0) {
             const firstLine = childLines[0]
             const indentMatch = firstLine.match(/^(\s*[├└]── )(.+)$/)
             if (indentMatch) {
-              childLines[0] = indentMatch[1] + indentMatch[2] + ` (×${childCount})`
+              childLines[0] =
+                indentMatch[1] + indentMatch[2] + ` (×${childCount})`
             }
             lines.push(...childLines)
           }
           i += childCount
         } else {
           // Single child
-          lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+          lines.push(
+            ...formatNode(child, prefix + childPrefix, isChildLast, depth + 1)
+          )
           i++
         }
       }
@@ -556,12 +720,17 @@ function generateDOMStructureInPage(): string {
     return lines
   }
 
-  function formatNode(el: Element, prefix: string, isLast: boolean, depth: number): string[] {
+  function formatNode(
+    el: Element,
+    prefix: string,
+    isLast: boolean,
+    depth: number
+  ): string[] {
     if (shouldExclude(el) || depth > MAX_DEPTH) return []
 
     const lines: string[] = []
-    const connector = isLast ? '└── ' : '├── '
-    const childPrefix = isLast ? '    ' : '│   '
+    const connector = isLast ? "└── " : "├── "
+    const childPrefix = isLast ? "    " : "│   "
 
     let label = el.tagName.toLowerCase()
 
@@ -570,44 +739,48 @@ function generateDOMStructureInPage(): string {
     }
 
     const classes = Array.from(el.classList)
-      .filter(c => !c.startsWith('__') && !c.includes('plasmo'))
+      .filter((c) => !c.startsWith("__") && !c.includes("plasmo"))
       .slice(0, MAX_CLASSES)
     if (classes.length > 0) {
-      label += '.' + classes.join('.')
+      label += "." + classes.join(".")
     }
 
-    const role = el.getAttribute('role')
+    const role = el.getAttribute("role")
     if (role) {
       label += ` [role="${role}"]`
     }
 
-    const ariaLabel = el.getAttribute('aria-label')
+    const ariaLabel = el.getAttribute("aria-label")
     if (ariaLabel) {
-      const short = ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + '...' : ariaLabel
+      const short =
+        ariaLabel.length > 30 ? ariaLabel.slice(0, 30) + "..." : ariaLabel
       label += ` [aria-label="${short}"]`
     }
 
     const dataAttrs: string[] = []
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith('data-') && !attr.name.includes('plasmo')) {
-        const val = attr.value.length > 30 ? attr.value.slice(0, 30) + '...' : attr.value
+      if (attr.name.startsWith("data-") && !attr.name.includes("plasmo")) {
+        const val =
+          attr.value.length > 30 ? attr.value.slice(0, 30) + "..." : attr.value
         dataAttrs.push(`${attr.name}="${val}"`)
         if (dataAttrs.length >= 3) break
       }
     }
     if (dataAttrs.length > 0) {
-      label += ` {${dataAttrs.join(' ')}}`
+      label += ` {${dataAttrs.join(" ")}}`
     }
 
-    const validChildren = Array.from(el.children).filter(c => !shouldExclude(c))
+    const validChildren = Array.from(el.children).filter(
+      (c) => !shouldExclude(c)
+    )
     if (validChildren.length > 0 && depth >= MAX_DEPTH) {
       // Show child signatures instead of just count
-      const childSigs = validChildren.map(c => getElementSignature(c))
+      const childSigs = validChildren.map((c) => getElementSignature(c))
       const uniqueSigs = Array.from(new Set(childSigs))
       if (uniqueSigs.length === 1) {
         label += ` (${validChildren.length} × ${uniqueSigs[0]})`
       } else if (uniqueSigs.length <= 3) {
-        label += ` (${validChildren.length} children: ${uniqueSigs.join(', ')})`
+        label += ` (${validChildren.length} children: ${uniqueSigs.join(", ")})`
       } else {
         label += ` (${validChildren.length} children)`
       }
@@ -631,8 +804,10 @@ function generateDOMStructureInPage(): string {
 
         // Count consecutive elements with same signature
         let count = 1
-        while (i + count < validChildren.length &&
-               getElementSignature(validChildren[i + count]) === childSig) {
+        while (
+          i + count < validChildren.length &&
+          getElementSignature(validChildren[i + count]) === childSig
+        ) {
           count++
         }
 
@@ -655,7 +830,9 @@ function generateDOMStructureInPage(): string {
         } else {
           // Show normally (single element)
           const isChildLast = i === validChildren.length - 1
-          lines.push(...formatNode(child, prefix + childPrefix, isChildLast, depth + 1))
+          lines.push(
+            ...formatNode(child, prefix + childPrefix, isChildLast, depth + 1)
+          )
           i++
         }
       }
@@ -669,13 +846,13 @@ function generateDOMStructureInPage(): string {
     let i = 1
 
     while (i < lines.length) {
-      const currentIndent = lines[i].match(/^(\s*)/)?.[1] || ''
+      const currentIndent = lines[i].match(/^(\s*)/)?.[1] || ""
 
       // Collect all siblings at this indent level (same parent)
       const siblings: { subtree: string[]; startIdx: number }[] = []
 
       while (i < lines.length) {
-        const lineIndent = lines[i].match(/^(\s*)/)?.[1] || ''
+        const lineIndent = lines[i].match(/^(\s*)/)?.[1] || ""
         if (lineIndent.length < currentIndent.length) break
         if (lineIndent.length > currentIndent.length) {
           i++
@@ -687,7 +864,7 @@ function generateDOMStructureInPage(): string {
         let subtreeEnd = i + 1
 
         while (subtreeEnd < lines.length) {
-          const nextIndent = lines[subtreeEnd].match(/^(\s*)/)?.[1] || ''
+          const nextIndent = lines[subtreeEnd].match(/^(\s*)/)?.[1] || ""
           if (nextIndent.length <= currentIndent.length) break
           subtreeEnd++
         }
@@ -704,7 +881,7 @@ function generateDOMStructureInPage(): string {
       const groups = new Map<string, { subtree: string[]; count: number }>()
 
       for (const sibling of siblings) {
-        const key = sibling.subtree.join('\n')
+        const key = sibling.subtree.join("\n")
         const existing = groups.get(key)
         if (existing) {
           existing.count++
@@ -718,14 +895,17 @@ function generateDOMStructureInPage(): string {
         if (group.count > 1) {
           // Add/update count on first line
           let firstLine = group.subtree[0]
-          if (!firstLine.includes('(×')) {
+          if (!firstLine.includes("(×")) {
             const match = firstLine.match(/^(\s*[├└]── )(.+)$/)
             if (match) {
               firstLine = match[1] + match[2] + ` (×${group.count})`
             }
           } else {
             // Already has count, multiply it
-            firstLine = firstLine.replace(/\(×(\d+)\)/, (_, n) => `(×${parseInt(n) * group.count})`)
+            firstLine = firstLine.replace(
+              /\(×(\d+)\)/,
+              (_, n) => `(×${parseInt(n) * group.count})`
+            )
           }
           result.push(firstLine)
           for (let j = 1; j < group.subtree.length; j++) {
@@ -741,53 +921,74 @@ function generateDOMStructureInPage(): string {
     return result
   }
 
-  const lines: string[] = ['body']
-  const bodyChildren = Array.from(document.body.children).filter(c => !shouldExclude(c))
+  const lines: string[] = ["body"]
+  const bodyChildren = Array.from(document.body.children).filter(
+    (c) => !shouldExclude(c)
+  )
   for (let i = 0; i < bodyChildren.length; i++) {
     const child = bodyChildren[i]
     const isLast = i === bodyChildren.length - 1
-    lines.push(...formatNode(child, '', isLast, 1))
+    lines.push(...formatNode(child, "", isLast, 1))
   }
 
   // Compress repeated subtrees
   const compressed = compressRepeatedSubtrees(lines)
 
-  return compressed.join('\n')
+  return compressed.join("\n")
 }
 
 export async function capturePageHTML(): Promise<PageCaptureResult> {
-  debugLog('[HTML Capture] Function called')
+  debugLog("[HTML Capture] Function called")
 
   let activeTabUrl: string | undefined
 
   try {
-    debugLog('[HTML Capture] Starting capture...')
+    debugLog("[HTML Capture] Starting capture...")
 
     if (!chrome?.tabs || !chrome?.scripting) {
-      console.error('[HTML Capture] chrome.tabs or chrome.scripting API not available!')
-      throw new Error('chrome.tabs or chrome.scripting API not available')
+      console.error(
+        "[HTML Capture] chrome.tabs or chrome.scripting API not available!"
+      )
+      throw new Error("chrome.tabs or chrome.scripting API not available")
     }
 
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    debugLog('[HTML Capture] Active tab:', activeTab?.id, 'URL:', activeTab?.url)
+    const [activeTab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    })
+    debugLog(
+      "[HTML Capture] Active tab:",
+      activeTab?.id,
+      "URL:",
+      activeTab?.url
+    )
     activeTabUrl = activeTab?.url
 
     if (!activeTab?.id) {
-      console.error('[HTML Capture] No active tab found!')
-      throw new Error('No active tab found')
+      console.error("[HTML Capture] No active tab found!")
+      throw new Error("No active tab found")
     }
 
-    if (!activeTab.url ||
-        activeTab.url.startsWith('chrome-extension://') ||
-        activeTab.url.startsWith('chrome://') ||
-        activeTab.url.startsWith('about:')) {
-      console.error('[HTML Capture] Active tab is not a webpage:', activeTab.url)
-      throw new Error('Please open the extension on a webpage, not an extension page')
+    if (
+      !activeTab.url ||
+      activeTab.url.startsWith("chrome-extension://") ||
+      activeTab.url.startsWith("chrome://") ||
+      activeTab.url.startsWith("about:")
+    ) {
+      console.error(
+        "[HTML Capture] Active tab is not a webpage:",
+        activeTab.url
+      )
+      throw new Error(
+        "Please open the extension on a webpage, not an extension page"
+      )
     }
 
     const pageUrl = activeTab.url
-    debugLog('[HTML Capture] Page URL:', pageUrl)
-    debugLog('[HTML Capture] Injecting script to capture HTML and DOM structure...')
+    debugLog("[HTML Capture] Page URL:", pageUrl)
+    debugLog(
+      "[HTML Capture] Injecting script to capture HTML and DOM structure..."
+    )
 
     const results = await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
@@ -799,31 +1000,52 @@ export async function capturePageHTML(): Promise<PageCaptureResult> {
       func: () => document.documentElement.outerHTML
     })
 
-    debugLog('[HTML Capture] Script executed, results:', results?.length)
+    debugLog("[HTML Capture] Script executed, results:", results?.length)
 
     if (!htmlResults || htmlResults.length === 0 || !htmlResults[0]?.result) {
-      console.error('[HTML Capture] No HTML results returned from script')
-      throw new Error('Failed to capture HTML: No results returned')
+      console.error("[HTML Capture] No HTML results returned from script")
+      throw new Error("Failed to capture HTML: No results returned")
     }
 
     const html = htmlResults[0].result
-    const domStructure = results?.[0]?.result || 'body\n└── (structure unavailable)'
+    const domStructure =
+      results?.[0]?.result || "body\n└── (structure unavailable)"
 
-    debugLog('📸 Captured HTML from page, length:', html?.length, 'URL:', pageUrl)
-    debugLog('[HTML Capture] Success! HTML length:', html?.length, 'Structure lines:', domStructure.split('\n').length)
+    debugLog(
+      "📸 Captured HTML from page, length:",
+      html?.length,
+      "URL:",
+      pageUrl
+    )
+    debugLog(
+      "[HTML Capture] Success! HTML length:",
+      html?.length,
+      "Structure lines:",
+      domStructure.split("\n").length
+    )
     return { html, url: pageUrl, domStructure }
   } catch (error) {
-    console.error('[HTML Capture] Error:', error)
-    debugError('❌ Failed to capture page HTML:', error)
+    console.error("[HTML Capture] Error:", error)
+    debugError("❌ Failed to capture page HTML:", error)
 
     if (activeTabUrl && /visual-editor-test\.html/.test(activeTabUrl)) {
-      debugWarn('[HTML Capture] Falling back to empty HTML for test page:', activeTabUrl)
-      return { html: '<html></html>', url: activeTabUrl, domStructure: 'body' }
+      debugWarn(
+        "[HTML Capture] Falling back to empty HTML for test page:",
+        activeTabUrl
+      )
+      return { html: "<html></html>", url: activeTabUrl, domStructure: "body" }
     }
 
-    if (activeTabUrl && activeTabUrl.startsWith('chrome-extension://') && process.env.NODE_ENV !== 'production') {
-      debugWarn('[HTML Capture] Falling back to empty HTML for extension page in dev/test:', activeTabUrl)
-      return { html: '<html></html>', url: activeTabUrl, domStructure: 'body' }
+    if (
+      activeTabUrl &&
+      activeTabUrl.startsWith("chrome-extension://") &&
+      process.env.NODE_ENV !== "production"
+    ) {
+      debugWarn(
+        "[HTML Capture] Falling back to empty HTML for extension page in dev/test:",
+        activeTabUrl
+      )
+      return { html: "<html></html>", url: activeTabUrl, domStructure: "body" }
     }
 
     throw error

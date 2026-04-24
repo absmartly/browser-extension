@@ -3,12 +3,12 @@
  * Provides syntax highlighting, validation, and full code editing features for JSON
  */
 
-import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { basicSetup } from 'codemirror'
-import { linter, type Diagnostic } from '@codemirror/lint'
+import { json } from "@codemirror/lang-json"
+import { linter, type Diagnostic } from "@codemirror/lint"
+import { EditorState } from "@codemirror/state"
+import { oneDark } from "@codemirror/theme-one-dark"
+import { EditorView } from "@codemirror/view"
+import { basicSetup } from "codemirror"
 
 export class JSONEditor {
   private editorHost: HTMLElement | null = null
@@ -17,8 +17,8 @@ export class JSONEditor {
   async show(title: string, currentJSON: string): Promise<string | null> {
     return new Promise((resolve) => {
       // Create editor host in regular DOM
-      this.editorHost = document.createElement('div')
-      this.editorHost.id = 'absmartly-json-editor-host'
+      this.editorHost = document.createElement("div")
+      this.editorHost.id = "absmartly-json-editor-host"
       this.editorHost.style.cssText = `
         position: fixed;
         top: 0;
@@ -29,49 +29,49 @@ export class JSONEditor {
         pointer-events: auto;
       `
 
-      const editorStyle = document.createElement('style')
-      editorStyle.id = 'absmartly-json-editor-styles'
+      const editorStyle = document.createElement("style")
+      editorStyle.id = "absmartly-json-editor-styles"
       editorStyle.textContent = this.getEditorStyles()
       document.head.appendChild(editorStyle)
 
       // Create editor elements
-      const backdrop = document.createElement('div')
-      backdrop.className = 'json-editor-backdrop'
+      const backdrop = document.createElement("div")
+      backdrop.className = "json-editor-backdrop"
 
-      const container = document.createElement('div')
-      container.className = 'json-editor-container'
+      const container = document.createElement("div")
+      container.className = "json-editor-container"
 
-      const header = document.createElement('div')
-      header.className = 'json-editor-header'
+      const header = document.createElement("div")
+      header.className = "json-editor-header"
 
-      const titleEl = document.createElement('h3')
-      titleEl.className = 'json-editor-title'
+      const titleEl = document.createElement("h3")
+      titleEl.className = "json-editor-title"
       titleEl.textContent = title
 
-      const statusEl = document.createElement('span')
-      statusEl.className = 'json-editor-status'
-      statusEl.id = 'json-editor-status'
-      statusEl.textContent = 'Valid JSON'
+      const statusEl = document.createElement("span")
+      statusEl.className = "json-editor-status"
+      statusEl.id = "json-editor-status"
+      statusEl.textContent = "Valid JSON"
 
       header.appendChild(titleEl)
       header.appendChild(statusEl)
 
       // Create editor container
-      const editorContainer = document.createElement('div')
-      editorContainer.id = 'json-codemirror-container'
-      editorContainer.className = 'json-editor-codemirror-container'
+      const editorContainer = document.createElement("div")
+      editorContainer.id = "json-codemirror-container"
+      editorContainer.className = "json-editor-codemirror-container"
 
       // Create toolbar
-      const toolbar = document.createElement('div')
-      toolbar.className = 'json-editor-toolbar'
+      const toolbar = document.createElement("div")
+      toolbar.className = "json-editor-toolbar"
 
-      const formatBtn = document.createElement('button')
-      formatBtn.className = 'json-toolbar-button'
-      formatBtn.innerHTML = '⚡ Format'
-      formatBtn.title = 'Format JSON'
+      const formatBtn = document.createElement("button")
+      formatBtn.className = "json-toolbar-button"
+      formatBtn.innerHTML = "⚡ Format"
+      formatBtn.title = "Format JSON"
 
-      const tipsEl = document.createElement('div')
-      tipsEl.className = 'json-editor-tips'
+      const tipsEl = document.createElement("div")
+      tipsEl.className = "json-editor-tips"
       tipsEl.innerHTML = `
         <div style="font-size: 11px; color: #858585;">
           <strong>Tips:</strong> 
@@ -85,17 +85,17 @@ export class JSONEditor {
       toolbar.appendChild(tipsEl)
 
       // Create buttons
-      const buttons = document.createElement('div')
-      buttons.className = 'json-editor-buttons'
+      const buttons = document.createElement("div")
+      buttons.className = "json-editor-buttons"
 
-      const cancelBtn = document.createElement('button')
-      cancelBtn.className = 'json-editor-button json-editor-button-cancel'
-      cancelBtn.id = 'json-editor-close-button'
-      cancelBtn.innerHTML = '<span>✕</span> Cancel'
+      const cancelBtn = document.createElement("button")
+      cancelBtn.className = "json-editor-button json-editor-button-cancel"
+      cancelBtn.id = "json-editor-close-button"
+      cancelBtn.innerHTML = "<span>✕</span> Cancel"
 
-      const saveBtn = document.createElement('button')
-      saveBtn.className = 'json-editor-button json-editor-button-save'
-      saveBtn.innerHTML = '<span>✓</span> Save Changes'
+      const saveBtn = document.createElement("button")
+      saveBtn.className = "json-editor-button json-editor-button-save"
+      saveBtn.innerHTML = "<span>✓</span> Save Changes"
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -114,16 +114,16 @@ export class JSONEditor {
       const jsonLinter = linter((view) => {
         const diagnostics: Diagnostic[] = []
         const content = view.state.doc.toString()
-        
+
         try {
           JSON.parse(content)
-          statusEl.textContent = '✓ Valid JSON'
-          statusEl.style.color = '#4ade80'
+          statusEl.textContent = "✓ Valid JSON"
+          statusEl.style.color = "#4ade80"
         } catch (e) {
           const error = e as SyntaxError
           statusEl.textContent = `✕ ${error.message}`
-          statusEl.style.color = '#f87171'
-          
+          statusEl.style.color = "#f87171"
+
           // Try to find the error position
           const match = error.message.match(/position (\d+)/)
           if (match) {
@@ -131,12 +131,12 @@ export class JSONEditor {
             diagnostics.push({
               from: pos,
               to: pos + 1,
-              severity: 'error',
+              severity: "error",
               message: error.message
             })
           }
         }
-        
+
         return diagnostics
       })
 
@@ -160,20 +160,20 @@ export class JSONEditor {
 
         // Focus the editor
         this.editorView.focus()
-        
+
         // Initial validation
         try {
           JSON.parse(currentJSON)
-          statusEl.textContent = '✓ Valid JSON'
-          statusEl.style.color = '#4ade80'
+          statusEl.textContent = "✓ Valid JSON"
+          statusEl.style.color = "#4ade80"
         } catch (e) {
           statusEl.textContent = `✕ ${(e as Error).message}`
-          statusEl.style.color = '#f87171'
+          statusEl.style.color = "#f87171"
         }
       }, 10)
 
       // Handle button clicks
-      formatBtn.addEventListener('click', (e) => {
+      formatBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         if (this.editorView) {
           try {
@@ -187,28 +187,28 @@ export class JSONEditor {
                 insert: formatted
               }
             })
-            statusEl.textContent = '✓ Valid JSON'
-            statusEl.style.color = '#4ade80'
+            statusEl.textContent = "✓ Valid JSON"
+            statusEl.style.color = "#4ade80"
           } catch (e) {
             statusEl.textContent = `✕ ${(e as Error).message}`
-            statusEl.style.color = '#f87171'
+            statusEl.style.color = "#f87171"
           }
         }
       })
 
-      cancelBtn.addEventListener('click', (e) => {
+      cancelBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
         this.cleanup()
         resolve(null)
       })
 
-      saveBtn.addEventListener('click', (e) => {
+      saveBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
-        
-        const newJSON = this.editorView?.state.doc.toString() || ''
-        
+
+        const newJSON = this.editorView?.state.doc.toString() || ""
+
         // Validate before saving
         try {
           JSON.parse(newJSON)
@@ -216,23 +216,23 @@ export class JSONEditor {
           resolve(newJSON)
         } catch (e) {
           statusEl.textContent = `✕ Cannot save invalid JSON: ${(e as Error).message}`
-          statusEl.style.color = '#f87171'
+          statusEl.style.color = "#f87171"
           // Don't resolve - keep editor open
         }
       })
 
       // Handle ESC key
       const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && this.editorHost) {
-          document.removeEventListener('keydown', escapeHandler)
+        if (e.key === "Escape" && this.editorHost) {
+          document.removeEventListener("keydown", escapeHandler)
           this.cleanup()
           resolve(null)
         }
       }
-      document.addEventListener('keydown', escapeHandler)
+      document.addEventListener("keydown", escapeHandler)
 
       // Prevent backdrop clicks from closing (only click outside container)
-      backdrop.addEventListener('click', (e) => {
+      backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) {
           this.cleanup()
           resolve(null)
@@ -240,11 +240,11 @@ export class JSONEditor {
       })
 
       // Prevent clicks from propagating to the page
-      container.addEventListener('click', (e) => {
+      container.addEventListener("click", (e) => {
         e.stopPropagation()
       })
 
-      container.addEventListener('mousedown', (e) => {
+      container.addEventListener("mousedown", (e) => {
         e.stopPropagation()
       })
     })
@@ -257,7 +257,7 @@ export class JSONEditor {
     }
 
     // Remove styles from document head
-    const styleEl = document.getElementById('absmartly-json-editor-styles')
+    const styleEl = document.getElementById("absmartly-json-editor-styles")
     if (styleEl) {
       styleEl.remove()
     }

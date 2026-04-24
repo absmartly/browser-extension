@@ -1,14 +1,22 @@
+import { ArrowPathIcon, BoltIcon, CogIcon } from "@heroicons/react/24/outline"
 import React from "react"
-import { ExperimentList } from "~src/components/ExperimentList"
+
+import {
+  CreateExperimentDropdown,
+  CreateExperimentDropdownPanel
+} from "~src/components/CreateExperimentDropdown"
 import { ExperimentFilter } from "~src/components/ExperimentFilter"
-import { Pagination } from "~src/components/Pagination"
-import { Button } from "~src/components/ui/Button"
+import { ExperimentList } from "~src/components/ExperimentList"
 import { Logo } from "~src/components/Logo"
-import { CreateExperimentDropdown, CreateExperimentDropdownPanel } from "~src/components/CreateExperimentDropdown"
+import { Pagination } from "~src/components/Pagination"
 import { SDKStatusAlert } from "~src/components/SDKStatusAlert"
+import { Button } from "~src/components/ui/Button"
 import { useSDKStatus } from "~src/hooks/useSDKStatus"
-import { CogIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline"
-import type { Experiment, ABsmartlyConfig, Application } from "~src/types/absmartly"
+import type {
+  ABsmartlyConfig,
+  Application,
+  Experiment
+} from "~src/types/absmartly"
 import type { ExperimentFilters } from "~src/types/filters"
 import type { View } from "~src/types/view"
 
@@ -31,7 +39,10 @@ interface ListViewProps {
   templateSearchQuery: string
   onExperimentClick: (experiment: Experiment) => void
   onToggleFavorite: (experimentId: number) => void
-  onFilterChange: (filterState: any, callback: (filters: ExperimentFilters) => void) => void
+  onFilterChange: (
+    filterState: any,
+    callback: (filters: ExperimentFilters) => void
+  ) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
   onRefresh: () => void
@@ -42,7 +53,12 @@ interface ListViewProps {
   setView: (view: View) => void
   setCreatePanelOpen: (open: boolean) => void
   setTemplateSearchQuery: (query: string) => void
-  loadExperiments: (force?: boolean, page?: number, pageSize?: number, filters?: ExperimentFilters) => Promise<void>
+  loadExperiments: (
+    force?: boolean,
+    page?: number,
+    pageSize?: number,
+    filters?: ExperimentFilters
+  ) => Promise<void>
 }
 
 export function ListView({
@@ -85,17 +101,18 @@ export function ListView({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Logo config={config} />
-            <h1 id="experiments-heading" className="text-lg font-semibold">Experiments</h1>
+            <h1 id="experiments-heading" className="text-lg font-semibold">
+              Experiments
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             <button
               id="refresh-experiments-button"
               onClick={onRefresh}
-              className={`p-2 hover:bg-gray-100 rounded-md transition-colors ${experimentsLoading ? 'animate-spin' : ''}`}
+              className={`p-2 hover:bg-gray-100 rounded-md transition-colors ${experimentsLoading ? "animate-spin" : ""}`}
               aria-label="Refresh experiments"
               title="Refresh experiments"
-              disabled={experimentsLoading}
-            >
+              disabled={experimentsLoading}>
               <ArrowPathIcon className="h-5 w-5 text-gray-600" />
             </button>
             <CreateExperimentDropdown
@@ -106,30 +123,30 @@ export function ListView({
             />
             <button
               id="nav-events"
-              onClick={() => setView('events')}
+              onClick={() => setView("events")}
               className="p-2 hover:bg-gray-100 rounded-md transition-colors"
               aria-label="Events Debug"
-              title="Events Debug"
-            >
+              title="Events Debug">
               <BoltIcon className="h-5 w-5 text-gray-600" />
             </button>
             <button
               id="nav-settings"
-              onClick={() => setView('settings')}
+              onClick={() => setView("settings")}
               className="p-2 hover:bg-gray-100 rounded-md transition-colors"
               aria-label="Settings"
-              title="Settings"
-            >
+              title="Settings">
               <CogIcon className="h-5 w-5 text-gray-600" />
             </button>
           </div>
         </div>
         {filters && (
           <ExperimentFilter
-            onFilterChange={(filterState) => onFilterChange(filterState, (newFilters) => {
-              setCurrentPage(1)
-              loadExperiments(false, 1, pageSize, newFilters)
-            })}
+            onFilterChange={(filterState) =>
+              onFilterChange(filterState, (newFilters) => {
+                setCurrentPage(1)
+                loadExperiments(false, 1, pageSize, newFilters)
+              })
+            }
             initialFilters={filters}
             applications={applications}
           />
@@ -153,15 +170,18 @@ export function ListView({
         />
       </div>
       {!isAuthenticated && (
-        <div role="alert" className="bg-blue-50 text-blue-700 px-4 py-2 text-sm">
+        <div
+          role="alert"
+          className="bg-blue-50 text-blue-700 px-4 py-2 text-sm">
           <div className="flex items-center justify-between">
-            <span>You are not logged in. Log in to load fresh experiments.</span>
+            <span>
+              You are not logged in. Log in to load fresh experiments.
+            </span>
             <Button
               onClick={onLoginRedirect}
               size="sm"
               variant="primary"
-              className="ml-2"
-            >
+              className="ml-2">
               Login
             </Button>
           </div>
@@ -187,7 +207,9 @@ export function ListView({
         />
         <Pagination
           currentPage={currentPage}
-          totalPages={totalExperiments ? Math.ceil(totalExperiments / pageSize) : 0}
+          totalPages={
+            totalExperiments ? Math.ceil(totalExperiments / pageSize) : 0
+          }
           pageSize={pageSize}
           totalItems={totalExperiments}
           hasMore={hasMore}

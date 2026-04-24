@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { isSDKAvailable } from '~src/utils/sdk-bridge'
+import { useCallback, useEffect, useRef, useState } from "react"
+
+import { isSDKAvailable } from "~src/utils/sdk-bridge"
 
 export interface SDKStatus {
   sdkDetected: boolean
@@ -28,7 +29,7 @@ export function useSDKStatus() {
 
     checkInFlightRef.current = true
     if (isInitial) {
-      setStatus(prev => ({ ...prev, checking: true }))
+      setStatus((prev) => ({ ...prev, checking: true }))
     }
 
     try {
@@ -42,9 +43,9 @@ export function useSDKStatus() {
         })
       }
     } catch (error) {
-      console.error('[useSDKStatus] Error checking SDK availability:', error)
+      console.error("[useSDKStatus] Error checking SDK availability:", error)
       if (isMountedRef.current) {
-        setStatus(prev => ({
+        setStatus((prev) => ({
           sdkDetected: prev.sdkDetected,
           checking: false,
           checked: prev.checked
@@ -63,7 +64,7 @@ export function useSDKStatus() {
     }
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         void runCheck(false)
       }
     }
@@ -72,21 +73,24 @@ export function useSDKStatus() {
       void runCheck(false)
     }
 
-    const handleTabUpdated = (_tabId: number, info: chrome.tabs.TabChangeInfo) => {
-      if (info.status === 'complete') {
+    const handleTabUpdated = (
+      _tabId: number,
+      info: chrome.tabs.TabChangeInfo
+    ) => {
+      if (info.status === "complete") {
         void runCheck(false)
       }
     }
 
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener("focus", handleFocus)
+    document.addEventListener("visibilitychange", handleVisibility)
     chrome.tabs?.onActivated.addListener(handleTabActivated)
     chrome.tabs?.onUpdated.addListener(handleTabUpdated)
 
     return () => {
       isMountedRef.current = false
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener("focus", handleFocus)
+      document.removeEventListener("visibilitychange", handleVisibility)
       chrome.tabs?.onActivated.removeListener(handleTabActivated)
       chrome.tabs?.onUpdated.removeListener(handleTabUpdated)
     }

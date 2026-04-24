@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import { Button } from './ui/Button'
-import { XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline"
+import React, { useState } from "react"
+
+import { Button } from "./ui/Button"
 
 interface AIDOMChangesDialogProps {
   isOpen: boolean
@@ -15,13 +16,13 @@ export function AIDOMChangesDialog({
   onGenerate,
   variantName
 }: AIDOMChangesDialogProps) {
-  const [prompt, setPrompt] = useState('')
+  const [prompt, setPrompt] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      setError('Please enter a prompt')
+      setError("Please enter a prompt")
       return
     }
 
@@ -30,17 +31,19 @@ export function AIDOMChangesDialog({
 
     try {
       await onGenerate(prompt)
-      setPrompt('')
+      setPrompt("")
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate DOM changes')
+      setError(
+        err instanceof Error ? err.message : "Failed to generate DOM changes"
+      )
     } finally {
       setLoading(false)
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       handleGenerate()
     }
   }
@@ -60,8 +63,7 @@ export function AIDOMChangesDialog({
           <button
             onClick={onClose}
             disabled={loading}
-            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
-          >
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
@@ -69,15 +71,19 @@ export function AIDOMChangesDialog({
         <div className="p-4">
           <div className="mb-4">
             <p className="text-sm text-gray-600 mb-2">
-              Variant: <span className="font-medium text-gray-900">{variantName}</span>
+              Variant:{" "}
+              <span className="font-medium text-gray-900">{variantName}</span>
             </p>
             <p className="text-sm text-gray-600">
-              Describe what you want to change on the page. The AI will analyze the HTML and generate appropriate DOM changes.
+              Describe what you want to change on the page. The AI will analyze
+              the HTML and generate appropriate DOM changes.
             </p>
           </div>
 
           <div className="mb-4">
-            <label htmlFor="ai-prompt" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="ai-prompt"
+              className="block text-sm font-medium text-gray-700 mb-2">
               What would you like to change?
             </label>
             <textarea
@@ -90,7 +96,8 @@ export function AIDOMChangesDialog({
               className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Press {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to generate
+              Press {navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}+Enter to
+              generate
             </p>
           </div>
 
@@ -101,7 +108,9 @@ export function AIDOMChangesDialog({
           )}
 
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <p className="text-sm text-blue-800 font-medium mb-1">Example prompts:</p>
+            <p className="text-sm text-blue-800 font-medium mb-1">
+              Example prompts:
+            </p>
             <ul className="text-sm text-blue-700 space-y-1 ml-4 list-disc">
               <li>Change the main CTA button background to blue</li>
               <li>Hide the pricing section</li>
@@ -117,15 +126,13 @@ export function AIDOMChangesDialog({
             type="button"
             variant="secondary"
             onClick={onClose}
-            disabled={loading}
-          >
+            disabled={loading}>
             Cancel
           </Button>
           <Button
             type="button"
             onClick={handleGenerate}
-            disabled={loading || !prompt.trim()}
-          >
+            disabled={loading || !prompt.trim()}>
             {loading ? (
               <>
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />

@@ -1,3 +1,10 @@
+import { initVisualEditor, VisualEditor } from "./core/visual-editor"
+import type {
+  DOMChange,
+  VisualEditorMessage,
+  VisualEditorOptions
+} from "./types/visual-editor"
+
 /**
  * ABsmartly Visual Editor - Unified Entry Point
  *
@@ -6,30 +13,27 @@
  */
 
 // Main visual editor class
-export { VisualEditor, initVisualEditor } from './core/visual-editor'
-import { VisualEditor, initVisualEditor } from './core/visual-editor'
-import type { VisualEditorOptions } from './types/visual-editor'
-import type { DOMChange, VisualEditorMessage } from './types/visual-editor'
+export { VisualEditor, initVisualEditor } from "./core/visual-editor"
 
 // Core modules
-export { default as StateManager } from './core/state-manager'
-export { default as EventHandlers } from './core/event-handlers'
-export { default as ContextMenu } from './core/context-menu'
-export { default as EditModes } from './core/edit-modes'
-export { default as Cleanup } from './core/cleanup'
+export { default as StateManager } from "./core/state-manager"
+export { default as EventHandlers } from "./core/event-handlers"
+export { default as ContextMenu } from "./core/context-menu"
+export { default as EditModes } from "./core/edit-modes"
+export { default as Cleanup } from "./core/cleanup"
 
 // UI modules
-export { default as UIComponents } from './ui/components'
-export { Toolbar } from './ui/toolbar'
-export { Notifications } from './ui/notifications'
-export { Styles } from './ui/styles'
-export { JSONEditor } from './ui/json-editor'
-export { JavaScriptEditor } from './ui/javascript-editor'
-export { default as HtmlEditor } from './ui/html-editor'
-export { default as BlockInserter } from './ui/block-inserter'
+export { default as UIComponents } from "./ui/components"
+export { Toolbar } from "./ui/toolbar"
+export { Notifications } from "./ui/notifications"
+export { Styles } from "./ui/styles"
+export { JSONEditor } from "./ui/json-editor"
+export { JavaScriptEditor } from "./ui/javascript-editor"
+export { default as HtmlEditor } from "./ui/html-editor"
+export { default as BlockInserter } from "./ui/block-inserter"
 
 // Utilities
-export { generateRobustSelector } from './utils/selector-generator'
+export { generateRobustSelector } from "./utils/selector-generator"
 
 // Types
 export type {
@@ -49,16 +53,16 @@ export type {
   ElementMetadata,
   VisualEditorMessage,
   VisualEditorError
-} from './types/visual-editor'
+} from "./types/visual-editor"
 
 export {
   DEFAULT_VISUAL_EDITOR_CONFIG,
   DEFAULT_SELECTOR_OPTIONS,
   DEFAULT_CHANGE_TRACKING_OPTIONS
-} from './types/visual-editor'
+} from "./types/visual-editor"
 
 // Version information
-export const VISUAL_EDITOR_VERSION = '3.0.0-unified'
+export const VISUAL_EDITOR_VERSION = "3.0.0-unified"
 
 /**
  * Factory function for creating a visual editor instance
@@ -126,26 +130,26 @@ export function withVisualEditor<T>(
 export function isDOMChange(obj: any): obj is DOMChange {
   return (
     obj &&
-    typeof obj === 'object' &&
-    typeof obj.selector === 'string' &&
-    typeof obj.type === 'string'
+    typeof obj === "object" &&
+    typeof obj.selector === "string" &&
+    typeof obj.type === "string"
   )
 }
 
 export function isVisualEditorMessage(obj: any): obj is VisualEditorMessage {
   return (
     obj &&
-    typeof obj === 'object' &&
-    typeof obj.type === 'string' &&
-    obj.type.startsWith('ABSMARTLY_VISUAL_EDITOR_')
+    typeof obj === "object" &&
+    typeof obj.type === "string" &&
+    obj.type.startsWith("ABSMARTLY_VISUAL_EDITOR_")
   )
 }
 
 // Browser environment detection
 export const isBrowserSupported = (): boolean => {
   return !!(
-    typeof window !== 'undefined' &&
-    typeof document !== 'undefined' &&
+    typeof window !== "undefined" &&
+    typeof document !== "undefined" &&
     document.querySelector &&
     window.getSelection &&
     window.addEventListener
@@ -155,7 +159,7 @@ export const isBrowserSupported = (): boolean => {
 // Extension environment detection
 export const isExtensionContext = (): boolean => {
   return !!(
-    typeof chrome !== 'undefined' &&
+    typeof chrome !== "undefined" &&
     chrome.runtime &&
     chrome.runtime.sendMessage
   )
@@ -163,12 +167,12 @@ export const isExtensionContext = (): boolean => {
 
 // Content script environment detection
 export const isContentScript = (): boolean => {
-  return isExtensionContext() && typeof window !== 'undefined'
+  return isExtensionContext() && typeof window !== "undefined"
 }
 
 // Background script environment detection
 export const isBackgroundScript = (): boolean => {
-  return isExtensionContext() && typeof window === 'undefined'
+  return isExtensionContext() && typeof window === "undefined"
 }
 
 /**

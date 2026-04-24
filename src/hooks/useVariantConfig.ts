@@ -1,8 +1,15 @@
-import type { DOMChange, DOMChangesData, DOMChangesConfig } from '~src/types/dom-changes'
+import type {
+  DOMChange,
+  DOMChangesConfig,
+  DOMChangesData
+} from "~src/types/dom-changes"
 
 export type VariantConfig = Record<string, unknown>
 
-export function getDOMChangesFromConfig(config: VariantConfig | undefined, domFieldName: string = '__dom_changes'): DOMChangesData {
+export function getDOMChangesFromConfig(
+  config: VariantConfig | undefined,
+  domFieldName: string = "__dom_changes"
+): DOMChangesData {
   if (!config) return []
   const domData = config[domFieldName]
   if (!domData) return []
@@ -10,7 +17,11 @@ export function getDOMChangesFromConfig(config: VariantConfig | undefined, domFi
   return domData as DOMChangesConfig
 }
 
-export function setDOMChangesInConfig(config: VariantConfig, domChanges: DOMChangesData, domFieldName: string = '__dom_changes'): VariantConfig {
+export function setDOMChangesInConfig(
+  config: VariantConfig,
+  domChanges: DOMChangesData,
+  domFieldName: string = "__dom_changes"
+): VariantConfig {
   const newConfig = { ...config }
 
   if (Array.isArray(domChanges)) {
@@ -29,10 +40,14 @@ export function setDOMChangesInConfig(config: VariantConfig, domChanges: DOMChan
   return newConfig
 }
 
-export function getVariablesForDisplay(config: VariantConfig, domFieldName: string, fieldsToExclude: string[] = ['__inject_html']): VariantConfig {
+export function getVariablesForDisplay(
+  config: VariantConfig,
+  domFieldName: string,
+  fieldsToExclude: string[] = ["__inject_html"]
+): VariantConfig {
   const filtered = { ...config }
   const allExclusions = [...fieldsToExclude, domFieldName]
-  allExclusions.forEach(field => delete filtered[field])
+  allExclusions.forEach((field) => delete filtered[field])
   return filtered
 }
 

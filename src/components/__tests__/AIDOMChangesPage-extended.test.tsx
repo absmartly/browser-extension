@@ -1,16 +1,19 @@
-import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
-import { AIDOMChangesPage } from '../AIDOMChangesPage'
-import type { DOMChange } from '~src/types/dom-changes'
-import { sendToBackground } from '~src/lib/messaging'
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import React from "react"
 
-jest.mock('~src/lib/messaging', () => ({
+import "@testing-library/jest-dom"
+
+import { sendToBackground } from "~src/lib/messaging"
+import type { DOMChange } from "~src/types/dom-changes"
+
+import { AIDOMChangesPage } from "../AIDOMChangesPage"
+
+jest.mock("~src/lib/messaging", () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
   sendToBackground: jest.fn().mockResolvedValue({ success: true })
 }))
 
-jest.mock('~src/utils/storage', () => ({
+jest.mock("~src/utils/storage", () => ({
   storage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
@@ -28,29 +31,31 @@ jest.mock('~src/utils/storage', () => ({
   }
 }))
 
-jest.mock('~src/utils/markdown', () => ({
+jest.mock("~src/utils/markdown", () => ({
   renderMarkdown: jest.fn((md: string) => md)
 }))
 
 const conversationState = {
   chatHistory: [],
   conversationSession: {
-    id: 'test-session-id',
+    id: "test-session-id",
     messages: [],
     timestamp: Date.now(),
     htmlSent: false
   },
   conversationList: [],
-  currentConversationId: 'test-session-id',
+  currentConversationId: "test-session-id",
   isLoadingHistory: false,
   error: null
 }
 
-jest.mock('~src/hooks/useConversationHistory', () => ({
+jest.mock("~src/hooks/useConversationHistory", () => ({
   useConversationHistory: jest.fn(() => ({
     chatHistory: conversationState.chatHistory,
     setChatHistory: jest.fn((history) => {
-      conversationState.chatHistory = Array.isArray(history) ? history : history(conversationState.chatHistory)
+      conversationState.chatHistory = Array.isArray(history)
+        ? history
+        : history(conversationState.chatHistory)
     }),
     conversationSession: conversationState.conversationSession,
     setConversationSession: jest.fn((session) => {
@@ -66,7 +71,7 @@ jest.mock('~src/hooks/useConversationHistory', () => ({
     handleNewChat: jest.fn(() => {
       conversationState.chatHistory = []
       conversationState.conversationSession = {
-        id: 'new-session-' + Date.now(),
+        id: "new-session-" + Date.now(),
         messages: [],
         timestamp: Date.now(),
         htmlSent: false
@@ -78,7 +83,10 @@ jest.mock('~src/hooks/useConversationHistory', () => ({
       conversationState.conversationSession = conversation.conversationSession
     }),
     handleDeleteConversation: jest.fn(async (conversationId) => {
-      conversationState.conversationList = conversationState.conversationList.filter(c => c.id !== conversationId)
+      conversationState.conversationList =
+        conversationState.conversationList.filter(
+          (c) => c.id !== conversationId
+        )
     }),
     refreshHTML: jest.fn(async () => {
       if (conversationState.conversationSession) {
@@ -108,23 +116,23 @@ global.chrome = {
 
 Element.prototype.scrollIntoView = jest.fn()
 
-describe('AIDOMChangesPage - Extended Tests', () => {
+describe("AIDOMChangesPage - Extended Tests", () => {
   const mockChanges: DOMChange[] = [
     {
-      selector: '.test-button',
-      type: 'style',
-      value: { color: 'red' }
+      selector: ".test-button",
+      type: "style",
+      value: { color: "red" }
     }
   ]
 
   const defaultProps = {
-    variantName: 'Test Variant',
+    variantName: "Test Variant",
     currentChanges: mockChanges,
     onBack: jest.fn(),
     onGenerate: jest.fn().mockResolvedValue({
       domChanges: mockChanges,
-      response: 'Generated changes',
-      action: 'append' as const
+      response: "Generated changes",
+      action: "append" as const
     }),
     onRestoreChanges: jest.fn(),
     onPreviewToggle: jest.fn(),
@@ -136,27 +144,27 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     jest.clearAllMocks()
     conversationState.chatHistory = []
     conversationState.conversationSession = {
-      id: 'test-session-id',
+      id: "test-session-id",
       messages: [],
       timestamp: Date.now(),
       htmlSent: false
     }
     conversationState.conversationList = []
-    conversationState.currentConversationId = 'test-session-id'
+    conversationState.currentConversationId = "test-session-id"
     conversationState.isLoadingHistory = false
     conversationState.error = null
   })
 
-  describe('Streaming AI Response', () => {
-    it('should display streaming response with progress indicator', async () => {
-      const streamingResponse = 'Analyzing your request...'
+  describe("Streaming AI Response", () => {
+    it("should display streaming response with progress indicator", async () => {
+      const streamingResponse = "Analyzing your request..."
       const mockStreamingGenerate = jest.fn().mockImplementation(async () => {
         return new Promise((resolve) => {
           setTimeout(() => {
             resolve({
               domChanges: mockChanges,
               response: streamingResponse,
-              action: 'append' as const
+              action: "append" as const
             })
           }, 100)
         })
@@ -170,9 +178,11 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       )
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Make it red' } })
+      fireEvent.change(textarea, { target: { value: "Make it red" } })
 
-      const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+      const generateButton = screen.getByRole("button", {
+        name: /Generate DOM Changes/i
+      })
       fireEvent.click(generateButton)
 
       await waitFor(() => {
@@ -180,26 +190,26 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should handle streaming error mid-response with recovery', async () => {
-      const mockFailingGenerate = jest.fn()
-        .mockRejectedValueOnce(new Error('Network timeout'))
+    it("should handle streaming error mid-response with recovery", async () => {
+      const mockFailingGenerate = jest
+        .fn()
+        .mockRejectedValueOnce(new Error("Network timeout"))
         .mockResolvedValueOnce({
           domChanges: mockChanges,
-          response: 'Success after retry',
-          action: 'append' as const
+          response: "Success after retry",
+          action: "append" as const
         })
 
       render(
-        <AIDOMChangesPage
-          {...defaultProps}
-          onGenerate={mockFailingGenerate}
-        />
+        <AIDOMChangesPage {...defaultProps} onGenerate={mockFailingGenerate} />
       )
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Make it red' } })
+      fireEvent.change(textarea, { target: { value: "Make it red" } })
 
-      const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+      const generateButton = screen.getByRole("button", {
+        name: /Generate DOM Changes/i
+      })
 
       fireEvent.click(generateButton)
 
@@ -211,7 +221,7 @@ describe('AIDOMChangesPage - Extended Tests', () => {
         expect(screen.getByText(/Network timeout/i)).toBeInTheDocument()
       })
 
-      fireEvent.change(textarea, { target: { value: 'Try again' } })
+      fireEvent.change(textarea, { target: { value: "Try again" } })
       fireEvent.click(generateButton)
 
       await waitFor(() => {
@@ -220,33 +230,32 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Apply Invalid DOM Changes', () => {
-    it('should show validation error for invalid selector', async () => {
+  describe("Apply Invalid DOM Changes", () => {
+    it("should show validation error for invalid selector", async () => {
       const invalidChanges: DOMChange[] = [
         {
-          selector: '',
-          type: 'style',
-          value: { color: 'red' }
+          selector: "",
+          type: "style",
+          value: { color: "red" }
         }
       ]
 
       const mockGenerateInvalid = jest.fn().mockResolvedValue({
         domChanges: invalidChanges,
-        response: 'Generated invalid changes',
-        action: 'append' as const
+        response: "Generated invalid changes",
+        action: "append" as const
       })
 
       render(
-        <AIDOMChangesPage
-          {...defaultProps}
-          onGenerate={mockGenerateInvalid}
-        />
+        <AIDOMChangesPage {...defaultProps} onGenerate={mockGenerateInvalid} />
       )
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Invalid selector' } })
+      fireEvent.change(textarea, { target: { value: "Invalid selector" } })
 
-      const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+      const generateButton = screen.getByRole("button", {
+        name: /Generate DOM Changes/i
+      })
       fireEvent.click(generateButton)
 
       await waitFor(() => {
@@ -254,7 +263,7 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should validate DOM changes before applying', async () => {
+    it("should validate DOM changes before applying", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
       await waitFor(() => {
@@ -263,10 +272,10 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Session Recovery', () => {
-    it('should recover conversation after page reload', async () => {
+  describe("Session Recovery", () => {
+    it("should recover conversation after page reload", async () => {
       conversationState.chatHistory = [
-        { role: 'user', content: 'Previous message', timestamp: Date.now() }
+        { role: "user", content: "Previous message", timestamp: Date.now() }
       ]
 
       render(<AIDOMChangesPage {...defaultProps} />)
@@ -276,10 +285,15 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should preserve changes after session recovery', async () => {
+    it("should preserve changes after session recovery", async () => {
       conversationState.chatHistory = [
-        { role: 'user', content: 'Previous message', timestamp: Date.now() },
-        { role: 'assistant', content: 'Applied changes', timestamp: Date.now(), domChanges: mockChanges }
+        { role: "user", content: "Previous message", timestamp: Date.now() },
+        {
+          role: "assistant",
+          content: "Applied changes",
+          timestamp: Date.now(),
+          domChanges: mockChanges
+        }
       ]
 
       render(<AIDOMChangesPage {...defaultProps} />)
@@ -290,16 +304,20 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Image Upload', () => {
-    it('should handle image upload and compression', async () => {
+  describe("Image Upload", () => {
+    it("should handle image upload and compression", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const file = new File(['image'], 'test.png', { type: 'image/png' })
-      const fileInput = screen.getByRole('textbox', { name: /What would you like to change/i }).parentElement?.parentElement?.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(["image"], "test.png", { type: "image/png" })
+      const fileInput = screen
+        .getByRole("textbox", { name: /What would you like to change/i })
+        .parentElement?.parentElement?.querySelector(
+          'input[type="file"]'
+        ) as HTMLInputElement
 
       expect(fileInput).toBeInTheDocument()
 
-      Object.defineProperty(fileInput, 'files', {
+      Object.defineProperty(fileInput, "files", {
         value: [file],
         writable: false
       })
@@ -312,17 +330,25 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should show error for oversized images', async () => {
+    it("should show error for oversized images", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const largeFile = new File([new ArrayBuffer(10 * 1024 * 1024)], 'large.png', {
-        type: 'image/png'
-      })
-      const fileInput = screen.getByRole('textbox', { name: /What would you like to change/i }).parentElement?.parentElement?.querySelector('input[type="file"]') as HTMLInputElement
+      const largeFile = new File(
+        [new ArrayBuffer(10 * 1024 * 1024)],
+        "large.png",
+        {
+          type: "image/png"
+        }
+      )
+      const fileInput = screen
+        .getByRole("textbox", { name: /What would you like to change/i })
+        .parentElement?.parentElement?.querySelector(
+          'input[type="file"]'
+        ) as HTMLInputElement
 
       expect(fileInput).toBeInTheDocument()
 
-      Object.defineProperty(fileInput, 'files', {
+      Object.defineProperty(fileInput, "files", {
         value: [largeFile],
         writable: false
       })
@@ -335,17 +361,23 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should handle image upload errors', async () => {
+    it("should handle image upload errors", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const invalidFile = new File(['not an image'], 'test.txt', { type: 'text/plain' })
-      const fileInput = screen.getByRole('textbox', { name: /What would you like to change/i }).parentElement?.parentElement?.querySelector('input[type="file"]') as HTMLInputElement
+      const invalidFile = new File(["not an image"], "test.txt", {
+        type: "text/plain"
+      })
+      const fileInput = screen
+        .getByRole("textbox", { name: /What would you like to change/i })
+        .parentElement?.parentElement?.querySelector(
+          'input[type="file"]'
+        ) as HTMLInputElement
 
       expect(fileInput).toBeInTheDocument()
 
       const imageCountBefore = screen.queryAllByAltText(/Attachment/i).length
 
-      Object.defineProperty(fileInput, 'files', {
+      Object.defineProperty(fileInput, "files", {
         value: [invalidFile],
         writable: false
       })
@@ -359,34 +391,40 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Conversation History', () => {
-    it('should switch between conversations during active chat', async () => {
+  describe("Conversation History", () => {
+    it("should switch between conversations during active chat", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const newConversationButton = screen.getByRole('button', { name: /New Chat/i })
+      const newConversationButton = screen.getByRole("button", {
+        name: /New Chat/i
+      })
 
       const initialChatLength = conversationState.chatHistory.length
 
       fireEvent.click(newConversationButton)
 
       await waitFor(() => {
-        expect(conversationState.chatHistory.length).toBeLessThanOrEqual(initialChatLength)
+        expect(conversationState.chatHistory.length).toBeLessThanOrEqual(
+          initialChatLength
+        )
       })
     })
 
-    it('should preserve current message when switching conversations', async () => {
+    it("should preserve current message when switching conversations", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Unsaved message' } })
+      fireEvent.change(textarea, { target: { value: "Unsaved message" } })
 
-      expect(textarea).toHaveValue('Unsaved message')
+      expect(textarea).toHaveValue("Unsaved message")
 
-      const newConversationButton = screen.getByRole('button', { name: /New Chat/i })
+      const newConversationButton = screen.getByRole("button", {
+        name: /New Chat/i
+      })
 
       conversationState.chatHistory = []
       conversationState.conversationSession = {
-        id: 'new-session-' + Date.now(),
+        id: "new-session-" + Date.now(),
         messages: [],
         timestamp: Date.now(),
         htmlSent: false
@@ -399,10 +437,10 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should handle conversation deletion', async () => {
+    it("should handle conversation deletion", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const deleteButton = screen.queryByRole('button', { name: /Delete/i })
+      const deleteButton = screen.queryByRole("button", { name: /Delete/i })
       if (deleteButton) {
         fireEvent.click(deleteButton)
 
@@ -413,14 +451,14 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('HTML Capture', () => {
-    it('should handle HTML capture failure', async () => {
+  describe("HTML Capture", () => {
+    it("should handle HTML capture failure", async () => {
       const mockSendToBackground = sendToBackground as jest.Mock
-      mockSendToBackground.mockRejectedValueOnce(new Error('Capture failed'))
+      mockSendToBackground.mockRejectedValueOnce(new Error("Capture failed"))
 
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const captureButton = screen.queryByRole('button', { name: /Capture/i })
+      const captureButton = screen.queryByRole("button", { name: /Capture/i })
       if (captureButton) {
         fireEvent.click(captureButton)
 
@@ -430,15 +468,15 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       }
     })
 
-    it('should retry HTML capture on failure', async () => {
+    it("should retry HTML capture on failure", async () => {
       const mockSendToBackground = sendToBackground as jest.Mock
       mockSendToBackground
-        .mockRejectedValueOnce(new Error('Capture failed'))
-        .mockResolvedValueOnce({ success: true, html: '<div>Test</div>' })
+        .mockRejectedValueOnce(new Error("Capture failed"))
+        .mockResolvedValueOnce({ success: true, html: "<div>Test</div>" })
 
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const captureButton = screen.queryByRole('button', { name: /Capture/i })
+      const captureButton = screen.queryByRole("button", { name: /Capture/i })
       if (captureButton) {
         fireEvent.click(captureButton)
 
@@ -455,21 +493,22 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Network Errors', () => {
-    it('should handle network error during AI request', async () => {
-      const mockGenerateError = jest.fn().mockRejectedValue(new Error('Network error'))
+  describe("Network Errors", () => {
+    it("should handle network error during AI request", async () => {
+      const mockGenerateError = jest
+        .fn()
+        .mockRejectedValue(new Error("Network error"))
 
       render(
-        <AIDOMChangesPage
-          {...defaultProps}
-          onGenerate={mockGenerateError}
-        />
+        <AIDOMChangesPage {...defaultProps} onGenerate={mockGenerateError} />
       )
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Test request' } })
+      fireEvent.change(textarea, { target: { value: "Test request" } })
 
-      const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+      const generateButton = screen.getByRole("button", {
+        name: /Generate DOM Changes/i
+      })
       fireEvent.click(generateButton)
 
       await waitFor(() => {
@@ -477,26 +516,26 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should allow retry after network error', async () => {
-      const mockGenerateError = jest.fn()
-        .mockRejectedValueOnce(new Error('Network error'))
+    it("should allow retry after network error", async () => {
+      const mockGenerateError = jest
+        .fn()
+        .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce({
           domChanges: mockChanges,
-          response: 'Success',
-          action: 'append' as const
+          response: "Success",
+          action: "append" as const
         })
 
       render(
-        <AIDOMChangesPage
-          {...defaultProps}
-          onGenerate={mockGenerateError}
-        />
+        <AIDOMChangesPage {...defaultProps} onGenerate={mockGenerateError} />
       )
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Test request' } })
+      fireEvent.change(textarea, { target: { value: "Test request" } })
 
-      const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+      const generateButton = screen.getByRole("button", {
+        name: /Generate DOM Changes/i
+      })
 
       fireEvent.click(generateButton)
 
@@ -504,7 +543,7 @@ describe('AIDOMChangesPage - Extended Tests', () => {
         expect(mockGenerateError).toHaveBeenCalledTimes(1)
       })
 
-      const retryButton = screen.queryByRole('button', { name: /Retry/i })
+      const retryButton = screen.queryByRole("button", { name: /Retry/i })
       if (retryButton) {
         fireEvent.click(retryButton)
 
@@ -514,32 +553,32 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       }
     })
 
-    it('should show timeout error after long wait', async () => {
+    it("should show timeout error after long wait", async () => {
       jest.useFakeTimers()
 
-      const mockLongGenerate = jest.fn().mockImplementation(() =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({
-              domChanges: mockChanges,
-              response: 'Success',
-              action: 'append' as const
-            })
-          }, 60000)
-        })
+      const mockLongGenerate = jest.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                domChanges: mockChanges,
+                response: "Success",
+                action: "append" as const
+              })
+            }, 60000)
+          })
       )
 
       render(
-        <AIDOMChangesPage
-          {...defaultProps}
-          onGenerate={mockLongGenerate}
-        />
+        <AIDOMChangesPage {...defaultProps} onGenerate={mockLongGenerate} />
       )
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Test request' } })
+      fireEvent.change(textarea, { target: { value: "Test request" } })
 
-      const generateButton = screen.getByRole('button', { name: /Generate DOM Changes/i })
+      const generateButton = screen.getByRole("button", {
+        name: /Generate DOM Changes/i
+      })
       fireEvent.click(generateButton)
 
       jest.advanceTimersByTime(60000)
@@ -552,11 +591,11 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Clear Conversation', () => {
-    it('should clear conversation history', async () => {
+  describe("Clear Conversation", () => {
+    it("should clear conversation history", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const clearButton = screen.queryByRole('button', { name: /Clear/i })
+      const clearButton = screen.queryByRole("button", { name: /Clear/i })
       if (clearButton) {
         fireEvent.click(clearButton)
 
@@ -566,28 +605,28 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       }
     })
 
-    it('should reset to initial state after clear', async () => {
+    it("should reset to initial state after clear", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Test message' } })
+      fireEvent.change(textarea, { target: { value: "Test message" } })
 
-      const clearButton = screen.queryByRole('button', { name: /Clear/i })
+      const clearButton = screen.queryByRole("button", { name: /Clear/i })
       if (clearButton) {
         fireEvent.click(clearButton)
 
         await waitFor(() => {
-          expect(textarea).toHaveValue('')
+          expect(textarea).toHaveValue("")
         })
       }
     })
   })
 
-  describe('Export Conversation', () => {
-    it('should export conversation as JSON', async () => {
+  describe("Export Conversation", () => {
+    it("should export conversation as JSON", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
-      const exportButton = screen.queryByRole('button', { name: /Export/i })
+      const exportButton = screen.queryByRole("button", { name: /Export/i })
       if (exportButton) {
         fireEvent.click(exportButton)
 
@@ -597,10 +636,10 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       }
     })
 
-    it('should include all messages in export', async () => {
+    it("should include all messages in export", async () => {
       conversationState.chatHistory = [
-        { role: 'user', content: 'First message', timestamp: Date.now() },
-        { role: 'assistant', content: 'Response', timestamp: Date.now() }
+        { role: "user", content: "First message", timestamp: Date.now() },
+        { role: "assistant", content: "Response", timestamp: Date.now() }
       ]
 
       render(<AIDOMChangesPage {...defaultProps} />)
@@ -609,7 +648,7 @@ describe('AIDOMChangesPage - Extended Tests', () => {
         expect(screen.queryByText(/First message/i)).toBeInTheDocument()
       })
 
-      const exportButton = screen.queryByRole('button', { name: /Export/i })
+      const exportButton = screen.queryByRole("button", { name: /Export/i })
       if (exportButton) {
         fireEvent.click(exportButton)
         await waitFor(() => {
@@ -619,24 +658,24 @@ describe('AIDOMChangesPage - Extended Tests', () => {
     })
   })
 
-  describe('Conversation Switching', () => {
-    it('should save current conversation before switching', async () => {
+  describe("Conversation Switching", () => {
+    it("should save current conversation before switching", async () => {
       render(<AIDOMChangesPage {...defaultProps} />)
 
       const textarea = screen.getByPlaceholderText(/Example: Change the CTA/i)
-      fireEvent.change(textarea, { target: { value: 'Current message' } })
+      fireEvent.change(textarea, { target: { value: "Current message" } })
 
-      expect(textarea).toHaveValue('Current message')
+      expect(textarea).toHaveValue("Current message")
 
       conversationState.chatHistory = []
       conversationState.conversationSession = {
-        id: 'new-session-' + Date.now(),
+        id: "new-session-" + Date.now(),
         messages: [],
         timestamp: Date.now(),
         htmlSent: false
       }
 
-      const newChatButton = screen.getByRole('button', { name: /New Chat/i })
+      const newChatButton = screen.getByRole("button", { name: /New Chat/i })
       fireEvent.click(newChatButton)
 
       await waitFor(() => {
@@ -644,9 +683,13 @@ describe('AIDOMChangesPage - Extended Tests', () => {
       })
     })
 
-    it('should load conversation history on switch', async () => {
+    it("should load conversation history on switch", async () => {
       conversationState.chatHistory = [
-        { role: 'user', content: 'Previous chat message', timestamp: Date.now() }
+        {
+          role: "user",
+          content: "Previous chat message",
+          timestamp: Date.now()
+        }
       ]
 
       render(<AIDOMChangesPage {...defaultProps} />)

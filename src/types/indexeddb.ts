@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationSession } from './absmartly'
+import type { ChatMessage, ConversationSession } from "./absmartly"
 
 export interface IDBConversationRecord {
   id: string
@@ -23,7 +23,7 @@ export interface IDBSchema {
   metadata: IDBMetadataRecord
 }
 
-export const DB_NAME = 'absmartly-conversations'
+export const DB_NAME = "absmartly-conversations"
 export const DB_VERSION = 1
-export const STORE_CONVERSATIONS = 'conversations'
-export const STORE_METADATA = 'metadata'
+export const STORE_CONVERSATIONS = "conversations"
+export const STORE_METADATA = "metadata"

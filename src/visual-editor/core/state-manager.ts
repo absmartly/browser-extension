@@ -3,10 +3,10 @@
  * Manages the global state of the visual editor
  */
 
-import type { DOMChange } from '../types/visual-editor'
+import type { DOMChange } from "../types/visual-editor"
 
 export interface UndoRedoAction {
-  type: 'add' | 'update' | 'remove'
+  type: "add" | "update" | "remove"
   change: DOMChange
   index: number
 }
@@ -81,7 +81,7 @@ class StateManager {
   }
 
   private notifyStateChange(): void {
-    this.stateChangeListeners.forEach(listener => listener(this.state))
+    this.stateChangeListeners.forEach((listener) => listener(this.state))
   }
 
   // Convenience methods for common state updates

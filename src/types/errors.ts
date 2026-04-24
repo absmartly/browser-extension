@@ -6,7 +6,7 @@ export class APIError extends Error {
     public readonly code?: string
   ) {
     super(message)
-    this.name = 'APIError'
+    this.name = "APIError"
   }
 
   static isAPIError(err: unknown): err is APIError {

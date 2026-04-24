@@ -12,7 +12,7 @@
  * 5. Validates XPath syntax using document.evaluate()
  */
 
-import { debugWarn } from './debug'
+import { debugWarn } from "./debug"
 
 export interface XPathValidationResult {
   valid: boolean
@@ -69,62 +69,62 @@ const DANGEROUS_PATTERNS = [
 ]
 
 export function validateXPath(xpath: string): XPathValidationResult {
-  if (!xpath || typeof xpath !== 'string') {
-    const error = 'Invalid XPath: not a string'
-    debugWarn('[XPath Validator]', error)
+  if (!xpath || typeof xpath !== "string") {
+    const error = "Invalid XPath: not a string"
+    debugWarn("[XPath Validator]", error)
     return { valid: false, error }
   }
 
   if (xpath.length > 500) {
-    const error = 'XPath too long (max 500 chars)'
-    debugWarn('[XPath Validator]', error)
+    const error = "XPath too long (max 500 chars)"
+    debugWarn("[XPath Validator]", error)
     return { valid: false, error }
   }
 
   if (!SAFE_XPATH_PATTERN.test(xpath)) {
-    const error = 'XPath contains unsafe characters'
-    debugWarn('[XPath Validator]', error, xpath)
+    const error = "XPath contains unsafe characters"
+    debugWarn("[XPath Validator]", error, xpath)
     return { valid: false, error }
   }
 
   for (const pattern of DANGEROUS_XPATH_FUNCTIONS) {
     if (pattern.test(xpath)) {
-      const error = 'XPath contains dangerous function'
-      debugWarn('[XPath Validator]', error, xpath)
+      const error = "XPath contains dangerous function"
+      debugWarn("[XPath Validator]", error, xpath)
       return { valid: false, error }
     }
   }
 
   for (const pattern of XPATH_INJECTION_PATTERNS) {
     if (pattern.test(xpath)) {
-      const error = 'XPath expression contains suspicious pattern'
-      debugWarn('[XPath Validator]', error, xpath)
+      const error = "XPath expression contains suspicious pattern"
+      debugWarn("[XPath Validator]", error, xpath)
       return { valid: false, error }
     }
   }
 
   for (const pattern of DISALLOWED_XPATH_TOKENS) {
     if (pattern.test(xpath)) {
-      const error = 'XPath contains disallowed axis or traversal tokens'
-      debugWarn('[XPath Validator]', error, xpath)
+      const error = "XPath contains disallowed axis or traversal tokens"
+      debugWarn("[XPath Validator]", error, xpath)
       return { valid: false, error }
     }
   }
 
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(xpath)) {
-      const error = 'XPath targets potentially sensitive data'
-      debugWarn('[XPath Validator]', error, xpath)
+      const error = "XPath targets potentially sensitive data"
+      debugWarn("[XPath Validator]", error, xpath)
       return { valid: false, error }
     }
   }
 
-  if (typeof document !== 'undefined' && document.evaluate) {
+  if (typeof document !== "undefined" && document.evaluate) {
     try {
       document.evaluate(xpath, document, null, XPathResult.ANY_TYPE, null)
     } catch (e) {
       const error = `Invalid XPath syntax: ${e instanceof Error ? e.message : String(e)}`
-      debugWarn('[XPath Validator]', error)
+      debugWarn("[XPath Validator]", error)
       return { valid: false, error }
     }
   }
@@ -140,7 +140,5 @@ export function validateXPath(xpath: string): XPathValidationResult {
  * @returns Sanitized XPath expression
  */
 export function sanitizeXPath(xpath: string): string {
-  return xpath
-    .replace(/[^\w\s\[\]@='"\.\-_\*\/\(\):]/g, '')
-    .slice(0, 500)
+  return xpath.replace(/[^\w\s\[\]@='"\.\-_\*\/\(\):]/g, "").slice(0, 500)
 }

@@ -22,14 +22,14 @@ export interface CookieOptions {
   path?: string
   maxAge?: number
   secure?: boolean
-  sameSite?: 'strict' | 'lax' | 'none'
+  sameSite?: "strict" | "lax" | "none"
 }
 
 export interface URLFilter {
-  matchType?: 'path' | 'full-url' | 'domain' | 'query' | 'hash'
+  matchType?: "path" | "full-url" | "domain" | "query" | "hash"
   include?: string[]
   exclude?: string[]
-  mode?: 'regex' | 'wildcard'
+  mode?: "regex" | "wildcard"
 }
 
 export interface InjectionCode {

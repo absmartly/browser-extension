@@ -32,7 +32,7 @@ export interface GeminiPart {
 }
 
 export interface GeminiContent {
-  role: 'user' | 'model' | 'function'
+  role: "user" | "model" | "function"
   parts: GeminiPart[]
 }
 
@@ -40,7 +40,7 @@ export interface GeminiFunctionDeclaration {
   name: string
   description: string
   parameters: {
-    type: 'object'
+    type: "object"
     properties: Record<string, unknown>
     required?: string[]
   }

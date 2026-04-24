@@ -1,17 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { BackgroundAPIClient } from '~src/lib/background-api-client'
-import { getConfig } from '~src/utils/storage'
-import { debugLog } from '~src/utils/debug'
+import { useCallback, useEffect, useRef, useState } from "react"
+
+import { BackgroundAPIClient } from "~src/lib/background-api-client"
 import type {
   ABsmartlyConfig,
-  Experiment,
   Application,
-  UnitType,
-  Metric,
+  Experiment,
   ExperimentTag,
+  ExperimentTeam,
   ExperimentUser,
-  ExperimentTeam
-} from '~src/types/absmartly'
+  Metric,
+  UnitType
+} from "~src/types/absmartly"
+import { debugLog } from "~src/utils/debug"
+import { getConfig } from "~src/utils/storage"
 
 interface ExperimentParams {
   page?: number
@@ -19,7 +20,11 @@ interface ExperimentParams {
   [key: string]: unknown
 }
 
-type AuthErrorType = 'not-authenticated' | 'auth-check-failed' | 'token-expired' | null
+type AuthErrorType =
+  | "not-authenticated"
+  | "auth-check-failed"
+  | "token-expired"
+  | null
 
 export function useABsmartly() {
   const [client] = useState(() => new BackgroundAPIClient())
@@ -40,36 +45,40 @@ export function useABsmartly() {
     authCheckInFlightRef.current = true
 
     try {
-      debugLog('[useABsmartly] Checking authentication...')
-      const result = await chrome.runtime.sendMessage({ type: 'CHECK_AUTH' })
+      debugLog("[useABsmartly] Checking authentication...")
+      const result = await chrome.runtime.sendMessage({ type: "CHECK_AUTH" })
 
       if (result?.success && result?.data?.user) {
-        debugLog('[useABsmartly] ✅ Authenticated as:', result.data.user.email)
+        debugLog("[useABsmartly] ✅ Authenticated as:", result.data.user.email)
         setUser(result.data.user)
         setIsAuthenticated(true)
         setAuthErrorType(null)
-      } else if (result?.error === 'AUTH_EXPIRED') {
-        debugLog('[useABsmartly] ❌ Token expired')
+      } else if (result?.error === "AUTH_EXPIRED") {
+        debugLog("[useABsmartly] ❌ Token expired")
         setUser(null)
         setIsAuthenticated(false)
-        setAuthErrorType('token-expired')
+        setAuthErrorType("token-expired")
       } else {
-        debugLog('[useABsmartly] ❌ Not authenticated:', result?.error)
+        debugLog("[useABsmartly] ❌ Not authenticated:", result?.error)
         setUser(null)
         setIsAuthenticated(false)
-        setAuthErrorType('not-authenticated')
+        setAuthErrorType("not-authenticated")
       }
     } catch (err) {
-      debugLog('[useABsmartly] ❌ Auth check failed:', err)
-      console.error('[useABsmartly] Authentication check error - extension may be in invalid state:', {
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'auth-check-failed',
-        suggestion: 'Try reloading the extension or checking Chrome extension permissions'
-      })
+      debugLog("[useABsmartly] ❌ Auth check failed:", err)
+      console.error(
+        "[useABsmartly] Authentication check error - extension may be in invalid state:",
+        {
+          error: err instanceof Error ? err.message : String(err),
+          errorType: "auth-check-failed",
+          suggestion:
+            "Try reloading the extension or checking Chrome extension permissions"
+        }
+      )
       setUser(null)
       setIsAuthenticated(false)
-      setAuthErrorType('auth-check-failed')
-      setError('Unable to verify authentication. Please reload the extension.')
+      setAuthErrorType("auth-check-failed")
+      setError("Unable to verify authentication. Please reload the extension.")
     } finally {
       lastAuthCheckAtRef.current = Date.now()
       authCheckInFlightRef.current = false
@@ -94,17 +103,17 @@ export function useABsmartly() {
     }
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         void checkAuth()
       }
     }
 
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener("focus", handleFocus)
+    document.addEventListener("visibilitychange", handleVisibility)
 
     return () => {
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener("focus", handleFocus)
+      document.removeEventListener("visibilitychange", handleVisibility)
     }
   }, [config, checkAuth])
 
@@ -115,18 +124,22 @@ export function useABsmartly() {
       if (!savedConfig) {
         const envApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
         const envApiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
-        const envApplicationName = process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
+        const envApplicationName =
+          process.env.PLASMO_PUBLIC_ABSMARTLY_APPLICATION_NAME
 
         if (envApiKey && envApiEndpoint) {
           savedConfig = {
             apiKey: envApiKey,
             apiEndpoint: envApiEndpoint,
             applicationName: envApplicationName,
-            authMethod: 'apikey',
-            domChangesFieldName: '__dom_changes',
-            vibeStudioEnabled: process.env.PLASMO_PUBLIC_VIBE_STUDIO_ENABLED === 'true'
+            authMethod: "apikey",
+            domChangesFieldName: "__dom_changes",
+            vibeStudioEnabled:
+              process.env.PLASMO_PUBLIC_VIBE_STUDIO_ENABLED === "true"
           } as ABsmartlyConfig
-          debugLog('[useABsmartly] Using config from environment variables (not saved to storage)')
+          debugLog(
+            "[useABsmartly] Using config from environment variables (not saved to storage)"
+          )
         }
       }
 
@@ -134,12 +147,13 @@ export function useABsmartly() {
         setConfig(savedConfig)
       }
     } catch (err) {
-      const errorMessage = err instanceof Error
-        ? `Configuration error: ${err.message}`
-        : 'Failed to load configuration from storage'
+      const errorMessage =
+        err instanceof Error
+          ? `Configuration error: ${err.message}`
+          : "Failed to load configuration from storage"
       setError(errorMessage)
-      console.error('[useABsmartly] Configuration load failed:', err)
-      console.error('[useABsmartly] User will see:', errorMessage)
+      console.error("[useABsmartly] Configuration load failed:", err)
+      console.error("[useABsmartly] User will see:", errorMessage)
     } finally {
       setLoading(false)
     }
@@ -149,37 +163,67 @@ export function useABsmartly() {
     setConfig(newConfig)
   }, [])
 
-  const getExperiments = useCallback(async (params?: ExperimentParams): Promise<{experiments: Experiment[], total?: number, hasMore?: boolean}> => {
-    return client.getExperiments(params)
-  }, [client])
+  const getExperiments = useCallback(
+    async (
+      params?: ExperimentParams
+    ): Promise<{
+      experiments: Experiment[]
+      total?: number
+      hasMore?: boolean
+    }> => {
+      return client.getExperiments(params)
+    },
+    [client]
+  )
 
-  const getExperiment = useCallback(async (id: number): Promise<Experiment> => {
-    return client.getExperiment(id)
-  }, [client])
+  const getExperiment = useCallback(
+    async (id: number): Promise<Experiment> => {
+      return client.getExperiment(id)
+    },
+    [client]
+  )
 
-  const startExperiment = useCallback(async (id: number): Promise<Experiment> => {
-    return client.startExperiment(id)
-  }, [client])
+  const startExperiment = useCallback(
+    async (id: number): Promise<Experiment> => {
+      return client.startExperiment(id)
+    },
+    [client]
+  )
 
-  const stopExperiment = useCallback(async (id: number): Promise<Experiment> => {
-    return client.stopExperiment(id)
-  }, [client])
+  const stopExperiment = useCallback(
+    async (id: number): Promise<Experiment> => {
+      return client.stopExperiment(id)
+    },
+    [client]
+  )
 
-  const createExperiment = useCallback(async (experimentData: Partial<Experiment>): Promise<Experiment> => {
-    return client.createExperiment(experimentData as any)
-  }, [client])
+  const createExperiment = useCallback(
+    async (experimentData: Partial<Experiment>): Promise<Experiment> => {
+      return client.createExperiment(experimentData as any)
+    },
+    [client]
+  )
 
-  const updateExperiment = useCallback(async (id: number, experimentData: Partial<Experiment>): Promise<Experiment> => {
-    return client.updateExperiment(id, experimentData as any)
-  }, [client])
+  const updateExperiment = useCallback(
+    async (
+      id: number,
+      experimentData: Partial<Experiment>
+    ): Promise<Experiment> => {
+      return client.updateExperiment(id, experimentData as any)
+    },
+    [client]
+  )
 
   const getFavorites = useCallback(async (): Promise<number[]> => {
     return client.getFavorites()
   }, [client])
 
-  const setExperimentFavorite = useCallback(async (id: number, favorite: boolean): Promise<void> => {
-    return client.setExperimentFavorite(id, favorite)
-  }, [client])
+  const setExperimentFavorite = useCallback(
+    async (id: number, favorite: boolean): Promise<void> => {
+      return client.setExperimentFavorite(id, favorite)
+    },
+    [client]
+  )
 
   const getApplications = useCallback(async (): Promise<Application[]> => {
     return client.getApplications()
@@ -205,9 +249,17 @@ export function useABsmartly() {
     return client.getTeams()
   }, [client])
 
-  const getTemplates = useCallback(async (type: 'test_template' | 'feature_template' | 'test_template,feature_template' = 'test_template'): Promise<Experiment[]> => {
-    return client.getTemplates(type)
-  }, [client])
+  const getTemplates = useCallback(
+    async (
+      type:
+        | "test_template"
+        | "feature_template"
+        | "test_template,feature_template" = "test_template"
+    ): Promise<Experiment[]> => {
+      return client.getTemplates(type)
+    },
+    [client]
+  )
 
   return {
     client,

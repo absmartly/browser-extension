@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon } from "@heroicons/react/24/outline"
+import React, { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 
 interface DialogProps {
   open: boolean
@@ -26,48 +26,53 @@ interface DialogFooterProps {
   children: React.ReactNode
 }
 
-export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
+export const Dialog: React.FC<DialogProps> = ({
+  open,
+  onOpenChange,
+  children
+}) => {
   const [container, setContainer] = useState<HTMLElement | null>(null)
-  
+
   useEffect(() => {
     // Find the extension root or body
-    const root = document.getElementById('__plasmo') || document.body
+    const root = document.getElementById("__plasmo") || document.body
     setContainer(root)
   }, [])
-  
+
   if (!open || !container) return null
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div 
-        className="fixed inset-0 bg-black/50" 
+      <div
+        className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-[10000]">
-        {children}
-      </div>
+      <div className="relative z-[10000]">{children}</div>
     </div>,
     container
   )
 }
 
-export const DialogContent: React.FC<DialogContentProps> = ({ children, className = '' }) => {
+export const DialogContent: React.FC<DialogContentProps> = ({
+  children,
+  className = ""
+}) => {
   return (
-    <div className={`bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto flex flex-col ${className}`}>
+    <div
+      className={`bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto flex flex-col ${className}`}>
       {children}
     </div>
   )
 }
 
 export const DialogHeader: React.FC<DialogHeaderProps> = ({ children }) => {
-  return (
-    <div className="px-6 py-4 border-b border-gray-200">
-      {children}
-    </div>
-  )
+  return <div className="px-6 py-4 border-b border-gray-200">{children}</div>
 }
 
-export const DialogTitle: React.FC<DialogTitleProps> = ({ children, className = '' }) => {
+export const DialogTitle: React.FC<DialogTitleProps> = ({
+  children,
+  className = ""
+}) => {
   return (
     <h2 className={`text-lg font-semibold text-gray-900 ${className}`}>
       {children}
@@ -83,10 +88,8 @@ export const DialogFooter: React.FC<DialogFooterProps> = ({ children }) => {
   )
 }
 
-export const DialogDescription: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <p className="text-sm text-gray-500 mt-1">
-      {children}
-    </p>
-  )
+export const DialogDescription: React.FC<{ children: React.ReactNode }> = ({
+  children
+}) => {
+  return <p className="text-sm text-gray-500 mt-1">{children}</p>
 }

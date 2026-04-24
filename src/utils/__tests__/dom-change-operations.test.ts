@@ -1,43 +1,53 @@
-import { applyDOMChangeAction } from '../dom-change-operations'
-import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
 
-describe('DOM Change Operations', () => {
-  const createMockTextChange = (selector: string, value: string = 'test'): DOMChange => ({
+import { applyDOMChangeAction } from "../dom-change-operations"
+
+describe("DOM Change Operations", () => {
+  const createMockTextChange = (
+    selector: string,
+    value: string = "test"
+  ): DOMChange => ({
     selector,
-    type: 'text',
+    type: "text",
     value
   })
 
-  const createMockHtmlChange = (selector: string, value: string = '<div>test</div>'): DOMChange => ({
+  const createMockHtmlChange = (
+    selector: string,
+    value: string = "<div>test</div>"
+  ): DOMChange => ({
     selector,
-    type: 'html',
+    type: "html",
     value
   })
 
-  const createMockStyleChange = (selector: string, value: Record<string, string> = { color: 'red' }): DOMChange => ({
+  const createMockStyleChange = (
+    selector: string,
+    value: Record<string, string> = { color: "red" }
+  ): DOMChange => ({
     selector,
-    type: 'style',
+    type: "style",
     value
   })
 
   const createMockRemoveChange = (selector: string): DOMChange => ({
     selector,
-    type: 'remove'
+    type: "remove"
   })
 
   const createMockChange = createMockTextChange
 
-  describe('append action', () => {
-    it('should append new changes to empty array', () => {
+  describe("append action", () => {
+    it("should append new changes to empty array", () => {
       const currentChanges: DOMChange[] = []
       const newChanges = [
-        createMockChange('.button', 'text'),
-        createMockChange('.title', 'text')
+        createMockChange(".button", "text"),
+        createMockChange(".title", "text")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Added changes',
-        action: 'append'
+        response: "Added changes",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -46,18 +56,16 @@ describe('DOM Change Operations', () => {
       expect(updated).toEqual(newChanges)
     })
 
-    it('should append new changes to existing array', () => {
-      const currentChanges = [
-        createMockTextChange('.existing')
-      ]
+    it("should append new changes to existing array", () => {
+      const currentChanges = [createMockTextChange(".existing")]
       const newChanges = [
-        createMockHtmlChange('.new1'),
-        createMockStyleChange('.new2')
+        createMockHtmlChange(".new1"),
+        createMockStyleChange(".new2")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Added more changes',
-        action: 'append'
+        response: "Added more changes",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -68,12 +76,12 @@ describe('DOM Change Operations', () => {
       expect(updated[2]).toEqual(newChanges[1])
     })
 
-    it('should append empty array without error', () => {
-      const currentChanges = [createMockChange('.existing', 'text')]
+    it("should append empty array without error", () => {
+      const currentChanges = [createMockChange(".existing", "text")]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'No changes',
-        action: 'append'
+        response: "No changes",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -82,13 +90,13 @@ describe('DOM Change Operations', () => {
       expect(updated).toEqual(currentChanges)
     })
 
-    it('should preserve original array immutability', () => {
-      const currentChanges = [createMockChange('.original', 'text')]
+    it("should preserve original array immutability", () => {
+      const currentChanges = [createMockChange(".original", "text")]
       const originalLength = currentChanges.length
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.new', 'text')],
-        response: 'Added',
-        action: 'append'
+        domChanges: [createMockChange(".new", "text")],
+        response: "Added",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -99,19 +107,17 @@ describe('DOM Change Operations', () => {
     })
   })
 
-  describe('replace_all action', () => {
-    it('should replace all changes with new changes', () => {
+  describe("replace_all action", () => {
+    it("should replace all changes with new changes", () => {
       const currentChanges = [
-        createMockTextChange('.old1'),
-        createMockHtmlChange('.old2')
+        createMockTextChange(".old1"),
+        createMockHtmlChange(".old2")
       ]
-      const newChanges = [
-        createMockStyleChange('.new')
-      ]
+      const newChanges = [createMockStyleChange(".new")]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Replaced all',
-        action: 'replace_all'
+        response: "Replaced all",
+        action: "replace_all"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -122,14 +128,12 @@ describe('DOM Change Operations', () => {
       expect(updated).not.toContain(currentChanges[1])
     })
 
-    it('should replace with empty array', () => {
-      const currentChanges = [
-        createMockChange('.old', 'text')
-      ]
+    it("should replace with empty array", () => {
+      const currentChanges = [createMockChange(".old", "text")]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Cleared all',
-        action: 'replace_all'
+        response: "Cleared all",
+        action: "replace_all"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -138,13 +142,13 @@ describe('DOM Change Operations', () => {
       expect(updated).toEqual([])
     })
 
-    it('should work when current changes is empty', () => {
+    it("should work when current changes is empty", () => {
       const currentChanges: DOMChange[] = []
-      const newChanges = [createMockChange('.new', 'text')]
+      const newChanges = [createMockChange(".new", "text")]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'New changes',
-        action: 'replace_all'
+        response: "New changes",
+        action: "replace_all"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -154,68 +158,68 @@ describe('DOM Change Operations', () => {
     })
   })
 
-  describe('replace_specific action', () => {
-    it('should replace changes matching target selectors', () => {
+  describe("replace_specific action", () => {
+    it("should replace changes matching target selectors", () => {
       const currentChanges = [
-        createMockChange('.keep1', 'text'),
-        createMockChange('.replace1', 'html'),
-        createMockChange('.keep2', 'style'),
-        createMockChange('.replace2', 'text')
+        createMockChange(".keep1", "text"),
+        createMockChange(".replace1", "html"),
+        createMockChange(".keep2", "style"),
+        createMockChange(".replace2", "text")
       ]
       const newChanges = [
-        createMockChange('.new1', 'text'),
-        createMockChange('.new2', 'html')
+        createMockChange(".new1", "text"),
+        createMockChange(".new2", "html")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Replaced specific',
-        action: 'replace_specific',
-        targetSelectors: ['.replace1', '.replace2']
+        response: "Replaced specific",
+        action: "replace_specific",
+        targetSelectors: [".replace1", ".replace2"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(4)
-      expect(updated.filter(c => c.selector === '.keep1')).toHaveLength(1)
-      expect(updated.filter(c => c.selector === '.keep2')).toHaveLength(1)
-      expect(updated.filter(c => c.selector === '.new1')).toHaveLength(1)
-      expect(updated.filter(c => c.selector === '.new2')).toHaveLength(1)
-      expect(updated.filter(c => c.selector === '.replace1')).toHaveLength(0)
-      expect(updated.filter(c => c.selector === '.replace2')).toHaveLength(0)
+      expect(updated.filter((c) => c.selector === ".keep1")).toHaveLength(1)
+      expect(updated.filter((c) => c.selector === ".keep2")).toHaveLength(1)
+      expect(updated.filter((c) => c.selector === ".new1")).toHaveLength(1)
+      expect(updated.filter((c) => c.selector === ".new2")).toHaveLength(1)
+      expect(updated.filter((c) => c.selector === ".replace1")).toHaveLength(0)
+      expect(updated.filter((c) => c.selector === ".replace2")).toHaveLength(0)
     })
 
-    it('should handle single target selector', () => {
+    it("should handle single target selector", () => {
       const currentChanges = [
-        createMockChange('.keep', 'text'),
-        createMockChange('.replace', 'html')
+        createMockChange(".keep", "text"),
+        createMockChange(".replace", "html")
       ]
-      const newChanges = [createMockChange('.new', 'style')]
+      const newChanges = [createMockChange(".new", "style")]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Replaced one',
-        action: 'replace_specific',
-        targetSelectors: ['.replace']
+        response: "Replaced one",
+        action: "replace_specific",
+        targetSelectors: [".replace"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(2)
-      expect(updated.some(c => c.selector === '.keep')).toBe(true)
-      expect(updated.some(c => c.selector === '.new')).toBe(true)
-      expect(updated.some(c => c.selector === '.replace')).toBe(false)
+      expect(updated.some((c) => c.selector === ".keep")).toBe(true)
+      expect(updated.some((c) => c.selector === ".new")).toBe(true)
+      expect(updated.some((c) => c.selector === ".replace")).toBe(false)
     })
 
-    it('should keep all changes when target selector not found', () => {
+    it("should keep all changes when target selector not found", () => {
       const currentChanges = [
-        createMockChange('.existing1', 'text'),
-        createMockChange('.existing2', 'html')
+        createMockChange(".existing1", "text"),
+        createMockChange(".existing2", "html")
       ]
-      const newChanges = [createMockChange('.new', 'style')]
+      const newChanges = [createMockChange(".new", "style")]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Target not found',
-        action: 'replace_specific',
-        targetSelectors: ['.nonexistent']
+        response: "Target not found",
+        action: "replace_specific",
+        targetSelectors: [".nonexistent"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -226,107 +230,105 @@ describe('DOM Change Operations', () => {
       expect(updated).toContainEqual(newChanges[0])
     })
 
-    it('should throw error when targetSelectors is undefined', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+    it("should throw error when targetSelectors is undefined", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.new', 'text')],
-        response: 'Missing selectors',
-        action: 'replace_specific'
+        domChanges: [createMockChange(".new", "text")],
+        response: "Missing selectors",
+        action: "replace_specific"
       }
 
       expect(() => applyDOMChangeAction(currentChanges, result)).toThrow(
-        'replace_specific action requires targetSelectors array'
+        "replace_specific action requires targetSelectors array"
       )
     })
 
-    it('should throw error when targetSelectors is empty array', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+    it("should throw error when targetSelectors is empty array", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.new', 'text')],
-        response: 'Empty selectors',
-        action: 'replace_specific',
+        domChanges: [createMockChange(".new", "text")],
+        response: "Empty selectors",
+        action: "replace_specific",
         targetSelectors: []
       }
 
       expect(() => applyDOMChangeAction(currentChanges, result)).toThrow(
-        'replace_specific action requires targetSelectors array'
+        "replace_specific action requires targetSelectors array"
       )
     })
 
-    it('should handle multiple changes with same selector in new changes', () => {
-      const currentChanges = [
-        createMockChange('.old', 'text')
-      ]
+    it("should handle multiple changes with same selector in new changes", () => {
+      const currentChanges = [createMockChange(".old", "text")]
       const newChanges = [
-        createMockChange('.new', 'text'),
-        createMockChange('.new', 'style')
+        createMockChange(".new", "text"),
+        createMockChange(".new", "style")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'Multiple with same selector',
-        action: 'replace_specific',
-        targetSelectors: ['.old']
+        response: "Multiple with same selector",
+        action: "replace_specific",
+        targetSelectors: [".old"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(2)
-      expect(updated.filter(c => c.selector === '.new')).toHaveLength(2)
+      expect(updated.filter((c) => c.selector === ".new")).toHaveLength(2)
     })
   })
 
-  describe('remove_specific action', () => {
-    it('should remove changes matching target selectors', () => {
+  describe("remove_specific action", () => {
+    it("should remove changes matching target selectors", () => {
       const currentChanges = [
-        createMockChange('.keep1', 'text'),
-        createMockChange('.remove1', 'html'),
-        createMockChange('.keep2', 'style'),
-        createMockChange('.remove2', 'text')
+        createMockChange(".keep1", "text"),
+        createMockChange(".remove1", "html"),
+        createMockChange(".keep2", "style"),
+        createMockChange(".remove2", "text")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Removed specific',
-        action: 'remove_specific',
-        targetSelectors: ['.remove1', '.remove2']
+        response: "Removed specific",
+        action: "remove_specific",
+        targetSelectors: [".remove1", ".remove2"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(2)
-      expect(updated.filter(c => c.selector === '.keep1')).toHaveLength(1)
-      expect(updated.filter(c => c.selector === '.keep2')).toHaveLength(1)
-      expect(updated.filter(c => c.selector === '.remove1')).toHaveLength(0)
-      expect(updated.filter(c => c.selector === '.remove2')).toHaveLength(0)
+      expect(updated.filter((c) => c.selector === ".keep1")).toHaveLength(1)
+      expect(updated.filter((c) => c.selector === ".keep2")).toHaveLength(1)
+      expect(updated.filter((c) => c.selector === ".remove1")).toHaveLength(0)
+      expect(updated.filter((c) => c.selector === ".remove2")).toHaveLength(0)
     })
 
-    it('should handle single target selector', () => {
+    it("should handle single target selector", () => {
       const currentChanges = [
-        createMockChange('.keep', 'text'),
-        createMockChange('.remove', 'html')
+        createMockChange(".keep", "text"),
+        createMockChange(".remove", "html")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Removed one',
-        action: 'remove_specific',
-        targetSelectors: ['.remove']
+        response: "Removed one",
+        action: "remove_specific",
+        targetSelectors: [".remove"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(1)
-      expect(updated[0].selector).toBe('.keep')
+      expect(updated[0].selector).toBe(".keep")
     })
 
-    it('should keep all changes when target selector not found', () => {
+    it("should keep all changes when target selector not found", () => {
       const currentChanges = [
-        createMockChange('.existing1', 'text'),
-        createMockChange('.existing2', 'html')
+        createMockChange(".existing1", "text"),
+        createMockChange(".existing2", "html")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Target not found',
-        action: 'remove_specific',
-        targetSelectors: ['.nonexistent']
+        response: "Target not found",
+        action: "remove_specific",
+        targetSelectors: [".nonexistent"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -335,62 +337,62 @@ describe('DOM Change Operations', () => {
       expect(updated).toEqual(currentChanges)
     })
 
-    it('should throw error when targetSelectors is undefined', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+    it("should throw error when targetSelectors is undefined", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Missing selectors',
-        action: 'remove_specific'
+        response: "Missing selectors",
+        action: "remove_specific"
       }
 
       expect(() => applyDOMChangeAction(currentChanges, result)).toThrow(
-        'remove_specific action requires targetSelectors array'
+        "remove_specific action requires targetSelectors array"
       )
     })
 
-    it('should throw error when targetSelectors is empty array', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+    it("should throw error when targetSelectors is empty array", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Empty selectors',
-        action: 'remove_specific',
+        response: "Empty selectors",
+        action: "remove_specific",
         targetSelectors: []
       }
 
       expect(() => applyDOMChangeAction(currentChanges, result)).toThrow(
-        'remove_specific action requires targetSelectors array'
+        "remove_specific action requires targetSelectors array"
       )
     })
 
-    it('should remove all matching when multiple have same selector', () => {
+    it("should remove all matching when multiple have same selector", () => {
       const currentChanges = [
-        createMockChange('.remove', 'text'),
-        createMockChange('.keep', 'html'),
-        createMockChange('.remove', 'style')
+        createMockChange(".remove", "text"),
+        createMockChange(".keep", "html"),
+        createMockChange(".remove", "style")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Remove duplicates',
-        action: 'remove_specific',
-        targetSelectors: ['.remove']
+        response: "Remove duplicates",
+        action: "remove_specific",
+        targetSelectors: [".remove"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(1)
-      expect(updated[0].selector).toBe('.keep')
+      expect(updated[0].selector).toBe(".keep")
     })
 
-    it('should return empty array when removing all changes', () => {
+    it("should return empty array when removing all changes", () => {
       const currentChanges = [
-        createMockChange('.remove1', 'text'),
-        createMockChange('.remove2', 'html')
+        createMockChange(".remove1", "text"),
+        createMockChange(".remove2", "html")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Remove all',
-        action: 'remove_specific',
-        targetSelectors: ['.remove1', '.remove2']
+        response: "Remove all",
+        action: "remove_specific",
+        targetSelectors: [".remove1", ".remove2"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -400,16 +402,16 @@ describe('DOM Change Operations', () => {
     })
   })
 
-  describe('none action', () => {
-    it('should return current changes unchanged', () => {
+  describe("none action", () => {
+    it("should return current changes unchanged", () => {
       const currentChanges = [
-        createMockChange('.existing1', 'text'),
-        createMockChange('.existing2', 'html')
+        createMockChange(".existing1", "text"),
+        createMockChange(".existing2", "html")
       ]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.ignored', 'style')],
-        response: 'No changes',
-        action: 'none'
+        domChanges: [createMockChange(".ignored", "style")],
+        response: "No changes",
+        action: "none"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -418,12 +420,12 @@ describe('DOM Change Operations', () => {
       expect(updated).toBe(currentChanges)
     })
 
-    it('should return empty array unchanged', () => {
+    it("should return empty array unchanged", () => {
       const currentChanges: DOMChange[] = []
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.ignored', 'text')],
-        response: 'No changes',
-        action: 'none'
+        domChanges: [createMockChange(".ignored", "text")],
+        response: "No changes",
+        action: "none"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -432,16 +434,16 @@ describe('DOM Change Operations', () => {
       expect(updated).toBe(currentChanges)
     })
 
-    it('should ignore new domChanges in result', () => {
-      const currentChanges = [createMockChange('.current', 'text')]
+    it("should ignore new domChanges in result", () => {
+      const currentChanges = [createMockChange(".current", "text")]
       const newChanges = [
-        createMockChange('.new1', 'html'),
-        createMockChange('.new2', 'style')
+        createMockChange(".new1", "html"),
+        createMockChange(".new2", "style")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: newChanges,
-        response: 'These are ignored',
-        action: 'none'
+        response: "These are ignored",
+        action: "none"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -453,18 +455,18 @@ describe('DOM Change Operations', () => {
     })
   })
 
-  describe('edge cases', () => {
-    it('should handle complex DOM changes with all properties', () => {
+  describe("edge cases", () => {
+    it("should handle complex DOM changes with all properties", () => {
       const complexChange: DOMChange = {
-        selector: '.complex',
-        type: 'style',
-        value: { color: 'red', fontSize: '16px' }
+        selector: ".complex",
+        type: "style",
+        value: { color: "red", fontSize: "16px" }
       }
       const currentChanges = [complexChange]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Keep complex',
-        action: 'none'
+        response: "Keep complex",
+        action: "none"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -472,18 +474,18 @@ describe('DOM Change Operations', () => {
       expect(updated).toEqual([complexChange])
     })
 
-    it('should preserve disabled changes', () => {
+    it("should preserve disabled changes", () => {
       const disabledChange: DOMChange = {
-        selector: '.disabled',
-        type: 'text',
-        value: 'disabled text',
+        selector: ".disabled",
+        type: "text",
+        value: "disabled text",
         disabled: true
       }
       const currentChanges = [disabledChange]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.new')],
-        response: 'Append',
-        action: 'append'
+        domChanges: [createMockChange(".new")],
+        response: "Append",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -492,31 +494,31 @@ describe('DOM Change Operations', () => {
       expect(updated[0].disabled).toBe(true)
     })
 
-    it('should handle special characters in selectors', () => {
+    it("should handle special characters in selectors", () => {
       const currentChanges = [
         createMockTextChange('[data-test="value"]'),
-        createMockHtmlChange('#id\\:with\\:colons')
+        createMockHtmlChange("#id\\:with\\:colons")
       ]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Special chars',
-        action: 'remove_specific',
+        response: "Special chars",
+        action: "remove_specific",
         targetSelectors: ['[data-test="value"]']
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(1)
-      expect(updated[0].selector).toBe('#id\\:with\\:colons')
+      expect(updated[0].selector).toBe("#id\\:with\\:colons")
     })
 
-    it('should handle very long selector strings', () => {
-      const longSelector = '.a'.repeat(1000)
+    it("should handle very long selector strings", () => {
+      const longSelector = ".a".repeat(1000)
       const currentChanges = [createMockTextChange(longSelector)]
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Long selector',
-        action: 'none'
+        response: "Long selector",
+        action: "none"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -524,57 +526,57 @@ describe('DOM Change Operations', () => {
       expect(updated[0].selector).toBe(longSelector)
     })
 
-    it('should handle empty strings in selectors', () => {
-      const currentChanges = [createMockTextChange('')]
+    it("should handle empty strings in selectors", () => {
+      const currentChanges = [createMockTextChange("")]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockHtmlChange('')],
-        response: 'Empty selector',
-        action: 'append'
+        domChanges: [createMockHtmlChange("")],
+        response: "Empty selector",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
 
       expect(updated).toHaveLength(2)
-      expect(updated.every(c => c.selector === '')).toBe(true)
+      expect(updated.every((c) => c.selector === "")).toBe(true)
     })
   })
 
-  describe('type safety and exhaustiveness', () => {
-    it('should throw for unknown action type', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+  describe("type safety and exhaustiveness", () => {
+    it("should throw for unknown action type", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result = {
         domChanges: [],
-        response: 'Unknown',
-        action: 'invalid_action'
+        response: "Unknown",
+        action: "invalid_action"
       } as any
 
       expect(() => applyDOMChangeAction(currentChanges, result)).toThrow(
-        'Unknown action type: invalid_action'
+        "Unknown action type: invalid_action"
       )
     })
 
-    it('should handle action type with different casing', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+    it("should handle action type with different casing", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result = {
         domChanges: [],
-        response: 'Uppercase',
-        action: 'NONE'
+        response: "Uppercase",
+        action: "NONE"
       } as any
 
       expect(() => applyDOMChangeAction(currentChanges, result)).toThrow(
-        'Unknown action type: NONE'
+        "Unknown action type: NONE"
       )
     })
   })
 
-  describe('immutability guarantees', () => {
-    it('should not mutate currentChanges array for append', () => {
-      const currentChanges = [createMockChange('.original', 'text')]
+  describe("immutability guarantees", () => {
+    it("should not mutate currentChanges array for append", () => {
+      const currentChanges = [createMockChange(".original", "text")]
       const originalRef = currentChanges[0]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.new', 'html')],
-        response: 'Test',
-        action: 'append'
+        domChanges: [createMockChange(".new", "html")],
+        response: "Test",
+        action: "append"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -584,17 +586,17 @@ describe('DOM Change Operations', () => {
       expect(updated).not.toBe(currentChanges)
     })
 
-    it('should not mutate currentChanges array for replace_specific', () => {
+    it("should not mutate currentChanges array for replace_specific", () => {
       const currentChanges = [
-        createMockChange('.keep', 'text'),
-        createMockChange('.remove', 'html')
+        createMockChange(".keep", "text"),
+        createMockChange(".remove", "html")
       ]
       const originalLength = currentChanges.length
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.new', 'style')],
-        response: 'Test',
-        action: 'replace_specific',
-        targetSelectors: ['.remove']
+        domChanges: [createMockChange(".new", "style")],
+        response: "Test",
+        action: "replace_specific",
+        targetSelectors: [".remove"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -603,17 +605,17 @@ describe('DOM Change Operations', () => {
       expect(updated).not.toBe(currentChanges)
     })
 
-    it('should not mutate currentChanges array for remove_specific', () => {
+    it("should not mutate currentChanges array for remove_specific", () => {
       const currentChanges = [
-        createMockChange('.keep', 'text'),
-        createMockChange('.remove', 'html')
+        createMockChange(".keep", "text"),
+        createMockChange(".remove", "html")
       ]
       const originalLength = currentChanges.length
       const result: AIDOMGenerationResult = {
         domChanges: [],
-        response: 'Test',
-        action: 'remove_specific',
-        targetSelectors: ['.remove']
+        response: "Test",
+        action: "remove_specific",
+        targetSelectors: [".remove"]
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)
@@ -622,12 +624,12 @@ describe('DOM Change Operations', () => {
       expect(updated).not.toBe(currentChanges)
     })
 
-    it('should return same reference for none action', () => {
-      const currentChanges = [createMockChange('.test', 'text')]
+    it("should return same reference for none action", () => {
+      const currentChanges = [createMockChange(".test", "text")]
       const result: AIDOMGenerationResult = {
-        domChanges: [createMockChange('.ignored', 'html')],
-        response: 'Test',
-        action: 'none'
+        domChanges: [createMockChange(".ignored", "html")],
+        response: "Test",
+        action: "none"
       }
 
       const updated = applyDOMChangeAction(currentChanges, result)

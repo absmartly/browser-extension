@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { debugLog } from '~src/utils/debug'
-import { localAreaStorage } from '~src/utils/storage'
-import { useDebounce } from './useDebounce'
-import type { ExperimentFilters } from '~src/types/storage-state'
-import type { ABsmartlyConfig } from '~src/types/absmartly'
+import { useCallback, useEffect, useRef, useState } from "react"
+
+import type { ABsmartlyConfig } from "~src/types/absmartly"
+import type { ExperimentFilters } from "~src/types/storage-state"
+import { debugLog } from "~src/utils/debug"
+import { localAreaStorage } from "~src/utils/storage"
+
+import { useDebounce } from "./useDebounce"
 
 const DEBOUNCE_DELAY_MS = 250
 
@@ -12,25 +14,27 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
   const [filtersLoaded, setFiltersLoaded] = useState(false)
   const [filtersInitialized, setFiltersInitialized] = useState(false)
   const debouncedFilters = useDebounce(filters, DEBOUNCE_DELAY_MS)
-  const onFiltersChangeRef = useRef<((filters: ExperimentFilters) => void) | null>(null)
+  const onFiltersChangeRef = useRef<
+    ((filters: ExperimentFilters) => void) | null
+  >(null)
   const lastFiredFiltersRef = useRef<string | null>(null)
 
   useEffect(() => {
     const storage = localAreaStorage
 
     Promise.all([
-      storage.get<ExperimentFilters>('experimentFilters'),
-      storage.get<ABsmartlyConfig>('absmartly-config')
+      storage.get<ExperimentFilters>("experimentFilters"),
+      storage.get<ABsmartlyConfig>("absmartly-config")
     ]).then(([savedFilters, savedConfig]) => {
-      debugLog('Loading saved filters:', savedFilters)
-      debugLog('Loading config for app filter:', savedConfig)
+      debugLog("Loading saved filters:", savedFilters)
+      debugLog("Loading config for app filter:", savedConfig)
 
       const defaultFilters = {
-        state: ['created', 'ready']
+        state: ["created", "ready"]
       }
 
       if (savedConfig?.applicationName) {
-        storage.set('pendingApplicationFilter', savedConfig.applicationName)
+        storage.set("pendingApplicationFilter", savedConfig.applicationName)
       }
 
       if (savedFilters) {
@@ -44,33 +48,41 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
     })
   }, [])
 
-  const handleFilterChange = useCallback((
-    filterState: ExperimentFilters,
-    onFiltersChange: (filters: ExperimentFilters) => void
-  ) => {
-    debugLog('handleFilterChange called with:', filterState)
-    debugLog('Current filters:', filters)
+  const handleFilterChange = useCallback(
+    (
+      filterState: ExperimentFilters,
+      onFiltersChange: (filters: ExperimentFilters) => void
+    ) => {
+      debugLog("handleFilterChange called with:", filterState)
+      debugLog("Current filters:", filters)
 
-    onFiltersChangeRef.current = onFiltersChange
+      onFiltersChangeRef.current = onFiltersChange
 
-    const hasActualChange = JSON.stringify(filterState) !== JSON.stringify(filters)
-    debugLog('Has actual change:', hasActualChange)
+      const hasActualChange =
+        JSON.stringify(filterState) !== JSON.stringify(filters)
+      debugLog("Has actual change:", hasActualChange)
 
-    if (hasActualChange) {
-      if (!filtersInitialized) {
-        setFiltersInitialized(true)
+      if (hasActualChange) {
+        if (!filtersInitialized) {
+          setFiltersInitialized(true)
+        }
+        setFilters(filterState)
+        const storage = localAreaStorage
+        storage.set("experimentFilters", filterState)
+        debugLog("Filter changed, will notify parent after debounce")
+      } else {
+        debugLog("No actual change detected, not reloading")
       }
-      setFilters(filterState)
-      const storage = localAreaStorage
-      storage.set('experimentFilters', filterState)
-      debugLog('Filter changed, will notify parent after debounce')
-    } else {
-      debugLog('No actual change detected, not reloading')
-    }
-  }, [filters, filtersInitialized])
+    },
+    [filters, filtersInitialized]
+  )
 
   useEffect(() => {
-    if (!debouncedFilters || !filtersInitialized || !onFiltersChangeRef.current) {
+    if (
+      !debouncedFilters ||
+      !filtersInitialized ||
+      !onFiltersChangeRef.current
+    ) {
       return
     }
     const snapshot = JSON.stringify(debouncedFilters)
@@ -78,7 +90,7 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
       return
     }
     lastFiredFiltersRef.current = snapshot
-    debugLog('Debounced filters changed, triggering reload')
+    debugLog("Debounced filters changed, triggering reload")
     onFiltersChangeRef.current(debouncedFilters)
   }, [debouncedFilters, filtersInitialized])
 
@@ -94,7 +106,11 @@ export function useExperimentFilters(config: ABsmartlyConfig | null) {
 
 const filterParamsCache = new Map<string, Record<string, unknown>>()
 
-export function buildFilterParams(filterState: ExperimentFilters | null, page: number, size: number) {
+export function buildFilterParams(
+  filterState: ExperimentFilters | null,
+  page: number,
+  size: number
+) {
   const cacheKey = JSON.stringify({ filterState, page, size })
   const cached = filterParamsCache.get(cacheKey)
   if (cached) {
@@ -106,7 +122,7 @@ export function buildFilterParams(filterState: ExperimentFilters | null, page: n
     items: size,
     iterations: 1,
     previews: 1,
-    type: 'test'
+    type: "test"
   }
 
   if (!filterState) {
@@ -119,30 +135,34 @@ export function buildFilterParams(filterState: ExperimentFilters | null, page: n
   }
 
   if (filterState.state?.length > 0) {
-    params.state = filterState.state.join(',')
+    params.state = filterState.state.join(",")
   }
   if (filterState.significance?.length > 0) {
-    params.significance = filterState.significance.join(',')
+    params.significance = filterState.significance.join(",")
   }
   if (filterState.owners?.length > 0) {
-    params.owners = filterState.owners.join(',')
+    params.owners = filterState.owners.join(",")
   }
   if (filterState.teams?.length > 0) {
-    params.teams = filterState.teams.join(',')
+    params.teams = filterState.teams.join(",")
   }
   if (filterState.tags?.length > 0) {
-    params.tags = filterState.tags.join(',')
+    params.tags = filterState.tags.join(",")
   }
   if (filterState.applications?.length > 0) {
-    params.applications = filterState.applications.join(',')
+    params.applications = filterState.applications.join(",")
   }
 
-  if (filterState.sample_ratio_mismatch === true) params.sample_ratio_mismatch = true
+  if (filterState.sample_ratio_mismatch === true)
+    params.sample_ratio_mismatch = true
   if (filterState.cleanup_needed === true) params.cleanup_needed = true
   if (filterState.audience_mismatch === true) params.audience_mismatch = true
-  if (filterState.sample_size_reached === true) params.sample_size_reached = true
-  if (filterState.experiments_interact === true) params.experiments_interact = true
-  if (filterState.assignment_conflict === true) params.assignment_conflict = true
+  if (filterState.sample_size_reached === true)
+    params.sample_size_reached = true
+  if (filterState.experiments_interact === true)
+    params.experiments_interact = true
+  if (filterState.assignment_conflict === true)
+    params.assignment_conflict = true
 
   filterParamsCache.set(cacheKey, params)
   if (filterParamsCache.size > 50) {

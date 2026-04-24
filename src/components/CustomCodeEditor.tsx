@@ -1,8 +1,10 @@
-import React, { useEffect, useRef } from 'react'
-import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { sendToContent } from '~src/lib/messaging'
-import { Button } from './ui/Button'
-import type { CustomCodeSection } from '~src/types/absmartly'
+import React, { useEffect, useRef } from "react"
+
+import { sendToContent } from "~src/lib/messaging"
+import type { CustomCodeSection } from "~src/types/absmartly"
+import { debugError, debugLog, debugWarn } from "~src/utils/debug"
+
+import { Button } from "./ui/Button"
 
 interface CustomCodeEditorProps {
   isOpen: boolean
@@ -35,16 +37,21 @@ export function CustomCodeEditor({
 
   useEffect(() => {
     if (!isOpen) {
-      debugLog('CustomCodeEditor: isOpen is false, not opening')
+      debugLog("CustomCodeEditor: isOpen is false, not opening")
       return
     }
 
-    debugLog('CustomCodeEditor: Opening code editor for section:', section, 'with value length:', value?.length || 0)
+    debugLog(
+      "CustomCodeEditor: Opening code editor for section:",
+      section,
+      "with value length:",
+      value?.length || 0
+    )
 
     const openEditor = async () => {
       try {
         await sendToContent({
-          type: 'OPEN_CODE_EDITOR',
+          type: "OPEN_CODE_EDITOR",
           data: {
             section,
             value,
@@ -54,20 +61,20 @@ export function CustomCodeEditor({
           }
         })
       } catch (error) {
-        console.error('Error opening code editor:', error)
+        console.error("Error opening code editor:", error)
       }
     }
     openEditor()
 
     const handleMessage = (message: any) => {
-      debugLog('CustomCodeEditor received message:', message)
+      debugLog("CustomCodeEditor received message:", message)
 
-      if (message.type === 'CODE_EDITOR_SAVE') {
-        debugLog('Saving value:', message.value)
+      if (message.type === "CODE_EDITOR_SAVE") {
+        debugLog("Saving value:", message.value)
         onChangeRef.current(message.value)
         onSaveRef.current(message.value)
-      } else if (message.type === 'CODE_EDITOR_CLOSE') {
-        debugLog('Closing editor')
+      } else if (message.type === "CODE_EDITOR_CLOSE") {
+        debugLog("Closing editor")
         onCloseRef.current()
       }
     }
@@ -79,10 +86,10 @@ export function CustomCodeEditor({
       const closeEditor = async () => {
         try {
           await sendToContent({
-            type: 'CLOSE_CODE_EDITOR'
+            type: "CLOSE_CODE_EDITOR"
           })
         } catch (error) {
-          console.error('Error closing code editor:', error)
+          console.error("Error closing code editor:", error)
         }
       }
       closeEditor()
@@ -91,33 +98,33 @@ export function CustomCodeEditor({
 
   const getSectionTitle = (section: CustomCodeSection) => {
     switch (section) {
-      case 'headStart':
-        return 'Start of <head> tag'
-      case 'headEnd':
-        return 'End of <head> tag'
-      case 'bodyStart':
-        return 'Start of <body> tag'
-      case 'bodyEnd':
-        return 'End of <body> tag'
-      case 'styleTag':
-        return 'CSS Styles'
+      case "headStart":
+        return "Start of <head> tag"
+      case "headEnd":
+        return "End of <head> tag"
+      case "bodyStart":
+        return "Start of <body> tag"
+      case "bodyEnd":
+        return "End of <body> tag"
+      case "styleTag":
+        return "CSS Styles"
       default:
-        return 'Custom Code'
+        return "Custom Code"
     }
   }
 
   const getPlaceholder = (section: CustomCodeSection) => {
     switch (section) {
-      case 'headStart':
-      case 'headEnd':
-        return '<!-- Add your HTML/JavaScript code here -->\n<script>\n  // Your code\n</script>'
-      case 'bodyStart':
-      case 'bodyEnd':
-        return '<!-- Add your HTML/JavaScript code here -->\n<script>\n  // Your code\n</script>'
-      case 'styleTag':
-        return '/* Add your CSS styles here */\n.my-class {\n  /* styles */\n}'
+      case "headStart":
+      case "headEnd":
+        return "<!-- Add your HTML/JavaScript code here -->\n<script>\n  // Your code\n</script>"
+      case "bodyStart":
+      case "bodyEnd":
+        return "<!-- Add your HTML/JavaScript code here -->\n<script>\n  // Your code\n</script>"
+      case "styleTag":
+        return "/* Add your CSS styles here */\n.my-class {\n  /* styles */\n}"
       default:
-        return '// Enter your code here'
+        return "// Enter your code here"
     }
   }
 

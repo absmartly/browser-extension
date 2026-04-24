@@ -6,8 +6,8 @@
  * @module ElementState
  */
 
-import { sanitizeHTML } from '../utils/html-sanitizer'
-import { Logger } from '../utils/logger'
+import { sanitizeHTML } from "../utils/html-sanitizer"
+import { Logger } from "../utils/logger"
 
 export interface ElementState {
   textContent: string
@@ -25,7 +25,7 @@ export class ElementStateManager {
     const htmlElement = element as HTMLElement
 
     const state: ElementState = {
-      textContent: element.textContent || '',
+      textContent: element.textContent || "",
       innerHTML: element.innerHTML,
       attributes: {},
       styles: {},
@@ -51,16 +51,25 @@ export class ElementStateManager {
   /**
    * Restore an element to its original state
    */
-  static restoreElementState(element: Element, originalState: ElementState): void {
+  static restoreElementState(
+    element: Element,
+    originalState: ElementState
+  ): void {
     const htmlElement = element as HTMLElement
 
     try {
       // CRITICAL: Never restore innerHTML for structural elements (body, html, head)
       // This would wipe out dynamically added elements like the sidebar
-      const isStructuralElement = element.tagName === 'BODY' || element.tagName === 'HTML' || element.tagName === 'HEAD'
+      const isStructuralElement =
+        element.tagName === "BODY" ||
+        element.tagName === "HTML" ||
+        element.tagName === "HEAD"
 
       if (isStructuralElement) {
-        Logger.log('[ElementStateManager] Skipping innerHTML restoration for structural element:', element.tagName)
+        Logger.log(
+          "[ElementStateManager] Skipping innerHTML restoration for structural element:",
+          element.tagName
+        )
       } else {
         // Restore innerHTML first (this clears textContent)
         if (originalState.innerHTML !== undefined) {
@@ -77,8 +86,14 @@ export class ElementStateManager {
         const currentAttrs = Array.from(element.attributes)
         currentAttrs.forEach((attr) => {
           // Skip removing 'class' (handled separately via classList) and tracking attributes (removed explicitly later)
-          if (!originalState.attributes.hasOwnProperty(attr.name) &&
-              !['class', 'data-absmartly-experiment', 'data-absmartly-modified'].includes(attr.name)) {
+          if (
+            !originalState.attributes.hasOwnProperty(attr.name) &&
+            ![
+              "class",
+              "data-absmartly-experiment",
+              "data-absmartly-modified"
+            ].includes(attr.name)
+          ) {
             element.removeAttribute(attr.name)
           }
         })
@@ -92,7 +107,7 @@ export class ElementStateManager {
       // Restore styles (always safe to restore)
       if (originalState.styles && htmlElement.style) {
         // Clear all inline styles first
-        element.removeAttribute('style')
+        element.removeAttribute("style")
 
         // Restore original styles
         Object.entries(originalState.styles).forEach(([prop, value]) => {
@@ -102,16 +117,16 @@ export class ElementStateManager {
 
       // Restore class list (always safe to restore)
       if (originalState.classList) {
-        element.className = originalState.classList.join(' ')
+        element.className = originalState.classList.join(" ")
       }
 
       // Remove tracking attributes
-      element.removeAttribute('data-absmartly-experiment')
-      element.removeAttribute('data-absmartly-modified')
+      element.removeAttribute("data-absmartly-experiment")
+      element.removeAttribute("data-absmartly-modified")
 
-      Logger.log('Restored element to original state:', element)
+      Logger.log("Restored element to original state:", element)
     } catch (error) {
-      Logger.error('Error restoring element:', error)
+      Logger.error("Error restoring element:", error)
     }
   }
 }

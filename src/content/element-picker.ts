@@ -1,6 +1,6 @@
-import { generateRobustSelector } from '~src/visual-editor/utils/selector-generator'
+import { debugLog, debugWarn } from "~src/utils/debug"
+import { generateRobustSelector } from "~src/visual-editor/utils/selector-generator"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
 export class ElementPicker {
   private overlay: HTMLDivElement | null = null
   private notification: HTMLDivElement | null = null
@@ -12,37 +12,37 @@ export class ElementPicker {
 
   start(callback: (selector: string) => void) {
     if (this.isActive) {
-      debugLog('ElementPicker already active')
+      debugLog("ElementPicker already active")
       return
     }
-    
-    debugLog('ElementPicker starting...')
+
+    debugLog("ElementPicker starting...")
     this.isActive = true
     this.callback = callback
     this.createOverlay()
     this.createNotification()
     this.addEventListeners()
-    
+
     // Listen for cancel message
     this.messageListener = (message: any) => {
-      if (message.type === 'CANCEL_ELEMENT_PICKER') {
-        debugLog('ElementPicker received cancel message')
+      if (message.type === "CANCEL_ELEMENT_PICKER") {
+        debugLog("ElementPicker received cancel message")
         this.stop()
       }
     }
     chrome.runtime.onMessage.addListener(this.messageListener)
-    debugLog('ElementPicker started successfully')
+    debugLog("ElementPicker started successfully")
   }
 
   stop() {
     if (!this.isActive) return
-    
+
     this.isActive = false
     this.removeOverlay()
     this.removeNotification()
     this.removeEventListeners()
     this.callback = null
-    
+
     // Remove message listener
     if (this.messageListener) {
       chrome.runtime.onMessage.removeListener(this.messageListener)
@@ -56,14 +56,14 @@ export class ElementPicker {
       this.notification = null
     }
     // Remove animation style
-    const style = document.querySelector('style[data-absmartly-animation]')
+    const style = document.querySelector("style[data-absmartly-animation]")
     if (style) {
       style.remove()
     }
   }
 
   private createOverlay() {
-    this.overlay = document.createElement('div')
+    this.overlay = document.createElement("div")
     this.overlay.style.cssText = `
       position: fixed;
       top: 0;
@@ -78,7 +78,7 @@ export class ElementPicker {
   }
 
   private createNotification() {
-    this.notification = document.createElement('div')
+    this.notification = document.createElement("div")
     this.notification.style.cssText = `
       position: fixed;
       top: 20px;
@@ -96,11 +96,11 @@ export class ElementPicker {
       pointer-events: none;
       animation: slideDown 0.3s ease-out;
     `
-    this.notification.textContent = '🎯 Click an element on the page...'
-    
+    this.notification.textContent = "🎯 Click an element on the page..."
+
     // Add animation keyframes
-    const style = document.createElement('style')
-    style.setAttribute('data-absmartly-animation', 'true')
+    const style = document.createElement("style")
+    style.setAttribute("data-absmartly-animation", "true")
     style.textContent = `
       @keyframes slideDown {
         from {
@@ -129,8 +129,8 @@ export class ElementPicker {
     this.removeHighlight()
 
     const rect = element.getBoundingClientRect()
-    const highlight = document.createElement('div')
-    highlight.className = 'absmartly-element-highlight'
+    const highlight = document.createElement("div")
+    highlight.className = "absmartly-element-highlight"
     highlight.style.cssText = `
       position: fixed;
       top: ${rect.top}px;
@@ -145,7 +145,7 @@ export class ElementPicker {
     `
 
     // Add info tooltip
-    const info = document.createElement('div')
+    const info = document.createElement("div")
     info.style.cssText = `
       position: absolute;
       top: -30px;
@@ -167,7 +167,7 @@ export class ElementPicker {
   }
 
   private removeHighlight() {
-    const existing = document.querySelector('.absmartly-element-highlight')
+    const existing = document.querySelector(".absmartly-element-highlight")
     if (existing) {
       existing.remove()
     }
@@ -204,12 +204,18 @@ export class ElementPicker {
     const targetTag = element.tagName.toLowerCase()
     const allTargets = Array.from(document.querySelectorAll(targetTag))
 
-    for (let ancestorDepth = 1; ancestorDepth < ancestors.length; ancestorDepth++) {
+    for (
+      let ancestorDepth = 1;
+      ancestorDepth < ancestors.length;
+      ancestorDepth++
+    ) {
       const ancestor = ancestors[ancestorDepth]
       const tagName = ancestor.tagName.toLowerCase()
 
       // Get data-* attributes for this ancestor
-      const dataAttrs = Array.from(ancestor.attributes).filter(attr => attr.name.startsWith('data-'))
+      const dataAttrs = Array.from(ancestor.attributes).filter((attr) =>
+        attr.name.startsWith("data-")
+      )
 
       // Try building a selector with this ancestor
       let ancestorSelector = tagName
@@ -217,10 +223,11 @@ export class ElementPicker {
       // Add data attributes if available
       if (dataAttrs.length > 0) {
         // Prefer data-framer-name and other stable attributes
-        const stableAttr = dataAttrs.find(attr =>
-          attr.name === 'data-framer-name' ||
-          attr.name === 'data-name' ||
-          attr.name === 'data-testid'
+        const stableAttr = dataAttrs.find(
+          (attr) =>
+            attr.name === "data-framer-name" ||
+            attr.name === "data-name" ||
+            attr.name === "data-testid"
         )
         if (stableAttr) {
           ancestorSelector = `${tagName}[${stableAttr.name}="${stableAttr.value}"]`
@@ -231,7 +238,7 @@ export class ElementPicker {
       // This is crucial for sites like Framer where many elements share the same data-framer-name
       if (ancestor.parentElement) {
         const siblings = Array.from(ancestor.parentElement.children).filter(
-          child => child.tagName === ancestor.tagName
+          (child) => child.tagName === ancestor.tagName
         )
         if (siblings.length > 1) {
           const index = siblings.indexOf(ancestor) + 1
@@ -258,7 +265,9 @@ export class ElementPicker {
       const parent = current.parentElement
 
       if (parent) {
-        const siblings = Array.from(parent.children).filter(child => child.tagName === current!.tagName)
+        const siblings = Array.from(parent.children).filter(
+          (child) => child.tagName === current!.tagName
+        )
         if (siblings.length > 1) {
           const index = siblings.indexOf(current) + 1
           parts.unshift(`${tagName}:nth-of-type(${index})`)
@@ -270,7 +279,7 @@ export class ElementPicker {
       }
 
       // Check if current selector is unique
-      const testSelector = parts.join(' > ')
+      const testSelector = parts.join(" > ")
       const matches = document.querySelectorAll(testSelector)
       if (matches.length === 1 && matches[0] === element) {
         return testSelector
@@ -280,13 +289,13 @@ export class ElementPicker {
       depth++
     }
 
-    const positionalSelector = parts.join(' > ')
+    const positionalSelector = parts.join(" > ")
     return positionalSelector
   }
 
   private handleMouseMove = (e: MouseEvent) => {
     if (!this.isActive) return
-    
+
     const element = document.elementFromPoint(e.clientX, e.clientY)
     if (element && element !== this.highlightedElement) {
       this.highlightElement(element)
@@ -294,32 +303,43 @@ export class ElementPicker {
   }
 
   private handleClick = (e: MouseEvent) => {
-    debugLog('[ElementPicker] handleClick called, isActive:', this.isActive)
+    debugLog("[ElementPicker] handleClick called, isActive:", this.isActive)
     if (!this.isActive) {
-      debugLog('[ElementPicker] handleClick: picker not active, returning')
+      debugLog("[ElementPicker] handleClick: picker not active, returning")
       return
     }
 
-    debugLog('[ElementPicker] handleClick: processing click at', e.clientX, e.clientY)
+    debugLog(
+      "[ElementPicker] handleClick: processing click at",
+      e.clientX,
+      e.clientY
+    )
     e.preventDefault()
     e.stopPropagation()
 
     const element = document.elementFromPoint(e.clientX, e.clientY)
-    debugLog('[ElementPicker] Element at click point:', element?.tagName, element?.className)
+    debugLog(
+      "[ElementPicker] Element at click point:",
+      element?.tagName,
+      element?.className
+    )
     if (element) {
       const selector = this.generateSelector(element)
       this.selectedElement = element
 
       // Validate the final selector
       const matches = document.querySelectorAll(selector)
-      debugLog(`[ElementPicker] Final selector matches ${matches.length} element(s):`, selector)
+      debugLog(
+        `[ElementPicker] Final selector matches ${matches.length} element(s):`,
+        selector
+      )
       if (matches.length !== 1) {
-        console.error('[ElementPicker] ⚠️ WARNING: Selector is not unique!')
+        console.error("[ElementPicker] ⚠️ WARNING: Selector is not unique!")
       }
 
       // Send message with the selected element
       chrome.runtime.sendMessage({
-        type: 'ELEMENT_SELECTED',
+        type: "ELEMENT_SELECTED",
         selector: selector
       })
 
@@ -329,30 +349,30 @@ export class ElementPicker {
 
       this.stop()
     }
-    
+
     return false
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       this.stop()
     }
   }
 
   private addEventListeners() {
-    document.addEventListener('mousemove', this.handleMouseMove, true)
-    document.addEventListener('click', this.handleClick, true)
-    document.addEventListener('keydown', this.handleKeyDown, true)
-    
+    document.addEventListener("mousemove", this.handleMouseMove, true)
+    document.addEventListener("click", this.handleClick, true)
+    document.addEventListener("keydown", this.handleKeyDown, true)
+
     // Prevent context menu
-    document.addEventListener('contextmenu', this.preventEvent, true)
+    document.addEventListener("contextmenu", this.preventEvent, true)
   }
 
   private removeEventListeners() {
-    document.removeEventListener('mousemove', this.handleMouseMove, true)
-    document.removeEventListener('click', this.handleClick, true)
-    document.removeEventListener('keydown', this.handleKeyDown, true)
-    document.removeEventListener('contextmenu', this.preventEvent, true)
+    document.removeEventListener("mousemove", this.handleMouseMove, true)
+    document.removeEventListener("click", this.handleClick, true)
+    document.removeEventListener("keydown", this.handleKeyDown, true)
+    document.removeEventListener("contextmenu", this.preventEvent, true)
   }
 
   private preventEvent = (e: Event) => {

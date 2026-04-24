@@ -3,9 +3,10 @@
  * Provides a floating toolbar with actions and information
  */
 
-import StateManager from '../core/state-manager'
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import StateManager from "../core/state-manager"
+
 export class Toolbar {
   private stateManager: StateManager
   private toolbar: HTMLElement | null = null
@@ -14,11 +15,11 @@ export class Toolbar {
   private redoButton: HTMLElement | null = null
 
   // Callback functions to be set by the main visual editor
-  onUndo: () => void = () => debugLog('[Toolbar] Undo callback not set')
-  onRedo: () => void = () => debugLog('[Toolbar] Redo callback not set')
-  onClear: () => void = () => debugLog('[Toolbar] Clear callback not set')
-  onSave: () => void = () => debugLog('[Toolbar] Save callback not set')
-  onExit: () => void = () => debugLog('[Toolbar] Exit callback not set')
+  onUndo: () => void = () => debugLog("[Toolbar] Undo callback not set")
+  onRedo: () => void = () => debugLog("[Toolbar] Redo callback not set")
+  onClear: () => void = () => debugLog("[Toolbar] Clear callback not set")
+  onSave: () => void = () => debugLog("[Toolbar] Save callback not set")
+  onExit: () => void = () => debugLog("[Toolbar] Exit callback not set")
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
@@ -28,54 +29,56 @@ export class Toolbar {
   private shadowRoot: ShadowRoot | null = null
 
   create(): void {
-    debugLog('[Toolbar] Creating toolbar')
-    console.error('[Toolbar] Create called - this should appear in console')
-    console.trace('[Toolbar] Create called from:')
+    debugLog("[Toolbar] Creating toolbar")
+    console.error("[Toolbar] Create called - this should appear in console")
+    console.trace("[Toolbar] Create called from:")
 
     // Also add a visual indicator that this code ran
-    const debugMarker = document.createElement('div')
-    debugMarker.id = 'absmartly-toolbar-debug-marker'
-    debugMarker.textContent = 'Toolbar create() was called at ' + new Date().toISOString()
-    debugMarker.style.display = 'none'
+    const debugMarker = document.createElement("div")
+    debugMarker.id = "absmartly-toolbar-debug-marker"
+    debugMarker.textContent =
+      "Toolbar create() was called at " + new Date().toISOString()
+    debugMarker.style.display = "none"
     document.body.appendChild(debugMarker)
 
     if (this.toolbar) {
-      debugLog('[Toolbar] Toolbar already exists, removing old one')
+      debugLog("[Toolbar] Toolbar already exists, removing old one")
       this.remove()
     }
 
     // Create Shadow DOM host for complete isolation from page styles
-    this.shadowHost = document.createElement('div')
-    this.shadowHost.id = 'absmartly-visual-editor-toolbar-host'
-    this.shadowHost.style.cssText = 'all: initial; position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;'
+    this.shadowHost = document.createElement("div")
+    this.shadowHost.id = "absmartly-visual-editor-toolbar-host"
+    this.shadowHost.style.cssText =
+      "all: initial; position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;"
 
     // Attach shadow root (open mode for testability with Playwright)
-    this.shadowRoot = this.shadowHost.attachShadow({ mode: 'open' })
+    this.shadowRoot = this.shadowHost.attachShadow({ mode: "open" })
 
-    this.toolbar = document.createElement('div')
-    this.toolbar.className = 'absmartly-toolbar'
-    this.toolbar.id = 'absmartly-visual-editor-toolbar'
-    this.toolbar.setAttribute('data-absmartly', 'toolbar')
+    this.toolbar = document.createElement("div")
+    this.toolbar.className = "absmartly-toolbar"
+    this.toolbar.id = "absmartly-visual-editor-toolbar"
+    this.toolbar.setAttribute("data-absmartly", "toolbar")
 
     // Apply styles directly without !important
-    this.toolbar.style.position = 'fixed'
-    this.toolbar.style.top = '20px'
-    this.toolbar.style.right = '20px'
-    this.toolbar.style.background = 'white'
-    this.toolbar.style.border = '2px solid #3b82f6'
-    this.toolbar.style.borderRadius = '12px'
-    this.toolbar.style.padding = '12px'
-    this.toolbar.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)'
-    this.toolbar.style.display = 'flex'
-    this.toolbar.style.flexDirection = 'column'
-    this.toolbar.style.gap = '8px'
-    this.toolbar.style.fontFamily = 'system-ui, -apple-system, sans-serif'
-    this.toolbar.style.fontSize = '14px'
-    this.toolbar.style.maxWidth = '320px'
-    this.toolbar.style.minWidth = '280px'
-    this.toolbar.style.pointerEvents = 'auto'
-    this.toolbar.style.userSelect = 'none'
-    this.toolbar.style.zIndex = '2147483647'
+    this.toolbar.style.position = "fixed"
+    this.toolbar.style.top = "20px"
+    this.toolbar.style.right = "20px"
+    this.toolbar.style.background = "white"
+    this.toolbar.style.border = "2px solid #3b82f6"
+    this.toolbar.style.borderRadius = "12px"
+    this.toolbar.style.padding = "12px"
+    this.toolbar.style.boxShadow = "0 10px 25px rgba(0,0,0,0.2)"
+    this.toolbar.style.display = "flex"
+    this.toolbar.style.flexDirection = "column"
+    this.toolbar.style.gap = "8px"
+    this.toolbar.style.fontFamily = "system-ui, -apple-system, sans-serif"
+    this.toolbar.style.fontSize = "14px"
+    this.toolbar.style.maxWidth = "320px"
+    this.toolbar.style.minWidth = "280px"
+    this.toolbar.style.pointerEvents = "auto"
+    this.toolbar.style.userSelect = "none"
+    this.toolbar.style.zIndex = "2147483647"
 
     const config = this.stateManager.getConfig()
 
@@ -167,13 +170,13 @@ export class Toolbar {
     `
 
     // Store references to key elements
-    this.changesCounter = this.toolbar.querySelector('.absmartly-changes-count')
+    this.changesCounter = this.toolbar.querySelector(".absmartly-changes-count")
     this.undoButton = this.toolbar.querySelector('[data-action="undo"]')
     this.redoButton = this.toolbar.querySelector('[data-action="redo"]')
 
     // Add hover effects via CSS inside shadow root
-    const style = document.createElement('style')
-    style.id = 'absmartly-toolbar-styles'
+    const style = document.createElement("style")
+    style.id = "absmartly-toolbar-styles"
     style.textContent = `
       .absmartly-toolbar-button:hover {
         background: #e5e7eb;
@@ -192,25 +195,31 @@ export class Toolbar {
 
     // Append shadow host to document body
     document.body.appendChild(this.shadowHost!)
-    debugLog('[Toolbar] Toolbar added to Shadow DOM')
+    debugLog("[Toolbar] Toolbar added to Shadow DOM")
 
     // Verify shadow host is in DOM
-    const verifyShadowHost = document.getElementById('absmartly-visual-editor-toolbar-host')
+    const verifyShadowHost = document.getElementById(
+      "absmartly-visual-editor-toolbar-host"
+    )
     if (verifyShadowHost) {
-      debugLog('[Toolbar] Verified: Shadow host found in DOM')
-      debugLog('[Toolbar] Toolbar is now isolated in Shadow DOM, protected from page styles')
+      debugLog("[Toolbar] Verified: Shadow host found in DOM")
+      debugLog(
+        "[Toolbar] Toolbar is now isolated in Shadow DOM, protected from page styles"
+      )
     } else {
-      console.error('[Toolbar] ERROR: Shadow host not found in DOM after appendChild!')
+      console.error(
+        "[Toolbar] ERROR: Shadow host not found in DOM after appendChild!"
+      )
     }
 
     // Add event listeners
-    this.toolbar.addEventListener('click', this.handleToolbarClick)
-    debugLog('[Toolbar] Event listeners attached')
+    this.toolbar.addEventListener("click", this.handleToolbarClick)
+    debugLog("[Toolbar] Event listeners attached")
   }
 
   remove(): void {
-    debugLog('[Toolbar] Remove called')
-    console.trace('[Toolbar] Remove stack trace:')
+    debugLog("[Toolbar] Remove called")
+    console.trace("[Toolbar] Remove stack trace:")
 
     if (this.shadowHost) {
       this.shadowHost.remove()
@@ -233,39 +242,39 @@ export class Toolbar {
 
   updateUndoRedoButtons(canUndo: boolean, canRedo: boolean): void {
     if (this.undoButton) {
-      this.undoButton.style.opacity = canUndo ? '1' : '0.5'
+      this.undoButton.style.opacity = canUndo ? "1" : "0.5"
       ;(this.undoButton as HTMLButtonElement).disabled = !canUndo
     }
     if (this.redoButton) {
-      this.redoButton.style.opacity = canRedo ? '1' : '0.5'
+      this.redoButton.style.opacity = canRedo ? "1" : "0.5"
       ;(this.redoButton as HTMLButtonElement).disabled = !canRedo
     }
   }
 
   private handleToolbarClick = (e: MouseEvent) => {
-    debugLog('[Toolbar] Click detected on:', e.target)
+    debugLog("[Toolbar] Click detected on:", e.target)
     e.preventDefault()
     e.stopPropagation()
     e.stopImmediatePropagation()
 
     const target = e.target as HTMLElement
-    const action = target.getAttribute('data-action')
-    debugLog('[Toolbar] Action:', action)
+    const action = target.getAttribute("data-action")
+    debugLog("[Toolbar] Action:", action)
 
     switch (action) {
-      case 'undo':
+      case "undo":
         this.onUndo()
         break
-      case 'redo':
+      case "redo":
         this.onRedo()
         break
-      case 'clear':
+      case "clear":
         this.onClear()
         break
-      case 'save':
+      case "save":
         this.onSave()
         break
-      case 'exit':
+      case "exit":
         this.onExit()
         break
     }

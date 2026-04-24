@@ -1,5 +1,6 @@
-import { debugWarn, debugLog } from './debug'
-import { isSSRFSafe } from '~background/utils/security'
+import { isSSRFSafe } from "~background/utils/security"
+
+import { debugLog, debugWarn } from "./debug"
 
 export interface ValidationResult {
   valid: boolean
@@ -8,32 +9,100 @@ export interface ValidationResult {
 }
 
 const DANGEROUS_PATTERNS = [
-  { pattern: /\beval\s*\(/, reason: 'Direct eval() call detected', severity: 'critical' },
-  { pattern: /Function\s*\(/, reason: 'Function constructor detected', severity: 'critical' },
-  { pattern: /document\.cookie/i, reason: 'Access to document.cookie detected', severity: 'critical' },
-  { pattern: /localStorage/i, reason: 'Access to localStorage detected', severity: 'critical' },
-  { pattern: /sessionStorage/i, reason: 'Access to sessionStorage detected', severity: 'critical' },
-  { pattern: /XMLHttpRequest/i, reason: 'XMLHttpRequest usage detected', severity: 'critical' },
-  { pattern: /fetch\s*\(/, reason: 'fetch() call detected', severity: 'critical' },
-  { pattern: /import\s*\(/, reason: 'Dynamic import() detected', severity: 'critical' },
-  { pattern: /require\s*\(/, reason: 'require() call detected', severity: 'critical' },
-  { pattern: /chrome\./i, reason: 'Chrome API access detected', severity: 'critical' },
-  { pattern: /browser\./i, reason: 'Browser API access detected', severity: 'critical' },
-  { pattern: /\.__proto__/, reason: 'Prototype manipulation detected', severity: 'critical' },
-  { pattern: /\.constructor/, reason: 'Constructor access detected', severity: 'high' },
-  { pattern: /while\s*\(\s*true\s*\)/i, reason: 'Infinite while loop detected', severity: 'high' },
-  { pattern: /for\s*\(\s*;\s*;\s*\)/i, reason: 'Infinite for loop detected', severity: 'high' },
-  { pattern: /window\.location\s*=|location\.href\s*=/, reason: 'Page navigation detected', severity: 'medium' },
-  { pattern: /document\.write/, reason: 'document.write() usage detected', severity: 'medium' }
+  {
+    pattern: /\beval\s*\(/,
+    reason: "Direct eval() call detected",
+    severity: "critical"
+  },
+  {
+    pattern: /Function\s*\(/,
+    reason: "Function constructor detected",
+    severity: "critical"
+  },
+  {
+    pattern: /document\.cookie/i,
+    reason: "Access to document.cookie detected",
+    severity: "critical"
+  },
+  {
+    pattern: /localStorage/i,
+    reason: "Access to localStorage detected",
+    severity: "critical"
+  },
+  {
+    pattern: /sessionStorage/i,
+    reason: "Access to sessionStorage detected",
+    severity: "critical"
+  },
+  {
+    pattern: /XMLHttpRequest/i,
+    reason: "XMLHttpRequest usage detected",
+    severity: "critical"
+  },
+  {
+    pattern: /fetch\s*\(/,
+    reason: "fetch() call detected",
+    severity: "critical"
+  },
+  {
+    pattern: /import\s*\(/,
+    reason: "Dynamic import() detected",
+    severity: "critical"
+  },
+  {
+    pattern: /require\s*\(/,
+    reason: "require() call detected",
+    severity: "critical"
+  },
+  {
+    pattern: /chrome\./i,
+    reason: "Chrome API access detected",
+    severity: "critical"
+  },
+  {
+    pattern: /browser\./i,
+    reason: "Browser API access detected",
+    severity: "critical"
+  },
+  {
+    pattern: /\.__proto__/,
+    reason: "Prototype manipulation detected",
+    severity: "critical"
+  },
+  {
+    pattern: /\.constructor/,
+    reason: "Constructor access detected",
+    severity: "high"
+  },
+  {
+    pattern: /while\s*\(\s*true\s*\)/i,
+    reason: "Infinite while loop detected",
+    severity: "high"
+  },
+  {
+    pattern: /for\s*\(\s*;\s*;\s*\)/i,
+    reason: "Infinite for loop detected",
+    severity: "high"
+  },
+  {
+    pattern: /window\.location\s*=|location\.href\s*=/,
+    reason: "Page navigation detected",
+    severity: "medium"
+  },
+  {
+    pattern: /document\.write/,
+    reason: "document.write() usage detected",
+    severity: "medium"
+  }
 ]
 
 const MAX_CODE_LENGTH = 50000
 
 export function validateExperimentCode(code: string): ValidationResult {
-  if (!code || typeof code !== 'string') {
+  if (!code || typeof code !== "string") {
     return {
       valid: false,
-      reason: 'Code must be a non-empty string'
+      reason: "Code must be a non-empty string"
     }
   }
 
@@ -48,13 +117,13 @@ export function validateExperimentCode(code: string): ValidationResult {
 
   for (const { pattern, reason, severity } of DANGEROUS_PATTERNS) {
     if (pattern.test(code)) {
-      if (severity === 'critical') {
+      if (severity === "critical") {
         debugWarn(`[CodeValidator] BLOCKED: ${reason}`)
         return {
           valid: false,
           reason: `Security violation: ${reason}`
         }
-      } else if (severity === 'high') {
+      } else if (severity === "high") {
         debugWarn(`[CodeValidator] WARNING (high): ${reason}`)
         warnings.push(reason)
       } else {
@@ -64,7 +133,9 @@ export function validateExperimentCode(code: string): ValidationResult {
   }
 
   if (warnings.length > 0) {
-    debugLog(`[CodeValidator] Code validated with ${warnings.length} warning(s)`)
+    debugLog(
+      `[CodeValidator] Code validated with ${warnings.length} warning(s)`
+    )
   }
 
   return {
@@ -74,17 +145,17 @@ export function validateExperimentCode(code: string): ValidationResult {
 }
 
 export function validateExperimentURL(url: string): ValidationResult {
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== "string") {
     return {
       valid: false,
-      reason: 'URL must be a non-empty string'
+      reason: "URL must be a non-empty string"
     }
   }
 
   try {
     const parsed = new URL(url)
 
-    const blockedProtocols = ['javascript:', 'data:', 'file:', 'vbscript:']
+    const blockedProtocols = ["javascript:", "data:", "file:", "vbscript:"]
     if (blockedProtocols.includes(parsed.protocol.toLowerCase())) {
       return {
         valid: false,
@@ -103,7 +174,7 @@ export function validateExperimentURL(url: string): ValidationResult {
   } catch (error) {
     return {
       valid: false,
-      reason: 'Invalid URL format'
+      reason: "Invalid URL format"
     }
   }
 }

@@ -1,32 +1,36 @@
 import React, { useEffect, useRef } from "react"
-import { debugLog } from '~src/utils/debug'
 
+import { CookieConsentModal } from "~src/components/CookieConsentModal"
+import EventsDebugPage from "~src/components/EventsDebugPage"
 import { ExperimentDetail } from "~src/components/ExperimentDetail"
 import { ExperimentEditor } from "~src/components/ExperimentEditor"
 import { SettingsView } from "~src/components/SettingsView"
-import EventsDebugPage from "~src/components/EventsDebugPage"
 import { Button } from "~src/components/ui/Button"
-import { CookieConsentModal } from "~src/components/CookieConsentModal"
-import { ListView } from "~src/components/views/ListView"
 import { AIDOMChangesView } from "~src/components/views/AIDOMChangesView"
-import { NotificationProvider } from "~src/contexts/NotificationContext"
+import { ListView } from "~src/components/views/ListView"
+import {
+  NotificationProvider,
+  useNotifications
+} from "~src/contexts/NotificationContext"
 import { useABsmartly } from "~src/hooks/useABsmartly"
-import { usePermissions } from "~src/hooks/usePermissions"
 import { useActiveSitePermission } from "~src/hooks/useActiveSitePermission"
-import { SitePermissionBanner } from "./SitePermissionBanner"
-import { useExperimentFilters } from "~src/hooks/useExperimentFilters"
-import { useExperimentLoading } from "~src/hooks/useExperimentLoading"
 import { useEditorResources } from "~src/hooks/useEditorResources"
+import { useExperimentFilters } from "~src/hooks/useExperimentFilters"
+import { useExperimentHandlers } from "~src/hooks/useExperimentHandlers"
+import { useExperimentInitialization } from "~src/hooks/useExperimentInitialization"
+import { useExperimentLoading } from "~src/hooks/useExperimentLoading"
+import { useExtensionState } from "~src/hooks/useExtensionState"
 import { useFavorites } from "~src/hooks/useFavorites"
+import { useLoginRedirect } from "~src/hooks/useLoginRedirect"
+import { usePermissions } from "~src/hooks/usePermissions"
+import { useSidebarState } from "~src/hooks/useSidebarState"
 import { useTemplates } from "~src/hooks/useTemplates"
 import { useViewNavigation } from "~src/hooks/useViewNavigation"
-import { useExperimentHandlers } from "~src/hooks/useExperimentHandlers"
-import { useSidebarState } from "~src/hooks/useSidebarState"
-import { useExtensionState } from "~src/hooks/useExtensionState"
-import { useExperimentInitialization } from "~src/hooks/useExperimentInitialization"
-import { useLoginRedirect } from "~src/hooks/useLoginRedirect"
-import { useNotifications } from "~src/contexts/NotificationContext"
 import type { ABsmartlyConfig } from "~src/types/absmartly"
+import { debugLog } from "~src/utils/debug"
+
+import { SitePermissionBanner } from "./SitePermissionBanner"
+
 import "~style.css"
 
 function SidebarContent() {
@@ -74,12 +78,8 @@ function SidebarContent() {
     handleBackFromAI
   } = useViewNavigation()
 
-  const {
-    filters,
-    filtersLoaded,
-    handleFilterChange,
-    setFilters
-  } = useExperimentFilters(config)
+  const { filters, filtersLoaded, handleFilterChange, setFilters } =
+    useExperimentFilters(config)
 
   const {
     error,
@@ -160,16 +160,13 @@ function SidebarContent() {
     requestPermissionsIfNeeded
   })
 
-  const {
-    favoriteExperiments,
-    loadFavorites,
-    handleToggleFavorite
-  } = useFavorites({
-    getFavorites,
-    setExperimentFavorite,
-    requestPermissionsIfNeeded,
-    onError: showError
-  })
+  const { favoriteExperiments, loadFavorites, handleToggleFavorite } =
+    useFavorites({
+      getFavorites,
+      setExperimentFavorite,
+      requestPermissionsIfNeeded,
+      onError: showError
+    })
 
   const {
     templates,
@@ -221,22 +218,24 @@ function SidebarContent() {
     setError
   })
 
-  const prevViewRef = useRef<string>('list')
+  const prevViewRef = useRef<string>("list")
   useEffect(() => {
-    debugLog(JSON.stringify({
-      type: 'STATE_CHANGE',
-      component: 'ExtensionUI',
-      event: 'VIEW_CHANGED',
-      timestamp: Date.now(),
-      oldView: prevViewRef.current,
-      newView: view,
-      aiDomContextSet: !!aiDomContext
-    }))
+    debugLog(
+      JSON.stringify({
+        type: "STATE_CHANGE",
+        component: "ExtensionUI",
+        event: "VIEW_CHANGED",
+        timestamp: Date.now(),
+        oldView: prevViewRef.current,
+        newView: view,
+        aiDomContextSet: !!aiDomContext
+      })
+    )
     prevViewRef.current = view
   }, [view, aiDomContext])
 
   useEffect(() => {
-    if (view === 'list' && currentPage !== 1) {
+    if (view === "list" && currentPage !== 1) {
       setCurrentPage(1)
     }
   }, [view, currentPage, setCurrentPage])
@@ -256,8 +255,15 @@ function SidebarContent() {
       )
     }
 
-    window.addEventListener('absmartly:navigate-ai', handleAIDispatch as EventListener)
-    return () => window.removeEventListener('absmartly:navigate-ai', handleAIDispatch as EventListener)
+    window.addEventListener(
+      "absmartly:navigate-ai",
+      handleAIDispatch as EventListener
+    )
+    return () =>
+      window.removeEventListener(
+        "absmartly:navigate-ai",
+        handleAIDispatch as EventListener
+      )
   }, [handleNavigateToAI])
 
   useEffect(() => {
@@ -265,10 +271,12 @@ function SidebarContent() {
       const target = event.target as HTMLElement | null
       if (!target) return
 
-      const button = target.closest('#generate-with-ai-button') as HTMLElement | null
+      const button = target.closest(
+        "#generate-with-ai-button"
+      ) as HTMLElement | null
       if (!button) return
 
-      const variantName = button.getAttribute('data-variant-name') || ''
+      const variantName = button.getAttribute("data-variant-name") || ""
       const map = (window as any).__absmartlyAIContextMap || {}
       const ctx = map[variantName]
       if (!ctx) return
@@ -284,25 +292,33 @@ function SidebarContent() {
       )
     }
 
-    document.addEventListener('click', handleAIClick)
-    return () => document.removeEventListener('click', handleAIClick)
+    document.addEventListener("click", handleAIClick)
+    return () => document.removeEventListener("click", handleAIClick)
   }, [handleNavigateToAI])
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && (!isAuthenticated || error) && config && view === 'list') {
-        debugLog('Document became visible with error state, attempting to refresh...')
+      if (
+        !document.hidden &&
+        (!isAuthenticated || error) &&
+        config &&
+        view === "list"
+      ) {
+        debugLog(
+          "Document became visible with error state, attempting to refresh..."
+        )
         loadExperiments(true, 1, pageSize)
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
   }, [isAuthenticated, error, config, view, pageSize, loadExperiments])
 
   const handleSettingsSave = (newConfig: Partial<ABsmartlyConfig>) => {
     updateConfig({ ...config, ...newConfig } as ABsmartlyConfig)
-    setView('list')
+    setView("list")
   }
 
   if (configLoading) {
@@ -316,7 +332,7 @@ function SidebarContent() {
     )
   }
 
-  if (!config && view !== 'settings') {
+  if (!config && view !== "settings") {
     return (
       <div className="w-full h-screen p-4">
         <div className="flex flex-col items-center justify-center h-full space-y-4">
@@ -324,7 +340,9 @@ function SidebarContent() {
           <p className="text-sm text-gray-600 text-center">
             Please configure your API settings to get started
           </p>
-          <Button id="configure-settings-button" onClick={() => setView('settings')}>
+          <Button
+            id="configure-settings-button"
+            onClick={() => setView("settings")}>
             Configure Settings
           </Button>
         </div>
@@ -335,7 +353,7 @@ function SidebarContent() {
   return (
     <div className="w-full h-screen bg-white flex flex-col">
       <SitePermissionBanner permission={activeSitePermission} />
-      {view === 'list' && (
+      {view === "list" && (
         <ListView
           config={config}
           filteredExperiments={filteredExperiments}
@@ -374,11 +392,11 @@ function SidebarContent() {
         />
       )}
 
-      {view === 'detail' && (
-        selectedExperiment ? (
+      {view === "detail" &&
+        (selectedExperiment ? (
           <ExperimentDetail
             experiment={selectedExperiment}
-            onBack={() => setView('list')}
+            onBack={() => setView("list")}
             onStart={handleStartExperiment}
             onStop={handleStopExperiment}
             applications={applications}
@@ -386,7 +404,9 @@ function SidebarContent() {
             owners={owners}
             teams={teams}
             tags={tags}
-            onNavigateToAI={config?.vibeStudioEnabled ? handleNavigateToAI : undefined}
+            onNavigateToAI={
+              config?.vibeStudioEnabled ? handleNavigateToAI : undefined
+            }
             autoNavigateToAI={autoNavigateToAI}
             onUpdate={handleUpdateExperiment}
             loading={experimentDetailLoading}
@@ -399,36 +419,35 @@ function SidebarContent() {
               <p className="text-gray-600">Loading experiment details...</p>
             </div>
           </div>
-        )
-      )}
+        ))}
 
-      {view === 'settings' && (
+      {view === "settings" && (
         <SettingsView
           onSave={handleSettingsSave}
-          onCancel={() => setView('list')}
+          onCancel={() => setView("list")}
         />
       )}
 
-      {view === 'events' && (
-        <EventsDebugPage onBack={() => setView('list')} />
-      )}
+      {view === "events" && <EventsDebugPage onBack={() => setView("list")} />}
 
-      {(view === 'create' || view === 'edit') && (
+      {(view === "create" || view === "edit") && (
         <ExperimentEditor
           experiment={selectedExperiment}
           onSave={handleSaveExperiment}
-          onCancel={() => setView('list')}
+          onCancel={() => setView("list")}
           applications={applications}
           unitTypes={unitTypes}
           metrics={metrics}
           tags={tags}
           owners={owners}
           teams={teams}
-          onNavigateToAI={config?.vibeStudioEnabled ? handleNavigateToAI : undefined}
+          onNavigateToAI={
+            config?.vibeStudioEnabled ? handleNavigateToAI : undefined
+          }
         />
       )}
 
-      {view === 'ai-dom-changes' && config?.vibeStudioEnabled && (
+      {view === "ai-dom-changes" && config?.vibeStudioEnabled && (
         <AIDOMChangesView
           aiDomContext={aiDomContext}
           onBackFromAI={handleBackFromAI}
@@ -437,20 +456,22 @@ function SidebarContent() {
 
       <CookieConsentModal
         isOpen={needsPermissions}
-        onGrant={() => handleGrantPermissions(
-          () => {
-            showSuccess('Permissions granted. Reloading...')
-            setTimeout(() => {
-              setIsAuthExpired(false)
-              setError(null)
-              loadExperiments(true)
-            }, 500)
-          },
-          (message) => {
-            setError(message)
-            showError(message)
-          }
-        )}
+        onGrant={() =>
+          handleGrantPermissions(
+            () => {
+              showSuccess("Permissions granted. Reloading...")
+              setTimeout(() => {
+                setIsAuthExpired(false)
+                setError(null)
+                loadExperiments(true)
+              }, 500)
+            },
+            (message) => {
+              setError(message)
+              showError(message)
+            }
+          )
+        }
         onDeny={handleDenyPermissions}
       />
     </div>

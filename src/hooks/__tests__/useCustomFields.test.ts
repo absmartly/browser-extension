@@ -1,14 +1,16 @@
-import { renderHook, waitFor, act } from '@testing-library/react'
-import { useCustomFields } from '../useCustomFields'
-import { BackgroundAPIClient } from '~src/lib/background-api-client'
+import { act, renderHook, waitFor } from "@testing-library/react"
 
-jest.mock('~src/lib/background-api-client')
-jest.mock('~src/utils/debug', () => ({
+import { BackgroundAPIClient } from "~src/lib/background-api-client"
+
+import { useCustomFields } from "../useCustomFields"
+
+jest.mock("~src/lib/background-api-client")
+jest.mock("~src/utils/debug", () => ({
   debugLog: jest.fn(),
   debugError: jest.fn()
 }))
 
-describe('useCustomFields', () => {
+describe("useCustomFields", () => {
   let mockGetCustomSectionFields: jest.Mock
 
   beforeEach(() => {
@@ -22,16 +24,16 @@ describe('useCustomFields', () => {
     jest.clearAllMocks()
   })
 
-  it('should fetch custom fields on mount', async () => {
+  it("should fetch custom fields on mount", async () => {
     const mockFields = [
       {
         id: 1,
         section_id: 1,
-        title: 'Hypothesis',
-        help_text: 'What is your hypothesis?',
-        placeholder: 'Enter hypothesis',
-        default_value: '',
-        type: 'text' as const,
+        title: "Hypothesis",
+        help_text: "What is your hypothesis?",
+        placeholder: "Enter hypothesis",
+        default_value: "",
+        type: "text" as const,
         required: true,
         archived: false,
         order_index: 1
@@ -55,7 +57,7 @@ describe('useCustomFields', () => {
     expect(mockGetCustomSectionFields).toHaveBeenCalledTimes(1)
   })
 
-  it('should handle empty custom fields response', async () => {
+  it("should handle empty custom fields response", async () => {
     mockGetCustomSectionFields.mockResolvedValue([])
 
     const { result } = renderHook(() => useCustomFields())
@@ -68,8 +70,8 @@ describe('useCustomFields', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('should handle fetch errors gracefully', async () => {
-    const errorMessage = 'Failed to fetch custom fields'
+  it("should handle fetch errors gracefully", async () => {
+    const errorMessage = "Failed to fetch custom fields"
     mockGetCustomSectionFields.mockRejectedValue(new Error(errorMessage))
 
     const { result } = renderHook(() => useCustomFields())
@@ -82,8 +84,8 @@ describe('useCustomFields', () => {
     expect(result.current.error).toBe(errorMessage)
   })
 
-  it('should handle non-Error objects in catch block', async () => {
-    mockGetCustomSectionFields.mockRejectedValue('String error')
+  it("should handle non-Error objects in catch block", async () => {
+    mockGetCustomSectionFields.mockRejectedValue("String error")
 
     const { result } = renderHook(() => useCustomFields())
 
@@ -92,16 +94,16 @@ describe('useCustomFields', () => {
     })
 
     expect(result.current.customFields).toEqual([])
-    expect(result.current.error).toBe('Failed to fetch custom fields')
+    expect(result.current.error).toBe("Failed to fetch custom fields")
   })
 
-  it('should allow refetching custom fields', async () => {
+  it("should allow refetching custom fields", async () => {
     const mockFields1 = [
-      { id: 1, title: 'Field 1', type: 'text' as const, required: true }
+      { id: 1, title: "Field 1", type: "text" as const, required: true }
     ]
     const mockFields2 = [
-      { id: 1, title: 'Field 1', type: 'text' as const, required: true },
-      { id: 2, title: 'Field 2', type: 'string' as const, required: false }
+      { id: 1, title: "Field 1", type: "text" as const, required: true },
+      { id: 2, title: "Field 2", type: "string" as const, required: false }
     ]
 
     mockGetCustomSectionFields.mockResolvedValueOnce(mockFields1)
@@ -125,13 +127,43 @@ describe('useCustomFields', () => {
     expect(mockGetCustomSectionFields).toHaveBeenCalledTimes(2)
   })
 
-  it('should handle multiple field types', async () => {
+  it("should handle multiple field types", async () => {
     const mockFields = [
-      { id: 1, title: 'Text', type: 'text' as const, required: true, default_value: '' },
-      { id: 2, title: 'String', type: 'string' as const, required: false, default_value: 'default' },
-      { id: 3, title: 'JSON', type: 'json' as const, required: false, default_value: '{}' },
-      { id: 4, title: 'Boolean', type: 'boolean' as const, required: false, default_value: 'false' },
-      { id: 5, title: 'Number', type: 'number' as const, required: false, default_value: '0' }
+      {
+        id: 1,
+        title: "Text",
+        type: "text" as const,
+        required: true,
+        default_value: ""
+      },
+      {
+        id: 2,
+        title: "String",
+        type: "string" as const,
+        required: false,
+        default_value: "default"
+      },
+      {
+        id: 3,
+        title: "JSON",
+        type: "json" as const,
+        required: false,
+        default_value: "{}"
+      },
+      {
+        id: 4,
+        title: "Boolean",
+        type: "boolean" as const,
+        required: false,
+        default_value: "false"
+      },
+      {
+        id: 5,
+        title: "Number",
+        type: "number" as const,
+        required: false,
+        default_value: "0"
+      }
     ]
 
     mockGetCustomSectionFields.mockResolvedValue(mockFields)
@@ -143,12 +175,16 @@ describe('useCustomFields', () => {
     })
 
     expect(result.current.customFields).toHaveLength(5)
-    expect(result.current.customFields.map(f => f.type)).toEqual([
-      'text', 'string', 'json', 'boolean', 'number'
+    expect(result.current.customFields.map((f) => f.type)).toEqual([
+      "text",
+      "string",
+      "json",
+      "boolean",
+      "number"
     ])
   })
 
-  it('should set loading state correctly during refetch', async () => {
+  it("should set loading state correctly during refetch", async () => {
     mockGetCustomSectionFields.mockResolvedValue([])
 
     const { result } = renderHook(() => useCustomFields())
@@ -158,8 +194,11 @@ describe('useCustomFields', () => {
     })
 
     let resolveRefetch: (value: any) => void
-    mockGetCustomSectionFields.mockImplementation(() =>
-      new Promise(resolve => { resolveRefetch = resolve })
+    mockGetCustomSectionFields.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefetch = resolve
+        })
     )
 
     act(() => {
@@ -171,7 +210,9 @@ describe('useCustomFields', () => {
     })
 
     await act(async () => {
-      resolveRefetch([{ id: 1, title: 'Field', type: 'text' as const, required: true }])
+      resolveRefetch([
+        { id: 1, title: "Field", type: "text" as const, required: true }
+      ])
     })
 
     await waitFor(() => {
@@ -179,17 +220,17 @@ describe('useCustomFields', () => {
     })
   })
 
-  it('should clear error state on successful refetch', async () => {
-    mockGetCustomSectionFields.mockRejectedValueOnce(new Error('Initial error'))
+  it("should clear error state on successful refetch", async () => {
+    mockGetCustomSectionFields.mockRejectedValueOnce(new Error("Initial error"))
 
     const { result } = renderHook(() => useCustomFields())
 
     await waitFor(() => {
-      expect(result.current.error).toBe('Initial error')
+      expect(result.current.error).toBe("Initial error")
     })
 
     mockGetCustomSectionFields.mockResolvedValueOnce([
-      { id: 1, title: 'Field', type: 'text' as const, required: true }
+      { id: 1, title: "Field", type: "text" as const, required: true }
     ])
 
     result.current.refetch()

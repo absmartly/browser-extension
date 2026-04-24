@@ -32,7 +32,9 @@ export interface MessageAdapter {
    * Register a message listener
    * Returns a function to remove the listener
    */
-  onMessage(handler: (message: Message, sender: MessageSender) => void | Promise<void>): () => void
+  onMessage(
+    handler: (message: Message, sender: MessageSender) => void | Promise<void>
+  ): () => void
 }
 
 /**
@@ -47,11 +49,15 @@ export class ChromeMessageAdapter implements MessageAdapter {
   async sendToAllTabs(message: Message): Promise<void> {
     const tabs = await chrome.tabs.query({})
     await Promise.all(
-      tabs.map(tab => tab.id ? this.sendToTab(tab.id, message) : Promise.resolve())
+      tabs.map((tab) =>
+        tab.id ? this.sendToTab(tab.id, message) : Promise.resolve()
+      )
     )
   }
 
-  onMessage(handler: (message: Message, sender: MessageSender) => void | Promise<void>): () => void {
+  onMessage(
+    handler: (message: Message, sender: MessageSender) => void | Promise<void>
+  ): () => void {
     const listener = (
       message: any,
       sender: chrome.runtime.MessageSender,
@@ -82,28 +88,29 @@ export class ChromeMessageAdapter implements MessageAdapter {
  * Uses window.postMessage for testing
  */
 export class WindowMessageAdapter implements MessageAdapter {
-  private listeners: Set<(message: Message, sender: MessageSender) => void> = new Set()
+  private listeners: Set<(message: Message, sender: MessageSender) => void> =
+    new Set()
 
   constructor() {
     // Listen for test messages
-    window.addEventListener('message', (event) => {
+    window.addEventListener("message", (event) => {
       if (event.source !== window) {
         return
       }
 
       const isFileProtocol =
-        window.location.protocol === 'file:' || event.origin === 'null'
+        window.location.protocol === "file:" || event.origin === "null"
       if (!isFileProtocol && event.origin !== window.location.origin) {
         return
       }
 
-      if (event.data?.source === 'absmartly-test-to-background') {
+      if (event.data?.source === "absmartly-test-to-background") {
         const message = event.data.message
         const sender: MessageSender = {
           tab: event.data.tabId ? { id: event.data.tabId } : undefined
         }
 
-        this.listeners.forEach(listener => {
+        this.listeners.forEach((listener) => {
           listener(message, sender)
         })
       }
@@ -112,22 +119,30 @@ export class WindowMessageAdapter implements MessageAdapter {
 
   async sendToTab(tabId: number, message: Message): Promise<void> {
     // For tests, post back to the window
-    window.postMessage({
-      source: 'absmartly-background-to-tab',
-      tabId,
-      message
-    }, this.getTargetOrigin())
+    window.postMessage(
+      {
+        source: "absmartly-background-to-tab",
+        tabId,
+        message
+      },
+      this.getTargetOrigin()
+    )
   }
 
   async sendToAllTabs(message: Message): Promise<void> {
     // For tests, just broadcast
-    window.postMessage({
-      source: 'absmartly-background-to-tab',
-      message
-    }, this.getTargetOrigin())
+    window.postMessage(
+      {
+        source: "absmartly-background-to-tab",
+        message
+      },
+      this.getTargetOrigin()
+    )
   }
 
-  onMessage(handler: (message: Message, sender: MessageSender) => void | Promise<void>): () => void {
+  onMessage(
+    handler: (message: Message, sender: MessageSender) => void | Promise<void>
+  ): () => void {
     this.listeners.add(handler)
     return () => {
       this.listeners.delete(handler)
@@ -135,8 +150,9 @@ export class WindowMessageAdapter implements MessageAdapter {
   }
 
   private getTargetOrigin(): string {
-    return window.location.origin === 'null' || window.location.protocol === 'file:'
-      ? '*'
+    return window.location.origin === "null" ||
+      window.location.protocol === "file:"
+      ? "*"
       : window.location.origin
   }
 }
