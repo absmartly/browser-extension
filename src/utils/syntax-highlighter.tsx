@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react"
 
 /**
  * Simple CSS selector syntax highlighting
@@ -9,10 +9,10 @@ export const highlightCSSSelector = (selector: string): React.ReactNode => {
 
   // Pattern to match different parts of CSS selectors
   const parts = []
-  let current = ''
+  let current = ""
   let inAttribute = false
   let inQuote = false
-  let quoteChar = ''
+  let quoteChar = ""
 
   for (let i = 0; i < selector.length; i++) {
     const char = selector[i]
@@ -21,79 +21,103 @@ export const highlightCSSSelector = (selector: string): React.ReactNode => {
       current += char
       if (char === quoteChar) {
         inQuote = false
-        parts.push({ type: 'string', value: current })
-        current = ''
+        parts.push({ type: "string", value: current })
+        current = ""
       }
     } else if (char === '"' || char === "'") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
       current = char
       inQuote = true
       quoteChar = char
-    } else if (char === '.') {
+    } else if (char === ".") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'class', value: '.' })
-      current = ''
-    } else if (char === '#') {
+      parts.push({ type: "class", value: "." })
+      current = ""
+    } else if (char === "#") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'id', value: '#' })
-      current = ''
-    } else if (char === '[') {
+      parts.push({ type: "id", value: "#" })
+      current = ""
+    } else if (char === "[") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'bracket', value: '[' })
-      current = ''
+      parts.push({ type: "bracket", value: "[" })
+      current = ""
       inAttribute = true
-    } else if (char === ']') {
+    } else if (char === "]") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'bracket', value: ']' })
-      current = ''
+      parts.push({ type: "bracket", value: "]" })
+      current = ""
       inAttribute = false
-    } else if (char === ':') {
+    } else if (char === ":") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'pseudo', value: ':' })
-      current = ''
-    } else if ((char === '>' || char === '+' || char === '~') && !inAttribute) {
+      parts.push({ type: "pseudo", value: ":" })
+      current = ""
+    } else if ((char === ">" || char === "+" || char === "~") && !inAttribute) {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'combinator', value: char })
-      current = ''
+      parts.push({ type: "combinator", value: char })
+      current = ""
     } else {
       current += char
     }
   }
 
   if (current) {
-    parts.push({ type: 'text', value: current })
+    parts.push({ type: "text", value: current })
   }
 
   return (
     <>
       {parts.map((part, index) => {
         switch (part.type) {
-          case 'class':
-            return <span key={index} className="text-blue-600">{part.value}</span>
-          case 'id':
-            return <span key={index} className="text-purple-600">{part.value}</span>
-          case 'bracket':
-            return <span key={index} className="text-gray-600">{part.value}</span>
-          case 'pseudo':
-            return <span key={index} className="text-green-600">{part.value}</span>
-          case 'combinator':
-            return <span key={index} className="text-orange-600">{part.value}</span>
-          case 'string':
-            return <span key={index} className="text-red-500">{part.value}</span>
+          case "class":
+            return (
+              <span key={index} className="text-blue-600">
+                {part.value}
+              </span>
+            )
+          case "id":
+            return (
+              <span key={index} className="text-purple-600">
+                {part.value}
+              </span>
+            )
+          case "bracket":
+            return (
+              <span key={index} className="text-gray-600">
+                {part.value}
+              </span>
+            )
+          case "pseudo":
+            return (
+              <span key={index} className="text-green-600">
+                {part.value}
+              </span>
+            )
+          case "combinator":
+            return (
+              <span key={index} className="text-orange-600">
+                {part.value}
+              </span>
+            )
+          case "string":
+            return (
+              <span key={index} className="text-red-500">
+                {part.value}
+              </span>
+            )
           default:
             return <span key={index}>{part.value}</span>
         }
@@ -110,12 +134,12 @@ export const highlightHTML = (html: string): React.ReactNode => {
   if (!html) return null
 
   const parts = []
-  let current = ''
+  let current = ""
   let inTag = false
   let inTagName = false
   let inAttribute = false
   let inString = false
-  let stringChar = ''
+  let stringChar = ""
 
   for (let i = 0; i < html.length; i++) {
     const char = html[i]
@@ -124,68 +148,90 @@ export const highlightHTML = (html: string): React.ReactNode => {
       current += char
       if (char === stringChar) {
         inString = false
-        parts.push({ type: 'string', value: current })
-        current = ''
+        parts.push({ type: "string", value: current })
+        current = ""
       }
     } else if (inTag && (char === '"' || char === "'")) {
       if (current) {
-        parts.push({ type: inAttribute ? 'attribute' : 'text', value: current })
+        parts.push({ type: inAttribute ? "attribute" : "text", value: current })
       }
       current = char
       inString = true
       stringChar = char
       inAttribute = true
-    } else if (char === '<') {
+    } else if (char === "<") {
       if (current) {
-        parts.push({ type: 'text', value: current })
+        parts.push({ type: "text", value: current })
       }
-      parts.push({ type: 'bracket', value: '<' })
-      current = ''
+      parts.push({ type: "bracket", value: "<" })
+      current = ""
       inTag = true
       inTagName = true
-    } else if (char === '>') {
+    } else if (char === ">") {
       if (current) {
-        parts.push({ type: inTagName ? 'tagName' : 'attribute', value: current })
+        parts.push({
+          type: inTagName ? "tagName" : "attribute",
+          value: current
+        })
       }
-      parts.push({ type: 'bracket', value: '>' })
-      current = ''
+      parts.push({ type: "bracket", value: ">" })
+      current = ""
       inTag = false
       inTagName = false
       inAttribute = false
-    } else if (inTag && char === ' ') {
+    } else if (inTag && char === " ") {
       if (current) {
-        parts.push({ type: inTagName ? 'tagName' : 'attribute', value: current })
+        parts.push({
+          type: inTagName ? "tagName" : "attribute",
+          value: current
+        })
       }
-      current = ' '
+      current = " "
       inTagName = false
       inAttribute = true
-    } else if (inTag && char === '/') {
+    } else if (inTag && char === "/") {
       if (current) {
-        parts.push({ type: 'attribute', value: current })
+        parts.push({ type: "attribute", value: current })
       }
-      parts.push({ type: 'bracket', value: '/' })
-      current = ''
+      parts.push({ type: "bracket", value: "/" })
+      current = ""
     } else {
       current += char
     }
   }
 
   if (current) {
-    parts.push({ type: 'text', value: current })
+    parts.push({ type: "text", value: current })
   }
 
   return (
     <>
       {parts.map((part, index) => {
         switch (part.type) {
-          case 'bracket':
-            return <span key={index} className="text-gray-600">{part.value}</span>
-          case 'tagName':
-            return <span key={index} className="text-blue-600">{part.value}</span>
-          case 'attribute':
-            return <span key={index} className="text-purple-600">{part.value}</span>
-          case 'string':
-            return <span key={index} className="text-green-600">{part.value}</span>
+          case "bracket":
+            return (
+              <span key={index} className="text-gray-600">
+                {part.value}
+              </span>
+            )
+          case "tagName":
+            return (
+              <span key={index} className="text-blue-600">
+                {part.value}
+              </span>
+            )
+          case "attribute":
+            return (
+              <span key={index} className="text-purple-600">
+                {part.value}
+              </span>
+            )
+          case "string":
+            return (
+              <span key={index} className="text-green-600">
+                {part.value}
+              </span>
+            )
           default:
             return <span key={index}>{part.value}</span>
         }

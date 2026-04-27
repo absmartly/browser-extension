@@ -1,27 +1,31 @@
-import { renderHook, act } from '@testing-library/react'
-import { useViewNavigation } from '../useViewNavigation'
-import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
+import { act, renderHook } from "@testing-library/react"
 
-jest.mock('~src/utils/debug', () => ({
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
+
+import { useViewNavigation } from "../useViewNavigation"
+
+jest.mock("~src/utils/debug", () => ({
   debugLog: jest.fn(),
   debugWarn: jest.fn()
 }))
 
-jest.mock('~src/utils/storage', () => ({
+jest.mock("~src/utils/storage", () => ({
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined)
   }
 }))
 
-describe('useViewNavigation', () => {
-  const mockOnGenerate = jest.fn<Promise<AIDOMGenerationResult>, any[]>().mockResolvedValue({
-    response: 'test',
-    domChanges: [],
-    action: 'replace_all'
-  })
+describe("useViewNavigation", () => {
+  const mockOnGenerate = jest
+    .fn<Promise<AIDOMGenerationResult>, any[]>()
+    .mockResolvedValue({
+      response: "test",
+      domChanges: [],
+      action: "replace_all"
+    })
   const mockCurrentChanges: DOMChange[] = [
-    { selector: '.test', type: 'text', value: 'Hello' }
+    { selector: ".test", type: "text", value: "Hello" }
   ]
   const mockOnRestoreChanges = jest.fn()
   const mockOnPreviewToggle = jest.fn()
@@ -32,13 +36,13 @@ describe('useViewNavigation', () => {
     jest.clearAllMocks()
   })
 
-  describe('handleNavigateToAI', () => {
-    it('should navigate to ai-dom-changes view', () => {
+  describe("handleNavigateToAI", () => {
+    it("should navigate to ai-dom-changes view", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A',
+          "Variant A",
           mockOnGenerate,
           mockCurrentChanges,
           mockOnRestoreChanges,
@@ -48,13 +52,15 @@ describe('useViewNavigation', () => {
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
+      expect(result.current.view).toBe("ai-dom-changes")
       expect(result.current.aiDomContext).not.toBeNull()
-      expect(result.current.aiDomContext!.variantName).toBe('Variant A')
-      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(mockOnPreviewWithChanges)
+      expect(result.current.aiDomContext!.variantName).toBe("Variant A")
+      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(
+        mockOnPreviewWithChanges
+      )
     })
 
-    it('should preserve the correct onPreviewWithChanges callback from the first call', () => {
+    it("should preserve the correct onPreviewWithChanges callback from the first call", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       const correctPreviewWithChanges = jest.fn()
@@ -62,7 +68,7 @@ describe('useViewNavigation', () => {
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A',
+          "Variant A",
           mockOnGenerate,
           mockCurrentChanges,
           mockOnRestoreChanges,
@@ -72,7 +78,7 @@ describe('useViewNavigation', () => {
         )
 
         result.current.handleNavigateToAI(
-          'Variant A',
+          "Variant A",
           mockOnGenerate,
           mockCurrentChanges,
           mockOnRestoreChanges,
@@ -82,11 +88,15 @@ describe('useViewNavigation', () => {
         )
       })
 
-      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(correctPreviewWithChanges)
-      expect(result.current.aiDomContext!.onPreviewWithChanges).not.toBe(wrongPreviewWithChanges)
+      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(
+        correctPreviewWithChanges
+      )
+      expect(result.current.aiDomContext!.onPreviewWithChanges).not.toBe(
+        wrongPreviewWithChanges
+      )
     })
 
-    it('should ignore duplicate calls in the same synchronous frame', () => {
+    it("should ignore duplicate calls in the same synchronous frame", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       const firstCallback = jest.fn()
@@ -95,80 +105,119 @@ describe('useViewNavigation', () => {
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, firstCallback
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          firstCallback
         )
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, secondCallback
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          secondCallback
         )
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, thirdCallback
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          thirdCallback
         )
       })
 
-      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(firstCallback)
+      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(
+        firstCallback
+      )
     })
 
-    it('should skip if already in ai-dom-changes view', () => {
+    it("should skip if already in ai-dom-changes view", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
+      expect(result.current.view).toBe("ai-dom-changes")
 
       const newCallback = jest.fn()
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant B', mockOnGenerate, [],
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, newCallback
+          "Variant B",
+          mockOnGenerate,
+          [],
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          newCallback
         )
       })
 
-      expect(result.current.aiDomContext!.variantName).toBe('Variant A')
-      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(mockOnPreviewWithChanges)
+      expect(result.current.aiDomContext!.variantName).toBe("Variant A")
+      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(
+        mockOnPreviewWithChanges
+      )
     })
 
-    it('should store all callbacks in aiDomContext', () => {
+    it("should store all callbacks in aiDomContext", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
       const ctx = result.current.aiDomContext!
-      expect(ctx.variantName).toBe('Variant A')
+      expect(ctx.variantName).toBe("Variant A")
       expect(ctx.onGenerate).toBe(mockOnGenerate)
       expect(ctx.currentChanges).toBe(mockCurrentChanges)
       expect(ctx.onRestoreChanges).toBe(mockOnRestoreChanges)
       expect(ctx.onPreviewToggle).toBe(mockOnPreviewToggle)
       expect(ctx.onPreviewRefresh).toBe(mockOnPreviewRefresh)
       expect(ctx.onPreviewWithChanges).toBe(mockOnPreviewWithChanges)
-      expect(ctx.previousView).toBe('list')
+      expect(ctx.previousView).toBe("list")
     })
 
-    it('should clear autoNavigateToAI on navigation', () => {
+    it("should clear autoNavigateToAI on navigation", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
-        result.current.setAutoNavigateToAI('Variant A')
+        result.current.setAutoNavigateToAI("Variant A")
       })
 
-      expect(result.current.autoNavigateToAI).toBe('Variant A')
+      expect(result.current.autoNavigateToAI).toBe("Variant A")
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
@@ -176,120 +225,152 @@ describe('useViewNavigation', () => {
     })
   })
 
-  describe('handleBackFromAI', () => {
-    it('should return to previous view', () => {
+  describe("handleBackFromAI", () => {
+    it("should return to previous view", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
+      expect(result.current.view).toBe("ai-dom-changes")
 
       act(() => {
         result.current.handleBackFromAI()
       })
 
-      expect(result.current.view).toBe('list')
+      expect(result.current.view).toBe("list")
     })
 
-    it('should allow re-navigation after going back', () => {
+    it("should allow re-navigation after going back", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
+      expect(result.current.view).toBe("ai-dom-changes")
 
       act(() => {
         result.current.handleBackFromAI()
       })
 
-      expect(result.current.view).toBe('list')
+      expect(result.current.view).toBe("list")
 
       const newCallback = jest.fn()
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant B', mockOnGenerate, [],
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, newCallback
+          "Variant B",
+          mockOnGenerate,
+          [],
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          newCallback
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
-      expect(result.current.aiDomContext!.variantName).toBe('Variant B')
-      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(newCallback)
+      expect(result.current.view).toBe("ai-dom-changes")
+      expect(result.current.aiDomContext!.variantName).toBe("Variant B")
+      expect(result.current.aiDomContext!.onPreviewWithChanges).toBe(
+        newCallback
+      )
     })
 
-    it('should fall back to list view if no context', () => {
+    it("should fall back to list view if no context", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleBackFromAI()
       })
 
-      expect(result.current.view).toBe('list')
+      expect(result.current.view).toBe("list")
     })
   })
 
-  describe('navigation guard reset', () => {
-    it('should reset guard when view changes away from ai-dom-changes externally', () => {
+  describe("navigation guard reset", () => {
+    it("should reset guard when view changes away from ai-dom-changes externally", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
+      expect(result.current.view).toBe("ai-dom-changes")
 
       act(() => {
-        result.current.setView('list')
+        result.current.setView("list")
       })
 
-      expect(result.current.view).toBe('list')
+      expect(result.current.view).toBe("list")
 
       const newCallback = jest.fn()
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant B', mockOnGenerate, [],
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, newCallback
+          "Variant B",
+          mockOnGenerate,
+          [],
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          newCallback
         )
       })
 
-      expect(result.current.view).toBe('ai-dom-changes')
-      expect(result.current.aiDomContext!.variantName).toBe('Variant B')
+      expect(result.current.view).toBe("ai-dom-changes")
+      expect(result.current.aiDomContext!.variantName).toBe("Variant B")
     })
 
-    it('should preserve previousView correctly', () => {
+    it("should preserve previousView correctly", () => {
       const { result } = renderHook(() => useViewNavigation())
 
       act(() => {
-        result.current.setView('detail')
+        result.current.setView("detail")
       })
 
       act(() => {
         result.current.handleNavigateToAI(
-          'Variant A', mockOnGenerate, mockCurrentChanges,
-          mockOnRestoreChanges, mockOnPreviewToggle, mockOnPreviewRefresh, mockOnPreviewWithChanges
+          "Variant A",
+          mockOnGenerate,
+          mockCurrentChanges,
+          mockOnRestoreChanges,
+          mockOnPreviewToggle,
+          mockOnPreviewRefresh,
+          mockOnPreviewWithChanges
         )
       })
 
-      expect(result.current.aiDomContext!.previousView).toBe('detail')
+      expect(result.current.aiDomContext!.previousView).toBe("detail")
 
       act(() => {
         result.current.handleBackFromAI()
       })
 
-      expect(result.current.view).toBe('detail')
+      expect(result.current.view).toBe("detail")
     })
   })
 })

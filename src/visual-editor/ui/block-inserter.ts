@@ -3,17 +3,17 @@
  * Allows inserting new HTML blocks before/after selected elements
  */
 
-import { EditorView, keymap } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { html } from '@codemirror/lang-html'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { basicSetup } from 'codemirror'
-import { defaultKeymap } from '@codemirror/commands'
-import DOMPurify from 'dompurify'
+import { defaultKeymap } from "@codemirror/commands"
+import { html } from "@codemirror/lang-html"
+import { EditorState } from "@codemirror/state"
+import { oneDark } from "@codemirror/theme-one-dark"
+import { EditorView, keymap } from "@codemirror/view"
+import { basicSetup } from "codemirror"
+import DOMPurify from "dompurify"
 
 export interface InsertBlockOptions {
   html: string
-  position: 'before' | 'after'
+  position: "before" | "after"
 }
 
 export class BlockInserter {
@@ -21,7 +21,8 @@ export class BlockInserter {
   private editorView: EditorView | null = null
   private previewContainer: HTMLElement | null = null
   private previewElement: HTMLElement | null = null
-  private resolveCallback: ((value: InsertBlockOptions | null) => void) | null = null
+  private resolveCallback: ((value: InsertBlockOptions | null) => void) | null =
+    null
 
   async show(element: Element): Promise<InsertBlockOptions | null> {
     // Clean up any previous instance first
@@ -37,9 +38,9 @@ export class BlockInserter {
   private createDialog(element: Element): void {
     // Cleanup is now called in show() before creating the promise
 
-    this.dialogHost = document.createElement('div')
-    this.dialogHost.id = 'absmartly-block-inserter-host'
-    this.dialogHost.setAttribute('data-absmartly-ignore', 'true')
+    this.dialogHost = document.createElement("div")
+    this.dialogHost.id = "absmartly-block-inserter-host"
+    this.dialogHost.setAttribute("data-absmartly-ignore", "true")
     this.dialogHost.style.cssText = `
       position: fixed;
       top: 0;
@@ -50,26 +51,26 @@ export class BlockInserter {
       pointer-events: auto;
     `
 
-    const styleEl = document.createElement('style')
-    styleEl.id = 'absmartly-block-inserter-styles'
+    const styleEl = document.createElement("style")
+    styleEl.id = "absmartly-block-inserter-styles"
     styleEl.textContent = this.getStyles()
     document.head.appendChild(styleEl)
 
-    const backdrop = document.createElement('div')
-    backdrop.className = 'inserter-backdrop'
+    const backdrop = document.createElement("div")
+    backdrop.className = "inserter-backdrop"
 
-    const container = document.createElement('div')
-    container.className = 'inserter-container'
+    const container = document.createElement("div")
+    container.className = "inserter-container"
 
-    const header = document.createElement('div')
-    header.className = 'inserter-header'
+    const header = document.createElement("div")
+    header.className = "inserter-header"
 
-    const title = document.createElement('h3')
-    title.className = 'inserter-title'
-    title.textContent = 'Insert HTML Block (Live Preview)'
+    const title = document.createElement("h3")
+    title.className = "inserter-title"
+    title.textContent = "Insert HTML Block (Live Preview)"
 
-    const subtitle = document.createElement('div')
-    subtitle.className = 'inserter-subtitle'
+    const subtitle = document.createElement("div")
+    subtitle.className = "inserter-subtitle"
     subtitle.textContent = `Insert relative to <${element.tagName.toLowerCase()}>`
 
     header.appendChild(title)
@@ -82,15 +83,15 @@ export class BlockInserter {
     let initialX = 0
     let initialY = 0
 
-    header.style.cursor = 'move'
+    header.style.cursor = "move"
 
-    header.addEventListener('mousedown', (e) => {
+    header.addEventListener("mousedown", (e) => {
       isDragging = true
       initialX = e.clientX - currentX
       initialY = e.clientY - currentY
     })
 
-    document.addEventListener('mousemove', (e) => {
+    document.addEventListener("mousemove", (e) => {
       if (isDragging) {
         e.preventDefault()
         currentX = e.clientX - initialX
@@ -99,28 +100,28 @@ export class BlockInserter {
       }
     })
 
-    document.addEventListener('mouseup', () => {
+    document.addEventListener("mouseup", () => {
       isDragging = false
     })
 
-    const content = document.createElement('div')
-    content.className = 'inserter-content'
+    const content = document.createElement("div")
+    content.className = "inserter-content"
 
-    const editorPanel = document.createElement('div')
-    editorPanel.className = 'inserter-panel inserter-panel-editor'
+    const editorPanel = document.createElement("div")
+    editorPanel.className = "inserter-panel inserter-panel-editor"
 
-    const editorLabel = document.createElement('div')
-    editorLabel.className = 'inserter-label'
+    const editorLabel = document.createElement("div")
+    editorLabel.className = "inserter-label"
     editorLabel.innerHTML = '<span class="icon">📝</span> HTML Code'
 
-    const editorContainer = document.createElement('div')
-    editorContainer.id = 'block-inserter-codemirror'
-    editorContainer.className = 'inserter-editor'
+    const editorContainer = document.createElement("div")
+    editorContainer.id = "block-inserter-codemirror"
+    editorContainer.className = "inserter-editor"
 
-    const errorContainer = document.createElement('div')
-    errorContainer.id = 'inserter-error'
-    errorContainer.className = 'inserter-error'
-    errorContainer.style.display = 'none'
+    const errorContainer = document.createElement("div")
+    errorContainer.id = "inserter-error"
+    errorContainer.className = "inserter-error"
+    errorContainer.style.display = "none"
 
     editorPanel.appendChild(editorLabel)
     editorPanel.appendChild(editorContainer)
@@ -128,40 +129,46 @@ export class BlockInserter {
 
     content.appendChild(editorPanel)
 
-    const positionGroup = document.createElement('div')
-    positionGroup.className = 'inserter-position-group'
+    const positionGroup = document.createElement("div")
+    positionGroup.className = "inserter-position-group"
 
-    const positionLabel = document.createElement('div')
-    positionLabel.className = 'inserter-position-label'
-    positionLabel.textContent = 'Insert Position:'
+    const positionLabel = document.createElement("div")
+    positionLabel.className = "inserter-position-label"
+    positionLabel.textContent = "Insert Position:"
 
-    const positionOptions = document.createElement('div')
-    positionOptions.className = 'inserter-position-options'
+    const positionOptions = document.createElement("div")
+    positionOptions.className = "inserter-position-options"
 
-    let selectedPosition: 'before' | 'after' = 'after'
+    let selectedPosition: "before" | "after" = "after"
 
-    const beforeBtn = document.createElement('button')
-    beforeBtn.className = 'position-btn'
+    const beforeBtn = document.createElement("button")
+    beforeBtn.className = "position-btn"
     beforeBtn.innerHTML = '<span class="icon">⬆️</span> Before'
-    beforeBtn.dataset.position = 'before'
+    beforeBtn.dataset.position = "before"
 
-    const afterBtn = document.createElement('button')
-    afterBtn.className = 'position-btn position-btn-selected'
+    const afterBtn = document.createElement("button")
+    afterBtn.className = "position-btn position-btn-selected"
     afterBtn.innerHTML = '<span class="icon">⬇️</span> After'
-    afterBtn.dataset.position = 'after'
+    afterBtn.dataset.position = "after"
 
     const updatePosition = (btn: HTMLElement) => {
-      positionOptions.querySelectorAll('.position-btn').forEach(b => b.classList.remove('position-btn-selected'))
-      btn.classList.add('position-btn-selected')
-      selectedPosition = btn.dataset.position as 'before' | 'after'
+      positionOptions
+        .querySelectorAll(".position-btn")
+        .forEach((b) => b.classList.remove("position-btn-selected"))
+      btn.classList.add("position-btn-selected")
+      selectedPosition = btn.dataset.position as "before" | "after"
       // Update preview position when position changes
       if (this.editorView && this.previewElement) {
-        this.updateLivePreview(this.editorView.state.doc.toString(), element, selectedPosition)
+        this.updateLivePreview(
+          this.editorView.state.doc.toString(),
+          element,
+          selectedPosition
+        )
       }
     }
 
-    beforeBtn.addEventListener('click', () => updatePosition(beforeBtn))
-    afterBtn.addEventListener('click', () => updatePosition(afterBtn))
+    beforeBtn.addEventListener("click", () => updatePosition(beforeBtn))
+    afterBtn.addEventListener("click", () => updatePosition(afterBtn))
 
     positionOptions.appendChild(beforeBtn)
     positionOptions.appendChild(afterBtn)
@@ -169,16 +176,16 @@ export class BlockInserter {
     positionGroup.appendChild(positionLabel)
     positionGroup.appendChild(positionOptions)
 
-    const buttons = document.createElement('div')
-    buttons.className = 'inserter-buttons'
+    const buttons = document.createElement("div")
+    buttons.className = "inserter-buttons"
 
-    const cancelBtn = document.createElement('button')
-    cancelBtn.className = 'inserter-button inserter-button-cancel'
-    cancelBtn.innerHTML = '<span>✕</span> Cancel'
+    const cancelBtn = document.createElement("button")
+    cancelBtn.className = "inserter-button inserter-button-cancel"
+    cancelBtn.innerHTML = "<span>✕</span> Cancel"
 
-    const insertBtn = document.createElement('button')
-    insertBtn.className = 'inserter-button inserter-button-insert'
-    insertBtn.innerHTML = '<span>✓</span> Insert Block'
+    const insertBtn = document.createElement("button")
+    insertBtn.className = "inserter-button inserter-button-insert"
+    insertBtn.innerHTML = "<span>✓</span> Insert Block"
 
     buttons.appendChild(cancelBtn)
     buttons.appendChild(insertBtn)
@@ -192,11 +199,12 @@ export class BlockInserter {
     this.dialogHost.appendChild(backdrop)
     document.body.appendChild(this.dialogHost)
 
-    const defaultHtml = '<div class="new-block">\n  <!-- Your content here -->\n  <p>New content</p>\n</div>'
+    const defaultHtml =
+      '<div class="new-block">\n  <!-- Your content here -->\n  <p>New content</p>\n</div>'
 
     // Create preview element on the page
-    this.previewElement = document.createElement('div')
-    this.previewElement.id = 'absmartly-block-inserter-preview'
+    this.previewElement = document.createElement("div")
+    this.previewElement.id = "absmartly-block-inserter-preview"
     this.previewElement.style.cssText = `
       outline: 2px dashed #10b981;
       outline-offset: 4px;
@@ -215,7 +223,11 @@ export class BlockInserter {
           keymap.of(defaultKeymap),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
-              this.updateLivePreview(update.state.doc.toString(), element, selectedPosition)
+              this.updateLivePreview(
+                update.state.doc.toString(),
+                element,
+                selectedPosition
+              )
             }
           })
         ]
@@ -233,19 +245,19 @@ export class BlockInserter {
 
     const handleInsert = () => {
       if (!this.editorView) {
-        console.error('[BlockInserter] No editor view!')
+        console.error("[BlockInserter] No editor view!")
         return
       }
 
       const html = this.editorView.state.doc.toString().trim()
       if (!html) {
-        this.showError('Please enter some HTML')
+        this.showError("Please enter some HTML")
         return
       }
 
       const validationResult = this.validateHTML(html)
       if (!validationResult.valid) {
-        this.showError(validationResult.error || 'Invalid HTML')
+        this.showError(validationResult.error || "Invalid HTML")
         return
       }
 
@@ -269,25 +281,29 @@ export class BlockInserter {
       this.cleanup()
     }
 
-    cancelBtn.addEventListener('click', handleCancel)
-    insertBtn.addEventListener('click', handleInsert)
+    cancelBtn.addEventListener("click", handleCancel)
+    insertBtn.addEventListener("click", handleInsert)
 
-    backdrop.addEventListener('click', (e) => {
+    backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) {
         handleCancel()
       }
     })
 
     const escHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && this.dialogHost) {
-        document.removeEventListener('keydown', escHandler)
+      if (e.key === "Escape" && this.dialogHost) {
+        document.removeEventListener("keydown", escHandler)
         handleCancel()
       }
     }
-    document.addEventListener('keydown', escHandler)
+    document.addEventListener("keydown", escHandler)
   }
 
-  private updateLivePreview(html: string, element: Element, position: 'before' | 'after'): void {
+  private updateLivePreview(
+    html: string,
+    element: Element,
+    position: "before" | "after"
+  ): void {
     if (!this.previewElement) return
 
     this.hideError()
@@ -298,41 +314,61 @@ export class BlockInserter {
     }
 
     if (!html.trim()) {
-      this.previewElement.innerHTML = '<div style="padding: 8px; color: #666; font-style: italic;">Type HTML to see preview...</div>'
+      this.previewElement.innerHTML =
+        '<div style="padding: 8px; color: #666; font-style: italic;">Type HTML to see preview...</div>'
     } else {
       const validationResult = this.validateHTML(html)
       if (!validationResult.valid) {
-        this.showError(validationResult.error || 'Invalid HTML')
-        this.previewElement.innerHTML = '<div style="padding: 8px; color: #c33; background: #fee; border-radius: 4px;">Invalid HTML - see error below</div>'
+        this.showError(validationResult.error || "Invalid HTML")
+        this.previewElement.innerHTML =
+          '<div style="padding: 8px; color: #c33; background: #fee; border-radius: 4px;">Invalid HTML - see error below</div>'
       } else {
         try {
           const sanitized = DOMPurify.sanitize(html)
           this.previewElement.innerHTML = sanitized
         } catch (error) {
-          this.showError(error instanceof Error ? error.message : 'Unknown error')
-          this.previewElement.innerHTML = '<div style="padding: 8px; color: #c33;">Preview error</div>'
+          this.showError(
+            error instanceof Error ? error.message : "Unknown error"
+          )
+          this.previewElement.innerHTML =
+            '<div style="padding: 8px; color: #c33;">Preview error</div>'
         }
       }
     }
 
     // Insert preview element at the correct position
-    if (position === 'before') {
+    if (position === "before") {
       element.parentElement?.insertBefore(this.previewElement, element)
     } else {
-      element.parentElement?.insertBefore(this.previewElement, element.nextSibling)
+      element.parentElement?.insertBefore(
+        this.previewElement,
+        element.nextSibling
+      )
     }
   }
 
   private validateHTML(html: string): { valid: boolean; error?: string } {
     if (!html.trim()) {
-      return { valid: false, error: 'HTML cannot be empty' }
+      return { valid: false, error: "HTML cannot be empty" }
     }
 
     const tagPattern = /<(\w+)(?:\s[^>]*)?>|<\/(\w+)>/g
     const stack: string[] = []
     const selfClosingTags = new Set([
-      'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-      'link', 'meta', 'param', 'source', 'track', 'wbr'
+      "area",
+      "base",
+      "br",
+      "col",
+      "embed",
+      "hr",
+      "img",
+      "input",
+      "link",
+      "meta",
+      "param",
+      "source",
+      "track",
+      "wbr"
     ])
 
     let match: RegExpExecArray | null
@@ -341,39 +377,51 @@ export class BlockInserter {
       const closeTag = match[2]
 
       if (openTag) {
-        if (!selfClosingTags.has(openTag.toLowerCase()) && !match[0].endsWith('/>')) {
+        if (
+          !selfClosingTags.has(openTag.toLowerCase()) &&
+          !match[0].endsWith("/>")
+        ) {
           stack.push(openTag)
         }
       } else if (closeTag) {
         if (stack.length === 0) {
-          return { valid: false, error: `Unexpected closing tag </${closeTag}>` }
+          return {
+            valid: false,
+            error: `Unexpected closing tag </${closeTag}>`
+          }
         }
         const expectedTag = stack.pop()
         if (expectedTag?.toLowerCase() !== closeTag.toLowerCase()) {
-          return { valid: false, error: `Mismatched tags: expected </${expectedTag}>, found </${closeTag}>` }
+          return {
+            valid: false,
+            error: `Mismatched tags: expected </${expectedTag}>, found </${closeTag}>`
+          }
         }
       }
     }
 
     if (stack.length > 0) {
-      return { valid: false, error: `Unclosed tag: <${stack[stack.length - 1]}>` }
+      return {
+        valid: false,
+        error: `Unclosed tag: <${stack[stack.length - 1]}>`
+      }
     }
 
     return { valid: true }
   }
 
   private showError(message: string): void {
-    const errorEl = document.getElementById('inserter-error')
+    const errorEl = document.getElementById("inserter-error")
     if (errorEl) {
       errorEl.textContent = `⚠️ ${message}`
-      errorEl.style.display = 'block'
+      errorEl.style.display = "block"
     }
   }
 
   private hideError(): void {
-    const errorEl = document.getElementById('inserter-error')
+    const errorEl = document.getElementById("inserter-error")
     if (errorEl) {
-      errorEl.style.display = 'none'
+      errorEl.style.display = "none"
     }
   }
 
@@ -383,7 +431,7 @@ export class BlockInserter {
       this.editorView = null
     }
 
-    const styleEl = document.getElementById('absmartly-block-inserter-styles')
+    const styleEl = document.getElementById("absmartly-block-inserter-styles")
     if (styleEl) {
       styleEl.remove()
     }

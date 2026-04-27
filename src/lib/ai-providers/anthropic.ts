@@ -1,68 +1,112 @@
-import Anthropic from '@anthropic-ai/sdk'
-import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
-import type { ConversationSession } from '~src/types/absmartly'
-import type { AIProvider, AIProviderConfig, GenerateOptions, ModelConfig, ModelInfo } from './base'
-import { sanitizeHtml } from './utils'
+import Anthropic from "@anthropic-ai/sdk"
+
 import {
-  SHARED_TOOL_SCHEMA,
-  CSS_QUERY_SCHEMA,
-  CSS_QUERY_DESCRIPTION,
-  XPATH_QUERY_SCHEMA,
-  XPATH_QUERY_DESCRIPTION,
-  DOM_CHANGES_TOOL_DESCRIPTION
-} from './shared-schema'
+  classifyAIError,
+  formatClassifiedError
+} from "~src/lib/ai-error-classifier"
+import type { ConversationSession } from "~src/types/absmartly"
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
+import { debugLog } from "~src/utils/debug"
+
 import {
-  processToolCalls,
-  prepareSession,
   makeConversationalResponse,
   makeFinalResponse,
   MAX_TOOL_ITERATIONS,
+  prepareSession,
+  processToolCalls,
   type ToolCall
-} from './agentic-loop'
-import { withTimeout, parseAPIError } from './constants'
-import { debugLog } from '~src/utils/debug'
-import { classifyAIError, formatClassifiedError } from '~src/lib/ai-error-classifier'
+} from "./agentic-loop"
+import type {
+  AIProvider,
+  AIProviderConfig,
+  GenerateOptions,
+  ModelConfig,
+  ModelInfo
+} from "./base"
+import { parseAPIError, withTimeout } from "./constants"
+import {
+  CSS_QUERY_DESCRIPTION,
+  CSS_QUERY_SCHEMA,
+  DOM_CHANGES_TOOL_DESCRIPTION,
+  SHARED_TOOL_SCHEMA,
+  XPATH_QUERY_DESCRIPTION,
+  XPATH_QUERY_SCHEMA
+} from "./shared-schema"
+import { sanitizeHtml } from "./utils"
 
-function isTextBlock(block: Anthropic.ContentBlock): block is Anthropic.TextBlock {
-  return block.type === 'text'
+function isTextBlock(
+  block: Anthropic.ContentBlock
+): block is Anthropic.TextBlock {
+  return block.type === "text"
 }
 
-function isToolUseBlock(block: Anthropic.ContentBlock): block is Anthropic.ToolUseBlock {
-  return block.type === 'tool_use'
+function isToolUseBlock(
+  block: Anthropic.ContentBlock
+): block is Anthropic.ToolUseBlock {
+  return block.type === "tool_use"
 }
 
 export class AnthropicProvider implements AIProvider {
   static modelConfig: ModelConfig = {
-    defaultEndpoint: 'https://api.anthropic.com',
-    modelsPath: '/v1/models',
-    headers: (apiKey) => ({ 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }),
+    defaultEndpoint: "https://api.anthropic.com",
+    modelsPath: "/v1/models",
+    headers: (apiKey) => ({
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01"
+    }),
     parseModels: (data) =>
       (data.data || [])
-        .filter((m: any) => m.id && (m.type === 'model' || m.object === 'model'))
-        .map((m: any): ModelInfo => ({
-          id: m.id,
-          name: m.display_name || m.id,
-          provider: m.owned_by ? m.owned_by.charAt(0).toUpperCase() + m.owned_by.slice(1) : 'Anthropic',
-          contextWindow: m.context_window || undefined
-        }))
+        .filter(
+          (m: any) => m.id && (m.type === "model" || m.object === "model")
+        )
+        .map(
+          (m: any): ModelInfo => ({
+            id: m.id,
+            name: m.display_name || m.id,
+            provider: m.owned_by
+              ? m.owned_by.charAt(0).toUpperCase() + m.owned_by.slice(1)
+              : "Anthropic",
+            contextWindow: m.context_window || undefined
+          })
+        )
         .sort((a: ModelInfo, b: ModelInfo) => a.name.localeCompare(b.name)),
     staticModels: () => [
-      { id: 'claude-sonnet-4-5-20250514', name: 'Claude Sonnet 4.5', provider: 'Anthropic', contextWindow: 200000 },
-      { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'Anthropic', contextWindow: 200000 },
-      { id: 'claude-haiku-4-20250414', name: 'Claude Haiku 4', provider: 'Anthropic', contextWindow: 200000 },
-      { id: 'claude-haiku-3-5-20241022', name: 'Claude Haiku 3.5', provider: 'Anthropic', contextWindow: 200000 }
+      {
+        id: "claude-sonnet-4-5-20250514",
+        name: "Claude Sonnet 4.5",
+        provider: "Anthropic",
+        contextWindow: 200000
+      },
+      {
+        id: "claude-opus-4-20250514",
+        name: "Claude Opus 4",
+        provider: "Anthropic",
+        contextWindow: 200000
+      },
+      {
+        id: "claude-haiku-4-20250414",
+        name: "Claude Haiku 4",
+        provider: "Anthropic",
+        contextWindow: 200000
+      },
+      {
+        id: "claude-haiku-3-5-20241022",
+        name: "Claude Haiku 3.5",
+        provider: "Anthropic",
+        contextWindow: 200000
+      }
     ]
   }
 
   constructor(private config: AIProviderConfig) {}
 
   getChunkRetrievalPrompt(): string {
-    return ''
+    return ""
   }
 
   getToolDefinition(): Anthropic.Tool {
     return {
-      name: 'dom_changes_generator',
+      name: "dom_changes_generator",
       description: DOM_CHANGES_TOOL_DESCRIPTION,
       input_schema: SHARED_TOOL_SCHEMA as Anthropic.Tool.InputSchema
     }
@@ -70,7 +114,7 @@ export class AnthropicProvider implements AIProvider {
 
   getCssQueryTool(): Anthropic.Tool {
     return {
-      name: 'css_query',
+      name: "css_query",
       description: CSS_QUERY_DESCRIPTION,
       input_schema: CSS_QUERY_SCHEMA as Anthropic.Tool.InputSchema
     }
@@ -78,7 +122,7 @@ export class AnthropicProvider implements AIProvider {
 
   getXPathQueryTool(): Anthropic.Tool {
     return {
-      name: 'xpath_query',
+      name: "xpath_query",
       description: XPATH_QUERY_DESCRIPTION,
       input_schema: XPATH_QUERY_SCHEMA as Anthropic.Tool.InputSchema
     }
@@ -91,13 +135,13 @@ export class AnthropicProvider implements AIProvider {
     images: string[] | undefined,
     options: GenerateOptions
   ): Promise<AIDOMGenerationResult & { session: ConversationSession }> {
-    debugLog('[Anthropic] Using Anthropic API with agentic loop')
+    debugLog("[Anthropic] Using Anthropic API with agentic loop")
     let authConfig: any = { dangerouslyAllowBrowser: true }
 
     if (this.config.apiKey) {
       authConfig.apiKey = this.config.apiKey
     } else {
-      throw new Error('API key is required')
+      throw new Error("API key is required")
     }
 
     if (this.config.customEndpoint) {
@@ -106,15 +150,24 @@ export class AnthropicProvider implements AIProvider {
 
     const anthropic = new Anthropic(authConfig)
 
-    const { session, systemPrompt: rawSystemPrompt, userMessageText } = await prepareSession(
-      html, prompt, currentChanges, options, 'Anthropic', sanitizeHtml
+    const {
+      session,
+      systemPrompt: rawSystemPrompt,
+      userMessageText
+    } = await prepareSession(
+      html,
+      prompt,
+      currentChanges,
+      options,
+      "Anthropic",
+      sanitizeHtml
     )
 
     const systemPrompt = sanitizeHtml(rawSystemPrompt)
-    debugLog('[Anthropic] System prompt length:', systemPrompt.length)
+    debugLog("[Anthropic] System prompt length:", systemPrompt.length)
 
-    const contentParts: Anthropic.MessageParam['content'] = [
-      { type: 'text', text: userMessageText }
+    const contentParts: Anthropic.MessageParam["content"] = [
+      { type: "text", text: userMessageText }
     ]
 
     if (images && images.length > 0) {
@@ -123,10 +176,14 @@ export class AnthropicProvider implements AIProvider {
         if (match) {
           const [, mediaType, base64Data] = match
           contentParts.push({
-            type: 'image',
+            type: "image",
             source: {
-              type: 'base64',
-              media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+              type: "base64",
+              media_type: mediaType as
+                | "image/jpeg"
+                | "image/png"
+                | "image/gif"
+                | "image/webp",
               data: base64Data
             }
           })
@@ -135,35 +192,41 @@ export class AnthropicProvider implements AIProvider {
     }
 
     const newUserMessage: Anthropic.MessageParam = {
-      role: 'user',
+      role: "user",
       content: contentParts
     }
-    session.messages.push({ role: 'user', content: userMessageText })
+    session.messages.push({ role: "user", content: userMessageText })
 
     const messages: Anthropic.MessageParam[] = [
-      ...session.messages.slice(0, -1).map(m => ({
-        role: m.role as 'user' | 'assistant',
+      ...session.messages.slice(0, -1).map((m) => ({
+        role: m.role as "user" | "assistant",
         content: sanitizeHtml(m.content)
       })),
       newUserMessage
     ]
 
-    const tools = [this.getToolDefinition(), this.getCssQueryTool(), this.getXPathQueryTool()]
+    const tools = [
+      this.getToolDefinition(),
+      this.getCssQueryTool(),
+      this.getXPathQueryTool()
+    ]
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       debugLog(`[Anthropic] Iteration ${iteration + 1}/${MAX_TOOL_ITERATIONS}`)
 
       let message: Anthropic.Message
       try {
-        message = await withTimeout(anthropic.messages.create({
-          model: this.config.llmModel || 'claude-sonnet-4-5-20250514',
-          max_tokens: 4096,
-          system: systemPrompt,
-          messages,
-          tools
-        }))
+        message = await withTimeout(
+          anthropic.messages.create({
+            model: this.config.llmModel || "claude-sonnet-4-5-20250514",
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages,
+            tools
+          })
+        )
       } catch (error: unknown) {
-        const baseError = new Error(parseAPIError(error, 'Anthropic API error'))
+        const baseError = new Error(parseAPIError(error, "Anthropic API error"))
         const classified = classifyAIError(baseError)
         throw new Error(formatClassifiedError(classified))
       }
@@ -172,35 +235,42 @@ export class AnthropicProvider implements AIProvider {
       const textBlocks = message.content.filter(isTextBlock)
 
       if (toolUseBlocks.length === 0) {
-        const responseText = textBlocks.map(block => block.text).join('\n').trim()
+        const responseText = textBlocks
+          .map((block) => block.text)
+          .join("\n")
+          .trim()
         return makeConversationalResponse(responseText, session)
       }
 
-      const toolCalls: ToolCall[] = toolUseBlocks.map(block => ({
+      const toolCalls: ToolCall[] = toolUseBlocks.map((block) => ({
         name: block.name,
         id: block.id,
         input: block.input
       }))
 
-      const outcome = await processToolCalls(toolCalls, 'Anthropic')
+      const outcome = await processToolCalls(toolCalls, "Anthropic")
 
-      if (outcome.type === 'final') {
+      if (outcome.type === "final") {
         return makeFinalResponse(outcome.result, session)
       }
 
-      messages.push({ role: 'assistant', content: message.content })
+      messages.push({ role: "assistant", content: message.content })
       messages.push({
-        role: 'user',
-        content: outcome.results.map(r => ({
-          type: 'tool_result' as const,
+        role: "user",
+        content: outcome.results.map((r) => ({
+          type: "tool_result" as const,
           tool_use_id: r.id,
           content: r.content
         }))
       })
 
-      debugLog(`[Anthropic] Processed ${outcome.results.length} tool results, continuing loop...`)
+      debugLog(
+        `[Anthropic] Processed ${outcome.results.length} tool results, continuing loop...`
+      )
     }
 
-    throw new Error(`Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`)
+    throw new Error(
+      `Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`
+    )
   }
 }

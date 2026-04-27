@@ -1,9 +1,12 @@
-import type { AIProviderType } from './base'
-import { getProviderOrigins } from './registry'
+import type { AIProviderType } from "./base"
+import { getProviderOrigins } from "./registry"
 
 const PERMISSION_TIMEOUT_MS = 5000
 
-export async function hasProviderPermissions(providerId: AIProviderType, customEndpoint?: string): Promise<boolean> {
+export async function hasProviderPermissions(
+  providerId: AIProviderType,
+  customEndpoint?: string
+): Promise<boolean> {
   const origins = getProviderOrigins(providerId, customEndpoint)
   if (origins.length === 0) return true
 
@@ -14,7 +17,10 @@ export async function hasProviderPermissions(providerId: AIProviderType, customE
   }
 }
 
-export async function ensureProviderPermissions(providerId: AIProviderType, customEndpoint?: string): Promise<boolean> {
+export async function ensureProviderPermissions(
+  providerId: AIProviderType,
+  customEndpoint?: string
+): Promise<boolean> {
   const origins = getProviderOrigins(providerId, customEndpoint)
   if (origins.length === 0) return true
 
@@ -24,7 +30,9 @@ export async function ensureProviderPermissions(providerId: AIProviderType, cust
 
     const result = await Promise.race([
       chrome.permissions.request({ origins }),
-      new Promise<false>(resolve => setTimeout(() => resolve(false), PERMISSION_TIMEOUT_MS))
+      new Promise<false>((resolve) =>
+        setTimeout(() => resolve(false), PERMISSION_TIMEOUT_MS)
+      )
     ])
     return result
   } catch {

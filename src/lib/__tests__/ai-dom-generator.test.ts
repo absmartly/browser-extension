@@ -1,18 +1,20 @@
-import { generateDOMChanges } from '../ai-dom-generator'
-import { createAIProvider } from '~src/lib/ai-providers'
-import { jest } from '@jest/globals'
-import type { AIProvider } from '~src/lib/ai-providers/base'
-import type { AIDOMGenerationResult } from '~src/types/dom-changes'
-import type { ConversationSession } from '~src/types/absmartly'
-import { unsafeSessionId } from '~src/types/branded'
+import { jest } from "@jest/globals"
 
-jest.mock('~src/lib/ai-providers', () => ({
+import { createAIProvider } from "~src/lib/ai-providers"
+import type { AIProvider } from "~src/lib/ai-providers/base"
+import type { ConversationSession } from "~src/types/absmartly"
+import { unsafeSessionId } from "~src/types/branded"
+import type { AIDOMGenerationResult } from "~src/types/dom-changes"
+
+import { generateDOMChanges } from "../ai-dom-generator"
+
+jest.mock("~src/lib/ai-providers", () => ({
   createAIProvider: jest.fn(),
   compressHtml: jest.fn((html: string) => html),
   sanitizeHtml: jest.fn((html: string) => html)
 }))
 
-jest.mock('~src/utils/debug', () => ({
+jest.mock("~src/utils/debug", () => ({
   debugLog: jest.fn(),
   debugError: jest.fn(),
   debugWarn: jest.fn()
@@ -20,8 +22,8 @@ jest.mock('~src/utils/debug', () => ({
 
 const mockFn = jest.fn as any
 
-describe('AI DOM Generator', () => {
-  const mockApiKey = 'test-api-key-123'
+describe("AI DOM Generator", () => {
+  const mockApiKey = "test-api-key-123"
   const mockHtml = '<html><body><p id="test">Test content</p></body></html>'
   const mockPrompt = 'Change the text to "Hello"'
 
@@ -37,20 +39,22 @@ describe('AI DOM Generator', () => {
     jest.mocked(createAIProvider).mockReturnValue(mockProvider)
   })
 
-  describe('generateDOMChanges', () => {
-    it('should generate DOM changes using provider factory', async () => {
-      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+  describe("generateDOMChanges", () => {
+    it("should generate DOM changes using provider factory", async () => {
+      const mockResult: AIDOMGenerationResult & {
+        session: ConversationSession
+      } = {
         domChanges: [
           {
-            selector: '#test',
-            type: 'text',
-            value: 'Hello'
+            selector: "#test",
+            type: "text",
+            value: "Hello"
           }
         ],
-        response: 'Changed the text',
-        action: 'append',
+        response: "Changed the text",
+        action: "append",
         session: {
-          id: unsafeSessionId('test-session'),
+          id: unsafeSessionId("test-session"),
           htmlSent: true,
           messages: []
         }
@@ -62,7 +66,7 @@ describe('AI DOM Generator', () => {
 
       expect(result).toEqual(mockResult)
       expect(createAIProvider).toHaveBeenCalledWith({
-        aiProvider: 'claude-subscription',
+        aiProvider: "claude-subscription",
         customEndpoint: undefined,
         llmModel: undefined
       })
@@ -75,13 +79,15 @@ describe('AI DOM Generator', () => {
       )
     })
 
-    it('should use specified AI provider', async () => {
-      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+    it("should use specified AI provider", async () => {
+      const mockResult: AIDOMGenerationResult & {
+        session: ConversationSession
+      } = {
         domChanges: [],
-        response: 'Done',
-        action: 'none',
+        response: "Done",
+        action: "none",
         session: {
-          id: unsafeSessionId('test-session'),
+          id: unsafeSessionId("test-session"),
           htmlSent: true,
           messages: []
         }
@@ -89,46 +95,57 @@ describe('AI DOM Generator', () => {
 
       mockProvider.generate.mockResolvedValue(mockResult)
 
-      await generateDOMChanges(mockHtml, mockPrompt, mockApiKey, [], undefined, {
-        aiProvider: 'openai-api'
-      })
+      await generateDOMChanges(
+        mockHtml,
+        mockPrompt,
+        mockApiKey,
+        [],
+        undefined,
+        {
+          aiProvider: "openai-api"
+        }
+      )
 
       expect(createAIProvider).toHaveBeenCalledWith({
         apiKey: mockApiKey,
-        aiProvider: 'openai-api',
+        aiProvider: "openai-api",
         llmModel: undefined,
         customEndpoint: undefined
       })
     })
 
-    it('should throw error when HTML is required but not provided', async () => {
+    it("should throw error when HTML is required but not provided", async () => {
       await expect(
-        generateDOMChanges('', mockPrompt, mockApiKey)
-      ).rejects.toThrow('HTML is required for the first message in a conversation')
+        generateDOMChanges("", mockPrompt, mockApiKey)
+      ).rejects.toThrow(
+        "HTML is required for the first message in a conversation"
+      )
     })
 
-    it('should allow empty HTML when session has htmlSent=true', async () => {
+    it("should allow empty HTML when session has htmlSent=true", async () => {
       const mockSession: ConversationSession = {
-        id: unsafeSessionId('existing-session'),
+        id: unsafeSessionId("existing-session"),
         htmlSent: true,
         messages: []
       }
 
-      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+      const mockResult: AIDOMGenerationResult & {
+        session: ConversationSession
+      } = {
         domChanges: [],
-        response: 'Done',
-        action: 'none',
+        response: "Done",
+        action: "none",
         session: mockSession
       }
 
       mockProvider.generate.mockResolvedValue(mockResult)
 
-      await generateDOMChanges('', mockPrompt, mockApiKey, [], undefined, {
+      await generateDOMChanges("", mockPrompt, mockApiKey, [], undefined, {
         conversationSession: mockSession
       })
 
       expect(mockProvider.generate).toHaveBeenCalledWith(
-        '',
+        "",
         mockPrompt,
         [],
         undefined,
@@ -136,18 +153,20 @@ describe('AI DOM Generator', () => {
       )
     })
 
-    it('should pass currentChanges and images to provider', async () => {
+    it("should pass currentChanges and images to provider", async () => {
       const mockCurrentChanges = [
-        { selector: '.test', type: 'text' as const, value: 'Test' }
+        { selector: ".test", type: "text" as const, value: "Test" }
       ]
-      const mockImages = ['data:image/png;base64,abc123']
+      const mockImages = ["data:image/png;base64,abc123"]
 
-      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+      const mockResult: AIDOMGenerationResult & {
+        session: ConversationSession
+      } = {
         domChanges: [],
-        response: 'Done',
-        action: 'append',
+        response: "Done",
+        action: "append",
         session: {
-          id: unsafeSessionId('test-session'),
+          id: unsafeSessionId("test-session"),
           htmlSent: true,
           messages: []
         }
@@ -172,38 +191,40 @@ describe('AI DOM Generator', () => {
       )
     })
 
-    it('should handle provider errors', async () => {
-      const mockError = new Error('Provider error: Rate limit exceeded')
+    it("should handle provider errors", async () => {
+      const mockError = new Error("Provider error: Rate limit exceeded")
       mockProvider.generate.mockRejectedValue(mockError)
 
       await expect(
         generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
-      ).rejects.toThrow('Provider error: Rate limit exceeded')
+      ).rejects.toThrow("Provider error: Rate limit exceeded")
     })
 
-    it('should handle multiple DOM changes', async () => {
-      const mockResult: AIDOMGenerationResult & { session: ConversationSession } = {
+    it("should handle multiple DOM changes", async () => {
+      const mockResult: AIDOMGenerationResult & {
+        session: ConversationSession
+      } = {
         domChanges: [
           {
-            selector: '#title',
-            type: 'text',
-            value: 'New Title'
+            selector: "#title",
+            type: "text",
+            value: "New Title"
           },
           {
-            selector: '.button',
-            type: 'style',
-            value: { backgroundColor: '#ff0000' }
+            selector: ".button",
+            type: "style",
+            value: { backgroundColor: "#ff0000" }
           },
           {
-            selector: '.hidden',
-            type: 'class',
-            add: ['hidden']
+            selector: ".hidden",
+            type: "class",
+            add: ["hidden"]
           }
         ],
-        response: 'Applied multiple changes',
-        action: 'append',
+        response: "Applied multiple changes",
+        action: "append",
         session: {
-          id: unsafeSessionId('test-session'),
+          id: unsafeSessionId("test-session"),
           htmlSent: true,
           messages: []
         }
@@ -214,9 +235,9 @@ describe('AI DOM Generator', () => {
       const result = await generateDOMChanges(mockHtml, mockPrompt, mockApiKey)
 
       expect(result.domChanges).toHaveLength(3)
-      expect(result.domChanges[0].selector).toBe('#title')
-      expect(result.domChanges[1].selector).toBe('.button')
-      expect(result.domChanges[2].selector).toBe('.hidden')
+      expect(result.domChanges[0].selector).toBe("#title")
+      expect(result.domChanges[1].selector).toBe(".button")
+      expect(result.domChanges[2].selector).toBe(".hidden")
     })
   })
 })

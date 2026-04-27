@@ -30,22 +30,22 @@ export interface OpenRouterModelsResponse {
 }
 
 export interface OpenRouterContentPart {
-  type: 'text' | 'image_url'
+  type: "text" | "image_url"
   text?: string
   image_url?: {
     url: string
-    detail?: 'low' | 'high' | 'auto'
+    detail?: "low" | "high" | "auto"
   }
 }
 
 export interface OpenRouterChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
+  role: "system" | "user" | "assistant" | "tool"
   content: string | OpenRouterContentPart[]
   name?: string
   tool_call_id?: string
   tool_calls?: Array<{
     id: string
-    type: 'function'
+    type: "function"
     function: {
       name: string
       arguments: string
@@ -64,7 +64,7 @@ export interface OpenRouterChatCompletionRequest {
   model: string
   messages: OpenRouterChatMessage[]
   tools?: Array<{
-    type: 'function'
+    type: "function"
     function: {
       name: string
       description: string

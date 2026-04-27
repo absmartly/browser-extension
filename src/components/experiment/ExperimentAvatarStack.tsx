@@ -1,6 +1,7 @@
-import React from 'react'
-import type { Experiment, ExperimentUser } from '~src/types/absmartly'
-import { getAvatarColor, getInitials, buildAvatarUrl } from '~src/utils/avatar'
+import React from "react"
+
+import type { Experiment, ExperimentUser } from "~src/types/absmartly"
+import { buildAvatarUrl, getAvatarColor, getInitials } from "~src/utils/avatar"
 
 interface AvatarData {
   id: string
@@ -16,16 +17,19 @@ interface ExperimentAvatarStackProps {
   experiment: Experiment
 }
 
-export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps) {
+export function ExperimentAvatarStack({
+  experiment
+}: ExperimentAvatarStackProps) {
   const getAllAvatars = (experiment: Experiment): AvatarData[] => {
     const avatars: AvatarData[] = []
 
     if (experiment.created_by) {
       const user = experiment.created_by
       const avatar = buildAvatarUrl(user.avatar)
-      const name = user.first_name || user.last_name ?
-        `${user.first_name || ''} ${user.last_name || ''}`.trim() :
-        user.email || 'Unknown'
+      const name =
+        user.first_name || user.last_name
+          ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
+          : user.email || "Unknown"
       const initials = getInitials(name)
 
       avatars.push({
@@ -37,22 +41,29 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
       })
     }
 
-    if ((experiment as any).owners && Array.isArray((experiment as any).owners)) {
-      (experiment as any).owners.forEach((ownerWrapper: any) => {
+    if (
+      (experiment as any).owners &&
+      Array.isArray((experiment as any).owners)
+    ) {
+      ;(experiment as any).owners.forEach((ownerWrapper: any) => {
         const owner = ownerWrapper.user || ownerWrapper
 
         if (!owner) return
 
-        if (experiment.created_by &&
-            (((owner as any).id && (owner as any).id === (experiment.created_by as any).id) ||
-             (owner.user_id && owner.user_id === experiment.created_by.user_id))) {
+        if (
+          experiment.created_by &&
+          (((owner as any).id &&
+            (owner as any).id === (experiment.created_by as any).id) ||
+            (owner.user_id && owner.user_id === experiment.created_by.user_id))
+        ) {
           return
         }
 
         const avatar = buildAvatarUrl(owner.avatar)
-        const name = owner.first_name || owner.last_name ?
-          `${owner.first_name || ''} ${owner.last_name || ''}`.trim() :
-          owner.email || 'Unknown'
+        const name =
+          owner.first_name || owner.last_name
+            ? `${owner.first_name || ""} ${owner.last_name || ""}`.trim()
+            : owner.email || "Unknown"
         const initials = getInitials(name)
 
         avatars.push({
@@ -96,7 +107,7 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
       {allAvatars.slice(0, 3).map((avatarData, idx) => (
         <div
           key={avatarData.id}
-          className={`relative group ${idx > 0 ? '-ml-2' : ''}`}
+          className={`relative group ${idx > 0 ? "-ml-2" : ""}`}
           style={{ zIndex: allAvatars.length - idx }}>
           <div className="relative">
             {avatarData.avatar ? (
@@ -106,25 +117,31 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
                   alt={avatarData.name}
                   className="h-7 w-7 rounded-full object-cover border-2 border-white shadow-sm"
                   onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                    const fallbackElement = e.currentTarget.nextElementSibling as HTMLElement
+                    e.currentTarget.style.display = "none"
+                    const fallbackElement = e.currentTarget
+                      .nextElementSibling as HTMLElement
                     if (fallbackElement) {
-                      fallbackElement.style.display = 'flex'
+                      fallbackElement.style.display = "flex"
                     }
                   }}
                 />
                 <div
                   className="h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                  style={{ display: 'none', backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
-                >
+                  style={{
+                    display: "none",
+                    backgroundColor:
+                      avatarData.color || getAvatarColor(avatarData.name)
+                  }}>
                   {avatarData.initials}
                 </div>
               </>
             ) : (
               <div
                 className="flex h-7 w-7 rounded-full items-center justify-center text-[11px] text-white font-semibold border-2 border-white shadow-sm"
-                style={{ backgroundColor: avatarData.color || getAvatarColor(avatarData.name) }}
-              >
+                style={{
+                  backgroundColor:
+                    avatarData.color || getAvatarColor(avatarData.name)
+                }}>
                 {avatarData.initials}
               </div>
             )}
@@ -142,7 +159,10 @@ export function ExperimentAvatarStack({ experiment }: ExperimentAvatarStackProps
             +{allAvatars.length - 3}
           </div>
           <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-            {allAvatars.slice(3).map(a => a.name).join(', ')}
+            {allAvatars
+              .slice(3)
+              .map((a) => a.name)
+              .join(", ")}
             <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
           </div>
         </div>

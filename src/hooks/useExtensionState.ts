@@ -1,13 +1,12 @@
 import { useState } from "react"
+
 import type { ABsmartlyConfig } from "~src/types/absmartly"
 
 interface UseExtensionStateProps {
   config: ABsmartlyConfig | null
 }
 
-export function useExtensionState({
-  config
-}: UseExtensionStateProps) {
+export function useExtensionState({ config }: UseExtensionStateProps) {
   const [error, setError] = useState<string | null>(null)
   const [isAuthExpired, setIsAuthExpired] = useState(false)
   const [createPanelOpen, setCreatePanelOpen] = useState(false)
@@ -15,7 +14,7 @@ export function useExtensionState({
 
   const handleAuthExpired = () => {
     setIsAuthExpired(true)
-    setError('Your session has expired. Please log in again.')
+    setError("Your session has expired. Please log in again.")
   }
 
   return {

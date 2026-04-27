@@ -1,9 +1,10 @@
-import React from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { XMarkIcon, ClipboardIcon } from '@heroicons/react/24/outline'
-import type { DOMChange } from '~src/types/dom-changes'
-import { renderMarkdown } from '~src/utils/markdown'
+import { json } from "@codemirror/lang-json"
+import { ClipboardIcon, XMarkIcon } from "@heroicons/react/24/outline"
+import CodeMirror from "@uiw/react-codemirror"
+import React from "react"
+
+import type { DOMChange } from "~src/types/dom-changes"
+import { renderMarkdown } from "~src/utils/markdown"
 
 interface ChangeViewerModalProps {
   isOpen: boolean
@@ -46,11 +47,10 @@ export function ChangeViewerModal({
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              DOM Changes
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900">DOM Changes</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {changes.length} change{changes.length !== 1 ? 's' : ''} • {formattedDate}
+              {changes.length} change{changes.length !== 1 ? "s" : ""} •{" "}
+              {formattedDate}
             </p>
           </div>
           <button
@@ -82,7 +82,7 @@ export function ChangeViewerModal({
                 onClick={handleCopy}
                 className="flex items-center gap-2 px-3 py-1 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors">
                 <ClipboardIcon className="w-4 h-4" />
-                {copied ? 'Copied!' : 'Copy JSON'}
+                {copied ? "Copied!" : "Copy JSON"}
               </button>
             </div>
 

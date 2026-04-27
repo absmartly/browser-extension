@@ -2,18 +2,18 @@
  * Integration tests for EditorCoordinator with CodeMirror-based HTML Editor
  */
 
-import { EditorCoordinator } from '../editor-coordinator'
-import StateManager from '../state-manager'
-import EventHandlers from '../event-handlers'
-import ContextMenu from '../context-menu'
-import UndoRedoManager from '../undo-redo-manager'
-import UIComponents from '../../ui/components'
-import EditModes from '../edit-modes'
-import Cleanup from '../cleanup'
-import { Notifications } from '../../ui/notifications'
-import HtmlEditor from '../../ui/html-editor'
+import UIComponents from "../../ui/components"
+import HtmlEditor from "../../ui/html-editor"
+import { Notifications } from "../../ui/notifications"
+import Cleanup from "../cleanup"
+import ContextMenu from "../context-menu"
+import EditModes from "../edit-modes"
+import { EditorCoordinator } from "../editor-coordinator"
+import EventHandlers from "../event-handlers"
+import StateManager from "../state-manager"
+import UndoRedoManager from "../undo-redo-manager"
 
-describe('EditorCoordinator HTML Editor Integration', () => {
+describe("EditorCoordinator HTML Editor Integration", () => {
   let coordinator: EditorCoordinator
   let stateManager: StateManager
   let undoRedoManager: UndoRedoManager
@@ -26,10 +26,10 @@ describe('EditorCoordinator HTML Editor Integration', () => {
 
     // Create StateManager
     stateManager = new StateManager({
-      experimentName: 'Test',
-      variantName: 'Control',
+      experimentName: "Test",
+      variantName: "Control",
       initialChanges: [],
-      logoUrl: 'https://example.com/logo.png'
+      logoUrl: "https://example.com/logo.png"
     })
 
     // Mock callbacks
@@ -37,7 +37,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       onChangesUpdate: jest.fn(),
       removeStyles: jest.fn(),
       addChange: jest.fn(),
-      getSelector: jest.fn().mockReturnValue('.test-element'),
+      getSelector: jest.fn().mockReturnValue(".test-element"),
       hideElement: jest.fn(),
       deleteElement: jest.fn(),
       copyElement: jest.fn(),
@@ -78,38 +78,38 @@ describe('EditorCoordinator HTML Editor Integration', () => {
     )
 
     // Mock the HtmlEditor show method
-    mockHtmlEditor = jest.spyOn(HtmlEditor.prototype, 'show')
+    mockHtmlEditor = jest.spyOn(HtmlEditor.prototype, "show")
   })
 
   afterEach(() => {
     jest.clearAllMocks()
     jest.restoreAllMocks()
-    document.body.innerHTML = ''
+    document.body.innerHTML = ""
   })
 
-  describe('handleEditHtmlAction', () => {
-    it('should initialize HTML editor when Edit HTML action is triggered', async () => {
-      const element = document.getElementById('test-element')!
+  describe("handleEditHtmlAction", () => {
+    it("should initialize HTML editor when Edit HTML action is triggered", async () => {
+      const element = document.getElementById("test-element")!
       const originalState = {
         innerHTML: element.innerHTML,
         textContent: element.textContent
       }
 
-      mockHtmlEditor.mockResolvedValue('<div>Modified HTML</div>')
+      mockHtmlEditor.mockResolvedValue("<div>Modified HTML</div>")
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(mockHtmlEditor).toHaveBeenCalledWith(element, 'Original HTML')
+      expect(mockHtmlEditor).toHaveBeenCalledWith(element, "Original HTML")
     })
 
-    it('should update element HTML when changes are saved', async () => {
-      const element = document.getElementById('test-element')!
+    it("should update element HTML when changes are saved", async () => {
+      const element = document.getElementById("test-element")!
       const originalState = {
         innerHTML: element.innerHTML,
         textContent: element.textContent
       }
 
-      const newHtml = '<div>New HTML Content</div>'
+      const newHtml = "<div>New HTML Content</div>"
       mockHtmlEditor.mockResolvedValue(newHtml)
 
       await coordinator.handleEditHtmlAction(element, originalState)
@@ -117,8 +117,8 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(element.innerHTML).toBe(newHtml)
     })
 
-    it('should not update element when editor is cancelled', async () => {
-      const element = document.getElementById('test-element')!
+    it("should not update element when editor is cancelled", async () => {
+      const element = document.getElementById("test-element")!
       const originalHtml = element.innerHTML
       const originalState = {
         innerHTML: originalHtml,
@@ -132,14 +132,14 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(element.innerHTML).toBe(originalHtml)
     })
 
-    it('should track HTML changes in state', async () => {
-      const element = document.getElementById('test-element')!
+    it("should track HTML changes in state", async () => {
+      const element = document.getElementById("test-element")!
       const originalState = {
         innerHTML: element.innerHTML,
         textContent: element.textContent
       }
 
-      const newHtml = '<p>Tracked HTML Change</p>'
+      const newHtml = "<p>Tracked HTML Change</p>"
       mockHtmlEditor.mockResolvedValue(newHtml)
 
       await coordinator.handleEditHtmlAction(element, originalState)
@@ -149,53 +149,57 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
       expect(changes[0]).toMatchObject({
-        selector: '.test-element',
-        type: 'html',
+        selector: ".test-element",
+        type: "html",
         value: newHtml
       })
     })
 
-    it('should show success notification after HTML update', async () => {
-      const element = document.getElementById('test-element')!
+    it("should show success notification after HTML update", async () => {
+      const element = document.getElementById("test-element")!
       const originalState = {
         innerHTML: element.innerHTML,
         textContent: element.textContent
       }
 
-      const notificationSpy = jest.spyOn(Notifications.prototype, 'show')
-      mockHtmlEditor.mockResolvedValue('<div>Updated</div>')
+      const notificationSpy = jest.spyOn(Notifications.prototype, "show")
+      mockHtmlEditor.mockResolvedValue("<div>Updated</div>")
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(notificationSpy).toHaveBeenCalledWith('HTML updated successfully', '', 'success')
+      expect(notificationSpy).toHaveBeenCalledWith(
+        "HTML updated successfully",
+        "",
+        "success"
+      )
     })
 
-    it('should remove context menu before opening editor', async () => {
-      const element = document.getElementById('test-element')!
+    it("should remove context menu before opening editor", async () => {
+      const element = document.getElementById("test-element")!
       const originalState = {
         innerHTML: element.innerHTML,
         textContent: element.textContent
       }
 
       // Create mock context menu elements that match what removeContextMenu removes
-      const menuOverlay = document.createElement('div')
-      menuOverlay.id = 'absmartly-menu-overlay'
+      const menuOverlay = document.createElement("div")
+      menuOverlay.id = "absmartly-menu-overlay"
       document.body.appendChild(menuOverlay)
 
-      const menuContainer = document.createElement('div')
-      menuContainer.id = 'absmartly-menu-container'
+      const menuContainer = document.createElement("div")
+      menuContainer.id = "absmartly-menu-container"
       document.body.appendChild(menuContainer)
 
-      mockHtmlEditor.mockResolvedValue('<div>Test</div>')
+      mockHtmlEditor.mockResolvedValue("<div>Test</div>")
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
       // Verify context menu elements were removed
-      expect(document.getElementById('absmartly-menu-overlay')).toBeFalsy()
-      expect(document.getElementById('absmartly-menu-container')).toBeFalsy()
+      expect(document.getElementById("absmartly-menu-overlay")).toBeFalsy()
+      expect(document.getElementById("absmartly-menu-container")).toBeFalsy()
     })
 
-    it('should handle complex HTML structures', async () => {
+    it("should handle complex HTML structures", async () => {
       const complexHtml = `
         <div class="container">
           <header>
@@ -215,7 +219,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
         </div>
       `
 
-      const element = document.getElementById('test-element')!
+      const element = document.getElementById("test-element")!
       element.innerHTML = complexHtml
 
       const originalState = {
@@ -223,17 +227,17 @@ describe('EditorCoordinator HTML Editor Integration', () => {
         textContent: element.textContent
       }
 
-      const modifiedHtml = complexHtml.replace('Title', 'Modified Title')
+      const modifiedHtml = complexHtml.replace("Title", "Modified Title")
       mockHtmlEditor.mockResolvedValue(modifiedHtml)
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(element.innerHTML).toContain('Modified Title')
-      expect(element.querySelector('h1')?.textContent).toBe('Modified Title')
+      expect(element.innerHTML).toContain("Modified Title")
+      expect(element.querySelector("h1")?.textContent).toBe("Modified Title")
     })
 
-    it('should update element HTML content', async () => {
-      const element = document.getElementById('test-element')!
+    it("should update element HTML content", async () => {
+      const element = document.getElementById("test-element")!
       const originalHtml = element.innerHTML
 
       const originalState = {
@@ -241,7 +245,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
         textContent: element.textContent
       }
 
-      const newHtml = '<div>Updated content</div>'
+      const newHtml = "<div>Updated content</div>"
       mockHtmlEditor.mockResolvedValue(newHtml)
 
       await coordinator.handleEditHtmlAction(element, originalState)
@@ -251,8 +255,8 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(element.innerHTML).not.toBe(originalHtml)
     })
 
-    it('should not update if new HTML is same as current', async () => {
-      const element = document.getElementById('test-element')!
+    it("should not update if new HTML is same as current", async () => {
+      const element = document.getElementById("test-element")!
       const currentHtml = element.innerHTML
 
       const originalState = {
@@ -268,8 +272,8 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       expect(undoRedoManager.canUndo()).toBe(false)
     })
 
-    it('should handle editor errors gracefully', async () => {
-      const element = document.getElementById('test-element')!
+    it("should handle editor errors gracefully", async () => {
+      const element = document.getElementById("test-element")!
       const originalHtml = element.innerHTML
 
       const originalState = {
@@ -278,32 +282,32 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       }
 
       // Mock editor throwing an error
-      mockHtmlEditor.mockRejectedValue(new Error('Editor failed to load'))
+      mockHtmlEditor.mockRejectedValue(new Error("Editor failed to load"))
 
       // Should not throw
       await expect(
         coordinator.handleEditHtmlAction(element, originalState)
-      ).rejects.toThrow('Editor failed to load')
+      ).rejects.toThrow("Editor failed to load")
 
       // Element should remain unchanged
       expect(element.innerHTML).toBe(originalHtml)
     })
   })
 
-  describe('Context Menu Integration', () => {
-    it('should handle Edit HTML menu action', () => {
-      const element = document.getElementById('test-element')!
-      const handleActionSpy = jest.spyOn(coordinator, 'handleMenuAction')
+  describe("Context Menu Integration", () => {
+    it("should handle Edit HTML menu action", () => {
+      const element = document.getElementById("test-element")!
+      const handleActionSpy = jest.spyOn(coordinator, "handleMenuAction")
 
-      coordinator.handleMenuAction('editHtml', element)
+      coordinator.handleMenuAction("editHtml", element)
 
-      expect(handleActionSpy).toHaveBeenCalledWith('editHtml', element)
+      expect(handleActionSpy).toHaveBeenCalledWith("editHtml", element)
     })
 
-    it('should pass correct original state to HTML editor', async () => {
-      const element = document.getElementById('test-element')!
-      element.innerHTML = '<span>Test Content</span>'
-      element.setAttribute('data-test', 'value')
+    it("should pass correct original state to HTML editor", async () => {
+      const element = document.getElementById("test-element")!
+      element.innerHTML = "<span>Test Content</span>"
+      element.setAttribute("data-test", "value")
 
       const originalState = {
         html: element.outerHTML,
@@ -313,7 +317,7 @@ describe('EditorCoordinator HTML Editor Integration', () => {
         innerHTML: element.innerHTML
       }
 
-      mockHtmlEditor.mockResolvedValue('<span>Modified</span>')
+      mockHtmlEditor.mockResolvedValue("<span>Modified</span>")
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
@@ -322,102 +326,104 @@ describe('EditorCoordinator HTML Editor Integration', () => {
       const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
       expect(changes[0]).toMatchObject({
-        selector: '.test-element',
-        type: 'html',
-        value: '<span>Modified</span>'
+        selector: ".test-element",
+        type: "html",
+        value: "<span>Modified</span>"
       })
     })
   })
 
-  describe('Multiple Edit Actions', () => {
-    it('should handle sequential HTML edits', async () => {
-      const element = document.getElementById('test-element')!
+  describe("Multiple Edit Actions", () => {
+    it("should handle sequential HTML edits", async () => {
+      const element = document.getElementById("test-element")!
 
       // First edit
-      mockHtmlEditor.mockResolvedValue('<div>First Edit</div>')
+      mockHtmlEditor.mockResolvedValue("<div>First Edit</div>")
       await coordinator.handleEditHtmlAction(element, {
-        innerHTML: 'Original',
-        textContent: 'Original'
+        innerHTML: "Original",
+        textContent: "Original"
       })
 
-      expect(element.innerHTML).toBe('<div>First Edit</div>')
+      expect(element.innerHTML).toBe("<div>First Edit</div>")
       expect(undoRedoManager.canUndo()).toBe(true)
 
       // Second edit
-      mockHtmlEditor.mockResolvedValue('<div>Second Edit</div>')
+      mockHtmlEditor.mockResolvedValue("<div>Second Edit</div>")
       await coordinator.handleEditHtmlAction(element, {
-        innerHTML: '<div>First Edit</div>',
-        textContent: 'First Edit'
+        innerHTML: "<div>First Edit</div>",
+        textContent: "First Edit"
       })
 
-      expect(element.innerHTML).toBe('<div>Second Edit</div>')
+      expect(element.innerHTML).toBe("<div>Second Edit</div>")
       // squashChanges() consolidates multiple changes to same element into 1
       const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
-      expect((changes[0] as any).value).toBe('<div>Second Edit</div>')
+      expect((changes[0] as any).value).toBe("<div>Second Edit</div>")
     })
 
-    it('should handle switching between text and HTML editing', async () => {
-      const element = document.getElementById('test-element')!
+    it("should handle switching between text and HTML editing", async () => {
+      const element = document.getElementById("test-element")!
 
       // Text edit
       coordinator.handleEditAction(element, {
-        textContent: 'Original',
-        innerHTML: 'Original'
+        textContent: "Original",
+        innerHTML: "Original"
       })
 
       // Simulate text change
-      element.textContent = 'Text Edit'
+      element.textContent = "Text Edit"
       element.blur()
 
       // HTML edit
-      mockHtmlEditor.mockResolvedValue('<strong>HTML Edit</strong>')
+      mockHtmlEditor.mockResolvedValue("<strong>HTML Edit</strong>")
       await coordinator.handleEditHtmlAction(element, {
-        innerHTML: 'Text Edit',
-        textContent: 'Text Edit'
+        innerHTML: "Text Edit",
+        textContent: "Text Edit"
       })
 
-      expect(element.innerHTML).toBe('<strong>HTML Edit</strong>')
+      expect(element.innerHTML).toBe("<strong>HTML Edit</strong>")
     })
   })
 
-  describe('State Management', () => {
-    it('should track HTML changes in visual editor state', async () => {
-      const element = document.getElementById('test-element')!
+  describe("State Management", () => {
+    it("should track HTML changes in visual editor state", async () => {
+      const element = document.getElementById("test-element")!
 
-      mockHtmlEditor.mockResolvedValue('<div>State Test</div>')
+      mockHtmlEditor.mockResolvedValue("<div>State Test</div>")
 
       await coordinator.handleEditHtmlAction(element, {
-        innerHTML: 'Original',
-        textContent: 'Original'
+        innerHTML: "Original",
+        textContent: "Original"
       })
 
       // Check that change was added to undoRedoManager
       const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
       expect(changes[0]).toMatchObject({
-        type: 'html',
-        value: '<div>State Test</div>'
+        type: "html",
+        value: "<div>State Test</div>"
       })
     })
 
-    it('should use correct selector for HTML changes', async () => {
-      const element = document.getElementById('test-element')!
-      element.className = 'test-class another-class'
+    it("should use correct selector for HTML changes", async () => {
+      const element = document.getElementById("test-element")!
+      element.className = "test-class another-class"
 
-      mockCallbacks.getSelector.mockReturnValue('#test-element.test-class.another-class')
-      mockHtmlEditor.mockResolvedValue('<div>Test</div>')
+      mockCallbacks.getSelector.mockReturnValue(
+        "#test-element.test-class.another-class"
+      )
+      mockHtmlEditor.mockResolvedValue("<div>Test</div>")
 
       await coordinator.handleEditHtmlAction(element, {
-        innerHTML: 'Original',
-        textContent: 'Original'
+        innerHTML: "Original",
+        textContent: "Original"
       })
 
       expect(mockCallbacks.getSelector).toHaveBeenCalledWith(element)
       // Check the change has the correct selector
       const changes = undoRedoManager.squashChanges()
       expect(changes[0]).toMatchObject({
-        selector: '#test-element.test-class.another-class'
+        selector: "#test-element.test-class.another-class"
       })
     })
   })

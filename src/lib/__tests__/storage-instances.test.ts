@@ -1,14 +1,21 @@
-const constructorCalls: any[] = []
-
-jest.mock("@plasmohq/storage", () => ({
-  Storage: jest.fn().mockImplementation((config?: any) => {
-    constructorCalls.push(config ?? "__no_args__")
-    return { _config: config, get: jest.fn(), set: jest.fn() }
-  }),
-}))
-
-import { storage, secureStorage, sessionStorage } from "../storage-instances"
 import { Storage } from "@plasmohq/storage"
+
+import { secureStorage, sessionStorage, storage } from "../storage-instances"
+
+jest.mock("@plasmohq/storage", () => {
+  const calls: any[] = []
+  return {
+    Storage: jest.fn().mockImplementation((config?: any) => {
+      calls.push(config ?? "__no_args__")
+      return { _config: config, get: jest.fn(), set: jest.fn() }
+    }),
+    __getConstructorCalls: () => calls
+  }
+})
+
+const { __getConstructorCalls } = jest.requireMock("@plasmohq/storage") as {
+  __getConstructorCalls: () => any[]
+}
 
 describe("storage-instances", () => {
   it("creates exactly three storage instances", () => {
@@ -16,18 +23,18 @@ describe("storage-instances", () => {
   })
 
   it("creates default storage with no config", () => {
-    expect(constructorCalls).toContain("__no_args__")
+    expect(__getConstructorCalls()).toContain("__no_args__")
   })
 
   it("creates secureStorage with area=local and secretKeyring=true", () => {
-    const secureCall = constructorCalls.find(
+    const secureCall = __getConstructorCalls().find(
       (c) => c && c.area === "local" && c.secretKeyring === true
     )
     expect(secureCall).toBeDefined()
   })
 
   it("creates sessionStorage with area=session", () => {
-    const sessionCall = constructorCalls.find(
+    const sessionCall = __getConstructorCalls().find(
       (c) => c && c.area === "session"
     )
     expect(sessionCall).toBeDefined()

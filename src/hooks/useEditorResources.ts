@@ -1,15 +1,16 @@
-import { useState, useCallback, useEffect } from 'react'
-import { debugLog, debugError } from '~src/utils/debug'
-import { APIError } from '~src/types/errors'
+import { useCallback, useEffect, useState } from "react"
+
 import type {
   ABsmartlyConfig,
   Application,
-  UnitType,
-  Metric,
   ExperimentTag,
+  ExperimentTeam,
   ExperimentUser,
-  ExperimentTeam
-} from '~src/types/absmartly'
+  Metric,
+  UnitType
+} from "~src/types/absmartly"
+import { APIError } from "~src/types/errors"
+import { debugError, debugLog } from "~src/utils/debug"
 
 interface UseEditorResourcesParams {
   config: ABsmartlyConfig | null
@@ -42,18 +43,19 @@ export function useEditorResources({
   const [teams, setTeams] = useState<ExperimentTeam[]>([])
 
   const loadEditorResources = useCallback(async () => {
-    debugLog('Loading editor resources...')
+    debugLog("Loading editor resources...")
     try {
-      const [apps, units, metricsData, tagsData, ownersData, teamsData] = await Promise.all([
-        getApplications(),
-        getUnitTypes(),
-        getMetrics(),
-        getExperimentTags(),
-        getOwners(),
-        getTeams()
-      ])
+      const [apps, units, metricsData, tagsData, ownersData, teamsData] =
+        await Promise.all([
+          getApplications(),
+          getUnitTypes(),
+          getMetrics(),
+          getExperimentTags(),
+          getOwners(),
+          getTeams()
+        ])
 
-      debugLog('Editor resources loaded:', {
+      debugLog("Editor resources loaded:", {
         apps: apps?.length || 0,
         units: units?.length || 0,
         metricsData: metricsData?.length || 0,
@@ -69,24 +71,36 @@ export function useEditorResources({
       setTeams(teamsData || [])
     } catch (err: unknown) {
       const error = APIError.fromError(err)
-      if (error.isAuthError || error.message === 'AUTH_EXPIRED') {
-        debugLog('[loadEditorResources] AUTH_EXPIRED error detected')
+      if (error.isAuthError || error.message === "AUTH_EXPIRED") {
+        debugLog("[loadEditorResources] AUTH_EXPIRED error detected")
         const permissionsGranted = await requestPermissionsIfNeeded(true)
         if (permissionsGranted) {
-          debugLog('[loadEditorResources] Retrying after permissions granted...')
+          debugLog(
+            "[loadEditorResources] Retrying after permissions granted..."
+          )
           setTimeout(() => loadEditorResources(), 500)
         }
       }
-      debugError('Failed to load editor resources:', error)
+      debugError("Failed to load editor resources:", error)
     }
-  }, [requestPermissionsIfNeeded, getApplications, getUnitTypes, getMetrics, getExperimentTags, getOwners, getTeams])
+  }, [
+    requestPermissionsIfNeeded,
+    getApplications,
+    getUnitTypes,
+    getMetrics,
+    getExperimentTags,
+    getOwners,
+    getTeams
+  ])
 
   useEffect(() => {
     if (config && isAuthenticated && unitTypes.length === 0) {
-      debugLog('Loading editor resources (config available, authenticated, resources not loaded)')
+      debugLog(
+        "Loading editor resources (config available, authenticated, resources not loaded)"
+      )
       loadEditorResources()
     } else if (config && !isAuthenticated) {
-      debugLog('Skipping editor resources load - not authenticated')
+      debugLog("Skipping editor resources load - not authenticated")
     }
   }, [config, isAuthenticated, unitTypes.length, loadEditorResources])
 

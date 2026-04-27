@@ -1,12 +1,27 @@
-import React, { useMemo } from 'react'
-import { Input } from '../ui/Input'
-import { Button } from '../ui/Button'
-import { CodeBracketIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
-import { DOMChangesInlineEditor } from '../DOMChangesInlineEditor'
-import { URLFilterSection } from '../URLFilterSection'
-import { GlobalDefaultsSection } from '../GlobalDefaultsSection'
-import type { DOMChange, DOMChangesData, AIDOMGenerationResult } from '~src/types/dom-changes'
-import { getChangesArray, getChangesConfig, getVariablesForDisplay, type VariantConfig } from '~src/hooks/useVariantConfig'
+import {
+  CodeBracketIcon,
+  TrashIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline"
+import React, { useMemo } from "react"
+
+import {
+  getChangesArray,
+  getChangesConfig,
+  getVariablesForDisplay,
+  type VariantConfig
+} from "~src/hooks/useVariantConfig"
+import type {
+  AIDOMGenerationResult,
+  DOMChange,
+  DOMChangesData
+} from "~src/types/dom-changes"
+
+import { DOMChangesInlineEditor } from "../DOMChangesInlineEditor"
+import { GlobalDefaultsSection } from "../GlobalDefaultsSection"
+import { Button } from "../ui/Button"
+import { Input } from "../ui/Input"
+import { URLFilterSection } from "../URLFilterSection"
 
 export interface Variant {
   name: string
@@ -34,8 +49,13 @@ interface VariantCardProps {
   newVarValueInputRef: React.RefObject<HTMLInputElement>
   onToggleExpand: () => void
   onUpdateName: (name: string) => void
-  onUpdateDOMChanges: (changes: DOMChange[], options?: { isReorder?: boolean }) => void
-  onUpdateDOMConfig: (configUpdate: Partial<Omit<DOMChangesData, 'changes'>>) => void
+  onUpdateDOMChanges: (
+    changes: DOMChange[],
+    options?: { isReorder?: boolean }
+  ) => void
+  onUpdateDOMConfig: (
+    configUpdate: Partial<Omit<DOMChangesData, "changes">>
+  ) => void
   onOpenJsonEditor: () => void
   onRemove: () => void
   onAddVariable: () => void
@@ -51,7 +71,10 @@ interface VariantCardProps {
   onVEStop: () => void
   onNavigateToAI?: (
     variantName: string,
-    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    onGenerate: (
+      prompt: string,
+      images?: string[]
+    ) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
@@ -106,25 +129,27 @@ export const VariantCard = React.memo(function VariantCard({
   )
 
   const domChangesData = useMemo(
-    () => getChangesConfig(variant.config[domFieldName] as DOMChangesData || []),
+    () =>
+      getChangesConfig((variant.config[domFieldName] as DOMChangesData) || []),
     [variant.config, domFieldName]
   )
 
   const changes = useMemo(
-    () => getChangesArray(variant.config[domFieldName] as DOMChangesData || []),
+    () =>
+      getChangesArray((variant.config[domFieldName] as DOMChangesData) || []),
     [variant.config, domFieldName]
   )
 
   return (
-    <div className={`border rounded-lg ${isControl ? 'border-gray-300 bg-gray-100' : 'border-gray-200'} ${isControl && !isExpanded ? 'opacity-60' : ''}`}>
+    <div
+      className={`border rounded-lg ${isControl ? "border-gray-300 bg-gray-100" : "border-gray-200"} ${isControl && !isExpanded ? "opacity-60" : ""}`}>
       <div className="px-4 py-3 flex items-center gap-2">
         <button
           id={`variant-toggle-${index}`}
           type="button"
           onClick={onToggleExpand}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          {isExpanded ? '▼' : '▶'}
+          className="text-gray-500 hover:text-gray-700">
+          {isExpanded ? "▼" : "▶"}
         </button>
         {isControl && (
           <span className="px-2 py-0.5 text-xs font-medium text-yellow-800 bg-yellow-200 rounded">
@@ -149,8 +174,7 @@ export const VariantCard = React.memo(function VariantCard({
             activeVEVariant
               ? `Cannot edit JSON while Visual Editor is active for "${activeVEVariant}"`
               : "View Full Variant Configuration"
-          }
-        >
+          }>
           <CodeBracketIcon className="h-4 w-4" />
           Json
         </Button>
@@ -159,8 +183,7 @@ export const VariantCard = React.memo(function VariantCard({
             type="button"
             onClick={onRemove}
             className="p-1 text-red-600 hover:text-red-800"
-            title="Delete variant"
-          >
+            title="Delete variant">
             <TrashIcon className="h-4 w-4" />
           </button>
         )}
@@ -170,26 +193,40 @@ export const VariantCard = React.memo(function VariantCard({
         <div className="px-4 pb-4 space-y-3 border-t border-gray-200 pt-3">
           {isControl && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
-              <svg className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
               <div className="text-xs text-amber-800">
-                <strong>Warning:</strong> You are editing the Control variant. Changes here affect the baseline for comparison.
+                <strong>Warning:</strong> You are editing the Control variant.
+                Changes here affect the baseline for comparison.
               </div>
             </div>
           )}
           <div>
-            <h5 id="variables-heading" className="text-sm font-medium text-gray-700 mb-2">Variables</h5>
+            <h5
+              id="variables-heading"
+              className="text-sm font-medium text-gray-700 mb-2">
+              Variables
+            </h5>
             <div className="space-y-2">
               {Object.entries(displayVariables).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2">
+                  <Input value={key} disabled className="flex-1 text-sm" />
                   <Input
-                    value={key}
-                    disabled
-                    className="flex-1 text-sm"
-                  />
-                  <Input
-                    value={typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')}
+                    value={
+                      typeof value === "object"
+                        ? JSON.stringify(value)
+                        : String(value ?? "")
+                    }
                     onChange={(e) => onUpdateVariable(key, e.target.value)}
                     className="flex-1 text-sm"
                     disabled={!canEdit}
@@ -198,8 +235,7 @@ export const VariantCard = React.memo(function VariantCard({
                     <button
                       type="button"
                       onClick={() => onDeleteVariable(key)}
-                      className="p-1 text-red-600 hover:text-red-800"
-                    >
+                      className="p-1 text-red-600 hover:text-red-800">
                       <XMarkIcon className="h-4 w-4" />
                     </button>
                   )}
@@ -213,9 +249,9 @@ export const VariantCard = React.memo(function VariantCard({
                     value={newVariableName}
                     onChange={(e) => onNewVariableNameChange(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         onSaveVariable()
-                      } else if (e.key === 'Escape') {
+                      } else if (e.key === "Escape") {
                         onCancelVariable()
                       }
                     }}
@@ -228,9 +264,9 @@ export const VariantCard = React.memo(function VariantCard({
                     value={newVariableValue}
                     onChange={(e) => onNewVariableValueChange(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         onSaveVariable()
-                      } else if (e.key === 'Escape') {
+                      } else if (e.key === "Escape") {
                         onCancelVariable()
                       }
                     }}
@@ -241,18 +277,25 @@ export const VariantCard = React.memo(function VariantCard({
                     type="button"
                     onClick={onSaveVariable}
                     className="p-1 text-green-600 hover:text-green-800"
-                    title="Save variable"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    title="Save variable">
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </button>
                   <button
                     type="button"
                     onClick={onCancelVariable}
                     className="p-1 text-red-600 hover:text-red-800"
-                    title="Cancel"
-                  >
+                    title="Cancel">
                     <XMarkIcon className="h-4 w-4" />
                   </button>
                 </div>
@@ -264,8 +307,7 @@ export const VariantCard = React.memo(function VariantCard({
                   onClick={onAddVariable}
                   size="sm"
                   variant="secondary"
-                  className="w-full"
-                >
+                  className="w-full">
                   Add Variable
                 </Button>
               )}

@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { Button } from '../ui/Button'
-import { SystemPromptEditor, getSystemPromptOverride, clearSystemPromptOverride } from '../SystemPromptEditor'
+import React, { useEffect, useState } from "react"
+
+import {
+  clearSystemPromptOverride,
+  getSystemPromptOverride,
+  SystemPromptEditor
+} from "../SystemPromptEditor"
+import { Button } from "../ui/Button"
 
 interface SystemPromptSectionProps {
   onPromptChange?: (hasOverride: boolean) => void
@@ -25,7 +30,7 @@ export const SystemPromptSection = React.memo(function SystemPromptSection({
       setHasOverride(hasPrompt)
       onPromptChange?.(hasPrompt)
     } catch (error) {
-      console.error('Failed to check system prompt override:', error)
+      console.error("Failed to check system prompt override:", error)
     } finally {
       setIsLoading(false)
     }
@@ -46,7 +51,11 @@ export const SystemPromptSection = React.memo(function SystemPromptSection({
   }
 
   const handleResetToDefault = async () => {
-    if (!confirm('Reset to default system prompt? This will remove your custom override.')) {
+    if (
+      !confirm(
+        "Reset to default system prompt? This will remove your custom override."
+      )
+    ) {
       return
     }
 
@@ -55,7 +64,7 @@ export const SystemPromptSection = React.memo(function SystemPromptSection({
       setHasOverride(false)
       onPromptChange?.(false)
     } catch (error) {
-      console.error('Failed to reset system prompt:', error)
+      console.error("Failed to reset system prompt:", error)
     }
   }
 
@@ -77,27 +86,28 @@ export const SystemPromptSection = React.memo(function SystemPromptSection({
           AI Chat System Prompt
         </label>
         <p className="text-xs text-gray-500 mb-3">
-          Customize the system prompt used for AI-powered DOM generation. The default prompt provides comprehensive instructions for DOM change generation.
+          Customize the system prompt used for AI-powered DOM generation. The
+          default prompt provides comprehensive instructions for DOM change
+          generation.
         </p>
         <p className="text-xs text-blue-600 mb-3">
-          💡 Note: The editor opens full-screen on your current web page. Navigate to any website first, then click the button below.
+          💡 Note: The editor opens full-screen on your current web page.
+          Navigate to any website first, then click the button below.
         </p>
 
         <div className="flex items-center gap-2">
           <Button
             id="edit-system-prompt-button"
             onClick={handleOpenEditor}
-            variant="secondary"
-          >
-            {hasOverride ? 'Edit Custom Prompt' : 'Customize Prompt'}
+            variant="secondary">
+            {hasOverride ? "Edit Custom Prompt" : "Customize Prompt"}
           </Button>
 
           {hasOverride && (
             <Button
               id="reset-system-prompt-button"
               onClick={handleResetToDefault}
-              variant="secondary"
-            >
+              variant="secondary">
               Reset to Default
             </Button>
           )}

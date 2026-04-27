@@ -1,7 +1,8 @@
-import { renderHook, act } from '@testing-library/react'
-import { useJsPreviewDiagnostics } from '../useJsPreviewDiagnostics'
+import { act, renderHook } from "@testing-library/react"
 
-jest.mock('~src/utils/debug', () => ({
+import { useJsPreviewDiagnostics } from "../useJsPreviewDiagnostics"
+
+jest.mock("~src/utils/debug", () => ({
   debugLog: jest.fn(),
   debugError: jest.fn()
 }))
@@ -16,7 +17,7 @@ interface ChromeRuntimeMock {
   }
 }
 
-describe('useJsPreviewDiagnostics', () => {
+describe("useJsPreviewDiagnostics", () => {
   let chromeMock: { runtime: ChromeRuntimeMock }
 
   const installChrome = () => {
@@ -52,26 +53,26 @@ describe('useJsPreviewDiagnostics', () => {
     delete (global as any).chrome
   })
 
-  it('starts with no warnings and no change diagnostics', () => {
+  it("starts with no warnings and no change diagnostics", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
 
     expect(result.current.pageWarning).toBeNull()
     expect(result.current.changeDiagnostics).toEqual({})
   })
 
-  it('stores a page warning when CSP probe reports eval blocked', () => {
+  it("stores a page warning when CSP probe reports eval blocked", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
 
     act(() => {
       emit({
-        type: 'PREVIEW_CSP_PROBE_BROADCAST',
+        type: "PREVIEW_CSP_PROBE_BROADCAST",
         payload: {
           evalAllowed: false,
           inlineAllowed: false,
           jsBlocked: true,
-          evalError: 'Refused to evaluate',
-          inlineError: 'inline <script> blocked',
-          timestamp: '2026-04-21T00:00:00Z'
+          evalError: "Refused to evaluate",
+          inlineError: "inline <script> blocked",
+          timestamp: "2026-04-21T00:00:00Z"
         }
       })
     })
@@ -80,132 +81,143 @@ describe('useJsPreviewDiagnostics', () => {
       evalAllowed: false,
       inlineAllowed: false,
       jsBlocked: true,
-      evalError: 'Refused to evaluate',
-      inlineError: 'inline <script> blocked',
-      timestamp: '2026-04-21T00:00:00Z'
+      evalError: "Refused to evaluate",
+      inlineError: "inline <script> blocked",
+      timestamp: "2026-04-21T00:00:00Z"
     })
   })
 
-  it('records a per-change CSP diagnostic keyed by experiment + selector', () => {
+  it("records a per-change CSP diagnostic keyed by experiment + selector", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
 
     act(() => {
       emit({
-        type: 'PREVIEW_JS_ERROR_BROADCAST',
+        type: "PREVIEW_JS_ERROR_BROADCAST",
         payload: {
-          experimentName: 'exp_1',
-          selector: '.hero',
-          reason: 'csp',
-          error: 'Refused to evaluate',
-          timestamp: '2026-04-21T00:00:01Z'
+          experimentName: "exp_1",
+          selector: ".hero",
+          reason: "csp",
+          error: "Refused to evaluate",
+          timestamp: "2026-04-21T00:00:01Z"
         }
       })
     })
 
-    const key = result.current.getChangeKey('exp_1', '.hero')
+    const key = result.current.getChangeKey("exp_1", ".hero")
     expect(result.current.changeDiagnostics[key]).toEqual({
-      reason: 'csp',
-      message: 'Refused to evaluate',
-      timestamp: '2026-04-21T00:00:01Z'
+      reason: "csp",
+      message: "Refused to evaluate",
+      timestamp: "2026-04-21T00:00:01Z"
     })
   })
 
-  it('records runtime errors separately from CSP failures', () => {
+  it("records runtime errors separately from CSP failures", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
 
     act(() => {
       emit({
-        type: 'PREVIEW_JS_ERROR_BROADCAST',
+        type: "PREVIEW_JS_ERROR_BROADCAST",
         payload: {
-          experimentName: 'exp_1',
-          selector: '.hero',
-          reason: 'runtime',
-          error: 'TypeError: x is not a function',
-          timestamp: '2026-04-21T00:00:02Z'
+          experimentName: "exp_1",
+          selector: ".hero",
+          reason: "runtime",
+          error: "TypeError: x is not a function",
+          timestamp: "2026-04-21T00:00:02Z"
         }
       })
     })
 
-    const key = result.current.getChangeKey('exp_1', '.hero')
-    expect(result.current.changeDiagnostics[key].reason).toBe('runtime')
-    expect(result.current.changeDiagnostics[key].message).toContain('TypeError')
+    const key = result.current.getChangeKey("exp_1", ".hero")
+    expect(result.current.changeDiagnostics[key].reason).toBe("runtime")
+    expect(result.current.changeDiagnostics[key].message).toContain("TypeError")
   })
 
-  it('pending diagnostics do not overwrite an existing csp/runtime error', () => {
+  it("pending diagnostics do not overwrite an existing csp/runtime error", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
-    const key = result.current.getChangeKey('exp_1', '.hero')
+    const key = result.current.getChangeKey("exp_1", ".hero")
 
     act(() => {
       emit({
-        type: 'PREVIEW_JS_ERROR_BROADCAST',
+        type: "PREVIEW_JS_ERROR_BROADCAST",
         payload: {
-          experimentName: 'exp_1',
-          selector: '.hero',
-          reason: 'csp',
-          error: 'Blocked',
-          timestamp: '2026-04-21T00:00:00Z'
+          experimentName: "exp_1",
+          selector: ".hero",
+          reason: "csp",
+          error: "Blocked",
+          timestamp: "2026-04-21T00:00:00Z"
         }
       })
     })
-    expect(result.current.changeDiagnostics[key].reason).toBe('csp')
+    expect(result.current.changeDiagnostics[key].reason).toBe("csp")
 
     act(() => {
       emit({
-        type: 'PREVIEW_JS_PENDING_BROADCAST',
+        type: "PREVIEW_JS_PENDING_BROADCAST",
         payload: {
-          experimentName: 'exp_1',
-          selector: '.hero',
-          timestamp: '2026-04-21T00:00:01Z'
+          experimentName: "exp_1",
+          selector: ".hero",
+          timestamp: "2026-04-21T00:00:01Z"
         }
       })
     })
 
-    expect(result.current.changeDiagnostics[key].reason).toBe('csp')
+    expect(result.current.changeDiagnostics[key].reason).toBe("csp")
   })
 
-  it('a pending diagnostic is promoted to an error if one arrives later', () => {
+  it("a pending diagnostic is promoted to an error if one arrives later", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
-    const key = result.current.getChangeKey('exp_1', '.hero')
+    const key = result.current.getChangeKey("exp_1", ".hero")
 
     act(() => {
       emit({
-        type: 'PREVIEW_JS_PENDING_BROADCAST',
+        type: "PREVIEW_JS_PENDING_BROADCAST",
         payload: {
-          experimentName: 'exp_1',
-          selector: '.hero',
-          timestamp: '2026-04-21T00:00:00Z'
+          experimentName: "exp_1",
+          selector: ".hero",
+          timestamp: "2026-04-21T00:00:00Z"
         }
       })
     })
-    expect(result.current.changeDiagnostics[key].reason).toBe('pending')
+    expect(result.current.changeDiagnostics[key].reason).toBe("pending")
 
     act(() => {
       emit({
-        type: 'PREVIEW_JS_ERROR_BROADCAST',
+        type: "PREVIEW_JS_ERROR_BROADCAST",
         payload: {
-          experimentName: 'exp_1',
-          selector: '.hero',
-          reason: 'csp',
-          error: 'Blocked',
-          timestamp: '2026-04-21T00:00:01Z'
+          experimentName: "exp_1",
+          selector: ".hero",
+          reason: "csp",
+          error: "Blocked",
+          timestamp: "2026-04-21T00:00:01Z"
         }
       })
     })
 
-    expect(result.current.changeDiagnostics[key].reason).toBe('csp')
+    expect(result.current.changeDiagnostics[key].reason).toBe("csp")
   })
 
-  it('clear() resets both page warning and per-change diagnostics', () => {
+  it("clear() resets both page warning and per-change diagnostics", () => {
     const { result } = renderHook(() => useJsPreviewDiagnostics())
 
     act(() => {
       emit({
-        type: 'PREVIEW_CSP_PROBE_BROADCAST',
-        payload: { evalAllowed: false, inlineAllowed: false, jsBlocked: true, timestamp: 't' }
+        type: "PREVIEW_CSP_PROBE_BROADCAST",
+        payload: {
+          evalAllowed: false,
+          inlineAllowed: false,
+          jsBlocked: true,
+          timestamp: "t"
+        }
       })
       emit({
-        type: 'PREVIEW_JS_ERROR_BROADCAST',
-        payload: { experimentName: 'exp_1', selector: '.x', reason: 'csp', error: 'e', timestamp: 't' }
+        type: "PREVIEW_JS_ERROR_BROADCAST",
+        payload: {
+          experimentName: "exp_1",
+          selector: ".x",
+          reason: "csp",
+          error: "e",
+          timestamp: "t"
+        }
       })
     })
 
@@ -220,7 +232,7 @@ describe('useJsPreviewDiagnostics', () => {
     expect(result.current.changeDiagnostics).toEqual({})
   })
 
-  it('removes the chrome.runtime listener on unmount', () => {
+  it("removes the chrome.runtime listener on unmount", () => {
     const { unmount } = renderHook(() => useJsPreviewDiagnostics())
 
     expect(chromeMock.runtime.onMessage.addListener).toHaveBeenCalledTimes(1)

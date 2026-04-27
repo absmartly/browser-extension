@@ -1,5 +1,6 @@
-import React from 'react'
-import { Input } from '../ui/Input'
+import React from "react"
+
+import { Input } from "../ui/Input"
 
 interface SDKConfigSectionProps {
   sdkWindowProperty: string
@@ -20,7 +21,8 @@ export const SDKConfigSection = React.memo(function SDKConfigSection({
         placeholder="e.g., ABsmartlyContext or sdk.context"
       />
       <p className="mt-1 text-xs text-gray-500">
-        The window property where the ABsmartly SDK context is stored. Leave empty to use automatic detection.
+        The window property where the ABsmartly SDK context is stored. Leave
+        empty to use automatic detection.
       </p>
     </div>
   )

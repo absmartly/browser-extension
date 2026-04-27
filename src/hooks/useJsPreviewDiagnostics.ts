@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
-import { debugLog } from '~src/utils/debug'
+import { useCallback, useEffect, useState } from "react"
 
-export type JsDiagnosticReason = 'csp' | 'runtime' | 'pending'
+import { debugLog } from "~src/utils/debug"
+
+export type JsDiagnosticReason = "csp" | "runtime" | "pending"
 
 export interface JsChangeDiagnostic {
   reason: JsDiagnosticReason
@@ -25,28 +26,32 @@ export interface UseJsPreviewDiagnosticsResult {
   getChangeKey: (experimentName: string | undefined, selector: string) => string
 }
 
-const changeKey = (experimentName: string | undefined, selector: string): string =>
-  `${experimentName || '__preview__'}::${selector}`
+const changeKey = (
+  experimentName: string | undefined,
+  selector: string
+): string => `${experimentName || "__preview__"}::${selector}`
 
 export function useJsPreviewDiagnostics(): UseJsPreviewDiagnosticsResult {
   const [pageWarning, setPageWarning] = useState<JsPagePspWarning | null>(null)
-  const [changeDiagnostics, setChangeDiagnostics] = useState<Record<string, JsChangeDiagnostic>>({})
+  const [changeDiagnostics, setChangeDiagnostics] = useState<
+    Record<string, JsChangeDiagnostic>
+  >({})
 
   useEffect(() => {
-    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) {
+    if (typeof chrome === "undefined" || !chrome.runtime?.onMessage) {
       return
     }
 
     const runtimeOnMessage = chrome.runtime.onMessage
 
     const listener = (message: unknown): void => {
-      if (!message || typeof message !== 'object') return
+      if (!message || typeof message !== "object") return
       const { type, payload } = message as { type?: string; payload?: any }
       if (!type || !payload) return
 
       switch (type) {
-        case 'PREVIEW_CSP_PROBE_BROADCAST': {
-          debugLog('[useJsPreviewDiagnostics] CSP probe result:', payload)
+        case "PREVIEW_CSP_PROBE_BROADCAST": {
+          debugLog("[useJsPreviewDiagnostics] CSP probe result:", payload)
           setPageWarning({
             evalAllowed: !!payload.evalAllowed,
             inlineAllowed: !!payload.inlineAllowed,
@@ -57,31 +62,31 @@ export function useJsPreviewDiagnostics(): UseJsPreviewDiagnosticsResult {
           })
           break
         }
-        case 'PREVIEW_JS_ERROR_BROADCAST': {
-          debugLog('[useJsPreviewDiagnostics] JS error:', payload)
+        case "PREVIEW_JS_ERROR_BROADCAST": {
+          debugLog("[useJsPreviewDiagnostics] JS error:", payload)
           const key = changeKey(payload.experimentName, payload.selector)
-          setChangeDiagnostics(prev => ({
+          setChangeDiagnostics((prev) => ({
             ...prev,
             [key]: {
-              reason: payload.reason === 'runtime' ? 'runtime' : 'csp',
-              message: String(payload.error || 'JavaScript execution failed'),
+              reason: payload.reason === "runtime" ? "runtime" : "csp",
+              message: String(payload.error || "JavaScript execution failed"),
               timestamp: payload.timestamp || new Date().toISOString()
             }
           }))
           break
         }
-        case 'PREVIEW_JS_PENDING_BROADCAST': {
-          debugLog('[useJsPreviewDiagnostics] JS pending:', payload)
+        case "PREVIEW_JS_PENDING_BROADCAST": {
+          debugLog("[useJsPreviewDiagnostics] JS pending:", payload)
           const key = changeKey(payload.experimentName, payload.selector)
-          setChangeDiagnostics(prev => {
-            if (prev[key] && prev[key].reason !== 'pending') {
+          setChangeDiagnostics((prev) => {
+            if (prev[key] && prev[key].reason !== "pending") {
               return prev
             }
             return {
               ...prev,
               [key]: {
-                reason: 'pending',
-                message: 'Waiting for selector to appear on the page',
+                reason: "pending",
+                message: "Waiting for selector to appear on the page",
                 timestamp: payload.timestamp || new Date().toISOString()
               }
             }

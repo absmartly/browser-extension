@@ -6,7 +6,7 @@
  * @module OverrideManager
  */
 
-import { Logger } from '../utils/logger'
+import { Logger } from "../utils/logger"
 
 export interface OverrideValue {
   variant: number
@@ -22,7 +22,7 @@ export interface ParsedOverrides {
 export class OverrideManager {
   private cookieName: string
 
-  constructor(cookieName: string = 'absmartly_overrides') {
+  constructor(cookieName: string = "absmartly_overrides") {
     this.cookieName = cookieName
   }
 
@@ -45,24 +45,24 @@ export class OverrideManager {
       let experimentsStr = cookieValue
 
       // Check if dev environment is included
-      if (cookieValue.startsWith('devEnv=')) {
-        const parts = cookieValue.split('|')
+      if (cookieValue.startsWith("devEnv=")) {
+        const parts = cookieValue.split("|")
         devEnv = decodeURIComponent(parts[0].substring(7)) // Remove 'devEnv=' prefix
-        experimentsStr = parts[1] || ''
+        experimentsStr = parts[1] || ""
       }
 
       const overrides: Record<string, number | OverrideValue> = {}
 
       if (experimentsStr) {
         // NEW FORMAT: comma separates experiments, dot separates values within each experiment
-        const experiments = experimentsStr.split(',')
+        const experiments = experimentsStr.split(",")
 
         for (const exp of experiments) {
-          const [name, values] = exp.split(':')
+          const [name, values] = exp.split(":")
           if (!name || !values) continue
 
           const decodedName = decodeURIComponent(name)
-          const parts = values.split('.')
+          const parts = values.split(".")
 
           if (parts.length === 1) {
             // Simple format: just variant (running experiment)
@@ -86,7 +86,10 @@ export class OverrideManager {
 
       return { overrides, devEnv }
     } catch (error) {
-      Logger.warn('[ABsmartly Extension] Failed to parse override cookie:', error)
+      Logger.warn(
+        "[ABsmartly Extension] Failed to parse override cookie:",
+        error
+      )
       return { overrides: {}, devEnv: null }
     }
   }
@@ -101,13 +104,13 @@ export class OverrideManager {
     try {
       // Just check if cookie exists - OverridesPlugin handles all parsing and application
       const row = document.cookie
-        .split('; ')
+        .split("; ")
         .find((row) => row.startsWith(`${this.cookieName}=`))
 
       let cookieValue: string | undefined
       if (row) {
         // Use substring to preserve values with = signs
-        const eqIndex = row.indexOf('=')
+        const eqIndex = row.indexOf("=")
         if (eqIndex !== -1) {
           cookieValue = row.substring(eqIndex + 1)
         }
@@ -115,24 +118,27 @@ export class OverrideManager {
 
       if (cookieValue) {
         Logger.log(
-          '[ABsmartly Extension] Found absmartly_overrides cookie (will be handled by OverridesPlugin)'
+          "[ABsmartly Extension] Found absmartly_overrides cookie (will be handled by OverridesPlugin)"
         )
 
         // Log if development environment is present (just for debugging)
-        if (cookieValue.startsWith('devEnv=')) {
+        if (cookieValue.startsWith("devEnv=")) {
           const devEnvMatch = cookieValue.match(/^devEnv=([^|]+)/)
           if (devEnvMatch) {
             Logger.log(
-              '[ABsmartly Extension] Development environment in cookie:',
+              "[ABsmartly Extension] Development environment in cookie:",
               decodeURIComponent(devEnvMatch[1])
             )
           }
         }
       } else {
-        Logger.log('[ABsmartly Extension] No experiment overrides cookie found')
+        Logger.log("[ABsmartly Extension] No experiment overrides cookie found")
       }
     } catch (error) {
-      Logger.error('[ABsmartly Extension] Error checking overrides cookie:', error)
+      Logger.error(
+        "[ABsmartly Extension] Error checking overrides cookie:",
+        error
+      )
     }
   }
 
@@ -142,19 +148,19 @@ export class OverrideManager {
   getCookieValue(): string | null {
     try {
       const row = document.cookie
-        .split('; ')
+        .split("; ")
         .find((row) => row.startsWith(`${this.cookieName}=`))
 
       if (!row) return null
 
       // Use substring to preserve values with = signs
-      const eqIndex = row.indexOf('=')
+      const eqIndex = row.indexOf("=")
       if (eqIndex === -1) return null
 
       const value = row.substring(eqIndex + 1)
       return value || null
     } catch (error) {
-      Logger.error('[ABsmartly Extension] Error getting cookie value:', error)
+      Logger.error("[ABsmartly Extension] Error getting cookie value:", error)
       return null
     }
   }

@@ -7,7 +7,7 @@
  * @module HTMLSanitizer
  */
 
-import DOMPurify from 'dompurify'
+import DOMPurify from "dompurify"
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -29,22 +29,53 @@ import DOMPurify from 'dompurify'
  * ```
  */
 export function sanitizeHTML(html: string): string {
-  if (!html) return ''
+  if (!html) return ""
 
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
-      'div', 'span', 'p', 'a', 'img', 'br', 'hr',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'ul', 'ol', 'li',
-      'table', 'thead', 'tbody', 'tr', 'td', 'th',
-      'strong', 'em', 'b', 'i', 'u',
-      'blockquote', 'pre', 'code'
+      "div",
+      "span",
+      "p",
+      "a",
+      "img",
+      "br",
+      "hr",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "ul",
+      "ol",
+      "li",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "td",
+      "th",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "u",
+      "blockquote",
+      "pre",
+      "code"
     ],
     ALLOWED_ATTR: [
-      'class', 'id', 'style',
-      'href', 'src', 'alt', 'title',
-      'width', 'height',
-      'colspan', 'rowspan'
+      "class",
+      "id",
+      "style",
+      "href",
+      "src",
+      "alt",
+      "title",
+      "width",
+      "height",
+      "colspan",
+      "rowspan"
     ],
     ALLOW_DATA_ATTR: false,
     KEEP_CONTENT: true

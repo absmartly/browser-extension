@@ -1,20 +1,26 @@
-import React, { useEffect } from 'react'
-import { Button } from './ui/Button'
-import { Input } from './ui/Input'
-import { Header } from './Header'
-import { CookieConsentModal } from './CookieConsentModal'
-import { AuthenticationStatusSection } from './settings/AuthenticationStatusSection'
-import { DOMChangesStorageSection } from './settings/DOMChangesStorageSection'
-import { SDKConfigSection } from './settings/SDKConfigSection'
-import { QueryStringOverridesSection } from './settings/QueryStringOverridesSection'
-import { AIProviderSection } from './settings/AIProviderSection'
-import { SystemPromptSection } from './settings/SystemPromptSection'
-import { Checkbox } from './ui/Checkbox'
-import { useSettingsForm } from '~src/hooks/useSettingsForm'
-import type { ABsmartlyConfig } from '~src/types/absmartly'
-import { setConfig } from '~src/utils/storage'
-import { ensureProviderPermissions, PROVIDER_REGISTRY } from '~src/lib/ai-providers'
-import { debugError } from '~src/utils/debug'
+import React, { useEffect, useState } from "react"
+
+import { useSettingsForm } from "~src/hooks/useSettingsForm"
+import {
+  ensureProviderPermissions,
+  PROVIDER_REGISTRY
+} from "~src/lib/ai-providers"
+import type { ABsmartlyConfig } from "~src/types/absmartly"
+import { debugError } from "~src/utils/debug"
+import { setConfig } from "~src/utils/storage"
+
+import { CookieConsentModal } from "./CookieConsentModal"
+import { Header } from "./Header"
+import { AIProviderSection } from "./settings/AIProviderSection"
+import { AuthenticationStatusSection } from "./settings/AuthenticationStatusSection"
+import { DOMChangesStorageSection } from "./settings/DOMChangesStorageSection"
+import { QueryStringOverridesSection } from "./settings/QueryStringOverridesSection"
+import { SDKConfigSection } from "./settings/SDKConfigSection"
+import { SystemPromptSection } from "./settings/SystemPromptSection"
+import { Button } from "./ui/Button"
+import { Checkbox } from "./ui/Checkbox"
+import { Input } from "./ui/Input"
+import { UnsavedChangesModal } from "./UnsavedChangesModal"
 
 interface SettingsViewProps {
   onSave: (config: ABsmartlyConfig) => void
@@ -69,8 +75,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     normalizeEndpoint,
     validateForm,
     buildConfig,
+    isDirty,
+    markFormPristine,
     requestCookiePermission
   } = useSettingsForm()
+
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false)
+  const [savingFromModal, setSavingFromModal] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -78,10 +89,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   const handleSave = async () => {
     const isValid = await validateForm()
-    if (!isValid) return
+    if (!isValid) return false
 
     if (aiApiKey && !PROVIDER_REGISTRY[aiProvider]?.isBridge) {
-      await ensureProviderPermissions(aiProvider, customEndpoint || undefined).catch(() => {})
+      await ensureProviderPermissions(
+        aiProvider,
+        customEndpoint || undefined
+      ).catch(() => {})
     }
 
     const config = buildConfig()
@@ -91,20 +105,67 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
       const normalized = normalizeEndpoint(apiEndpoint)
       if (normalized) {
-        localStorage.setItem('absmartly-endpoint', normalized)
+        localStorage.setItem("absmartly-endpoint", normalized)
       }
 
+      markFormPristine()
       onSave(config)
+      return true
     } catch (error) {
-      debugError('Failed to save config:', error)
-      setErrors({ general: 'Failed to save settings' })
+      debugError("Failed to save config:", error)
+      setErrors({ general: "Failed to save settings" })
+      return false
     }
   }
 
+  const handleBack = () => {
+    if (isDirty) {
+      setShowUnsavedModal(true)
+      return
+    }
+    onCancel()
+  }
+
+  const handleUnsavedSave = async () => {
+    setSavingFromModal(true)
+    try {
+      const saved = await handleSave()
+      if (saved) {
+        setShowUnsavedModal(false)
+      }
+    } finally {
+      setSavingFromModal(false)
+    }
+  }
+
+  const handleUnsavedDiscard = () => {
+    setShowUnsavedModal(false)
+    onCancel()
+  }
+
+  const handleUnsavedCancel = () => {
+    setShowUnsavedModal(false)
+  }
+
   const handleAuthenticate = () => {
-    if (apiEndpoint) {
-      const baseUrl = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    if (!apiEndpoint) return
+
+    const baseUrl = apiEndpoint.replace(/\/+$/, "").replace(/\/v1$/, "")
+    try {
       chrome.tabs.create({ url: baseUrl })
+    } catch (error) {
+      const message = (error as Error)?.message ?? ""
+      debugError("Failed to open authentication tab:", error)
+      if (message.includes("Extension context invalidated")) {
+        setErrors({
+          general:
+            "The extension was reloaded. Please close and reopen the sidebar, then try again."
+        })
+      } else {
+        setErrors({
+          general: `Failed to open authentication tab: ${message || "unknown error"}`
+        })
+      }
     }
   }
 
@@ -113,11 +174,12 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     setShowCookieConsentModal(false)
 
     if (granted && apiEndpoint) {
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
       await checkAuthStatus(apiEndpoint, { apiKey, authMethod })
     } else if (!granted) {
       setErrors({
-        general: 'Cookie permission was denied. Please grant permission to use JWT authentication.'
+        general:
+          "Cookie permission was denied. Please grant permission to use JWT authentication."
       })
     }
   }
@@ -125,7 +187,8 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
   const handleCookieConsentDeny = () => {
     setShowCookieConsentModal(false)
     setErrors({
-      general: 'Access permission is required to communicate with ABsmartly. Please grant permission to continue.'
+      general:
+        "Access permission is required to communicate with ABsmartly. Please grant permission to continue."
     })
   }
 
@@ -148,14 +211,24 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         onDeny={handleCookieConsentDeny}
       />
 
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleUnsavedSave}
+        onDiscard={handleUnsavedDiscard}
+        onCancel={handleUnsavedCancel}
+        saving={savingFromModal}
+      />
+
       <Header
         title="Settings"
-        onBack={onCancel}
+        onBack={handleBack}
         config={apiEndpoint ? { apiEndpoint } : undefined}
       />
 
       {errors.general && (
-        <div role="alert" className="bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
+        <div
+          role="alert"
+          className="bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
           {errors.general}
         </div>
       )}
@@ -182,15 +255,17 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       />
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">Authentication Method</label>
+        <label className="text-sm font-medium text-gray-700">
+          Authentication Method
+        </label>
         <div className="flex gap-4">
           <label className="flex items-center">
             <input
               id="auth-method-jwt"
               type="radio"
               value="jwt"
-              checked={authMethod === 'jwt'}
-              onChange={(e) => setAuthMethod(e.target.value as 'jwt')}
+              checked={authMethod === "jwt"}
+              onChange={(e) => setAuthMethod(e.target.value as "jwt")}
               className="mr-2"
             />
             <span className="text-sm">JWT from Browser Cookie (Default)</span>
@@ -200,24 +275,24 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
               id="auth-method-apikey"
               type="radio"
               value="apikey"
-              checked={authMethod === 'apikey'}
-              onChange={(e) => setAuthMethod(e.target.value as 'apikey')}
+              checked={authMethod === "apikey"}
+              onChange={(e) => setAuthMethod(e.target.value as "apikey")}
               className="mr-2"
             />
             <span className="text-sm">API Key</span>
           </label>
         </div>
         <p className="text-xs text-gray-500">
-          {authMethod === 'jwt'
-            ? 'Uses JWT token from browser cookies. You must be logged into ABsmartly.'
-            : 'Uses the API key configured below for authentication.'}
+          {authMethod === "jwt"
+            ? "Uses JWT token from browser cookies. You must be logged into ABsmartly."
+            : "Uses the API key configured below for authentication."}
         </p>
       </div>
 
       <div>
         <Input
           id="api-key-input"
-          label={`API Key ${authMethod === 'apikey' ? '(Required)' : '(Optional)'}`}
+          label={`API Key ${authMethod === "apikey" ? "(Required)" : "(Optional)"}`}
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
@@ -226,9 +301,9 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           showPasswordToggle={true}
         />
         <p className="mt-1 text-xs text-gray-500">
-          {authMethod === 'jwt'
-            ? 'Not used when JWT is selected. You must be logged into ABsmartly in your browser.'
-            : 'API key will be used for all authentication requests.'}
+          {authMethod === "jwt"
+            ? "Not used when JWT is selected. You must be logged into ABsmartly in your browser."
+            : "API key will be used for all authentication requests."}
         </p>
       </div>
 
@@ -265,9 +340,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             checked={vibeStudioEnabled}
             onChange={setVibeStudioEnabled}
           />
-          <label htmlFor="vibe-studio-toggle" className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+          <label
+            htmlFor="vibe-studio-toggle"
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
             Vibe Studio
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Beta</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+              Beta
+            </span>
           </label>
         </div>
         <p className="text-xs text-gray-500 ml-8">
@@ -282,13 +361,18 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
             checked={htmlInjectionEnabled}
             onChange={setHtmlInjectionEnabled}
           />
-          <label htmlFor="html-injection-toggle" className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+          <label
+            htmlFor="html-injection-toggle"
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
             HTML Injection
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Advanced</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+              Advanced
+            </span>
           </label>
         </div>
         <p className="text-xs text-gray-500 ml-8">
-          Enable the HTML injection section in experiments. Injected HTML applies to all variants regardless of assignment.
+          Enable the HTML injection section in experiments. Injected HTML
+          applies to all variants regardless of assignment.
         </p>
       </div>
 
@@ -314,10 +398,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       )}
 
       <div className="flex gap-2 pt-2">
-        <Button id="save-settings-button" onClick={handleSave} variant="primary">
+        <Button
+          id="save-settings-button"
+          onClick={handleSave}
+          variant="primary">
           Save Settings
         </Button>
-        <Button id="cancel-button" onClick={onCancel} variant="secondary">
+        <Button id="cancel-button" onClick={handleBack} variant="secondary">
           Cancel
         </Button>
       </div>

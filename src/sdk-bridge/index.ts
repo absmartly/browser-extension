@@ -9,17 +9,19 @@
  * @version 1.1.0
  */
 
-import { Orchestrator } from './core/orchestrator'
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { Orchestrator } from "./core/orchestrator"
+
 // Version
-export const SDK_BRIDGE_VERSION = '1.1.0'
+export const SDK_BRIDGE_VERSION = "1.1.0"
 
 // CRITICAL: Do not run SDK bridge inside the sidebar iframe!
 // The sidebar is the extension UI and should not process preview changes
 if (window.self !== window.top) {
   // We're in an iframe - check if it's the sidebar
-  const isInSidebarIframe = window.frameElement?.id === 'absmartly-sidebar-iframe'
+  const isInSidebarIframe =
+    window.frameElement?.id === "absmartly-sidebar-iframe"
   if (!isInSidebarIframe) {
     // Not the sidebar - initialize normally
     initializeBridge()
@@ -45,5 +47,5 @@ function initializeBridge() {
   orchestrator.start()
 
   // Log that we're loaded
-  debugLog('[SDK Bridge] Module loaded - version', SDK_BRIDGE_VERSION)
+  debugLog("[SDK Bridge] Module loaded - version", SDK_BRIDGE_VERSION)
 }

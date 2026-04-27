@@ -2,8 +2,8 @@
  * Type definitions for session storage state objects
  */
 
-import type { EditingDOMChange } from '~src/components/DOMChangeEditor'
-import type { DOMChange, AIDOMContext } from '~src/types/dom-changes'
+import type { EditingDOMChange } from "~src/components/DOMChangeEditor"
+import type { AIDOMContext, DOMChange } from "~src/types/dom-changes"
 
 export interface DOMChangesInlineState {
   variantName: string
@@ -23,7 +23,7 @@ export interface DragDropResult {
   variantName: string
   selector: string
   targetSelector: string
-  position: 'before' | 'after' | 'firstChild' | 'lastChild'
+  position: "before" | "after" | "firstChild" | "lastChild"
 }
 
 export interface VisualEditorChanges {

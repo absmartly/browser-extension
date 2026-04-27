@@ -3,11 +3,12 @@
  * Handles rearrange mode (drag & drop) and resize mode functionality
  */
 
-import StateManager from './state-manager'
-import { generateRobustSelector } from '../utils/selector-generator'
-import type { DOMChange } from '../types/visual-editor'
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import type { DOMChange } from "../types/visual-editor"
+import { generateRobustSelector } from "../utils/selector-generator"
+import StateManager from "./state-manager"
+
 export class EditModes {
   private stateManager: StateManager
   private addChange: ((change: DOMChange) => void) | null = null
@@ -21,13 +22,13 @@ export class EditModes {
   }
 
   enableRearrangeMode(element: Element): void {
-    debugLog('[ABSmartly] Enabling rearrange mode for element:', element)
+    debugLog("[ABSmartly] Enabling rearrange mode for element:", element)
 
     const smartElement = this.getSmartDraggableElement(element)
     if (!smartElement) return
 
     this.stateManager.setRearranging(true)
-    smartElement.classList.add('absmartly-draggable')
+    smartElement.classList.add("absmartly-draggable")
 
     // Check if this element already has a move change to preserve its TRUE original position
     const elementSelector = generateRobustSelector(smartElement, {
@@ -39,64 +40,75 @@ export class EditModes {
 
     const existingChanges = this.stateManager.getState().changes || []
     const existingMoveChange = existingChanges.find(
-      c => c.selector === elementSelector && c.type === 'move'
+      (c) => c.selector === elementSelector && c.type === "move"
     )
 
     // Store original parent info - use existing if available
     let originalParent: Element | null
     let originalNextSibling: Element | null
 
-    if (existingMoveChange && (existingMoveChange as any).value?.originalTargetSelector) {
+    if (
+      existingMoveChange &&
+      (existingMoveChange as any).value?.originalTargetSelector
+    ) {
       // This element was already moved, preserve its TRUE original position
-      debugLog('[ABSmartly] Element already has move change, preserving original position')
+      debugLog(
+        "[ABSmartly] Element already has move change, preserving original position"
+      )
       originalParent = null // Will be handled by trackMoveChange
       originalNextSibling = null // Will be handled by trackMoveChange
     } else {
       // First time moving this element, capture current position as original
       originalParent = smartElement.parentElement
       originalNextSibling = smartElement.nextElementSibling
-      debugLog('[ABSmartly] First move of element, capturing original position')
+      debugLog("[ABSmartly] First move of element, capturing original position")
     }
 
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true
 
     const handleDragStart = (e: DragEvent) => {
-      debugLog('[ABSmartly] Drag start')
+      debugLog("[ABSmartly] Drag start")
       this.stateManager.setDraggedElement(smartElement)
-      smartElement.classList.add('absmartly-dragging')
+      smartElement.classList.add("absmartly-dragging")
 
       // Set drag data
       if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData('text/html', smartElement.outerHTML)
+        e.dataTransfer.effectAllowed = "move"
+        e.dataTransfer.setData("text/html", smartElement.outerHTML)
       }
     }
 
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault()
       if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'move'
+        e.dataTransfer.dropEffect = "move"
       }
       const target = e.target as Element
       if (target !== smartElement && !smartElement.contains(target)) {
-        target.classList.add('absmartly-drop-target')
+        target.classList.add("absmartly-drop-target")
       }
     }
 
     const handleDragLeave = (e: DragEvent) => {
-      ;(e.target as Element).classList.remove('absmartly-drop-target')
+      ;(e.target as Element).classList.remove("absmartly-drop-target")
     }
 
     const handleDrop = (e: DragEvent) => {
       e.preventDefault()
       const target = e.target as Element
-      const dropTarget = target.closest('*:not(script):not(style):not(link)') as Element
+      const dropTarget = target.closest(
+        "*:not(script):not(style):not(link)"
+      ) as Element
 
-      if (dropTarget && dropTarget !== smartElement && !smartElement.contains(dropTarget)) {
+      if (
+        dropTarget &&
+        dropTarget !== smartElement &&
+        !smartElement.contains(dropTarget)
+      ) {
         // Remove drop target styling
-        document.querySelectorAll('.absmartly-drop-target').forEach(el => {
-          el.classList.remove('absmartly-drop-target')
+        document.querySelectorAll(".absmartly-drop-target").forEach((el) => {
+          el.classList.remove("absmartly-drop-target")
         })
 
         // Determine drop position
@@ -106,7 +118,10 @@ export class EditModes {
 
         try {
           if (insertAfter && dropTarget.nextElementSibling) {
-            dropTarget.parentElement?.insertBefore(smartElement, dropTarget.nextElementSibling)
+            dropTarget.parentElement?.insertBefore(
+              smartElement,
+              dropTarget.nextElementSibling
+            )
           } else if (!insertAfter) {
             dropTarget.parentElement?.insertBefore(smartElement, dropTarget)
           } else {
@@ -114,59 +129,63 @@ export class EditModes {
           }
 
           // Track the change
-          this.trackMoveChange(smartElement, originalParent, originalNextSibling)
-          debugLog('[ABSmartly] Element moved successfully')
+          this.trackMoveChange(
+            smartElement,
+            originalParent,
+            originalNextSibling
+          )
+          debugLog("[ABSmartly] Element moved successfully")
         } catch (error) {
-          debugWarn('[ABSmartly] Move failed:', error)
+          debugWarn("[ABSmartly] Move failed:", error)
         }
       }
     }
 
     const handleDragEnd = (e: DragEvent) => {
-      debugLog('[ABSmartly] Drag end')
+      debugLog("[ABSmartly] Drag end")
 
       // Clean up drag state
-      smartElement.classList.remove('absmartly-dragging')
+      smartElement.classList.remove("absmartly-dragging")
       ;(smartElement as HTMLElement).draggable = false
       this.stateManager.setDraggedElement(null)
       this.stateManager.setRearranging(false)
 
       // Remove all drop target indicators
-      document.querySelectorAll('.absmartly-drop-target').forEach(el => {
-        el.classList.remove('absmartly-drop-target')
+      document.querySelectorAll(".absmartly-drop-target").forEach((el) => {
+        el.classList.remove("absmartly-drop-target")
       })
 
       // Remove event listeners
-      smartElement.removeEventListener('dragstart', handleDragStart)
-      document.removeEventListener('dragover', handleDragOver)
-      document.removeEventListener('dragleave', handleDragLeave)
-      document.removeEventListener('drop', handleDrop)
-      smartElement.removeEventListener('dragend', handleDragEnd)
+      smartElement.removeEventListener("dragstart", handleDragStart)
+      document.removeEventListener("dragover", handleDragOver)
+      document.removeEventListener("dragleave", handleDragLeave)
+      document.removeEventListener("drop", handleDrop)
+      smartElement.removeEventListener("dragend", handleDragEnd)
 
-      smartElement.classList.remove('absmartly-draggable')
+      smartElement.classList.remove("absmartly-draggable")
     }
 
     // Add event listeners
-    smartElement.addEventListener('dragstart', handleDragStart)
-    document.addEventListener('dragover', handleDragOver)
-    document.addEventListener('dragleave', handleDragLeave)
-    document.addEventListener('drop', handleDrop)
-    smartElement.addEventListener('dragend', handleDragEnd)
+    smartElement.addEventListener("dragstart", handleDragStart)
+    document.addEventListener("dragover", handleDragOver)
+    document.addEventListener("dragleave", handleDragLeave)
+    document.addEventListener("drop", handleDrop)
+    smartElement.addEventListener("dragend", handleDragEnd)
 
     // Auto-exit after 10 seconds
     setTimeout(() => {
       if (this.stateManager.getState().isRearranging) {
-        handleDragEnd(new DragEvent('dragend'))
+        handleDragEnd(new DragEvent("dragend"))
       }
     }, 10000)
   }
 
   enableResizeMode(element: Element): void {
-    debugLog('[ABSmartly] Enabling resize mode for element:', element)
+    debugLog("[ABSmartly] Enabling resize mode for element:", element)
     const htmlElement = element as HTMLElement
 
     // Debug: Check current styles
-    debugLog('[ABSmartly] Current element styles:', {
+    debugLog("[ABSmartly] Current element styles:", {
       width: htmlElement.style.width,
       height: htmlElement.style.height,
       computedWidth: window.getComputedStyle(htmlElement).width,
@@ -174,11 +193,13 @@ export class EditModes {
     })
 
     this.stateManager.setResizing(true)
-    element.classList.add('absmartly-resize-active')
+    element.classList.add("absmartly-resize-active")
 
     // Set global flag to prevent DOM changes from being reapplied during resize
     ;(window as any).__absmartlyVisualEditorModifying = true
-    debugLog('[ABSmartly] Set visual editor modifying flag to prevent DOM changes reapplication')
+    debugLog(
+      "[ABSmartly] Set visual editor modifying flag to prevent DOM changes reapplication"
+    )
 
     // Store original styles locally for tracking
     const originalStyles = {
@@ -199,92 +220,110 @@ export class EditModes {
       // Store current styles before any resize happens
       const computedStyle = window.getComputedStyle(htmlElement)
       existingData.styles = {
-        width: htmlElement.style.width || computedStyle.width || '',
-        height: htmlElement.style.height || computedStyle.height || ''
+        width: htmlElement.style.width || computedStyle.width || "",
+        height: htmlElement.style.height || computedStyle.height || ""
       }
       htmlElement.dataset.absmartlyOriginal = JSON.stringify(existingData)
-      debugLog('[ABSmartly] Stored original dimensions in DOM:', existingData.styles)
+      debugLog(
+        "[ABSmartly] Stored original dimensions in DOM:",
+        existingData.styles
+      )
     }
 
     // Create resize handles
     const handles = this.createResizeHandles(element as HTMLElement)
 
     const handleMouseDown = (e: MouseEvent, direction: string) => {
-      debugLog('[ABSmartly] Resize handle mousedown:', direction)
+      debugLog("[ABSmartly] Resize handle mousedown:", direction)
       e.preventDefault()
       e.stopPropagation()
 
       // Set global flag to prevent DOM changes from being reapplied during resize
       ;(window as any).__absmartlyVisualEditorModifying = true
-      debugLog('[ABSmartly] MOUSEDOWN: Set visual editor modifying flag to prevent DOM changes reapplication', {
-        flagValue: (window as any).__absmartlyVisualEditorModifying,
-        timestamp: Date.now(),
-        direction
-      })
+      debugLog(
+        "[ABSmartly] MOUSEDOWN: Set visual editor modifying flag to prevent DOM changes reapplication",
+        {
+          flagValue: (window as any).__absmartlyVisualEditorModifying,
+          timestamp: Date.now(),
+          direction
+        }
+      )
 
       const startX = e.clientX
       const startY = e.clientY
       const startRect = element.getBoundingClientRect()
-      debugLog('[ABSmartly] Start rect:', startRect)
+      debugLog("[ABSmartly] Start rect:", startRect)
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         const deltaX = moveEvent.clientX - startX
         const deltaY = moveEvent.clientY - startY
 
-        this.applyResize(element as HTMLElement, direction, deltaX, deltaY, startRect)
+        this.applyResize(
+          element as HTMLElement,
+          direction,
+          deltaX,
+          deltaY,
+          startRect
+        )
       }
 
       const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
 
         // Clear global flag to allow DOM changes to be reapplied again
         ;(window as any).__absmartlyVisualEditorModifying = false
-        debugLog('[ABSmartly] MOUSEUP: Cleared visual editor modifying flag, DOM changes can be reapplied', {
-          flagValue: (window as any).__absmartlyVisualEditorModifying,
-          timestamp: Date.now()
-        })
+        debugLog(
+          "[ABSmartly] MOUSEUP: Cleared visual editor modifying flag, DOM changes can be reapplied",
+          {
+            flagValue: (window as any).__absmartlyVisualEditorModifying,
+            timestamp: Date.now()
+          }
+        )
 
         // Track the change
         this.trackResizeChange(element, originalStyles)
       }
 
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
     }
 
     // Attach handlers to resize handles
-    handles.forEach(handle => {
+    handles.forEach((handle) => {
       const direction = handle.dataset.direction!
-      debugLog('[ABSmartly] Attaching mousedown handler to handle:', direction)
-      handle.addEventListener('mousedown', (e) => {
-        debugLog('[ABSmartly] Handle clicked:', direction)
+      debugLog("[ABSmartly] Attaching mousedown handler to handle:", direction)
+      handle.addEventListener("mousedown", (e) => {
+        debugLog("[ABSmartly] Handle clicked:", direction)
         handleMouseDown(e, direction)
       })
     })
-    debugLog('[ABSmartly] Created', handles.length, 'resize handles')
+    debugLog("[ABSmartly] Created", handles.length, "resize handles")
 
     // Exit resize mode on Escape or click outside
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         this.exitResizeMode(element as HTMLElement, handles)
       }
     }
 
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Element
-      if (!element.contains(target) && !target.closest('[data-absmartly-resize-handle]')) {
+      if (
+        !element.contains(target) &&
+        !target.closest("[data-absmartly-resize-handle]")
+      ) {
         this.exitResizeMode(element as HTMLElement, handles)
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown)
-    document.addEventListener('click', handleClickOutside, true)
+    document.addEventListener("keydown", handleKeyDown)
+    document.addEventListener("click", handleClickOutside, true)
 
     // Store cleanup functions
     ;(element as any).__absmartlyResizeCleanup = () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('click', handleClickOutside, true)
+      document.removeEventListener("keydown", handleKeyDown)
+      document.removeEventListener("click", handleClickOutside, true)
     }
   }
 
@@ -297,19 +336,31 @@ export class EditModes {
       const computedStyle = window.getComputedStyle(current)
 
       // Skip inline elements unless they have specific styling
-      if (computedStyle.display === 'inline' &&
-          !['a', 'button', 'span'].includes(tagName)) {
+      if (
+        computedStyle.display === "inline" &&
+        !["a", "button", "span"].includes(tagName)
+      ) {
         current = current.parentElement
         continue
       }
 
       // Prefer block-level containers
-      if (['div', 'section', 'article', 'header', 'footer', 'main', 'aside'].includes(tagName)) {
+      if (
+        [
+          "div",
+          "section",
+          "article",
+          "header",
+          "footer",
+          "main",
+          "aside"
+        ].includes(tagName)
+      ) {
         return current
       }
 
       // Also good candidates
-      if (['li', 'tr', 'td', 'th', 'figure', 'blockquote'].includes(tagName)) {
+      if (["li", "tr", "td", "th", "figure", "blockquote"].includes(tagName)) {
         return current
       }
 
@@ -321,11 +372,11 @@ export class EditModes {
 
   private createResizeHandles(element: HTMLElement): HTMLElement[] {
     const handles: HTMLElement[] = []
-    const directions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+    const directions = ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
 
-    directions.forEach(direction => {
-      const handle = document.createElement('div')
-      handle.dataset.absmartlyResizeHandle = 'true'
+    directions.forEach((direction) => {
+      const handle = document.createElement("div")
+      handle.dataset.absmartlyResizeHandle = "true"
       handle.dataset.direction = direction
       handle.style.cssText = `
         position: absolute;
@@ -347,44 +398,54 @@ export class EditModes {
     return handles
   }
 
-  private positionResizeHandle(handle: HTMLElement, direction: string, element: HTMLElement): void {
+  private positionResizeHandle(
+    handle: HTMLElement,
+    direction: string,
+    element: HTMLElement
+  ): void {
     const rect = element.getBoundingClientRect()
     const scrollX = window.scrollX
     const scrollY = window.scrollY
 
     const positions: { [key: string]: { left: number; top: number } } = {
-      'nw': { left: rect.left - 5, top: rect.top - 5 },
-      'n': { left: rect.left + rect.width / 2 - 5, top: rect.top - 5 },
-      'ne': { left: rect.right - 5, top: rect.top - 5 },
-      'e': { left: rect.right - 5, top: rect.top + rect.height / 2 - 5 },
-      'se': { left: rect.right - 5, top: rect.bottom - 5 },
-      's': { left: rect.left + rect.width / 2 - 5, top: rect.bottom - 5 },
-      'sw': { left: rect.left - 5, top: rect.bottom - 5 },
-      'w': { left: rect.left - 5, top: rect.top + rect.height / 2 - 5 }
+      nw: { left: rect.left - 5, top: rect.top - 5 },
+      n: { left: rect.left + rect.width / 2 - 5, top: rect.top - 5 },
+      ne: { left: rect.right - 5, top: rect.top - 5 },
+      e: { left: rect.right - 5, top: rect.top + rect.height / 2 - 5 },
+      se: { left: rect.right - 5, top: rect.bottom - 5 },
+      s: { left: rect.left + rect.width / 2 - 5, top: rect.bottom - 5 },
+      sw: { left: rect.left - 5, top: rect.bottom - 5 },
+      w: { left: rect.left - 5, top: rect.top + rect.height / 2 - 5 }
     }
 
     const pos = positions[direction]
-    handle.style.left = (pos.left + scrollX) + 'px'
-    handle.style.top = (pos.top + scrollY) + 'px'
-    handle.style.position = 'absolute'
+    handle.style.left = pos.left + scrollX + "px"
+    handle.style.top = pos.top + scrollY + "px"
+    handle.style.position = "absolute"
   }
 
   private getResizeCursor(direction: string): string {
     const cursors: { [key: string]: string } = {
-      'nw': 'nw-resize',
-      'n': 'n-resize',
-      'ne': 'ne-resize',
-      'e': 'e-resize',
-      'se': 'se-resize',
-      's': 's-resize',
-      'sw': 'sw-resize',
-      'w': 'w-resize'
+      nw: "nw-resize",
+      n: "n-resize",
+      ne: "ne-resize",
+      e: "e-resize",
+      se: "se-resize",
+      s: "s-resize",
+      sw: "sw-resize",
+      w: "w-resize"
     }
-    return cursors[direction] || 'move'
+    return cursors[direction] || "move"
   }
 
-  private applyResize(element: HTMLElement, direction: string, deltaX: number, deltaY: number, startRect: DOMRect): void {
-    debugLog('[ABSmartly] RESIZE: Applying resize', {
+  private applyResize(
+    element: HTMLElement,
+    direction: string,
+    deltaX: number,
+    deltaY: number,
+    startRect: DOMRect
+  ): void {
+    debugLog("[ABSmartly] RESIZE: Applying resize", {
       direction,
       deltaX,
       deltaY,
@@ -394,58 +455,60 @@ export class EditModes {
         width: element.style.width,
         height: element.style.height
       }
-    });
+    })
     const style = element.style
 
     switch (direction) {
-      case 'se': // Southeast - resize both width and height
-        style.width = Math.max(50, startRect.width + deltaX) + 'px'
-        style.height = Math.max(20, startRect.height + deltaY) + 'px'
+      case "se": // Southeast - resize both width and height
+        style.width = Math.max(50, startRect.width + deltaX) + "px"
+        style.height = Math.max(20, startRect.height + deltaY) + "px"
         break
 
-      case 'e': // East - resize width only
-        style.width = Math.max(50, startRect.width + deltaX) + 'px'
+      case "e": // East - resize width only
+        style.width = Math.max(50, startRect.width + deltaX) + "px"
         break
 
-      case 's': // South - resize height only
-        style.height = Math.max(20, startRect.height + deltaY) + 'px'
+      case "s": // South - resize height only
+        style.height = Math.max(20, startRect.height + deltaY) + "px"
         break
 
-      case 'sw': // Southwest
-        style.width = Math.max(50, startRect.width - deltaX) + 'px'
-        style.height = Math.max(20, startRect.height + deltaY) + 'px'
+      case "sw": // Southwest
+        style.width = Math.max(50, startRect.width - deltaX) + "px"
+        style.height = Math.max(20, startRect.height + deltaY) + "px"
         break
 
-      case 'w': // West
-        style.width = Math.max(50, startRect.width - deltaX) + 'px'
+      case "w": // West
+        style.width = Math.max(50, startRect.width - deltaX) + "px"
         break
 
-      case 'nw': // Northwest
-        style.width = Math.max(50, startRect.width - deltaX) + 'px'
-        style.height = Math.max(20, startRect.height - deltaY) + 'px'
+      case "nw": // Northwest
+        style.width = Math.max(50, startRect.width - deltaX) + "px"
+        style.height = Math.max(20, startRect.height - deltaY) + "px"
         break
 
-      case 'n': // North
-        style.height = Math.max(20, startRect.height - deltaY) + 'px'
+      case "n": // North
+        style.height = Math.max(20, startRect.height - deltaY) + "px"
         break
 
-      case 'ne': // Northeast
-        style.width = Math.max(50, startRect.width + deltaX) + 'px'
-        style.height = Math.max(20, startRect.height - deltaY) + 'px'
+      case "ne": // Northeast
+        style.width = Math.max(50, startRect.width + deltaX) + "px"
+        style.height = Math.max(20, startRect.height - deltaY) + "px"
         break
     }
   }
 
   private exitResizeMode(element: HTMLElement, handles: HTMLElement[]): void {
-    element.classList.remove('absmartly-resize-active')
+    element.classList.remove("absmartly-resize-active")
     this.stateManager.setResizing(false)
 
     // Clear global flag to allow DOM changes to be reapplied again
     ;(window as any).__absmartlyVisualEditorModifying = false
-    debugLog('[ABSmartly] Cleared visual editor modifying flag, DOM changes can be reapplied')
+    debugLog(
+      "[ABSmartly] Cleared visual editor modifying flag, DOM changes can be reapplied"
+    )
 
     // Remove handles
-    handles.forEach(handle => handle.remove())
+    handles.forEach((handle) => handle.remove())
 
     // Clean up event listeners
     if ((element as any).__absmartlyResizeCleanup) {
@@ -454,11 +517,15 @@ export class EditModes {
     }
   }
 
-  private trackMoveChange(element: Element, originalParent: Element | null, originalNextSibling: Element | null): void {
-    debugLog('[ABSmartly] Tracking move change for element:', element)
+  private trackMoveChange(
+    element: Element,
+    originalParent: Element | null,
+    originalNextSibling: Element | null
+  ): void {
+    debugLog("[ABSmartly] Tracking move change for element:", element)
 
     if (!this.addChange) {
-      debugWarn('[ABSmartly] No addChange callback set for EditModes')
+      debugWarn("[ABSmartly] No addChange callback set for EditModes")
       return
     }
 
@@ -473,17 +540,28 @@ export class EditModes {
     // Check if this element already has a move change to preserve its TRUE original position
     const existingChanges = this.stateManager.getState().changes || []
     const existingMoveChange = existingChanges.find(
-      c => c.selector === elementSelector && c.type === 'move'
+      (c) => c.selector === elementSelector && c.type === "move"
     )
 
     // Determine the ORIGINAL position for reverting
     let originalTargetSelector: string | null = null
-    let originalPosition: 'before' | 'after' | 'firstChild' | 'lastChild' | null = null
+    let originalPosition:
+      | "before"
+      | "after"
+      | "firstChild"
+      | "lastChild"
+      | null = null
 
-    if (existingMoveChange && (existingMoveChange as any).value?.originalTargetSelector) {
+    if (
+      existingMoveChange &&
+      (existingMoveChange as any).value?.originalTargetSelector
+    ) {
       // Preserve the TRUE original position from the first move
-      debugLog('[ABSmartly] Preserving original position from existing move change')
-      originalTargetSelector = (existingMoveChange as any).value.originalTargetSelector
+      debugLog(
+        "[ABSmartly] Preserving original position from existing move change"
+      )
+      originalTargetSelector = (existingMoveChange as any).value
+        .originalTargetSelector
       originalPosition = (existingMoveChange as any).value.originalPosition
     } else if (originalNextSibling) {
       // Element was originally before its next sibling
@@ -493,11 +571,11 @@ export class EditModes {
         includeParentContext: true,
         maxParentLevels: 3
       })
-      originalPosition = 'before'
+      originalPosition = "before"
     } else if (originalParent) {
       // Element was the last child of its parent
       const previousSibling = Array.from(originalParent.children).find(
-        child => child.nextElementSibling === null && child !== element
+        (child) => child.nextElementSibling === null && child !== element
       )
       if (previousSibling) {
         originalTargetSelector = generateRobustSelector(previousSibling, {
@@ -506,7 +584,7 @@ export class EditModes {
           includeParentContext: true,
           maxParentLevels: 3
         })
-        originalPosition = 'after'
+        originalPosition = "after"
       } else {
         // Was the only or first child
         originalTargetSelector = generateRobustSelector(originalParent, {
@@ -515,7 +593,10 @@ export class EditModes {
           includeParentContext: true,
           maxParentLevels: 3
         })
-        originalPosition = originalParent.firstElementChild === element ? 'firstChild' : 'lastChild'
+        originalPosition =
+          originalParent.firstElementChild === element
+            ? "firstChild"
+            : "lastChild"
       }
     }
 
@@ -524,7 +605,7 @@ export class EditModes {
     const currentNextSibling = element.nextElementSibling
 
     let targetSelector: string
-    let position: 'before' | 'after' | 'firstChild' | 'lastChild'
+    let position: "before" | "after" | "firstChild" | "lastChild"
 
     if (currentNextSibling) {
       // Element was placed before its next sibling
@@ -534,7 +615,7 @@ export class EditModes {
         includeParentContext: true,
         maxParentLevels: 3
       })
-      position = 'before'
+      position = "before"
     } else if (element.previousElementSibling) {
       // Element was placed after its previous sibling
       targetSelector = generateRobustSelector(element.previousElementSibling, {
@@ -543,7 +624,7 @@ export class EditModes {
         includeParentContext: true,
         maxParentLevels: 3
       })
-      position = 'after'
+      position = "after"
     } else if (currentParent) {
       // Element is the only child or first child
       targetSelector = generateRobustSelector(currentParent, {
@@ -552,29 +633,33 @@ export class EditModes {
         includeParentContext: true,
         maxParentLevels: 3
       })
-      position = currentParent.firstElementChild === element ? 'firstChild' : 'lastChild'
+      position =
+        currentParent.firstElementChild === element ? "firstChild" : "lastChild"
     } else {
-      debugWarn('[ABSmartly] Could not determine move target')
+      debugWarn("[ABSmartly] Could not determine move target")
       return
     }
 
     // Create the move change
     const moveChange: DOMChange = {
       selector: elementSelector,
-      type: 'move',
+      type: "move",
       targetSelector,
       position
     }
 
-    debugLog('[ABSmartly] Creating move change with original position:', moveChange)
+    debugLog(
+      "[ABSmartly] Creating move change with original position:",
+      moveChange
+    )
     this.addChange(moveChange)
   }
 
   private trackResizeChange(element: Element, originalStyles: any): void {
-    debugLog('[ABSmartly] Tracking resize change for element:', element)
+    debugLog("[ABSmartly] Tracking resize change for element:", element)
 
     if (!this.addChange) {
-      debugWarn('[ABSmartly] No addChange callback set for EditModes')
+      debugWarn("[ABSmartly] No addChange callback set for EditModes")
       return
     }
 
@@ -585,7 +670,10 @@ export class EditModes {
     }
 
     // Only track if styles actually changed
-    if (currentStyles.width !== originalStyles.width || currentStyles.height !== originalStyles.height) {
+    if (
+      currentStyles.width !== originalStyles.width ||
+      currentStyles.height !== originalStyles.height
+    ) {
       const elementSelector = generateRobustSelector(element, {
         preferDataAttributes: false,
         avoidAutoGenerated: true,
@@ -595,11 +683,11 @@ export class EditModes {
 
       const styleChange: DOMChange = {
         selector: elementSelector,
-        type: 'style',
+        type: "style",
         value: currentStyles
       }
 
-      debugLog('[ABSmartly] Creating resize/style change:', styleChange)
+      debugLog("[ABSmartly] Creating resize/style change:", styleChange)
       this.addChange(styleChange)
     }
   }

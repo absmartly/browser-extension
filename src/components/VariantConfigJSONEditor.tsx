@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react'
-import type { Variant } from './VariantList'
-import { sendToContent } from '~src/lib/messaging'
+import React, { useEffect, useRef } from "react"
+
+import { sendToContent } from "~src/lib/messaging"
+
+import type { Variant } from "./VariantList"
 
 interface VariantConfigJSONEditorProps {
   isOpen: boolean
@@ -14,12 +16,9 @@ interface VariantConfigJSONEditorProps {
  * Shows all config fields (including __inject_html, __dom_changes, and custom variables)
  * This gives users complete visibility into what will be sent to the API
  */
-export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = ({
-  isOpen,
-  onClose,
-  variant,
-  onSave,
-}) => {
+export const VariantConfigJSONEditor: React.FC<
+  VariantConfigJSONEditorProps
+> = ({ isOpen, onClose, variant, onSave }) => {
   const onSaveRef = useRef(onSave)
   const onCloseRef = useRef(onClose)
 
@@ -39,26 +38,26 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
     const openEditor = async () => {
       try {
         await sendToContent({
-          type: 'OPEN_JSON_EDITOR',
+          type: "OPEN_JSON_EDITOR",
           data: {
             variantName: variant.name,
             value: JSON.stringify(fullConfig, null, 2)
           }
         })
       } catch (error) {
-        console.error('Error opening JSON editor:', error)
+        console.error("Error opening JSON editor:", error)
       }
     }
     openEditor()
 
     const handleMessage = (message: any) => {
-      if (message.type === 'JSON_EDITOR_SAVE') {
+      if (message.type === "JSON_EDITOR_SAVE") {
         try {
           const parsedConfig = JSON.parse(message.value)
 
           // Validate: must be an object
-          if (typeof parsedConfig !== 'object' || parsedConfig === null) {
-            console.error('Variant config must be an object')
+          if (typeof parsedConfig !== "object" || parsedConfig === null) {
+            console.error("Variant config must be an object")
             return
           }
 
@@ -66,8 +65,14 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
           if (parsedConfig.__dom_changes) {
             const domChanges = parsedConfig.__dom_changes
             if (!Array.isArray(domChanges)) {
-              if (typeof domChanges !== 'object' || !domChanges.changes || !Array.isArray(domChanges.changes)) {
-                console.error('__dom_changes must be either an array or an object with a changes array')
+              if (
+                typeof domChanges !== "object" ||
+                !domChanges.changes ||
+                !Array.isArray(domChanges.changes)
+              ) {
+                console.error(
+                  "__dom_changes must be either an array or an object with a changes array"
+                )
                 return
               }
             }
@@ -82,9 +87,9 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
           onSaveRef.current(updatedVariant)
           onCloseRef.current()
         } catch (e) {
-          console.error('Failed to parse JSON:', e)
+          console.error("Failed to parse JSON:", e)
         }
-      } else if (message.type === 'JSON_EDITOR_CLOSE') {
+      } else if (message.type === "JSON_EDITOR_CLOSE") {
         onCloseRef.current()
       }
     }
@@ -96,10 +101,10 @@ export const VariantConfigJSONEditor: React.FC<VariantConfigJSONEditorProps> = (
       const closeEditor = async () => {
         try {
           await sendToContent({
-            type: 'CLOSE_JSON_EDITOR'
+            type: "CLOSE_JSON_EDITOR"
           })
         } catch (error) {
-          console.error('Error closing JSON editor:', error)
+          console.error("Error closing JSON editor:", error)
         }
       }
       closeEditor()

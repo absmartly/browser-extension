@@ -1,6 +1,8 @@
-import { renderHook, waitFor } from '@testing-library/react'
-import { useEditorStateRestoration } from '../useEditorStateRestoration'
-import type { DOMChange } from '~src/types/dom-changes'
+import { renderHook, waitFor } from "@testing-library/react"
+
+import type { DOMChange } from "~src/types/dom-changes"
+
+import { useEditorStateRestoration } from "../useEditorStateRestoration"
 
 const mockSessionGet = jest.fn()
 const mockSessionSet = jest.fn()
@@ -9,7 +11,7 @@ const mockLocalGet = jest.fn()
 const mockLocalSet = jest.fn()
 const mockLocalRemove = jest.fn()
 
-jest.mock('~src/utils/storage', () => ({
+jest.mock("~src/utils/storage", () => ({
   sessionStorage: {
     get: (...args: any[]) => mockSessionGet(...args),
     set: (...args: any[]) => mockSessionSet(...args),
@@ -22,18 +24,18 @@ jest.mock('~src/utils/storage', () => ({
   }
 }))
 
-jest.mock('~src/utils/debug', () => ({
+jest.mock("~src/utils/debug", () => ({
   debugLog: jest.fn(),
   debugWarn: jest.fn()
 }))
 
-describe('useEditorStateRestoration', () => {
+describe("useEditorStateRestoration", () => {
   const mockOnChange = jest.fn()
   const mockSetEditingChange = jest.fn()
   const mockSetPickingForField = jest.fn()
 
   const defaultProps = {
-    variantName: 'test-variant',
+    variantName: "test-variant",
     changes: [] as DOMChange[],
     onChange: mockOnChange,
     setEditingChange: mockSetEditingChange,
@@ -48,48 +50,65 @@ describe('useEditorStateRestoration', () => {
     mockLocalGet.mockResolvedValue(null)
     mockSessionRemove.mockResolvedValue(undefined)
     mockLocalRemove.mockResolvedValue(undefined)
-
     ;(global as any).chrome = {
       runtime: {
         onMessage: { addListener: jest.fn(), removeListener: jest.fn() }
       },
       storage: {
-        session: { onChanged: { addListener: jest.fn(), removeListener: jest.fn() } }
+        session: {
+          onChanged: { addListener: jest.fn(), removeListener: jest.fn() }
+        }
       }
     }
   })
 
-  describe('AI state restoration guard', () => {
-    it('should restore AI changes when current changes are empty', async () => {
+  describe("AI state restoration guard", () => {
+    it("should restore AI changes when current changes are empty", async () => {
       const aiChanges: DOMChange[] = [
-        { selector: '.ai-button', type: 'styleRules', states: { hover: { color: 'blue' } } } as DOMChange
+        {
+          selector: ".ai-button",
+          type: "styleRules",
+          states: { hover: { color: "blue" } }
+        } as DOMChange
       ]
 
       mockSessionGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') {
-          return Promise.resolve({ variantName: 'test-variant', changes: aiChanges })
+        if (key === "aiDomChangesState") {
+          return Promise.resolve({
+            variantName: "test-variant",
+            changes: aiChanges
+          })
         }
         return Promise.resolve(null)
       })
 
-      renderHook(() => useEditorStateRestoration({ ...defaultProps, changes: [] }))
+      renderHook(() =>
+        useEditorStateRestoration({ ...defaultProps, changes: [] })
+      )
 
       await waitFor(() => {
         expect(mockOnChange).toHaveBeenCalledWith(aiChanges)
       })
     })
 
-    it('should NOT restore AI changes when current changes already exist', async () => {
+    it("should NOT restore AI changes when current changes already exist", async () => {
       const existingChanges: DOMChange[] = [
-        { selector: '.button', type: 'style', value: { color: 'red' } }
+        { selector: ".button", type: "style", value: { color: "red" } }
       ]
       const aiChanges: DOMChange[] = [
-        { selector: '.button', type: 'styleRules', states: { hover: { color: 'blue' } } } as DOMChange
+        {
+          selector: ".button",
+          type: "styleRules",
+          states: { hover: { color: "blue" } }
+        } as DOMChange
       ]
 
       mockSessionGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') {
-          return Promise.resolve({ variantName: 'test-variant', changes: aiChanges })
+        if (key === "aiDomChangesState") {
+          return Promise.resolve({
+            variantName: "test-variant",
+            changes: aiChanges
+          })
         }
         return Promise.resolve(null)
       })
@@ -99,20 +118,23 @@ describe('useEditorStateRestoration', () => {
       )
 
       await waitFor(() => {
-        expect(mockSessionRemove).toHaveBeenCalledWith('aiDomChangesState')
+        expect(mockSessionRemove).toHaveBeenCalledWith("aiDomChangesState")
       })
 
       expect(mockOnChange).not.toHaveBeenCalledWith(aiChanges)
     })
 
-    it('should clean up AI state from both session and local storage even when not applying', async () => {
+    it("should clean up AI state from both session and local storage even when not applying", async () => {
       const existingChanges: DOMChange[] = [
-        { selector: '.button', type: 'style', value: { color: 'red' } }
+        { selector: ".button", type: "style", value: { color: "red" } }
       ]
 
       mockSessionGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') {
-          return Promise.resolve({ variantName: 'test-variant', changes: [{ selector: '.x', type: 'text', value: 'y' }] })
+        if (key === "aiDomChangesState") {
+          return Promise.resolve({
+            variantName: "test-variant",
+            changes: [{ selector: ".x", type: "text", value: "y" }]
+          })
         }
         return Promise.resolve(null)
       })
@@ -122,71 +144,83 @@ describe('useEditorStateRestoration', () => {
       )
 
       await waitFor(() => {
-        expect(mockSessionRemove).toHaveBeenCalledWith('aiDomChangesState')
-        expect(mockLocalRemove).toHaveBeenCalledWith('aiDomChangesState')
+        expect(mockSessionRemove).toHaveBeenCalledWith("aiDomChangesState")
+        expect(mockLocalRemove).toHaveBeenCalledWith("aiDomChangesState")
       })
     })
 
-    it('should restore from localAreaStorage when sessionStorage has no AI state', async () => {
+    it("should restore from localAreaStorage when sessionStorage has no AI state", async () => {
       const aiChanges: DOMChange[] = [
-        { selector: '.ai-button', type: 'text', value: 'AI text' }
+        { selector: ".ai-button", type: "text", value: "AI text" }
       ]
 
       mockSessionGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') return Promise.resolve(null)
+        if (key === "aiDomChangesState") return Promise.resolve(null)
         return Promise.resolve(null)
       })
       mockLocalGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') {
-          return Promise.resolve({ variantName: 'test-variant', changes: aiChanges })
+        if (key === "aiDomChangesState") {
+          return Promise.resolve({
+            variantName: "test-variant",
+            changes: aiChanges
+          })
         }
         return Promise.resolve(null)
       })
 
-      renderHook(() => useEditorStateRestoration({ ...defaultProps, changes: [] }))
+      renderHook(() =>
+        useEditorStateRestoration({ ...defaultProps, changes: [] })
+      )
 
       await waitFor(() => {
         expect(mockOnChange).toHaveBeenCalledWith(aiChanges)
       })
     })
 
-    it('should NOT restore AI state for a different variant', async () => {
+    it("should NOT restore AI state for a different variant", async () => {
       const aiChanges: DOMChange[] = [
-        { selector: '.x', type: 'text', value: 'test' }
+        { selector: ".x", type: "text", value: "test" }
       ]
 
       mockSessionGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') {
-          return Promise.resolve({ variantName: 'other-variant', changes: aiChanges })
+        if (key === "aiDomChangesState") {
+          return Promise.resolve({
+            variantName: "other-variant",
+            changes: aiChanges
+          })
         }
         return Promise.resolve(null)
       })
 
-      renderHook(() => useEditorStateRestoration({ ...defaultProps, changes: [] }))
+      renderHook(() =>
+        useEditorStateRestoration({ ...defaultProps, changes: [] })
+      )
 
       await waitFor(() => {
         expect(mockSessionGet).toHaveBeenCalled()
       })
 
-      await new Promise(r => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 50))
       expect(mockOnChange).not.toHaveBeenCalledWith(aiChanges)
     })
 
-    it('should NOT restore AI state when changes array is empty', async () => {
+    it("should NOT restore AI state when changes array is empty", async () => {
       mockSessionGet.mockImplementation((key: string) => {
-        if (key === 'aiDomChangesState') {
-          return Promise.resolve({ variantName: 'test-variant', changes: [] })
+        if (key === "aiDomChangesState") {
+          return Promise.resolve({ variantName: "test-variant", changes: [] })
         }
         return Promise.resolve(null)
       })
 
-      renderHook(() => useEditorStateRestoration({ ...defaultProps, changes: [] }))
+      renderHook(() =>
+        useEditorStateRestoration({ ...defaultProps, changes: [] })
+      )
 
       await waitFor(() => {
         expect(mockSessionGet).toHaveBeenCalled()
       })
 
-      await new Promise(r => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 50))
       expect(mockOnChange).not.toHaveBeenCalled()
     })
   })

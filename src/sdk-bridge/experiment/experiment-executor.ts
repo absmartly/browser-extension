@@ -1,11 +1,12 @@
-import { Logger } from '../utils/logger'
-import { validateExperimentCode } from '~src/utils/code-validator'
-import type { ExecutionContext } from './code-executor'
+import { validateExperimentCode } from "~src/utils/code-validator"
+
+import { Logger } from "../utils/logger"
+import type { ExecutionContext } from "./code-executor"
 
 export class ExperimentExecutor {
   static execute(code: string, context: ExecutionContext = {}): boolean {
-    if (!code || typeof code !== 'string') {
-      Logger.warn('Invalid code provided to ExperimentExecutor')
+    if (!code || typeof code !== "string") {
+      Logger.warn("Invalid code provided to ExperimentExecutor")
       return false
     }
 
@@ -14,7 +15,9 @@ export class ExperimentExecutor {
       Logger.error(
         `[ExperimentExecutor] Code validation failed: ${validationResult.reason}`
       )
-      Logger.error(`[ExperimentExecutor] Rejected code for experiment: ${context.experimentName || 'unknown'}`)
+      Logger.error(
+        `[ExperimentExecutor] Rejected code for experiment: ${context.experimentName || "unknown"}`
+      )
       return false
     }
 
@@ -29,11 +32,11 @@ export class ExperimentExecutor {
       const { element, experimentName } = context
 
       const executeFn = new Function(
-        'element',
-        'document',
-        'window',
-        'console',
-        'experimentName',
+        "element",
+        "document",
+        "window",
+        "console",
+        "experimentName",
         code
       )
 
@@ -42,7 +45,7 @@ export class ExperimentExecutor {
         document,
         window,
         console,
-        experimentName || '__preview__'
+        experimentName || "__preview__"
       )
 
       Logger.log(
@@ -50,7 +53,10 @@ export class ExperimentExecutor {
       )
       return true
     } catch (error) {
-      Logger.error('[ExperimentExecutor] Error executing JavaScript code:', error)
+      Logger.error(
+        "[ExperimentExecutor] Error executing JavaScript code:",
+        error
+      )
       return false
     }
   }

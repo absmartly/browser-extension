@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react'
-import { sendToContent } from '~src/lib/messaging'
-import { AI_DOM_GENERATION_SYSTEM_PROMPT } from '~src/prompts/ai-dom-generation-system-prompt'
-import { getMetadata, setMetadata } from '~src/utils/indexeddb-storage'
+import React, { useEffect, useRef } from "react"
+
+import { sendToContent } from "~src/lib/messaging"
+import { AI_DOM_GENERATION_SYSTEM_PROMPT } from "~src/prompts/ai-dom-generation-system-prompt"
+import { getMetadata, setMetadata } from "~src/utils/indexeddb-storage"
 
 interface SystemPromptEditorProps {
   isOpen: boolean
@@ -9,12 +10,12 @@ interface SystemPromptEditorProps {
   onSave: (prompt: string) => void
 }
 
-const SYSTEM_PROMPT_KEY = 'ai-system-prompt-override'
+const SYSTEM_PROMPT_KEY = "ai-system-prompt-override"
 
 export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
   isOpen,
   onClose,
-  onSave,
+  onSave
 }) => {
   const onSaveRef = useRef(onSave)
   const onCloseRef = useRef(onClose)
@@ -32,37 +33,49 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
         const override = await getMetadata(SYSTEM_PROMPT_KEY)
         const currentPrompt = override || AI_DOM_GENERATION_SYSTEM_PROMPT
 
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+        const tabs = await chrome.tabs.query({
+          active: true,
+          currentWindow: true
+        })
         const currentTab = tabs[0]
 
         if (!currentTab?.id) {
-          alert('Please navigate to a web page first to use the system prompt editor.\n\nThe editor opens in full-screen on the current page.')
+          alert(
+            "Please navigate to a web page first to use the system prompt editor.\n\nThe editor opens in full-screen on the current page."
+          )
           onCloseRef.current()
           return
         }
 
-        const tabUrl = currentTab.url || ''
-        if (tabUrl.startsWith('chrome://') || tabUrl.startsWith('chrome-extension://')) {
-          alert('Cannot open editor on Chrome system pages.\n\nPlease navigate to a regular web page first.')
+        const tabUrl = currentTab.url || ""
+        if (
+          tabUrl.startsWith("chrome://") ||
+          tabUrl.startsWith("chrome-extension://")
+        ) {
+          alert(
+            "Cannot open editor on Chrome system pages.\n\nPlease navigate to a regular web page first."
+          )
           onCloseRef.current()
           return
         }
 
         await sendToContent({
-          type: 'OPEN_MARKDOWN_EDITOR',
+          type: "OPEN_MARKDOWN_EDITOR",
           data: {
-            title: 'System Prompt Override',
+            title: "System Prompt Override",
             value: currentPrompt,
             defaultValue: AI_DOM_GENERATION_SYSTEM_PROMPT
           }
         })
       } catch (error) {
-        console.error('Error opening markdown editor:', error)
+        console.error("Error opening markdown editor:", error)
 
-        if (error.message?.includes('Could not establish connection')) {
-          alert('Please navigate to a web page first to use the system prompt editor.\n\nThe editor opens in full-screen on the current page, so you need to be viewing a website.')
+        if (error.message?.includes("Could not establish connection")) {
+          alert(
+            "Please navigate to a web page first to use the system prompt editor.\n\nThe editor opens in full-screen on the current page, so you need to be viewing a website."
+          )
         } else {
-          alert('Failed to open editor: ' + error.message)
+          alert("Failed to open editor: " + error.message)
         }
 
         onCloseRef.current()
@@ -71,7 +84,7 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
     openEditor()
 
     const handleMessage = (message: any) => {
-      if (message.type === 'MARKDOWN_EDITOR_SAVE') {
+      if (message.type === "MARKDOWN_EDITOR_SAVE") {
         const newPrompt = message.value
 
         setMetadata(SYSTEM_PROMPT_KEY, newPrompt)
@@ -80,9 +93,9 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
             onCloseRef.current()
           })
           .catch((error) => {
-            console.error('Failed to save system prompt:', error)
+            console.error("Failed to save system prompt:", error)
           })
-      } else if (message.type === 'MARKDOWN_EDITOR_CLOSE') {
+      } else if (message.type === "MARKDOWN_EDITOR_CLOSE") {
         onCloseRef.current()
       }
     }
@@ -102,7 +115,7 @@ export async function getSystemPromptOverride(): Promise<string | null> {
     const override = await getMetadata(SYSTEM_PROMPT_KEY)
     return override || null
   } catch (error) {
-    console.error('Failed to get system prompt override:', error)
+    console.error("Failed to get system prompt override:", error)
     return null
   }
 }
@@ -111,6 +124,6 @@ export async function clearSystemPromptOverride(): Promise<void> {
   try {
     await setMetadata(SYSTEM_PROMPT_KEY, null)
   } catch (error) {
-    console.error('Failed to clear system prompt override:', error)
+    console.error("Failed to clear system prompt override:", error)
   }
 }

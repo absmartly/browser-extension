@@ -1,4 +1,4 @@
-import { debugLog, debugWarn, debugError } from '~src/utils/debug'
+import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 
 export interface RetryConfig {
   maxRetries?: number
@@ -9,16 +9,17 @@ export interface RetryConfig {
   shouldRetry?: (error: any, attempt: number) => boolean
 }
 
-const DEFAULT_CONFIG: Required<Omit<RetryConfig, 'shouldRetry'>> = {
+const DEFAULT_CONFIG: Required<Omit<RetryConfig, "shouldRetry">> = {
   maxRetries: 3,
   baseDelay: 1000,
   maxDelay: 10000,
   retryableStatusCodes: [408, 429, 500, 502, 503, 504],
-  retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ENETUNREACH']
+  retryableErrors: ["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "ENETUNREACH"]
 }
 
 function isRetryableError(error: any, config: RetryConfig): boolean {
-  const statusCodes = config.retryableStatusCodes || DEFAULT_CONFIG.retryableStatusCodes
+  const statusCodes =
+    config.retryableStatusCodes || DEFAULT_CONFIG.retryableStatusCodes
   const errorCodes = config.retryableErrors || DEFAULT_CONFIG.retryableErrors
 
   if (error.response?.status && statusCodes.includes(error.response.status)) {
@@ -29,7 +30,10 @@ function isRetryableError(error: any, config: RetryConfig): boolean {
     return true
   }
 
-  if (error.message?.includes('timeout') || error.message?.includes('network')) {
+  if (
+    error.message?.includes("timeout") ||
+    error.message?.includes("network")
+  ) {
     return true
   }
 
@@ -65,15 +69,21 @@ export async function withRetry<T>(
       lastError = error
 
       if (attempt === maxRetries) {
-        debugError('[Retry] Max retries reached, giving up', { error, attempts: attempt + 1 })
+        debugError("[Retry] Max retries reached, giving up", {
+          error,
+          attempts: attempt + 1
+        })
         throw error
       }
 
       const shouldRetryCustom = config.shouldRetry?.(error, attempt)
       const shouldRetryDefault = isRetryableError(error, config)
 
-      if (shouldRetryCustom === false || (!shouldRetryCustom && !shouldRetryDefault)) {
-        debugLog('[Retry] Error not retryable, giving up', { error, attempt })
+      if (
+        shouldRetryCustom === false ||
+        (!shouldRetryCustom && !shouldRetryDefault)
+      ) {
+        debugLog("[Retry] Error not retryable, giving up", { error, attempt })
         throw error
       }
 
@@ -82,7 +92,7 @@ export async function withRetry<T>(
       const errorCode = (error as any).code
       const errorMessage = (error as any).message
 
-      debugWarn('[Retry] Operation failed, retrying...', {
+      debugWarn("[Retry] Operation failed, retrying...", {
         attempt: attempt + 1,
         maxRetries,
         delayMs: delay,
@@ -109,10 +119,10 @@ export function withRateLimitRetry<T>(
     retryableStatusCodes: [429],
     shouldRetry: (error, attempt) => {
       if (error.response?.status === 429) {
-        const retryAfter = error.response?.headers?.['retry-after']
+        const retryAfter = error.response?.headers?.["retry-after"]
         if (retryAfter) {
           const retryAfterMs = parseInt(retryAfter) * 1000
-          debugLog('[Retry] Rate limited, retry-after header:', retryAfterMs)
+          debugLog("[Retry] Rate limited, retry-after header:", retryAfterMs)
         }
         return true
       }
@@ -130,7 +140,7 @@ export function withNetworkRetry<T>(
     baseDelay: 1000,
     maxDelay: 5000,
     retryableStatusCodes: [408, 500, 502, 503, 504],
-    retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ENETUNREACH']
+    retryableErrors: ["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "ENETUNREACH"]
   })
 }
 
@@ -155,11 +165,14 @@ export function createRetryableRequest<T>(
         onRetry(attempt + 1, error)
       }
 
-      debugLog(`[Retry] ${operationName} - Attempt ${attempt + 1}/${maxRetries}`, {
-        shouldRetry,
-        error: error.message,
-        statusCode: error.response?.status
-      })
+      debugLog(
+        `[Retry] ${operationName} - Attempt ${attempt + 1}/${maxRetries}`,
+        {
+          shouldRetry,
+          error: error.message,
+          statusCode: error.response?.status
+        }
+      )
 
       return shouldRetry
     }

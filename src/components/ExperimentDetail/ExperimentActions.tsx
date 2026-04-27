@@ -1,6 +1,10 @@
-import React from 'react'
-import { ArrowTopRightOnSquareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
-import { getConfig } from '~src/utils/storage'
+import {
+  ArrowTopRightOnSquareIcon,
+  PencilSquareIcon
+} from "@heroicons/react/24/outline"
+import React from "react"
+
+import { getConfig } from "~src/utils/storage"
 
 interface ExperimentActionsProps {
   experimentId: number
@@ -16,15 +20,18 @@ export function ExperimentActions({ experimentId }: ExperimentActionsProps) {
             try {
               const config = await getConfig()
               if (config?.apiEndpoint) {
-                const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                const baseUrl = config.apiEndpoint
+                  .replace(/\/+$/, "")
+                  .replace(/\/v1$/, "")
                 const url = `${baseUrl}/experiments/${experimentId}`
                 chrome.tabs.create({ url })
               }
-            } catch { /* config unavailable */ }
+            } catch {
+              /* config unavailable */
+            }
           }}
           className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-          aria-label="Open in ABsmartly"
-        >
+          aria-label="Open in ABsmartly">
           <ArrowTopRightOnSquareIcon className="h-4 w-4" />
         </button>
 
@@ -41,15 +48,18 @@ export function ExperimentActions({ experimentId }: ExperimentActionsProps) {
             try {
               const config = await getConfig()
               if (config?.apiEndpoint) {
-                const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+                const baseUrl = config.apiEndpoint
+                  .replace(/\/+$/, "")
+                  .replace(/\/v1$/, "")
                 const url = `${baseUrl}/experiments/${experimentId}/edit`
                 chrome.tabs.create({ url })
               }
-            } catch { /* config unavailable */ }
+            } catch {
+              /* config unavailable */
+            }
           }}
           className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-          aria-label="Edit in ABsmartly"
-        >
+          aria-label="Edit in ABsmartly">
           <PencilSquareIcon className="h-4 w-4" />
         </button>
 

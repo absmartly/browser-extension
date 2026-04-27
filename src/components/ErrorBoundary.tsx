@@ -1,5 +1,6 @@
-import React, { Component, type ReactNode } from 'react'
-import { debugError } from '~src/utils/debug'
+import React, { Component, type ReactNode } from "react"
+
+import { debugError } from "~src/utils/debug"
 
 interface Props {
   children: ReactNode
@@ -23,10 +24,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    debugError('[ErrorBoundary] Component error caught:', error)
-    debugError('[ErrorBoundary] Component stack:', errorInfo.componentStack)
+    debugError("[ErrorBoundary] Component error caught:", error)
+    debugError("[ErrorBoundary] Component stack:", errorInfo.componentStack)
 
-    console.error('[ErrorBoundary] React component error:', {
+    console.error("[ErrorBoundary] React component error:", {
       message: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack
@@ -55,8 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="h-8 w-8 text-red-600"
                   fill="none"
                   viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
+                  stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -74,7 +74,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="border-t border-gray-200 pt-4">
               <p className="text-sm text-gray-600 mb-3">
-                The extension encountered an unexpected error and needs to reload.
+                The extension encountered an unexpected error and needs to
+                reload.
               </p>
 
               {this.state.error && (
@@ -97,15 +98,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
               <button
                 onClick={this.handleReset}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-              >
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
                 Reload Extension
               </button>
             </div>
 
             <div className="border-t border-gray-200 pt-4">
               <p className="text-xs text-gray-500">
-                If this error persists, please report it to the development team with the technical details above.
+                If this error persists, please report it to the development team
+                with the technical details above.
               </p>
             </div>
           </div>
@@ -126,8 +127,7 @@ export function ErrorFallbackUI(): ReactNode {
             className="h-12 w-12 text-red-600"
             fill="none"
             viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
+            stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -144,8 +144,7 @@ export function ErrorFallbackUI(): ReactNode {
         </p>
         <button
           onClick={() => window.location.reload()}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-        >
+          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
           Reload Extension
         </button>
       </div>

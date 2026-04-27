@@ -3,10 +3,11 @@
  * Handles mouse events, clicks, and interaction logic
  */
 
-import { generateRobustSelector } from '../utils/selector-generator'
-import StateManager from './state-manager'
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { generateRobustSelector } from "../utils/selector-generator"
+import StateManager from "./state-manager"
+
 export class EventHandlers {
   private stateManager: StateManager
   private isEditing = false
@@ -31,24 +32,26 @@ export class EventHandlers {
     if (!this.hoverEnabled) return
 
     // Ignore preview header elements
-    if ((e.target as Element).closest('#absmartly-preview-header')) {
+    if ((e.target as Element).closest("#absmartly-preview-header")) {
       return
     }
     if (this.isEditing) return
     const target = e.target as Element
 
     // Don't hover on our Shadow DOM hosts
-    if (target.id === 'absmartly-visual-editor-banner-host' ||
-        target.closest('#absmartly-visual-editor-banner-host') ||
-        target.id === 'absmartly-menu-host' ||
-        target.closest('#absmartly-menu-host') ||
-        target.id === 'absmartly-html-editor-host' ||
-        target.closest('#absmartly-html-editor-host') ||
-        target.id === 'absmartly-hover-tooltip') {
+    if (
+      target.id === "absmartly-visual-editor-banner-host" ||
+      target.closest("#absmartly-visual-editor-banner-host") ||
+      target.id === "absmartly-menu-host" ||
+      target.closest("#absmartly-menu-host") ||
+      target.id === "absmartly-html-editor-host" ||
+      target.closest("#absmartly-html-editor-host") ||
+      target.id === "absmartly-hover-tooltip"
+    ) {
       return
     }
 
-    target.classList.add('absmartly-hover')
+    target.classList.add("absmartly-hover")
     // Don't update state on hover - it's just a visual effect!
 
     // Show tooltip with element selector
@@ -63,8 +66,8 @@ export class EventHandlers {
       maxParentLevels: 3
     })
 
-    this.hoverTooltip = document.createElement('div')
-    this.hoverTooltip.id = 'absmartly-hover-tooltip'
+    this.hoverTooltip = document.createElement("div")
+    this.hoverTooltip.id = "absmartly-hover-tooltip"
     this.hoverTooltip.style.cssText = `
       position: fixed;
       background: #1f2937;
@@ -88,15 +91,16 @@ export class EventHandlers {
     const tooltipX = Math.min(rect.left, window.innerWidth - 420)
     const tooltipY = rect.top - 30
 
-    this.hoverTooltip.style.left = tooltipX + 'px'
-    this.hoverTooltip.style.top = (tooltipY < 10 ? rect.bottom + 5 : tooltipY) + 'px'
+    this.hoverTooltip.style.left = tooltipX + "px"
+    this.hoverTooltip.style.top =
+      (tooltipY < 10 ? rect.bottom + 5 : tooltipY) + "px"
 
     document.body.appendChild(this.hoverTooltip)
   }
 
   handleMouseOut = (e: MouseEvent): void => {
     if (this.isEditing) return
-    ;(e.target as Element).classList.remove('absmartly-hover')
+    ;(e.target as Element).classList.remove("absmartly-hover")
     // Don't update state on hover - it's just a visual effect!
 
     // Remove tooltip
@@ -112,42 +116,46 @@ export class EventHandlers {
 
     // Prevent selecting body or html elements to avoid page corruption
     if (target === document.body || target === document.documentElement) {
-      debugWarn('[ABSmartly] Cannot select body or html element - this could corrupt the page')
+      debugWarn(
+        "[ABSmartly] Cannot select body or html element - this could corrupt the page"
+      )
       return
     }
 
     // CRITICAL: Check for menu host first (shadow DOM container)
-    const menuHost = document.getElementById('absmartly-menu-host')
+    const menuHost = document.getElementById("absmartly-menu-host")
     if (menuHost && (menuHost === target || menuHost.contains(target))) {
       // Don't interfere with shadow DOM menu at all
       return
     }
 
     // Don't open menu if clicking within editable content
-    if (this.isEditing || (target as HTMLElement).contentEditable === 'true') {
+    if (this.isEditing || (target as HTMLElement).contentEditable === "true") {
       return
     }
 
     // Ignore clicks on our UI (banner, editor hosts, toolbar, preview header, hierarchy panel, image dialog, and block inserter)
-    if (target.id === 'absmartly-visual-editor-banner-host' ||
-        target.closest('#absmartly-visual-editor-banner-host') ||
-        target.id === 'absmartly-html-editor-host' ||
-        target.closest('#absmartly-html-editor-host') ||
-        target.id === 'absmartly-image-dialog-host' ||
-        target.closest('#absmartly-image-dialog-host') ||
-        target.id === 'absmartly-block-inserter-host' ||
-        target.closest('#absmartly-block-inserter-host') ||
-        target.closest('.absmartly-toolbar') ||
-        target.id === 'absmartly-preview-header' ||
-        target.closest('#absmartly-preview-header') ||
-        target.id === 'absmartly-relative-selector-host' ||
-        target.closest('#absmartly-relative-selector-host')) {
+    if (
+      target.id === "absmartly-visual-editor-banner-host" ||
+      target.closest("#absmartly-visual-editor-banner-host") ||
+      target.id === "absmartly-html-editor-host" ||
+      target.closest("#absmartly-html-editor-host") ||
+      target.id === "absmartly-image-dialog-host" ||
+      target.closest("#absmartly-image-dialog-host") ||
+      target.id === "absmartly-block-inserter-host" ||
+      target.closest("#absmartly-block-inserter-host") ||
+      target.closest(".absmartly-toolbar") ||
+      target.id === "absmartly-preview-header" ||
+      target.closest("#absmartly-preview-header") ||
+      target.id === "absmartly-relative-selector-host" ||
+      target.closest("#absmartly-relative-selector-host")
+    ) {
       return
     }
 
     // IMPORTANT: Don't show menu if we're currently editing text
-    if (this.isEditing || (target as HTMLElement).contentEditable === 'true') {
-      debugLog('[ABSmartly] Ignoring click - currently editing')
+    if (this.isEditing || (target as HTMLElement).contentEditable === "true") {
+      debugLog("[ABSmartly] Ignoring click - currently editing")
       return
     }
 
@@ -158,25 +166,26 @@ export class EventHandlers {
     // Remove previous selection and menu
     const currentSelected = this.stateManager.getState().selectedElement
     if (currentSelected) {
-      currentSelected.classList.remove('absmartly-selected')
+      currentSelected.classList.remove("absmartly-selected")
     }
-    const existingHost = document.getElementById('absmartly-menu-host')
+    const existingHost = document.getElementById("absmartly-menu-host")
     if (existingHost) existingHost.remove()
 
     // Select new element
     this.stateManager.setSelectedElement(target)
-    target.classList.remove('absmartly-hover')
-    target.classList.add('absmartly-selected')
+    target.classList.remove("absmartly-hover")
+    target.classList.add("absmartly-selected")
 
     // Store original values in DOM immediately when element is selected
     // This ensures we always have the original value before any changes
     if (!(target as HTMLElement).dataset.absmartlyOriginal) {
-      (target as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
+      ;(target as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
         textContent: target.textContent,
         innerHTML: target.innerHTML
         // Store both to support both text and HTML editing modes
       })
-      ;(target as HTMLElement).dataset.absmartlyExperiment = config.experimentName || '__preview__'
+      ;(target as HTMLElement).dataset.absmartlyExperiment =
+        config.experimentName || "__preview__"
     }
 
     // Show context menu - this will be handled by context-menu module
@@ -193,20 +202,30 @@ export class EventHandlers {
   }
 
   // This will be set by the main visual editor to connect to context menu
-  showContextMenu: (x: number, y: number, element: Element) => void = (x, y, element) => {
-    debugLog('[ABSmartly] Context menu requested at', x, y, 'for element', element)
+  showContextMenu: (x: number, y: number, element: Element) => void = (
+    x,
+    y,
+    element
+  ) => {
+    debugLog(
+      "[ABSmartly] Context menu requested at",
+      x,
+      y,
+      "for element",
+      element
+    )
   }
 
   attachEventListeners(): void {
-    document.addEventListener('mouseover', this.handleMouseOver, true)
-    document.addEventListener('mouseout', this.handleMouseOut, true)
-    document.addEventListener('click', this.handleClick, true)
+    document.addEventListener("mouseover", this.handleMouseOver, true)
+    document.addEventListener("mouseout", this.handleMouseOut, true)
+    document.addEventListener("click", this.handleClick, true)
   }
 
   detachEventListeners(): void {
-    document.removeEventListener('mouseover', this.handleMouseOver, true)
-    document.removeEventListener('mouseout', this.handleMouseOut, true)
-    document.removeEventListener('click', this.handleClick, true)
+    document.removeEventListener("mouseover", this.handleMouseOver, true)
+    document.removeEventListener("mouseout", this.handleMouseOut, true)
+    document.removeEventListener("click", this.handleClick, true)
 
     // Clean up tooltip
     if (this.hoverTooltip) {

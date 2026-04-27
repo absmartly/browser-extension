@@ -1,11 +1,10 @@
-import { BackgroundAPIClient } from '../background-api-client'
+import { BackgroundAPIClient } from "../background-api-client"
 
-describe('BackgroundAPIClient', () => {
+describe("BackgroundAPIClient", () => {
   let client: BackgroundAPIClient
 
   beforeEach(() => {
     client = new BackgroundAPIClient()
-
     ;(global as any).chrome = {
       runtime: {
         sendMessage: jest.fn()
@@ -17,50 +16,50 @@ describe('BackgroundAPIClient', () => {
     jest.clearAllMocks()
   })
 
-  describe('sendOperation - error handling', () => {
-    it('should throw when background returns undefined (service worker crashed)', async () => {
+  describe("sendOperation - error handling", () => {
+    it("should throw when background returns undefined (service worker crashed)", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(undefined)
 
       await expect(client.getApplications()).rejects.toThrow(
-        'Background service worker did not respond'
+        "Background service worker did not respond"
       )
     })
 
-    it('should throw when background returns null', async () => {
+    it("should throw when background returns null", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(null)
 
       await expect(client.getApplications()).rejects.toThrow(
-        'Background service worker did not respond'
+        "Background service worker did not respond"
       )
     })
 
-    it('should throw APIError on failure response', async () => {
+    it("should throw APIError on failure response", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: false,
-        error: 'Unauthorized',
+        error: "Unauthorized",
         isAuthError: true
       })
 
-      await expect(client.getApplications()).rejects.toThrow('Unauthorized')
+      await expect(client.getApplications()).rejects.toThrow("Unauthorized")
     })
   })
 
-  describe('makeRequest - error handling', () => {
-    it('should throw when background returns undefined', async () => {
+  describe("makeRequest - error handling", () => {
+    it("should throw when background returns undefined", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue(undefined)
 
       await expect(client.getFavorites()).rejects.toThrow(
-        'Background service worker did not respond'
+        "Background service worker did not respond"
       )
     })
   })
 
-  describe('getExperiments', () => {
-    it('should return experiments with pagination info', async () => {
+  describe("getExperiments", () => {
+    it("should return experiments with pagination info", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: {
-          experiments: [{ id: 1, name: 'Test' }],
+          experiments: [{ id: 1, name: "Test" }],
           total: 100,
           has_more: true
         }
@@ -73,26 +72,26 @@ describe('BackgroundAPIClient', () => {
       expect(result.hasMore).toBe(true)
     })
 
-    it('should use API_REQUEST for pagination support', async () => {
+    it("should use API_REQUEST for pagination support", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: { experiments: [] }
       })
 
-      await client.getExperiments({ state: 'running' } as any)
+      await client.getExperiments({ state: "running" } as any)
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'API_REQUEST',
-        method: 'GET',
-        path: '/experiments',
-        data: { state: 'running' }
+        type: "API_REQUEST",
+        method: "GET",
+        path: "/experiments",
+        data: { state: "running" }
       })
     })
   })
 
-  describe('getExperiment', () => {
-    it('should fetch single experiment via typed operation', async () => {
-      const mockExperiment = { id: 42, name: 'Test' }
+  describe("getExperiment", () => {
+    it("should fetch single experiment via typed operation", async () => {
+      const mockExperiment = { id: 42, name: "Test" }
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: mockExperiment
@@ -101,15 +100,15 @@ describe('BackgroundAPIClient', () => {
       const result = await client.getExperiment(42)
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'API_OPERATION',
-        operation: { op: 'getExperiment', id: 42 }
+        type: "API_OPERATION",
+        operation: { op: "getExperiment", id: 42 }
       })
       expect(result).toEqual(mockExperiment)
     })
   })
 
-  describe('setExperimentFavorite', () => {
-    it('should send favoriteExperiment operation', async () => {
+  describe("setExperimentFavorite", () => {
+    it("should send favoriteExperiment operation", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: undefined
@@ -118,17 +117,17 @@ describe('BackgroundAPIClient', () => {
       await client.setExperimentFavorite(10, true)
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'API_OPERATION',
-        operation: { op: 'favoriteExperiment', id: 10, favorite: true }
+        type: "API_OPERATION",
+        operation: { op: "favoriteExperiment", id: 10, favorite: true }
       })
     })
   })
 
-  describe('getCustomSectionFields', () => {
-    it('should fetch custom section fields successfully', async () => {
+  describe("getCustomSectionFields", () => {
+    it("should fetch custom section fields successfully", async () => {
       const mockFields = [
-        { id: 1, title: 'Hypothesis', type: 'text' },
-        { id: 2, title: 'Purpose', type: 'string' }
+        { id: 1, title: "Hypothesis", type: "text" },
+        { id: 2, title: "Purpose", type: "string" }
       ]
 
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
@@ -139,13 +138,13 @@ describe('BackgroundAPIClient', () => {
       const result = await client.getCustomSectionFields()
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'API_OPERATION',
-        operation: { op: 'listCustomSectionFields' }
+        type: "API_OPERATION",
+        operation: { op: "listCustomSectionFields" }
       })
       expect(result).toEqual(mockFields)
     })
 
-    it('should return empty array when data is not an array', async () => {
+    it("should return empty array when data is not an array", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: null
@@ -156,9 +155,9 @@ describe('BackgroundAPIClient', () => {
     })
   })
 
-  describe('getApplications', () => {
-    it('should fetch applications via typed operation', async () => {
-      const mockApps = [{ id: 1, name: 'App1' }]
+  describe("getApplications", () => {
+    it("should fetch applications via typed operation", async () => {
+      const mockApps = [{ id: 1, name: "App1" }]
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: mockApps
@@ -167,8 +166,8 @@ describe('BackgroundAPIClient', () => {
       const result = await client.getApplications()
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'API_OPERATION',
-        operation: { op: 'listApplications' }
+        type: "API_OPERATION",
+        operation: { op: "listApplications" }
       })
       expect(result).toEqual(mockApps)
     })

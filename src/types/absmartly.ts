@@ -1,12 +1,29 @@
-import type { DOMChange, URLFilter } from './dom-changes'
-import type { ExperimentId, ApplicationId, VariantName, APIEndpoint, ConversationId, SessionId } from './branded'
+import type { AIProviderType } from "~src/lib/ai-providers"
+
+import type {
+  APIEndpoint,
+  ApplicationId,
+  ConversationId,
+  ExperimentId,
+  SessionId,
+  VariantName
+} from "./branded"
+import type { DOMChange, URLFilter } from "./dom-changes"
 
 export interface Experiment {
   readonly id: ExperimentId
   readonly name: string
   readonly display_name?: string
-  readonly state: 'created' | 'ready' | 'running' | 'development' | 'full_on' | 'stopped' | 'archived' | 'scheduled'
-  readonly status?: 'draft' | 'running' | 'stopped' | 'archived'
+  readonly state:
+    | "created"
+    | "ready"
+    | "running"
+    | "development"
+    | "full_on"
+    | "stopped"
+    | "archived"
+    | "scheduled"
+  readonly status?: "draft" | "running" | "stopped" | "archived"
   readonly created_at: string
   readonly updated_at?: string
   readonly full_on_variant?: number
@@ -20,7 +37,11 @@ export interface Experiment {
   readonly applications?: readonly Application[]
   readonly unit_type?: { readonly unit_type_id: number; readonly name?: string }
   readonly unit_type_id?: number
-  readonly primary_metric?: { readonly metric_id: number; readonly name?: string; readonly id?: number }
+  readonly primary_metric?: {
+    readonly metric_id: number
+    readonly name?: string
+    readonly id?: number
+  }
   readonly experiment_tags?: readonly ExperimentTag[]
   readonly context_ids?: readonly string[]
   readonly owner?: ExperimentOwner
@@ -31,9 +52,11 @@ export interface Experiment {
   readonly exposures?: number
   readonly started_at?: string
   readonly stopped_at?: string
-  readonly type?: 'group_sequential' | 'fixed_horizon' | 'test'
+  readonly type?: "group_sequential" | "fixed_horizon" | "test"
   readonly favorite?: boolean
-  readonly custom_section_field_values?: readonly ExperimentCustomSectionFieldValue[] | Readonly<Record<string, unknown>>
+  readonly custom_section_field_values?:
+    | readonly ExperimentCustomSectionFieldValue[]
+    | Readonly<Record<string, unknown>>
 }
 
 export interface Variant {
@@ -108,7 +131,14 @@ export interface ExperimentCustomSectionField {
   readonly custom_section_field_id: number
   readonly name: string
   readonly title?: string
-  readonly type: 'text' | 'select' | 'multiselect' | 'string' | 'json' | 'boolean' | 'number'
+  readonly type:
+    | "text"
+    | "select"
+    | "multiselect"
+    | "string"
+    | "json"
+    | "boolean"
+    | "number"
   readonly required: boolean
   readonly options?: readonly string[]
   readonly default_value?: string
@@ -132,9 +162,12 @@ export interface ExperimentInjectionCode {
   bodyEnd?: string
 }
 
-export type CustomCodeSection = 'headStart' | 'headEnd' | 'bodyStart' | 'bodyEnd' | 'styleTag'
-
-import type { AIProviderType } from '~src/lib/ai-providers'
+export type CustomCodeSection =
+  | "headStart"
+  | "headEnd"
+  | "bodyStart"
+  | "bodyEnd"
+  | "styleTag"
 
 type ABsmartlyConfigBase = {
   apiEndpoint: APIEndpoint
@@ -163,8 +196,8 @@ type ABsmartlyConfigBase = {
 
 export type ABsmartlyConfig = ABsmartlyConfigBase &
   (
-    | { authMethod: 'jwt'; apiKey?: never }
-    | { authMethod: 'apikey'; apiKey: string }
+    | { authMethod: "jwt"; apiKey?: never }
+    | { authMethod: "apikey"; apiKey: string }
     | { authMethod?: never; apiKey?: string }
   )
 
@@ -205,7 +238,7 @@ export interface ConversationSession {
   anthropicSystemParameter?: string[]
   nextPrompt?: string
   messages: Array<{
-    role: 'user' | 'assistant'
+    role: "user" | "assistant"
     content: string
   }>
   model?: string
@@ -214,7 +247,7 @@ export interface ConversationSession {
 
 export interface ChatMessage {
   id?: string
-  role: 'user' | 'assistant'
+  role: "user" | "assistant"
   content: string
   timestamp: number
   images?: string[]
@@ -263,4 +296,4 @@ export interface StoredConversationsData {
   version: number
 }
 
-export type { URLFilter, DOMChangesData, DOMChange } from './dom-changes'
+export type { URLFilter, DOMChangesData, DOMChange } from "./dom-changes"

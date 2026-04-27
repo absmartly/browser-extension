@@ -3,10 +3,11 @@
  * Handles the right-click context menu and its actions
  */
 
-import { generateRobustSelector } from '../utils/selector-generator'
-import StateManager from './state-manager'
+import { debugLog, debugWarn } from "~src/utils/debug"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { generateRobustSelector } from "../utils/selector-generator"
+import StateManager from "./state-manager"
+
 export interface MenuAction {
   icon: string
   label: string
@@ -28,14 +29,16 @@ export class ContextMenu {
     this.stateManager = stateManager
     // Check query string for shadow DOM override
     const urlParams = new URLSearchParams(window.location.search)
-    const shadowDOMParam = urlParams.get('use_shadow_dom_for_visual_editor_context_menu')
-    const disableShadowDOM = shadowDOMParam === '0'
-    this.useShadowDOM = disableShadowDOM ? false : (useShadowDOM !== false)
+    const shadowDOMParam = urlParams.get(
+      "use_shadow_dom_for_visual_editor_context_menu"
+    )
+    const disableShadowDOM = shadowDOMParam === "0"
+    this.useShadowDOM = disableShadowDOM ? false : useShadowDOM !== false
   }
 
   show(x: number, y: number, element: Element): void {
     // Remove any existing menu first
-    const existingHost = document.getElementById('absmartly-menu-host')
+    const existingHost = document.getElementById("absmartly-menu-host")
     if (existingHost) existingHost.remove()
 
     // Calculate menu dimensions (approximate based on number of items)
@@ -45,7 +48,8 @@ export class ContextMenu {
     const dividerHeight = 9
     const dividerCount = isImage ? 5 : 4 // Number of dividers
     const menuPadding = 8
-    const estimatedMenuHeight = (menuItemCount * itemHeight) + (dividerCount * dividerHeight) + menuPadding
+    const estimatedMenuHeight =
+      menuItemCount * itemHeight + dividerCount * dividerHeight + menuPadding
     const estimatedMenuWidth = 220
 
     // Determine if menu fits in viewport
@@ -76,10 +80,10 @@ export class ContextMenu {
     }
 
     // Create host element for shadow DOM
-    const menuHost = document.createElement('div')
-    menuHost.id = 'absmartly-menu-host'
+    const menuHost = document.createElement("div")
+    menuHost.id = "absmartly-menu-host"
     menuHost.style.cssText = `
-      position: ${useAbsolutePositioning ? 'absolute' : 'fixed'};
+      position: ${useAbsolutePositioning ? "absolute" : "fixed"};
       top: 0;
       left: 0;
       width: 0;
@@ -89,30 +93,41 @@ export class ContextMenu {
     `
 
     // Check if we should use shadow DOM
-    debugLog('🔍 Context Menu - Use Shadow DOM:', this.useShadowDOM)
+    debugLog("🔍 Context Menu - Use Shadow DOM:", this.useShadowDOM)
 
     // Attach shadow root with open mode for testability (unless disabled)
-    const shadow = this.useShadowDOM ? menuHost.attachShadow({ mode: 'open' }) : menuHost
-    debugLog('🔍 Shadow container:', this.useShadowDOM ? 'Using shadow DOM' : 'Using menuHost directly')
+    const shadow = this.useShadowDOM
+      ? menuHost.attachShadow({ mode: "open" })
+      : menuHost
+    debugLog(
+      "🔍 Shadow container:",
+      this.useShadowDOM ? "Using shadow DOM" : "Using menuHost directly"
+    )
 
     // Create styles for shadow DOM
-    const style = document.createElement('style')
-    style.textContent = this.getMenuStyles(useAbsolutePositioning, scrollX, scrollY, menuLeft, menuTop)
+    const style = document.createElement("style")
+    style.textContent = this.getMenuStyles(
+      useAbsolutePositioning,
+      scrollX,
+      scrollY,
+      menuLeft,
+      menuTop
+    )
     shadow.appendChild(style)
 
     // Create backdrop
-    const backdrop = document.createElement('div')
-    backdrop.className = 'menu-backdrop'
+    const backdrop = document.createElement("div")
+    backdrop.className = "menu-backdrop"
 
     // Create menu container
-    const menuContainer = document.createElement('div')
-    menuContainer.className = 'menu-container'
+    const menuContainer = document.createElement("div")
+    menuContainer.className = "menu-container"
 
     // Create menu items
-    this.createMenuItems(element).forEach(item => {
-      if ('divider' in item && item.divider) {
-        const divider = document.createElement('div')
-        divider.className = 'menu-divider'
+    this.createMenuItems(element).forEach((item) => {
+      if ("divider" in item && item.divider) {
+        const divider = document.createElement("div")
+        divider.className = "menu-divider"
         menuContainer.appendChild(divider)
       } else {
         const menuItem = this.createMenuItem(item as MenuAction)
@@ -128,14 +143,16 @@ export class ContextMenu {
     document.body.appendChild(menuHost)
 
     // Handle clicks in shadow DOM
-    backdrop.addEventListener('click', (e) => {
+    backdrop.addEventListener("click", (e) => {
       e.stopPropagation()
       menuHost.remove()
     })
 
-    menuContainer.addEventListener('click', (e) => {
+    menuContainer.addEventListener("click", (e) => {
       e.stopPropagation()
-      const menuItem = (e.target as Element).closest('.menu-item') as HTMLElement
+      const menuItem = (e.target as Element).closest(
+        ".menu-item"
+      ) as HTMLElement
       if (menuItem) {
         const action = menuItem.dataset.action
         if (action) {
@@ -146,7 +163,13 @@ export class ContextMenu {
     })
   }
 
-  private getMenuStyles(useAbsolutePositioning: boolean, scrollX: number, scrollY: number, menuLeft: number, menuTop: number): string {
+  private getMenuStyles(
+    useAbsolutePositioning: boolean,
+    scrollX: number,
+    scrollY: number,
+    menuLeft: number,
+    menuTop: number
+  ): string {
     return `
       * {
         box-sizing: border-box;
@@ -166,7 +189,7 @@ export class ContextMenu {
       }
 
       .menu-container {
-        position: ${useAbsolutePositioning ? 'absolute' : 'fixed'};
+        position: ${useAbsolutePositioning ? "absolute" : "fixed"};
         left: ${menuLeft}px;
         top: ${menuTop}px;
         background: white;
@@ -176,8 +199,8 @@ export class ContextMenu {
         padding: 4px 0;
         min-width: 200px;
         max-width: 280px;
-        ${useAbsolutePositioning ? '' : 'max-height: calc(100vh - 20px);'}
-        ${useAbsolutePositioning ? '' : 'overflow-y: auto;'}
+        ${useAbsolutePositioning ? "" : "max-height: calc(100vh - 20px);"}
+        ${useAbsolutePositioning ? "" : "overflow-y: auto;"}
         z-index: 2;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-size: 13px;
@@ -244,29 +267,42 @@ export class ContextMenu {
 
   private createMenuItems(element: Element): MenuItem[] {
     const items: MenuItem[] = [
-      { icon: '✏️', label: 'Edit Text', action: 'edit' },
-      { icon: '</>', label: 'Edit HTML', action: 'editHtml' },
+      { icon: "✏️", label: "Edit Text", action: "edit" },
+      { icon: "</>", label: "Edit HTML", action: "editHtml" },
       { divider: true },
-      { icon: '🔄', label: 'Rearrange', action: 'rearrange' },
-      { icon: '↔️', label: 'Resize', action: 'resize' },
+      { icon: "🔄", label: "Rearrange", action: "rearrange" },
+      { icon: "↔️", label: "Resize", action: "resize" },
       { divider: true },
-      { icon: '📋', label: 'Copy', action: 'copy' },
-      { icon: '🔗', label: 'Copy Selector Path', action: 'copySelector', shortcut: '⌘+Shift+C' },
+      { icon: "📋", label: "Copy", action: "copy" },
+      {
+        icon: "🔗",
+        label: "Copy Selector Path",
+        action: "copySelector",
+        shortcut: "⌘+Shift+C"
+      },
       { divider: true },
-      { icon: '🎯', label: 'Select Relative Element', action: 'selectRelative' },
-      { icon: '➕', label: 'Insert new block', action: 'insert-block' },
+      {
+        icon: "🎯",
+        label: "Select Relative Element",
+        action: "selectRelative"
+      },
+      { icon: "➕", label: "Insert new block", action: "insert-block" },
       { divider: true }
     ]
 
     // Add "Change image source" if element is an image or has background image
     if (this.isImageElement(element)) {
-      items.push({ icon: '🖼️', label: 'Change image source', action: 'change-image-source' })
+      items.push({
+        icon: "🖼️",
+        label: "Change image source",
+        action: "change-image-source"
+      })
       items.push({ divider: true })
     }
 
     items.push(
-      { icon: '👁', label: 'Hide', action: 'hide' },
-      { icon: '🗑', label: 'Delete', action: 'delete', shortcut: 'Delete' }
+      { icon: "👁", label: "Hide", action: "hide" },
+      { icon: "🗑", label: "Delete", action: "delete", shortcut: "Delete" }
     )
 
     return items
@@ -278,35 +314,35 @@ export class ContextMenu {
     }
 
     // Check if it's an img tag
-    if (element.tagName.toLowerCase() === 'img') {
+    if (element.tagName.toLowerCase() === "img") {
       return true
     }
 
     // Check if element has a background image
     const computedStyle = window.getComputedStyle(element)
     const backgroundImage = computedStyle.backgroundImage
-    return backgroundImage && backgroundImage !== 'none'
+    return backgroundImage && backgroundImage !== "none"
   }
 
   private createMenuItem(item: MenuAction): HTMLElement {
-    const menuItem = document.createElement('div')
-    menuItem.className = 'menu-item'
+    const menuItem = document.createElement("div")
+    menuItem.className = "menu-item"
     menuItem.dataset.action = item.action
 
-    const icon = document.createElement('span')
-    icon.className = 'menu-icon'
+    const icon = document.createElement("span")
+    icon.className = "menu-icon"
     icon.textContent = item.icon
 
-    const label = document.createElement('span')
-    label.className = 'menu-label'
+    const label = document.createElement("span")
+    label.className = "menu-label"
     label.textContent = item.label
 
     menuItem.appendChild(icon)
     menuItem.appendChild(label)
 
     if (item.shortcut) {
-      const shortcut = document.createElement('span')
-      shortcut.className = 'menu-shortcut'
+      const shortcut = document.createElement("span")
+      shortcut.className = "menu-shortcut"
       shortcut.textContent = item.shortcut
       menuItem.appendChild(shortcut)
     }
@@ -315,13 +351,16 @@ export class ContextMenu {
   }
 
   // This will be set by the main visual editor to handle actions
-  handleAction: (action: string, element: Element) => void = (action, element) => {
-    debugLog('[ABSmartly] Menu action:', action, 'for element:', element)
+  handleAction: (action: string, element: Element) => void = (
+    action,
+    element
+  ) => {
+    debugLog("[ABSmartly] Menu action:", action, "for element:", element)
   }
 
   private showNotification(message: string): void {
     // This will be implemented by ui-components module
-    debugLog('[ABSmartly] Notification:', message)
+    debugLog("[ABSmartly] Notification:", message)
   }
 }
 

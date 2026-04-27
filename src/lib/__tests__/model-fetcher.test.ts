@@ -1,8 +1,9 @@
-import { ModelFetcher } from "../model-fetcher"
 import { AnthropicProvider } from "~src/lib/ai-providers/anthropic"
-import { OpenAIProvider } from "~src/lib/ai-providers/openai"
 import { GeminiProvider } from "~src/lib/ai-providers/gemini"
+import { OpenAIProvider } from "~src/lib/ai-providers/openai"
 import { OpenRouterProvider } from "~src/lib/ai-providers/openrouter"
+
+import { ModelFetcher } from "../model-fetcher"
 
 global.fetch = jest.fn()
 
@@ -29,9 +30,9 @@ describe("ModelFetcher", () => {
         json: async () => ({
           data: [
             { id: "gpt-4-turbo", object: "model" },
-            { id: "gpt-4", object: "model" },
-          ],
-        }),
+            { id: "gpt-4", object: "model" }
+          ]
+        })
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -43,14 +44,14 @@ describe("ModelFetcher", () => {
       expect(mockFetch).toHaveBeenCalledWith(
         "https://api.openai.com/v1/models",
         expect.objectContaining({
-          headers: { Authorization: "Bearer sk-test-key" },
+          headers: { Authorization: "Bearer sk-test-key" }
         })
       )
       expect(models).toHaveLength(2)
       expect(models[0]).toMatchObject({
         id: expect.any(String),
         name: expect.any(String),
-        provider: "OpenAI",
+        provider: "OpenAI"
       })
     })
 
@@ -64,10 +65,10 @@ describe("ModelFetcher", () => {
               displayName: "Gemini Pro",
               supportedGenerationMethods: ["generateContent"],
               inputTokenLimit: 32768,
-              outputTokenLimit: 2048,
-            },
-          ],
-        }),
+              outputTokenLimit: 2048
+            }
+          ]
+        })
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -84,7 +85,7 @@ describe("ModelFetcher", () => {
       expect(models[0]).toMatchObject({
         id: "gemini-pro",
         name: "Gemini Pro",
-        provider: "Google",
+        provider: "Google"
       })
     })
 
@@ -97,10 +98,10 @@ describe("ModelFetcher", () => {
               id: "claude-sonnet-4-5-20250514",
               type: "model",
               display_name: "Claude Sonnet 4.5",
-              context_window: 200000,
-            },
-          ],
-        }),
+              context_window: 200000
+            }
+          ]
+        })
       } as Response)
 
       await ModelFetcher.fetchModels(
@@ -120,8 +121,8 @@ describe("ModelFetcher", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          data: [{ id: "gpt-4", object: "model" }],
-        }),
+          data: [{ id: "gpt-4", object: "model" }]
+        })
       } as Response)
 
       await ModelFetcher.fetchModels("openai", "sk-test-key", config)
@@ -138,7 +139,7 @@ describe("ModelFetcher", () => {
     it("should return staticModels on API error", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        statusText: "Unauthorized",
+        statusText: "Unauthorized"
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -174,24 +175,16 @@ describe("ModelFetcher", () => {
                 resolve({
                   ok: true,
                   json: async () => ({
-                    data: [{ id: "gpt-4", object: "model" }],
-                  }),
+                    data: [{ id: "gpt-4", object: "model" }]
+                  })
                 } as Response),
               100
             )
           )
       )
 
-      const promise1 = ModelFetcher.fetchModels(
-        "openai",
-        "sk-test-key",
-        config
-      )
-      const promise2 = ModelFetcher.fetchModels(
-        "openai",
-        "sk-test-key",
-        config
-      )
+      const promise1 = ModelFetcher.fetchModels("openai", "sk-test-key", config)
+      const promise2 = ModelFetcher.fetchModels("openai", "sk-test-key", config)
 
       const [models1, models2] = await Promise.all([promise1, promise2])
 
@@ -209,9 +202,9 @@ describe("ModelFetcher", () => {
             { id: "gpt-4-turbo", object: "model" },
             { id: "text-embedding-ada-002", object: "model" },
             { id: "gpt-3.5-turbo", object: "model" },
-            { id: "whisper-1", object: "model" },
-          ],
-        }),
+            { id: "whisper-1", object: "model" }
+          ]
+        })
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -234,17 +227,17 @@ describe("ModelFetcher", () => {
               displayName: "Gemini Pro",
               supportedGenerationMethods: ["generateContent"],
               inputTokenLimit: 32768,
-              outputTokenLimit: 2048,
+              outputTokenLimit: 2048
             },
             {
               name: "models/embedding-001",
               displayName: "Embedding Model",
               supportedGenerationMethods: ["embedContent"],
               inputTokenLimit: 2048,
-              outputTokenLimit: 768,
-            },
-          ],
-        }),
+              outputTokenLimit: 768
+            }
+          ]
+        })
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -266,15 +259,15 @@ describe("ModelFetcher", () => {
               id: "claude-sonnet-4-5-20250514",
               type: "model",
               display_name: "Claude Sonnet 4.5",
-              context_window: 200000,
+              context_window: 200000
             },
             {
               id: "some-other-thing",
               type: "not-a-model",
-              display_name: "Not a model",
-            },
-          ],
-        }),
+              display_name: "Not a model"
+            }
+          ]
+        })
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -297,10 +290,10 @@ describe("ModelFetcher", () => {
               id: "claude-haiku-3-5-20241022",
               type: "model",
               display_name: "Claude Haiku 3.5",
-              context_window: 200000,
-            },
-          ],
-        }),
+              context_window: 200000
+            }
+          ]
+        })
       } as Response)
 
       await ModelFetcher.fetchModels(
@@ -314,8 +307,8 @@ describe("ModelFetcher", () => {
         expect.objectContaining({
           headers: {
             "x-api-key": "sk-ant-test-key",
-            "anthropic-version": "2023-06-01",
-          },
+            "anthropic-version": "2023-06-01"
+          }
         })
       )
     })
@@ -329,10 +322,10 @@ describe("ModelFetcher", () => {
               id: "openai/gpt-4",
               name: "GPT-4",
               pricing: { prompt: "0.00003", completion: "0.00006" },
-              context_length: 8192,
-            },
-          ],
-        }),
+              context_length: 8192
+            }
+          ]
+        })
       } as Response)
 
       const models = await ModelFetcher.fetchModels(
@@ -357,28 +350,28 @@ describe("ModelFetcher", () => {
               id: "openai/gpt-4",
               name: "GPT-4",
               pricing: { prompt: "0.00003", completion: "0.00006" },
-              context_length: 8192,
+              context_length: 8192
             },
             {
               id: "openai/gpt-3.5-turbo",
               name: "GPT-3.5 Turbo",
               pricing: { prompt: "0.0000005", completion: "0.0000015" },
-              context_length: 16385,
+              context_length: 16385
             },
             {
               id: "anthropic/claude-3-opus",
               name: "Claude 3 Opus",
               pricing: { prompt: "0.000015", completion: "0.000075" },
-              context_length: 200000,
+              context_length: 200000
             },
             {
               id: "google/gemini-pro",
               name: "Gemini Pro",
               pricing: { prompt: "0.000000125", completion: "0.000000375" },
-              context_length: 32768,
-            },
-          ],
-        }),
+              context_length: 32768
+            }
+          ]
+        })
       } as Response)
 
       const grouped = await ModelFetcher.fetchGroupedModels(
@@ -395,7 +388,7 @@ describe("ModelFetcher", () => {
     it("should return static models grouped on API error", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        statusText: "Unauthorized",
+        statusText: "Unauthorized"
       } as Response)
 
       const grouped = await ModelFetcher.fetchGroupedModels(
@@ -413,8 +406,8 @@ describe("ModelFetcher", () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          data: [{ id: "gpt-4", object: "model" }],
-        }),
+          data: [{ id: "gpt-4", object: "model" }]
+        })
       } as Response)
 
       await ModelFetcher.fetchModels(
@@ -437,8 +430,8 @@ describe("ModelFetcher", () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            data: [{ id: "gpt-4", object: "model" }],
-          }),
+            data: [{ id: "gpt-4", object: "model" }]
+          })
         } as Response)
         .mockResolvedValueOnce({
           ok: true,
@@ -449,16 +442,16 @@ describe("ModelFetcher", () => {
                 displayName: "Gemini Pro",
                 supportedGenerationMethods: ["generateContent"],
                 inputTokenLimit: 32768,
-                outputTokenLimit: 2048,
-              },
-            ],
-          }),
+                outputTokenLimit: 2048
+              }
+            ]
+          })
         } as Response)
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            data: [{ id: "gpt-4", object: "model" }],
-          }),
+            data: [{ id: "gpt-4", object: "model" }]
+          })
         } as Response)
         .mockResolvedValueOnce({
           ok: true,
@@ -469,10 +462,10 @@ describe("ModelFetcher", () => {
                 displayName: "Gemini Pro",
                 supportedGenerationMethods: ["generateContent"],
                 inputTokenLimit: 32768,
-                outputTokenLimit: 2048,
-              },
-            ],
-          }),
+                outputTokenLimit: 2048
+              }
+            ]
+          })
         } as Response)
 
       await ModelFetcher.fetchModels(

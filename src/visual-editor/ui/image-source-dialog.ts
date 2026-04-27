@@ -15,40 +15,40 @@ export class ImageSourceDialog {
   }
 
   getCurrentImageSource(element: Element): string {
-    if (element.tagName.toLowerCase() === 'img') {
+    if (element.tagName.toLowerCase() === "img") {
       return (element as HTMLImageElement).src
     }
 
     const computedStyle = window.getComputedStyle(element)
     const backgroundImage = computedStyle.backgroundImage
 
-    if (backgroundImage && backgroundImage !== 'none') {
+    if (backgroundImage && backgroundImage !== "none") {
       const urlMatch = backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/)
       return urlMatch ? urlMatch[1] : backgroundImage
     }
 
-    return ''
+    return ""
   }
 
   validateImageUrl(url: string): boolean {
-    if (!url || url.trim() === '') return false
+    if (!url || url.trim() === "") return false
 
     try {
       new URL(url)
       return true
     } catch {
-      return url.startsWith('data:image/') || url.startsWith('/')
+      return url.startsWith("data:image/") || url.startsWith("/")
     }
   }
 
   private createDialog(element: Element, currentSrc: string): void {
     this.remove()
 
-    const isImgTag = element.tagName.toLowerCase() === 'img'
-    const elementType = isImgTag ? 'image' : 'background image'
+    const isImgTag = element.tagName.toLowerCase() === "img"
+    const elementType = isImgTag ? "image" : "background image"
 
-    const dialogHost = document.createElement('div')
-    dialogHost.id = 'absmartly-image-dialog-host'
+    const dialogHost = document.createElement("div")
+    dialogHost.id = "absmartly-image-dialog-host"
     dialogHost.style.cssText = `
       position: fixed;
       top: 0;
@@ -59,9 +59,9 @@ export class ImageSourceDialog {
       pointer-events: none;
     `
 
-    const shadow = dialogHost.attachShadow({ mode: 'open' })
+    const shadow = dialogHost.attachShadow({ mode: "open" })
 
-    const style = document.createElement('style')
+    const style = document.createElement("style")
     style.textContent = `
       * {
         box-sizing: border-box;
@@ -208,62 +208,64 @@ export class ImageSourceDialog {
     `
     shadow.appendChild(style)
 
-    const backdrop = document.createElement('div')
-    backdrop.className = 'dialog-backdrop'
+    const backdrop = document.createElement("div")
+    backdrop.className = "dialog-backdrop"
 
-    const container = document.createElement('div')
-    container.className = 'dialog-container'
+    const container = document.createElement("div")
+    container.className = "dialog-container"
 
-    const header = document.createElement('div')
-    header.className = 'dialog-header'
+    const header = document.createElement("div")
+    header.className = "dialog-header"
     header.textContent = `Change ${elementType} source`
 
-    const description = document.createElement('div')
-    description.className = 'dialog-description'
+    const description = document.createElement("div")
+    description.className = "dialog-description"
     description.textContent = `Enter a new URL for the ${elementType}`
 
-    const label = document.createElement('label')
-    label.className = 'dialog-label'
-    label.textContent = 'Image URL'
+    const label = document.createElement("label")
+    label.className = "dialog-label"
+    label.textContent = "Image URL"
 
-    const input = document.createElement('input')
-    input.className = 'dialog-input'
-    input.type = 'text'
-    input.placeholder = 'https://example.com/image.jpg'
+    const input = document.createElement("input")
+    input.className = "dialog-input"
+    input.type = "text"
+    input.placeholder = "https://example.com/image.jpg"
     input.value = currentSrc
 
-    const hint = document.createElement('div')
-    hint.className = 'dialog-hint'
-    hint.textContent = 'Enter a full URL starting with http:// or https://'
+    const hint = document.createElement("div")
+    hint.className = "dialog-hint"
+    hint.textContent = "Enter a full URL starting with http:// or https://"
 
-    const errorDiv = document.createElement('div')
-    errorDiv.className = 'dialog-error'
-    errorDiv.style.display = 'none'
+    const errorDiv = document.createElement("div")
+    errorDiv.className = "dialog-error"
+    errorDiv.style.display = "none"
 
-    const preview = document.createElement('div')
-    preview.className = 'dialog-preview'
+    const preview = document.createElement("div")
+    preview.className = "dialog-preview"
     if (currentSrc && this.validateImageUrl(currentSrc)) {
-      const img = document.createElement('img')
+      const img = document.createElement("img")
       img.src = currentSrc
-      img.alt = 'Current image'
+      img.alt = "Current image"
       img.onerror = () => {
-        preview.innerHTML = '<div class="dialog-preview-empty">Image preview not available</div>'
+        preview.innerHTML =
+          '<div class="dialog-preview-empty">Image preview not available</div>'
       }
       preview.appendChild(img)
     } else {
-      preview.innerHTML = '<div class="dialog-preview-empty">No image preview</div>'
+      preview.innerHTML =
+        '<div class="dialog-preview-empty">No image preview</div>'
     }
 
-    const buttons = document.createElement('div')
-    buttons.className = 'dialog-buttons'
+    const buttons = document.createElement("div")
+    buttons.className = "dialog-buttons"
 
-    const cancelButton = document.createElement('button')
-    cancelButton.className = 'dialog-button dialog-button-cancel'
-    cancelButton.textContent = 'Cancel'
+    const cancelButton = document.createElement("button")
+    cancelButton.className = "dialog-button dialog-button-cancel"
+    cancelButton.textContent = "Cancel"
 
-    const applyButton = document.createElement('button')
-    applyButton.className = 'dialog-button dialog-button-apply'
-    applyButton.textContent = 'Apply'
+    const applyButton = document.createElement("button")
+    applyButton.className = "dialog-button dialog-button-apply"
+    applyButton.textContent = "Apply"
 
     const handleApply = (e?: Event) => {
       if (e) {
@@ -274,8 +276,8 @@ export class ImageSourceDialog {
       const url = input.value.trim()
 
       if (!this.validateImageUrl(url)) {
-        errorDiv.textContent = 'Please enter a valid URL'
-        errorDiv.style.display = 'block'
+        errorDiv.textContent = "Please enter a valid URL"
+        errorDiv.style.display = "block"
         return
       }
 
@@ -295,30 +297,30 @@ export class ImageSourceDialog {
       this.remove()
     }
 
-    cancelButton.addEventListener('click', (e) => {
+    cancelButton.addEventListener("click", (e) => {
       handleCancel(e)
     })
-    applyButton.addEventListener('click', (e) => {
+    applyButton.addEventListener("click", (e) => {
       handleApply(e)
     })
-    backdrop.addEventListener('click', (e) => {
+    backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) {
         handleCancel()
       }
     })
 
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
         e.preventDefault()
         handleApply()
-      } else if (e.key === 'Escape') {
+      } else if (e.key === "Escape") {
         e.preventDefault()
         handleCancel()
       }
     })
 
-    input.addEventListener('input', () => {
-      errorDiv.style.display = 'none'
+    input.addEventListener("input", () => {
+      errorDiv.style.display = "none"
     })
 
     buttons.appendChild(cancelButton)

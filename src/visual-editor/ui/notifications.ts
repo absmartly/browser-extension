@@ -6,12 +6,16 @@
 export class Notifications {
   private currentNotification: HTMLElement | null = null
 
-  show(title: string, message: string = '', type: 'success' | 'error' | 'info' | 'warning' = 'info'): void {
+  show(
+    title: string,
+    message: string = "",
+    type: "success" | "error" | "info" | "warning" = "info"
+  ): void {
     // Remove existing notification
     this.remove()
 
-    const notification = document.createElement('div')
-    notification.className = 'absmartly-notification'
+    const notification = document.createElement("div")
+    notification.className = "absmartly-notification"
     notification.style.cssText = `
       position: fixed !important;
       bottom: 20px !important;
@@ -31,7 +35,7 @@ export class Notifications {
       animation: absmartly-slideUp 0.3s ease-out !important;
     `
 
-    const strong = document.createElement('strong')
+    const strong = document.createElement("strong")
     strong.textContent = title
     notification.appendChild(strong)
 
@@ -53,7 +57,8 @@ export class Notifications {
 
   remove(): void {
     if (this.currentNotification) {
-      this.currentNotification.style.animation = 'absmartly-slideDown 0.3s ease-out forwards'
+      this.currentNotification.style.animation =
+        "absmartly-slideDown 0.3s ease-out forwards"
       setTimeout(() => {
         if (this.currentNotification) {
           this.currentNotification.remove()
@@ -63,26 +68,28 @@ export class Notifications {
     }
   }
 
-  private getBackgroundColor(type: 'success' | 'error' | 'info' | 'warning'): string {
+  private getBackgroundColor(
+    type: "success" | "error" | "info" | "warning"
+  ): string {
     switch (type) {
-      case 'success':
-        return '#10b981'
-      case 'error':
-        return '#ef4444'
-      case 'warning':
-        return '#f59e0b'
-      case 'info':
+      case "success":
+        return "#10b981"
+      case "error":
+        return "#ef4444"
+      case "warning":
+        return "#f59e0b"
+      case "info":
       default:
-        return '#3b82f6'
+        return "#3b82f6"
     }
   }
 
   private addAnimationStyles(): void {
     // Check if styles already exist
-    if (document.getElementById('absmartly-notification-styles')) return
+    if (document.getElementById("absmartly-notification-styles")) return
 
-    const style = document.createElement('style')
-    style.id = 'absmartly-notification-styles'
+    const style = document.createElement("style")
+    style.id = "absmartly-notification-styles"
     style.textContent = `
       @keyframes absmartly-slideUp {
         from {

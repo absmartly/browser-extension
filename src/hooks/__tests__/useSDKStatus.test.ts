@@ -1,10 +1,12 @@
-import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSDKStatus } from '../useSDKStatus'
-import * as sdkBridge from '~src/utils/sdk-bridge'
+import { act, renderHook, waitFor } from "@testing-library/react"
 
-jest.mock('~src/utils/sdk-bridge')
+import * as sdkBridge from "~src/utils/sdk-bridge"
 
-describe('useSDKStatus', () => {
+import { useSDKStatus } from "../useSDKStatus"
+
+jest.mock("~src/utils/sdk-bridge")
+
+describe("useSDKStatus", () => {
   let mockIsSDKAvailable: jest.Mock
 
   beforeEach(() => {
@@ -20,7 +22,7 @@ describe('useSDKStatus', () => {
     jest.useRealTimers()
   })
 
-  it('should start with checking state', () => {
+  it("should start with checking state", () => {
     mockIsSDKAvailable.mockResolvedValue(false)
 
     const { result } = renderHook(() => useSDKStatus())
@@ -30,7 +32,7 @@ describe('useSDKStatus', () => {
     expect(result.current.checked).toBe(false)
   })
 
-  it('should detect SDK when available', async () => {
+  it("should detect SDK when available", async () => {
     mockIsSDKAvailable.mockResolvedValue(true)
 
     const { result } = renderHook(() => useSDKStatus())
@@ -44,7 +46,7 @@ describe('useSDKStatus', () => {
     expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
   })
 
-  it('should report SDK not detected when unavailable', async () => {
+  it("should report SDK not detected when unavailable", async () => {
     mockIsSDKAvailable.mockResolvedValue(false)
 
     const { result } = renderHook(() => useSDKStatus())
@@ -58,7 +60,7 @@ describe('useSDKStatus', () => {
     expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
   })
 
-  it('should not poll after the initial check', async () => {
+  it("should not poll after the initial check", async () => {
     mockIsSDKAvailable.mockResolvedValue(false)
 
     renderHook(() => useSDKStatus())
@@ -75,10 +77,10 @@ describe('useSDKStatus', () => {
     expect(mockIsSDKAvailable).toHaveBeenCalledTimes(1)
   })
 
-  it('should handle isSDKAvailable rejection', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+  it("should handle isSDKAvailable rejection", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation()
 
-    mockIsSDKAvailable.mockRejectedValue(new Error('Network error'))
+    mockIsSDKAvailable.mockRejectedValue(new Error("Network error"))
 
     const { result } = renderHook(() => useSDKStatus())
 
@@ -92,11 +94,11 @@ describe('useSDKStatus', () => {
     consoleErrorSpy.mockRestore()
   })
 
-  it('should handle isSDKAvailable throwing synchronously', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+  it("should handle isSDKAvailable throwing synchronously", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation()
 
     mockIsSDKAvailable.mockImplementation(() => {
-      throw new Error('Sync error')
+      throw new Error("Sync error")
     })
 
     const { result } = renderHook(() => useSDKStatus())
@@ -112,10 +114,13 @@ describe('useSDKStatus', () => {
     consoleErrorSpy.mockRestore()
   })
 
-  it('should not error on unmount during an in-flight check', async () => {
+  it("should not error on unmount during an in-flight check", async () => {
     let resolveDetection: (value: boolean) => void
     mockIsSDKAvailable.mockImplementation(
-      () => new Promise((resolve) => { resolveDetection = resolve })
+      () =>
+        new Promise((resolve) => {
+          resolveDetection = resolve
+        })
     )
 
     const { unmount } = renderHook(() => useSDKStatus())

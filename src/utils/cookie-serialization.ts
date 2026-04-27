@@ -1,33 +1,36 @@
-import type { ExperimentOverrides, OverrideValue } from './overrides'
-import { ENV_TYPE } from './overrides'
+import type { ExperimentOverrides, OverrideValue } from "./overrides"
+import { ENV_TYPE } from "./overrides"
 
 /**
  * Parse cookie value format: "devEnv=envName|exp1:variant.env.id,exp2:variant"
  * Extracts both overrides and dev environment from cookie string
  */
-export function parseCookieValue(cookieValue: string): { overrides: ExperimentOverrides; devEnv?: string } {
+export function parseCookieValue(cookieValue: string): {
+  overrides: ExperimentOverrides
+  devEnv?: string
+} {
   if (!cookieValue) return { overrides: {} }
 
   let devEnv: string | undefined
   let experimentsStr = cookieValue
 
   // Check if dev environment is included
-  if (cookieValue.startsWith('devEnv=')) {
-    const parts = cookieValue.split('|')
+  if (cookieValue.startsWith("devEnv=")) {
+    const parts = cookieValue.split("|")
     devEnv = decodeURIComponent(parts[0].substring(7))
-    experimentsStr = parts[1] || ''
+    experimentsStr = parts[1] || ""
   }
 
   const overrides: ExperimentOverrides = {}
   if (experimentsStr) {
-    const experiments = experimentsStr.split(',')
+    const experiments = experimentsStr.split(",")
 
     for (const exp of experiments) {
-      const [name, values] = exp.split(':')
+      const [name, values] = exp.split(":")
       if (!name || !values) continue
 
       const decodedName = decodeURIComponent(name)
-      const parts = values.split('.')
+      const parts = values.split(".")
 
       if (parts.length === 1) {
         // Simple format: just variant (running experiment)
@@ -56,10 +59,13 @@ export function parseCookieValue(cookieValue: string): { overrides: ExperimentOv
  * Serialize a single experiment override to string format
  * Format: "name:variant" or "name:variant.env.id"
  */
-function serializeExperiment(name: string, value: number | OverrideValue): string {
+function serializeExperiment(
+  name: string,
+  value: number | OverrideValue
+): string {
   const encodedName = encodeURIComponent(name)
 
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     // Simple format for running experiments
     return `${encodedName}:${value}`
   }
@@ -82,14 +88,17 @@ function serializeExperiment(name: string, value: number | OverrideValue): strin
  * Serialize overrides to cookie string format
  * Format: "devEnv=envName|exp1:variant.env.id,exp2:variant"
  */
-export function serializeOverrides(overrides: ExperimentOverrides, devEnv?: string | null): string {
+export function serializeOverrides(
+  overrides: ExperimentOverrides,
+  devEnv?: string | null
+): string {
   const parts: string[] = []
 
   for (const [name, value] of Object.entries(overrides)) {
     parts.push(serializeExperiment(name, value))
   }
 
-  const experimentsStr = parts.join(',')
+  const experimentsStr = parts.join(",")
 
   // Include dev environment if provided
   if (devEnv) {

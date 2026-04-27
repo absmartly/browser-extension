@@ -1,5 +1,6 @@
-import { getJWTCookie } from './cookies'
-import type { ABsmartlyConfig } from '~src/types/absmartly'
+import type { ABsmartlyConfig } from "~src/types/absmartly"
+
+import { getJWTCookie } from "./cookies"
 
 export interface AuthCheckResult {
   success: boolean
@@ -22,29 +23,30 @@ export function buildAuthFetchOptions(
   useAuthHeader: boolean = false
 ): RequestInit {
   const fetchOptions: RequestInit = {
-    method: 'GET',
+    method: "GET",
     headers: {}
   }
 
-  if (authMethod === 'jwt') {
+  if (authMethod === "jwt") {
     if (useAuthHeader && jwtToken) {
-      fetchOptions.credentials = 'omit'
+      fetchOptions.credentials = "omit"
       fetchOptions.headers = {
-        'Authorization': `JWT ${jwtToken}`
+        Authorization: `JWT ${jwtToken}`
       }
     } else {
-      fetchOptions.credentials = 'include'
+      fetchOptions.credentials = "include"
     }
-  } else if (authMethod === 'apikey') {
-    fetchOptions.credentials = 'omit'
+  } else if (authMethod === "apikey") {
+    fetchOptions.credentials = "omit"
 
     if (config.apiKey) {
-      const authHeader = config.apiKey.includes('.') && config.apiKey.split('.').length === 3
-        ? `JWT ${config.apiKey}`
-        : `Api-Key ${config.apiKey}`
+      const authHeader =
+        config.apiKey.includes(".") && config.apiKey.split(".").length === 3
+          ? `JWT ${config.apiKey}`
+          : `Api-Key ${config.apiKey}`
 
       fetchOptions.headers = {
-        'Authorization': authHeader
+        Authorization: authHeader
       }
     }
   }
@@ -66,7 +68,11 @@ async function processFetchResponse(
 
   // If we have a user but no avatar object, fetch full user details
   let finalUserData = responseData
-  if (responseData.user && responseData.user.avatar_file_upload_id && !responseData.user.avatar) {
+  if (
+    responseData.user &&
+    responseData.user.avatar_file_upload_id &&
+    !responseData.user.avatar
+  ) {
     try {
       // Fetching full user details to get avatar
       const userId = responseData.user.id
@@ -84,28 +90,30 @@ async function processFetchResponse(
         }
       }
     } catch (avatarError) {
-      console.error('[Avatar] Error fetching avatar metadata:', avatarError)
+      console.error("[Avatar] Error fetching avatar metadata:", avatarError)
     }
   }
 
   // Return only essential user fields to minimize data transfer
   const userData = finalUserData.user
   if (userData) {
-    const firstName = userData.first_name || ''
-    const lastName = userData.last_name || ''
-    const fullName = [firstName, lastName].filter(Boolean).join(' ')
+    const firstName = userData.first_name || ""
+    const lastName = userData.last_name || ""
+    const fullName = [firstName, lastName].filter(Boolean).join(" ")
 
     const minimalUser: any = {
       id: userData.id,
       email: userData.email,
       first_name: userData.first_name,
       last_name: userData.last_name,
-      name: fullName || userData.email || 'User',
+      name: fullName || userData.email || "User",
       picture: userData.picture,
-      avatar: userData.avatar?.base_url ? {
-        base_url: userData.avatar.base_url,
-        file_name: userData.avatar.file_name
-      } : undefined
+      avatar: userData.avatar?.base_url
+        ? {
+            base_url: userData.avatar.base_url,
+            file_name: userData.avatar.file_name
+          }
+        : undefined
     }
 
     // If we have an avatar base_url, create a proxy URL for it
@@ -117,11 +125,14 @@ async function processFetchResponse(
         // Create a proper config object with the auth method for fetchAuthenticatedImage
         const imageConfig = {
           apiEndpoint: baseUrl,
-          authMethod: config.authMethod || 'jwt',
+          authMethod: config.authMethod || "jwt",
           apiKey: config.apiKey
         }
 
-        const avatarProxyUrl = await fetchAuthenticatedImage(avatarUrl, imageConfig as any)
+        const avatarProxyUrl = await fetchAuthenticatedImage(
+          avatarUrl,
+          imageConfig as any
+        )
         if (avatarProxyUrl) {
           minimalUser.avatarUrl = avatarProxyUrl
         }
@@ -163,16 +174,20 @@ export async function fetchAuthenticatedImage(
   config: ABsmartlyConfig
 ): Promise<string | null> {
   try {
-    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
+    if (
+      typeof chrome === "undefined" ||
+      !chrome.runtime ||
+      !chrome.runtime.getURL
+    ) {
       return null
     }
 
     const params = new URLSearchParams({
       url: url,
-      authMethod: config.authMethod || 'jwt'
+      authMethod: config.authMethod || "jwt"
     })
 
-    return `${chrome.runtime.getURL('/api/avatar')}?${params.toString()}`
+    return `${chrome.runtime.getURL("/api/avatar")}?${params.toString()}`
   } catch (error) {
     return null
   }
@@ -185,34 +200,41 @@ export async function fetchAuthenticatedImage(
  * @param config - ABsmartly configuration with apiEndpoint, apiKey, and authMethod
  * @returns Promise with authentication result
  */
-export async function checkAuthentication(config: ABsmartlyConfig): Promise<AuthCheckResult> {
+export async function checkAuthentication(
+  config: ABsmartlyConfig
+): Promise<AuthCheckResult> {
   if (!config?.apiEndpoint) {
-    return { success: false, error: 'No endpoint configured' }
+    return { success: false, error: "No endpoint configured" }
   }
 
-  const baseUrl = config.apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+  const baseUrl = config.apiEndpoint.replace(/\/+$/, "").replace(/\/v1$/, "")
   const fullAuthUrl = `${baseUrl}/auth/current-user`
 
   // Use ONLY the selected auth method - NO FALLBACKS
-  const authMethod = config.authMethod || 'jwt'
+  const authMethod = config.authMethod || "jwt"
 
   // For JWT, check if token exists
   let jwtToken: string | null = null
-  if (authMethod === 'jwt') {
+  if (authMethod === "jwt") {
     jwtToken = await getJWTCookie(config.apiEndpoint)
 
     if (!jwtToken) {
-      return { success: false, error: 'No JWT token available' }
+      return { success: false, error: "No JWT token available" }
     }
   }
 
   // For API Key, validate it exists
-  if (authMethod === 'apikey' && !config.apiKey) {
-    return { success: false, error: 'No API key configured' }
+  if (authMethod === "apikey" && !config.apiKey) {
+    return { success: false, error: "No API key configured" }
   }
 
   // Build fetch options - Strategy 1 for JWT (credentials only, no header)
-  const fetchOptions = buildAuthFetchOptions(authMethod, config, jwtToken, false)
+  const fetchOptions = buildAuthFetchOptions(
+    authMethod,
+    config,
+    jwtToken,
+    false
+  )
 
   try {
     // Add timeout controller to prevent hanging
@@ -229,9 +251,14 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
       clearTimeout(timeoutId)
 
       // If 401 and using JWT, try fallback strategy with Authorization header
-      if (userResponse.status === 401 && authMethod === 'jwt' && jwtToken) {
+      if (userResponse.status === 401 && authMethod === "jwt" && jwtToken) {
         // Build fetch options with Authorization header (Strategy 2)
-        const fallbackOptions = buildAuthFetchOptions(authMethod, config, jwtToken, true)
+        const fallbackOptions = buildAuthFetchOptions(
+          authMethod,
+          config,
+          jwtToken,
+          true
+        )
 
         const fallbackResponse = await fetch(fullAuthUrl, {
           ...fallbackOptions,
@@ -239,28 +266,40 @@ export async function checkAuthentication(config: ABsmartlyConfig): Promise<Auth
         })
 
         if (!fallbackResponse.ok) {
-          return { success: false, error: 'Not authenticated' }
+          return { success: false, error: "Not authenticated" }
         }
 
         // Strategy 2 worked, use this response
-        return await processFetchResponse(fallbackResponse, baseUrl, fallbackOptions, controller, config)
+        return await processFetchResponse(
+          fallbackResponse,
+          baseUrl,
+          fallbackOptions,
+          controller,
+          config
+        )
       }
 
       if (!userResponse.ok) {
-        return { success: false, error: 'Not authenticated' }
+        return { success: false, error: "Not authenticated" }
       }
 
       // Strategy 1 worked, process the response
-      return await processFetchResponse(userResponse, baseUrl, fetchOptions, controller, config)
+      return await processFetchResponse(
+        userResponse,
+        baseUrl,
+        fetchOptions,
+        controller,
+        config
+      )
     } catch (fetchError: any) {
       clearTimeout(timeoutId)
-      if (fetchError.name === 'AbortError') {
-        return { success: false, error: 'Request timed out' }
+      if (fetchError.name === "AbortError") {
+        return { success: false, error: "Request timed out" }
       }
       throw fetchError
     }
   } catch (error: any) {
-    console.error('Auth check error:', error)
-    return { success: false, error: error.message || 'Auth check failed' }
+    console.error("Auth check error:", error)
+    return { success: false, error: error.message || "Auth check failed" }
   }
 }

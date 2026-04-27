@@ -1,5 +1,5 @@
-import type { DOMChange, AIDOMGenerationResult } from '~src/types/dom-changes'
-import type { ConversationSession } from '~src/types/absmartly'
+import type { ConversationSession } from "~src/types/absmartly"
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
 
 export interface ModelInfo {
   id: string
@@ -24,50 +24,54 @@ export type ToolDefinition = {
   type?: string
   input_schema?: Record<string, unknown>
   parameters?: Record<string, unknown>
-  function?: { name: string; description?: string; parameters?: Record<string, unknown> }
+  function?: {
+    name: string
+    description?: string
+    parameters?: Record<string, unknown>
+  }
 }
 
 export type AIProviderType =
-  | 'claude-subscription'
-  | 'codex'
-  | 'anthropic-api'
-  | 'openai-api'
-  | 'openrouter-api'
-  | 'gemini-api'
+  | "claude-subscription"
+  | "codex"
+  | "anthropic-api"
+  | "openai-api"
+  | "openrouter-api"
+  | "gemini-api"
 
 export type AIProviderConfig =
   | {
-      aiProvider: 'anthropic-api'
+      aiProvider: "anthropic-api"
       apiKey: string
       llmModel?: string
       customEndpoint?: string
     }
   | {
-      aiProvider: 'claude-subscription'
+      aiProvider: "claude-subscription"
       customEndpoint?: string
       apiKey?: never
       llmModel?: string
     }
   | {
-      aiProvider: 'openai-api'
+      aiProvider: "openai-api"
       apiKey: string
       llmModel?: string
       customEndpoint?: string
     }
   | {
-      aiProvider: 'openrouter-api'
+      aiProvider: "openrouter-api"
       apiKey: string
       llmModel: string
       customEndpoint?: string
     }
   | {
-      aiProvider: 'gemini-api'
+      aiProvider: "gemini-api"
       apiKey: string
       llmModel?: string
       customEndpoint?: string
     }
   | {
-      aiProvider: 'codex'
+      aiProvider: "codex"
       customEndpoint?: string
       apiKey?: never
       llmModel?: string
@@ -95,43 +99,45 @@ export interface AIProvider {
 
 export function isAnthropicConfig(
   config: AIProviderConfig
-): config is Extract<AIProviderConfig, { aiProvider: 'anthropic-api' }> {
-  return config.aiProvider === 'anthropic-api'
+): config is Extract<AIProviderConfig, { aiProvider: "anthropic-api" }> {
+  return config.aiProvider === "anthropic-api"
 }
 
 export function isClaudeSubscriptionConfig(
   config: AIProviderConfig
-): config is Extract<AIProviderConfig, { aiProvider: 'claude-subscription' }> {
-  return config.aiProvider === 'claude-subscription'
+): config is Extract<AIProviderConfig, { aiProvider: "claude-subscription" }> {
+  return config.aiProvider === "claude-subscription"
 }
 
 export function isOpenAIConfig(
   config: AIProviderConfig
-): config is Extract<AIProviderConfig, { aiProvider: 'openai-api' }> {
-  return config.aiProvider === 'openai-api'
+): config is Extract<AIProviderConfig, { aiProvider: "openai-api" }> {
+  return config.aiProvider === "openai-api"
 }
 
 export function isOpenRouterConfig(
   config: AIProviderConfig
-): config is Extract<AIProviderConfig, { aiProvider: 'openrouter-api' }> {
-  return config.aiProvider === 'openrouter-api'
+): config is Extract<AIProviderConfig, { aiProvider: "openrouter-api" }> {
+  return config.aiProvider === "openrouter-api"
 }
 
 export function isGeminiConfig(
   config: AIProviderConfig
-): config is Extract<AIProviderConfig, { aiProvider: 'gemini-api' }> {
-  return config.aiProvider === 'gemini-api'
+): config is Extract<AIProviderConfig, { aiProvider: "gemini-api" }> {
+  return config.aiProvider === "gemini-api"
 }
 
 export function isCodexConfig(
   config: AIProviderConfig
-): config is Extract<AIProviderConfig, { aiProvider: 'codex' }> {
-  return config.aiProvider === 'codex'
+): config is Extract<AIProviderConfig, { aiProvider: "codex" }> {
+  return config.aiProvider === "codex"
 }
 
-export type BridgeProviderName = 'claude' | 'codex'
+export type BridgeProviderName = "claude" | "codex"
 
-export function getBridgeProviderName(aiProvider: AIProviderType): BridgeProviderName {
-  if (aiProvider === 'codex') return 'codex'
-  return 'claude'
+export function getBridgeProviderName(
+  aiProvider: AIProviderType
+): BridgeProviderName {
+  if (aiProvider === "codex") return "codex"
+  return "claude"
 }

@@ -5,7 +5,7 @@
  * only safe patterns are used in DOM manipulation.
  */
 
-import { debugWarn } from './debug'
+import { debugWarn } from "./debug"
 
 const ALLOWED_SELECTOR_PATTERN = /^[a-zA-Z0-9\-_#\.\s\[\]="':>+~*^$|()]+$/
 
@@ -23,33 +23,39 @@ const DANGEROUS_SELECTOR_PATTERNS = [
  * @returns true if the selector is safe, false otherwise
  */
 export function validateSelector(selector: string): boolean {
-  if (!selector || typeof selector !== 'string') {
-    debugWarn('[Selector Validator] Invalid selector: not a string')
+  if (!selector || typeof selector !== "string") {
+    debugWarn("[Selector Validator] Invalid selector: not a string")
     return false
   }
 
   if (selector.length > 1000) {
-    debugWarn('[Selector Validator] Selector too long (max 1000 chars)')
+    debugWarn("[Selector Validator] Selector too long (max 1000 chars)")
     return false
   }
 
   if (!ALLOWED_SELECTOR_PATTERN.test(selector)) {
-    debugWarn('[Selector Validator] Selector contains unsafe characters:', selector)
+    debugWarn(
+      "[Selector Validator] Selector contains unsafe characters:",
+      selector
+    )
     return false
   }
 
   for (const pattern of DANGEROUS_SELECTOR_PATTERNS) {
     if (pattern.test(selector)) {
-      debugWarn('[Selector Validator] Selector contains dangerous pattern:', selector)
+      debugWarn(
+        "[Selector Validator] Selector contains dangerous pattern:",
+        selector
+      )
       return false
     }
   }
 
   // Basic syntax check: balanced brackets and parentheses (no DOM needed)
-  const brackets = selector.split('[').length - selector.split(']').length
-  const parens = selector.split('(').length - selector.split(')').length
+  const brackets = selector.split("[").length - selector.split("]").length
+  const parens = selector.split("(").length - selector.split(")").length
   if (brackets !== 0 || parens !== 0) {
-    debugWarn('[Selector Validator] Invalid CSS selector syntax:', selector)
+    debugWarn("[Selector Validator] Invalid CSS selector syntax:", selector)
     return false
   }
 
@@ -64,7 +70,5 @@ export function validateSelector(selector: string): boolean {
  * @returns Sanitized CSS selector
  */
 export function sanitizeSelector(selector: string): string {
-  return selector
-    .replace(/[^\w\s\-_#\.\[\]="':>+~*^$|()]/g, '')
-    .slice(0, 1000)
+  return selector.replace(/[^\w\s\-_#\.\[\]="':>+~*^$|()]/g, "").slice(0, 1000)
 }

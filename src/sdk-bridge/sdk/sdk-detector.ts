@@ -6,7 +6,7 @@
  * @module SDKDetector
  */
 
-import { Logger } from '../utils/logger'
+import { Logger } from "../utils/logger"
 
 export interface SDKDetectionResult {
   sdk: any | null
@@ -41,9 +41,9 @@ export class SDKDetector {
     ]
 
     for (const location of sdkLocations) {
-      if (location && typeof location.createContext === 'function') {
+      if (location && typeof location.createContext === "function") {
         sdk = location
-        Logger.log('[ABsmartly Extension] SDK instance found')
+        Logger.log("[ABsmartly Extension] SDK instance found")
         break
       }
     }
@@ -65,7 +65,7 @@ export class SDKDetector {
 
     // First pass: Check if any location is directly a context (has treatment method)
     for (const location of possibleLocations) {
-      if (location && typeof location.treatment === 'function') {
+      if (location && typeof location.treatment === "function") {
         context = location
         break
       }
@@ -74,7 +74,11 @@ export class SDKDetector {
     // Second pass: Check if any location has a context property with treatment method
     if (!context) {
       for (const location of possibleLocations) {
-        if (location && location.context && typeof location.context.treatment === 'function') {
+        if (
+          location &&
+          location.context &&
+          typeof location.context.treatment === "function"
+        ) {
           context = location.context
           break
         }
@@ -84,10 +88,15 @@ export class SDKDetector {
     // Third pass: Check for contexts array
     if (!context) {
       for (const location of possibleLocations) {
-        if (location && location.contexts && Array.isArray(location.contexts) && location.contexts.length > 0) {
+        if (
+          location &&
+          location.contexts &&
+          Array.isArray(location.contexts) &&
+          location.contexts.length > 0
+        ) {
           // Check each context in the array for treatment method
           for (const ctx of location.contexts) {
-            if (ctx && typeof ctx.treatment === 'function') {
+            if (ctx && typeof ctx.treatment === "function") {
               context = ctx
               break
             }
@@ -103,17 +112,23 @@ export class SDKDetector {
 
       // Store where we found it
       if ((window as any).ABsmartlyContext === context) {
-        this.contextPropertyPath = 'ABsmartlyContext'
+        this.contextPropertyPath = "ABsmartlyContext"
       } else if ((window as any).absmartly === context) {
-        this.contextPropertyPath = 'absmartly'
-      } else if ((window as any).sdk && (window as any).sdk.context === context) {
-        this.contextPropertyPath = 'sdk.context'
+        this.contextPropertyPath = "absmartly"
+      } else if (
+        (window as any).sdk &&
+        (window as any).sdk.context === context
+      ) {
+        this.contextPropertyPath = "sdk.context"
       } else {
-        this.contextPropertyPath = 'unknown'
+        this.contextPropertyPath = "unknown"
       }
 
-      Logger.log('[ABsmartly Extension] ✅ Context found and cached at:', this.contextPropertyPath)
-      Logger.log('[ABsmartly Extension] 📊 Context details:', {
+      Logger.log(
+        "[ABsmartly Extension] ✅ Context found and cached at:",
+        this.contextPropertyPath
+      )
+      Logger.log("[ABsmartly Extension] 📊 Context details:", {
         hasTreatment: !!context.treatment,
         hasPeek: !!context.peek,
         hasData: !!context.data,
@@ -122,7 +137,7 @@ export class SDKDetector {
         contextType: typeof context
       })
     } else if (!context) {
-      Logger.warn('[ABsmartly Extension] ⚠️ No context found after detection')
+      Logger.warn("[ABsmartly Extension] ⚠️ No context found after detection")
     }
 
     return { sdk, context, contextPath: this.contextPropertyPath }

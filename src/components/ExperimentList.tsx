@@ -1,20 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import type { Experiment } from '~src/types/absmartly'
-import { ReloadBanner } from './experiment-list/ReloadBanner'
+import React, { useCallback, useEffect, useState } from "react"
+
+import type { Experiment } from "~src/types/absmartly"
+import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 import {
-  type ExperimentOverrides,
-  type OverrideValue,
   ENV_TYPE,
+  getDevelopmentEnvironment,
   initializeOverrides,
-  saveOverrides,
   reloadPageWithOverrides,
   saveDevelopmentEnvironment,
-  getDevelopmentEnvironment
-} from '~src/utils/overrides'
-import { getCurrentVariantAssignments, type VariantAssignments } from '~src/utils/sdk-bridge'
-import { getConfig } from '~src/utils/storage'
-import { ExperimentListItem } from './experiment/ExperimentListItem'
+  saveOverrides,
+  type ExperimentOverrides,
+  type OverrideValue
+} from "~src/utils/overrides"
+import {
+  getCurrentVariantAssignments,
+  type VariantAssignments
+} from "~src/utils/sdk-bridge"
+import { getConfig } from "~src/utils/storage"
+
+import { ReloadBanner } from "./experiment-list/ReloadBanner"
+import { ExperimentListItem } from "./experiment/ExperimentListItem"
 
 interface ExperimentListProps {
   experiments: Experiment[]
@@ -24,44 +29,54 @@ interface ExperimentListProps {
   onToggleFavorite?: (experimentId: number) => void
 }
 
-export function ExperimentList({ experiments, onExperimentClick, loading, favoriteExperiments = new Set(), onToggleFavorite }: ExperimentListProps) {
+export function ExperimentList({
+  experiments,
+  onExperimentClick,
+  loading,
+  favoriteExperiments = new Set(),
+  onToggleFavorite
+}: ExperimentListProps) {
   const [overrides, setOverrides] = useState<ExperimentOverrides>({})
   const [showReloadBanner, setShowReloadBanner] = useState(false)
   const [realVariants, setRealVariants] = useState<VariantAssignments>({})
   const [experimentsInContext, setExperimentsInContext] = useState<string[]>([])
   const [developmentEnv, setDevelopmentEnv] = useState<string | null>(null)
-  const [domFieldName, setDomFieldName] = useState<string>('__dom_changes')
+  const [domFieldName, setDomFieldName] = useState<string>("__dom_changes")
 
   useEffect(() => {
     const init = async () => {
       try {
         const config = await getConfig()
-        const fieldName = config?.domChangesFieldName || '__dom_changes'
+        const fieldName = config?.domChangesFieldName || "__dom_changes"
         setDomFieldName(fieldName)
 
         const loadedOverrides = await initializeOverrides()
         setOverrides(loadedOverrides)
       } catch (error) {
-        debugError('Failed to initialize overrides:', error)
+        debugError("Failed to initialize overrides:", error)
       }
 
       let devEnv = await getDevelopmentEnvironment()
       if (!devEnv) {
         try {
-          const { BackgroundAPIClient } = await import('~src/lib/background-api-client')
+          const { BackgroundAPIClient } = await import(
+            "~src/lib/background-api-client"
+          )
           const client = new BackgroundAPIClient()
 
           const environments = await client.getEnvironments()
-          debugLog('Fetched environments:', environments)
+          debugLog("Fetched environments:", environments)
 
-          const firstDevEnv = environments.find(env => env.name.toLowerCase().includes('dev'))
+          const firstDevEnv = environments.find((env) =>
+            env.name.toLowerCase().includes("dev")
+          )
           if (firstDevEnv) {
             devEnv = firstDevEnv.name
             await saveDevelopmentEnvironment(firstDevEnv.name)
-            debugLog('Saved development environment:', firstDevEnv.name)
+            debugLog("Saved development environment:", firstDevEnv.name)
           }
         } catch (error) {
-          debugWarn('Failed to fetch environments:', error)
+          debugWarn("Failed to fetch environments:", error)
         }
       }
       setDevelopmentEnv(devEnv)
@@ -71,24 +86,31 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
 
   useEffect(() => {
     if (experiments.length > 0) {
-      const experimentNames = experiments.map(exp => exp.name)
+      const experimentNames = experiments.map((exp) => exp.name)
 
       const checkAssignments = async () => {
         const data = await getCurrentVariantAssignments(experimentNames)
         setRealVariants(data.assignments)
         setExperimentsInContext(data.experimentsInContext)
-        debugLog('SDK data:', data)
+        debugLog("SDK data:", data)
 
-        const hasActiveOverrides = Object.entries(overrides).some(([expName, overrideValue]) => {
-          const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
-          const sdkVariant = data.assignments[expName]
+        const hasActiveOverrides = Object.entries(overrides).some(
+          ([expName, overrideValue]) => {
+            const variant =
+              typeof overrideValue === "number"
+                ? overrideValue
+                : overrideValue.variant
+            const sdkVariant = data.assignments[expName]
 
-          debugLog(`Comparing override for ${expName}: override=${variant}, sdk=${sdkVariant}`)
+            debugLog(
+              `Comparing override for ${expName}: override=${variant}, sdk=${sdkVariant}`
+            )
 
-          return sdkVariant !== undefined && sdkVariant !== variant
-        })
+            return sdkVariant !== undefined && sdkVariant !== variant
+          }
+        )
 
-        debugLog('Has active overrides after comparison:', hasActiveOverrides)
+        debugLog("Has active overrides after comparison:", hasActiveOverrides)
         setShowReloadBanner(hasActiveOverrides)
       }
 
@@ -98,49 +120,68 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     }
   }, [experiments, overrides])
 
-  const handleOverrideChange = useCallback(async (experimentName: string, variantIndex: number, experiment: Experiment) => {
-    const newOverrides = { ...overrides }
-    if (variantIndex === -1) {
-      delete newOverrides[experimentName]
-    } else {
-      const status = experiment.state || experiment.status || 'created'
-      let overrideValue: number | OverrideValue = variantIndex
-      debugLog('[ABsmartly] handleOverrideChange - experiment:', experimentName, 'status:', status, 'variantIndex:', variantIndex)
+  const handleOverrideChange = useCallback(
+    async (
+      experimentName: string,
+      variantIndex: number,
+      experiment: Experiment
+    ) => {
+      const newOverrides = { ...overrides }
+      if (variantIndex === -1) {
+        delete newOverrides[experimentName]
+      } else {
+        const status = experiment.state || experiment.status || "created"
+        let overrideValue: number | OverrideValue = variantIndex
+        debugLog(
+          "[ABsmartly] handleOverrideChange - experiment:",
+          experimentName,
+          "status:",
+          status,
+          "variantIndex:",
+          variantIndex
+        )
 
-      if (status === 'development') {
-        overrideValue = {
-          variant: variantIndex,
-          env: ENV_TYPE.DEVELOPMENT,
-          id: experiment.id
+        if (status === "development") {
+          overrideValue = {
+            variant: variantIndex,
+            env: ENV_TYPE.DEVELOPMENT,
+            id: experiment.id
+          }
+          debugLog("[ABsmartly] Setting development override:", overrideValue)
+        } else if (status !== "running" && status !== "full_on") {
+          overrideValue = {
+            variant: variantIndex,
+            env: ENV_TYPE.API_FETCH,
+            id: experiment.id
+          }
+          debugLog("[ABsmartly] Setting non-running override:", overrideValue)
         }
-        debugLog('[ABsmartly] Setting development override:', overrideValue)
-      } else if (status !== 'running' && status !== 'full_on') {
-        overrideValue = {
-          variant: variantIndex,
-          env: ENV_TYPE.API_FETCH,
-          id: experiment.id
-        }
-        debugLog('[ABsmartly] Setting non-running override:', overrideValue)
+
+        newOverrides[experimentName] = overrideValue
+      }
+      debugLog("[ABsmartly] New overrides to save:", newOverrides)
+      setOverrides(newOverrides)
+
+      try {
+        await saveOverrides(newOverrides)
+      } catch (error) {
+        debugError("[ABsmartly] Failed to save overrides:", error)
       }
 
-      newOverrides[experimentName] = overrideValue
-    }
-    debugLog('[ABsmartly] New overrides to save:', newOverrides)
-    setOverrides(newOverrides)
+      const hasActiveOverrides = Object.entries(newOverrides).some(
+        ([expName, overrideValue]) => {
+          const variant =
+            typeof overrideValue === "number"
+              ? overrideValue
+              : overrideValue.variant
+          return realVariants[expName] !== variant
+        }
+      )
 
-    try {
-      await saveOverrides(newOverrides)
-    } catch (error) {
-      debugError('[ABsmartly] Failed to save overrides:', error)
-    }
-
-    const hasActiveOverrides = Object.entries(newOverrides).some(([expName, overrideValue]) => {
-      const variant = typeof overrideValue === 'number' ? overrideValue : overrideValue.variant
-      return realVariants[expName] !== variant
-    })
-
-    setShowReloadBanner(hasActiveOverrides)
-  }, [overrides, realVariants])
+      setShowReloadBanner(hasActiveOverrides)
+    },
+    [overrides, realVariants]
+  )
 
   const handleReload = useCallback(async () => {
     await reloadPageWithOverrides()
@@ -151,7 +192,7 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
     try {
       await saveOverrides({})
     } catch (error) {
-      debugError('[ABsmartly] Failed to clear overrides:', error)
+      debugError("[ABsmartly] Failed to clear overrides:", error)
       return
     }
     setOverrides({})
@@ -172,7 +213,9 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
 
   if (experiments.length === 0) {
     return (
-      <div id="no-experiments-message" className="text-center py-8 text-gray-500">
+      <div
+        id="no-experiments-message"
+        className="text-center py-8 text-gray-500">
         No experiments found
       </div>
     )
@@ -199,7 +242,9 @@ export function ExperimentList({ experiments, onExperimentClick, loading, favori
             domFieldName={domFieldName}
             isFavorite={favoriteExperiments.has(experiment.id)}
             onExperimentClick={onExperimentClick}
-            onToggleFavorite={(experimentId) => onToggleFavorite?.(experimentId)}
+            onToggleFavorite={(experimentId) =>
+              onToggleFavorite?.(experimentId)
+            }
             onOverrideChange={handleOverrideChange}
           />
         ))}

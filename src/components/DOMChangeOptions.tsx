@@ -1,27 +1,28 @@
-import React, { useState } from 'react';
-import { Input } from './ui/Input';
-import { Button } from './ui/Button';
+import React, { useState } from "react"
+
+import { Button } from "./ui/Button"
+import { Input } from "./ui/Input"
 
 export interface DOMChangeOptionsProps {
-  important?: boolean;
-  waitForElement?: boolean;
-  triggerOnView?: boolean;
-  persistStyle?: boolean;
-  observerRoot?: string;
-  onImportantChange?: (value: boolean) => void;
-  onWaitForElementChange?: (value: boolean) => void;
-  onTriggerOnViewChange?: (value: boolean) => void;
-  onPersistStyleChange?: (value: boolean) => void;
-  onObserverRootChange?: (value: string) => void;
-  onStartPicker?: (field: string) => void;
-  pickingForField?: string | null;
-  disabled?: boolean;
-  idPrefix?: string;
-  showImportant?: boolean;
-  showWaitForElement?: boolean;
-  showTriggerOnView?: boolean;
-  showPersistStyle?: boolean;
-  showObserverRoot?: boolean;
+  important?: boolean
+  waitForElement?: boolean
+  triggerOnView?: boolean
+  persistStyle?: boolean
+  observerRoot?: string
+  onImportantChange?: (value: boolean) => void
+  onWaitForElementChange?: (value: boolean) => void
+  onTriggerOnViewChange?: (value: boolean) => void
+  onPersistStyleChange?: (value: boolean) => void
+  onObserverRootChange?: (value: string) => void
+  onStartPicker?: (field: string) => void
+  pickingForField?: string | null
+  disabled?: boolean
+  idPrefix?: string
+  showImportant?: boolean
+  showWaitForElement?: boolean
+  showTriggerOnView?: boolean
+  showPersistStyle?: boolean
+  showObserverRoot?: boolean
 }
 
 export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
@@ -29,7 +30,7 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
   waitForElement = false,
   triggerOnView = false,
   persistStyle = false,
-  observerRoot = '',
+  observerRoot = "",
   onImportantChange,
   onWaitForElementChange,
   onTriggerOnViewChange,
@@ -38,14 +39,16 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
   onStartPicker,
   pickingForField,
   disabled = false,
-  idPrefix = 'dom-options',
+  idPrefix = "dom-options",
   showImportant = true,
   showWaitForElement = true,
   showTriggerOnView = true,
   showPersistStyle = true,
-  showObserverRoot = true,
+  showObserverRoot = true
 }) => {
-  const [localPickingForField, setLocalPickingForField] = useState<string | null>(pickingForField || null)
+  const [localPickingForField, setLocalPickingForField] = useState<
+    string | null
+  >(pickingForField || null)
   return (
     <div className="space-y-2">
       {showImportant && onImportantChange && (
@@ -59,8 +62,12 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
             className="mt-0.5 mr-2"
           />
           <label htmlFor={`${idPrefix}-important`} className="text-xs">
-            <span className="font-medium text-gray-700">Use !important flag</span>
-            <p className="text-gray-500">Ensures styles override existing CSS</p>
+            <span className="font-medium text-gray-700">
+              Use !important flag
+            </span>
+            <p className="text-gray-500">
+              Ensures styles override existing CSS
+            </p>
           </label>
         </div>
       )}
@@ -76,8 +83,12 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
             className="mt-0.5 mr-2"
           />
           <label htmlFor={`${idPrefix}-wait`} className="text-xs">
-            <span className="font-medium text-gray-700">Wait for element (lazy-loaded)</span>
-            <p className="text-gray-500">Apply change when element appears in DOM</p>
+            <span className="font-medium text-gray-700">
+              Wait for element (lazy-loaded)
+            </span>
+            <p className="text-gray-500">
+              Apply change when element appears in DOM
+            </p>
           </label>
         </div>
       )}
@@ -94,7 +105,9 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
           />
           <label htmlFor={`${idPrefix}-trigger-view`} className="text-xs">
             <span className="font-medium text-gray-700">Trigger on-view</span>
-            <p className="text-gray-500">Only register exposure when element is visible</p>
+            <p className="text-gray-500">
+              Only register exposure when element is visible
+            </p>
           </label>
         </div>
       )}
@@ -111,13 +124,21 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
           />
           <label htmlFor={`${idPrefix}-persist`} className="text-xs">
             <span className="font-medium text-gray-700">Persist change</span>
-            <p className="text-gray-500">Re-apply change when frameworks or interactions overwrite it</p>
+            <p className="text-gray-500">
+              Re-apply change when frameworks or interactions overwrite it
+            </p>
           </label>
         </div>
       )}
 
       {showObserverRoot && waitForElement && onObserverRootChange && (
         <div className="ml-6">
+          <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            `waitForElement` only delays when the change is applied. `Observer
+            Root` is used as the immediate exposure trigger anchor, and if it is
+            empty exposure falls back to `body`, so all variants track
+            immediately.
+          </div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Observer Root (optional)
           </label>
@@ -128,26 +149,27 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
                 onChange={(e) => onObserverRootChange(e.target.value)}
                 placeholder="body, .container, #app"
                 disabled={disabled}
-                className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${localPickingForField === 'observerRoot' ? 'border-blue-500' : 'border-gray-300'}`}
+                className={`w-full px-3 py-2 pr-10 border rounded-md text-xs font-mono bg-white ${localPickingForField === "observerRoot" ? "border-blue-500" : "border-gray-300"}`}
               />
             </div>
             {onStartPicker && (
               <Button
                 type="button"
                 onClick={() => {
-                  setLocalPickingForField('observerRoot')
-                  onStartPicker('observerRoot')
+                  setLocalPickingForField("observerRoot")
+                  onStartPicker("observerRoot")
                 }}
                 size="sm"
                 variant="secondary"
                 title="Pick element"
-                className={localPickingForField === 'observerRoot' ? 'bg-blue-100' : ''}
-              >
+                className={
+                  localPickingForField === "observerRoot" ? "bg-blue-100" : ""
+                }>
                 🎯
               </Button>
             )}
           </div>
-          {localPickingForField === 'observerRoot' && (
+          {localPickingForField === "observerRoot" && (
             <p className="text-xs text-blue-600 mt-1 animate-pulse">
               Click an element on the page...
             </p>
@@ -155,5 +177,5 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}

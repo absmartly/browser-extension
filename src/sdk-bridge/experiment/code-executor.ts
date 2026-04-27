@@ -6,9 +6,10 @@
  * @module CodeExecutor
  */
 
-import { Logger } from '../utils/logger'
-import { validateExperimentCode } from '~src/utils/code-validator'
-import { ExperimentExecutor } from './experiment-executor'
+import { validateExperimentCode } from "~src/utils/code-validator"
+
+import { Logger } from "../utils/logger"
+import { ExperimentExecutor } from "./experiment-executor"
 
 export interface ExecutionContext {
   element?: HTMLElement
@@ -45,23 +46,21 @@ export class CodeExecutor {
    * @param code - The code to validate
    * @returns Object with { isValid, errors }
    */
-  static validate(
-    code: string
-  ): { isValid: boolean; errors: string[] } {
+  static validate(code: string): { isValid: boolean; errors: string[] } {
     const errors: string[] = []
 
-    if (!code || typeof code !== 'string') {
-      errors.push('Code must be a non-empty string')
+    if (!code || typeof code !== "string") {
+      errors.push("Code must be a non-empty string")
       return { isValid: false, errors }
     }
 
     const validationResult = validateExperimentCode(code)
     if (!validationResult.valid) {
-      errors.push(validationResult.reason || 'Code validation failed')
+      errors.push(validationResult.reason || "Code validation failed")
     }
 
     if (validationResult.warnings) {
-      validationResult.warnings.forEach(warning => {
+      validationResult.warnings.forEach((warning) => {
         Logger.warn(`[CodeExecutor] Validation warning: ${warning}`)
       })
     }

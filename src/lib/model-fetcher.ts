@@ -1,8 +1,8 @@
-import type { ModelConfig, ModelInfo } from '~src/lib/ai-providers/base'
-import { notifyUser } from '~src/utils/notifications'
-import { debugLog } from '~src/utils/debug'
+import type { ModelConfig, ModelInfo } from "~src/lib/ai-providers/base"
+import { debugLog } from "~src/utils/debug"
+import { notifyUser } from "~src/utils/notifications"
 
-export type { ModelInfo } from '~src/lib/ai-providers/base'
+export type { ModelInfo } from "~src/lib/ai-providers/base"
 
 export interface GroupedModels {
   [provider: string]: ModelInfo[]
@@ -24,11 +24,18 @@ class ModelFetcherClass {
     }
 
     if (this.fetchingPromises.has(providerKey)) {
-      debugLog(`[ModelFetcher] Already fetching ${providerKey} models, returning existing promise`)
+      debugLog(
+        `[ModelFetcher] Already fetching ${providerKey} models, returning existing promise`
+      )
       return this.fetchingPromises.get(providerKey)!
     }
 
-    const fetchPromise = this.doFetch(providerKey, apiKey, config, customEndpoint)
+    const fetchPromise = this.doFetch(
+      providerKey,
+      apiKey,
+      config,
+      customEndpoint
+    )
     this.fetchingPromises.set(providerKey, fetchPromise)
 
     try {
@@ -46,7 +53,12 @@ class ModelFetcherClass {
     config: ModelConfig,
     customEndpoint?: string
   ): Promise<GroupedModels> {
-    const models = await this.fetchModels(providerKey, apiKey, config, customEndpoint)
+    const models = await this.fetchModels(
+      providerKey,
+      apiKey,
+      config,
+      customEndpoint
+    )
     return this.groupModelsByProvider(models)
   }
 
@@ -78,20 +90,30 @@ class ModelFetcherClass {
       debugLog(`[ModelFetcher] Fetched ${models.length} ${providerKey} models`)
       return models.length > 0 ? models : config.staticModels()
     } catch (error) {
-      console.error(`[ModelFetcher] Error fetching ${providerKey} models:`, error)
+      console.error(
+        `[ModelFetcher] Error fetching ${providerKey} models:`,
+        error
+      )
 
       let userMessage = `Failed to fetch latest models from ${providerKey}. `
-      if (error?.message?.includes('401') || error?.message?.includes('403') || error?.message?.includes('unauthorized')) {
-        userMessage += 'Please check your API key in settings.'
-      } else if (error?.message?.includes('429')) {
-        userMessage += 'Rate limit exceeded. Try again in a moment.'
-      } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
-        userMessage += 'Network connection failed.'
+      if (
+        error?.message?.includes("401") ||
+        error?.message?.includes("403") ||
+        error?.message?.includes("unauthorized")
+      ) {
+        userMessage += "Please check your API key in settings."
+      } else if (error?.message?.includes("429")) {
+        userMessage += "Rate limit exceeded. Try again in a moment."
+      } else if (
+        error?.message?.includes("network") ||
+        error?.message?.includes("fetch")
+      ) {
+        userMessage += "Network connection failed."
       } else {
-        userMessage += 'Using cached model list.'
+        userMessage += "Using cached model list."
       }
 
-      notifyUser(userMessage, 'warning')
+      notifyUser(userMessage, "warning")
       return config.staticModels()
     }
   }
@@ -99,7 +121,7 @@ class ModelFetcherClass {
   private groupModelsByProvider(models: ModelInfo[]): GroupedModels {
     const grouped: GroupedModels = {}
     for (const model of models) {
-      const provider = model.provider || 'Other'
+      const provider = model.provider || "Other"
       if (!grouped[provider]) {
         grouped[provider] = []
       }
@@ -114,7 +136,7 @@ class ModelFetcherClass {
       debugLog(`[ModelFetcher] Cleared cache for ${provider}`)
     } else {
       this.cache.clear()
-      debugLog('[ModelFetcher] Cleared all model cache')
+      debugLog("[ModelFetcher] Cleared all model cache")
     }
   }
 }

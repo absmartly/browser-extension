@@ -1,19 +1,29 @@
-import { renderHook, waitFor, act } from '@testing-library/react'
-import { useConversationHistory } from '../useConversationHistory'
-import * as aiConversationStorage from '~src/utils/ai-conversation-storage'
-import * as aiConversationMigration from '~src/utils/ai-conversation-migration'
-import * as htmlCapture from '~src/utils/html-capture'
-import * as messaging from '~src/lib/messaging'
-import type { ChatMessage, ConversationSession, StoredConversation } from '~src/types/absmartly'
-import { unsafeSessionId, unsafeConversationId, unsafeVariantName } from '~src/types/branded'
+import { act, renderHook, waitFor } from "@testing-library/react"
 
-jest.mock('~src/utils/ai-conversation-storage')
-jest.mock('~src/utils/ai-conversation-migration')
-jest.mock('~src/utils/html-capture')
-jest.mock('~src/lib/messaging')
+import * as messaging from "~src/lib/messaging"
+import type {
+  ChatMessage,
+  ConversationSession,
+  StoredConversation
+} from "~src/types/absmartly"
+import {
+  unsafeConversationId,
+  unsafeSessionId,
+  unsafeVariantName
+} from "~src/types/branded"
+import * as aiConversationMigration from "~src/utils/ai-conversation-migration"
+import * as aiConversationStorage from "~src/utils/ai-conversation-storage"
+import * as htmlCapture from "~src/utils/html-capture"
 
-describe('useConversationHistory', () => {
-  const mockVariantName = 'test-variant'
+import { useConversationHistory } from "../useConversationHistory"
+
+jest.mock("~src/utils/ai-conversation-storage")
+jest.mock("~src/utils/ai-conversation-migration")
+jest.mock("~src/utils/html-capture")
+jest.mock("~src/lib/messaging")
+
+describe("useConversationHistory", () => {
+  const mockVariantName = "test-variant"
   let mockGetConversationList: jest.Mock
   let mockSaveConversation: jest.Mock
   let mockLoadConversation: jest.Mock
@@ -36,39 +46,46 @@ describe('useConversationHistory', () => {
     mockMigrateConversation = jest.fn()
     mockCapturePageHTML = jest.fn()
     mockSendToBackground = jest.fn()
-
-    ;(aiConversationStorage.getConversationList as jest.Mock) = mockGetConversationList
-    ;(aiConversationStorage.saveConversation as jest.Mock) = mockSaveConversation
-    ;(aiConversationStorage.loadConversation as jest.Mock) = mockLoadConversation
-    ;(aiConversationStorage.deleteConversation as jest.Mock) = mockDeleteConversation
-    ;(aiConversationStorage.setActiveConversation as jest.Mock) = mockSetActiveConversation
+    ;(aiConversationStorage.getConversationList as jest.Mock) =
+      mockGetConversationList
+    ;(aiConversationStorage.saveConversation as jest.Mock) =
+      mockSaveConversation
+    ;(aiConversationStorage.loadConversation as jest.Mock) =
+      mockLoadConversation
+    ;(aiConversationStorage.deleteConversation as jest.Mock) =
+      mockDeleteConversation
+    ;(aiConversationStorage.setActiveConversation as jest.Mock) =
+      mockSetActiveConversation
     ;(aiConversationMigration.needsMigration as jest.Mock) = mockNeedsMigration
-    ;(aiConversationMigration.migrateConversation as jest.Mock) = mockMigrateConversation
+    ;(aiConversationMigration.migrateConversation as jest.Mock) =
+      mockMigrateConversation
     ;(htmlCapture.capturePageHTML as jest.Mock) = mockCapturePageHTML
     ;(messaging.sendToBackground as jest.Mock) = mockSendToBackground
 
     mockNeedsMigration.mockResolvedValue(false)
     mockGetConversationList.mockResolvedValue([])
     mockCapturePageHTML.mockResolvedValue({
-      html: '<html><body>test</body></html>',
-      url: 'https://example.com',
-      domStructure: 'body\n  test'
+      html: "<html><body>test</body></html>",
+      url: "https://example.com",
+      domStructure: "body\n  test"
     })
     mockSendToBackground.mockResolvedValue({
       success: true,
       session: {
-        id: unsafeSessionId('session-id'),
+        id: unsafeSessionId("session-id"),
         htmlSent: true,
         messages: []
       }
     })
   })
 
-  describe('Initialization', () => {
-    it('should initialize with empty conversation when no active conversation exists', async () => {
+  describe("Initialization", () => {
+    it("should initialize with empty conversation when no active conversation exists", async () => {
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       expect(result.current.isLoadingHistory).toBe(true)
 
@@ -83,39 +100,47 @@ describe('useConversationHistory', () => {
       expect(mockCapturePageHTML).toHaveBeenCalled()
       expect(mockSendToBackground).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'AI_INITIALIZE_SESSION'
+          type: "AI_INITIALIZE_SESSION"
         })
       )
     })
 
-    it('should load active conversation if one exists', async () => {
+    it("should load active conversation if one exists", async () => {
       const mockSession: ConversationSession = {
-        id: unsafeSessionId('session-1'),
+        id: unsafeSessionId("session-1"),
         htmlSent: true,
         messages: []
       }
       const mockMessages: ChatMessage[] = [
-        { role: 'user', content: 'Hello', timestamp: Date.now() },
-        { role: 'assistant', content: 'Hi there!', timestamp: Date.now() }
+        { role: "user", content: "Hello", timestamp: Date.now() },
+        { role: "assistant", content: "Hi there!", timestamp: Date.now() }
       ]
       const mockConversation: StoredConversation = {
-        id: unsafeConversationId('conv-1'),
+        id: unsafeConversationId("conv-1"),
         variantName: unsafeVariantName(mockVariantName),
         messages: mockMessages,
         conversationSession: mockSession,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 2,
-        firstUserMessage: 'Hello',
+        firstUserMessage: "Hello",
         isActive: true
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Hello', messageCount: 2, createdAt: Date.now(), isActive: true }
+        {
+          id: unsafeConversationId("conv-1"),
+          firstUserMessage: "Hello",
+          messageCount: 2,
+          createdAt: Date.now(),
+          isActive: true
+        }
       ])
       mockLoadConversation.mockResolvedValue(mockConversation)
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -123,15 +148,20 @@ describe('useConversationHistory', () => {
 
       expect(result.current.chatHistory).toEqual(mockMessages)
       expect(result.current.conversationSession).toEqual(mockSession)
-      expect(result.current.currentConversationId).toBe('conv-1')
-      expect(mockLoadConversation).toHaveBeenCalledWith(mockVariantName, 'conv-1')
+      expect(result.current.currentConversationId).toBe("conv-1")
+      expect(mockLoadConversation).toHaveBeenCalledWith(
+        mockVariantName,
+        "conv-1"
+      )
     })
 
-    it('should handle migration when needed', async () => {
+    it("should handle migration when needed", async () => {
       mockNeedsMigration.mockResolvedValue(true)
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -141,25 +171,29 @@ describe('useConversationHistory', () => {
       expect(mockMigrateConversation).toHaveBeenCalledWith(mockVariantName)
     })
 
-    it('should handle migration failure during load', async () => {
-      const migrationError = new Error('Migration failed')
+    it("should handle migration failure during load", async () => {
+      const migrationError = new Error("Migration failed")
       mockNeedsMigration.mockRejectedValue(migrationError)
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
       })
 
-      expect(result.current.error).toBe('Migration failed')
+      expect(result.current.error).toBe("Migration failed")
     })
 
-    it('should handle HTML capture failure during initialization', async () => {
-      const captureError = new Error('Capture failed')
+    it("should handle HTML capture failure during initialization", async () => {
+      const captureError = new Error("Capture failed")
       mockCapturePageHTML.mockRejectedValue(captureError)
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -169,30 +203,38 @@ describe('useConversationHistory', () => {
       expect(mockCapturePageHTML).toHaveBeenCalled()
     })
 
-    it('should initialize HTML for loaded conversation if not sent', async () => {
+    it("should initialize HTML for loaded conversation if not sent", async () => {
       const mockSession: ConversationSession = {
-        id: unsafeSessionId('session-1'),
+        id: unsafeSessionId("session-1"),
         htmlSent: false,
         messages: []
       }
       const mockConversation: StoredConversation = {
-        id: unsafeConversationId('conv-1'),
+        id: unsafeConversationId("conv-1"),
         variantName: unsafeVariantName(mockVariantName),
         messages: [],
         conversationSession: mockSession,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 0,
-        firstUserMessage: 'Test',
+        firstUserMessage: "Test",
         isActive: true
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Test', messageCount: 0, createdAt: Date.now(), isActive: true }
+        {
+          id: unsafeConversationId("conv-1"),
+          firstUserMessage: "Test",
+          messageCount: 0,
+          createdAt: Date.now(),
+          isActive: true
+        }
       ])
       mockLoadConversation.mockResolvedValue(mockConversation)
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -204,19 +246,21 @@ describe('useConversationHistory', () => {
 
       expect(mockSendToBackground).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'AI_INITIALIZE_SESSION',
+          type: "AI_INITIALIZE_SESSION",
           conversationSession: mockSession
         })
       )
     })
   })
 
-  describe('handleNewChat', () => {
-    it('should save current conversation before creating new chat', async () => {
+  describe("handleNewChat", () => {
+    it("should save current conversation before creating new chat", async () => {
       mockGetConversationList.mockResolvedValue([])
       mockSaveConversation.mockResolvedValue(undefined)
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -225,7 +269,7 @@ describe('useConversationHistory', () => {
       const initialConvId = result.current.currentConversationId
 
       const mockMessages: ChatMessage[] = [
-        { role: 'user', content: 'Test message', timestamp: Date.now() }
+        { role: "user", content: "Test message", timestamp: Date.now() }
       ]
 
       act(() => {
@@ -245,10 +289,12 @@ describe('useConversationHistory', () => {
       expect(result.current.currentConversationId).toBeTruthy()
     })
 
-    it('should not save empty conversation when creating new chat', async () => {
+    it("should not save empty conversation when creating new chat", async () => {
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -261,18 +307,22 @@ describe('useConversationHistory', () => {
       expect(mockSaveConversation).not.toHaveBeenCalled()
     })
 
-    it('should handle storage quota during save', async () => {
+    it("should handle storage quota during save", async () => {
       mockGetConversationList.mockResolvedValue([])
-      mockSaveConversation.mockRejectedValue(new Error('QuotaExceededError'))
+      mockSaveConversation.mockRejectedValue(new Error("QuotaExceededError"))
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
       })
 
       act(() => {
-        result.current.setChatHistory([{ role: 'user', content: 'Test', timestamp: Date.now() }])
+        result.current.setChatHistory([
+          { role: "user", content: "Test", timestamp: Date.now() }
+        ])
       })
 
       await act(async () => {
@@ -283,46 +333,68 @@ describe('useConversationHistory', () => {
     })
   })
 
-  describe('switchConversation', () => {
-    it('should save current conversation before switching', async () => {
+  describe("switchConversation", () => {
+    it("should save current conversation before switching", async () => {
       const mockSession: ConversationSession = {
-        id: unsafeSessionId('session-1'),
+        id: unsafeSessionId("session-1"),
         htmlSent: true,
         messages: []
       }
-      const targetMessage = { role: 'user' as const, content: 'Previous conversation', timestamp: Date.now() }
+      const targetMessage = {
+        role: "user" as const,
+        content: "Previous conversation",
+        timestamp: Date.now()
+      }
       const targetConversation: StoredConversation = {
-        id: unsafeConversationId('conv-2'),
+        id: unsafeConversationId("conv-2"),
         variantName: unsafeVariantName(mockVariantName),
         messages: [targetMessage],
         conversationSession: mockSession,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 1,
-        firstUserMessage: 'Previous conversation',
+        firstUserMessage: "Previous conversation",
         isActive: false
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Current', messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(), isActive: true },
-        { id: unsafeConversationId('conv-2'), firstUserMessage: 'Previous', messageCount: 1, createdAt: Date.now(), updatedAt: Date.now(), isActive: false }
+        {
+          id: unsafeConversationId("conv-1"),
+          firstUserMessage: "Current",
+          messageCount: 0,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isActive: true
+        },
+        {
+          id: unsafeConversationId("conv-2"),
+          firstUserMessage: "Previous",
+          messageCount: 1,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isActive: false
+        }
       ])
       mockLoadConversation.mockResolvedValue(targetConversation)
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
       })
 
       await act(async () => {
-        result.current.setChatHistory([{ role: 'user', content: 'Current message', timestamp: Date.now() }])
+        result.current.setChatHistory([
+          { role: "user", content: "Current message", timestamp: Date.now() }
+        ])
       })
 
       await act(async () => {
         await result.current.switchConversation({
-          id: unsafeConversationId('conv-2'),
-          firstUserMessage: 'Previous',
+          id: unsafeConversationId("conv-2"),
+          firstUserMessage: "Previous",
           messageCount: 1,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -331,25 +403,33 @@ describe('useConversationHistory', () => {
       })
 
       await waitFor(() => {
-        expect(mockLoadConversation).toHaveBeenCalledWith(mockVariantName, 'conv-2')
+        expect(mockLoadConversation).toHaveBeenCalledWith(
+          mockVariantName,
+          "conv-2"
+        )
       })
 
       await waitFor(() => {
         expect(result.current.chatHistory).toHaveLength(1)
       })
 
-      expect(mockSetActiveConversation).toHaveBeenCalledWith(mockVariantName, 'conv-2')
-      expect(result.current.chatHistory[0].content).toBe('Previous conversation')
+      expect(mockSetActiveConversation).toHaveBeenCalledWith(
+        mockVariantName,
+        "conv-2"
+      )
+      expect(result.current.chatHistory[0].content).toBe(
+        "Previous conversation"
+      )
     })
 
-    it('should handle parallel conversation switches', async () => {
+    it("should handle parallel conversation switches", async () => {
       const mockSession1: ConversationSession = {
-        id: unsafeSessionId('session-1'),
+        id: unsafeSessionId("session-1"),
         htmlSent: true,
         messages: []
       }
       const mockSession2: ConversationSession = {
-        id: unsafeSessionId('session-2'),
+        id: unsafeSessionId("session-2"),
         htmlSent: true,
         messages: []
       }
@@ -357,29 +437,35 @@ describe('useConversationHistory', () => {
       mockGetConversationList.mockResolvedValue([])
       mockLoadConversation
         .mockResolvedValueOnce({
-          id: unsafeConversationId('conv-1'),
+          id: unsafeConversationId("conv-1"),
           variantName: unsafeVariantName(mockVariantName),
-          messages: [{ role: 'user', content: 'Conv 1', timestamp: Date.now() }],
+          messages: [
+            { role: "user", content: "Conv 1", timestamp: Date.now() }
+          ],
           conversationSession: mockSession1,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           messageCount: 1,
-          firstUserMessage: 'Conv 1',
+          firstUserMessage: "Conv 1",
           isActive: false
         })
         .mockResolvedValueOnce({
-          id: unsafeConversationId('conv-2'),
+          id: unsafeConversationId("conv-2"),
           variantName: unsafeVariantName(mockVariantName),
-          messages: [{ role: 'user', content: 'Conv 2', timestamp: Date.now() }],
+          messages: [
+            { role: "user", content: "Conv 2", timestamp: Date.now() }
+          ],
           conversationSession: mockSession2,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           messageCount: 1,
-          firstUserMessage: 'Conv 2',
+          firstUserMessage: "Conv 2",
           isActive: false
         })
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -387,16 +473,16 @@ describe('useConversationHistory', () => {
 
       await act(async () => {
         const switch1 = result.current.switchConversation({
-          id: unsafeConversationId('conv-1'),
-          firstUserMessage: 'Conv 1',
+          id: unsafeConversationId("conv-1"),
+          firstUserMessage: "Conv 1",
           messageCount: 1,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           isActive: false
         })
         const switch2 = result.current.switchConversation({
-          id: unsafeConversationId('conv-2'),
-          firstUserMessage: 'Conv 2',
+          id: unsafeConversationId("conv-2"),
+          firstUserMessage: "Conv 2",
           messageCount: 1,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -409,26 +495,39 @@ describe('useConversationHistory', () => {
     })
   })
 
-  describe('handleDeleteConversation', () => {
-    it('should delete conversation and create new session if deleting active', async () => {
+  describe("handleDeleteConversation", () => {
+    it("should delete conversation and create new session if deleting active", async () => {
       const mockConversation: StoredConversation = {
-        id: unsafeConversationId('conv-1'),
+        id: unsafeConversationId("conv-1"),
         variantName: unsafeVariantName(mockVariantName),
-        messages: [{ role: 'user', content: 'Test', timestamp: Date.now() }],
-        conversationSession: { id: unsafeSessionId('session-1'), htmlSent: true, messages: [] },
+        messages: [{ role: "user", content: "Test", timestamp: Date.now() }],
+        conversationSession: {
+          id: unsafeSessionId("session-1"),
+          htmlSent: true,
+          messages: []
+        },
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 1,
-        firstUserMessage: 'Test',
+        firstUserMessage: "Test",
         isActive: true
       }
 
       mockGetConversationList.mockResolvedValue([
-        { id: unsafeConversationId('conv-1'), firstUserMessage: 'Test', messageCount: 1, createdAt: Date.now(), updatedAt: Date.now(), isActive: true }
+        {
+          id: unsafeConversationId("conv-1"),
+          firstUserMessage: "Test",
+          messageCount: 1,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isActive: true
+        }
       ])
       mockLoadConversation.mockResolvedValue(mockConversation)
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -437,11 +536,14 @@ describe('useConversationHistory', () => {
       const initialConvId = result.current.currentConversationId
 
       await act(async () => {
-        await result.current.handleDeleteConversation('conv-1')
+        await result.current.handleDeleteConversation("conv-1")
       })
 
       await waitFor(() => {
-        expect(mockDeleteConversation).toHaveBeenCalledWith(mockVariantName, 'conv-1')
+        expect(mockDeleteConversation).toHaveBeenCalledWith(
+          mockVariantName,
+          "conv-1"
+        )
       })
 
       expect(result.current.chatHistory).toEqual([])
@@ -449,13 +551,27 @@ describe('useConversationHistory', () => {
       expect(result.current.currentConversationId).toBeTruthy()
     })
 
-    it('should delete conversation without affecting active session', async () => {
+    it("should delete conversation without affecting active session", async () => {
       mockGetConversationList.mockResolvedValue([
-        { id: 'conv-1', firstUserMessage: 'Active', messageCount: 1, createdAt: Date.now(), isActive: true },
-        { id: 'conv-2', firstUserMessage: 'Old', messageCount: 1, createdAt: Date.now(), isActive: false }
+        {
+          id: "conv-1",
+          firstUserMessage: "Active",
+          messageCount: 1,
+          createdAt: Date.now(),
+          isActive: true
+        },
+        {
+          id: "conv-2",
+          firstUserMessage: "Old",
+          messageCount: 1,
+          createdAt: Date.now(),
+          isActive: false
+        }
       ])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -464,34 +580,39 @@ describe('useConversationHistory', () => {
       const initialConvId = result.current.currentConversationId
 
       await act(async () => {
-        await result.current.handleDeleteConversation('conv-2')
+        await result.current.handleDeleteConversation("conv-2")
       })
 
-      expect(mockDeleteConversation).toHaveBeenCalledWith(mockVariantName, 'conv-2')
+      expect(mockDeleteConversation).toHaveBeenCalledWith(
+        mockVariantName,
+        "conv-2"
+      )
       expect(result.current.currentConversationId).toBe(initialConvId)
     })
   })
 
-  describe('refreshHTML', () => {
-    it('should refresh HTML context successfully', async () => {
+  describe("refreshHTML", () => {
+    it("should refresh HTML context successfully", async () => {
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
       })
 
       mockCapturePageHTML.mockResolvedValue({
-        html: '<html><body>refreshed</body></html>',
-        url: 'https://example.com/new',
-        domStructure: 'body\n  refreshed'
+        html: "<html><body>refreshed</body></html>",
+        url: "https://example.com/new",
+        domStructure: "body\n  refreshed"
       })
 
       mockSendToBackground.mockResolvedValue({
         success: true,
         session: {
-          id: 'session-id',
+          id: "session-id",
           htmlSent: true,
           messages: []
         }
@@ -506,15 +627,17 @@ describe('useConversationHistory', () => {
       expect(mockCapturePageHTML).toHaveBeenCalled()
       expect(mockSendToBackground).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'AI_REFRESH_HTML'
+          type: "AI_REFRESH_HTML"
         })
       )
     })
 
-    it('should handle refresh failure', async () => {
+    it("should handle refresh failure", async () => {
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -522,7 +645,7 @@ describe('useConversationHistory', () => {
 
       mockSendToBackground.mockResolvedValue({
         success: false,
-        error: 'Refresh failed'
+        error: "Refresh failed"
       })
 
       let refreshResult: boolean = true
@@ -531,11 +654,13 @@ describe('useConversationHistory', () => {
       })
 
       expect(refreshResult).toBe(false)
-      expect(result.current.error).toBe('Refresh failed')
+      expect(result.current.error).toBe("Refresh failed")
     })
 
-    it('should return false when no active conversation', async () => {
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+    it("should return false when no active conversation", async () => {
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -551,26 +676,28 @@ describe('useConversationHistory', () => {
       })
 
       expect(refreshResult).toBe(false)
-      expect(result.current.error).toBe('No active conversation to refresh')
+      expect(result.current.error).toBe("No active conversation to refresh")
     })
   })
 
-  describe('saveCurrentConversation', () => {
-    it('should save conversation with correct metadata', async () => {
+  describe("saveCurrentConversation", () => {
+    it("should save conversation with correct metadata", async () => {
       mockGetConversationList.mockResolvedValue([])
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
       })
 
       const messages: ChatMessage[] = [
-        { role: 'user', content: 'Hello', timestamp: Date.now() },
-        { role: 'assistant', content: 'Hi!', timestamp: Date.now() }
+        { role: "user", content: "Hello", timestamp: Date.now() },
+        { role: "assistant", content: "Hi!", timestamp: Date.now() }
       ]
       const session: ConversationSession = {
-        id: unsafeSessionId('session-1'),
+        id: unsafeSessionId("session-1"),
         htmlSent: true,
         messages: []
       }
@@ -586,25 +713,29 @@ describe('useConversationHistory', () => {
           messages,
           conversationSession: session,
           messageCount: 2,
-          firstUserMessage: 'Hello',
+          firstUserMessage: "Hello",
           isActive: true
         })
       )
     })
 
-    it('should handle storage errors', async () => {
+    it("should handle storage errors", async () => {
       mockGetConversationList.mockResolvedValue([])
-      mockSaveConversation.mockRejectedValue(new Error('Storage full'))
+      mockSaveConversation.mockRejectedValue(new Error("Storage full"))
 
-      const { result } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
       })
 
-      const messages: ChatMessage[] = [{ role: 'user', content: 'Test', timestamp: Date.now() }]
+      const messages: ChatMessage[] = [
+        { role: "user", content: "Test", timestamp: Date.now() }
+      ]
       const session: ConversationSession = {
-        id: unsafeSessionId('session-1'),
+        id: unsafeSessionId("session-1"),
         htmlSent: true,
         messages: []
       }
@@ -613,15 +744,17 @@ describe('useConversationHistory', () => {
         await act(async () => {
           await result.current.saveCurrentConversation(messages, session)
         })
-      }).rejects.toThrow('Storage full')
+      }).rejects.toThrow("Storage full")
     })
   })
 
-  describe('Cleanup on unmount', () => {
-    it('should not cause errors on unmount with active conversation', async () => {
+  describe("Cleanup on unmount", () => {
+    it("should not cause errors on unmount with active conversation", async () => {
       mockGetConversationList.mockResolvedValue([])
 
-      const { result, unmount } = renderHook(() => useConversationHistory(mockVariantName))
+      const { result, unmount } = renderHook(() =>
+        useConversationHistory(mockVariantName)
+      )
 
       await waitFor(() => {
         expect(result.current.isLoadingHistory).toBe(false)
@@ -631,9 +764,9 @@ describe('useConversationHistory', () => {
     })
   })
 
-  describe('Session recovery after errors', () => {
-    it('should recover from initialization error', async () => {
-      mockGetConversationList.mockRejectedValueOnce(new Error('Network error'))
+  describe("Session recovery after errors", () => {
+    it("should recover from initialization error", async () => {
+      mockGetConversationList.mockRejectedValueOnce(new Error("Network error"))
 
       const { result, rerender, unmount } = renderHook(
         (props) => useConversationHistory(props.variantName),
@@ -641,7 +774,7 @@ describe('useConversationHistory', () => {
       )
 
       await waitFor(() => {
-        expect(result.current.error).toBe('Network error')
+        expect(result.current.error).toBe("Network error")
       })
 
       expect(result.current.isLoadingHistory).toBe(false)
@@ -651,17 +784,23 @@ describe('useConversationHistory', () => {
       mockGetConversationList.mockResolvedValue([])
       mockNeedsMigration.mockResolvedValue(false)
 
-      const { result: newResult } = renderHook(
-        () => useConversationHistory('new-variant')
+      const { result: newResult } = renderHook(() =>
+        useConversationHistory("new-variant")
       )
 
-      await waitFor(() => {
-        expect(newResult.current.isLoadingHistory).toBe(false)
-      }, { timeout: 3000 })
+      await waitFor(
+        () => {
+          expect(newResult.current.isLoadingHistory).toBe(false)
+        },
+        { timeout: 3000 }
+      )
 
-      await waitFor(() => {
-        expect(newResult.current.conversationSession).toBeDefined()
-      }, { timeout: 3000 })
+      await waitFor(
+        () => {
+          expect(newResult.current.conversationSession).toBeDefined()
+        },
+        { timeout: 3000 }
+      )
 
       expect(newResult.current.error).toBeNull()
     })

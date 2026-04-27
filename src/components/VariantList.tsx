@@ -1,20 +1,27 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { sendToContent } from '~src/lib/messaging'
-import { Button } from './ui/Button'
-import { PlusIcon } from '@heroicons/react/24/outline'
-import { VariantConfigJSONEditor } from './VariantConfigJSONEditor'
-import type { DOMChange, DOMChangesData, DOMChangesConfig, AIDOMGenerationResult } from '~src/types/dom-changes'
-import { localAreaStorage as storage } from "~src/utils/storage"
-import { VariantCard, type Variant } from './variant/VariantCard'
+import { PlusIcon } from "@heroicons/react/24/outline"
+import React, { useCallback, useEffect, useRef, useState } from "react"
+
 import {
-  getDOMChangesFromConfig,
-  setDOMChangesInConfig,
   getChangesArray,
   getChangesConfig,
+  getDOMChangesFromConfig,
+  setDOMChangesInConfig,
   type VariantConfig
-} from '~src/hooks/useVariantConfig'
-import { useVariantPreview } from '~src/hooks/useVariantPreview'
+} from "~src/hooks/useVariantConfig"
+import { useVariantPreview } from "~src/hooks/useVariantPreview"
+import { sendToContent } from "~src/lib/messaging"
+import type {
+  AIDOMGenerationResult,
+  DOMChange,
+  DOMChangesConfig,
+  DOMChangesData
+} from "~src/types/dom-changes"
+import { debugError, debugLog, debugWarn } from "~src/utils/debug"
+import { localAreaStorage as storage } from "~src/utils/storage"
+
+import { Button } from "./ui/Button"
+import { VariantCard, type Variant } from "./variant/VariantCard"
+import { VariantConfigJSONEditor } from "./VariantConfigJSONEditor"
 
 interface VariantListProps {
   initialVariants: Variant[]
@@ -26,7 +33,10 @@ interface VariantListProps {
   domFieldName: string
   onNavigateToAI?: (
     variantName: string,
-    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
+    onGenerate: (
+      prompt: string,
+      images?: string[]
+    ) => Promise<AIDOMGenerationResult>,
     currentChanges: DOMChange[],
     onRestoreChanges: (changes: DOMChange[]) => void,
     onPreviewToggle: (enabled: boolean) => void,
@@ -50,10 +60,14 @@ export function VariantList({
   const [variants, setVariants] = useState<Variant[]>(initialVariants)
   const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
-  const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(null)
-  const [addingVariableForVariant, setAddingVariableForVariant] = useState<number | null>(null)
-  const [newVariableName, setNewVariableName] = useState('')
-  const [newVariableValue, setNewVariableValue] = useState('')
+  const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(
+    null
+  )
+  const [addingVariableForVariant, setAddingVariableForVariant] = useState<
+    number | null
+  >(null)
+  const [newVariableName, setNewVariableName] = useState("")
+  const [newVariableValue, setNewVariableValue] = useState("")
   const [expandedVariants, setExpandedVariants] = useState<Set<number>>(() => {
     const expanded = new Set<number>()
     for (let i = 1; i < initialVariants.length; i++) {
@@ -86,13 +100,15 @@ export function VariantList({
   useEffect(() => {
     const loadSavedChanges = async () => {
       if (initialVariants.length > 0) {
-        const storageKey = experimentId === 0
-          ? 'experiment-new-variants'
-          : `experiment-${experimentId}-variants`
+        const storageKey =
+          experimentId === 0
+            ? "experiment-new-variants"
+            : `experiment-${experimentId}-variants`
         try {
           const savedVariants = await storage.get(storageKey)
           if (savedVariants && Array.isArray(savedVariants)) {
-            const hasActualChanges = JSON.stringify(savedVariants) !== JSON.stringify(initialVariants)
+            const hasActualChanges =
+              JSON.stringify(savedVariants) !== JSON.stringify(initialVariants)
 
             if (hasActualChanges) {
               setVariants(savedVariants)
@@ -101,14 +117,15 @@ export function VariantList({
             }
           }
         } catch (error) {
-          debugError('Failed to load saved variants:', error)
+          debugError("Failed to load saved variants:", error)
         }
         return
       }
 
-      const storageKey = experimentId === 0
-        ? 'experiment-new-variants'
-        : `experiment-${experimentId}-variants`
+      const storageKey =
+        experimentId === 0
+          ? "experiment-new-variants"
+          : `experiment-${experimentId}-variants`
       try {
         const savedVariants = await storage.get(storageKey)
         if (savedVariants && Array.isArray(savedVariants)) {
@@ -117,7 +134,7 @@ export function VariantList({
           onVariantsChange(savedVariants, true)
         }
       } catch (error) {
-        debugError('Failed to load saved variants:', error)
+        debugError("Failed to load saved variants:", error)
       }
     }
     loadSavedChanges()
@@ -133,11 +150,12 @@ export function VariantList({
   }, [initialVariants, experimentId])
 
   const saveToStorage = (updatedVariants: Variant[]) => {
-    const storageKey = experimentId === 0
-      ? 'experiment-new-variants'
-      : `experiment-${experimentId}-variants`
-    storage.set(storageKey, updatedVariants).catch(error => {
-      debugError('Failed to save variants to storage:', error)
+    const storageKey =
+      experimentId === 0
+        ? "experiment-new-variants"
+        : `experiment-${experimentId}-variants`
+    storage.set(storageKey, updatedVariants).catch((error) => {
+      debugError("Failed to save variants to storage:", error)
     })
   }
 
@@ -170,9 +188,16 @@ export function VariantList({
     updateVariants(newVariants)
   }
 
-  const updateVariantDOMChanges = (index: number, changes: DOMChange[], options?: { isReorder?: boolean }) => {
+  const updateVariantDOMChanges = (
+    index: number,
+    changes: DOMChange[],
+    options?: { isReorder?: boolean }
+  ) => {
     const newVariants = [...variants]
-    const domChangesData = getDOMChangesFromConfig(newVariants[index].config, domFieldName)
+    const domChangesData = getDOMChangesFromConfig(
+      newVariants[index].config,
+      domFieldName
+    )
 
     const currentConfig = getChangesConfig(domChangesData)
     const updatedDOMChanges: DOMChangesData = {
@@ -182,70 +207,103 @@ export function VariantList({
 
     newVariants[index] = {
       ...newVariants[index],
-      config: setDOMChangesInConfig(newVariants[index].config, updatedDOMChanges, domFieldName)
+      config: setDOMChangesInConfig(
+        newVariants[index].config,
+        updatedDOMChanges,
+        domFieldName
+      )
     }
 
     updateVariants(newVariants)
 
-    if (previewEnabled && activePreviewVariant === index && !options?.isReorder) {
-      const enabledChanges = changes.filter(c => !c.disabled)
+    if (
+      previewEnabled &&
+      activePreviewVariant === index &&
+      !options?.isReorder
+    ) {
+      const enabledChanges = changes.filter((c) => !c.disabled)
       try {
         sendToContent({
-          type: 'ABSMARTLY_PREVIEW',
-          action: 'update',
+          type: "ABSMARTLY_PREVIEW",
+          action: "update",
           changes: enabledChanges,
           experimentName: experimentName,
           variantName: newVariants[index].name
-        }).catch(error => {
-          debugError('[VariantList] Error sending ABSMARTLY_PREVIEW (update):', error)
+        }).catch((error) => {
+          debugError(
+            "[VariantList] Error sending ABSMARTLY_PREVIEW (update):",
+            error
+          )
         })
       } catch (error) {
-        debugError('[VariantList] Exception sending ABSMARTLY_PREVIEW (update):', error)
+        debugError(
+          "[VariantList] Exception sending ABSMARTLY_PREVIEW (update):",
+          error
+        )
       }
     }
   }
 
   useEffect(() => {
     const applyAIDomChanges = async () => {
-      const returnFlag = (typeof window !== 'undefined') ? (window as any).__absmartlyReturnToDomChanges : null
+      const returnFlag =
+        typeof window !== "undefined"
+          ? (window as any).__absmartlyReturnToDomChanges
+          : null
       if (returnFlag) {
         delete (window as any).__absmartlyReturnToDomChanges
         setTimeout(() => {
-          const section = document.querySelector('[data-dom-changes-section="true"]')
+          const section = document.querySelector(
+            '[data-dom-changes-section="true"]'
+          )
           if (section) {
-            section.scrollIntoView({ block: 'start' })
+            section.scrollIntoView({ block: "start" })
           }
         }, 0)
       }
 
       if (aiChangesAppliedRef.current) return
 
-      let aiDomChangesState: { variantName: string; changes: DOMChange[] } | null = null
+      let aiDomChangesState: {
+        variantName: string
+        changes: DOMChange[]
+      } | null = null
       try {
-        aiDomChangesState = await storage.get<{ variantName: string; changes: DOMChange[] }>('aiDomChangesState')
+        aiDomChangesState = await storage.get<{
+          variantName: string
+          changes: DOMChange[]
+        }>("aiDomChangesState")
       } catch (error) {
-        debugWarn('[VariantList] Failed to read aiDomChangesState from storage:', error)
+        debugWarn(
+          "[VariantList] Failed to read aiDomChangesState from storage:",
+          error
+        )
       }
-      const windowState = (typeof window !== 'undefined')
-        ? (window as any).__absmartlyLatestDomChanges
-        : null
+      const windowState =
+        typeof window !== "undefined"
+          ? (window as any).__absmartlyLatestDomChanges
+          : null
       const effectiveState = aiDomChangesState || windowState
       if (!effectiveState || !effectiveState.variantName) return
 
-      const targetIndex = variants.findIndex(v => v.name === effectiveState.variantName)
+      const targetIndex = variants.findIndex(
+        (v) => v.name === effectiveState.variantName
+      )
       if (targetIndex === -1) return
 
       if (effectiveState.changes && effectiveState.changes.length > 0) {
         updateVariantDOMChanges(targetIndex, effectiveState.changes)
         aiChangesAppliedRef.current = true
-        await storage.remove('aiDomChangesState')
+        await storage.remove("aiDomChangesState")
         if (windowState) {
           delete (window as any).__absmartlyLatestDomChanges
         }
         setTimeout(() => {
-          const section = document.querySelector('[data-dom-changes-section="true"]')
+          const section = document.querySelector(
+            '[data-dom-changes-section="true"]'
+          )
           if (section) {
-            section.scrollIntoView({ block: 'start' })
+            section.scrollIntoView({ block: "start" })
           }
         }, 0)
       }
@@ -254,9 +312,15 @@ export function VariantList({
     applyAIDomChanges()
   }, [variants, updateVariantDOMChanges])
 
-  const updateVariantDOMConfig = (index: number, configUpdate: Partial<Omit<DOMChangesConfig, 'changes'>>) => {
+  const updateVariantDOMConfig = (
+    index: number,
+    configUpdate: Partial<Omit<DOMChangesConfig, "changes">>
+  ) => {
     const newVariants = [...variants]
-    const domChangesData = getDOMChangesFromConfig(newVariants[index].config, domFieldName)
+    const domChangesData = getDOMChangesFromConfig(
+      newVariants[index].config,
+      domFieldName
+    )
     const currentDOMConfig = getChangesConfig(domChangesData)
 
     const updatedDOMChanges: DOMChangesData = {
@@ -266,7 +330,11 @@ export function VariantList({
 
     newVariants[index] = {
       ...newVariants[index],
-      config: setDOMChangesInConfig(newVariants[index].config, updatedDOMChanges, domFieldName)
+      config: setDOMChangesInConfig(
+        newVariants[index].config,
+        updatedDOMChanges,
+        domFieldName
+      )
     }
 
     updateVariants(newVariants)
@@ -274,8 +342,8 @@ export function VariantList({
 
   const addVariantVariable = (index: number) => {
     setAddingVariableForVariant(index)
-    setNewVariableName('')
-    setNewVariableValue('')
+    setNewVariableName("")
+    setNewVariableValue("")
     setTimeout(() => {
       newVarNameInputRef.current?.focus()
     }, 0)
@@ -287,11 +355,11 @@ export function VariantList({
 
     if (!key && newVarNameInputRef.current) {
       key = newVarNameInputRef.current.value.trim()
-      debugLog('📝 Read key from ref:', key)
+      debugLog("📝 Read key from ref:", key)
     }
     if (!value && newVarValueInputRef.current) {
       value = newVarValueInputRef.current.value
-      debugLog('📝 Read value from ref:', value)
+      debugLog("📝 Read value from ref:", value)
     }
 
     if (!key) {
@@ -301,11 +369,14 @@ export function VariantList({
     const newVariants = [...variants]
     let parsedValue: unknown = value
     try {
-      if (value && (value.startsWith('{') || value.startsWith('['))) {
+      if (value && (value.startsWith("{") || value.startsWith("["))) {
         parsedValue = JSON.parse(value)
       }
     } catch (error) {
-      debugWarn(`[VariantList] Failed to parse variable value as JSON for key "${key}":`, error)
+      debugWarn(
+        `[VariantList] Failed to parse variable value as JSON for key "${key}":`,
+        error
+      )
     }
 
     newVariants[index] = {
@@ -314,25 +385,28 @@ export function VariantList({
     }
     updateVariants(newVariants)
     setAddingVariableForVariant(null)
-    setNewVariableName('')
-    setNewVariableValue('')
+    setNewVariableName("")
+    setNewVariableValue("")
   }
 
   const cancelNewVariable = () => {
     setAddingVariableForVariant(null)
-    setNewVariableName('')
-    setNewVariableValue('')
+    setNewVariableName("")
+    setNewVariableValue("")
   }
 
   const updateVariantVariable = (index: number, key: string, value: string) => {
     const newVariants = [...variants]
     let parsedValue: unknown = value
     try {
-      if (value.startsWith('{') || value.startsWith('[')) {
+      if (value.startsWith("{") || value.startsWith("[")) {
         parsedValue = JSON.parse(value)
       }
     } catch (error) {
-      debugWarn(`[VariantList] Failed to parse variable value as JSON for key "${key}":`, error)
+      debugWarn(
+        `[VariantList] Failed to parse variable value as JSON for key "${key}":`,
+        error
+      )
     }
     newVariants[index] = {
       ...newVariants[index],
@@ -349,50 +423,81 @@ export function VariantList({
     updateVariants(newVariants)
   }
 
-  const handleNavigateToAIWithPreview = useCallback((
-    variantName: string,
-    onGenerate: (prompt: string, images?: string[]) => Promise<AIDOMGenerationResult>,
-    currentChanges: DOMChange[],
-    onRestoreChanges: (changes: DOMChange[]) => void,
-    onPreviewToggle: (enabled: boolean) => void,
-    _onPreviewRefresh: () => void
-  ) => {
-    debugLog('[VariantList] handleNavigateToAIWithPreview called for variant:', variantName)
-    debugLog('[VariantList] handleNavigateToAIWithPreview called with params:', {
-      variantName,
-      currentChangesLength: currentChanges?.length,
-      hasOnGenerate: !!onGenerate,
-      hasOnRestoreChanges: !!onRestoreChanges,
-      hasOnPreviewToggle: !!onPreviewToggle
-    })
+  const handleNavigateToAIWithPreview = useCallback(
+    (
+      variantName: string,
+      onGenerate: (
+        prompt: string,
+        images?: string[]
+      ) => Promise<AIDOMGenerationResult>,
+      currentChanges: DOMChange[],
+      onRestoreChanges: (changes: DOMChange[]) => void,
+      onPreviewToggle: (enabled: boolean) => void,
+      _onPreviewRefresh: () => void
+    ) => {
+      debugLog(
+        "[VariantList] handleNavigateToAIWithPreview called for variant:",
+        variantName
+      )
+      debugLog(
+        "[VariantList] handleNavigateToAIWithPreview called with params:",
+        {
+          variantName,
+          currentChangesLength: currentChanges?.length,
+          hasOnGenerate: !!onGenerate,
+          hasOnRestoreChanges: !!onRestoreChanges,
+          hasOnPreviewToggle: !!onPreviewToggle
+        }
+      )
 
-    const variantIndex = variants.findIndex(v => v.name === variantName)
+      const variantIndex = variants.findIndex((v) => v.name === variantName)
 
-    const wrappedPreviewToggle = (enabled: boolean) => {
-      if (variantIndex !== -1) {
-        handlePreviewToggle(enabled, variantIndex)
+      const wrappedPreviewToggle = (enabled: boolean) => {
+        if (variantIndex !== -1) {
+          handlePreviewToggle(enabled, variantIndex)
+        }
       }
-    }
 
-    const wrappedPreviewWithChanges = (enabled: boolean, changes: DOMChange[]) => {
-      if (variantIndex !== -1) {
-        handlePreviewWithChanges(enabled, variantIndex, changes)
+      const wrappedPreviewWithChanges = (
+        enabled: boolean,
+        changes: DOMChange[]
+      ) => {
+        if (variantIndex !== -1) {
+          handlePreviewWithChanges(enabled, variantIndex, changes)
+        }
       }
-    }
 
-    const wrappedPreviewRefresh = () => {
-      if (variantIndex !== -1) {
-        handlePreviewRefresh(variantIndex)
+      const wrappedPreviewRefresh = () => {
+        if (variantIndex !== -1) {
+          handlePreviewRefresh(variantIndex)
+        }
       }
-    }
 
-    if (onNavigateToAI) {
-      debugLog('[VariantList] Calling parent onNavigateToAI with all 7 parameters')
-      onNavigateToAI(variantName, onGenerate, currentChanges, onRestoreChanges, wrappedPreviewToggle, wrappedPreviewRefresh, wrappedPreviewWithChanges)
-    } else {
-      debugWarn('[VariantList] onNavigateToAI is not defined!')
-    }
-  }, [variants, onNavigateToAI, handlePreviewToggle, handlePreviewRefresh, handlePreviewWithChanges])
+      if (onNavigateToAI) {
+        debugLog(
+          "[VariantList] Calling parent onNavigateToAI with all 7 parameters"
+        )
+        onNavigateToAI(
+          variantName,
+          onGenerate,
+          currentChanges,
+          onRestoreChanges,
+          wrappedPreviewToggle,
+          wrappedPreviewRefresh,
+          wrappedPreviewWithChanges
+        )
+      } else {
+        debugWarn("[VariantList] onNavigateToAI is not defined!")
+      }
+    },
+    [
+      variants,
+      onNavigateToAI,
+      handlePreviewToggle,
+      handlePreviewRefresh,
+      handlePreviewWithChanges
+    ]
+  )
 
   return (
     <div className="space-y-4">
@@ -403,8 +508,7 @@ export function VariantList({
             type="button"
             onClick={addVariant}
             size="sm"
-            variant="secondary"
-          >
+            variant="secondary">
             <PlusIcon className="h-4 w-4 mr-1" />
             Add Variant
           </Button>
@@ -430,7 +534,11 @@ export function VariantList({
               previewEnabled={previewEnabled}
               activePreviewVariant={activePreviewVariant}
               activeVEVariant={activeVEVariant}
-              activePreviewVariantName={activePreviewVariant !== null ? variants[activePreviewVariant]?.name : null}
+              activePreviewVariantName={
+                activePreviewVariant !== null
+                  ? variants[activePreviewVariant]?.name
+                  : null
+              }
               autoNavigateToAI={autoNavigateToAI}
               addingVariableForVariant={addingVariableForVariant}
               newVariableName={newVariableName}
@@ -447,8 +555,12 @@ export function VariantList({
                 setExpandedVariants(newExpanded)
               }}
               onUpdateName={(name) => updateVariantName(index, name)}
-              onUpdateDOMChanges={(changes, options) => updateVariantDOMChanges(index, changes, options)}
-              onUpdateDOMConfig={(config) => updateVariantDOMConfig(index, config)}
+              onUpdateDOMChanges={(changes, options) =>
+                updateVariantDOMChanges(index, changes, options)
+              }
+              onUpdateDOMConfig={(config) =>
+                updateVariantDOMConfig(index, config)
+              }
               onOpenJsonEditor={() => {
                 setJsonEditorVariant(index)
                 setJsonEditorOpen(true)
@@ -457,14 +569,21 @@ export function VariantList({
               onAddVariable={() => addVariantVariable(index)}
               onSaveVariable={() => saveNewVariable(index)}
               onCancelVariable={cancelNewVariable}
-              onUpdateVariable={(key, value) => updateVariantVariable(index, key, value)}
+              onUpdateVariable={(key, value) =>
+                updateVariantVariable(index, key, value)
+              }
               onDeleteVariable={(key) => deleteVariantVariable(index, key)}
               onNewVariableNameChange={setNewVariableName}
               onNewVariableValueChange={setNewVariableValue}
               onPreviewToggle={(enabled) => {
-                debugLog('[VariantList] onPreviewToggle inline callback called:', { enabled, index })
+                debugLog(
+                  "[VariantList] onPreviewToggle inline callback called:",
+                  { enabled, index }
+                )
                 if (activeVEVariant && activeVEVariant !== variant.name) {
-                  alert(`Visual Editor is active for variant "${activeVEVariant}". Please close it first.`)
+                  alert(
+                    `Visual Editor is active for variant "${activeVEVariant}". Please close it first.`
+                  )
                   return
                 }
                 handlePreviewToggle(enabled, index)
@@ -472,7 +591,9 @@ export function VariantList({
               onPreviewRefresh={() => handlePreviewRefresh(index)}
               onVEStart={() => setActiveVEVariant(variant.name)}
               onVEStop={() => setActiveVEVariant(null)}
-              onNavigateToAI={onNavigateToAI ? handleNavigateToAIWithPreview : undefined}
+              onNavigateToAI={
+                onNavigateToAI ? handleNavigateToAIWithPreview : undefined
+              }
               allVariantsCount={variants.length}
             />
           )

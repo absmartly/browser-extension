@@ -1,16 +1,16 @@
+import { notifyUser } from "../notifications"
 import {
+  clearExperimentsCache,
   getExperimentsCache,
   setExperimentsCache,
-  clearExperimentsCache,
   STORAGE_KEYS
-} from '../storage'
-import { notifyUser } from '../notifications'
+} from "../storage"
 
-jest.mock('../notifications', () => ({
+jest.mock("../notifications", () => ({
   notifyUser: jest.fn().mockResolvedValue(undefined)
 }))
 
-jest.mock('@plasmohq/storage', () => {
+jest.mock("@plasmohq/storage", () => {
   const mockStorage = {
     get: jest.fn(),
     set: jest.fn(),
@@ -21,27 +21,27 @@ jest.mock('@plasmohq/storage', () => {
   }
 })
 
-describe('Storage Chunk Recovery', () => {
+describe("Storage Chunk Recovery", () => {
   let mockStorage: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    const { Storage } = require('@plasmohq/storage')
+    const { Storage } = require("@plasmohq/storage")
     mockStorage = new Storage()
   })
 
-  describe('Quota exceeded during chunking', () => {
-    it('should notify user when quota exceeded on direct write', async () => {
-      const quotaError = new Error('QuotaExceededError: quota exceeded')
+  describe("Quota exceeded during chunking", () => {
+    it("should notify user when quota exceeded on direct write", async () => {
+      const quotaError = new Error("QuotaExceededError: quota exceeded")
       mockStorage.set.mockRejectedValue(quotaError)
 
       const experiments = [
         {
           id: 1,
-          name: 'Test Exp',
-          display_name: 'Test Experiment',
-          state: 'running',
-          status: 'active',
+          name: "Test Exp",
+          display_name: "Test Experiment",
+          state: "running",
+          status: "active",
           percentage_of_traffic: 100
         }
       ]
@@ -49,76 +49,76 @@ describe('Storage Chunk Recovery', () => {
       await setExperimentsCache(experiments)
 
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('quota exceeded'),
-        'warning'
+        expect.stringContaining("quota exceeded"),
+        "warning"
       )
     })
 
-    it('should detect when data is too large even for chunking', async () => {
+    it("should detect when data is too large even for chunking", async () => {
       mockStorage.set.mockImplementation((key, value) => {
         if (key === STORAGE_KEYS.EXPERIMENTS_CACHE) {
-          throw new Error('QuotaExceededError: quota exceeded')
+          throw new Error("QuotaExceededError: quota exceeded")
         }
         return Promise.resolve()
       })
 
       const largeExperiments = Array.from({ length: 10000 }, (_, i) => ({
         id: i,
-        name: 'Very long name '.repeat(100),
-        display_name: 'Very long display name '.repeat(100),
-        state: 'running',
-        status: 'active',
+        name: "Very long name ".repeat(100),
+        display_name: "Very long display name ".repeat(100),
+        state: "running",
+        status: "active",
         percentage_of_traffic: 100,
         traffic_split: Array(100).fill({ variant: 0, percentage: 100 }),
         variants: Array(50).fill({
           variant: 0,
-          name: 'Variant name '.repeat(50),
+          name: "Variant name ".repeat(50),
           is_control: false
         }),
         applications: Array(20).fill({
           application_id: 1,
           id: 1,
-          name: 'App name '.repeat(20)
+          name: "App name ".repeat(20)
         })
       }))
 
       await setExperimentsCache(largeExperiments)
 
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('Cache data too large'),
-        'warning'
+        expect.stringContaining("Cache data too large"),
+        "warning"
       )
     })
 
-    it('should fail gracefully when all storage methods fail', async () => {
-      mockStorage.set.mockRejectedValue(new Error('Storage unavailable'))
+    it("should fail gracefully when all storage methods fail", async () => {
+      mockStorage.set.mockRejectedValue(new Error("Storage unavailable"))
 
-      const experiments = [{ id: 1, name: 'Test', state: 'running' }]
+      const experiments = [{ id: 1, name: "Test", state: "running" }]
 
       await setExperimentsCache(experiments)
 
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to cache experiments'),
-        'warning'
+        expect.stringContaining("Failed to cache experiments"),
+        "warning"
       )
       expect(mockStorage.remove).toHaveBeenCalled()
     })
   })
 
-  describe('Partial chunk writes (browser crash mid-write)', () => {
-    it('should detect missing chunks during read', async () => {
+  describe("Partial chunk writes (browser crash mid-write)", () => {
+    it("should detect missing chunks during read", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 3, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
           return Promise.resolve('{"experiments":[')
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
           return Promise.resolve(null)
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_2') {
-          return Promise.resolve(']}')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_2") {
+          return Promise.resolve("]}")
         }
         return Promise.resolve(null)
       })
@@ -127,20 +127,22 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
-      expect(mockStorage.remove).toHaveBeenCalledWith(STORAGE_KEYS.EXPERIMENTS_CACHE)
+      expect(mockStorage.remove).toHaveBeenCalledWith(
+        STORAGE_KEYS.EXPERIMENTS_CACHE
+      )
     })
 
-    it('should handle partial chunk write failure during save', async () => {
+    it("should handle partial chunk write failure during save", async () => {
       mockStorage.remove.mockResolvedValue(undefined)
       mockStorage.set.mockImplementation((key, value) => {
         if (key === STORAGE_KEYS.EXPERIMENTS_CACHE) {
-          return Promise.reject(new Error('quota exceeded'))
+          return Promise.reject(new Error("quota exceeded"))
         }
-        if (key.includes('_chunk_')) {
-          return Promise.reject(new Error('Browser crashed mid-write'))
+        if (key.includes("_chunk_")) {
+          return Promise.reject(new Error("Browser crashed mid-write"))
         }
         return Promise.resolve()
       })
@@ -148,41 +150,45 @@ describe('Storage Chunk Recovery', () => {
       const experiments = Array.from({ length: 100 }, (_, i) => ({
         id: i,
         name: `Experiment ${i}`,
-        state: 'running'
+        state: "running"
       }))
 
       await setExperimentsCache(experiments)
 
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to cache experiments'),
-        'warning'
+        expect.stringContaining("Failed to cache experiments"),
+        "warning"
       )
       expect(mockStorage.remove).toHaveBeenCalled()
     })
 
-    it('should clear partial chunks before retry', async () => {
+    it("should clear partial chunks before retry", async () => {
       mockStorage.set.mockResolvedValue(undefined)
 
-      const experiments = [{ id: 1, name: 'Test', state: 'running' }]
+      const experiments = [{ id: 1, name: "Test", state: "running" }]
 
       await setExperimentsCache(experiments)
 
-      expect(mockStorage.remove).toHaveBeenCalledWith(STORAGE_KEYS.EXPERIMENTS_CACHE)
-      expect(mockStorage.remove).toHaveBeenCalledWith(STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta')
+      expect(mockStorage.remove).toHaveBeenCalledWith(
+        STORAGE_KEYS.EXPERIMENTS_CACHE
+      )
+      expect(mockStorage.remove).toHaveBeenCalledWith(
+        STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta"
+      )
     })
   })
 
-  describe('Corrupted chunks detection', () => {
-    it('should detect invalid JSON in chunks', async () => {
+  describe("Corrupted chunks detection", () => {
+    it("should detect invalid JSON in chunks", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 2, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
           return Promise.resolve('{"invalid json')
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
-          return Promise.resolve('}')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
+          return Promise.resolve("}")
         }
         return Promise.resolve(null)
       })
@@ -191,21 +197,21 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
 
-    it('should detect empty chunk data', async () => {
+    it("should detect empty chunk data", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 2, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
-          return Promise.resolve('')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
+          return Promise.resolve("")
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
-          return Promise.resolve('')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
+          return Promise.resolve("")
         }
         return Promise.resolve(null)
       })
@@ -214,17 +220,17 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
 
-    it('should validate reassembled chunk data against schema', async () => {
+    it("should validate reassembled chunk data against schema", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 1, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
           return Promise.resolve('{"invalid":"data","missing":"experiments"}')
         }
         return Promise.resolve(null)
@@ -234,14 +240,14 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
 
-    it('should handle malformed chunk metadata', async () => {
+    it("should handle malformed chunk metadata", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, version: 1 })
         }
         return Promise.resolve(null)
@@ -253,28 +259,24 @@ describe('Storage Chunk Recovery', () => {
     })
   })
 
-  describe('Incomplete chunk set rebuilding', () => {
-    it('should rebuild valid cache from complete chunk set', async () => {
+  describe("Incomplete chunk set rebuilding", () => {
+    it("should rebuild valid cache from complete chunk set", async () => {
       const validCacheData = {
         version: 1,
         experiments: [
           {
             id: 1,
-            name: 'Test 1',
-            state: 'running',
-            created_at: '2024-01-01T00:00:00Z',
-            variants: [
-              { name: 'Control', config: '{}' }
-            ]
+            name: "Test 1",
+            state: "running",
+            created_at: "2024-01-01T00:00:00Z",
+            variants: [{ name: "Control", config: "{}" }]
           },
           {
             id: 2,
-            name: 'Test 2',
-            state: 'stopped',
-            created_at: '2024-01-01T00:00:00Z',
-            variants: [
-              { name: 'Control', config: '{}' }
-            ]
+            name: "Test 2",
+            state: "stopped",
+            created_at: "2024-01-01T00:00:00Z",
+            variants: [{ name: "Control", config: "{}" }]
           }
         ],
         timestamp: Date.now()
@@ -284,13 +286,13 @@ describe('Storage Chunk Recovery', () => {
       const chunk1 = dataStr.substring(Math.floor(dataStr.length / 2))
 
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 2, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
           return Promise.resolve(chunk0)
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
           return Promise.resolve(chunk1)
         }
         return Promise.resolve(null)
@@ -303,19 +305,19 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should fail when first chunk is missing', async () => {
+    it("should fail when first chunk is missing", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 3, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
           return Promise.resolve(null)
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
-          return Promise.resolve('chunk1')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
+          return Promise.resolve("chunk1")
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_2') {
-          return Promise.resolve('chunk2')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_2") {
+          return Promise.resolve("chunk2")
         }
         return Promise.resolve(null)
       })
@@ -324,24 +326,24 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
 
-    it('should fail when middle chunk is missing', async () => {
+    it("should fail when middle chunk is missing", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 3, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
-          return Promise.resolve('chunk0')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
+          return Promise.resolve("chunk0")
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
           return Promise.resolve(null)
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_2') {
-          return Promise.resolve('chunk2')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_2") {
+          return Promise.resolve("chunk2")
         }
         return Promise.resolve(null)
       })
@@ -350,23 +352,23 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
 
-    it('should fail when last chunk is missing', async () => {
+    it("should fail when last chunk is missing", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 3, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
-          return Promise.resolve('chunk0')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
+          return Promise.resolve("chunk0")
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
-          return Promise.resolve('chunk1')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
+          return Promise.resolve("chunk1")
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_2') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_2") {
           return Promise.resolve(null)
         }
         return Promise.resolve(null)
@@ -376,36 +378,38 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
   })
 
-  describe('Race conditions between tabs', () => {
-    it('should handle concurrent writes without corruption', async () => {
+  describe("Race conditions between tabs", () => {
+    it("should handle concurrent writes without corruption", async () => {
       let writeOrder: string[] = []
 
       mockStorage.remove.mockResolvedValue(undefined)
       mockStorage.set.mockImplementation((key, value) => {
         writeOrder.push(key)
-        return new Promise(resolve => setTimeout(resolve, Math.random() * 10))
+        return new Promise((resolve) => setTimeout(resolve, Math.random() * 10))
       })
 
-      const experiments1 = [{ id: 1, name: 'Tab 1 Exp', state: 'running' }]
-      const experiments2 = [{ id: 2, name: 'Tab 2 Exp', state: 'stopped' }]
+      const experiments1 = [{ id: 1, name: "Tab 1 Exp", state: "running" }]
+      const experiments2 = [{ id: 2, name: "Tab 2 Exp", state: "stopped" }]
 
       await Promise.all([
         setExperimentsCache(experiments1),
         setExperimentsCache(experiments2)
       ])
 
-      const cacheWrites = writeOrder.filter(k => k === STORAGE_KEYS.EXPERIMENTS_CACHE)
+      const cacheWrites = writeOrder.filter(
+        (k) => k === STORAGE_KEYS.EXPERIMENTS_CACHE
+      )
       expect(cacheWrites.length).toBeGreaterThan(0)
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should clear old chunks before writing new ones', async () => {
+    it("should clear old chunks before writing new ones", async () => {
       const removeOrder: string[] = []
       const setOrder: string[] = []
 
@@ -419,12 +423,16 @@ describe('Storage Chunk Recovery', () => {
         return Promise.resolve()
       })
 
-      const experiments = [{ id: 1, name: 'Test', state: 'running' }]
+      const experiments = [{ id: 1, name: "Test", state: "running" }]
 
       await setExperimentsCache(experiments)
 
-      const firstRemoveIndex = removeOrder.findIndex(k => k === STORAGE_KEYS.EXPERIMENTS_CACHE)
-      const firstSetIndex = setOrder.findIndex(k => k === STORAGE_KEYS.EXPERIMENTS_CACHE)
+      const firstRemoveIndex = removeOrder.findIndex(
+        (k) => k === STORAGE_KEYS.EXPERIMENTS_CACHE
+      )
+      const firstSetIndex = setOrder.findIndex(
+        (k) => k === STORAGE_KEYS.EXPERIMENTS_CACHE
+      )
 
       expect(firstRemoveIndex).toBeGreaterThanOrEqual(0)
       if (firstSetIndex >= 0) {
@@ -432,15 +440,15 @@ describe('Storage Chunk Recovery', () => {
       }
     })
 
-    it('should handle read during write gracefully', async () => {
+    it("should handle read during write gracefully", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 2, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
           return Promise.resolve('{"experiments":[')
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_1') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_1") {
           return Promise.resolve(null)
         }
         return Promise.resolve(null)
@@ -448,35 +456,44 @@ describe('Storage Chunk Recovery', () => {
 
       mockStorage.set.mockResolvedValue(undefined)
 
-      const writePromise = setExperimentsCache([{ id: 1, name: 'Test', state: 'running' }])
+      const writePromise = setExperimentsCache([
+        { id: 1, name: "Test", state: "running" }
+      ])
       const readPromise = getExperimentsCache()
 
-      const [writeResult, readResult] = await Promise.all([writePromise, readPromise])
+      const [writeResult, readResult] = await Promise.all([
+        writePromise,
+        readPromise
+      ])
 
       expect(readResult).toBeNull()
     })
   })
 
-  describe('Orphaned chunk cleanup', () => {
-    it('should cleanup old chunks from previous sessions', async () => {
+  describe("Orphaned chunk cleanup", () => {
+    it("should cleanup old chunks from previous sessions", async () => {
       mockStorage.remove.mockResolvedValue(undefined)
 
       await clearExperimentsCache()
 
-      expect(mockStorage.remove).toHaveBeenCalledWith(STORAGE_KEYS.EXPERIMENTS_CACHE)
-      expect(mockStorage.remove).toHaveBeenCalledWith(STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta')
+      expect(mockStorage.remove).toHaveBeenCalledWith(
+        STORAGE_KEYS.EXPERIMENTS_CACHE
+      )
+      expect(mockStorage.remove).toHaveBeenCalledWith(
+        STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta"
+      )
 
       for (let i = 0; i < 10; i++) {
         expect(mockStorage.remove).toHaveBeenCalledWith(
-          STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_' + i
+          STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_" + i
         )
       }
     })
 
-    it('should cleanup chunks even when metadata is corrupted', async () => {
+    it("should cleanup chunks even when metadata is corrupted", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
-          throw new Error('Corrupted metadata')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
+          throw new Error("Corrupted metadata")
         }
         return Promise.resolve(null)
       })
@@ -489,47 +506,47 @@ describe('Storage Chunk Recovery', () => {
       expect(mockStorage.remove).toHaveBeenCalled()
     })
 
-    it('should handle cleanup errors without throwing', async () => {
-      mockStorage.remove.mockRejectedValue(new Error('Cleanup failed'))
+    it("should handle cleanup errors without throwing", async () => {
+      mockStorage.remove.mockRejectedValue(new Error("Cleanup failed"))
 
       await expect(clearExperimentsCache()).resolves.not.toThrow()
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should cleanup before writing new cache', async () => {
-      const operations: Array<{ type: 'remove' | 'set', key: string }> = []
+    it("should cleanup before writing new cache", async () => {
+      const operations: Array<{ type: "remove" | "set"; key: string }> = []
 
       mockStorage.remove.mockImplementation((key) => {
-        operations.push({ type: 'remove', key })
+        operations.push({ type: "remove", key })
         return Promise.resolve()
       })
 
       mockStorage.set.mockImplementation((key, value) => {
-        operations.push({ type: 'set', key })
+        operations.push({ type: "set", key })
         return Promise.resolve()
       })
 
-      const experiments = [{ id: 1, name: 'Test', state: 'running' }]
+      const experiments = [{ id: 1, name: "Test", state: "running" }]
 
       await setExperimentsCache(experiments)
 
-      const firstSet = operations.findIndex(op => op.type === 'set')
-      const firstRemove = operations.findIndex(op => op.type === 'remove')
+      const firstSet = operations.findIndex((op) => op.type === "set")
+      const firstRemove = operations.findIndex((op) => op.type === "remove")
 
       expect(firstRemove).toBeLessThan(firstSet)
     })
   })
 
-  describe('Edge cases and error paths', () => {
-    it('should handle null metadata gracefully', async () => {
+  describe("Edge cases and error paths", () => {
+    it("should handle null metadata gracefully", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve(null)
         }
         if (key === STORAGE_KEYS.EXPERIMENTS_CACHE) {
           return Promise.resolve({
             version: 1,
-            experiments: [{ id: 1, name: 'Test', state: 'running' }],
+            experiments: [{ id: 1, name: "Test", state: "running" }],
             timestamp: Date.now()
           })
         }
@@ -542,15 +559,15 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should handle metadata with chunked=false', async () => {
+    it("should handle metadata with chunked=false", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: false, chunks: 0, version: 1 })
         }
         if (key === STORAGE_KEYS.EXPERIMENTS_CACHE) {
           return Promise.resolve({
             version: 1,
-            experiments: [{ id: 1, name: 'Test', state: 'running' }],
+            experiments: [{ id: 1, name: "Test", state: "running" }],
             timestamp: Date.now()
           })
         }
@@ -563,9 +580,9 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should handle zero chunks metadata', async () => {
+    it("should handle zero chunks metadata", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 0, version: 1 })
         }
         return Promise.resolve(null)
@@ -576,9 +593,9 @@ describe('Storage Chunk Recovery', () => {
       expect(result).toBeNull()
     })
 
-    it('should handle negative chunk count', async () => {
+    it("should handle negative chunk count", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: -1, version: 1 })
         }
         return Promise.resolve(null)
@@ -589,9 +606,9 @@ describe('Storage Chunk Recovery', () => {
       expect(result).toBeNull()
     })
 
-    it('should handle very large chunk count', async () => {
+    it("should handle very large chunk count", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 1000, version: 1 })
         }
         return Promise.resolve(null)
@@ -601,12 +618,12 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
 
-    it('should handle storage.get returning undefined', async () => {
+    it("should handle storage.get returning undefined", async () => {
       mockStorage.get.mockResolvedValue(undefined)
 
       const result = await getExperimentsCache()
@@ -615,7 +632,7 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should handle empty experiments array', async () => {
+    it("should handle empty experiments array", async () => {
       mockStorage.set.mockResolvedValue(undefined)
 
       const experiments: any[] = []
@@ -632,14 +649,14 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).not.toHaveBeenCalled()
     })
 
-    it('should handle experiments with missing optional fields', async () => {
+    it("should handle experiments with missing optional fields", async () => {
       mockStorage.set.mockResolvedValue(undefined)
 
       const experiments = [
         {
           id: 1,
-          name: 'Test',
-          state: 'running'
+          name: "Test",
+          state: "running"
         }
       ]
 
@@ -649,40 +666,46 @@ describe('Storage Chunk Recovery', () => {
     })
   })
 
-  describe('All error paths in setExperimentsCache', () => {
-    it('should handle error during clearExperimentsCache', async () => {
-      mockStorage.remove.mockRejectedValue(new Error('Clear failed'))
-      mockStorage.set.mockRejectedValue(new Error('Set failed'))
+  describe("All error paths in setExperimentsCache", () => {
+    it("should handle error during clearExperimentsCache", async () => {
+      mockStorage.remove.mockRejectedValue(new Error("Clear failed"))
+      mockStorage.set.mockRejectedValue(new Error("Set failed"))
 
-      const experiments = [{ id: 1, name: 'Test', state: 'running' }]
+      const experiments = [{ id: 1, name: "Test", state: "running" }]
 
       await setExperimentsCache(experiments)
 
       expect(notifyUser).toHaveBeenCalled()
     })
 
-    it('should handle error in minimalExperiments mapping', async () => {
+    it("should handle error in minimalExperiments mapping", async () => {
       mockStorage.set.mockResolvedValue(undefined)
 
-      const experimentsWithCircularRef: any = [{ id: 1, name: 'Test', state: 'running' }]
+      const experimentsWithCircularRef: any = [
+        { id: 1, name: "Test", state: "running" }
+      ]
       experimentsWithCircularRef[0].self = experimentsWithCircularRef[0]
 
-      await expect(setExperimentsCache(experimentsWithCircularRef)).resolves.not.toThrow()
+      await expect(
+        setExperimentsCache(experimentsWithCircularRef)
+      ).resolves.not.toThrow()
     })
 
-    it('should handle error during JSON.stringify', async () => {
+    it("should handle error during JSON.stringify", async () => {
       mockStorage.set.mockResolvedValue(undefined)
 
       const experiments = [
         {
           id: 1,
-          name: 'Test',
-          state: 'running',
-          variants: [{
-            variant: 0,
-            name: 'Control',
-            is_control: true
-          }]
+          name: "Test",
+          state: "running",
+          variants: [
+            {
+              variant: 0,
+              name: "Control",
+              is_control: true
+            }
+          ]
         }
       ]
 
@@ -691,33 +714,33 @@ describe('Storage Chunk Recovery', () => {
       expect(mockStorage.set).toHaveBeenCalled()
     })
 
-    it('should notify user on metadata write failure', async () => {
+    it("should notify user on metadata write failure", async () => {
       mockStorage.set.mockImplementation((key, value) => {
         if (key === STORAGE_KEYS.EXPERIMENTS_CACHE) {
-          throw new Error('quota exceeded')
+          throw new Error("quota exceeded")
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
-          throw new Error('Metadata write failed')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
+          throw new Error("Metadata write failed")
         }
         return Promise.resolve()
       })
 
-      const experiments = [{ id: 1, name: 'Test', state: 'running' }]
+      const experiments = [{ id: 1, name: "Test", state: "running" }]
 
       await setExperimentsCache(experiments)
 
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to cache experiments'),
-        'warning'
+        expect.stringContaining("Failed to cache experiments"),
+        "warning"
       )
     })
   })
 
-  describe('All error paths in getExperimentsCache', () => {
-    it('should handle error reading metadata', async () => {
+  describe("All error paths in getExperimentsCache", () => {
+    it("should handle error reading metadata", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
-          throw new Error('Read failed')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
+          throw new Error("Read failed")
         }
         return Promise.resolve(null)
       })
@@ -728,13 +751,13 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).toHaveBeenCalled()
     })
 
-    it('should handle error reading chunks', async () => {
+    it("should handle error reading chunks", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 2, version: 1 })
         }
-        if (key.includes('_chunk_')) {
-          throw new Error('Chunk read failed')
+        if (key.includes("_chunk_")) {
+          throw new Error("Chunk read failed")
         }
         return Promise.resolve(null)
       })
@@ -745,13 +768,15 @@ describe('Storage Chunk Recovery', () => {
       expect(notifyUser).toHaveBeenCalled()
     })
 
-    it('should handle error during JSON validation', async () => {
+    it("should handle error during JSON validation", async () => {
       mockStorage.get.mockImplementation((key) => {
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta') {
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta") {
           return Promise.resolve({ chunked: true, chunks: 1, version: 1 })
         }
-        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_0') {
-          return Promise.resolve('{"experiments":[{"id":"not-a-number"}],"timestamp":123}')
+        if (key === STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_0") {
+          return Promise.resolve(
+            '{"experiments":[{"id":"not-a-number"}],"timestamp":123}'
+          )
         }
         return Promise.resolve(null)
       })
@@ -760,19 +785,19 @@ describe('Storage Chunk Recovery', () => {
 
       expect(result).toBeNull()
       expect(notifyUser).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted'),
-        'warning'
+        expect.stringContaining("corrupted"),
+        "warning"
       )
     })
   })
 
-  describe('All error paths in clearExperimentsCache', () => {
-    it('should continue cleanup even if individual removes fail', async () => {
+  describe("All error paths in clearExperimentsCache", () => {
+    it("should continue cleanup even if individual removes fail", async () => {
       let removeCallCount = 0
       mockStorage.remove.mockImplementation((key) => {
         removeCallCount++
         if (removeCallCount % 2 === 0) {
-          throw new Error('Remove failed')
+          throw new Error("Remove failed")
         }
         return Promise.resolve()
       })
@@ -781,22 +806,24 @@ describe('Storage Chunk Recovery', () => {
       expect(mockStorage.remove).toHaveBeenCalled()
     })
 
-    it('should not throw on complete removal failure', async () => {
-      mockStorage.remove.mockRejectedValue(new Error('All removes failed'))
+    it("should not throw on complete removal failure", async () => {
+      mockStorage.remove.mockRejectedValue(new Error("All removes failed"))
 
       await expect(clearExperimentsCache()).resolves.not.toThrow()
     })
 
-    it('should remove all expected keys', async () => {
+    it("should remove all expected keys", async () => {
       mockStorage.remove.mockResolvedValue(undefined)
 
       await clearExperimentsCache()
 
-      const removedKeys = mockStorage.remove.mock.calls.map(call => call[0])
+      const removedKeys = mockStorage.remove.mock.calls.map((call) => call[0])
       expect(removedKeys).toContain(STORAGE_KEYS.EXPERIMENTS_CACHE)
-      expect(removedKeys).toContain(STORAGE_KEYS.EXPERIMENTS_CACHE + '_meta')
+      expect(removedKeys).toContain(STORAGE_KEYS.EXPERIMENTS_CACHE + "_meta")
       for (let i = 0; i < 10; i++) {
-        expect(removedKeys).toContain(STORAGE_KEYS.EXPERIMENTS_CACHE + '_chunk_' + i)
+        expect(removedKeys).toContain(
+          STORAGE_KEYS.EXPERIMENTS_CACHE + "_chunk_" + i
+        )
       }
     })
   })

@@ -1,13 +1,15 @@
-import { generateRobustSelector } from '../utils/selector-generator'
-import StateManager from './state-manager'
-import UndoRedoManager from './undo-redo-manager'
-import { Notifications } from '../ui/notifications'
-import ImageSourceDialog from '../ui/image-source-dialog'
-import BlockInserter from '../ui/block-inserter'
-import type { DOMChange } from '../types/visual-editor'
-import DOMPurify from 'dompurify'
+import DOMPurify from "dompurify"
 
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { debugLog, debugWarn } from "~src/utils/debug"
+
+import type { DOMChange } from "../types/visual-editor"
+import BlockInserter from "../ui/block-inserter"
+import ImageSourceDialog from "../ui/image-source-dialog"
+import { Notifications } from "../ui/notifications"
+import { generateRobustSelector } from "../utils/selector-generator"
+import StateManager from "./state-manager"
+import UndoRedoManager from "./undo-redo-manager"
+
 export interface ElementActionsOptions {
   onChangesUpdate: (changes: DOMChange[]) => void
   setHoverEnabled?: (enabled: boolean) => void
@@ -53,17 +55,17 @@ export class ElementActions {
   // Element selection methods
   public selectElement(element: HTMLElement): void {
     if (this.selectedElement) {
-      this.selectedElement.classList.remove('absmartly-selected')
+      this.selectedElement.classList.remove("absmartly-selected")
     }
 
     this.selectedElement = element
-    element.classList.add('absmartly-selected')
+    element.classList.add("absmartly-selected")
     this.stateManager.setSelectedElement(element)
   }
 
   public deselectElement(): void {
     if (this.selectedElement) {
-      this.selectedElement.classList.remove('absmartly-selected')
+      this.selectedElement.classList.remove("absmartly-selected")
       this.selectedElement = null
     }
     this.stateManager.setSelectedElement(null)
@@ -73,8 +75,8 @@ export class ElementActions {
   public showHoverTooltip(element: HTMLElement, x: number, y: number): void {
     this.removeHoverTooltip()
 
-    this.hoverTooltip = document.createElement('div')
-    this.hoverTooltip.className = 'absmartly-hover-tooltip'
+    this.hoverTooltip = document.createElement("div")
+    this.hoverTooltip.className = "absmartly-hover-tooltip"
     this.hoverTooltip.textContent = this.getSelector(element)
 
     const tooltipX = Math.min(x + 10, window.innerWidth - 200)
@@ -108,33 +110,37 @@ export class ElementActions {
       try {
         originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
       } catch (e) {
-        console.error('[ElementActions] Failed to parse original data:', e)
+        console.error("[ElementActions] Failed to parse original data:", e)
       }
       if (!originalData.styles) {
         originalData.styles = {}
       }
       if (!originalData.styles.display) {
         const computedStyle = window.getComputedStyle(htmlElement)
-        originalData.styles.display = htmlElement.style.display || computedStyle.display || ''
+        originalData.styles.display =
+          htmlElement.style.display || computedStyle.display || ""
         htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-        debugLog('[ElementActions] Stored original display value:', originalData.styles.display)
+        debugLog(
+          "[ElementActions] Stored original display value:",
+          originalData.styles.display
+        )
       }
 
       const selector = this.getSelector(htmlElement)
       const oldValue = originalData.styles.display
-      htmlElement.style.display = 'none'
+      htmlElement.style.display = "none"
       this.undoRedoManager.addChange(
         {
           selector,
-          type: 'style',
-          value: { display: 'none' }
+          type: "style",
+          value: { display: "none" }
         },
         { display: oldValue }
       )
       this.deselectElement()
     } catch (error) {
-      console.error('Failed to hide element:', error)
-      this.notifications.show('Failed to hide element', '', 'error')
+      console.error("Failed to hide element:", error)
+      this.notifications.show("Failed to hide element", "", "error")
     }
   }
 
@@ -142,10 +148,15 @@ export class ElementActions {
     if (!this.selectedElement) return
 
     try {
-      const isImgTag = this.selectedElement.tagName.toLowerCase() === 'img'
-      const currentSrc = this.imageSourceDialog.getCurrentImageSource(this.selectedElement)
+      const isImgTag = this.selectedElement.tagName.toLowerCase() === "img"
+      const currentSrc = this.imageSourceDialog.getCurrentImageSource(
+        this.selectedElement
+      )
 
-      const newSrc = await this.imageSourceDialog.show(this.selectedElement, currentSrc)
+      const newSrc = await this.imageSourceDialog.show(
+        this.selectedElement,
+        currentSrc
+      )
       if (!newSrc) {
         return
       }
@@ -159,33 +170,34 @@ export class ElementActions {
         this.undoRedoManager.addChange(
           {
             selector,
-            type: 'attribute',
+            type: "attribute",
             value: { src: newSrc },
-            mode: 'merge'
+            mode: "merge"
           },
           { src: oldSrc }
         )
       } else {
-        const oldBgImage = this.selectedElement.style.backgroundImage ||
-                           window.getComputedStyle(this.selectedElement).backgroundImage
+        const oldBgImage =
+          this.selectedElement.style.backgroundImage ||
+          window.getComputedStyle(this.selectedElement).backgroundImage
 
         this.selectedElement.style.backgroundImage = `url('${newSrc}')`
 
         this.undoRedoManager.addChange(
           {
             selector,
-            type: 'style',
-            value: { 'background-image': `url('${newSrc}')` },
-            mode: 'merge'
+            type: "style",
+            value: { "background-image": `url('${newSrc}')` },
+            mode: "merge"
           },
-          { 'background-image': oldBgImage }
+          { "background-image": oldBgImage }
         )
       }
 
-      this.notifications.show('Image source updated', '', 'success')
+      this.notifications.show("Image source updated", "", "success")
     } catch (error) {
-      console.error('Failed to change image source:', error)
-      this.notifications.show('Failed to change image source', '', 'error')
+      console.error("Failed to change image source:", error)
+      this.notifications.show("Failed to change image source", "", "error")
     }
   }
 
@@ -197,7 +209,8 @@ export class ElementActions {
 
     // Store original display value for restoration
     const computedStyle = window.getComputedStyle(htmlElement)
-    const originalDisplay = htmlElement.style.display || computedStyle.display || ''
+    const originalDisplay =
+      htmlElement.style.display || computedStyle.display || ""
 
     // Store original value in data attribute if not already stored
     if (!htmlElement.dataset.absmartlyOriginal) {
@@ -211,7 +224,7 @@ export class ElementActions {
     try {
       originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
     } catch (e) {
-      console.error('[ElementActions] Failed to parse original data:', e)
+      console.error("[ElementActions] Failed to parse original data:", e)
     }
     if (!originalData.styles) {
       originalData.styles = {}
@@ -223,13 +236,13 @@ export class ElementActions {
 
     // MIMIC delete by hiding the element (in VE/preview mode)
     // In production, the DOM Changes plugin will actually remove it
-    htmlElement.style.display = 'none'
+    htmlElement.style.display = "none"
 
     // Track the delete change
     this.undoRedoManager.addChange(
       {
         selector,
-        type: 'remove'
+        type: "remove"
       },
       htmlElement.outerHTML
     )
@@ -243,18 +256,25 @@ export class ElementActions {
     try {
       const html = this.selectedElement.outerHTML
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(html).then(() => {
-          this.notifications.show('Element HTML copied to clipboard!', '', 'success')
-        }).catch((error) => {
-          console.error('Failed to copy to clipboard:', error)
-          this.notifications.show('Failed to copy to clipboard', '', 'error')
-        })
+        navigator.clipboard
+          .writeText(html)
+          .then(() => {
+            this.notifications.show(
+              "Element HTML copied to clipboard!",
+              "",
+              "success"
+            )
+          })
+          .catch((error) => {
+            console.error("Failed to copy to clipboard:", error)
+            this.notifications.show("Failed to copy to clipboard", "", "error")
+          })
       } else {
-        this.notifications.show('Clipboard not available', '', 'error')
+        this.notifications.show("Clipboard not available", "", "error")
       }
     } catch (error) {
-      console.error('Failed to copy element:', error)
-      this.notifications.show('Failed to copy element', '', 'error')
+      console.error("Failed to copy element:", error)
+      this.notifications.show("Failed to copy element", "", "error")
     }
   }
 
@@ -264,22 +284,33 @@ export class ElementActions {
     try {
       const selector = this.getSelector(this.selectedElement)
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(selector).then(() => {
-          this.notifications.show(`Selector copied: ${selector}`, '', 'success')
-        }).catch((error) => {
-          console.error('Failed to copy selector to clipboard:', error)
-          this.notifications.show('Failed to copy selector to clipboard', '', 'error')
-        })
+        navigator.clipboard
+          .writeText(selector)
+          .then(() => {
+            this.notifications.show(
+              `Selector copied: ${selector}`,
+              "",
+              "success"
+            )
+          })
+          .catch((error) => {
+            console.error("Failed to copy selector to clipboard:", error)
+            this.notifications.show(
+              "Failed to copy selector to clipboard",
+              "",
+              "error"
+            )
+          })
       } else {
-        this.notifications.show('Clipboard not available', '', 'error')
+        this.notifications.show("Clipboard not available", "", "error")
       }
     } catch (error) {
-      console.error('Failed to copy selector:', error)
-      this.notifications.show('Failed to copy selector', '', 'error')
+      console.error("Failed to copy selector:", error)
+      this.notifications.show("Failed to copy selector", "", "error")
     }
   }
 
-  public moveElement(direction: 'up' | 'down'): void {
+  public moveElement(direction: "up" | "down"): void {
     if (!this.selectedElement) return
 
     const parent = this.selectedElement.parentElement
@@ -287,20 +318,29 @@ export class ElementActions {
 
     // Capture original position before moving
     const selector = this.getSelector(this.selectedElement)
-    const oldDirection = direction === 'up' ? 'down' : 'up' // opposite direction for undo
+    const oldDirection = direction === "up" ? "down" : "up" // opposite direction for undo
 
-    if (direction === 'up' && this.selectedElement.previousElementSibling) {
-      parent.insertBefore(this.selectedElement, this.selectedElement.previousElementSibling)
-    } else if (direction === 'down' && this.selectedElement.nextElementSibling) {
-      parent.insertBefore(this.selectedElement.nextElementSibling, this.selectedElement)
+    if (direction === "up" && this.selectedElement.previousElementSibling) {
+      parent.insertBefore(
+        this.selectedElement,
+        this.selectedElement.previousElementSibling
+      )
+    } else if (
+      direction === "down" &&
+      this.selectedElement.nextElementSibling
+    ) {
+      parent.insertBefore(
+        this.selectedElement.nextElementSibling,
+        this.selectedElement
+      )
     }
 
     this.undoRedoManager.addChange(
       {
         selector,
-        type: 'move',
+        type: "move",
         targetSelector: parent.tagName.toLowerCase(),
-        position: direction === 'up' ? 'before' : 'after'
+        position: direction === "up" ? "before" : "after"
       } as any,
       oldDirection
     )
@@ -328,28 +368,30 @@ export class ElementActions {
       const referenceElement = this.selectedElement
       const referenceSelector = this.getSelector(referenceElement)
 
-      if (options.position === 'before') {
-        referenceElement.insertAdjacentHTML('beforebegin', sanitizedHtml)
+      if (options.position === "before") {
+        referenceElement.insertAdjacentHTML("beforebegin", sanitizedHtml)
       } else {
-        referenceElement.insertAdjacentHTML('afterend', sanitizedHtml)
+        referenceElement.insertAdjacentHTML("afterend", sanitizedHtml)
       }
 
-      const insertedElement = options.position === 'before'
-        ? referenceElement.previousElementSibling
-        : referenceElement.nextElementSibling
+      const insertedElement =
+        options.position === "before"
+          ? referenceElement.previousElementSibling
+          : referenceElement.nextElementSibling
 
       if (insertedElement) {
         const htmlElement = insertedElement as HTMLElement
-        htmlElement.dataset.absmartlyModified = 'true'
+        htmlElement.dataset.absmartlyModified = "true"
         const config = this.stateManager.getConfig()
-        htmlElement.dataset.absmartlyExperiment = config.experimentName || '__preview__'
+        htmlElement.dataset.absmartlyExperiment =
+          config.experimentName || "__preview__"
 
         // Generate a selector for the inserted element so we can remove it on undo
         const insertedSelector = this.getSelector(htmlElement)
 
         const change: any = {
           selector: referenceSelector,
-          type: 'insert',
+          type: "insert",
           html: sanitizedHtml,
           position: options.position
         }
@@ -359,103 +401,132 @@ export class ElementActions {
 
         this.notifications.show(
           `HTML block inserted ${options.position} selected element`,
-          '',
-          'success'
+          "",
+          "success"
         )
 
         this.selectElement(htmlElement)
       } else {
-        this.notifications.show('Element inserted but could not be selected', '', 'warning')
+        this.notifications.show(
+          "Element inserted but could not be selected",
+          "",
+          "warning"
+        )
       }
     } catch (error) {
-      console.error('[ElementActions] Failed to insert new block:', error)
-      this.notifications.show('Failed to insert element', '', 'error')
+      console.error("[ElementActions] Failed to insert new block:", error)
+      this.notifications.show("Failed to insert element", "", "error")
     }
   }
 
   public showRelativeElementSelector(): void {
     // Placeholder - will implement relative element highlighting
-    this.notifications.show('Select relative elements: Coming soon!', '', 'info')
+    this.notifications.show(
+      "Select relative elements: Coming soon!",
+      "",
+      "info"
+    )
   }
 
   // Helper to revert a DOM change
   private revertDOMChange(change: DOMChange): void {
-    debugLog('[ElementActions] Reverting DOM change:', change)
+    debugLog("[ElementActions] Reverting DOM change:", change)
 
     try {
       const elements = document.querySelectorAll(change.selector)
 
-      elements.forEach(element => {
+      elements.forEach((element) => {
         const htmlElement = element as HTMLElement
 
         switch (change.type) {
-          case 'move':
+          case "move":
             // Revert move by moving element back to original position
             // Note: for simple up/down moves, we don't have original position stored
             // This would need enhancement to store original parent/sibling info
-            debugLog('[ElementActions] Move revert not fully implemented')
+            debugLog("[ElementActions] Move revert not fully implemented")
             break
 
-          case 'text':
+          case "text":
             // Check for original text in dataset
             let originalData: any = null
             try {
-              originalData = htmlElement.dataset.absmartlyOriginal ?
-                JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+              originalData = htmlElement.dataset.absmartlyOriginal
+                ? JSON.parse(htmlElement.dataset.absmartlyOriginal)
+                : null
             } catch (e) {
-              console.error('[ElementActions] Failed to parse original data:', e)
+              console.error(
+                "[ElementActions] Failed to parse original data:",
+                e
+              )
             }
             if (originalData?.text !== undefined) {
               htmlElement.textContent = originalData.text
-              debugLog('[ElementActions] Reverted text content')
+              debugLog("[ElementActions] Reverted text content")
             }
             break
 
-          case 'style':
+          case "style":
             // Revert to original styles
             let styleOrigData: any = null
             try {
-              styleOrigData = htmlElement.dataset.absmartlyOriginal ?
-                JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+              styleOrigData = htmlElement.dataset.absmartlyOriginal
+                ? JSON.parse(htmlElement.dataset.absmartlyOriginal)
+                : null
             } catch (e) {
-              console.error('[ElementActions] Failed to parse original data:', e)
+              console.error(
+                "[ElementActions] Failed to parse original data:",
+                e
+              )
             }
-            if (styleOrigData?.styles && change.value && typeof change.value === 'object') {
+            if (
+              styleOrigData?.styles &&
+              change.value &&
+              typeof change.value === "object"
+            ) {
               // Restore original values for changed properties
               for (const prop in change.value) {
                 if (styleOrigData.styles[prop] !== undefined) {
-                  (htmlElement.style as any)[prop] = styleOrigData.styles[prop] || ''
+                  ;(htmlElement.style as any)[prop] =
+                    styleOrigData.styles[prop] || ""
                 } else {
                   // If no original value was stored, clear the property
-                  (htmlElement.style as any)[prop] = ''
+                  ;(htmlElement.style as any)[prop] = ""
                 }
               }
-              debugLog('[ElementActions] Reverted style changes to original values')
-            } else if (change.value && typeof change.value === 'object') {
+              debugLog(
+                "[ElementActions] Reverted style changes to original values"
+              )
+            } else if (change.value && typeof change.value === "object") {
               // Fallback: just remove the styles if no original data
               for (const prop in change.value) {
-                (htmlElement.style as any)[prop] = ''
+                ;(htmlElement.style as any)[prop] = ""
               }
-              debugLog('[ElementActions] Removed style changes (no original data)')
+              debugLog(
+                "[ElementActions] Removed style changes (no original data)"
+              )
             }
             break
 
-          case 'html':
+          case "html":
             // Revert HTML content
             let origData: any = null
             try {
-              origData = htmlElement.dataset.absmartlyOriginal ?
-                JSON.parse(htmlElement.dataset.absmartlyOriginal) : null
+              origData = htmlElement.dataset.absmartlyOriginal
+                ? JSON.parse(htmlElement.dataset.absmartlyOriginal)
+                : null
             } catch (e) {
-              console.error('[ElementActions] Failed to parse original data:', e)
+              console.error(
+                "[ElementActions] Failed to parse original data:",
+                e
+              )
             }
             if (origData?.html !== undefined) {
               htmlElement.innerHTML = DOMPurify.sanitize(origData.html)
-              debugLog('[ElementActions] Reverted HTML content')
+              debugLog("[ElementActions] Reverted HTML content")
             }
             break
 
-          case 'remove':
+          case "remove":
             // Can't revert remove on existing element since it was removed
             // This case is handled separately below
             break
@@ -464,32 +535,37 @@ export class ElementActions {
 
       // Special handling for remove - would need to restore the element
       // Note: We don't currently store the HTML for removed elements in undo data
-      if (change.type === 'remove') {
-        debugLog('[ElementActions] Remove revert not fully implemented - element cannot be restored')
+      if (change.type === "remove") {
+        debugLog(
+          "[ElementActions] Remove revert not fully implemented - element cannot be restored"
+        )
       }
     } catch (error) {
-      console.error('[ElementActions] Error reverting DOM change:', error)
+      console.error("[ElementActions] Error reverting DOM change:", error)
     }
   }
 
   // Change management methods
   public undoLastChange(): void {
-    debugLog('[ElementActions] undoLastChange called')
+    debugLog("[ElementActions] undoLastChange called")
 
     // Get the current changes from state manager (source of truth)
-    const currentChanges = [...this.stateManager.getState().changes || []]
+    const currentChanges = [...(this.stateManager.getState().changes || [])]
     const undoItem = this.stateManager.popUndo()
 
     if (!undoItem) {
-      debugLog('[ElementActions] No undo items available')
-      this.notifications.show('Nothing to undo', '', 'info')
+      debugLog("[ElementActions] No undo items available")
+      this.notifications.show("Nothing to undo", "", "info")
       return
     }
 
-    debugLog('[ElementActions] Performing undo:', undoItem)
-    debugLog('[ElementActions] Current changes before undo:', currentChanges.length)
+    debugLog("[ElementActions] Performing undo:", undoItem)
+    debugLog(
+      "[ElementActions] Current changes before undo:",
+      currentChanges.length
+    )
 
-    if (undoItem.type === 'add') {
+    if (undoItem.type === "add") {
       // Revert the DOM change that was added
       const changeToRevert = undoItem.change
       this.revertDOMChange(changeToRevert)
@@ -498,21 +574,21 @@ export class ElementActions {
       currentChanges.splice(undoItem.index, 1)
       // Push to redo stack
       this.stateManager.pushRedo(undoItem)
-    } else if (undoItem.type === 'update') {
+    } else if (undoItem.type === "update") {
       const currentChange = currentChanges[undoItem.index]
       currentChanges[undoItem.index] = undoItem.change
       this.stateManager.pushRedo({
         ...undoItem,
         change: currentChange
       })
-    } else if (undoItem.type === 'remove') {
+    } else if (undoItem.type === "remove") {
       // Re-add the removed change
       currentChanges.splice(undoItem.index, 0, undoItem.change)
       // Push to redo stack
       this.stateManager.pushRedo(undoItem)
     }
 
-    debugLog('[ElementActions] Changes after undo:', currentChanges.length)
+    debugLog("[ElementActions] Changes after undo:", currentChanges.length)
 
     // Update state manager changes
     this.stateManager.setChanges(currentChanges)
@@ -520,17 +596,17 @@ export class ElementActions {
     // Don't call onChangesUpdate here - that would save to sidebar
     // The visual editor will handle updating the UI
 
-    this.notifications.show('Change undone', '', 'success')
+    this.notifications.show("Change undone", "", "success")
   }
 
   // Helper to apply a DOM change
   private applyDOMChange(change: DOMChange): void {
-    debugLog('[ElementActions] Applying DOM change:', change)
+    debugLog("[ElementActions] Applying DOM change:", change)
 
     try {
       const elements = document.querySelectorAll(change.selector)
 
-      elements.forEach(element => {
+      elements.forEach((element) => {
         const htmlElement = element as HTMLElement
 
         // Initialize data-absmartly-original if not present
@@ -541,107 +617,119 @@ export class ElementActions {
         try {
           originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
         } catch (e) {
-          console.error('[ElementActions] Failed to parse original data:', e)
+          console.error("[ElementActions] Failed to parse original data:", e)
         }
 
         switch (change.type) {
-          case 'move':
+          case "move":
             // Apply move to target position
             if (change.targetSelector && change.position) {
               const target = document.querySelector(change.targetSelector)
               if (target) {
                 const parent = target.parentElement
                 if (parent) {
-                  if (change.position === 'before') {
+                  if (change.position === "before") {
                     parent.insertBefore(htmlElement, target)
-                  } else if (change.position === 'after') {
+                  } else if (change.position === "after") {
                     parent.insertBefore(htmlElement, target.nextSibling)
-                  } else if (change.position === 'firstChild') {
+                  } else if (change.position === "firstChild") {
                     target.insertBefore(htmlElement, target.firstChild)
-                  } else if (change.position === 'lastChild') {
+                  } else if (change.position === "lastChild") {
                     target.appendChild(htmlElement)
                   }
-                  debugLog('[ElementActions] Moved element to target position')
+                  debugLog("[ElementActions] Moved element to target position")
                 }
               }
             }
             break
 
-          case 'text':
+          case "text":
             if (change.value !== undefined) {
               // Store original textContent if not already stored
               if (!originalData.textContent) {
                 originalData.textContent = htmlElement.textContent
-                htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-                debugLog('[ElementActions] Stored original textContent:', originalData.textContent)
+                htmlElement.dataset.absmartlyOriginal =
+                  JSON.stringify(originalData)
+                debugLog(
+                  "[ElementActions] Stored original textContent:",
+                  originalData.textContent
+                )
               }
               htmlElement.textContent = change.value
-              debugLog('[ElementActions] Applied text content')
+              debugLog("[ElementActions] Applied text content")
             }
             break
 
-          case 'style':
+          case "style":
             // Apply styles
-            if (change.value && typeof change.value === 'object') {
+            if (change.value && typeof change.value === "object") {
               // Store original styles if not already stored
               if (!originalData.styles) {
                 originalData.styles = {}
               }
               for (const prop in change.value) {
                 if (!originalData.styles[prop]) {
-                  originalData.styles[prop] = (htmlElement.style as any)[prop] || ''
-                  debugLog(`[ElementActions] Stored original style.${prop}:`, originalData.styles[prop])
+                  originalData.styles[prop] =
+                    (htmlElement.style as any)[prop] || ""
+                  debugLog(
+                    `[ElementActions] Stored original style.${prop}:`,
+                    originalData.styles[prop]
+                  )
                 }
-                (htmlElement.style as any)[prop] = change.value[prop]
+                ;(htmlElement.style as any)[prop] = change.value[prop]
               }
-              htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-              debugLog('[ElementActions] Applied style changes')
+              htmlElement.dataset.absmartlyOriginal =
+                JSON.stringify(originalData)
+              debugLog("[ElementActions] Applied style changes")
             }
             break
 
-          case 'html':
+          case "html":
             if (change.value !== undefined) {
               // Store original innerHTML if not already stored
               if (!originalData.innerHTML) {
                 originalData.innerHTML = htmlElement.innerHTML
-                htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-                debugLog('[ElementActions] Stored original innerHTML')
+                htmlElement.dataset.absmartlyOriginal =
+                  JSON.stringify(originalData)
+                debugLog("[ElementActions] Stored original innerHTML")
               }
               htmlElement.innerHTML = DOMPurify.sanitize(change.value)
-              debugLog('[ElementActions] Applied HTML content')
+              debugLog("[ElementActions] Applied HTML content")
             }
             break
 
-          case 'remove':
+          case "remove":
             // Remove the element
             htmlElement.remove()
-            debugLog('[ElementActions] Removed element')
+            debugLog("[ElementActions] Removed element")
             break
-
         }
       })
     } catch (error) {
-      console.error('[ElementActions] Error applying DOM change:', error)
+      console.error("[ElementActions] Error applying DOM change:", error)
     }
   }
 
   public redoChange(): void {
-    debugLog('[ElementActions] redoChange called')
+    debugLog("[ElementActions] redoChange called")
 
     // Get the current changes from state manager (source of truth)
-    const currentChanges = [...this.stateManager.getState().changes || []]
+    const currentChanges = [...(this.stateManager.getState().changes || [])]
     const redoItem = this.stateManager.popRedo()
 
     if (!redoItem) {
-      debugLog('[ElementActions] No redo items available')
-      this.notifications.show('Nothing to redo', '', 'info')
+      debugLog("[ElementActions] No redo items available")
+      this.notifications.show("Nothing to redo", "", "info")
       return
     }
 
-    debugLog('[ElementActions] Performing redo:', redoItem)
-    debugLog('[ElementActions] Current changes before redo:', currentChanges.length)
+    debugLog("[ElementActions] Performing redo:", redoItem)
+    debugLog(
+      "[ElementActions] Current changes before redo:",
+      currentChanges.length
+    )
 
-    if (redoItem.type === 'add') {
+    if (redoItem.type === "add") {
       // Re-apply the DOM change
       this.applyDOMChange(redoItem.change)
 
@@ -649,21 +737,21 @@ export class ElementActions {
       currentChanges.splice(redoItem.index, 0, redoItem.change)
       // Push to undo stack
       this.stateManager.pushUndo(redoItem)
-    } else if (redoItem.type === 'update') {
+    } else if (redoItem.type === "update") {
       const currentChange = currentChanges[redoItem.index]
       currentChanges[redoItem.index] = redoItem.change
       this.stateManager.pushUndo({
         ...redoItem,
         change: currentChange
       })
-    } else if (redoItem.type === 'remove') {
+    } else if (redoItem.type === "remove") {
       // Remove the change again
       currentChanges.splice(redoItem.index, 1)
       // Push to undo stack
       this.stateManager.pushUndo(redoItem)
     }
 
-    debugLog('[ElementActions] Changes after redo:', currentChanges.length)
+    debugLog("[ElementActions] Changes after redo:", currentChanges.length)
 
     // Update state manager changes
     this.stateManager.setChanges(currentChanges)
@@ -671,15 +759,15 @@ export class ElementActions {
     // Don't call onChangesUpdate here - that would save to sidebar
     // The visual editor will handle updating the UI
 
-    this.notifications.show('Change redone', '', 'success')
+    this.notifications.show("Change redone", "", "success")
   }
 
   public clearAllChanges(): void {
-    if (confirm('Are you sure you want to clear all changes?')) {
+    if (confirm("Are you sure you want to clear all changes?")) {
       this.undoRedoManager.clear()
       this.stateManager.setChanges([])
       this.options.onChangesUpdate([])
-      this.notifications.show('All changes cleared', '', 'success')
+      this.notifications.show("All changes cleared", "", "success")
     }
   }
 
@@ -696,12 +784,13 @@ export class ElementActions {
   public isExtensionElement(element: HTMLElement): boolean {
     let current: HTMLElement | null = element
     while (current) {
-      const id = current.id || ''
-      const className = typeof current.className === 'string'
-        ? current.className
-        : (current.className as any)?.baseVal || ''
+      const id = current.id || ""
+      const className =
+        typeof current.className === "string"
+          ? current.className
+          : (current.className as any)?.baseVal || ""
 
-      if (id.includes('absmartly') || className.includes('absmartly')) {
+      if (id.includes("absmartly") || className.includes("absmartly")) {
         return true
       }
 
@@ -709,5 +798,4 @@ export class ElementActions {
     }
     return false
   }
-
 }

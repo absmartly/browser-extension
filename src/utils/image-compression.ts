@@ -9,13 +9,13 @@ export type ThumbnailOptions = ImageCompressionOptions
 const DEFAULT_THUMBNAIL_OPTIONS: Required<ImageCompressionOptions> = {
   maxWidth: 200,
   maxHeight: 200,
-  quality: 0.7,
+  quality: 0.7
 }
 
 const DEFAULT_LLM_OPTIONS: Required<ImageCompressionOptions> = {
   maxWidth: 1000,
   maxHeight: 1000,
-  quality: 0.85,
+  quality: 0.85
 }
 
 async function compressImage(
@@ -40,7 +40,10 @@ async function compressImage(
           let height = img.height
 
           if (width > options.maxWidth || height > options.maxHeight) {
-            const ratio = Math.min(options.maxWidth / width, options.maxHeight / height)
+            const ratio = Math.min(
+              options.maxWidth / width,
+              options.maxHeight / height
+            )
             width = width * ratio
             height = height * ratio
           }
@@ -50,10 +53,16 @@ async function compressImage(
 
           ctx.drawImage(img, 0, 0, width, height)
 
-          const compressedBase64 = canvas.toDataURL("image/jpeg", options.quality)
+          const compressedBase64 = canvas.toDataURL(
+            "image/jpeg",
+            options.quality
+          )
           resolve(compressedBase64)
         } catch (error) {
-          console.error("[ImageCompression] Error during canvas processing:", error)
+          console.error(
+            "[ImageCompression] Error during canvas processing:",
+            error
+          )
           resolve(null)
         }
       }
@@ -94,10 +103,15 @@ export async function compressImages(
     return undefined
   }
 
-  const results = await Promise.allSettled(images.map((img) => compressImageToThumbnail(img)))
+  const results = await Promise.allSettled(
+    images.map((img) => compressImageToThumbnail(img))
+  )
   const validThumbnails = results
-    .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled' && result.value !== null)
-    .map(result => result.value)
+    .filter(
+      (result): result is PromiseFulfilledResult<string> =>
+        result.status === "fulfilled" && result.value !== null
+    )
+    .map((result) => result.value)
 
   return validThumbnails.length > 0 ? validThumbnails : undefined
 }
@@ -109,10 +123,15 @@ export async function compressImagesForLLM(
     return undefined
   }
 
-  const results = await Promise.allSettled(images.map((img) => compressImageForLLM(img)))
+  const results = await Promise.allSettled(
+    images.map((img) => compressImageForLLM(img))
+  )
   const validImages = results
-    .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled' && result.value !== null)
-    .map(result => result.value)
+    .filter(
+      (result): result is PromiseFulfilledResult<string> =>
+        result.status === "fulfilled" && result.value !== null
+    )
+    .map((result) => result.value)
 
   return validImages.length > 0 ? validImages : undefined
 }

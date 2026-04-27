@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { debugLog, debugWarn } from '~src/utils/debug'
+import { useCallback, useEffect, useState } from "react"
+
+import { debugLog, debugWarn } from "~src/utils/debug"
 
 /**
  * Normalise an active-tab URL into the `origin/*` match pattern that
@@ -8,15 +9,23 @@ import { debugLog, debugWarn } from '~src/utils/debug'
  * the new-tab page, PDF viewer, etc.) so the caller can skip the banner
  * entirely in those contexts.
  */
-export function originPatternFromUrl(url: string | undefined | null): string | null {
+export function originPatternFromUrl(
+  url: string | undefined | null
+): string | null {
   if (!url) return null
   try {
     const parsed = new URL(url)
-    if (parsed.protocol === 'chrome:' || parsed.protocol === 'chrome-extension:' || parsed.protocol === 'about:' || parsed.protocol === 'edge:' || parsed.protocol === 'devtools:') {
+    if (
+      parsed.protocol === "chrome:" ||
+      parsed.protocol === "chrome-extension:" ||
+      parsed.protocol === "about:" ||
+      parsed.protocol === "edge:" ||
+      parsed.protocol === "devtools:"
+    ) {
       return null
     }
-    if (parsed.protocol === 'file:') {
-      return 'file:///*'
+    if (parsed.protocol === "file:") {
+      return "file:///*"
     }
     return `${parsed.protocol}//${parsed.host}/*`
   } catch {
@@ -48,12 +57,15 @@ export interface ActiveSitePermissionState {
 }
 
 async function queryActiveTabUrl(): Promise<string | undefined> {
-  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return undefined
+  if (typeof chrome === "undefined" || !chrome.tabs?.query) return undefined
   try {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true
+    })
     return tab?.url
   } catch (err) {
-    debugWarn('[useActiveSitePermission] chrome.tabs.query failed:', err)
+    debugWarn("[useActiveSitePermission] chrome.tabs.query failed:", err)
     return undefined
   }
 }
@@ -89,17 +101,22 @@ export function useActiveSitePermission(): ActiveSitePermissionState {
     } catch {
       setHost(null)
     }
-    if (typeof chrome === 'undefined' || !chrome.permissions?.contains) {
+    if (typeof chrome === "undefined" || !chrome.permissions?.contains) {
       setHasPermission(true)
       setChecked(true)
       return
     }
     try {
       const granted = await chrome.permissions.contains({ origins: [pattern] })
-      debugLog('[useActiveSitePermission] pattern:', pattern, 'granted:', granted)
+      debugLog(
+        "[useActiveSitePermission] pattern:",
+        pattern,
+        "granted:",
+        granted
+      )
       setHasPermission(!!granted)
     } catch (err) {
-      debugWarn('[useActiveSitePermission] permissions.contains failed:', err)
+      debugWarn("[useActiveSitePermission] permissions.contains failed:", err)
       setHasPermission(true)
     } finally {
       setChecked(true)
@@ -109,7 +126,7 @@ export function useActiveSitePermission(): ActiveSitePermissionState {
   useEffect(() => {
     refresh()
 
-    if (typeof chrome === 'undefined') return
+    if (typeof chrome === "undefined") return
 
     const onAdded = () => refresh()
     const onRemoved = () => refresh()
@@ -127,8 +144,16 @@ export function useActiveSitePermission(): ActiveSitePermissionState {
       // Chrome typings for `permissions.onAdded/onRemoved` don't expose
       // `removeListener` on the narrow event subtype; cast through `unknown`
       // so cleanup still unregisters the listeners in practice.
-      ;(chrome.permissions?.onAdded as unknown as { removeListener?: (fn: () => void) => void } | undefined)?.removeListener?.(onAdded)
-      ;(chrome.permissions?.onRemoved as unknown as { removeListener?: (fn: () => void) => void } | undefined)?.removeListener?.(onRemoved)
+      ;(
+        chrome.permissions?.onAdded as unknown as
+          | { removeListener?: (fn: () => void) => void }
+          | undefined
+      )?.removeListener?.(onAdded)
+      ;(
+        chrome.permissions?.onRemoved as unknown as
+          | { removeListener?: (fn: () => void) => void }
+          | undefined
+      )?.removeListener?.(onRemoved)
       chrome.tabs?.onActivated?.removeListener?.(onTabActivated)
       chrome.tabs?.onUpdated?.removeListener?.(onTabUpdated)
     }
@@ -136,13 +161,16 @@ export function useActiveSitePermission(): ActiveSitePermissionState {
 
   const requestPermission = useCallback(async () => {
     if (!originPattern) return true
-    if (typeof chrome === 'undefined' || !chrome.permissions?.request) return false
+    if (typeof chrome === "undefined" || !chrome.permissions?.request)
+      return false
     try {
-      const granted = await chrome.permissions.request({ origins: [originPattern] })
+      const granted = await chrome.permissions.request({
+        origins: [originPattern]
+      })
       setHasPermission(!!granted)
       return !!granted
     } catch (err) {
-      debugWarn('[useActiveSitePermission] permissions.request failed:', err)
+      debugWarn("[useActiveSitePermission] permissions.request failed:", err)
       return false
     }
   }, [originPattern])

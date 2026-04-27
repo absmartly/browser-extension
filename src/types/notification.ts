@@ -1,4 +1,4 @@
-export type ToastType = 'error' | 'warning' | 'info' | 'success'
+export type ToastType = "error" | "warning" | "info" | "success"
 
 export interface ToastAction {
   label: string

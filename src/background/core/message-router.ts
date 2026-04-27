@@ -1,15 +1,18 @@
-import { debugLog, debugError, debugWarn } from '~src/utils/debug'
-import { validateMessage, validateSender as validateSenderSecurity } from '~src/lib/message-security'
-import type { ExtensionMessage } from '~src/lib/messaging'
+import {
+  validateMessage,
+  validateSender as validateSenderSecurity
+} from "~src/lib/message-security"
+import type { ExtensionMessage } from "~src/lib/messaging"
+import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 
 export function validateSender(sender: chrome.runtime.MessageSender): boolean {
   const validation = validateSenderSecurity(sender, true)
 
   if (!validation.valid) {
     if (validation.securityViolation) {
-      debugError('[MessageRouter] Security violation:', validation.error)
+      debugError("[MessageRouter] Security violation:", validation.error)
     } else {
-      debugWarn('[MessageRouter] Sender validation failed:', validation.error)
+      debugWarn("[MessageRouter] Sender validation failed:", validation.error)
     }
     return false
   }
@@ -29,16 +32,21 @@ export function routeMessage(
 
   if (!validation.valid) {
     if (validation.securityViolation) {
-      debugError('[MessageRouter] Message validation failed:', validation.error)
+      debugError("[MessageRouter] Message validation failed:", validation.error)
     }
     sendResponse({
       success: false,
-      error: validation.error || 'Invalid message'
+      error: validation.error || "Invalid message"
     })
     return true
   }
 
-  debugLog('[MessageRouter] Routing message:', message.type, 'from:', message.from || sender.tab?.id)
+  debugLog(
+    "[MessageRouter] Routing message:",
+    message.type,
+    "from:",
+    message.from || sender.tab?.id
+  )
 
   return false
 }

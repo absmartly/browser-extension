@@ -1,9 +1,10 @@
-import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { QueryStringOverridesSection } from '../QueryStringOverridesSection'
-import { DEFAULT_CONFIG } from '../../../config/defaults'
+import { fireEvent, render, screen } from "@testing-library/react"
+import React from "react"
 
-describe('QueryStringOverridesSection', () => {
+import { DEFAULT_CONFIG } from "../../../config/defaults"
+import { QueryStringOverridesSection } from "../QueryStringOverridesSection"
+
+describe("QueryStringOverridesSection", () => {
   const mockOnQueryPrefixChange = jest.fn()
   const mockOnPersistQueryToCookieChange = jest.fn()
 
@@ -11,8 +12,8 @@ describe('QueryStringOverridesSection', () => {
     jest.clearAllMocks()
   })
 
-  describe('Rendering with DEFAULT_CONFIG', () => {
-    it('should render with DEFAULT_CONFIG.queryPrefix as placeholder', () => {
+  describe("Rendering with DEFAULT_CONFIG", () => {
+    it("should render with DEFAULT_CONFIG.queryPrefix as placeholder", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix=""
@@ -22,11 +23,13 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const input = screen.getByLabelText(/Query Parameter Prefix/i) as HTMLInputElement
+      const input = screen.getByLabelText(
+        /Query Parameter Prefix/i
+      ) as HTMLInputElement
       expect(input.placeholder).toBe(DEFAULT_CONFIG.queryPrefix)
     })
 
-    it('should display example text with DEFAULT_CONFIG.queryPrefix', () => {
+    it("should display example text with DEFAULT_CONFIG.queryPrefix", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix=""
@@ -37,7 +40,9 @@ describe('QueryStringOverridesSection', () => {
       )
 
       const exampleText = screen.getByText(/Prefix for query parameters/i)
-      expect(exampleText.textContent).toContain(`?${DEFAULT_CONFIG.queryPrefix}button_color=1`)
+      expect(exampleText.textContent).toContain(
+        `?${DEFAULT_CONFIG.queryPrefix}button_color=1`
+      )
     })
 
     it('should render with correct default queryPrefix value "_"', () => {
@@ -50,13 +55,15 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const input = screen.getByLabelText(/Query Parameter Prefix/i) as HTMLInputElement
-      expect(input.value).toBe('_')
+      const input = screen.getByLabelText(
+        /Query Parameter Prefix/i
+      ) as HTMLInputElement
+      expect(input.value).toBe("_")
     })
   })
 
-  describe('Input interactions', () => {
-    it('should call onQueryPrefixChange when input value changes', () => {
+  describe("Input interactions", () => {
+    it("should call onQueryPrefixChange when input value changes", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -67,13 +74,13 @@ describe('QueryStringOverridesSection', () => {
       )
 
       const input = screen.getByLabelText(/Query Parameter Prefix/i)
-      fireEvent.change(input, { target: { value: 'custom_' } })
+      fireEvent.change(input, { target: { value: "custom_" } })
 
-      expect(mockOnQueryPrefixChange).toHaveBeenCalledWith('custom_')
+      expect(mockOnQueryPrefixChange).toHaveBeenCalledWith("custom_")
       expect(mockOnQueryPrefixChange).toHaveBeenCalledTimes(1)
     })
 
-    it('should call onPersistQueryToCookieChange when checkbox is toggled', () => {
+    it("should call onPersistQueryToCookieChange when checkbox is toggled", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -83,7 +90,9 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const checkbox = screen.getByRole('checkbox', { name: /Persist query string overrides to cookie/i })
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Persist query string overrides to cookie/i
+      })
       fireEvent.click(checkbox)
 
       expect(mockOnPersistQueryToCookieChange).toHaveBeenCalledWith(false)
@@ -91,9 +100,9 @@ describe('QueryStringOverridesSection', () => {
     })
   })
 
-  describe('Props display', () => {
-    it('should display custom queryPrefix value when provided', () => {
-      const customPrefix = 'exp_'
+  describe("Props display", () => {
+    it("should display custom queryPrefix value when provided", () => {
+      const customPrefix = "exp_"
       render(
         <QueryStringOverridesSection
           queryPrefix={customPrefix}
@@ -103,11 +112,13 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const input = screen.getByLabelText(/Query Parameter Prefix/i) as HTMLInputElement
-      expect(input.value).toBe('exp_')
+      const input = screen.getByLabelText(
+        /Query Parameter Prefix/i
+      ) as HTMLInputElement
+      expect(input.value).toBe("exp_")
     })
 
-    it('should show checkbox checked when persistQueryToCookie is true', () => {
+    it("should show checkbox checked when persistQueryToCookie is true", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -117,11 +128,13 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const checkbox = screen.getByRole('checkbox', { name: /Persist query string overrides to cookie/i })
-      expect(checkbox.getAttribute('aria-checked')).toBe('true')
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Persist query string overrides to cookie/i
+      })
+      expect(checkbox.getAttribute("aria-checked")).toBe("true")
     })
 
-    it('should show checkbox unchecked when persistQueryToCookie is false', () => {
+    it("should show checkbox unchecked when persistQueryToCookie is false", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -131,13 +144,15 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const checkbox = screen.getByRole('checkbox', { name: /Persist query string overrides to cookie/i })
-      expect(checkbox.getAttribute('aria-checked')).toBe('false')
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Persist query string overrides to cookie/i
+      })
+      expect(checkbox.getAttribute("aria-checked")).toBe("false")
     })
   })
 
-  describe('Component structure', () => {
-    it('should render section heading', () => {
+  describe("Component structure", () => {
+    it("should render section heading", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -147,10 +162,10 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      expect(screen.getByText('Query String Overrides')).toBeInTheDocument()
+      expect(screen.getByText("Query String Overrides")).toBeInTheDocument()
     })
 
-    it('should render input label', () => {
+    it("should render input label", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -160,10 +175,12 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      expect(screen.getByLabelText(/Query Parameter Prefix/i)).toBeInTheDocument()
+      expect(
+        screen.getByLabelText(/Query Parameter Prefix/i)
+      ).toBeInTheDocument()
     })
 
-    it('should render helper text for query prefix', () => {
+    it("should render helper text for query prefix", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -173,10 +190,12 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      expect(screen.getByText(/Prefix for query parameters/i)).toBeInTheDocument()
+      expect(
+        screen.getByText(/Prefix for query parameters/i)
+      ).toBeInTheDocument()
     })
 
-    it('should render helper text for persist to cookie checkbox', () => {
+    it("should render helper text for persist to cookie checkbox", () => {
       render(
         <QueryStringOverridesSection
           queryPrefix={DEFAULT_CONFIG.queryPrefix}
@@ -186,14 +205,18 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      expect(screen.getByText(/When enabled, query string overrides will be saved to a cookie/i)).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /When enabled, query string overrides will be saved to a cookie/i
+        )
+      ).toBeInTheDocument()
     })
   })
 
-  describe('DEFAULT_CONFIG integration', () => {
-    it('should correctly use DEFAULT_CONFIG placeholder value', () => {
-      expect(DEFAULT_CONFIG.queryPrefix).toBe('_')
-      
+  describe("DEFAULT_CONFIG integration", () => {
+    it("should correctly use DEFAULT_CONFIG placeholder value", () => {
+      expect(DEFAULT_CONFIG.queryPrefix).toBe("_")
+
       render(
         <QueryStringOverridesSection
           queryPrefix=""
@@ -203,13 +226,15 @@ describe('QueryStringOverridesSection', () => {
         />
       )
 
-      const input = screen.getByLabelText(/Query Parameter Prefix/i) as HTMLInputElement
-      expect(input.placeholder).toBe('_')
+      const input = screen.getByLabelText(
+        /Query Parameter Prefix/i
+      ) as HTMLInputElement
+      expect(input.placeholder).toBe("_")
     })
 
-    it('should display correct example with DEFAULT_CONFIG value', () => {
-      expect(DEFAULT_CONFIG.queryPrefix).toBe('_')
-      
+    it("should display correct example with DEFAULT_CONFIG value", () => {
+      expect(DEFAULT_CONFIG.queryPrefix).toBe("_")
+
       render(
         <QueryStringOverridesSection
           queryPrefix=""
@@ -220,12 +245,14 @@ describe('QueryStringOverridesSection', () => {
       )
 
       const exampleText = screen.getByText(/Prefix for query parameters/i)
-      expect(exampleText.textContent).toBe('Prefix for query parameters (e.g., ?_button_color=1)')
+      expect(exampleText.textContent).toBe(
+        "Prefix for query parameters (e.g., ?_button_color=1)"
+      )
     })
   })
 
-  describe('Memoization', () => {
-    it('should be wrapped with React.memo', () => {
+  describe("Memoization", () => {
+    it("should be wrapped with React.memo", () => {
       // React.memo components don't automatically get a displayName
       // Check if it's a memoized component by verifying it's not just a plain function
       expect(QueryStringOverridesSection).toBeDefined()

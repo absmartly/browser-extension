@@ -1,26 +1,30 @@
+import {
+  ClaudeCodeBridgeClient,
+  ConnectionState,
+  type BridgeHealthResponse
+} from "../claude-code-client"
+
 const mockStorageInstance = {
   get: jest.fn(),
   set: jest.fn(),
   remove: jest.fn()
 }
 
-jest.mock('@plasmohq/storage', () => {
+jest.mock("@plasmohq/storage", () => {
   return {
     Storage: jest.fn().mockImplementation(() => mockStorageInstance)
   }
 })
 
-import { ClaudeCodeBridgeClient, ConnectionState, type BridgeHealthResponse } from '../claude-code-client'
-
-describe('ClaudeCodeBridgeClient', () => {
+describe("ClaudeCodeBridgeClient", () => {
   let client: ClaudeCodeBridgeClient
   let mockStorage: typeof mockStorageInstance
   let mockFetch: jest.MockedFunction<typeof fetch>
 
   beforeEach(() => {
     jest.clearAllMocks()
-    jest.spyOn(console, 'log').mockImplementation()
-    jest.spyOn(console, 'error').mockImplementation()
+    jest.spyOn(console, "log").mockImplementation()
+    jest.spyOn(console, "error").mockImplementation()
 
     mockStorage = mockStorageInstance
     mockStorage.get.mockClear()
@@ -36,90 +40,119 @@ describe('ClaudeCodeBridgeClient', () => {
     jest.restoreAllMocks()
   })
 
-  describe('Port Discovery Logic', () => {
-    const createMockResponse = (ok: boolean, data?: any): Response => ({
-      ok,
-      status: ok ? 200 : 500,
-      json: jest.fn().mockResolvedValue(data || { ok }),
-      headers: new Headers(),
-      redirected: false,
-      statusText: ok ? 'OK' : 'Error',
-      type: 'basic',
-      url: '',
-      clone: jest.fn(),
-      body: null,
-      bodyUsed: false,
-      arrayBuffer: jest.fn(),
-      blob: jest.fn(),
-      formData: jest.fn(),
-      text: jest.fn()
-    } as any)
+  describe("Port Discovery Logic", () => {
+    const createMockResponse = (ok: boolean, data?: any): Response =>
+      ({
+        ok,
+        status: ok ? 200 : 500,
+        json: jest.fn().mockResolvedValue(data || { ok }),
+        headers: new Headers(),
+        redirected: false,
+        statusText: ok ? "OK" : "Error",
+        type: "basic",
+        url: "",
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn()
+      }) as any
 
-    it('should try custom port first when saved in storage', async () => {
+    it("should try custom port first when saved in storage", async () => {
       mockStorage.get.mockResolvedValue(3002)
-      mockFetch.mockResolvedValueOnce(createMockResponse(true, { ok: true, authenticated: true }))
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(true, { ok: true, authenticated: true })
+      )
 
       const port = await client.findBridgePort()
 
-      expect(mockStorage.get).toHaveBeenCalledWith('claudeBridgePort')
+      expect(mockStorage.get).toHaveBeenCalledWith("claudeBridgePort")
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3002/health',
-        expect.objectContaining({ method: 'GET' })
+        "http://localhost:3002/health",
+        expect.objectContaining({ method: "GET" })
       )
       expect(port).toBe(3002)
     })
 
-    it('should fall back to default ports when custom port fails', async () => {
+    it("should fall back to default ports when custom port fails", async () => {
       mockStorage.get.mockResolvedValue(3002)
       mockFetch
-        .mockRejectedValueOnce(new Error('Connection refused'))
-        .mockResolvedValueOnce(createMockResponse(true, { ok: true, authenticated: true }))
+        .mockRejectedValueOnce(new Error("Connection refused"))
+        .mockResolvedValueOnce(
+          createMockResponse(true, { ok: true, authenticated: true })
+        )
 
       const port = await client.findBridgePort()
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3002/health', expect.any(Object))
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/health', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3002/health",
+        expect.any(Object)
+      )
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3000/health",
+        expect.any(Object)
+      )
       expect(port).toBe(3000)
     })
 
-    it('should try default ports in order: 3000, 3001, 3002, 3003, 3004', async () => {
+    it("should try default ports in order: 3000, 3001, 3002, 3003, 3004", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
-        .mockRejectedValueOnce(new Error('Port 3000 refused'))
-        .mockRejectedValueOnce(new Error('Port 3001 refused'))
-        .mockResolvedValueOnce(createMockResponse(true, { ok: true, authenticated: true }))
+        .mockRejectedValueOnce(new Error("Port 3000 refused"))
+        .mockRejectedValueOnce(new Error("Port 3001 refused"))
+        .mockResolvedValueOnce(
+          createMockResponse(true, { ok: true, authenticated: true })
+        )
 
       const port = await client.findBridgePort()
 
-      expect(mockFetch).toHaveBeenNthCalledWith(1, 'http://localhost:3000/health', expect.any(Object))
-      expect(mockFetch).toHaveBeenNthCalledWith(2, 'http://localhost:3001/health', expect.any(Object))
-      expect(mockFetch).toHaveBeenNthCalledWith(3, 'http://localhost:3002/health', expect.any(Object))
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        "http://localhost:3000/health",
+        expect.any(Object)
+      )
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        "http://localhost:3001/health",
+        expect.any(Object)
+      )
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        3,
+        "http://localhost:3002/health",
+        expect.any(Object)
+      )
       expect(port).toBe(3002)
     })
 
-    it('should save working port to storage', async () => {
+    it("should save working port to storage", async () => {
       mockStorage.get.mockResolvedValue(null)
-      mockFetch.mockResolvedValueOnce(createMockResponse(true, { ok: true, authenticated: true }))
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(true, { ok: true, authenticated: true })
+      )
 
       await client.findBridgePort()
 
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgePort', 3000)
+      expect(mockStorage.set).toHaveBeenCalledWith("claudeBridgePort", 3000)
     })
 
-    it('should throw error after trying all ports without success', async () => {
+    it("should throw error after trying all ports without success", async () => {
       mockStorage.get.mockResolvedValue(null)
-      mockFetch.mockRejectedValue(new Error('Connection refused'))
+      mockFetch.mockRejectedValue(new Error("Connection refused"))
 
       await expect(client.findBridgePort()).rejects.toThrow(
-        'Could not connect to AI CLI Bridge on any port (3000, 3001, 3002, 3003, 3004)'
+        "Could not connect to AI CLI Bridge on any port (3000, 3001, 3002, 3003, 3004)"
       )
 
       expect(mockFetch).toHaveBeenCalledTimes(5)
     })
 
-    it('should not save custom port to storage when it succeeds', async () => {
+    it("should not save custom port to storage when it succeeds", async () => {
       mockStorage.get.mockResolvedValue(3002)
-      mockFetch.mockResolvedValueOnce(createMockResponse(true, { ok: true, authenticated: true }))
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(true, { ok: true, authenticated: true })
+      )
 
       await client.findBridgePort()
 
@@ -127,7 +160,7 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('Connection Timeout Handling', () => {
+  describe("Connection Timeout Handling", () => {
     beforeEach(() => {
       jest.useFakeTimers()
     })
@@ -136,24 +169,26 @@ describe('ClaudeCodeBridgeClient', () => {
       jest.useRealTimers()
     })
 
-    it('should timeout gracefully on unresponsive port', async () => {
+    it("should timeout gracefully on unresponsive port", async () => {
       mockStorage.get.mockResolvedValue(null)
 
-      const abortError = new Error('Aborted')
-      abortError.name = 'AbortError'
+      const abortError = new Error("Aborted")
+      abortError.name = "AbortError"
 
       mockFetch.mockRejectedValue(abortError)
 
       const promise = client.findBridgePort()
 
-      await expect(promise).rejects.toThrow('Could not connect to AI CLI Bridge on any port')
+      await expect(promise).rejects.toThrow(
+        "Could not connect to AI CLI Bridge on any port"
+      )
     })
 
-    it('should handle network timeouts without hanging', async () => {
+    it("should handle network timeouts without hanging", async () => {
       mockStorage.get.mockResolvedValue(3001)
 
-      const abortError = new Error('Timeout')
-      abortError.name = 'AbortError'
+      const abortError = new Error("Timeout")
+      abortError.name = "AbortError"
 
       mockFetch.mockRejectedValueOnce(abortError)
       mockFetch.mockResolvedValueOnce({
@@ -170,11 +205,11 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port).toBe(3000)
     })
 
-    it('should retry with next port on timeout', async () => {
+    it("should retry with next port on timeout", async () => {
       mockStorage.get.mockResolvedValue(null)
 
-      const abortError = new Error('Timeout')
-      abortError.name = 'AbortError'
+      const abortError = new Error("Timeout")
+      abortError.name = "AbortError"
 
       mockFetch
         .mockRejectedValueOnce(abortError)
@@ -194,20 +229,22 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3)
     })
 
-    it('should give up after trying all ports on timeout', async () => {
+    it("should give up after trying all ports on timeout", async () => {
       mockStorage.get.mockResolvedValue(null)
 
-      const abortError = new Error('Timeout')
-      abortError.name = 'AbortError'
+      const abortError = new Error("Timeout")
+      abortError.name = "AbortError"
       mockFetch.mockRejectedValue(abortError)
 
-      await expect(client.findBridgePort()).rejects.toThrow('Could not connect to AI CLI Bridge on any port')
+      await expect(client.findBridgePort()).rejects.toThrow(
+        "Could not connect to AI CLI Bridge on any port"
+      )
       expect(mockFetch).toHaveBeenCalledTimes(5)
     })
 
-    it('should clear timeout after successful connection', async () => {
+    it("should clear timeout after successful connection", async () => {
       mockStorage.get.mockResolvedValue(null)
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout')
+      const clearTimeoutSpy = jest.spyOn(global, "clearTimeout")
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -221,8 +258,8 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('Health Check Validation', () => {
-    it('should validate /health endpoint response structure', async () => {
+  describe("Health Check Validation", () => {
+    it("should validate /health endpoint response structure", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -235,7 +272,7 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port).toBe(3000)
     })
 
-    it('should detect when bridge server returns not ok', async () => {
+    it("should detect when bridge server returns not ok", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -255,7 +292,7 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port).toBe(3001)
     })
 
-    it('should handle non-200 HTTP status codes', async () => {
+    it("should handle non-200 HTTP status codes", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -274,13 +311,13 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port).toBe(3001)
     })
 
-    it('should handle malformed JSON in health response', async () => {
+    it("should handle malformed JSON in health response", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: jest.fn().mockRejectedValue(new Error('Invalid JSON'))
+          json: jest.fn().mockRejectedValue(new Error("Invalid JSON"))
         } as any)
         .mockResolvedValueOnce({
           ok: true,
@@ -293,7 +330,7 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port).toBe(3001)
     })
 
-    it('should validate health response contains ok field', async () => {
+    it("should validate health response contains ok field", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -312,13 +349,13 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port).toBe(3001)
     })
 
-    it('should accept optional subscriptionType in health response', async () => {
+    it("should accept optional subscriptionType in health response", async () => {
       mockStorage.get.mockResolvedValue(null)
       const healthResponse: BridgeHealthResponse = {
         ok: true,
         authenticated: true,
-        subscriptionType: 'premium',
-        claudeProcess: 'running',
+        subscriptionType: "premium",
+        claudeProcess: "running",
         expiresAt: Date.now() + 3600000
       }
 
@@ -337,11 +374,11 @@ describe('ClaudeCodeBridgeClient', () => {
       const connection = await client.connect()
 
       expect(connection.authenticated).toBe(true)
-      expect(connection.subscriptionType).toBe('premium')
+      expect(connection.subscriptionType).toBe("premium")
     })
   })
 
-  describe('EventSource Stream Handling', () => {
+  describe("EventSource Stream Handling", () => {
     let mockEventSourceInstance: any
 
     beforeEach(() => {
@@ -353,11 +390,10 @@ describe('ClaudeCodeBridgeClient', () => {
         onerror: null,
         readyState: 1
       }
-
       ;(global.EventSource as any) = jest.fn(() => mockEventSourceInstance)
     })
 
-    it('should create EventSource with correct URL', async () => {
+    it("should create EventSource with correct URL", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -375,12 +411,14 @@ describe('ClaudeCodeBridgeClient', () => {
       const onMessage = jest.fn()
       const onError = jest.fn()
 
-      client.streamResponses('conv-123', onMessage, onError)
+      client.streamResponses("conv-123", onMessage, onError)
 
-      expect(global.EventSource).toHaveBeenCalledWith('http://localhost:3000/conversations/conv-123/stream')
+      expect(global.EventSource).toHaveBeenCalledWith(
+        "http://localhost:3000/conversations/conv-123/stream"
+      )
     })
 
-    it('should parse SSE messages correctly', async () => {
+    it("should parse SSE messages correctly", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -398,15 +436,20 @@ describe('ClaudeCodeBridgeClient', () => {
       const onMessage = jest.fn()
       const onError = jest.fn()
 
-      client.streamResponses('conv-123', onMessage, onError)
+      client.streamResponses("conv-123", onMessage, onError)
 
-      const testEvent = { data: JSON.stringify({ type: 'message', content: 'test' }) }
+      const testEvent = {
+        data: JSON.stringify({ type: "message", content: "test" })
+      }
       mockEventSourceInstance.onmessage(testEvent)
 
-      expect(onMessage).toHaveBeenCalledWith({ type: 'message', content: 'test' })
+      expect(onMessage).toHaveBeenCalledWith({
+        type: "message",
+        content: "test"
+      })
     })
 
-    it('should handle malformed JSON in SSE messages', async () => {
+    it("should handle malformed JSON in SSE messages", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -424,15 +467,15 @@ describe('ClaudeCodeBridgeClient', () => {
       const onMessage = jest.fn()
       const onError = jest.fn()
 
-      client.streamResponses('conv-123', onMessage, onError)
+      client.streamResponses("conv-123", onMessage, onError)
 
-      const testEvent = { data: 'invalid json{' }
+      const testEvent = { data: "invalid json{" }
       mockEventSourceInstance.onmessage(testEvent)
 
       expect(onMessage).not.toHaveBeenCalled()
     })
 
-    it('should handle stream disconnection gracefully', async () => {
+    it("should handle stream disconnection gracefully", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -450,20 +493,20 @@ describe('ClaudeCodeBridgeClient', () => {
       const onMessage = jest.fn()
       const onError = jest.fn()
 
-      client.streamResponses('conv-123', onMessage, onError)
+      client.streamResponses("conv-123", onMessage, onError)
 
       mockEventSourceInstance.readyState = 2
-      mockEventSourceInstance.onerror(new Event('error'))
+      mockEventSourceInstance.onerror(new Event("error"))
 
       expect(onError).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringContaining('Stream connection closed')
+          message: expect.stringContaining("Stream connection closed")
         })
       )
       expect(mockEventSourceInstance.close).toHaveBeenCalled()
     })
 
-    it('should allow reconnection when EventSource is in CONNECTING state', async () => {
+    it("should allow reconnection when EventSource is in CONNECTING state", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -474,59 +517,68 @@ describe('ClaudeCodeBridgeClient', () => {
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
-      } as any)
+          json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
+        } as any)
 
       await client.connect()
       const onMessage = jest.fn()
       const onError = jest.fn()
 
-      client.streamResponses('conv-123', onMessage, onError)
+      client.streamResponses("conv-123", onMessage, onError)
 
       mockEventSourceInstance.readyState = 0
-      mockEventSourceInstance.onerror(new Event('error'))
+      mockEventSourceInstance.onerror(new Event("error"))
 
       expect(onError).not.toHaveBeenCalled()
       expect(mockEventSourceInstance.close).not.toHaveBeenCalled()
     })
 
-    it('should throw error when streaming without connection', () => {
+    it("should throw error when streaming without connection", () => {
       const onMessage = jest.fn()
       const onError = jest.fn()
 
       expect(() => {
-        client.streamResponses('conv-123', onMessage, onError)
-      }).toThrow('Not connected to bridge')
+        client.streamResponses("conv-123", onMessage, onError)
+      }).toThrow("Not connected to bridge")
     })
   })
 
-  describe('Error Recovery', () => {
-    it('should distinguish network errors from server not found', async () => {
+  describe("Error Recovery", () => {
+    it("should distinguish network errors from server not found", async () => {
       mockStorage.get.mockResolvedValue(null)
-      const networkError = new Error('ECONNREFUSED')
+      const networkError = new Error("ECONNREFUSED")
       mockFetch.mockRejectedValue(networkError)
 
       await expect(client.findBridgePort()).rejects.toThrow(
-        'Could not connect to AI CLI Bridge on any port'
+        "Could not connect to AI CLI Bridge on any port"
       )
     })
 
-    it('should set connection state to SERVER_NOT_FOUND on failure', async () => {
+    it("should set connection state to SERVER_NOT_FOUND on failure", async () => {
       mockStorage.get.mockResolvedValue(null)
-      mockFetch.mockRejectedValue(new Error('Connection refused'))
+      mockFetch.mockRejectedValue(new Error("Connection refused"))
 
       await expect(client.connect()).rejects.toThrow()
       expect(client.getConnectionState()).toBe(ConnectionState.SERVER_NOT_FOUND)
     })
 
-    it('should set connection state to CONNECTING during connection', async () => {
+    it("should set connection state to CONNECTING during connection", async () => {
       mockStorage.get.mockResolvedValue(null)
-      mockFetch.mockImplementation(() =>
-        new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          status: 200,
-          json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
-        } as any), 100))
+      mockFetch.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  status: 200,
+                  json: jest
+                    .fn()
+                    .mockResolvedValue({ ok: true, authenticated: true })
+                } as any),
+              100
+            )
+          )
       )
 
       const connectPromise = client.connect()
@@ -534,16 +586,16 @@ describe('ClaudeCodeBridgeClient', () => {
       await connectPromise
     })
 
-    it('should cleanup resources on connection failure', async () => {
+    it("should cleanup resources on connection failure", async () => {
       mockStorage.get.mockResolvedValue(null)
-      mockFetch.mockRejectedValue(new Error('Connection failed'))
+      mockFetch.mockRejectedValue(new Error("Connection failed"))
 
       await expect(client.connect()).rejects.toThrow()
 
       expect(client.getConnection()).toBeNull()
     })
 
-    it('should handle race conditions between multiple tabs', async () => {
+    it("should handle race conditions between multiple tabs", async () => {
       mockStorage.get.mockResolvedValue(3001)
 
       mockFetch
@@ -567,11 +619,11 @@ describe('ClaudeCodeBridgeClient', () => {
       expect(port2).toBe(3001)
     })
 
-    it('should recover from temporary network issues', async () => {
+    it("should recover from temporary network issues", async () => {
       mockStorage.get.mockResolvedValue(null)
 
       mockFetch
-        .mockRejectedValueOnce(new Error('Network unstable'))
+        .mockRejectedValueOnce(new Error("Network unstable"))
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -583,27 +635,31 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('connect()', () => {
-    it('should establish connection successfully', async () => {
+  describe("connect()", () => {
+    it("should establish connection successfully", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true, subscriptionType: 'free' })
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          authenticated: true,
+          subscriptionType: "free"
+        })
       } as any)
 
       const connection = await client.connect()
 
       expect(connection).toEqual({
-        url: 'http://localhost:3000',
+        url: "http://localhost:3000",
         port: 3000,
         authenticated: true,
-        subscriptionType: 'free'
+        subscriptionType: "free"
       })
       expect(client.getConnectionState()).toBe(ConnectionState.CONNECTED)
     })
 
-    it('should store connection details', async () => {
+    it("should store connection details", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch.mockResolvedValue({
         ok: true,
@@ -620,8 +676,8 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('testConnection()', () => {
-    it('should test connection with custom port', async () => {
+  describe("testConnection()", () => {
+    it("should test connection with custom port", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
@@ -630,21 +686,24 @@ describe('ClaudeCodeBridgeClient', () => {
 
       const result = await client.testConnection(3005)
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3005/health', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3005/health",
+        expect.any(Object)
+      )
       expect(result).toBe(true)
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgePort', 3005)
+      expect(mockStorage.set).toHaveBeenCalledWith("claudeBridgePort", 3005)
     })
 
-    it('should throw on connection failure', async () => {
+    it("should throw on connection failure", async () => {
       mockStorage.get.mockResolvedValue(null)
-      mockFetch.mockRejectedValue(new Error('Connection refused'))
+      mockFetch.mockRejectedValue(new Error("Connection refused"))
 
       await expect(client.testConnection()).rejects.toThrow()
     })
   })
 
-  describe('createConversation()', () => {
-    it('should auto-connect if not connected', async () => {
+  describe("createConversation()", () => {
+    it("should auto-connect if not connected", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -660,15 +719,18 @@ describe('ClaudeCodeBridgeClient', () => {
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: jest.fn().mockResolvedValue({ conversationId: 'conv-123' })
+          json: jest.fn().mockResolvedValue({ conversationId: "conv-123" })
         } as any)
 
-      const result = await client.createConversation('session-1', '/path/to/cwd')
+      const result = await client.createConversation(
+        "session-1",
+        "/path/to/cwd"
+      )
 
-      expect(result.conversationId).toBe('conv-123')
+      expect(result.conversationId).toBe("conv-123")
     })
 
-    it('should send correct request body', async () => {
+    it("should send correct request body", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -684,29 +746,36 @@ describe('ClaudeCodeBridgeClient', () => {
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: jest.fn().mockResolvedValue({ conversationId: 'conv-123' })
+          json: jest.fn().mockResolvedValue({ conversationId: "conv-123" })
         } as any)
 
-      await client.createConversation('session-1', '/cwd', 'allow', { type: 'object' }, '<html></html>', 'claude-opus-4')
+      await client.createConversation(
+        "session-1",
+        "/cwd",
+        "allow",
+        { type: "object" },
+        "<html></html>",
+        "claude-opus-4"
+      )
 
       expect(mockFetch).toHaveBeenLastCalledWith(
-        'http://localhost:3000/conversations',
+        "http://localhost:3000/conversations",
         expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            session_id: 'session-1',
-            cwd: '/cwd',
-            permissionMode: 'allow',
-            jsonSchema: { type: 'object' },
-            html: '<html></html>',
-            model: 'claude-opus-4'
+            session_id: "session-1",
+            cwd: "/cwd",
+            permissionMode: "allow",
+            jsonSchema: { type: "object" },
+            html: "<html></html>",
+            model: "claude-opus-4"
           })
         })
       )
     })
 
-    it('should throw error on failed request', async () => {
+    it("should throw error on failed request", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -725,14 +794,14 @@ describe('ClaudeCodeBridgeClient', () => {
           json: jest.fn()
         } as any)
 
-      await expect(client.createConversation('session-1', '/cwd')).rejects.toThrow(
-        'Failed to create conversation: 400'
-      )
+      await expect(
+        client.createConversation("session-1", "/cwd")
+      ).rejects.toThrow("Failed to create conversation: 400")
     })
   })
 
-  describe('refreshHtml()', () => {
-    it('should send HTML refresh request', async () => {
+  describe("refreshHtml()", () => {
+    it("should send HTML refresh request", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -752,18 +821,18 @@ describe('ClaudeCodeBridgeClient', () => {
         } as any)
 
       await client.connect()
-      await client.refreshHtml('conv-123', '<html>updated</html>')
+      await client.refreshHtml("conv-123", "<html>updated</html>")
 
       expect(mockFetch).toHaveBeenLastCalledWith(
-        'http://localhost:3000/conversations/conv-123/refresh',
+        "http://localhost:3000/conversations/conv-123/refresh",
         expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ html: '<html>updated</html>' })
+          method: "POST",
+          body: JSON.stringify({ html: "<html>updated</html>" })
         })
       )
     })
 
-    it('should auto-connect if not connected', async () => {
+    it("should auto-connect if not connected", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -782,19 +851,26 @@ describe('ClaudeCodeBridgeClient', () => {
           json: jest.fn()
         } as any)
 
-      await client.refreshHtml('conv-123', '<html></html>')
+      await client.refreshHtml("conv-123", "<html></html>")
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/health', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3000/health",
+        expect.any(Object)
+      )
     })
   })
 
-  describe('getHtmlChunks()', () => {
-    it('should fetch HTML chunks for selectors', async () => {
+  describe("getHtmlChunks()", () => {
+    it("should fetch HTML chunks for selectors", async () => {
       mockStorage.get.mockResolvedValue(null)
       const mockResponse = {
         results: [
-          { selector: '.header', html: '<div class="header"></div>', found: true },
-          { selector: '.footer', html: '', found: false, error: 'Not found' }
+          {
+            selector: ".header",
+            html: '<div class="header"></div>',
+            found: true
+          },
+          { selector: ".footer", html: "", found: false, error: "Not found" }
         ]
       }
 
@@ -816,7 +892,10 @@ describe('ClaudeCodeBridgeClient', () => {
         } as any)
 
       await client.connect()
-      const result = await client.getHtmlChunks('conv-123', ['.header', '.footer'])
+      const result = await client.getHtmlChunks("conv-123", [
+        ".header",
+        ".footer"
+      ])
 
       expect(result.results).toHaveLength(2)
       expect(result.results[0].found).toBe(true)
@@ -824,13 +903,18 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('queryXPath()', () => {
-    it('should execute XPath query', async () => {
+  describe("queryXPath()", () => {
+    it("should execute XPath query", async () => {
       mockStorage.get.mockResolvedValue(null)
       const mockResponse = {
         xpath: '//div[@class="content"]',
         matches: [
-          { selector: '.content', html: '<div class="content"></div>', textContent: '', nodeType: 'ELEMENT_NODE' }
+          {
+            selector: ".content",
+            html: '<div class="content"></div>',
+            textContent: "",
+            nodeType: "ELEMENT_NODE"
+          }
         ],
         found: true
       }
@@ -853,13 +937,17 @@ describe('ClaudeCodeBridgeClient', () => {
         } as any)
 
       await client.connect()
-      const result = await client.queryXPath('conv-123', '//div[@class="content"]', 10)
+      const result = await client.queryXPath(
+        "conv-123",
+        '//div[@class="content"]',
+        10
+      )
 
       expect(result.found).toBe(true)
       expect(result.matches).toHaveLength(1)
     })
 
-    it('should use default maxResults of 10', async () => {
+    it("should use default maxResults of 10", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -875,23 +963,25 @@ describe('ClaudeCodeBridgeClient', () => {
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: jest.fn().mockResolvedValue({ xpath: '//div', matches: [], found: false })
+          json: jest
+            .fn()
+            .mockResolvedValue({ xpath: "//div", matches: [], found: false })
         } as any)
 
       await client.connect()
-      await client.queryXPath('conv-123', '//div')
+      await client.queryXPath("conv-123", "//div")
 
       expect(mockFetch).toHaveBeenLastCalledWith(
-        'http://localhost:3000/conversations/conv-123/xpath',
+        "http://localhost:3000/conversations/conv-123/xpath",
         expect.objectContaining({
-          body: JSON.stringify({ xpath: '//div', maxResults: 10 })
+          body: JSON.stringify({ xpath: "//div", maxResults: 10 })
         })
       )
     })
   })
 
-  describe('sendMessage()', () => {
-    it('should send message with all parameters', async () => {
+  describe("sendMessage()", () => {
+    it("should send message with all parameters", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -911,23 +1001,29 @@ describe('ClaudeCodeBridgeClient', () => {
         } as any)
 
       await client.connect()
-      await client.sendMessage('conv-123', 'Hello', ['file1.txt', 'file2.txt'], 'System prompt', { type: 'object' })
+      await client.sendMessage(
+        "conv-123",
+        "Hello",
+        ["file1.txt", "file2.txt"],
+        "System prompt",
+        { type: "object" }
+      )
 
       expect(mockFetch).toHaveBeenLastCalledWith(
-        'http://localhost:3000/conversations/conv-123/messages',
+        "http://localhost:3000/conversations/conv-123/messages",
         expect.objectContaining({
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({
-            content: 'Hello',
-            files: ['file1.txt', 'file2.txt'],
-            systemPrompt: 'System prompt',
-            jsonSchema: { type: 'object' }
+            content: "Hello",
+            files: ["file1.txt", "file2.txt"],
+            systemPrompt: "System prompt",
+            jsonSchema: { type: "object" }
           })
         })
       )
     })
 
-    it('should use default empty files array', async () => {
+    it("should use default empty files array", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch
         .mockResolvedValueOnce({
@@ -947,10 +1043,10 @@ describe('ClaudeCodeBridgeClient', () => {
         } as any)
 
       await client.connect()
-      await client.sendMessage('conv-123', 'Hello')
+      await client.sendMessage("conv-123", "Hello")
 
       expect(mockFetch).toHaveBeenLastCalledWith(
-        'http://localhost:3000/conversations/conv-123/messages',
+        "http://localhost:3000/conversations/conv-123/messages",
         expect.objectContaining({
           body: expect.stringContaining('"files":[]')
         })
@@ -958,8 +1054,8 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('disconnect()', () => {
-    it('should clear connection and reset state', async () => {
+  describe("disconnect()", () => {
+    it("should clear connection and reset state", async () => {
       mockStorage.get.mockResolvedValue(null)
       mockFetch.mockResolvedValue({
         ok: true,
@@ -977,124 +1073,146 @@ describe('ClaudeCodeBridgeClient', () => {
     })
   })
 
-  describe('setCustomPort()', () => {
-    it('should save custom port and disconnect', async () => {
+  describe("setCustomPort()", () => {
+    it("should save custom port and disconnect", async () => {
       await client.setCustomPort(3010)
 
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgePort', 3010)
+      expect(mockStorage.set).toHaveBeenCalledWith("claudeBridgePort", 3010)
       expect(client.getConnection()).toBeNull()
       expect(client.getConnectionState()).toBe(ConnectionState.NOT_CONFIGURED)
     })
   })
 
-  describe('clearCustomPort()', () => {
-    it('should remove custom port from storage and disconnect', async () => {
+  describe("clearCustomPort()", () => {
+    it("should remove custom port from storage and disconnect", async () => {
       await client.clearCustomPort()
 
-      expect(mockStorage.remove).toHaveBeenCalledWith('claudeBridgePort')
+      expect(mockStorage.remove).toHaveBeenCalledWith("claudeBridgePort")
       expect(client.getConnection()).toBeNull()
       expect(client.getConnectionState()).toBe(ConnectionState.NOT_CONFIGURED)
     })
   })
 
-  describe('testEndpoint()', () => {
-    it('should test connection with a full endpoint URL', async () => {
+  describe("testEndpoint()", () => {
+    it("should test connection with a full endpoint URL", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
         json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
       } as any)
 
-      const result = await client.testEndpoint('https://remote-bridge.example.com:3000')
+      const result = await client.testEndpoint(
+        "https://remote-bridge.example.com:3000"
+      )
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://remote-bridge.example.com:3000/health',
-        expect.objectContaining({ method: 'GET' })
+        "https://remote-bridge.example.com:3000/health",
+        expect.objectContaining({ method: "GET" })
       )
       expect(result).toBe(true)
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+      expect(mockStorage.set).toHaveBeenCalledWith(
+        "claudeBridgeEndpoint",
+        "https://remote-bridge.example.com:3000"
+      )
     })
 
-    it('should strip trailing slashes from endpoint URL', async () => {
+    it("should strip trailing slashes from endpoint URL", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
         json: jest.fn().mockResolvedValue({ ok: true, authenticated: true })
       } as any)
 
-      await client.testEndpoint('https://remote-bridge.example.com:3000/')
+      await client.testEndpoint("https://remote-bridge.example.com:3000/")
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://remote-bridge.example.com:3000/health',
-        expect.objectContaining({ method: 'GET' })
+        "https://remote-bridge.example.com:3000/health",
+        expect.objectContaining({ method: "GET" })
       )
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+      expect(mockStorage.set).toHaveBeenCalledWith(
+        "claudeBridgeEndpoint",
+        "https://remote-bridge.example.com:3000"
+      )
     })
 
-    it('should throw on endpoint connection failure', async () => {
-      mockFetch.mockRejectedValue(new Error('Connection refused'))
+    it("should throw on endpoint connection failure", async () => {
+      mockFetch.mockRejectedValue(new Error("Connection refused"))
 
-      await expect(client.testEndpoint('https://bad-host.example.com')).rejects.toThrow()
+      await expect(
+        client.testEndpoint("https://bad-host.example.com")
+      ).rejects.toThrow()
     })
   })
 
-  describe('setCustomEndpoint()', () => {
-    it('should save custom endpoint and disconnect', async () => {
-      await client.setCustomEndpoint('https://remote-bridge.example.com:3000')
+  describe("setCustomEndpoint()", () => {
+    it("should save custom endpoint and disconnect", async () => {
+      await client.setCustomEndpoint("https://remote-bridge.example.com:3000")
 
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+      expect(mockStorage.set).toHaveBeenCalledWith(
+        "claudeBridgeEndpoint",
+        "https://remote-bridge.example.com:3000"
+      )
       expect(client.getConnection()).toBeNull()
       expect(client.getConnectionState()).toBe(ConnectionState.NOT_CONFIGURED)
     })
 
-    it('should strip trailing slashes when saving', async () => {
-      await client.setCustomEndpoint('https://remote-bridge.example.com:3000/')
+    it("should strip trailing slashes when saving", async () => {
+      await client.setCustomEndpoint("https://remote-bridge.example.com:3000/")
 
-      expect(mockStorage.set).toHaveBeenCalledWith('claudeBridgeEndpoint', 'https://remote-bridge.example.com:3000')
+      expect(mockStorage.set).toHaveBeenCalledWith(
+        "claudeBridgeEndpoint",
+        "https://remote-bridge.example.com:3000"
+      )
     })
   })
 
-  describe('clearCustomEndpoint()', () => {
-    it('should remove custom endpoint from storage and disconnect', async () => {
+  describe("clearCustomEndpoint()", () => {
+    it("should remove custom endpoint from storage and disconnect", async () => {
       await client.clearCustomEndpoint()
 
-      expect(mockStorage.remove).toHaveBeenCalledWith('claudeBridgeEndpoint')
+      expect(mockStorage.remove).toHaveBeenCalledWith("claudeBridgeEndpoint")
       expect(client.getConnection()).toBeNull()
       expect(client.getConnectionState()).toBe(ConnectionState.NOT_CONFIGURED)
     })
   })
 
-  describe('connect() with custom endpoint', () => {
-    it('should use custom endpoint when set in storage', async () => {
+  describe("connect() with custom endpoint", () => {
+    it("should use custom endpoint when set in storage", async () => {
       mockStorage.get.mockImplementation((key: string) => {
-        if (key === 'claudeBridgeEndpoint') return Promise.resolve('https://remote.example.com:3000')
+        if (key === "claudeBridgeEndpoint")
+          return Promise.resolve("https://remote.example.com:3000")
         return Promise.resolve(null)
       })
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ ok: true, authenticated: true, subscriptionType: 'pro' })
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          authenticated: true,
+          subscriptionType: "pro"
+        })
       } as any)
 
       const connection = await client.connect()
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://remote.example.com:3000/health',
-        expect.objectContaining({ method: 'GET' })
+        "https://remote.example.com:3000/health",
+        expect.objectContaining({ method: "GET" })
       )
       expect(connection).toEqual({
-        url: 'https://remote.example.com:3000',
+        url: "https://remote.example.com:3000",
         port: 0,
         authenticated: true,
-        subscriptionType: 'pro'
+        subscriptionType: "pro"
       })
       expect(client.getConnectionState()).toBe(ConnectionState.CONNECTED)
     })
 
-    it('should skip port discovery when custom endpoint is set', async () => {
+    it("should skip port discovery when custom endpoint is set", async () => {
       mockStorage.get.mockImplementation((key: string) => {
-        if (key === 'claudeBridgeEndpoint') return Promise.resolve('https://remote.example.com')
-        if (key === 'claudeBridgePort') return Promise.resolve(3005)
+        if (key === "claudeBridgeEndpoint")
+          return Promise.resolve("https://remote.example.com")
+        if (key === "claudeBridgePort") return Promise.resolve(3005)
         return Promise.resolve(null)
       })
       mockFetch.mockResolvedValue({
@@ -1107,15 +1225,15 @@ describe('ClaudeCodeBridgeClient', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(1)
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://remote.example.com/health',
+        "https://remote.example.com/health",
         expect.any(Object)
       )
     })
 
-    it('should fall back to port discovery when custom endpoint is not set', async () => {
+    it("should fall back to port discovery when custom endpoint is not set", async () => {
       mockStorage.get.mockImplementation((key: string) => {
-        if (key === 'claudeBridgeEndpoint') return Promise.resolve(null)
-        if (key === 'claudeBridgePort') return Promise.resolve(null)
+        if (key === "claudeBridgeEndpoint") return Promise.resolve(null)
+        if (key === "claudeBridgePort") return Promise.resolve(null)
         return Promise.resolve(null)
       })
       mockFetch.mockResolvedValue({
@@ -1126,31 +1244,44 @@ describe('ClaudeCodeBridgeClient', () => {
 
       const connection = await client.connect()
 
-      expect(connection.url).toBe('http://localhost:3000')
+      expect(connection.url).toBe("http://localhost:3000")
       expect(connection.port).toBe(3000)
     })
 
-    it('should fail when custom endpoint is unreachable', async () => {
+    it("should fail when custom endpoint is unreachable", async () => {
       mockStorage.get.mockImplementation((key: string) => {
-        if (key === 'claudeBridgeEndpoint') return Promise.resolve('https://unreachable.example.com')
+        if (key === "claudeBridgeEndpoint")
+          return Promise.resolve("https://unreachable.example.com")
         return Promise.resolve(null)
       })
-      mockFetch.mockRejectedValue(new Error('Connection refused'))
+      mockFetch.mockRejectedValue(new Error("Connection refused"))
 
       await expect(client.connect()).rejects.toThrow()
       expect(client.getConnectionState()).toBe(ConnectionState.SERVER_NOT_FOUND)
     })
   })
 
-  describe('getConnectionStateMessage()', () => {
-    it('should return correct message for each state', async () => {
-      const { getConnectionStateMessage } = await import('../claude-code-client')
+  describe("getConnectionStateMessage()", () => {
+    it("should return correct message for each state", async () => {
+      const { getConnectionStateMessage } = await import(
+        "../claude-code-client"
+      )
 
-      expect(getConnectionStateMessage(ConnectionState.NOT_CONFIGURED)).toContain('not configured')
-      expect(getConnectionStateMessage(ConnectionState.CONNECTING)).toContain('Connecting')
-      expect(getConnectionStateMessage(ConnectionState.CONNECTED)).toContain('Connected')
-      expect(getConnectionStateMessage(ConnectionState.CONNECTION_FAILED)).toContain('Connection failed')
-      expect(getConnectionStateMessage(ConnectionState.SERVER_NOT_FOUND)).toContain('not found')
+      expect(
+        getConnectionStateMessage(ConnectionState.NOT_CONFIGURED)
+      ).toContain("not configured")
+      expect(getConnectionStateMessage(ConnectionState.CONNECTING)).toContain(
+        "Connecting"
+      )
+      expect(getConnectionStateMessage(ConnectionState.CONNECTED)).toContain(
+        "Connected"
+      )
+      expect(
+        getConnectionStateMessage(ConnectionState.CONNECTION_FAILED)
+      ).toContain("Connection failed")
+      expect(
+        getConnectionStateMessage(ConnectionState.SERVER_NOT_FOUND)
+      ).toContain("not found")
     })
   })
 })
