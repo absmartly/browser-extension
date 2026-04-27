@@ -77,6 +77,8 @@ const mockUseSettingsFormReturn = {
     authMethod: "jwt",
     applicationName: "test-app"
   }),
+  isDirty: false,
+  markFormPristine: jest.fn(),
   requestCookiePermission: jest.fn().mockResolvedValue(true)
 }
 
@@ -430,7 +432,13 @@ describe("SettingsView", () => {
   })
 
   describe("Cancel", () => {
-    it("should call onCancel when cancel button is clicked", () => {
+    it("should call onCancel when cancel button is clicked and form is pristine", () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
+        isDirty: false
+      })
+
       render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
 
       const cancelButton = document.querySelector(
@@ -439,6 +447,159 @@ describe("SettingsView", () => {
       fireEvent.click(cancelButton)
 
       expect(mockOnCancel).toHaveBeenCalled()
+    })
+
+    it("should NOT call onCancel directly when there are unsaved changes — opens modal instead", () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
+        isDirty: true
+      })
+
+      render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+      const cancelButton = document.querySelector(
+        "#cancel-button"
+      ) as HTMLElement
+      fireEvent.click(cancelButton)
+
+      expect(mockOnCancel).not.toHaveBeenCalled()
+      expect(screen.getByText("Save changes?")).toBeInTheDocument()
+    })
+
+    it("should discard changes and call onCancel when Discard button is clicked in unsaved-changes modal", () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
+        isDirty: true
+      })
+
+      render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+      fireEvent.click(document.querySelector("#cancel-button") as HTMLElement)
+      fireEvent.click(
+        document.querySelector("#unsaved-changes-discard") as HTMLElement
+      )
+
+      expect(mockOnCancel).toHaveBeenCalled()
+    })
+
+    it("should keep modal open when Cancel button inside the modal is clicked", () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
+        isDirty: true
+      })
+
+      render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+      fireEvent.click(document.querySelector("#cancel-button") as HTMLElement)
+      fireEvent.click(
+        document.querySelector("#unsaved-changes-cancel") as HTMLElement
+      )
+
+      expect(mockOnCancel).not.toHaveBeenCalled()
+    })
+
+    it("should save and call onSave when Save button is clicked in unsaved-changes modal", async () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      const mockMarkFormPristine = jest.fn()
+      const mockValidateForm = jest.fn().mockResolvedValue(true)
+      const mockBuildConfig = jest.fn().mockReturnValue({
+        apiEndpoint: "https://api.absmartly.com",
+        apiKey: "",
+        authMethod: "jwt"
+      })
+
+      // mockImplementation (not Once) so re-renders during the modal flow
+      // keep returning the same mocked hook values.
+      useSettingsForm.mockImplementation(() => ({
+        ...mockUseSettingsFormReturn,
+        isDirty: true,
+        markFormPristine: mockMarkFormPristine,
+        validateForm: mockValidateForm,
+        buildConfig: mockBuildConfig
+      }))
+
+      try {
+        render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+        fireEvent.click(document.querySelector("#cancel-button") as HTMLElement)
+        fireEvent.click(
+          document.querySelector("#unsaved-changes-save") as HTMLElement
+        )
+
+        await waitFor(() => {
+          expect(mockValidateForm).toHaveBeenCalled()
+          expect(mockBuildConfig).toHaveBeenCalled()
+          expect(storage.setConfig).toHaveBeenCalled()
+          expect(mockMarkFormPristine).toHaveBeenCalled()
+          expect(mockOnSave).toHaveBeenCalled()
+        })
+      } finally {
+        useSettingsForm.mockImplementation(() => mockUseSettingsFormReturn)
+      }
+    })
+
+    it("should keep modal open if save validation fails inside the modal", async () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      const mockValidateForm = jest.fn().mockResolvedValue(false)
+
+      useSettingsForm.mockImplementation(() => ({
+        ...mockUseSettingsFormReturn,
+        isDirty: true,
+        validateForm: mockValidateForm
+      }))
+
+      try {
+        render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+        fireEvent.click(document.querySelector("#cancel-button") as HTMLElement)
+        fireEvent.click(
+          document.querySelector("#unsaved-changes-save") as HTMLElement
+        )
+
+        await waitFor(() => {
+          expect(mockValidateForm).toHaveBeenCalled()
+        })
+
+        expect(mockOnCancel).not.toHaveBeenCalled()
+        expect(mockOnSave).not.toHaveBeenCalled()
+        expect(screen.getByText("Save changes?")).toBeInTheDocument()
+      } finally {
+        useSettingsForm.mockImplementation(() => mockUseSettingsFormReturn)
+      }
+    })
+  })
+
+  describe("Save flow marks form pristine", () => {
+    it("should call markFormPristine after successful save", async () => {
+      const { useSettingsForm } = require("~src/hooks/useSettingsForm")
+      const mockMarkFormPristine = jest.fn()
+      const mockValidateForm = jest.fn().mockResolvedValue(true)
+      const mockBuildConfig = jest.fn().mockReturnValue({
+        apiEndpoint: "https://api.absmartly.com",
+        apiKey: "",
+        authMethod: "jwt"
+      })
+
+      useSettingsForm.mockReturnValueOnce({
+        ...mockUseSettingsFormReturn,
+        validateForm: mockValidateForm,
+        buildConfig: mockBuildConfig,
+        markFormPristine: mockMarkFormPristine,
+        apiEndpoint: "https://api.absmartly.com"
+      })
+
+      render(<SettingsView onSave={mockOnSave} onCancel={mockOnCancel} />)
+
+      fireEvent.click(
+        document.querySelector("#save-settings-button") as HTMLElement
+      )
+
+      await waitFor(() => {
+        expect(mockMarkFormPristine).toHaveBeenCalled()
+      })
     })
   })
 

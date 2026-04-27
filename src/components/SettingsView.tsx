@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 
 import { useSettingsForm } from "~src/hooks/useSettingsForm"
 import {
@@ -20,6 +20,7 @@ import { SystemPromptSection } from "./settings/SystemPromptSection"
 import { Button } from "./ui/Button"
 import { Checkbox } from "./ui/Checkbox"
 import { Input } from "./ui/Input"
+import { UnsavedChangesModal } from "./UnsavedChangesModal"
 
 interface SettingsViewProps {
   onSave: (config: ABsmartlyConfig) => void
@@ -74,8 +75,13 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
     normalizeEndpoint,
     validateForm,
     buildConfig,
+    isDirty,
+    markFormPristine,
     requestCookiePermission
   } = useSettingsForm()
+
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false)
+  const [savingFromModal, setSavingFromModal] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -83,7 +89,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
 
   const handleSave = async () => {
     const isValid = await validateForm()
-    if (!isValid) return
+    if (!isValid) return false
 
     if (aiApiKey && !PROVIDER_REGISTRY[aiProvider]?.isBridge) {
       await ensureProviderPermissions(
@@ -102,17 +108,64 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         localStorage.setItem("absmartly-endpoint", normalized)
       }
 
+      markFormPristine()
       onSave(config)
+      return true
     } catch (error) {
       debugError("Failed to save config:", error)
       setErrors({ general: "Failed to save settings" })
+      return false
     }
   }
 
+  const handleBack = () => {
+    if (isDirty) {
+      setShowUnsavedModal(true)
+      return
+    }
+    onCancel()
+  }
+
+  const handleUnsavedSave = async () => {
+    setSavingFromModal(true)
+    try {
+      const saved = await handleSave()
+      if (saved) {
+        setShowUnsavedModal(false)
+      }
+    } finally {
+      setSavingFromModal(false)
+    }
+  }
+
+  const handleUnsavedDiscard = () => {
+    setShowUnsavedModal(false)
+    onCancel()
+  }
+
+  const handleUnsavedCancel = () => {
+    setShowUnsavedModal(false)
+  }
+
   const handleAuthenticate = () => {
-    if (apiEndpoint) {
-      const baseUrl = apiEndpoint.replace(/\/+$/, "").replace(/\/v1$/, "")
+    if (!apiEndpoint) return
+
+    const baseUrl = apiEndpoint.replace(/\/+$/, "").replace(/\/v1$/, "")
+    try {
       chrome.tabs.create({ url: baseUrl })
+    } catch (error) {
+      const message = (error as Error)?.message ?? ""
+      debugError("Failed to open authentication tab:", error)
+      if (message.includes("Extension context invalidated")) {
+        setErrors({
+          general:
+            "The extension was reloaded. Please close and reopen the sidebar, then try again."
+        })
+      } else {
+        setErrors({
+          general: `Failed to open authentication tab: ${message || "unknown error"}`
+        })
+      }
     }
   }
 
@@ -158,9 +211,17 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
         onDeny={handleCookieConsentDeny}
       />
 
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleUnsavedSave}
+        onDiscard={handleUnsavedDiscard}
+        onCancel={handleUnsavedCancel}
+        saving={savingFromModal}
+      />
+
       <Header
         title="Settings"
-        onBack={onCancel}
+        onBack={handleBack}
         config={apiEndpoint ? { apiEndpoint } : undefined}
       />
 
@@ -343,7 +404,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           variant="primary">
           Save Settings
         </Button>
-        <Button id="cancel-button" onClick={onCancel} variant="secondary">
+        <Button id="cancel-button" onClick={handleBack} variant="secondary">
           Cancel
         </Button>
       </div>

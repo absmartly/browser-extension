@@ -9,26 +9,30 @@ import {
 } from "../utils/overrides"
 import type { ExperimentOverrides } from "../utils/overrides"
 
-// Mock @plasmohq/storage before imports
-jest.mock("@plasmohq/storage")
-
-// Create a single storage instance mock that will be used across all tests
-let mockStorageInstance: any
-
-// Mock the Storage class
+// Mock the Storage class. The factory is hoisted by jest, so any captured
+// state has to live inside the closure (a top-level `let` would be in TDZ).
 jest.mock("@plasmohq/storage", () => {
+  const state: {
+    instance: { get: jest.Mock; set: jest.Mock } | null
+  } = { instance: null }
   return {
     Storage: jest.fn().mockImplementation(() => {
-      if (!mockStorageInstance) {
-        mockStorageInstance = {
+      if (!state.instance) {
+        state.instance = {
           get: jest.fn(),
           set: jest.fn()
         }
       }
-      return mockStorageInstance
-    })
+      return state.instance
+    }),
+    __getMockStorageInstance: () =>
+      state.instance ?? { get: jest.fn(), set: jest.fn() }
   }
 })
+
+const { __getMockStorageInstance } = jest.requireMock("@plasmohq/storage") as {
+  __getMockStorageInstance: () => { get: jest.Mock; set: jest.Mock }
+}
 
 // Mock chrome APIs
 const mockChromeApi = {
@@ -45,12 +49,9 @@ const mockChromeApi = {
 
 Object.assign(global, { chrome: mockChromeApi })
 
-// Get reference to the mock storage instance
-const mockStorage = (() => {
-  // Force the module to create the storage instance
-  require("../utils/overrides")
-  return mockStorageInstance
-})()
+// Force the module to create the storage instance
+require("../utils/overrides")
+const mockStorage = __getMockStorageInstance()
 
 describe("Storage Functions", () => {
   beforeEach(() => {

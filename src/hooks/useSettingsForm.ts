@@ -1,5 +1,4 @@
-import axios from "axios"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import type { AIProviderType } from "~src/lib/ai-providers"
 import { sendToBackground } from "~src/lib/messaging"
@@ -45,6 +44,35 @@ export function useSettingsForm() {
   const [vibeStudioEnabled, setVibeStudioEnabled] = useState(false)
   const [htmlInjectionEnabled, setHtmlInjectionEnabled] = useState(false)
   const [configLoadError, setConfigLoadError] = useState<string | null>(null)
+  const initialFormSnapshotRef = useRef<string | null>(null)
+
+  const buildFormSnapshot = (): string =>
+    JSON.stringify({
+      apiKey,
+      apiEndpoint,
+      applicationName,
+      domChangesFieldName,
+      authMethod,
+      sdkWindowProperty,
+      queryPrefix,
+      persistQueryToCookie,
+      aiProvider,
+      aiApiKey,
+      llmModel,
+      providerModels,
+      providerEndpoints,
+      customEndpoint,
+      vibeStudioEnabled,
+      htmlInjectionEnabled
+    })
+
+  const isDirty =
+    initialFormSnapshotRef.current !== null &&
+    initialFormSnapshotRef.current !== buildFormSnapshot()
+
+  const markFormPristine = () => {
+    initialFormSnapshotRef.current = buildFormSnapshot()
+  }
 
   const checkCookiePermission = async (): Promise<boolean> => {
     const permissions = await chrome.permissions.getAll()
@@ -143,6 +171,25 @@ export function useSettingsForm() {
       setHtmlInjectionEnabled(loadedHtmlInjectionEnabled)
       setCustomEndpoint(loadedCustomEndpoint)
 
+      initialFormSnapshotRef.current = JSON.stringify({
+        apiKey: loadedApiKey,
+        apiEndpoint: loadedApiEndpoint,
+        applicationName: loadedApplicationName,
+        domChangesFieldName: loadedDomChangesFieldName,
+        authMethod: loadedAuthMethod,
+        sdkWindowProperty: loadedSdkWindowProperty,
+        queryPrefix: loadedQueryPrefix,
+        persistQueryToCookie: loadedPersistQueryToCookie,
+        aiProvider: loadedAiProvider,
+        aiApiKey: loadedAiApiKey,
+        llmModel: loadedLlmModel,
+        providerModels: loadedProviderModels,
+        providerEndpoints: loadedProviderEndpoints,
+        customEndpoint: loadedCustomEndpoint,
+        vibeStudioEnabled: loadedVibeStudioEnabled,
+        htmlInjectionEnabled: loadedHtmlInjectionEnabled
+      })
+
       if (!hasStoredConfig && envApiKey && envApiEndpoint) {
         const autoConfig = {
           apiKey: loadedApiKey.trim() || undefined,
@@ -196,19 +243,28 @@ export function useSettingsForm() {
     try {
       setCheckingAuth(true)
 
+      const effectiveApiKey = (
+        configOverride ? configOverride.apiKey : apiKey
+      ).trim()
+      const effectiveAuthMethod = configOverride
+        ? configOverride.authMethod
+        : authMethod
+      const normalizedEndpoint = normalizeEndpoint(endpoint).replace(
+        /\/v1$/,
+        ""
+      )
+
+      const configForCheck: Record<string, unknown> = {
+        apiEndpoint: normalizedEndpoint,
+        authMethod: effectiveAuthMethod
+      }
+      if (effectiveApiKey) {
+        configForCheck.apiKey = effectiveApiKey
+      }
+
       const response = await sendToBackground({
         type: "CHECK_AUTH",
-        endpoint,
-        apiKey: configOverride ? configOverride.apiKey.trim() : apiKey,
-        authMethod: configOverride ? configOverride.authMethod : authMethod,
-        configOverride: configOverride
-          ? {
-              apiKey: configOverride.apiKey.trim(),
-              authMethod: configOverride.authMethod
-            }
-          : {
-              apiKey: apiKey
-            }
+        configJson: JSON.stringify(configForCheck)
       })
 
       const data = response.data as Record<string, unknown> | undefined
@@ -254,29 +310,26 @@ export function useSettingsForm() {
 
     try {
       debugLog("Validating endpoint:", normalized)
-      const response = await axios.get(`${normalized}/auth/current-user`, {
-        timeout: 5000,
-        validateStatus: (status) =>
-          status === 200 || status === 401 || status === 403
+      const response = await sendToBackground({
+        type: "VALIDATE_ENDPOINT",
+        endpoint: normalized
       })
 
-      if (
-        response.status === 200 ||
-        response.status === 401 ||
-        response.status === 403
-      ) {
+      if (response?.reachable) {
         debugLog("Endpoint is reachable:", normalized)
         return true
-      } else {
-        debugWarn("Endpoint returned unexpected status:", response.status)
-        return false
       }
+
+      debugWarn(
+        "Endpoint validation failed:",
+        (response?.error as string | undefined) ?? "unreachable"
+      )
+      return false
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        debugWarn("Endpoint validation failed:", error.message)
-      } else {
-        debugWarn("Endpoint validation failed with unknown error:", error)
-      }
+      debugWarn(
+        "Endpoint validation failed with unknown error:",
+        error instanceof Error ? error.message : error
+      )
       return false
     }
   }
@@ -396,6 +449,8 @@ export function useSettingsForm() {
     showCookieConsentModal,
     setShowCookieConsentModal,
     configLoadError,
+    isDirty,
+    markFormPristine,
     loadConfig,
     checkAuthStatus,
     normalizeEndpoint,
