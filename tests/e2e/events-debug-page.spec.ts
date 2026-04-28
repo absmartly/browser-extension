@@ -28,6 +28,10 @@ const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test
 let testServer: http.Server | null = null
 let testServerUrl: string | null = null
 
+// HTTP server lifecycle is owned by beforeAll/afterAll at file scope; tests
+// share the server URL. Run serially so the server isn't torn down mid-suite.
+test.describe.configure({ mode: 'serial' })
+
 test.beforeAll(async () => {
   // Start a simple HTTP server
   const testPageContent = fs.readFileSync(TEST_PAGE_PATH, 'utf-8')

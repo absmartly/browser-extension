@@ -31,6 +31,11 @@ interface ChangeSet {
   }
 }
 
+// All tests in this describe share a single BrowserContext built in
+// beforeAll. Must run serially or tests in different "parallel slots" will
+// race the same context (and tear it down via afterAll while peers still use it).
+test.describe.configure({ mode: 'serial' })
+
 test.describe('Visual Editor - Change Persistence and Restoration', () => {
   let context: BrowserContext
   let extensionId: string
