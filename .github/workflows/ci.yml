@@ -57,8 +57,15 @@ jobs:
           node-version: 22
       - run: bun install --frozen-lockfile
       - run: bunx playwright install chromium --with-deps
-      - run: bun run build:dev
+      # Build the production bundle and run e2e against it. The dev build
+      # (plasmo dev --no-hot-reload) and the prod build (plasmo build) can
+      # diverge in ways that ship broken: v1.4.2 had a content script that
+      # threw "Cannot find module '@plasmohq/storage'" only in the prod
+      # bundle, which the dev-build-based e2e suite never exercised. Always
+      # test what we ship.
+      - run: bun run build
         env:
+          NODE_ENV: production
           PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
