@@ -7,10 +7,10 @@ export default defineConfig({
   expect: {
     timeout: 10000
   },
-  fullyParallel: false,
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: 2,
   reporter: [['html', { open: process.env.SLOW === '1' ? 'always' : 'never' }], ['list']],
   use: {
     actionTimeout: 0,

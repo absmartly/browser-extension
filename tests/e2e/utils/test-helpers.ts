@@ -55,7 +55,11 @@ export async function injectSidebar(page: Page, extensionUrl: (path: string) => 
   }, sidebarUrl)
 
   const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
-  await sidebar.locator('body').waitFor({ timeout: 10000 })
+  // Wait for body to be visible — empty <body><div id="__plasmo"></div></body> has 0 height
+  // and is "not visible" until React mounts and renders content. The 30s ceiling tolerates
+  // parallel-worker CPU contention (the 2 MB sidebar bundle can be slow to parse under load);
+  // in the happy path the wait completes in ~1 s.
+  await sidebar.locator('body').waitFor({ state: 'visible', timeout: 30000 })
 
   return sidebar
 }
@@ -86,7 +90,8 @@ export async function injectSidebarMinimal(page: Page, extensionUrl: (path: stri
   }, extensionUrl('tabs/sidebar.html'))
 
   const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
-  await sidebar.locator('body').waitFor({ timeout: 10000 })
+  // Same rationale as injectSidebar — wait for React to render so the body has a height.
+  await sidebar.locator('body').waitFor({ state: 'visible', timeout: 30000 })
 
   return sidebar
 }
