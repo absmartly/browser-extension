@@ -28,9 +28,21 @@ async function globalSetup(config: FullConfig) {
   const buildDir = path.join(rootDir, 'build', 'chrome-mv3-dev')
   const manifestPath = path.join(buildDir, 'manifest.json')
 
-  // 1. Check if extension needs to be built
-  // Always rebuild the visual editor bundle with test flag for accurate testing
-  const visualEditorBundle = path.join(rootDir, '..', 'absmartly-visual-editor-bundles', 'visual-editor-injection.bundle')
+  // 1. Check if extension needs to be built.
+  //
+  // Note: we deliberately do NOT gate the rebuild on the presence of
+  // ../absmartly-visual-editor-bundles/visual-editor-injection.bundle here.
+  // That sister-repo file is unrelated to whether the extension build is up
+  // to date, and treating it as a trigger forced `plasmo build --tag=dev` to
+  // run on every CI invocation (the sister dir is never present in CI).
+  // That second build wiped the working artifact produced by
+  // `bun run build:dev` (plasmo dev --no-hot-reload) and replaced it with a
+  // production-style bundle in which Parcel externalises @plasmohq/storage,
+  // making every iframe sidebar load fail with
+  //   "PAGE ERROR: Cannot find module '@plasmohq/storage'"
+  // and 116 e2e tests time out waiting for a body that React never gets to
+  // render. If a contributor genuinely needs the visual-editor bundle they
+  // can run its own build separately.
   const sourcePaths = [
     path.join(rootDir, 'src'),
     path.join(rootDir, 'content'),
@@ -46,7 +58,6 @@ async function globalSetup(config: FullConfig) {
   const latestSourceMtime = Math.max(...sourcePaths.map(getLatestMtimeMs))
   const needsRebuild =
     !fs.existsSync(manifestPath) ||
-    !fs.existsSync(visualEditorBundle) ||
     latestSourceMtime > buildMtime
 
   if (needsRebuild) {

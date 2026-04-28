@@ -1,69 +1,72 @@
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require("fs")
+const path = require("path")
+const { execSync } = require("child_process")
 
-const srcDir = path.join(__dirname, '..', 'src', 'visual-editor');
-const buildDir = path.join(__dirname, '..', '..', 'absmartly-visual-editor-bundles');
-const entryFile = path.join(srcDir, 'index.ts');
-const outputFile = path.join(buildDir, 'visual-editor-injection.bundle');
+const srcDir = path.join(__dirname, "..", "src", "visual-editor")
+const buildDir = path.join(__dirname, "..", "build")
+const entryFile = path.join(srcDir, "index.ts")
+const outputFile = path.join(buildDir, "visual-editor-injection.bundle")
 
 // Create build directory if it doesn't exist
 if (!fs.existsSync(buildDir)) {
-  fs.mkdirSync(buildDir, { recursive: true });
+  fs.mkdirSync(buildDir, { recursive: true })
 }
 
-console.log('[Visual Editor Build] Building unified visual editor script...');
+console.log("[Visual Editor Build] Building unified visual editor script...")
 
 // Use esbuild to bundle the TypeScript modules
 try {
   // Check if esbuild is installed
   try {
-    execSync('npx esbuild --version', { stdio: 'ignore' });
+    execSync("npx esbuild --version", { stdio: "ignore" })
   } catch {
-    console.log('[Visual Editor Build] Installing esbuild...');
-    execSync('npm install --save-dev esbuild', { stdio: 'inherit' });
+    console.log("[Visual Editor Build] Installing esbuild...")
+    execSync("npm install --save-dev esbuild", { stdio: "inherit" })
   }
 
   // Build the bundle
   // Check if PLASMO_PUBLIC_DISABLE_SHADOW_DOM is set and pass it to esbuild
-  const disableShadowDOM = process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM === 'true';
-  const isProduction = process.env.NODE_ENV === 'production';
+  const disableShadowDOM =
+    process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM === "true"
+  const isProduction = process.env.NODE_ENV === "production"
 
   // Build the esbuild command with define flags
   // We use '"\\\"true\\\""' to ensure esbuild replaces process.env.X with the STRING "true", not the boolean true
   const defineFlags = disableShadowDOM
     ? ['--define:process.env.PLASMO_PUBLIC_DISABLE_SHADOW_DOM="\\"true\\""']
-    : [];
+    : []
 
   const buildCommand = [
-    'npx',
-    'esbuild',
+    "npx",
+    "esbuild",
     `"${entryFile}"`,
-    '--bundle',
+    "--bundle",
     `--outfile="${outputFile}"`,
-    '--format=iife',
-    '--global-name=ABSmartlyVisualEditor',
-    '--platform=browser',
-    '--target=es2020',
-    '--minify-syntax',
-    '--keep-names',
-    '--external:chrome',
-    '--loader:.ttf=dataurl',
-    '--loader:.woff=dataurl',
-    '--loader:.woff2=dataurl',
-    isProduction ? '--drop:console' : '',
+    "--format=iife",
+    "--global-name=ABSmartlyVisualEditor",
+    "--platform=browser",
+    "--target=es2020",
+    "--minify-syntax",
+    "--keep-names",
+    "--external:chrome",
+    "--loader:.ttf=dataurl",
+    "--loader:.woff=dataurl",
+    "--loader:.woff2=dataurl",
+    isProduction ? "--drop:console" : "",
     ...defineFlags
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(" ")
 
-  console.log('[Visual Editor Build] Running esbuild...');
+  console.log("[Visual Editor Build] Running esbuild...")
   if (disableShadowDOM) {
-    console.log('[Visual Editor Build] Shadow DOM disabled for tests');
-    console.log('[Visual Editor Build] Define flags:', defineFlags);
+    console.log("[Visual Editor Build] Shadow DOM disabled for tests")
+    console.log("[Visual Editor Build] Define flags:", defineFlags)
   }
-  execSync(buildCommand, { stdio: 'inherit' });
+  execSync(buildCommand, { stdio: "inherit" })
 
   // Read the bundled output
-  let bundledCode = fs.readFileSync(outputFile, 'utf8');
+  let bundledCode = fs.readFileSync(outputFile, "utf8")
 
   // Wrap the bundled code to make initVisualEditor available globally
   const wrappedCode = `
@@ -95,32 +98,31 @@ if (typeof ABSmartlyVisualEditor !== 'undefined') {
 if (typeof variantName !== 'undefined' && typeof experimentName !== 'undefined') {
   window.initVisualEditor(variantName, experimentName, logoUrl, initialChanges);
 }
-`;
+`
 
-  fs.writeFileSync(outputFile, wrappedCode);
-  console.log(`[Visual Editor Build] Successfully built ${outputFile}`);
+  fs.writeFileSync(outputFile, wrappedCode)
+  console.log(`[Visual Editor Build] Successfully built ${outputFile}`)
 
   // Also copy to build directories if they exist
   const buildDirs = [
-    path.join(__dirname, '..', 'build', 'chrome-mv3-dev'),
-    path.join(__dirname, '..', 'build', 'chrome-mv3-prod')
-  ];
+    path.join(__dirname, "..", "build", "chrome-mv3-dev"),
+    path.join(__dirname, "..", "build", "chrome-mv3-prod")
+  ]
 
-  buildDirs.forEach(dir => {
+  buildDirs.forEach((dir) => {
     if (fs.existsSync(dir)) {
-      const targetDir = path.join(dir, 'src', 'injected', 'build');
+      const targetDir = path.join(dir, "src", "injected", "build")
       if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
+        fs.mkdirSync(targetDir, { recursive: true })
       }
-      const targetFile = path.join(targetDir, 'visual-editor-injection.js');
+      const targetFile = path.join(targetDir, "visual-editor-injection.js")
       // Copy as .js for runtime usage
-      const bundleContent = fs.readFileSync(outputFile, 'utf8');
-      fs.writeFileSync(targetFile, bundleContent);
-      console.log(`[Visual Editor Build] Copied to ${targetFile}`);
+      const bundleContent = fs.readFileSync(outputFile, "utf8")
+      fs.writeFileSync(targetFile, bundleContent)
+      console.log(`[Visual Editor Build] Copied to ${targetFile}`)
     }
-  });
-
+  })
 } catch (error) {
-  console.error('[Visual Editor Build] Build failed:', error);
-  process.exit(1);
+  console.error("[Visual Editor Build] Build failed:", error)
+  process.exit(1)
 }
