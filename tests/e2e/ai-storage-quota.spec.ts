@@ -81,17 +81,12 @@ test.describe('AI Storage Quota Management', () => {
   })
 
   test.afterEach(async () => {
-    if (testPage) {
-      await testPage.evaluate(async () => {
-        const DB_NAME = 'absmartly-conversations'
-        await new Promise<void>((resolve) => {
-          const request = indexedDB.deleteDatabase(DB_NAME)
-          request.onsuccess = () => resolve()
-          request.onerror = () => resolve()
-        })
-      }).catch(() => {})
-      await testPage.close()
-    }
+    // Per-test fresh persistent context (see fixtures/extension.ts) means
+    // the IndexedDB data dies with the chrome profile when the context
+    // closes — no manual cleanup needed. Deleting in-page would require an
+    // onblocked handler (the page still holds an open connection) and was
+    // adding ~30s to every test that opened the DB.
+    if (testPage) await testPage.close()
   })
 
   test('should sanitize images before storage', async ({ extensionUrl }) => {
