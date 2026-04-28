@@ -49,6 +49,11 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
+    name: e2e-tests (${{ matrix.shard }})
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -70,7 +75,7 @@ jobs:
           PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
           PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
-      - run: bun run test:e2e
+      - run: bunx playwright test --shard=${{ matrix.shard }}
         env:
           CI: true
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -81,7 +86,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ strategy.job-index }}
           path: |
             playwright-report/
             test-results/
