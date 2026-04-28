@@ -3,10 +3,18 @@ import path from 'path'
 import fs from 'fs'
 import { ensureExtensionBuilt } from './setup'
 
+// In CI we run e2e against the production bundle (chrome-mv3-prod) so any
+// Plasmo/Parcel bundling regression surfaces before reaching Chrome Web Store.
+// v1.4.2 shipped a content script that threw "Cannot find module
+// '@plasmohq/storage'" because Parcel externalised it; only the prod bundle
+// had that issue, the dev bundle masked it. Locally we keep using
+// chrome-mv3-dev because `npm run dev` is the normal authoring loop.
+const EXTENSION_BUILD_NAME = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+
 // Ensure seed.html is copied to build directory before tests run
 function ensureSeedFileExists() {
   const seedSource = path.join(__dirname, '..', 'seed.html')
-  const buildDir = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+  const buildDir = path.join(__dirname, '..', '..', 'build', EXTENSION_BUILD_NAME)
   const seedDest = path.join(buildDir, 'tests', 'seed.html')
   const seedDestDir = path.dirname(seedDest)
 
@@ -36,11 +44,12 @@ export const test = base.extend<ExtFixtures>({
     // Extension build is already ensured in global setup
     // Don't rebuild here to avoid multiple rebuilds per test
 
-    const extPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const extPath = path.join(__dirname, '..', '..', 'build', EXTENSION_BUILD_NAME)
 
     // Verify extension was built successfully
     if (!fs.existsSync(extPath)) {
-      throw new Error(`Extension build directory not found: ${extPath}`)
+      const cmd = process.env.CI ? 'bun run build' : 'bun run build:dev'
+      throw new Error(`Extension build directory not found: ${extPath}. Run '${cmd}' first.`)
     }
 
     // Ensure seed.html is in the build directory

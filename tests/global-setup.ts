@@ -25,7 +25,14 @@ async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...')
 
   const rootDir = path.join(__dirname, '..')
-  const buildDir = path.join(rootDir, 'build', 'chrome-mv3-dev')
+  // CI runs e2e against the production bundle so Parcel/Plasmo bundling
+  // regressions are caught before they reach Chrome Web Store. Locally we
+  // keep using chrome-mv3-dev because `bun run build:dev` (plasmo dev
+  // --no-hot-reload) is the normal authoring loop. CI's workflow is
+  // responsible for running `bun run build` before invoking the e2e job;
+  // this script never tries to produce the prod bundle on its own.
+  const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+  const buildDir = path.join(rootDir, 'build', buildName)
   const manifestPath = path.join(buildDir, 'manifest.json')
 
   // 1. Check if extension needs to be built.
@@ -61,6 +68,15 @@ async function globalSetup(config: FullConfig) {
     latestSourceMtime > buildMtime
 
   if (needsRebuild) {
+    if (process.env.CI) {
+      // CI: don't auto-rebuild. The workflow is responsible for running
+      // `bun run build` before this point. If we got here without a manifest
+      // something upstream is wrong; fail loudly.
+      throw new Error(
+        `CI: production extension build missing at ${buildDir}. The CI workflow must run 'bun run build' before invoking e2e tests.`
+      )
+    }
+
     console.log('📦 Extension not built. Building now...')
     try {
       // Set environment variable to disable shadow DOM for tests
@@ -89,8 +105,8 @@ async function globalSetup(config: FullConfig) {
       throw new Error('Extension build failed. Please fix build errors and try again.')
     }
   } else {
-    console.log('✅ Extension already built')
-    console.log('⚠️  Note: Using existing build. Delete build/chrome-mv3-dev/manifest.json to force rebuild.')
+    console.log(`✅ Extension already built (${buildName})`)
+    console.log(`⚠️  Note: Using existing build at ${buildDir}. Delete its manifest.json to force rebuild.`)
   }
 
   // `plasmo build` wipes the build directory before re-emitting files, so if
