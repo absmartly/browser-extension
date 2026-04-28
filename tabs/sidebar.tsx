@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react"
-import { createRoot } from "react-dom/client"
 
 import { Storage } from "@plasmohq/storage"
 
@@ -152,48 +151,3 @@ const ABSmartlySidebar = () => {
 
 // Default export for Plasmo
 export default ABSmartlySidebar
-
-// Fallback mount: Plasmo's generated wrapper mounts React inside a
-// `DOMContentLoaded` listener (.plasmo/tabs/sidebar.tsx). For a tiny iframe
-// document — just `<div id="__plasmo">` + `<script defer>` — the parser can
-// finish so quickly that DOMContentLoaded fires before the deferred script's
-// listener is registered, leaving __plasmo empty forever. This is observed
-// on headless Linux CI runners (every smoke-test run shows the sidebar
-// iframe loaded but __plasmo with zero children); it doesn't happen on
-// local macOS where the script wins the race.
-//
-// Run our own check after a microtask: if __plasmo is still empty when the
-// document is ready, mount manually. Idempotent — Plasmo's wrapper bails on
-// re-entry, and we bail if any children are already present.
-if (typeof document !== "undefined") {
-  const fallbackMount = () => {
-    const root = document.getElementById("__plasmo")
-    if (!root) {
-      console.error("[sidebar.tsx] Fallback mount: __plasmo div not found")
-      return
-    }
-    if (root.children.length > 0) {
-      // Plasmo's wrapper already mounted; nothing to do.
-      return
-    }
-    console.warn(
-      "[sidebar.tsx] Fallback mount: __plasmo empty after document ready, mounting manually"
-    )
-    try {
-      const reactRoot = createRoot(root)
-      reactRoot.render(React.createElement(ABSmartlySidebar))
-    } catch (e) {
-      console.error("[sidebar.tsx] Fallback mount failed:", e)
-    }
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      // Run on next tick so Plasmo's listener (registered first) gets a
-      // chance to mount before we check.
-      setTimeout(fallbackMount, 0)
-    })
-  } else {
-    setTimeout(fallbackMount, 0)
-  }
-}
