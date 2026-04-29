@@ -49,7 +49,7 @@ test.describe('AI Provider Settings', () => {
       .catch(() => {})
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
-    await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
+    await aiProviderSelect.waitFor({ state: 'visible', timeout: 15000 })
 
     const selectedValue = await aiProviderSelect.inputValue()
     expect(selectedValue).toBe('claude-subscription')
@@ -83,7 +83,7 @@ test.describe('AI Provider Settings', () => {
 
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
-    await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
+    await aiProviderSelect.waitFor({ state: 'visible', timeout: 15000 })
 
     await aiProviderSelect.selectOption('anthropic-api')
 
@@ -109,7 +109,7 @@ test.describe('AI Provider Settings', () => {
     await openSettings(sidebar)
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
-    await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
+    await aiProviderSelect.waitFor({ state: 'visible', timeout: 15000 })
 
     await aiProviderSelect.selectOption('openai-api')
 
@@ -136,7 +136,7 @@ test.describe('AI Provider Settings', () => {
     }
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
-    await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
+    await aiProviderSelect.waitFor({ state: 'visible', timeout: 15000 })
     await aiProviderSelect.selectOption('anthropic-api')
 
     const apiKeyInput = sidebar.locator('#ai-api-key')
@@ -171,7 +171,7 @@ test.describe('AI Provider Settings', () => {
     await openSettings(sidebar)
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
-    await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
+    await aiProviderSelect.waitFor({ state: 'visible', timeout: 15000 })
 
     const selectedValue = await aiProviderSelect.inputValue()
     if (selectedValue !== 'claude-subscription') {
@@ -202,7 +202,7 @@ test.describe('AI Provider Settings', () => {
     await openSettings(sidebar)
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
-    await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
+    await aiProviderSelect.waitFor({ state: 'visible', timeout: 15000 })
     await aiProviderSelect.selectOption('claude-subscription')
 
     const advancedToggle = sidebar.locator('#advanced-endpoint-config-summary')

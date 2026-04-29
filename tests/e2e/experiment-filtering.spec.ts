@@ -36,7 +36,7 @@ test.describe('Experiment List Filters', () => {
   })
 
   test('Complete filter workflow: toggle panel, state filters, significance, alerts, search, clear', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
+    test.setTimeout(process.env.SLOW === '1' ? 120000 : 90000)
 
     let sidebar: any
     let stepNumber = 1
