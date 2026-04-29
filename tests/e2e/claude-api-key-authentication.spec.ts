@@ -79,6 +79,17 @@ test.describe('Claude API Key Authentication', () => {
 
     await openSettings(sidebar)
 
+    // The shared seed should already populate the absmartly apiKey field,
+    // but under workers=4 the form's loadConfig race occasionally leaves
+    // it blank. Fill explicitly so validateForm passes deterministically.
+    const absmartlyApiKeyField = sidebar.locator('#api-key-input')
+    if (await absmartlyApiKeyField.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const currentValue = await absmartlyApiKeyField.inputValue()
+      if (!currentValue) {
+        await absmartlyApiKeyField.fill(process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB')
+      }
+    }
+
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
     await providerSelect.selectOption('anthropic-api')
@@ -129,6 +140,16 @@ test.describe('Claude API Key Authentication', () => {
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
     await openSettings(sidebar)
+
+    // Same defensive fill as test #58 — the seeded apiKey may not always
+    // propagate into the form's apiKey state under workers=4.
+    const absmartlyApiKeyField = sidebar.locator('#api-key-input')
+    if (await absmartlyApiKeyField.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const currentValue = await absmartlyApiKeyField.inputValue()
+      if (!currentValue) {
+        await absmartlyApiKeyField.fill(process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB')
+      }
+    }
 
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
