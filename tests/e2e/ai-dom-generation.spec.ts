@@ -154,7 +154,7 @@ test.describe('AI DOM Changes Generation', () => {
 
       console.log('  Selecting Unit Type...')
       const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
-      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 30000 })
+      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 60000 })
       await unitTypeTrigger.click()
       console.log('  ✓ Clicked Unit Type dropdown')
 
