@@ -28,9 +28,10 @@ export async function createExperiment(
   const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
   await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
   // The trigger is disabled (cursor-not-allowed) until unit types load from
-  // the API. Under parallel CPU contention this fetch can exceed 5s; keep
-  // the per-API ceiling generous so we do not flake on a slow load.
-  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 20000 })
+  // the API. Under workers=4 + prod-bundle CI that fetch can exceed 20s when
+  // 4 sibling workers compete for the same endpoint; keep the per-API
+  // ceiling at 30s so we do not flake on a slow load.
+  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 30000 })
   await unitTypeTrigger.click()
   await debugWait(500)
 
