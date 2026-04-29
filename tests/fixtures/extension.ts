@@ -119,12 +119,15 @@ export const test = base.extend<ExtFixtures>({
     // under workers=4 + 4 CI shards = 16 sidebars in flight the API
     // saturates; the unit-type dropdown stays disabled for 30-90s. With
     // pre-fetch the dropdown enables in <100ms from cache.
+    //
+    // Note: chrome.storage.sync has an 8KB per-item limit which the full
+    // cache blows past; the seed.js helper routes editor-resources-cache
+    // to chrome.storage.local instead via the LOCAL_AREA_KEYS allowlist.
     const editorResourcesPath = path.join(__dirname, '..', '..', '.editor-resources-cache.json')
+    let editorResourcesCache: unknown = null
     if (fs.existsSync(editorResourcesPath)) {
       try {
-        const cached = JSON.parse(fs.readFileSync(editorResourcesPath, 'utf-8'))
-        seedData['editor-resources-cache'] = cached
-        seedData['plasmo:editor-resources-cache'] = cached
+        editorResourcesCache = JSON.parse(fs.readFileSync(editorResourcesPath, 'utf-8'))
       } catch {
         // Pre-fetch unavailable; fall back to live API calls per sidebar.
       }
@@ -149,6 +152,21 @@ export const test = base.extend<ExtFixtures>({
     }
 
     await seedPage.evaluate((data) => (window as any).seed(data), seedData)
+
+    // Editor resources cache is too large for chrome.storage.sync (8KB
+    // per-item limit), so write it directly to chrome.storage.local. The
+    // useEditorResources hook reads from `localAreaStorage`.
+    if (editorResourcesCache) {
+      await seedPage.evaluate(
+        (cache) =>
+          chrome.storage.local.set({
+            'editor-resources-cache': JSON.stringify(cache),
+            'plasmo:editor-resources-cache': JSON.stringify(cache)
+          }),
+        editorResourcesCache
+      )
+    }
+
     await seedPage.close()
 
     await use(context)

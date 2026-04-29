@@ -85,9 +85,12 @@ export interface EditorResourcesCache {
 // the unit-type-select dropdown stays disabled for 30-90s. With a cache
 // the dropdown enables in <100ms from prior data and the network refresh
 // happens behind the user.
+//
+// Stored in chrome.storage.local rather than sync because the full payload
+// often exceeds chrome.storage.sync's 8KB per-item limit.
 export async function getEditorResourcesCache(): Promise<EditorResourcesCache | null> {
   try {
-    const data = await storage.get(STORAGE_KEYS.EDITOR_RESOURCES_CACHE)
+    const data = await localAreaStorage.get(STORAGE_KEYS.EDITOR_RESOURCES_CACHE)
     return (data as unknown as EditorResourcesCache | undefined) ?? null
   } catch {
     return null
@@ -98,7 +101,7 @@ export async function setEditorResourcesCache(
   cache: Omit<EditorResourcesCache, "timestamp">
 ): Promise<void> {
   try {
-    await storage.set(STORAGE_KEYS.EDITOR_RESOURCES_CACHE, {
+    await localAreaStorage.set(STORAGE_KEYS.EDITOR_RESOURCES_CACHE, {
       ...cache,
       timestamp: Date.now()
     })
