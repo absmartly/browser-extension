@@ -181,11 +181,43 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   // arg as `arg`, not options — passing { timeout: 10000 } silently
   // falls through to the test-budget default and the wait can run
   // for the entire 60s budget.
+  // 20s ceiling: shard 3 of CI run 25121893575 saw the create change
+  // round-trip stretch close to the 10s budget under contention with
+  // sibling tests. 20s gives consistent headroom; locally it lands in
+  // <100ms.
   const insertedBlockExists = await page
     .locator("h2 + .inserted-block")
-    .waitFor({ state: "attached", timeout: 10000 })
+    .waitFor({ state: "attached", timeout: 20000 })
     .then(() => true)
     .catch(() => false)
+  if (!insertedBlockExists) {
+    // Capture the actual DOM around #test-container so the failure
+    // surfaces what the SDK applied (or didn't) instead of just a
+    // boolean.
+    const debugSnapshot = await page.evaluate(() => {
+      const container = document.querySelector("#test-container")
+      const h2 = document.querySelector("h2")
+      const allInserted = document.querySelectorAll(".inserted-block")
+      return {
+        containerHTML: container?.innerHTML?.slice(0, 500) ?? "<missing>",
+        h2Text: h2?.textContent?.trim() ?? "<no h2>",
+        h2NextSibling:
+          (h2?.nextElementSibling as HTMLElement | null)?.outerHTML?.slice(
+            0,
+            200
+          ) ?? "<no next sibling>",
+        insertedBlockCount: allInserted.length,
+        firstInsertedParent:
+          (allInserted[0]?.parentElement as HTMLElement | null)?.id ??
+          "<no .inserted-block>"
+      }
+    })
+    log(`  ✗ Inserted block missing — debug: ${JSON.stringify(debugSnapshot)}`)
+    await page.screenshot({
+      path: "test-results/insert-block-missing.png",
+      fullPage: true
+    })
+  }
   log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists`)
   expect(insertedBlockExists).toBeTruthy()
   await debugWait()
