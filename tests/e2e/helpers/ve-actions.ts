@@ -87,7 +87,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
 
   // Action 5: Insert new block
   await page.click('h2', { force: true })
-  await page.locator('.menu-container').waitFor({ state: 'visible' })
+  await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
   await debugWait()
 
   await clickContextMenuItem(page, 'Insert new block')
@@ -173,7 +173,11 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   // The 'Apply' click commits a 'create' DOMChange that lands via the
   // SDK postMessage round-trip — same race pattern as the HTML edit
   // above. Poll for the new .inserted-block to appear before asserting
-  // rather than reading once and racing the apply.
+  // rather than reading once and racing the apply. 10s ceiling: under
+  // shard contention the 5s budget was insufficient (CI run
+  // 25119114860 shard 3) — the apply chain crosses sidebar →
+  // background → content → orchestrator → PreviewManager and each
+  // postMessage hop pays scheduler-jitter cost.
   const insertedBlockExists = await page
     .waitForFunction(
       () => {
@@ -182,7 +186,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
         const next = h2.nextElementSibling
         return next?.classList.contains("inserted-block") ?? false
       },
-      { timeout: 5000 }
+      { timeout: 10000 }
     )
     .then(() => true)
     .catch(() => false)
@@ -200,7 +204,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
 
   // Action 5b: Insert another block, this time BEFORE the heading
   await page.click('h2', { force: true })
-  await page.locator('.menu-container').waitFor({ state: 'visible' })
+  await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
   await debugWait()
 
   await clickContextMenuItem(page, 'Insert new block')
@@ -244,6 +248,8 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await debugWait()
 
   // Same SDK-apply race as the after-block: poll instead of sampling.
+  // 10s ceiling for the same reason — the create change crosses
+  // multiple postMessage hops on its way to PreviewManager.
   const beforeBlockExists = await page
     .waitForFunction(
       () => {
@@ -252,7 +258,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
         const prev = h2.previousElementSibling
         return prev?.classList.contains("inserted-block-before") ?? false
       },
-      { timeout: 5000 }
+      { timeout: 10000 }
     )
     .then(() => true)
     .catch(() => false)
