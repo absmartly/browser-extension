@@ -221,14 +221,21 @@ export function useSettingsForm() {
         // against a real ABsmartly endpoint (longer when CI runs the suite
         // four-wide). Render the form first; let auth status fill in async
         // so #ai-provider-select etc. become visible at the speed of
-        // chrome.storage, not the speed of the network.
+        // chrome.storage, not the speed of the network. Catch failures
+        // here — the outer try/catch around loadConfig used to absorb
+        // these; without absorbing them now, an unhandled rejection
+        // bubbles up and crashes Jest tests with a stub chrome API.
         void (async () => {
-          const hasPermission = await checkCookiePermission()
-          if (hasPermission) {
-            await checkAuthStatus(loadedApiEndpoint, {
-              apiKey: loadedApiKey,
-              authMethod: loadedAuthMethod
-            })
+          try {
+            const hasPermission = await checkCookiePermission()
+            if (hasPermission) {
+              await checkAuthStatus(loadedApiEndpoint, {
+                apiKey: loadedApiKey,
+                authMethod: loadedAuthMethod
+              })
+            }
+          } catch (err) {
+            debugError("[useSettingsForm] Auth check failed:", err)
           }
         })()
       }
