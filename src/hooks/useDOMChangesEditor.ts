@@ -243,12 +243,16 @@ export function useDOMChangesEditor({
           }
           break
         case "create":
-          // 'create' changes insert a brand new element, so triggerOnView
-          // doesn't apply — the change itself is what brings the element
-          // into existence; there's nothing to defer until intersection.
-          // Other change types target an element that already exists in
-          // the page, hence the per-type triggerOnView serialization
-          // above.
+          // triggerOnView applies to 'create' the same way it applies to
+          // every other change type — the SDK plugin's ExposureTracker
+          // honours it for viewport-gated exposure firing (else branch in
+          // ExposureTracker.ts:81 tracks change.selector when the type is
+          // not move/delete, which covers 'create'). Earlier this case
+          // omitted it on the assumption that there was nothing to gate
+          // on, but exposure tracking is independent of element
+          // existence: even though the change inserts the element itself,
+          // the user can still want exposure to fire only once the
+          // inserted element scrolls into view.
           domChange = {
             selector: changeToSave.selector,
             type: "create",
@@ -256,6 +260,7 @@ export function useDOMChangesEditor({
             targetSelector: changeToSave.selector,
             position: changeToSave.position || "after",
             waitForElement: changeToSave.waitForElement,
+            triggerOnView: changeToSave.triggerOnView,
             observerRoot: changeToSave.observerRoot
           }
           break
