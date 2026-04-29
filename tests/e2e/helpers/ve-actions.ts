@@ -78,10 +78,13 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   // visible" because it's in a zero-size detached state. Headless CI
   // surfaces this race; locally the postMessage lands well before the
   // next action.
-  await page.waitForFunction(() => {
-    const h2 = document.querySelector('#test-container h2')
-    return h2?.textContent?.trim() === 'HTML Edited!'
-  }, { timeout: 5000 })
+  // locator.waitFor is preferred over page.waitForFunction(fn, opts)
+  // here — the latter's overload treats a single trailing object as
+  // `arg`, not `options`, silently using the test-budget timeout.
+  await page
+    .locator("#test-container h2")
+    .filter({ hasText: "HTML Edited!" })
+    .waitFor({ state: "attached", timeout: 5000 })
 
   await debugWait()
 
@@ -171,23 +174,16 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await debugWait()
 
   // The 'Apply' click commits a 'create' DOMChange that lands via the
-  // SDK postMessage round-trip — same race pattern as the HTML edit
-  // above. Poll for the new .inserted-block to appear before asserting
-  // rather than reading once and racing the apply. 10s ceiling: under
-  // shard contention the 5s budget was insufficient (CI run
-  // 25119114860 shard 3) — the apply chain crosses sidebar →
-  // background → content → orchestrator → PreviewManager and each
-  // postMessage hop pays scheduler-jitter cost.
+  // SDK postMessage round-trip — wait for the new .inserted-block to
+  // appear as h2's adjacent sibling rather than reading once.
+  // Using locator.waitFor here (not page.waitForFunction(fn, opts))
+  // because the latter's overload resolution treats a single second
+  // arg as `arg`, not options — passing { timeout: 10000 } silently
+  // falls through to the test-budget default and the wait can run
+  // for the entire 60s budget.
   const insertedBlockExists = await page
-    .waitForFunction(
-      () => {
-        const h2 = document.querySelector("h2")
-        if (!h2) return false
-        const next = h2.nextElementSibling
-        return next?.classList.contains("inserted-block") ?? false
-      },
-      { timeout: 10000 }
-    )
+    .locator("h2 + .inserted-block")
+    .waitFor({ state: "attached", timeout: 10000 })
     .then(() => true)
     .catch(() => false)
   log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists`)
@@ -248,19 +244,15 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   }
   await debugWait()
 
-  // Same SDK-apply race as the after-block: poll instead of sampling.
-  // 10s ceiling for the same reason — the create change crosses
-  // multiple postMessage hops on its way to PreviewManager.
+  // Same SDK-apply race as the after-block: wait for the new
+  // .inserted-block-before to appear as the h2's preceding sibling.
+  // CSS has no "preceding sibling" combinator, so anchor by the new
+  // element's class and check parent symmetry — equivalent to
+  // h2.previousElementSibling.classList.contains('inserted-block-before')
+  // expressed as locator-only.
   const beforeBlockExists = await page
-    .waitForFunction(
-      () => {
-        const h2 = document.querySelector("h2")
-        if (!h2) return false
-        const prev = h2.previousElementSibling
-        return prev?.classList.contains("inserted-block-before") ?? false
-      },
-      { timeout: 10000 }
-    )
+    .locator(".inserted-block-before + h2")
+    .waitFor({ state: "attached", timeout: 10000 })
     .then(() => true)
     .catch(() => false)
   log(`  ${beforeBlockExists ? '✓' : '✗'} Before-block exists as previousElementSibling of h2`)
