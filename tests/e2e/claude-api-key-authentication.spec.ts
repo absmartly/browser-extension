@@ -1,7 +1,24 @@
 import { test, expect } from '../fixtures/extension'
 import { setupTestPage, injectSidebar } from './utils/test-helpers'
+import type { FrameLocator } from '@playwright/test'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
+
+// SettingsView's `loading` flag stays true while useSettingsForm.loadConfig
+// runs — and that path awaits checkAuthStatus(), which under workers=4 +
+// prod-bundle CI can exceed 5s. While loading is true the AI provider
+// section isn't rendered, so #ai-provider-select waits time out.
+async function openSettings(sidebar: FrameLocator): Promise<void> {
+  const settingsButton = sidebar.locator('#nav-settings')
+  await settingsButton.waitFor({ state: 'visible', timeout: 5000 })
+  await settingsButton.evaluate((btn: HTMLElement) =>
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  )
+  await sidebar
+    .locator('[aria-label="Loading settings"]')
+    .waitFor({ state: 'hidden', timeout: 15000 })
+    .catch(() => {})
+}
 
 test.describe('Claude API Key Authentication', () => {
   test('should display AI API Key input in settings', async ({ context, extensionUrl }) => {
@@ -10,11 +27,7 @@ test.describe('Claude API Key Authentication', () => {
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
-    const settingsButton = sidebar.locator('#nav-settings')
-    await settingsButton.waitFor({ state: 'visible', timeout: 5000 })
-    await settingsButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await openSettings(sidebar)
 
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -35,11 +48,7 @@ test.describe('Claude API Key Authentication', () => {
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
-    const settingsButton = sidebar.locator('#nav-settings')
-    await settingsButton.waitFor({ state: 'visible', timeout: 5000 })
-    await settingsButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await openSettings(sidebar)
 
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -51,13 +60,12 @@ test.describe('Claude API Key Authentication', () => {
 
     const saveButton = sidebar.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await saveButton.click()
 
-    await settingsButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    // Save navigates back to list view; wait for it before re-opening settings.
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 10000 })
+
+    await openSettings(sidebar)
 
     const savedApiKeyInput = sidebar.locator('#ai-api-key')
     await savedApiKeyInput.waitFor({ state: 'visible', timeout: 5000 })
@@ -89,11 +97,7 @@ test.describe('Claude API Key Authentication', () => {
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
     const sidebar = page.frameLocator('#absmartly-sidebar-iframe')
 
-    const settingsButton = sidebar.locator('#nav-settings')
-    await settingsButton.waitFor({ state: 'visible', timeout: 5000 })
-    await settingsButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await openSettings(sidebar)
 
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -117,18 +121,18 @@ test.describe('Claude API Key Authentication', () => {
     const reloadedSidebar = await injectSidebar(page, extensionUrl)
 
     const configureButton = reloadedSidebar.locator('#configure-settings-button')
-    const reloadedSettingsButton = reloadedSidebar.locator('#nav-settings')
     const hasWelcome = await configureButton.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (hasWelcome) {
       await configureButton.evaluate((btn: HTMLElement) =>
         btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
       )
+      await reloadedSidebar
+        .locator('[aria-label="Loading settings"]')
+        .waitFor({ state: 'hidden', timeout: 15000 })
+        .catch(() => {})
     } else {
-      await reloadedSettingsButton.waitFor({ state: 'visible', timeout: 10000 })
-      await reloadedSettingsButton.evaluate((btn: HTMLElement) =>
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      )
+      await openSettings(reloadedSidebar)
     }
 
     const savedProviderSelect = reloadedSidebar.locator('#ai-provider-select')

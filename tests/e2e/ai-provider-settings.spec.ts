@@ -1,8 +1,24 @@
 import { test, expect } from '../fixtures/extension'
 import { injectSidebar } from './utils/test-helpers'
 import path from 'path'
+import type { FrameLocator } from '@playwright/test'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
+
+// SettingsView keeps `loading=true` while useSettingsForm.loadConfig awaits
+// checkAuthStatus, which under workers=4 + prod-bundle CI can exceed the
+// per-element 5s timeout. While loading is true the AI provider section
+// isn't rendered, so the bare nav-settings click + ai-provider-select wait
+// pattern times out. Block on the loading spinner clearing instead.
+async function openSettings(sidebar: FrameLocator): Promise<void> {
+  const settingsButton = sidebar.locator('#nav-settings')
+  await settingsButton.waitFor({ state: 'visible', timeout: 10000 })
+  await settingsButton.click()
+  await sidebar
+    .locator('[aria-label="Loading settings"]')
+    .waitFor({ state: 'hidden', timeout: 15000 })
+    .catch(() => {})
+}
 
 test.describe('AI Provider Settings', () => {
   test('should display AI provider selection with Claude Subscription by default', async ({ page, extensionId, extensionUrl, seedStorage }) => {
@@ -27,6 +43,10 @@ test.describe('AI Provider Settings', () => {
 
     await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
     await sidebar.locator('#nav-settings').click()
+    await sidebar
+      .locator('[aria-label="Loading settings"]')
+      .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {})
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -56,6 +76,10 @@ test.describe('AI Provider Settings', () => {
 
     await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
     await sidebar.locator('#nav-settings').click()
+    await sidebar
+      .locator('[aria-label="Loading settings"]')
+      .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {})
 
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
@@ -82,8 +106,7 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
-    await sidebar.locator('#nav-settings').click()
+    await openSettings(sidebar)
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -103,8 +126,7 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
-    await sidebar.locator('#nav-settings').click()
+    await openSettings(sidebar)
 
     const endpointInput = sidebar.locator('#absmartly-endpoint')
     await endpointInput.waitFor({ state: 'visible', timeout: 5000 })
@@ -125,8 +147,7 @@ test.describe('AI Provider Settings', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.evaluate((el: HTMLElement) => el.click())
 
-    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 10000 })
-    await sidebar.locator('#nav-settings').click()
+    await openSettings(sidebar)
 
     const savedAiProvider = sidebar.locator('#ai-provider-select')
     await savedAiProvider.waitFor({ state: 'visible', timeout: 5000 })
@@ -147,9 +168,7 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
-    await sidebar.locator('#nav-settings').click()
-
+    await openSettings(sidebar)
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -180,9 +199,7 @@ test.describe('AI Provider Settings', () => {
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
-    await sidebar.locator('#nav-settings').waitFor({ state: 'visible' })
-    await sidebar.locator('#nav-settings').click()
-
+    await openSettings(sidebar)
 
     const aiProviderSelect = sidebar.locator('#ai-provider-select')
     await aiProviderSelect.waitFor({ state: 'visible', timeout: 5000 })

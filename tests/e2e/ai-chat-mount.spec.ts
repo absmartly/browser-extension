@@ -297,10 +297,12 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     const sidebar = await injectSidebar(page, extensionUrl)
     console.log('[Test] Extension initialized')
 
-    // Wait for sidebar to load - wait for experiment list or empty state
+    // Wait for sidebar to load - wait for experiment list or empty state.
+    // 30s ceiling is generous for workers=4 + prod-bundle CI where the
+    // experiments fetch can queue behind 3 sibling worker requests.
     await Promise.race([
-      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 15000 }),
-      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 15000 })
+      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 30000 }),
+      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 30000 })
     ]).catch(() => {})
     console.log('[Test] Sidebar visible')
 
@@ -409,10 +411,12 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     const sidebar = await injectSidebar(page, extensionUrl)
     console.log('[Test] Extension initialized')
 
-    // Wait for sidebar to load - wait for experiment list or empty state
+    // Wait for sidebar to load - wait for experiment list or empty state.
+    // 30s ceiling is generous for workers=4 + prod-bundle CI where the
+    // experiments fetch can queue behind 3 sibling worker requests.
     await Promise.race([
-      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 15000 }),
-      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 15000 })
+      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 30000 }),
+      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 30000 })
     ]).catch(() => {})
     console.log('[Test] Sidebar loaded')
 

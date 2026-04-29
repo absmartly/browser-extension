@@ -61,6 +61,16 @@ export async function injectSidebar(page: Page, extensionUrl: (path: string) => 
   // in the happy path the wait completes in ~1 s.
   await sidebar.locator('body').waitFor({ state: 'visible', timeout: 30000 })
 
+  // …and then for a real view to render. ExtensionUI shows
+  // `<div role="status" aria-label="Loading">` while its top-level config
+  // load is in flight, after which it renders ListView (#nav-settings) or
+  // the welcome screen (#configure-settings-button). Tests that immediately
+  // look for #nav-settings would otherwise race the spinner under workers=4.
+  await sidebar
+    .locator('#nav-settings, #configure-settings-button')
+    .first()
+    .waitFor({ state: 'visible', timeout: 20000 })
+
   return sidebar
 }
 

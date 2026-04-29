@@ -113,6 +113,19 @@ export const test = base.extend<ExtFixtures>({
       'plasmo:absmartly-config': defaultConfig
     }
 
+    // The ABsmartly API key lives in the local-area secret store (not in
+    // sync alongside the rest of the config) — getConfig overrides
+    // config.apiKey with whatever's at `absmartly-apikey` in local. If the
+    // seeded apiKey only lands in the sync `absmartly-config` record,
+    // getConfig returns config with apiKey:'', which fails the
+    // SettingsView "API key required" validator and breaks any test that
+    // tries to save settings. Seed the secret keyring entry too.
+    const absmartlyApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+    if (absmartlyApiKey) {
+      seedData['absmartly-apikey'] = absmartlyApiKey
+      seedData['plasmo:absmartly-apikey'] = absmartlyApiKey
+    }
+
     if (anthropicApiKey) {
       seedData['ai-apikey'] = anthropicApiKey
       seedData['plasmo:ai-apikey'] = anthropicApiKey

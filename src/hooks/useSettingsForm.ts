@@ -217,13 +217,20 @@ export function useSettingsForm() {
       if (loadedApiEndpoint) {
         localStorage.setItem("absmartly-endpoint", loadedApiEndpoint)
 
-        const hasPermission = await checkCookiePermission()
-        if (hasPermission) {
-          await checkAuthStatus(loadedApiEndpoint, {
-            apiKey: loadedApiKey,
-            authMethod: loadedAuthMethod
-          })
-        }
+        // Auth check rarely matters for the initial paint and can take 1–3s
+        // against a real ABsmartly endpoint (longer when CI runs the suite
+        // four-wide). Render the form first; let auth status fill in async
+        // so #ai-provider-select etc. become visible at the speed of
+        // chrome.storage, not the speed of the network.
+        void (async () => {
+          const hasPermission = await checkCookiePermission()
+          if (hasPermission) {
+            await checkAuthStatus(loadedApiEndpoint, {
+              apiKey: loadedApiKey,
+              authMethod: loadedAuthMethod
+            })
+          }
+        })()
       }
 
       setLoading(false)
