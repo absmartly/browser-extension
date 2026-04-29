@@ -72,7 +72,8 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     })
 
     const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
-    await authUserInfo.waitFor({ state: 'visible', timeout: 10000 })
+    // Real auth round-trip via background SW under workers=4 can take 10-15s.
+    await authUserInfo.waitFor({ state: 'visible', timeout: 20000 })
 
     expect(await authUserInfo.isVisible()).toBeTruthy()
     console.log('API Key authentication successful via real API call through background SW')

@@ -298,11 +298,11 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     console.log('[Test] Extension initialized')
 
     // Wait for sidebar to load - wait for experiment list or empty state.
-    // 30s ceiling is generous for workers=4 + prod-bundle CI where the
-    // experiments fetch can queue behind 3 sibling worker requests.
+    // Under workers=4 + 4 CI shards = 16 sidebars in flight, the
+    // /v1/experiments fetch can take 30-50s. Generous ceiling.
     await Promise.race([
-      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 30000 }),
-      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 30000 })
+      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 60000 }),
+      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 60000 })
     ]).catch(() => {})
     console.log('[Test] Sidebar visible')
 
@@ -312,7 +312,7 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
 
     // Find first experiment in the list
     const firstExperiment = sidebar.locator('.experiment-item').first()
-    await firstExperiment.waitFor({ state: 'visible', timeout: 30000 })
+    await firstExperiment.waitFor({ state: 'visible', timeout: 60000 })
     console.log('[Test] Found first experiment')
 
     // Click on the experiment to open detail view
@@ -412,11 +412,11 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     console.log('[Test] Extension initialized')
 
     // Wait for sidebar to load - wait for experiment list or empty state.
-    // 30s ceiling is generous for workers=4 + prod-bundle CI where the
-    // experiments fetch can queue behind 3 sibling worker requests.
+    // Under workers=4 + 4 CI shards = 16 sidebars in flight, the
+    // /v1/experiments fetch can take 30-50s. Generous ceiling.
     await Promise.race([
-      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 30000 }),
-      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 30000 })
+      sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 60000 }),
+      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 60000 })
     ]).catch(() => {})
     console.log('[Test] Sidebar loaded')
 

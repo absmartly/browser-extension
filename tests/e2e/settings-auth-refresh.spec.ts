@@ -85,7 +85,9 @@ test.describe('Settings Auth Refresh Button', () => {
 
     await test.step('Verify refresh button responds to clicks', async () => {
       const refreshButton = sidebar.locator('#auth-refresh-button')
-      await expect(refreshButton).toBeVisible()
+      // Refresh button is hidden while checkingAuth=true. Under workers=4
+      // the auth probe can take 10-15s.
+      await expect(refreshButton).toBeVisible({ timeout: 20000 })
 
       // Initially should show "Not authenticated" or loading spinner
       let loadingSpinner = sidebar.locator('[role="status"]')

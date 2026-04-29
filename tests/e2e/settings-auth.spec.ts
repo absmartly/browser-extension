@@ -42,8 +42,8 @@ test.describe('Settings Authentication Tests', () => {
 
     const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
     // Real auth round-trip + user-data fetch under workers=4 + GH-hosted
-    // 2 vCPU runners has been observed at 12-15s.
-    await authUserInfo.waitFor({ state: 'visible', timeout: 20000 })
+    // 2 vCPU runners has been observed at 20-30s.
+    await authUserInfo.waitFor({ state: 'visible', timeout: 30000 })
 
     const authStatusSection = sidebar.locator('#authentication-status-heading')
     expect(await authStatusSection.isVisible()).toBeTruthy()
