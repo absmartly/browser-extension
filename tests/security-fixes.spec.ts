@@ -17,43 +17,6 @@ const TEST_URL = 'http://localhost:3456/visual-editor-test.html'
 
 test.describe('Security Fixes E2E Tests', () => {
   test.describe('Fix #1: innerHTML XSS Protection', () => {
-    test.skip('should sanitize malicious HTML in DOM changes', async ({ page }) => {
-      // Navigate to test page
-      await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
-
-      // Inject malicious HTML via DOM changes
-      const maliciousHTML = '<img src=x onerror=alert(document.cookie)>'
-
-      // Evaluate in page context
-      const wasSanitized = await page.evaluate((html) => {
-        // Simulate applying DOM change with malicious HTML
-        const testDiv = document.createElement('div')
-        testDiv.id = 'xss-test'
-
-        // DOMPurify should be available and used
-        if (typeof window.DOMPurify !== 'undefined') {
-          testDiv.innerHTML = window.DOMPurify.sanitize(html)
-        } else {
-          // Fallback sanitization (should never execute)
-          const temp = document.createElement('div')
-          temp.textContent = html
-          testDiv.innerHTML = temp.innerHTML
-        }
-
-        document.body.appendChild(testDiv)
-
-        // Check if onerror was removed
-        const hasOnerror = testDiv.innerHTML.includes('onerror')
-        const hasAlert = testDiv.innerHTML.includes('alert')
-
-        document.body.removeChild(testDiv)
-
-        return !hasOnerror && !hasAlert
-      }, maliciousHTML)
-
-      expect(wasSanitized).toBe(true)
-    })
-
     test('should not execute script tags in DOM changes', async ({ page }) => {
       await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
@@ -160,25 +123,6 @@ test.describe('Security Fixes E2E Tests', () => {
     })
   })
 
-  test.describe('Fix #5: API Key Encryption', () => {
-    test.skip('should not store API key in plain text', async ({ page }) => {
-      await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
-
-      // Check that API keys are not visible in regular storage
-      const hasPlainTextKey = await page.evaluate(() => {
-        return new Promise((resolve) => {
-          chrome.storage.local.get('absmartly-config', (result) => {
-            const config = result['absmartly-config']
-            // API key should be empty string in regular storage
-            resolve(config?.apiKey === '' || !config?.apiKey)
-          })
-        })
-      })
-
-      expect(hasPlainTextKey).toBe(true)
-    })
-  })
-
   test.describe('Fix #6: Input Validation with Zod', () => {
     test('should reject invalid API request methods', async ({ page }) => {
       await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
@@ -199,29 +143,6 @@ test.describe('Security Fixes E2E Tests', () => {
       })
 
       expect(validationWorks).toBe(true)
-    })
-
-    test.skip('should reject invalid URLs in config', async ({ page }) => {
-      await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
-
-      const urlValidation = await page.evaluate(() => {
-        const invalidUrls = [
-          'not-a-url',
-          'javascript:alert(1)',
-          'file:///etc/passwd'
-        ]
-
-        return invalidUrls.every(url => {
-          try {
-            new URL(url)
-            return false // Should have thrown
-          } catch {
-            return true // Correctly rejected
-          }
-        })
-      })
-
-      expect(urlValidation).toBe(true)
     })
   })
 
@@ -277,40 +198,6 @@ test.describe('Security Fixes E2E Tests', () => {
   })
 
   test.describe('Integration: Combined Security', () => {
-    test.skip('should apply all security layers for DOM changes', async ({ page }) => {
-      await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
-
-      const allSecurityLayersWork = await page.evaluate(() => {
-        // Test 1: XSS prevention
-        const maliciousHTML = '<img src=x onerror=alert(1)>'
-        const div1 = document.createElement('div')
-        if (window.DOMPurify) {
-          div1.innerHTML = window.DOMPurify.sanitize(maliciousHTML)
-        }
-        const xssPrevented = !div1.innerHTML.includes('onerror')
-
-        // Test 2: JSON error handling
-        let jsonHandled = false
-        try {
-          const parsed = JSON.parse('{invalid}')
-        } catch (e) {
-          jsonHandled = true
-        }
-
-        // Test 3: URL validation
-        let urlValidated = false
-        try {
-          const url = new URL('javascript:alert(1)')
-        } catch (e) {
-          urlValidated = true
-        }
-
-        return xssPrevented && jsonHandled && urlValidated
-      })
-
-      expect(allSecurityLayersWork).toBe(true)
-    })
-
     test('should prevent multiple attack vectors simultaneously', async ({ page }) => {
       await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
