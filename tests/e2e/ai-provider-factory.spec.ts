@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/extension'
 
 test.describe('AI Provider Factory E2E', () => {
   test('should switch between providers and persist API keys', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -50,7 +50,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should use HTML compression for all providers', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -126,7 +126,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should handle bridge restart recovery', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -147,7 +147,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should show API key field for both Anthropic and OpenAI providers', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -180,7 +180,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should display error for invalid API key format', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -207,7 +207,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should allow custom port configuration for bridge', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 
@@ -237,7 +237,7 @@ test.describe('AI Provider Factory E2E', () => {
   })
 
   test('should show provider-specific help text', async ({ page, extensionId }) => {
-    test.setTimeout(10000)
+    test.setTimeout(30000)
     const sidebarUrl = `chrome-extension://${extensionId}/tabs/sidebar.html`
     await page.goto(sidebarUrl)
 

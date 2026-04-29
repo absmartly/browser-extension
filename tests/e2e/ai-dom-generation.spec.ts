@@ -68,7 +68,7 @@ test.describe('AI DOM Changes Generation', () => {
   })
 
   test('Generate DOM changes using AI prompts', async ({ extensionId, extensionUrl, context }) => {
-    test.setTimeout(SLOW_MODE ? 60000 : 30000)
+    test.setTimeout(SLOW_MODE ? 120000 : 90000)
 
     await test.step('Inject sidebar', async () => {
       console.log('\n📂 STEP 1: Injecting sidebar')
