@@ -170,12 +170,22 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   }
   await debugWait()
 
-  const insertedBlockExists = await page.evaluate(() => {
-    const h2 = document.querySelector('h2')
-    if (!h2) return false
-    const nextElement = h2.nextElementSibling
-    return nextElement?.classList.contains('inserted-block') || false
-  })
+  // The 'Apply' click commits a 'create' DOMChange that lands via the
+  // SDK postMessage round-trip — same race pattern as the HTML edit
+  // above. Poll for the new .inserted-block to appear before asserting
+  // rather than reading once and racing the apply.
+  const insertedBlockExists = await page
+    .waitForFunction(
+      () => {
+        const h2 = document.querySelector("h2")
+        if (!h2) return false
+        const next = h2.nextElementSibling
+        return next?.classList.contains("inserted-block") ?? false
+      },
+      { timeout: 5000 }
+    )
+    .then(() => true)
+    .catch(() => false)
   log(`  ${insertedBlockExists ? '✓' : '✗'} Inserted block exists`)
   expect(insertedBlockExists).toBeTruthy()
   await debugWait()
@@ -233,12 +243,19 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   }
   await debugWait()
 
-  const beforeBlockExists = await page.evaluate(() => {
-    const h2 = document.querySelector('h2')
-    if (!h2) return false
-    const prevElement = h2.previousElementSibling
-    return prevElement?.classList.contains('inserted-block-before') || false
-  })
+  // Same SDK-apply race as the after-block: poll instead of sampling.
+  const beforeBlockExists = await page
+    .waitForFunction(
+      () => {
+        const h2 = document.querySelector("h2")
+        if (!h2) return false
+        const prev = h2.previousElementSibling
+        return prev?.classList.contains("inserted-block-before") ?? false
+      },
+      { timeout: 5000 }
+    )
+    .then(() => true)
+    .catch(() => false)
   log(`  ${beforeBlockExists ? '✓' : '✗'} Before-block exists as previousElementSibling of h2`)
   expect(beforeBlockExists).toBeTruthy()
 
