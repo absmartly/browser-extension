@@ -99,7 +99,7 @@ test.describe('Experiment Data Persistence', () => {
         console.log('  [DEBUG] Unit Type trigger visible')
 
         // Wait for it to become enabled (not disabled/loading)
-        await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 15000 })
+        await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
         console.log('  [DEBUG] Unit Type enabled')
 
         await testPage.screenshot({ path: 'debug-step4-before-unit-type-click.png', fullPage: true })
@@ -140,7 +140,7 @@ test.describe('Experiment Data Persistence', () => {
         console.log('  [DEBUG] Applications trigger visible')
 
         // Wait for it to become enabled
-        await sidebar.locator('#applications-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 15000 })
+        await sidebar.locator('#applications-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
         console.log('  [DEBUG] Applications enabled')
 
         await testPage.screenshot({ path: 'debug-step5-before-app-click.png', fullPage: true })
@@ -269,7 +269,7 @@ test.describe('Experiment Data Persistence', () => {
 
         console.log('  ✓ Experiment created, waiting for redirect...')
 
-        await sidebar.locator('#experiments-heading').waitFor({ timeout: 5000 })
+        await sidebar.locator('#experiments-heading').waitFor({ timeout: 30000 })
         console.log('  ✓ Redirected to experiments list')
 
         await testPage.screenshot({ path: 'debug-step8-after-redirect.png', fullPage: true })
@@ -345,7 +345,7 @@ test.describe('Experiment Data Persistence', () => {
 
         // Wait for navigation to detail view - look for the title to change
         console.log('  [DEBUG] Waiting for navigation to detail view...')
-        await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 5000 })
+        await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 15000 })
         await debugWait(1000) // Small wait for view to stabilize
 
         await testPage.screenshot({ path: 'debug-step9-after-click.png', fullPage: true })

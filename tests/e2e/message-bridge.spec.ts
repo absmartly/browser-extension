@@ -218,7 +218,7 @@ test.describe('Message Bridge System', () => {
   })
 
   test('Test API_REQUEST message (sidebar → background)', async ({ extensionUrl }) => {
-    test.setTimeout(30000)
+    test.setTimeout(60000)
 
     await testPage.evaluate((extUrl) => {
       const container = document.createElement('div')

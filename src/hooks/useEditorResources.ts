@@ -11,6 +11,10 @@ import type {
 } from "~src/types/absmartly"
 import { APIError } from "~src/types/errors"
 import { debugError, debugLog } from "~src/utils/debug"
+import {
+  getEditorResourcesCache,
+  setEditorResourcesCache
+} from "~src/utils/storage"
 
 interface UseEditorResourcesParams {
   config: ABsmartlyConfig | null
@@ -69,6 +73,18 @@ export function useEditorResources({
       setTags(tagsData || [])
       setOwners(ownersData || [])
       setTeams(teamsData || [])
+
+      // Persist for next sidebar mount — under workers=4 + 4 CI shards
+      // the six concurrent /v1/* calls take 30-90s; reading from cache
+      // unblocks the dropdowns immediately.
+      await setEditorResourcesCache({
+        applications: apps,
+        unitTypes: units,
+        metrics: metricsData,
+        tags: tagsData,
+        owners: ownersData,
+        teams: teamsData
+      })
     } catch (err: unknown) {
       const error = APIError.fromError(err)
       if (error.isAuthError || error.message === "AUTH_EXPIRED") {
@@ -93,7 +109,36 @@ export function useEditorResources({
     getTeams
   ])
 
+  // Cache hydration vs fresh fetch race: both effects below run after the
+  // initial render with `unitTypes.length === 0`. If the fresh-fetch effect
+  // doesn't gate on cache hydration, it fires loadEditorResources() in
+  // parallel with the cache read — wasting an API call and racing the
+  // dropdown's enable state. Track hydration in a state flag so the fetch
+  // effect can wait until the cache has had its chance to populate the
+  // store.
+  const [cacheHydrated, setCacheHydrated] = useState(false)
+
   useEffect(() => {
+    let cancelled = false
+    void getEditorResourcesCache().then((cached) => {
+      if (cancelled) return
+      if (cached) {
+        if (cached.applications) setApplications(cached.applications)
+        if (cached.unitTypes) setUnitTypes(cached.unitTypes)
+        if (cached.metrics) setMetrics(cached.metrics)
+        if (cached.tags) setTags(cached.tags)
+        if (cached.owners) setOwners(cached.owners)
+        if (cached.teams) setTeams(cached.teams)
+      }
+      setCacheHydrated(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!cacheHydrated) return
     if (config && isAuthenticated && unitTypes.length === 0) {
       debugLog(
         "Loading editor resources (config available, authenticated, resources not loaded)"
@@ -102,7 +147,13 @@ export function useEditorResources({
     } else if (config && !isAuthenticated) {
       debugLog("Skipping editor resources load - not authenticated")
     }
-  }, [config, isAuthenticated, unitTypes.length, loadEditorResources])
+  }, [
+    cacheHydrated,
+    config,
+    isAuthenticated,
+    unitTypes.length,
+    loadEditorResources
+  ])
 
   return {
     applications,

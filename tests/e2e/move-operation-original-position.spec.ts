@@ -15,7 +15,8 @@ test.describe('Move Operation Original Position Preservation', () => {
   test('should preserve original position when changing selector after move', async () => {
     test.setTimeout(60000)
 
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
     if (!fs.existsSync(extensionPath)) {
       throw new Error('Extension not built! Run "npm run build" first')
     }
@@ -40,7 +41,7 @@ test.describe('Move Operation Original Position Preservation', () => {
     let [sw] = context.serviceWorkers()
     if (!sw) {
       console.log('⏳ Waiting for service worker...')
-      sw = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      sw = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     const extensionId = new URL(sw.url()).host
     console.log('✅ Extension ID:', extensionId)
@@ -230,7 +231,8 @@ test.describe('Move Operation Original Position Preservation', () => {
   test('should preserve original position when changing target selector', async () => {
     test.setTimeout(60000)
 
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
     if (!fs.existsSync(extensionPath)) {
       throw new Error('Extension not built! Run "npm run build" first')
     }
@@ -255,7 +257,7 @@ test.describe('Move Operation Original Position Preservation', () => {
     let [sw] = context.serviceWorkers()
     if (!sw) {
       console.log('⏳ Waiting for service worker...')
-      sw = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      sw = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     const extensionId = new URL(sw.url()).host
     console.log('✅ Extension ID:', extensionId)

@@ -27,7 +27,13 @@ export async function createExperiment(
 
   const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
   await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
-  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 5000 })
+  // The trigger is disabled (cursor-not-allowed) until unitTypes is populated.
+  // useEditorResources hydrates this from chrome.storage.local on mount —
+  // tests fixture seeds that cache from a globalSetup pre-fetch — so the
+  // dropdown enables in well under a second. The 10s ceiling is just slack
+  // for first-mount React batching under workers=4 contention; if it
+  // genuinely times out, the cache plumbing is broken and we want to know.
+  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
   await unitTypeTrigger.click()
   await debugWait(500)
 

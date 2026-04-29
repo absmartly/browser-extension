@@ -1,51 +1,21 @@
 import { test } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import path from 'path'
+import { injectSidebar, initializeTestLogging } from './utils/test-helpers'
+import { createExperiment, activateVisualEditor } from './helpers/ve-experiment-setup'
 
 test.describe('Visual Editor Demo', () => {
   let page: Page
   let sidebarFrame: FrameLocator
 
-  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
-    const mockExperiments = [
-      {
-        id: 1,
-        name: "visual_editor_demo",
-        display_name: "Visual Editor Demo",
-        state: "ready",
-        variants: [
-          { variant: 0, name: "control", config: "{}" },
-          { variant: 1, name: "treatment", config: "{}" }
-        ]
-      }
-    ]
-
-    await seedStorage({ experiments: mockExperiments })
+  test.beforeEach(async ({ context, extensionUrl }) => {
+    initializeTestLogging()
 
     page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
     await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
 
-    await page.evaluate((url) => {
-      if (!document.getElementById('absmartly-sidebar-root')) {
-        document.body.style.paddingRight = '384px'
-        const container = document.createElement('div')
-        container.id = 'absmartly-sidebar-root'
-        container.style.cssText = `
-          position: fixed; top: 0; right: 0; width: 384px; height: 100%;
-          background: white; border-left: 1px solid #e5e7eb; z-index: 2147483647;
-        `
-        const iframe = document.createElement('iframe')
-        iframe.id = 'absmartly-sidebar-iframe'
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
-        iframe.src = url
-        container.appendChild(iframe)
-        document.body.appendChild(container)
-      }
-    }, extensionUrl('tabs/sidebar.html'))
-
-    await page.waitForSelector('#absmartly-sidebar-root')
-    sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
+    sidebarFrame = await injectSidebar(page, extensionUrl)
   })
 
   test.afterEach(async () => {
@@ -56,28 +26,14 @@ test.describe('Visual Editor Demo', () => {
     test.setTimeout(60000)
     console.log('\n🚀 Starting Visual Editor Demo')
 
-    console.log('⏳ Loading experiments...')
-    await sidebarFrame.locator('[role="status"][aria-label="Loading experiments"]')
-      .waitFor({ state: 'hidden', timeout: 30000 })
-      .catch(() => {})
+    // Create a fresh experiment via the UI so the demo doesn't depend on the
+    // ABsmartly API list state. The form is filled but not saved — the visual
+    // editor button on the unsaved-experiment screen still launches the VE.
+    console.log('📝 Creating experiment via UI...')
+    await createExperiment(sidebarFrame)
 
-    const experimentItem = sidebarFrame.locator('.experiment-item')
-    await experimentItem.first().waitFor({ state: 'visible', timeout: 5000 })
-
-    const count = await experimentItem.count()
-    console.log(`✅ Found ${count} experiments`)
-
-    // Open first experiment
-    console.log('📂 Opening experiment...')
-    await experimentItem.first().click()
-    await sidebarFrame.locator('#visual-editor-button').first().waitFor({ state: 'visible' })
-
-    // Launch Visual Editor
     console.log('🚀 Launching Visual Editor...')
-    await sidebarFrame.locator('#visual-editor-button').first().click()
-    // TODO: Replace timeout with specific element wait
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {}) // Wait for full initialization
-
+    await activateVisualEditor(sidebarFrame, page)
     console.log('✅ Visual Editor launched')
 
     // Demo: Click on different elements to show context menu
@@ -88,7 +44,6 @@ test.describe('Visual Editor Demo', () => {
     const heading = page.locator('#hero-title').first()
     await heading.scrollIntoViewIfNeeded()
     await heading.click()
-    // Wait briefly for UI update
     await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     await page.screenshot({
@@ -106,7 +61,6 @@ test.describe('Visual Editor Demo', () => {
     const button = page.locator('#btn-primary').first()
     await button.scrollIntoViewIfNeeded()
     await button.click()
-    // Wait briefly for UI update
     await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     await page.screenshot({
@@ -123,7 +77,6 @@ test.describe('Visual Editor Demo', () => {
     const card = page.locator('#card-1').first()
     await card.scrollIntoViewIfNeeded()
     await card.click()
-    // Wait briefly for UI update
     await page.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
 
     await page.screenshot({
@@ -141,11 +94,5 @@ test.describe('Visual Editor Demo', () => {
     console.log('\n📸 Full page screenshot: visual-editor-demo-full.png')
 
     console.log('\n✅ Demo complete!')
-    console.log('Context menus are visible in screenshots.')
-    console.log('The visual editor is working correctly.')
-    console.log('\nNote: Automated interaction with context menu requires')
-    console.log('special handling as it may be rendered in shadow DOM or portal.')
-
-    console.log('\n✨ Test complete!')
   })
 })

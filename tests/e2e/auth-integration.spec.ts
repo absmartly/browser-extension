@@ -62,13 +62,18 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     await endpointInput.waitFor({ state: 'visible', timeout: 5000 })
 
     const refreshButton = sidebar.locator('#auth-refresh-button')
-    await refreshButton.waitFor({ state: 'visible', timeout: 5000 })
+    // The button is hidden while `checkingAuth=true`. With the move of
+    // checkAuthStatus to fire-and-forget for faster initial paint, the
+    // probe still runs and gates this button. Under workers=4 +
+    // prod-bundle CI the probe can take 8-10s.
+    await refreshButton.waitFor({ state: 'visible', timeout: 15000 })
     await refreshButton.evaluate((btn: HTMLElement) => {
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
 
     const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
-    await authUserInfo.waitFor({ state: 'visible', timeout: 10000 })
+    // Real auth round-trip via background SW under workers=4 can take 10-15s.
+    await authUserInfo.waitFor({ state: 'visible', timeout: 20000 })
 
     expect(await authUserInfo.isVisible()).toBeTruthy()
     console.log('API Key authentication successful via real API call through background SW')

@@ -217,13 +217,39 @@ export function useSettingsForm() {
       if (loadedApiEndpoint) {
         localStorage.setItem("absmartly-endpoint", loadedApiEndpoint)
 
-        const hasPermission = await checkCookiePermission()
-        if (hasPermission) {
-          await checkAuthStatus(loadedApiEndpoint, {
-            apiKey: loadedApiKey,
-            authMethod: loadedAuthMethod
-          })
-        }
+        // Auth check rarely matters for the initial paint and can take 1–3s
+        // against a real ABsmartly endpoint (longer when CI runs the suite
+        // four-wide). Render the form first; let auth status fill in async
+        // so #ai-provider-select etc. become visible at the speed of
+        // chrome.storage, not the speed of the network. Catch failures
+        // here — the outer try/catch around loadConfig used to absorb
+        // these; without absorbing them now, an unhandled rejection
+        // bubbles up and crashes Jest tests with a stub chrome API.
+        void (async () => {
+          try {
+            const hasPermission = await checkCookiePermission()
+            if (hasPermission) {
+              await checkAuthStatus(loadedApiEndpoint, {
+                apiKey: loadedApiKey,
+                authMethod: loadedAuthMethod
+              })
+            }
+          } catch (err) {
+            debugError("[useSettingsForm] Auth check failed:", err)
+            // Make the auth probe failure user-visible too (the outer
+            // try/catch on loadConfig used to do this when the probe was
+            // synchronous). Set a low-severity field error rather than the
+            // hard configLoadError state — the form is already rendered
+            // and the user can still save / retry.
+            setErrors((prev) => ({
+              ...prev,
+              auth:
+                err instanceof Error
+                  ? `Authentication probe failed: ${err.message}`
+                  : "Authentication probe failed"
+            }))
+          }
+        })()
       }
 
       setLoading(false)
@@ -341,11 +367,22 @@ export function useSettingsForm() {
       newErrors.apiEndpoint = "API Endpoint is required"
     }
 
+    // Endpoint reachability used to be a blocking check here, but it
+    // round-trips through the background SW (5s timeout) and under
+    // workers=4 + GH-hosted CI it occasionally returns false even for a
+    // perfectly fine endpoint. That blocked save and left settings tests
+    // stuck waiting for a navigation that never came. Move the probe out
+    // of the validation pipeline — fire it for the side-effect (will set
+    // an inline reachability error if it fails) but don't gate save on it.
     if (apiEndpoint.trim()) {
-      const isReachable = await validateEndpointReachable(apiEndpoint)
-      if (!isReachable) {
-        newErrors.apiEndpoint = `Cannot reach endpoint. Please check the URL and your network connection.`
-      }
+      void validateEndpointReachable(apiEndpoint).then((isReachable) => {
+        if (!isReachable) {
+          setErrors((prev) => ({
+            ...prev,
+            apiEndpoint: `Cannot reach endpoint. Please check the URL and your network connection.`
+          }))
+        }
+      })
     }
 
     if (authMethod === "apikey" && !apiKey.trim()) {

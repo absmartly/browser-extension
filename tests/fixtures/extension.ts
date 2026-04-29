@@ -113,12 +113,60 @@ export const test = base.extend<ExtFixtures>({
       'plasmo:absmartly-config': defaultConfig
     }
 
+    // Seed editor resources cache from globalSetup pre-fetch (one real
+    // /v1/* call per resource at suite start, not per sidebar mount).
+    // Without this, every sidebar mount fires 6 concurrent /v1/* calls and
+    // under workers=4 + 4 CI shards = 16 sidebars in flight the API
+    // saturates; the unit-type dropdown stays disabled for 30-90s. With
+    // pre-fetch the dropdown enables in <100ms from cache.
+    //
+    // Note: chrome.storage.sync has an 8KB per-item limit which the full
+    // cache blows past; the seed.js helper routes editor-resources-cache
+    // to chrome.storage.local instead via the LOCAL_AREA_KEYS allowlist.
+    const editorResourcesPath = path.join(__dirname, '..', '..', '.editor-resources-cache.json')
+    let editorResourcesCache: unknown = null
+    if (fs.existsSync(editorResourcesPath)) {
+      try {
+        editorResourcesCache = JSON.parse(fs.readFileSync(editorResourcesPath, 'utf-8'))
+      } catch {
+        // Pre-fetch unavailable; fall back to live API calls per sidebar.
+      }
+    }
+
+    // The ABsmartly API key lives in the local-area secret store (not in
+    // sync alongside the rest of the config) — getConfig overrides
+    // config.apiKey with whatever's at `absmartly-apikey` in local. If the
+    // seeded apiKey only lands in the sync `absmartly-config` record,
+    // getConfig returns config with apiKey:'', which fails the
+    // SettingsView "API key required" validator and breaks any test that
+    // tries to save settings. Seed the secret keyring entry too.
+    const absmartlyApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+    if (absmartlyApiKey) {
+      seedData['absmartly-apikey'] = absmartlyApiKey
+      seedData['plasmo:absmartly-apikey'] = absmartlyApiKey
+    }
+
     if (anthropicApiKey) {
       seedData['ai-apikey'] = anthropicApiKey
       seedData['plasmo:ai-apikey'] = anthropicApiKey
     }
 
     await seedPage.evaluate((data) => (window as any).seed(data), seedData)
+
+    // Editor resources cache is too large for chrome.storage.sync (8KB
+    // per-item limit), so write it directly to chrome.storage.local. The
+    // useEditorResources hook reads from `localAreaStorage`.
+    if (editorResourcesCache) {
+      await seedPage.evaluate(
+        (cache) =>
+          chrome.storage.local.set({
+            'editor-resources-cache': JSON.stringify(cache),
+            'plasmo:editor-resources-cache': JSON.stringify(cache)
+          }),
+        editorResourcesCache
+      )
+    }
+
     await seedPage.close()
 
     await use(context)

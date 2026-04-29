@@ -284,11 +284,16 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle append action - add new changes to existing ones', async ({ extensionUrl }) => {
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate initial changes', async () => {
       sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(sidebar, 'Make all buttons have an orange background')
+      // Phrase the prompt as a direct instruction to apply specific CSS so
+      // the model emits DOM changes rather than asking a clarifying
+      // question (the latter has been observed under load and is what
+      // produces the flaky '0 changes' result).
+      await generateAndWait(sidebar, 'Apply background-color: orange to every .btn element on the page. Generate the DOM changes now.')
     })
 
     await test.step('Verify initial changes exist', async () => {
@@ -319,6 +324,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle replace_all action - replace all existing changes', async ({ extensionUrl }) => {
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate initial changes', async () => {
@@ -349,6 +355,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle replace_specific action - replace specific changes only', async ({ extensionUrl }) => {
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate multiple changes', async () => {
@@ -377,6 +384,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle remove_specific action - remove specific changes only', async ({ extensionUrl }) => {
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate multiple changes', async () => {
@@ -405,6 +413,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle none action - conversational response only', async ({ extensionUrl }) => {
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate initial changes', async () => {
@@ -439,6 +448,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should maintain change history across multiple operations', async ({ extensionUrl }) => {
+    test.setTimeout(120000)
     let sidebar: FrameLocator
 
     await test.step('Setup', async () => {

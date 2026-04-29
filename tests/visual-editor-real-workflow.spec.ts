@@ -3,8 +3,10 @@ import type { Page, BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 
-// Path to the built extension
-const EXTENSION_PATH = path.join(__dirname, '..', 'build', 'chrome-mv3-dev')
+// Match the build the rest of the suite uses: prod in CI (workflow runs
+// `bun run build`, leaving build/chrome-mv3-prod) and dev locally.
+const BUILD_NAME = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+const EXTENSION_PATH = path.join(__dirname, '..', 'build', BUILD_NAME)
 const TEST_PAGE_PATH = path.join(__dirname, 'fixtures', 'visual-editor-test.html')
 
 test.describe('ABsmartly Visual Editor Real Workflow', () => {

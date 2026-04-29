@@ -1,76 +1,21 @@
 import { test } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import path from 'path'
+import { injectSidebar, initializeTestLogging } from './utils/test-helpers'
+import { createExperiment, activateVisualEditor } from './helpers/ve-experiment-setup'
 
 test.describe('Simple Visual Editor Test', () => {
   let page: Page
   let sidebarFrame: FrameLocator
 
-  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
-    const mockExperiments = [
-      {
-        id: 1,
-        name: "simple_visual_editor_test",
-        display_name: "Simple Visual Editor Test",
-        state: "ready",
-        variants: [
-          { variant: 0, name: "control", config: "{}" },
-          { variant: 1, name: "treatment", config: "{}" }
-        ]
-      }
-    ]
-
-    await seedStorage({ experiments: mockExperiments })
+  test.beforeEach(async ({ context, extensionUrl }) => {
+    initializeTestLogging()
 
     page = await context.newPage()
     const testPagePath = path.join(__dirname, '..', 'visual-editor-test-page.html')
     await page.goto(`file://${testPagePath}`, { waitUntil: 'domcontentloaded', timeout: 10000 })
-    await page.waitForLoadState('domcontentloaded')
 
-    await page.evaluate((url) => {
-      const existing = document.getElementById('absmartly-sidebar-root')
-      if (existing) {
-        console.log('Sidebar already exists')
-        return
-      }
-
-      const originalPadding = document.body.style.paddingRight || '0px'
-      document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
-      document.body.style.transition = 'padding-right 0.3s ease-in-out'
-      document.body.style.paddingRight = '384px'
-
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      container.style.cssText = `
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 384px;
-        height: 100%;
-        background-color: white;
-        border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
-        z-index: 2147483647;
-        transform: translateX(0);
-        transition: transform 0.3s ease-in-out;
-      `
-
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = `
-        width: 100%;
-        height: 100%;
-        border: none;
-      `
-      iframe.src = url
-
-      container.appendChild(iframe)
-      document.body.appendChild(container)
-      console.log('Sidebar injected successfully')
-    }, extensionUrl('tabs/sidebar.html'))
-
-    await page.waitForSelector('#absmartly-sidebar-root', { timeout: 5000 })
-    sidebarFrame = page.frameLocator('#absmartly-sidebar-iframe')
+    sidebarFrame = await injectSidebar(page, extensionUrl)
   })
 
   test.afterEach(async () => {
@@ -81,38 +26,14 @@ test.describe('Simple Visual Editor Test', () => {
     test.setTimeout(60000)
     console.log('\n🚀 Starting Simple Visual Editor Test')
 
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
-
-    await page.screenshot({
-      path: 'test-results/sidebar-initial.png',
-      fullPage: true
-    })
-
-    console.log('⏳ Waiting for experiments to load...')
-    await sidebarFrame.locator('[role="status"][aria-label="Loading experiments"]')
-      .waitFor({ state: 'hidden', timeout: 30000 })
-      .catch(() => {})
-
-    const experimentCards = sidebarFrame.locator('.experiment-item')
-    await experimentCards.first().waitFor({ state: 'visible', timeout: 5000 })
-
-    const experimentCount = await experimentCards.count()
-    console.log(`✅ ${experimentCount} experiments loaded`)
-
-    console.log('\n🔍 Clicking first experiment...')
-    await experimentCards.first().click()
-
-    console.log('Waiting for experiment detail view...')
-    await sidebarFrame.locator('#visual-editor-button').first().waitFor({ state: 'visible', timeout: 5000 })
-
-    const visualEditorBtns = sidebarFrame.locator('#visual-editor-button')
-    const btnCount = await visualEditorBtns.count()
-    console.log(`Found ${btnCount} Visual Editor button(s)`)
+    // Create a fresh experiment via the UI rather than seeding storage —
+    // the previous seedStorage({ experiments }) wrote to a key the
+    // extension never reads (it reads experiments-cache).
+    console.log('📝 Creating experiment via UI')
+    await createExperiment(sidebarFrame)
 
     console.log('\n🚀 Launching Visual Editor...')
-    await visualEditorBtns.first().click()
-
-    await page.waitForFunction(() => document.readyState === 'complete', { timeout: 3000 }).catch(() => {})
+    await activateVisualEditor(sidebarFrame, page)
 
     await page.screenshot({
       path: 'test-results/after-visual-editor-click.png',

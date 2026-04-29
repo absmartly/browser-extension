@@ -42,8 +42,12 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
   let testPageUrl: string
 
   test.beforeAll(async () => {
-    // Setup extension context
-    const pathToExtension = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    // Setup extension context. Match the build the rest of the suite uses:
+    // prod in CI (workflow runs `bun run build`, leaving build/chrome-mv3-prod)
+    // and dev locally — hardcoding chrome-mv3-dev meant CI couldn't find the
+    // extension and serviceworker never registered.
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const pathToExtension = path.join(__dirname, '..', '..', 'build', buildName)
     console.log('📂 Launching browser with extension from:', pathToExtension)
     context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
@@ -62,7 +66,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     let [background] = context.serviceWorkers()
     if (!background) {
       console.log('⏳ Waiting for service worker...')
-      background = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      background = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     extensionId = background.url().split('/')[2]
     console.log('✅ Extension ID:', extensionId)

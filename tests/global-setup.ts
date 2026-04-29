@@ -183,6 +183,53 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ API credentials found in environment')
   }
 
+  // 5. Pre-fetch /v1/* editor resources ONCE so every test context can
+  // seed its cache instead of triggering 6 concurrent calls per sidebar
+  // mount. Under workers=4 + 4 CI shards = 16 sidebars in flight that
+  // burst saturates the API and the unit-type-select dropdown stays
+  // disabled for 30-90s. Pre-fetch reduces it to 6 calls total per CI
+  // shard at suite start.
+  if (apiKey && apiEndpoint) {
+    const cachePath = path.join(rootDir, '.editor-resources-cache.json')
+    // Endpoint env var sometimes ends in /v1 and sometimes doesn't, depending
+    // on which environment the workflow points at. Strip the trailing slash
+    // and the optional /v1 so we can append /v1/<resource> deterministically.
+    const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    const fetchOne = async (resource: string): Promise<unknown[]> => {
+      try {
+        const res = await fetch(`${baseEndpoint}/v1/${resource}?items=200`, {
+          headers: {
+            Authorization: `Api-Key ${apiKey}`,
+            Accept: 'application/json'
+          }
+        })
+        if (!res.ok) {
+          console.warn(`[globalSetup] Pre-fetch ${resource} failed: ${res.status}`)
+          return []
+        }
+        const data = await res.json()
+        const arr = data?.[resource] ?? (Array.isArray(data) ? data : [])
+        return Array.isArray(arr) ? arr : []
+      } catch (err) {
+        console.warn(`[globalSetup] Pre-fetch ${resource} threw:`, (err as Error).message)
+        return []
+      }
+    }
+    const [applications, unitTypes, metrics, tags, owners, teams] = await Promise.all([
+      fetchOne('applications'),
+      fetchOne('unit_types'),
+      fetchOne('metrics'),
+      fetchOne('experiment_tags'),
+      fetchOne('users'),
+      fetchOne('teams')
+    ])
+    fs.writeFileSync(
+      cachePath,
+      JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, timestamp: Date.now() })
+    )
+    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}) → ${cachePath}`)
+  }
+
   console.log('✅ Global setup completed successfully')
   console.log('---')
 }

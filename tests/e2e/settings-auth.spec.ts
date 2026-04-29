@@ -33,13 +33,17 @@ test.describe('Settings Authentication Tests', () => {
     await expect(sidebar.locator('#absmartly-endpoint')).toBeVisible({ timeout: 5000 })
 
     const refreshButton = sidebar.locator('#auth-refresh-button')
-    await refreshButton.waitFor({ state: 'visible', timeout: 5000 })
+    // The button is hidden while checkingAuth=true. The probe takes 5-15s
+    // on workers=4 + GH-hosted CI. Generous ceiling.
+    await refreshButton.waitFor({ state: 'visible', timeout: 20000 })
     await refreshButton.evaluate((btn: HTMLElement) => {
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
 
     const authUserInfo = sidebar.locator('[data-testid="auth-user-info"]')
-    await authUserInfo.waitFor({ state: 'visible', timeout: 10000 })
+    // Real auth round-trip + user-data fetch under workers=4 + GH-hosted
+    // 2 vCPU runners has been observed at 20-30s.
+    await authUserInfo.waitFor({ state: 'visible', timeout: 30000 })
 
     const authStatusSection = sidebar.locator('#authentication-status-heading')
     expect(await authStatusSection.isVisible()).toBeTruthy()
@@ -112,13 +116,15 @@ test.describe('Settings Authentication Tests', () => {
 
     const saveButton = sidebar.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await saveButton.click()
 
-    const authStatusSection = sidebar.locator('#authentication-status-heading')
-    await expect(authStatusSection).toBeVisible({ timeout: 5000 })
-    console.log('Auth status section visible after save')
+    // Save navigates back to list view; the previous assertion that
+    // #authentication-status-heading is still visible relied on save
+    // being silently blocked by validateEndpointReachable. With save
+    // now non-blocking, verify navigation succeeded — that proves the
+    // auth-method radio toggling didn't break the form's validity.
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 30000 })
+    console.log('Settings saved; navigated to list view')
 
     await page.close()
   })
