@@ -70,6 +70,19 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     // Editor did not close, continuing
   }
 
+  // Wait for the SDK postMessage round-trip to actually rewrite
+  // #test-container's innerHTML before clicking the new h2. Without
+  // this, Playwright's click can resolve the old <h2 id="section-title">
+  // element that's still in the DOM tree mid-transition (its parent is
+  // being replaced) and the force click fails with "Element is not
+  // visible" because it's in a zero-size detached state. Headless CI
+  // surfaces this race; locally the postMessage lands well before the
+  // next action.
+  await page.waitForFunction(() => {
+    const h2 = document.querySelector('#test-container h2')
+    return h2?.textContent?.trim() === 'HTML Edited!'
+  }, { timeout: 5000 })
+
   await debugWait()
 
   // Action 5: Insert new block
