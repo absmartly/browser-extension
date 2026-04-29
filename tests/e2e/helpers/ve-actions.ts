@@ -50,7 +50,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     }
   })
 
-  await page.keyboard.press('Meta+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('<h2>HTML Edited!</h2><p>New paragraph content</p>')
   await debugWait()
 
@@ -124,7 +124,17 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   })
   await debugWait()
 
-  await page.keyboard.press('Meta+A')
+  // Clear the cm-editor before typing the test HTML. Use ControlOrMeta
+  // (Cmd on macOS, Ctrl on Linux/Windows) — bare 'Meta+A' resolves to
+  // the Super/Windows key on Linux runners and does NOT trigger
+  // select-all, so the block-inserter's default placeholder
+  // (`<div class="new-block">...New content...</div>`) survives and
+  // gets concatenated with the user-typed HTML in the resulting
+  // create-change payload. CI run 25122478904 shard 3's diagnostic
+  // captured exactly this — both new-block and inserted-block ended
+  // up in the DOM, breaking the `h2 + .inserted-block` adjacency
+  // check.
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.press('Backspace')
   await debugWait()
 
@@ -255,7 +265,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     const editor = document.querySelector('.cm-content') as HTMLElement
     if (editor) editor.focus()
   })
-  await page.keyboard.press('Meta+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.press('Backspace')
   await debugWait()
 

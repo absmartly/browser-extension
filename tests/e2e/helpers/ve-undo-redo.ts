@@ -101,7 +101,11 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
     }
   })
 
-  await page.keyboard.press('Meta+A')
+  // ControlOrMeta is required on Linux CI runners — bare 'Meta+A' resolves
+  // to Super/Windows key there and does NOT trigger select-all, so the
+  // existing editor content survives and the typed test HTML is appended
+  // instead of replacing it.
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('<strong>Bold HTML test</strong>')
   await page.locator('#html-editor-apply-button').click()
   await page.locator('#html-editor-dialog').waitFor({ state: 'hidden' })
