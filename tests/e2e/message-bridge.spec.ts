@@ -42,14 +42,14 @@ test.describe('Message Bridge System', () => {
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
       console.log('✅ Service worker found, attaching console listener')
-      serviceWorker.on('console', (msg: any) => {
+      ;(serviceWorker as any).on('console', (msg: any) => {
         console.log(`  🔧 [ServiceWorker] [${msg.type()}] ${msg.text()}`)
       })
     } else {
       console.log('⚠️  No service worker found yet, waiting...')
       context.on('serviceworker', (worker) => {
         console.log('✅ Service worker attached, setting up console listener')
-        worker.on('console', (msg: any) => {
+        ;(worker as any).on('console', (msg: any) => {
           console.log(`  🔧 [ServiceWorker] [${msg.type()}] ${msg.text()}`)
         })
       })

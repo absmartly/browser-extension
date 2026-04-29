@@ -57,21 +57,27 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   let currentText = await page.locator('#test-paragraph').textContent()
   expect(currentText?.trim()).toBe('Text undo test')
 
-  // Undo text change
+  // Undo text change. SDK applies via postMessage so we must wait for the
+  // DOM to settle rather than reading textContent synchronously.
   await page.locator('[data-action="undo"]').click()
-  currentText = await page.locator('#test-paragraph').textContent()
-  expect(currentText?.trim()).toBe(originalText?.trim())
+  await expect(page.locator('#test-paragraph')).toHaveText(
+    originalText?.trim() || '',
+    { timeout: 5000 }
+  )
 
   // Redo text change
   await page.locator('[data-action="redo"]').click()
-  currentText = await page.locator('#test-paragraph').textContent()
-  expect(currentText?.trim()).toBe('Text undo test')
+  await expect(page.locator('#test-paragraph')).toHaveText('Text undo test', {
+    timeout: 5000
+  })
   log('  ✓ Text undo/redo')
 
   // Undo text change to return to original state before HTML edit test
   await page.locator('[data-action="undo"]').click()
-  currentText = await page.locator('#test-paragraph').textContent()
-  expect(currentText?.trim()).toBe(originalText?.trim())
+  await expect(page.locator('#test-paragraph')).toHaveText(
+    originalText?.trim() || '',
+    { timeout: 5000 }
+  )
 
   // 2. TEST HTML CHANGE UNDO/REDO
   await page.waitForFunction(() => {
@@ -95,23 +101,33 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
     }
   })
 
-  await page.keyboard.press('Meta+A')
+  // ControlOrMeta is required on Linux CI runners — bare 'Meta+A' resolves
+  // to Super/Windows key there and does NOT trigger select-all, so the
+  // existing editor content survives and the typed test HTML is appended
+  // instead of replacing it.
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('<strong>Bold HTML test</strong>')
   await page.locator('#html-editor-apply-button').click()
   await page.locator('#html-editor-dialog').waitFor({ state: 'hidden' })
 
-  let currentHtml = await page.locator('#test-paragraph').innerHTML()
-  expect(currentHtml).toContain('<strong>Bold HTML test</strong>')
+  // Apply lands via the SDK postMessage round-trip, so a synchronous
+  // innerHTML read here can race the apply. Poll until the new markup is
+  // in place rather than asserting on the first sample.
+  await expect
+    .poll(() => page.locator('#test-paragraph').innerHTML(), { timeout: 5000 })
+    .toContain('<strong>Bold HTML test</strong>')
 
-  // Undo HTML change
+  // Undo HTML change — wait for SDK round-trip to land
   await page.locator('[data-action="undo"]').click()
-  currentHtml = await page.locator('#test-paragraph').innerHTML()
-  expect(currentHtml).toBe(originalHtml)
+  await expect
+    .poll(() => page.locator('#test-paragraph').innerHTML(), { timeout: 5000 })
+    .toBe(originalHtml)
 
   // Redo HTML change
   await page.locator('[data-action="redo"]').click()
-  currentHtml = await page.locator('#test-paragraph').innerHTML()
-  expect(currentHtml).toContain('<strong>Bold HTML test</strong>')
+  await expect
+    .poll(() => page.locator('#test-paragraph').innerHTML(), { timeout: 5000 })
+    .toContain('<strong>Bold HTML test</strong>')
   log('  ✓ HTML undo/redo')
 
   // 3. TEST HIDE/SHOW UNDO/REDO
@@ -123,42 +139,39 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 
-  isVisible = await page.locator('#test-paragraph').isVisible()
-  expect(isVisible).toBe(false)
+  await expect(page.locator('#test-paragraph')).toBeHidden({ timeout: 5000 })
 
   await page.locator('[data-action="undo"]').click()
-  isVisible = await page.locator('#test-paragraph').isVisible()
-  expect(isVisible).toBe(true)
+  await expect(page.locator('#test-paragraph')).toBeVisible({ timeout: 5000 })
 
   await page.locator('[data-action="redo"]').click()
-  isVisible = await page.locator('#test-paragraph').isVisible()
-  expect(isVisible).toBe(false)
+  await expect(page.locator('#test-paragraph')).toBeHidden({ timeout: 5000 })
   log('  ✓ Hide/show undo/redo')
 
   await page.locator('[data-action="undo"]').click()
+  await expect(page.locator('#test-paragraph')).toBeVisible({ timeout: 5000 })
 
   // 4. TEST DELETE/RESTORE UNDO/REDO
-  let elementVisible = await page.locator('#test-paragraph').isVisible()
-  expect(elementVisible).toBe(true)
-
   await openContextMenu('#test-paragraph')
   await page.locator('.menu-item[data-action="delete"]').evaluate((el) => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 
-  elementVisible = await page.locator('#test-paragraph').isVisible()
-  expect(elementVisible).toBe(false)
+  // After delete via SDK the element is fully removed from the DOM.
+  await expect(page.locator('#test-paragraph')).toHaveCount(0, { timeout: 5000 })
 
+  // Undo delete: PreviewManager.restoreElementState reattaches via the
+  // captured parent + nextSibling, so the element returns to the DOM.
   await page.locator('[data-action="undo"]').click()
-  elementVisible = await page.locator('#test-paragraph').isVisible()
-  expect(elementVisible).toBe(true)
+  await expect(page.locator('#test-paragraph')).toHaveCount(1, { timeout: 5000 })
+  await expect(page.locator('#test-paragraph')).toBeVisible()
 
   await page.locator('[data-action="redo"]').click()
-  elementVisible = await page.locator('#test-paragraph').isVisible()
-  expect(elementVisible).toBe(false)
+  await expect(page.locator('#test-paragraph')).toHaveCount(0, { timeout: 5000 })
   log('  ✓ Delete/restore undo/redo')
 
   await page.locator('[data-action="undo"]').click()
+  await expect(page.locator('#test-paragraph')).toHaveCount(1, { timeout: 5000 })
 
   log('  ✓ All undo/redo tests passed')
 }

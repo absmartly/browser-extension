@@ -29,13 +29,29 @@ export async function testDiscardChanges(
 
   log('\n🗑️ Testing discard changes functionality...')
 
-  // Capture the CURRENT text (whatever it is from previous tests)
-  // The discard test is about discarding NEW changes, not reverting to initial page state
-  const originalText = await page.evaluate(() => {
-    const para = document.querySelector('#test-paragraph')
-    return para?.textContent?.trim()
-  })
-log(`Text before launching VE: "${originalText}"`)
+  // Earlier tests save a `delete` change against #test-paragraph (via the
+  // undo/redo limits step). With the SDK-applier refactor that change is now
+  // a real DOM removal — `delete` on the SDK side calls element.remove() —
+  // so once VE.start() replays lastSavedChanges under __visual_editor__ the
+  // paragraph is gone and we can't drive the discard test through it.
+  // #main-title is in lastSavedChanges only for attribute updates, so the
+  // element itself stays put during VE editing.
+  const targetSelector = '#main-title'
+
+  // Snapshot the saved-changes count before VE launches; the core invariant
+  // we want to verify is "discard does not add to the saved set."
+  const savedChangesBefore = await sidebar
+    .locator('[data-testid="dom-change-item"]')
+    .count()
+  log(`Saved DOM changes before VE: ${savedChangesBefore}`)
+
+  // Capture the current title text — page is in its clean (preview-off)
+  // state by the time this test runs, so this is the page's intrinsic value.
+  const originalText = await page.evaluate((sel: string) => {
+    const el = document.querySelector(sel)
+    return el?.textContent?.trim()
+  }, targetSelector)
+  log(`Text before launching VE: "${originalText}"`)
 
   await page.screenshot({ path: 'test-results/before-discard-test-ve-launch.png', fullPage: true })
 
@@ -93,15 +109,15 @@ log(`Text before launching VE: "${originalText}"`)
     throw err
   }
 
-  await page.waitForFunction(() => {
-    const para = document.querySelector('#test-paragraph')
-    if (!para) return false
+  await page.waitForFunction((sel: string) => {
+    const el = document.querySelector(sel)
+    if (!el) return false
     const banner = document.querySelector('#absmartly-visual-editor-banner-host .banner')
     return banner !== null && banner.children.length > 0
-  }, { timeout: 3000 })
+  }, targetSelector, { timeout: 3000 })
 
-  const paragraph = page.locator('#test-paragraph')
-  await paragraph.click()
+  const target = page.locator(targetSelector)
+  await target.click()
 
   const contextMenu = page.locator('.menu-container')
   await expect(contextMenu).toBeVisible()
@@ -109,23 +125,23 @@ log(`Text before launching VE: "${originalText}"`)
   const editTextButton = page.locator('.menu-item[data-action="edit"]')
   await editTextButton.click()
 
-  await page.waitForFunction(() => {
-    const para = document.querySelector('#test-paragraph')
-    return para?.getAttribute('contenteditable') === 'true'
-  })
+  await page.waitForFunction((sel: string) => {
+    const el = document.querySelector(sel)
+    return el?.getAttribute('contenteditable') === 'true'
+  }, targetSelector)
 
-  await paragraph.fill('Discarded change')
+  await target.fill('Discarded change')
   await page.locator('body').click({ position: { x: 10, y: 10 } })
 
-  await page.waitForFunction(() => {
-    const para = document.querySelector('#test-paragraph')
-    return para?.textContent?.trim() === 'Discarded change'
-  })
+  await page.waitForFunction((sel: string) => {
+    const el = document.querySelector(sel)
+    return el?.textContent?.trim() === 'Discarded change'
+  }, targetSelector)
 
-  const textBeforeDiscard = await page.evaluate(() => {
-    const para = document.querySelector('#test-paragraph')
-    return para?.textContent?.trim()
-  })
+  const textBeforeDiscard = await page.evaluate((sel: string) => {
+    const el = document.querySelector(sel)
+    return el?.textContent?.trim()
+  }, targetSelector)
   expect(textBeforeDiscard).toBe('Discarded change')
   log('  ✓ Change is visible on page')
 
@@ -143,23 +159,28 @@ log(`Text before launching VE: "${originalText}"`)
     return document.querySelector('.absmartly-toolbar') === null
   })
 
-const textAfterDiscard = await page.evaluate(() => {
-    const para = document.querySelector('#test-paragraph')
-    return para?.textContent?.trim()
-  })
+  const textAfterDiscard = await page.evaluate((sel: string) => {
+    const el = document.querySelector(sel)
+    return el?.textContent?.trim()
+  }, targetSelector)
 
   await page.screenshot({ path: 'test-results/step11-after-discard.png', fullPage: true })
 
-// After discarding, the page should show the saved changes from previous tests
-  // (not the discard test's unsaved change, and not the initial page state)
-  // The saved HTML change from the first VE session sets the text to "Bold HTML test"
-  expect(textAfterDiscard).toBe('Bold HTML test')
-  log('  ✓ Page shows saved changes from previous tests (discard test change was not saved)')
+  // VE.stop() tears down the __visual_editor__ preview it owned during
+  // editing, so the page returns to whatever state it was in before VE
+  // launched (clean, since preview was off when the discard test started).
+  // The discarded edit must NOT linger.
+  expect(textAfterDiscard).toBe(originalText)
+  expect(textAfterDiscard).not.toBe('Discarded change')
+  log(`  ✓ Page restored to pre-VE state ("${textAfterDiscard}")`)
 
-  // Count saved changes - should be the same as before we launched VE
-  // (the discard test doesn't save its change, but previous tests did save changes)
-  const savedChanges = await sidebar.locator('[data-testid="dom-change-item"]').count()
-  log(`  ✓ Sidebar has ${savedChanges} saved changes (from previous tests, not from discard test)`)
+  // Saved-changes count is the durable invariant: a discard must not add
+  // a row to the saved set (the previous tests' saves stay, nothing else).
+  const savedChangesAfter = await sidebar
+    .locator('[data-testid="dom-change-item"]')
+    .count()
+  log(`  ✓ Sidebar has ${savedChangesAfter} saved changes (was ${savedChangesBefore} before VE)`)
+  expect(savedChangesAfter).toBe(savedChangesBefore)
 
   log('\n✅ Discard changes test PASSED')
 }

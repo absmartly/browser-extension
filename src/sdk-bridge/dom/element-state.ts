@@ -15,6 +15,14 @@ export interface ElementState {
   attributes: Record<string, string>
   styles: Record<string, string>
   classList: string[]
+  // Position in the DOM at capture time. Used to reattach an element if a
+  // change like 'delete' or 'move' detaches it before the state is restored.
+  // Held as live Node references — fine because a captured state is short-lived
+  // (stored in PreviewManager.previewStateMap until removePreviewChanges runs).
+  // Optional so legacy callers / test mocks can still construct a state without
+  // capturing structural position.
+  parent?: Node | null
+  nextSibling?: Node | null
 }
 
 export class ElementStateManager {
@@ -29,7 +37,9 @@ export class ElementStateManager {
       innerHTML: element.innerHTML,
       attributes: {},
       styles: {},
-      classList: Array.from(element.classList)
+      classList: Array.from(element.classList),
+      parent: element.parentNode,
+      nextSibling: element.nextSibling
     }
 
     // Capture all attributes
@@ -58,6 +68,30 @@ export class ElementStateManager {
     const htmlElement = element as HTMLElement
 
     try {
+      // Reattach the element if a structural change ('delete' or 'move')
+      // detached it from its original parent OR moved it within the same
+      // parent. We have to handle both cases:
+      //   - Different parent: classic delete/move-across-tree restore.
+      //   - Same parent, different sibling: a move within siblings still
+      //     needs the element put back in front of its original
+      //     nextSibling.
+      // `parent.isConnected` (rather than document.contains) recognises
+      // shadow DOM hosts as valid restore targets — the latter returns
+      // false for nodes that live inside a shadow root, which would skip
+      // perfectly legitimate restorations.
+      const parent = originalState.parent
+      if (parent && parent.isConnected) {
+        const sibling = originalState.nextSibling
+        const siblingStillThere =
+          sibling && sibling !== element && sibling.parentNode === parent
+        const targetSibling: Node | null = siblingStillThere ? sibling : null
+        const needsReposition =
+          element.parentNode !== parent || element.nextSibling !== targetSibling
+        if (needsReposition) {
+          parent.insertBefore(element, targetSibling)
+        }
+      }
+
       // CRITICAL: Never restore innerHTML for structural elements (body, html, head)
       // This would wipe out dynamically added elements like the sidebar
       const isStructuralElement =

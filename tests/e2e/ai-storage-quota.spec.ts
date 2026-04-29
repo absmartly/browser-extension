@@ -58,12 +58,12 @@ test.describe('AI Storage Quota Management', () => {
 
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
-      serviceWorker.on('console', (msg: any) => {
+      ;(serviceWorker as any).on('console', (msg: any) => {
         console.log(`  [ServiceWorker] [${msg.type()}] ${msg.text()}`)
       })
     } else {
       context.on('serviceworker', (worker) => {
-        worker.on('console', (msg: any) => {
+        ;(worker as any).on('console', (msg: any) => {
           console.log(`  [ServiceWorker] [${msg.type()}] ${msg.text()}`)
         })
       })

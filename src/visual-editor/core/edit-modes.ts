@@ -43,24 +43,25 @@ export class EditModes {
       (c) => c.selector === elementSelector && c.type === "move"
     )
 
-    // Store original parent info - use existing if available
-    let originalParent: Element | null
-    let originalNextSibling: Element | null
+    // Always capture the LIVE pre-drag position as the rollback anchor.
+    // For repeat drags, that's where the previous move landed, and we
+    // need it so trackMoveChange can revert the drop before the SDK
+    // replays — otherwise PreviewManager would capture the post-drop
+    // DOM as 'original' and undo would land in the wrong place. The
+    // historical first-move anchor (used for the move change's
+    // `originalTargetSelector` metadata) is preserved separately on the
+    // existing move change.
+    const originalParent: Element | null = smartElement.parentElement
+    const originalNextSibling: Element | null = smartElement.nextElementSibling
 
     if (
       existingMoveChange &&
       (existingMoveChange as any).value?.originalTargetSelector
     ) {
-      // This element was already moved, preserve its TRUE original position
       debugLog(
-        "[ABSmartly] Element already has move change, preserving original position"
+        "[ABSmartly] Element already has move change; rollback anchor is the live (post-previous-drop) position, true-original survives in the existing move change"
       )
-      originalParent = null // Will be handled by trackMoveChange
-      originalNextSibling = null // Will be handled by trackMoveChange
     } else {
-      // First time moving this element, capture current position as original
-      originalParent = smartElement.parentElement
-      originalNextSibling = smartElement.nextElementSibling
       debugLog("[ABSmartly] First move of element, capturing original position")
     }
 
@@ -652,6 +653,25 @@ export class EditModes {
       "[ABSmartly] Creating move change with original position:",
       moveChange
     )
+
+    // Revert the live drop so the SDK can replay the move via PreviewManager.
+    // Without this, PreviewManager would capture the post-drop position as
+    // the canonical original and undo would land at the wrong spot.
+    if (originalParent) {
+      try {
+        if (
+          originalNextSibling &&
+          originalNextSibling.parentNode === originalParent
+        ) {
+          originalParent.insertBefore(element, originalNextSibling)
+        } else {
+          originalParent.appendChild(element)
+        }
+      } catch (err) {
+        debugWarn("[ABSmartly] Failed to revert drop pre-replay:", err)
+      }
+    }
+
     this.addChange(moveChange)
   }
 
@@ -680,6 +700,13 @@ export class EditModes {
         includeParentContext: true,
         maxParentLevels: 3
       })
+
+      // Discard the live width/height we wrote during the drag and let the
+      // SDK reapply via PreviewManager. Without this revert, PreviewManager
+      // would capture the post-drag state as the canonical original and
+      // undo would no longer return the element to its true original size.
+      htmlElement.style.width = originalStyles.width
+      htmlElement.style.height = originalStyles.height
 
       const styleChange: DOMChange = {
         selector: elementSelector,

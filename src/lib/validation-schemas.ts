@@ -160,8 +160,7 @@ export const DOMChangeActionSchema = z.enum([
   "html",
   "javascript",
   "move",
-  "remove",
-  "insert",
+  "delete",
   "create"
 ])
 
@@ -234,14 +233,8 @@ const DOMChangeMoveSchema = BaseDOMChangeSchema.extend({
   position: z.enum(["before", "after", "firstChild", "lastChild"])
 })
 
-const DOMChangeRemoveSchema = BaseDOMChangeSchema.extend({
-  type: z.literal("remove")
-})
-
-const DOMChangeInsertSchema = BaseDOMChangeSchema.extend({
-  type: z.literal("insert"),
-  html: z.string(),
-  position: z.enum(["before", "after", "firstChild", "lastChild"])
+const DOMChangeDeleteSchema = BaseDOMChangeSchema.extend({
+  type: z.literal("delete")
 })
 
 const DOMChangeCreateSchema = BaseDOMChangeSchema.extend({
@@ -260,8 +253,7 @@ export const DOMChangeSchema = z.discriminatedUnion("type", [
   DOMChangeHTMLSchema,
   DOMChangeJavaScriptSchema,
   DOMChangeMoveSchema,
-  DOMChangeRemoveSchema,
-  DOMChangeInsertSchema,
+  DOMChangeDeleteSchema,
   DOMChangeCreateSchema
 ])
 

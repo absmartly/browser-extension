@@ -114,7 +114,16 @@ describe("EditorCoordinator HTML Editor Integration", () => {
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(element.innerHTML).toBe(newHtml)
+      // The actual DOM update now happens via the SDK plugin (postMessage →
+      // PreviewManager). The unit test verifies the queued change shape;
+      // end-to-end behaviour is covered by the Playwright suite.
+      const changes = undoRedoManager.squashChanges()
+      expect(changes).toContainEqual(
+        expect.objectContaining({
+          type: "html",
+          value: newHtml
+        })
+      )
     })
 
     it("should not update element when editor is cancelled", async () => {
@@ -232,13 +241,14 @@ describe("EditorCoordinator HTML Editor Integration", () => {
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      expect(element.innerHTML).toContain("Modified Title")
-      expect(element.querySelector("h1")?.textContent).toBe("Modified Title")
+      const changes = undoRedoManager.squashChanges()
+      expect(changes).toContainEqual(
+        expect.objectContaining({ type: "html", value: modifiedHtml })
+      )
     })
 
     it("should update element HTML content", async () => {
       const element = document.getElementById("test-element")!
-      const originalHtml = element.innerHTML
 
       const originalState = {
         innerHTML: element.innerHTML,
@@ -250,9 +260,13 @@ describe("EditorCoordinator HTML Editor Integration", () => {
 
       await coordinator.handleEditHtmlAction(element, originalState)
 
-      // Verify that innerHTML was changed to the new HTML
-      expect(element.innerHTML).toBe(newHtml)
-      expect(element.innerHTML).not.toBe(originalHtml)
+      // The DOM apply now happens via the SDK plugin path; the unit test
+      // asserts the queued change shape. End-to-end DOM verification is in
+      // tests/e2e/visual-editor-complete.spec.ts.
+      const changes = undoRedoManager.squashChanges()
+      expect(changes).toContainEqual(
+        expect.objectContaining({ type: "html", value: newHtml })
+      )
     })
 
     it("should not update if new HTML is same as current", async () => {
@@ -344,7 +358,6 @@ describe("EditorCoordinator HTML Editor Integration", () => {
         textContent: "Original"
       })
 
-      expect(element.innerHTML).toBe("<div>First Edit</div>")
       expect(undoRedoManager.canUndo()).toBe(true)
 
       // Second edit
@@ -354,7 +367,6 @@ describe("EditorCoordinator HTML Editor Integration", () => {
         textContent: "First Edit"
       })
 
-      expect(element.innerHTML).toBe("<div>Second Edit</div>")
       // squashChanges() consolidates multiple changes to same element into 1
       const changes = undoRedoManager.squashChanges()
       expect(changes).toHaveLength(1)
@@ -381,7 +393,10 @@ describe("EditorCoordinator HTML Editor Integration", () => {
         textContent: "Text Edit"
       })
 
-      expect(element.innerHTML).toBe("<strong>HTML Edit</strong>")
+      const htmlChange = undoRedoManager
+        .squashChanges()
+        .find((c) => c.type === "html")
+      expect(htmlChange).toMatchObject({ value: "<strong>HTML Edit</strong>" })
     })
   })
 

@@ -58,17 +58,41 @@ export function useVisualEditorCoordination({
 
             const currentChanges = changesRef.current || []
 
-            const changesMap = new Map()
+            const changesMap = new Map<
+              string,
+              DOMChange & { originalIndex?: number }
+            >()
+            // Merge key for 'create' changes must be content-stable: a
+            // re-delivery of the same payload (storage rebroadcast,
+            // VISUAL_EDITOR_CHANGES_COMPLETE following an earlier
+            // VISUAL_EDITOR_CHANGES with the same payload, etc.) would
+            // otherwise produce a fresh index each pass and silently
+            // duplicate the create. Hash the targetSelector + position +
+            // element so identical creates collapse, while two distinct
+            // inserts (different anchor or different markup) stay
+            // separate. Non-create types still key by selector+type.
+            const keyFor = (change: DOMChange): string => {
+              if (change.type !== "create") {
+                return `${change.selector}-${change.type}`
+              }
+              const c = change as DOMChange & {
+                targetSelector?: string
+                position?: string
+                element?: string
+              }
+              return `create-${c.targetSelector ?? c.selector}-${c.position ?? "after"}-${c.element ?? ""}`
+            }
 
             currentChanges.forEach((change, index) => {
-              const key = `${change.selector}-${change.type}`
-              changesMap.set(key, { ...change, originalIndex: index })
+              changesMap.set(keyFor(change), {
+                ...change,
+                originalIndex: index
+              })
             })
 
             message.changes.forEach((change) => {
               const changeObj = change as DOMChange
-              const key = `${changeObj.selector}-${changeObj.type}`
-              changesMap.set(key, changeObj)
+              changesMap.set(keyFor(changeObj), changeObj)
             })
 
             const mergedChanges = Array.from(changesMap.values()) as DOMChange[]
@@ -113,16 +137,24 @@ export function useVisualEditorCoordination({
             const currentChanges = changesRef.current || []
 
             const changesMap = new Map()
+            const keyFor = (change: DOMChange, index: number): string =>
+              change.type === "create"
+                ? `create-${change.selector}-${index}`
+                : `${change.selector}-${change.type}`
 
             currentChanges.forEach((change, index) => {
-              const key = `${change.selector}-${change.type}`
-              changesMap.set(key, { ...change, originalIndex: index })
+              changesMap.set(keyFor(change, index), {
+                ...change,
+                originalIndex: index
+              })
             })
 
-            message.changes.forEach((change) => {
+            message.changes.forEach((change, index) => {
               const changeObj = change as DOMChange
-              const key = `${changeObj.selector}-${changeObj.type}`
-              changesMap.set(key, changeObj)
+              changesMap.set(
+                keyFor(changeObj, currentChanges.length + index),
+                changeObj
+              )
             })
 
             const mergedChanges = Array.from(changesMap.values()) as DOMChange[]
@@ -320,13 +352,26 @@ export function useVisualEditorCoordination({
           }
         }
 
-        if (!previewEnabled) {
-          debugLog("🔄 Enabling preview for visual editor")
-          onPreviewToggle(true)
-        } else {
-          debugLog("✅ Preview already active with changes applied")
-        }
-        debugLog("Preview activation complete, starting visual editor...")
+        // Pre-refactor the VE relied on the sidebar's production-preview
+        // path to render saved changes while editing, so we auto-flipped
+        // previewEnabled here. With the SDK-applier refactor VE.start()
+        // applies lastSavedChanges itself under VISUAL_EDITOR_EXPERIMENT_NAME
+        // and (if production preview was on) takes it over via
+        // wasProductionPreviewActive. Auto-toggling now is doubly harmful:
+        //   1. It overwrites PreviewManager's per-(element, experimentName)
+        //      state when VE then re-applies under its own name, losing the
+        //      production capture.
+        //   2. It leaves sidebar.previewEnabled = true after VE.stop() tears
+        //      down its own preview, desyncing the toggle from the page
+        //      (toggle bg-blue-600 / no data-absmartly-modified markers) and
+        //      causing the next user click to disable a "preview" that's
+        //      already gone.
+        // VE owns preview state during editing; the sidebar's flag should
+        // simply stay where it was.
+        debugLog(
+          "[ABSmartly] Skipping auto preview toggle — VE applies its own changes",
+          { previewEnabled }
+        )
 
         const storage = sessionStorage
         await storage.set("visualEditorState", {

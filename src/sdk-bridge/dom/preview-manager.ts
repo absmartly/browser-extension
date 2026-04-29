@@ -26,6 +26,11 @@ export class PreviewManager {
   private previewStateMap: Map<Element, PreviewState>
   private domManipulator: DOMManipulator
   private styleManagers: Map<string, StyleSheetManager> = new Map()
+  // Elements created by 'create' changes, keyed by experiment. The SDK's
+  // createElement doesn't expose the new node, so we diff parent children
+  // before/after to find them, then track here so removePreviewChanges can
+  // remove them on revert.
+  private createdElementsMap: Map<string, Set<Element>> = new Map()
 
   constructor() {
     this.previewStateMap = new Map()
@@ -102,8 +107,28 @@ export class PreviewManager {
       return false
     }
 
+    // For 'create' the change.selector is just a label — the real anchor is
+    // change.targetSelector. Snapshot the target's current children so we can
+    // diff after the SDK applies and identify the newly-inserted node(s).
+    let createTarget: Element | null = null
+    let createPreChildren: Set<Element> | null = null
+    if (change.type === "create") {
+      const targetSel = (change as any).targetSelector
+      if (targetSel) {
+        try {
+          createTarget = document.querySelector(targetSel)
+          if (createTarget) {
+            const parent = createTarget.parentElement || createTarget
+            createPreChildren = new Set(Array.from(parent.children))
+          }
+        } catch {
+          /* invalid selector — SDK will surface its own error */
+        }
+      }
+    }
+
     // Capture original state BEFORE applying (for undo functionality)
-    if (change.type !== "styleRules") {
+    if (change.type !== "styleRules" && change.type !== "create") {
       try {
         const elements = document.querySelectorAll(change.selector)
         const filtered = Array.from(elements).filter(
@@ -134,8 +159,34 @@ export class PreviewManager {
     // It handles: styleRules, waitForElement, PendingChangeManager, all change types
     const success = this.domManipulator.applyChange(change, experimentName)
 
-    // Mark applied elements AFTER for undo tracking (for non-styleRules)
-    if (success && change.type !== "styleRules") {
+    // For 'create': diff parent children to find the new node(s), tag them,
+    // and track in createdElementsMap so removePreviewChanges can detach them.
+    if (
+      success &&
+      change.type === "create" &&
+      createTarget &&
+      createPreChildren
+    ) {
+      const parent = createTarget.parentElement || createTarget
+      const after = Array.from(parent.children)
+      const newOnes = after.filter((el) => !createPreChildren!.has(el))
+      if (newOnes.length > 0) {
+        let bucket = this.createdElementsMap.get(experimentName)
+        if (!bucket) {
+          bucket = new Set()
+          this.createdElementsMap.set(experimentName, bucket)
+        }
+        for (const el of newOnes) {
+          bucket.add(el)
+          el.setAttribute("data-absmartly-experiment", experimentName)
+          el.setAttribute("data-absmartly-modified", "true")
+        }
+      }
+    }
+
+    // Mark applied elements AFTER for undo tracking (for non-styleRules,
+    // non-create — create marks the new element, not the reference).
+    if (success && change.type !== "styleRules" && change.type !== "create") {
       try {
         const elements = document.querySelectorAll(change.selector)
         const filtered = Array.from(elements).filter(
@@ -162,6 +213,21 @@ export class PreviewManager {
 
     let restoredCount = 0
     const elementsToRemove: Element[] = []
+
+    // Remove elements created by 'create' changes for this experiment.
+    // We do this first so subsequent revert passes don't observe stale nodes.
+    const created = this.createdElementsMap.get(experimentName)
+    if (created) {
+      for (const el of created) {
+        try {
+          el.remove()
+          restoredCount++
+        } catch {
+          /* element may already be detached */
+        }
+      }
+      this.createdElementsMap.delete(experimentName)
+    }
 
     // First, restore elements we tracked in previewStateMap
     for (const [element, data] of this.previewStateMap) {

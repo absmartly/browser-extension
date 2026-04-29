@@ -88,7 +88,7 @@ jest.mock("@anthropic-ai/sdk", () => ({
           ]
           response = "Made button blue"
         } else if (isRemove) {
-          changes = [{ selector: ".description", type: "remove" }]
+          changes = [{ selector: ".description", type: "delete" }]
           response = "Removed the description paragraph"
         } else if (isShadow) {
           changes = [
@@ -108,7 +108,7 @@ jest.mock("@anthropic-ai/sdk", () => ({
               type: "style",
               value: { "background-color": "blue" }
             },
-            { selector: ".description", type: "remove" }
+            { selector: ".description", type: "delete" }
           ]
           response = "Made title red, button blue, and hid the paragraph"
         } else {
@@ -293,7 +293,7 @@ describe("AI DOM Generator Integration Tests (with mocked providers)", () => {
 
       const hasRemoveChange = result.domChanges.some(
         (c) =>
-          c.type === "remove" &&
+          c.type === "delete" &&
           (c.selector.includes("description") || c.selector === "p")
       )
       expect(hasRemoveChange).toBe(true)
@@ -482,7 +482,7 @@ describe("AI DOM Generator Integration Tests (with mocked providers)", () => {
       const hasStyleChange = result.domChanges.some((c) => c.type === "style")
       const hasRemoveOrHide = result.domChanges.some(
         (c) =>
-          c.type === "remove" ||
+          c.type === "delete" ||
           (c.type === "style" &&
             "value" in c &&
             c.value &&

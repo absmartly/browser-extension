@@ -38,14 +38,14 @@ test.describe('AI DOM Changes Generation', () => {
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
       console.log('✅ Service worker found, attaching console listener')
-      serviceWorker.on('console', (msg: any) => {
+      ;(serviceWorker as any).on('console', (msg: any) => {
         console.log(`  🔧 [ServiceWorker] [${msg.type()}] ${msg.text()}`)
       })
     } else {
       console.log('⚠️  No service worker found yet, waiting...')
       context.on('serviceworker', (worker) => {
         console.log('✅ Service worker attached, setting up console listener')
-        worker.on('console', (msg: any) => {
+        ;(worker as any).on('console', (msg: any) => {
           console.log(`  🔧 [ServiceWorker] [${msg.type()}] ${msg.text()}`)
         })
       })
@@ -443,7 +443,7 @@ test.describe('AI DOM Changes Generation', () => {
     // Listen to service worker logs
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
-      serviceWorker.on('console', (msg: any) => {
+      ;(serviceWorker as any).on('console', (msg: any) => {
         const text = msg.text()
         allLogs.push(`[SW] ${text}`)
         if (text.includes('[AI') || text.includes('Anthropic') || text.includes('aiProvider') || text.includes('error') || text.includes('Error')) {

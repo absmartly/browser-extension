@@ -32,7 +32,7 @@ describe("DOM Change Operations", () => {
 
   const createMockRemoveChange = (selector: string): DOMChange => ({
     selector,
-    type: "remove"
+    type: "delete"
   })
 
   const createMockChange = createMockTextChange

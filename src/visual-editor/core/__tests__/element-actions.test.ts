@@ -40,6 +40,11 @@ describe("ElementActions", () => {
     // Clear all mocks
     jest.clearAllMocks()
 
+    // Stub window.postMessage so applyChangesViaSDK doesn't hit JSDOM's real
+    // message bus during unit tests. The orchestrator that consumes these
+    // messages lives in the page bundle, not the VE module under test.
+    jest.spyOn(window, "postMessage").mockImplementation(() => {})
+
     // Mock clipboard API
     Object.assign(navigator, {
       clipboard: {
@@ -113,6 +118,14 @@ describe("ElementActions", () => {
 
     mockStateManager.onStateChange.mockImplementation((callback) => {
       return () => {} // Return unsubscribe function
+    })
+
+    // applyCurrentChangesViaSDK reads variantName from config; provide a default
+    // so any op-test that calls into it has something to read.
+    mockStateManager.getConfig.mockReturnValue({
+      variantName: "test-variant",
+      experimentName: "test-experiment",
+      logoUrl: "test-logo.png"
     })
 
     // Mock UndoRedoManager
@@ -327,14 +340,23 @@ describe("ElementActions", () => {
 
       elementActions.hideElement()
 
-      expect(testDiv.style.display).toBe("none")
+      // hideElement's contract is to push a `style: {display: "none"}`
+      // change into the undo/redo manager. Replaying that change to the
+      // SDK plugin is owned by VisualEditor's setOnChangeAdded callback
+      // (see src/visual-editor/core/visual-editor.ts) — under that
+      // single-owner replay design the action methods MUST NOT also
+      // postMessage, otherwise every edit ships two PREVIEW_CHANGES
+      // replace cycles. In this unit test mockUndoRedoManager.addChange
+      // is a plain jest.fn() so the replay callback never fires; we
+      // assert the addChange contract here and let the e2e suite cover
+      // the wired-up postMessage path.
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#test-div",
           type: "style",
           value: { display: "none" }
         }),
-        expect.any(Object)
+        null
       )
       expect(mockStateManager.setSelectedElement).toHaveBeenCalledWith(null)
     })
@@ -390,7 +412,8 @@ describe("ElementActions", () => {
 
       await elementActions.changeImageSource()
 
-      expect(testImg.src).toBe("https://example.com/new.jpg")
+      // SDK applies the attribute via the postMessage path; unit test only
+      // verifies the change shape that was queued for the SDK.
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#test-img",
@@ -398,7 +421,7 @@ describe("ElementActions", () => {
           value: { src: "https://example.com/new.jpg" },
           mode: "merge"
         }),
-        { src: "https://example.com/old.jpg" }
+        null
       )
       expect(mockNotifications.show).toHaveBeenCalledWith(
         "Image source updated",
@@ -424,11 +447,6 @@ describe("ElementActions", () => {
 
       await elementActions.changeImageSource()
 
-      // Browser normalizes to double quotes when reading from DOM
-      expect(testDivWithBg.style.backgroundImage).toBe(
-        'url("https://example.com/new-bg.jpg")'
-      )
-      // But the change object uses single quotes as set by the implementation
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#test-bg",
@@ -438,7 +456,7 @@ describe("ElementActions", () => {
           },
           mode: "merge"
         }),
-        { "background-image": 'url("https://example.com/old-bg.jpg")' }
+        null
       )
     })
 
@@ -455,7 +473,6 @@ describe("ElementActions", () => {
 
       await elementActions.changeImageSource()
 
-      expect(testImg.src).toBe("https://example.com/old.jpg")
       expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
     })
 
@@ -506,14 +523,18 @@ describe("ElementActions", () => {
 
     it("should delete selected element", () => {
       mockGenerateRobustSelector.mockReturnValue("#test-div")
-      const parent = testDiv.parentElement
 
       elementActions.deleteElement()
 
-      // Delete now hides the element (doesn't remove from DOM)
-      // Coordinator handles adding the delete change when Delete key is pressed
-      expect(parent?.contains(testDiv)).toBe(true)
-      expect(testDiv.style.display).toBe("none")
+      // The actual DOM removal happens via the SDK (postMessage path) at
+      // runtime; the unit test asserts only the queued change shape.
+      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: "#test-div",
+          type: "delete"
+        }),
+        null
+      )
       expect(mockStateManager.setSelectedElement).toHaveBeenCalledWith(null)
     })
 
@@ -602,21 +623,25 @@ describe("ElementActions", () => {
     })
 
     it("should move element up", () => {
-      mockGenerateRobustSelector.mockReturnValue("#child-2")
-      const parent = testChild2.parentElement!
+      // Selector generator returns the element's own selector for the
+      // selectedElement and a sibling-shaped one for the target.
+      mockGenerateRobustSelector.mockImplementation((el: any) =>
+        el === testChild1 ? "#child-1" : "#child-2"
+      )
 
       elementActions.moveElement("up")
 
-      expect(parent.children[0]).toBe(testChild2)
-      expect(parent.children[1]).toBe(testChild1)
+      // SDK applies the move via postMessage; unit test asserts the queued
+      // change shape (selector = moved element, target = sibling we landed
+      // before, position = "before").
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#child-2",
           type: "move",
-          targetSelector: "div",
+          targetSelector: "#child-1",
           position: "before"
         }),
-        "down" // oldValue is opposite direction
+        null
       )
     })
 
@@ -629,13 +654,21 @@ describe("ElementActions", () => {
         selectedElement: testChild1
       })
 
-      mockGenerateRobustSelector.mockReturnValue("#child-1")
-      const parent = testChild1.parentElement!
+      mockGenerateRobustSelector.mockImplementation((el: any) =>
+        el === testChild2 ? "#child-2" : "#child-1"
+      )
 
       elementActions.moveElement("down")
 
-      expect(parent.children[0]).toBe(testChild2)
-      expect(parent.children[1]).toBe(testChild1)
+      expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: "#child-1",
+          type: "move",
+          targetSelector: "#child-2",
+          position: "after"
+        }),
+        null
+      )
     })
 
     it("should not move element up when it is first child", () => {
@@ -647,21 +680,15 @@ describe("ElementActions", () => {
         selectedElement: testChild1
       })
 
-      const parent = testChild1.parentElement!
-      const originalOrder = Array.from(parent.children)
-
       elementActions.moveElement("up")
 
-      expect(Array.from(parent.children)).toEqual(originalOrder)
+      // No change queued because there is no previous sibling to anchor on.
+      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
     })
 
     it("should not move element down when it is last child", () => {
-      const parent = testChild2.parentElement!
-      const originalOrder = Array.from(parent.children)
-
       elementActions.moveElement("down")
-
-      expect(Array.from(parent.children)).toEqual(originalOrder)
+      expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
     })
 
     it("should not move when no element is selected", () => {
@@ -736,13 +763,12 @@ describe("ElementActions", () => {
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#test-div",
-          type: "insert",
-          html: '<div class="inserted">New Block</div>',
+          type: "create",
+          element: '<div class="inserted">New Block</div>',
+          targetSelector: "#test-div",
           position: "after"
         }),
-        expect.objectContaining({
-          insertedSelector: expect.any(String)
-        })
+        null
       )
       expect(mockNotifications.show).toHaveBeenCalledWith(
         "HTML block inserted after selected element",
@@ -814,13 +840,12 @@ describe("ElementActions", () => {
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#test-div",
-          type: "insert",
-          html: '<div class="safe">Safe Content</div>',
+          type: "create",
+          element: '<div class="safe">Safe Content</div>',
+          targetSelector: "#test-div",
           position: "before"
         }),
-        expect.objectContaining({
-          insertedSelector: expect.any(String)
-        })
+        null
       )
     })
   })

@@ -142,11 +142,13 @@ export class BlockInserter {
     let selectedPosition: "before" | "after" = "after"
 
     const beforeBtn = document.createElement("button")
+    beforeBtn.id = "block-inserter-position-before"
     beforeBtn.className = "position-btn"
     beforeBtn.innerHTML = '<span class="icon">⬆️</span> Before'
     beforeBtn.dataset.position = "before"
 
     const afterBtn = document.createElement("button")
+    afterBtn.id = "block-inserter-position-after"
     afterBtn.className = "position-btn position-btn-selected"
     afterBtn.innerHTML = '<span class="icon">⬇️</span> After'
     afterBtn.dataset.position = "after"

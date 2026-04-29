@@ -75,10 +75,8 @@ export function DOMChangeList({
         return CommandLineIcon
       case "move":
         return ArrowsUpDownIcon
-      case "remove":
+      case "delete":
         return TrashIcon
-      case "insert":
-        return PlusCircleIcon
       case "create":
         return PlusCircleIcon
       default:
@@ -104,10 +102,8 @@ export function DOMChangeList({
         return "JavaScript"
       case "move":
         return "Move/Reorder"
-      case "remove":
-        return "Remove"
-      case "insert":
-        return "Insert"
+      case "delete":
+        return "Delete"
       case "create":
         return "Create"
       default:
@@ -259,20 +255,21 @@ export function DOMChangeList({
             </code>
           </span>
         )
-      case "remove":
-        return <span className="text-red-600">Remove element</span>
-      case "insert":
-        const insertChange = change as any
+      case "delete":
+        return <span className="text-red-600">Delete element</span>
+      case "create": {
+        const createChange = change as any
         return (
           <span className="text-green-600">
-            Insert new element {insertChange.position || "after"} the selected
+            Insert new element {createChange.position || "after"} the selected
             element
           </span>
         )
+      }
       default:
         return (
           <span className="text-gray-500">
-            Unknown change type: {change.type}
+            Unknown change type: {(change as DOMChange).type}
           </span>
         )
     }

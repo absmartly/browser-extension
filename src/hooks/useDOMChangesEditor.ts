@@ -66,8 +66,8 @@ export function useDOMChangesEditor({
         htmlValue:
           change.type === "html"
             ? change.value
-            : change.type === "insert"
-              ? (change as any).html
+            : change.type === "create"
+              ? (change as any).element
               : "",
         jsValue: change.type === "javascript" ? change.value : "",
         styleProperties:
@@ -97,7 +97,7 @@ export function useDOMChangesEditor({
         position:
           change.type === "move"
             ? change.position || "after"
-            : change.type === "insert"
+            : change.type === "create"
               ? (change as any).position
               : "after",
         mode: (change as any).mode || "merge",
@@ -233,23 +233,29 @@ export function useDOMChangesEditor({
             observerRoot: changeToSave.observerRoot
           }
           break
-        case "remove":
+        case "delete":
           domChange = {
             selector: changeToSave.selector,
-            type: "remove",
+            type: "delete",
             waitForElement: changeToSave.waitForElement,
             triggerOnView: changeToSave.triggerOnView,
             observerRoot: changeToSave.observerRoot
           }
           break
-        case "insert":
+        case "create":
+          // 'create' changes insert a brand new element, so triggerOnView
+          // doesn't apply — the change itself is what brings the element
+          // into existence; there's nothing to defer until intersection.
+          // Other change types target an element that already exists in
+          // the page, hence the per-type triggerOnView serialization
+          // above.
           domChange = {
             selector: changeToSave.selector,
-            type: "insert",
-            html: changeToSave.htmlValue || "",
+            type: "create",
+            element: changeToSave.htmlValue || "",
+            targetSelector: changeToSave.selector,
             position: changeToSave.position || "after",
             waitForElement: changeToSave.waitForElement,
-            triggerOnView: changeToSave.triggerOnView,
             observerRoot: changeToSave.observerRoot
           }
           break

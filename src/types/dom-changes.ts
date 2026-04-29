@@ -7,8 +7,7 @@ export type DOMChangeType =
   | "html"
   | "javascript"
   | "move"
-  | "remove"
-  | "insert"
+  | "delete"
   | "create"
 
 export interface URLFilterConfig {
@@ -119,20 +118,9 @@ export interface DOMChangeMove {
   observerRoot?: string
 }
 
-export interface DOMChangeRemove {
+export interface DOMChangeDelete {
   selector: string
-  type: "remove"
-  disabled?: boolean
-  waitForElement?: boolean
-  triggerOnView?: boolean
-  observerRoot?: string
-}
-
-export interface DOMChangeInsert {
-  selector: string
-  type: "insert"
-  html: string
-  position: "before" | "after" | "firstChild" | "lastChild"
+  type: "delete"
   disabled?: boolean
   waitForElement?: boolean
   triggerOnView?: boolean
@@ -159,8 +147,7 @@ export type DOMChange =
   | DOMChangeHTML
   | DOMChangeJavaScript
   | DOMChangeMove
-  | DOMChangeRemove
-  | DOMChangeInsert
+  | DOMChangeDelete
   | DOMChangeCreate
 
 export interface DOMChangesConfig {

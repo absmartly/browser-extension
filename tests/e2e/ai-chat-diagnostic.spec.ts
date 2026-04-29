@@ -56,7 +56,7 @@ test.describe('AI Chat Blank Screen Diagnostics', () => {
 
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
-      serviceWorker.on('console', (msg: any) => {
+      ;(serviceWorker as any).on('console', (msg: any) => {
         const msgType = msg.type()
         const msgText = msg.text()
         allConsoleMessages.push({ type: msgType, text: msgText, timestamp: Date.now() })
@@ -64,7 +64,7 @@ test.describe('AI Chat Blank Screen Diagnostics', () => {
       })
     } else {
       context.on('serviceworker', (worker) => {
-        worker.on('console', (msg: any) => {
+        ;(worker as any).on('console', (msg: any) => {
           const msgType = msg.type()
           const msgText = msg.text()
           allConsoleMessages.push({ type: msgType, text: msgText, timestamp: Date.now() })
