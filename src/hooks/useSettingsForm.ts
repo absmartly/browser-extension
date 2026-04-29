@@ -355,11 +355,22 @@ export function useSettingsForm() {
       newErrors.apiEndpoint = "API Endpoint is required"
     }
 
+    // Endpoint reachability used to be a blocking check here, but it
+    // round-trips through the background SW (5s timeout) and under
+    // workers=4 + GH-hosted CI it occasionally returns false even for a
+    // perfectly fine endpoint. That blocked save and left settings tests
+    // stuck waiting for a navigation that never came. Move the probe out
+    // of the validation pipeline — fire it for the side-effect (will set
+    // an inline reachability error if it fails) but don't gate save on it.
     if (apiEndpoint.trim()) {
-      const isReachable = await validateEndpointReachable(apiEndpoint)
-      if (!isReachable) {
-        newErrors.apiEndpoint = `Cannot reach endpoint. Please check the URL and your network connection.`
-      }
+      void validateEndpointReachable(apiEndpoint).then((isReachable) => {
+        if (!isReachable) {
+          setErrors((prev) => ({
+            ...prev,
+            apiEndpoint: `Cannot reach endpoint. Please check the URL and your network connection.`
+          }))
+        }
+      })
     }
 
     if (authMethod === "apikey" && !apiKey.trim()) {

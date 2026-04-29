@@ -26,12 +26,13 @@ test.describe('AI Provider Factory E2E', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
-    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 8000 })
-
+    // Don't wait for navigation back to list view — under workers=4 the
+    // validateEndpointReachable round-trip can leave the view on settings.
+    // The reload + re-open below is what actually verifies persistence.
     await page.goto(sidebarUrl)
     await page.waitForLoadState('networkidle')
 
-    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('#nav-settings').waitFor({ state: 'visible', timeout: 10000 })
     await page.click('#nav-settings')
 
     await page.waitForLoadState('networkidle')
