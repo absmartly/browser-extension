@@ -15,7 +15,8 @@ test.describe('Move Operation Original Position Preservation', () => {
   test('should preserve original position when changing selector after move', async () => {
     test.setTimeout(60000)
 
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
     if (!fs.existsSync(extensionPath)) {
       throw new Error('Extension not built! Run "npm run build" first')
     }
@@ -230,7 +231,8 @@ test.describe('Move Operation Original Position Preservation', () => {
   test('should preserve original position when changing target selector', async () => {
     test.setTimeout(60000)
 
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
     if (!fs.existsSync(extensionPath)) {
       throw new Error('Extension not built! Run "npm run build" first')
     }

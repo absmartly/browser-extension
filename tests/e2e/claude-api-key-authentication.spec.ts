@@ -138,9 +138,7 @@ test.describe('Claude API Key Authentication', () => {
 
     const saveButton = sidebar.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await saveButton.click()
 
     // Wait for save to complete - save navigates away from settings page
     await sidebar.locator('#experiments-heading, [data-testid="experiment-list"], #configure-settings-button').first().waitFor({ state: 'visible', timeout: 15000 })

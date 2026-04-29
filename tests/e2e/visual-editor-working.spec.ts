@@ -8,7 +8,8 @@ const test = base.extend<{
   extensionPath: string;
 }>({
   extensionId: async ({}, use) => {
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
 
     // Launch browser with extension
     const context = await chromium.launchPersistentContext('', {
@@ -32,7 +33,8 @@ const test = base.extend<{
   },
 
   extensionPath: async ({}, use) => {
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
     await use(extensionPath)
   }
 })
@@ -41,7 +43,8 @@ test.describe('Visual Editor Test', () => {
   test('Launch visual editor and test context menu', async ({ browser }) => {
     test.setTimeout(90000)
 
-    const extensionPath = path.join(__dirname, '..', '..', 'build', 'chrome-mv3-dev')
+    const buildName = process.env.CI ? 'chrome-mv3-prod' : 'chrome-mv3-dev'
+    const extensionPath = path.join(__dirname, '..', '..', 'build', buildName)
 
     // Verify extension is built
     if (!fs.existsSync(extensionPath)) {
