@@ -26,10 +26,10 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
 
   // Action 4: Edit HTML with CodeMirror editor on parent container
   await page.click('#test-container', { force: true })
-  await page.locator('.menu-container').waitFor({ state: 'visible' })
+  await page.locator('.menu-container').waitFor({ state: 'visible', timeout: 5000 })
   await page.locator('.menu-item[data-action="editHtml"]').click()
 
-  await page.locator('.cm-editor').waitFor({ state: 'visible' })
+  await page.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
   await debugWait()
 
   const hasCodeMirrorSyntaxHighlight = await page.evaluate(() => {
@@ -54,15 +54,15 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await page.keyboard.type('<h2>HTML Edited!</h2><p>New paragraph content</p>')
   await debugWait()
 
-  await page.locator('.editor-button-save').waitFor({ state: 'visible' })
+  await page.locator('.editor-button-save').waitFor({ state: 'visible', timeout: 5000 })
   await debugWait()
 
-  await page.evaluate(() => {
-    const saveBtn = document.querySelector('.editor-button-save') as HTMLButtonElement
-    if (saveBtn) {
-      saveBtn.click()
-    }
-  })
+  // Use Playwright's locator.click() rather than evaluate(btn.click()) —
+  // synthetic .click() in the page context doesn't always trigger React's
+  // onClick the same way in prod builds, and CI runs against the prod
+  // bundle. Real Playwright click goes through CDP and dispatches the
+  // full event sequence React expects.
+  await page.locator('.editor-button-save').click()
 
   try {
     await page.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
