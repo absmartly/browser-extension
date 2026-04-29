@@ -66,6 +66,22 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(target).toLowerCase()
     const stream = fs.createReadStream(target)
 
+    // Defer writeHead until the stream actually opens. fs.createReadStream
+    // returns synchronously but opens the fd asynchronously, so emitting a
+    // 200 first means a mid-flight unlink (or perms change between stat and
+    // open) sends headers we then can't take back. Wait for 'open', then
+    // commit to 200 and pipe.
+    stream.once('open', () => {
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        // Tests expect resources fresh; staleness here masks build issues.
+        'Cache-Control': 'no-store',
+        // Allow inlined extension iframes to fetch test fixtures cross-origin.
+        'Access-Control-Allow-Origin': '*'
+      })
+      stream.pipe(res)
+    })
+
     stream.once('error', () => {
       if (!res.headersSent) {
         res.writeHead(404, { 'Content-Type': 'text/plain' })
@@ -74,15 +90,6 @@ const server = http.createServer((req, res) => {
         res.destroy()
       }
     })
-
-    res.writeHead(200, {
-      'Content-Type': MIME[ext] || 'application/octet-stream',
-      // Tests expect resources fresh; staleness here masks build issues.
-      'Cache-Control': 'no-store',
-      // Allow inlined extension iframes to fetch test fixtures cross-origin.
-      'Access-Control-Allow-Origin': '*'
-    })
-    stream.pipe(res)
   })
 })
 
