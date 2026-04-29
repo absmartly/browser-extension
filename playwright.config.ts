@@ -22,7 +22,11 @@ export default defineConfig({
   // Web servers: test pages + AI CLI bridge
   webServer: [
     {
-      command: 'npx http-server tests/test-pages -p 3456 --silent',
+      // Custom Node static server. http-server (npm v14) crashes on certain
+      // malformed requests under parallel load, taking 20+ tests with it via
+      // ERR_CONNECTION_REFUSED. tests/test-server.js logs socket errors
+      // instead of exiting and bounds keep-alive timeouts.
+      command: 'node tests/test-server.js --port 3456 --root tests/test-pages',
       port: 3456,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000
