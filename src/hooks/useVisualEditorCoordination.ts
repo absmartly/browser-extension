@@ -59,16 +59,26 @@ export function useVisualEditorCoordination({
             const currentChanges = changesRef.current || []
 
             const changesMap = new Map()
+            // 'create' changes each add a distinct new element, so they must
+            // not collapse onto each other — give every one a unique key.
+            const keyFor = (change: DOMChange, index: number): string =>
+              change.type === "create"
+                ? `create-${change.selector}-${index}`
+                : `${change.selector}-${change.type}`
 
             currentChanges.forEach((change, index) => {
-              const key = `${change.selector}-${change.type}`
-              changesMap.set(key, { ...change, originalIndex: index })
+              changesMap.set(keyFor(change, index), {
+                ...change,
+                originalIndex: index
+              })
             })
 
-            message.changes.forEach((change) => {
+            message.changes.forEach((change, index) => {
               const changeObj = change as DOMChange
-              const key = `${changeObj.selector}-${changeObj.type}`
-              changesMap.set(key, changeObj)
+              changesMap.set(
+                keyFor(changeObj, currentChanges.length + index),
+                changeObj
+              )
             })
 
             const mergedChanges = Array.from(changesMap.values()) as DOMChange[]
@@ -113,16 +123,24 @@ export function useVisualEditorCoordination({
             const currentChanges = changesRef.current || []
 
             const changesMap = new Map()
+            const keyFor = (change: DOMChange, index: number): string =>
+              change.type === "create"
+                ? `create-${change.selector}-${index}`
+                : `${change.selector}-${change.type}`
 
             currentChanges.forEach((change, index) => {
-              const key = `${change.selector}-${change.type}`
-              changesMap.set(key, { ...change, originalIndex: index })
+              changesMap.set(keyFor(change, index), {
+                ...change,
+                originalIndex: index
+              })
             })
 
-            message.changes.forEach((change) => {
+            message.changes.forEach((change, index) => {
               const changeObj = change as DOMChange
-              const key = `${changeObj.selector}-${changeObj.type}`
-              changesMap.set(key, changeObj)
+              changesMap.set(
+                keyFor(changeObj, currentChanges.length + index),
+                changeObj
+              )
             })
 
             const mergedChanges = Array.from(changesMap.values()) as DOMChange[]
@@ -320,13 +338,26 @@ export function useVisualEditorCoordination({
           }
         }
 
-        if (!previewEnabled) {
-          debugLog("🔄 Enabling preview for visual editor")
-          onPreviewToggle(true)
-        } else {
-          debugLog("✅ Preview already active with changes applied")
-        }
-        debugLog("Preview activation complete, starting visual editor...")
+        // Pre-refactor the VE relied on the sidebar's production-preview
+        // path to render saved changes while editing, so we auto-flipped
+        // previewEnabled here. With the SDK-applier refactor VE.start()
+        // applies lastSavedChanges itself under VISUAL_EDITOR_EXPERIMENT_NAME
+        // and (if production preview was on) takes it over via
+        // wasProductionPreviewActive. Auto-toggling now is doubly harmful:
+        //   1. It overwrites PreviewManager's per-(element, experimentName)
+        //      state when VE then re-applies under its own name, losing the
+        //      production capture.
+        //   2. It leaves sidebar.previewEnabled = true after VE.stop() tears
+        //      down its own preview, desyncing the toggle from the page
+        //      (toggle bg-blue-600 / no data-absmartly-modified markers) and
+        //      causing the next user click to disable a "preview" that's
+        //      already gone.
+        // VE owns preview state during editing; the sidebar's flag should
+        // simply stay where it was.
+        debugLog(
+          "[ABSmartly] Skipping auto preview toggle — VE applies its own changes",
+          { previewEnabled }
+        )
 
         const storage = sessionStorage
         await storage.set("visualEditorState", {

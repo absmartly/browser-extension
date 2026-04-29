@@ -259,7 +259,7 @@ export class EditorCoordinator {
           this.undoRedoManager.addChange(
             {
               selector,
-              type: "remove"
+              type: "delete"
             },
             oldValue
           )
@@ -409,7 +409,7 @@ export class EditorCoordinator {
     this.removeContextMenu()
 
     this.eventHandlers.setEditing(true)
-    ;(element as HTMLElement).dataset.absmartlyModified = "true"
+    // PreviewManager owns data-absmartly-modified now; nothing to mark here.
 
     const preventDefault = (e: Event) => {
       if (this.eventHandlers.isEditingMode) {
@@ -445,31 +445,32 @@ export class EditorCoordinator {
       // If it has HTML children, save as HTML to preserve structure
       const hasHtmlChildren = Array.from(element.children).length > 0
 
+      // Capture the user's edits, then DISCARD the live contenteditable
+      // mutations and let the SDK reapply via PreviewManager. That way the
+      // production codepath is what actually paints the final state, and
+      // PreviewManager captures the pre-edit state as the canonical original.
+      const selector = this.callbacks.getSelector(element as HTMLElement)
       if (hasHtmlChildren) {
-        // Save as HTML to preserve inner element structure and styles
-        const selector = this.callbacks.getSelector(element as HTMLElement)
         const newValue = element.innerHTML
-        const oldValue = originalState.innerHTML
+        element.innerHTML = originalState.innerHTML
         this.undoRedoManager.addChange(
           {
             selector,
             type: "html",
             value: newValue
           },
-          oldValue
+          null
         )
       } else {
-        // Simple text node, save as text
-        const selector = this.callbacks.getSelector(element as HTMLElement)
         const newValue = element.textContent || ""
-        const oldValue = originalState.textContent
+        element.textContent = originalState.textContent
         this.undoRedoManager.addChange(
           {
             selector,
             type: "text",
             value: newValue
           },
-          oldValue
+          null
         )
       }
     }
@@ -514,17 +515,18 @@ export class EditorCoordinator {
     const newHtml = await this.htmlEditor.show(element, currentHtml)
 
     if (newHtml !== null && newHtml !== currentHtml) {
-      element.innerHTML = DOMPurify.sanitize(newHtml)
-
+      // The HTML editor used direct innerHTML writes for live preview during
+      // typing. Discard those by restoring the pre-edit innerHTML; the SDK
+      // will repaint via PreviewManager when the change lands.
+      element.innerHTML = currentHtml
       const selector = this.callbacks.getSelector(element as HTMLElement)
-      const oldValue = originalState.innerHTML
       this.undoRedoManager.addChange(
         {
           selector,
           type: "html",
           value: newHtml
         },
-        oldValue
+        null
       )
 
       this.notifications.show("HTML updated successfully", "", "success")
@@ -929,18 +931,7 @@ export class EditorCoordinator {
         this.stateManager.setSelectedElement(el as HTMLElement)
         this.selectedElement = el as HTMLElement // Important: update coordinator's selectedElement
         el.classList.add("absmartly-selected")
-
-        // Store original values for the element (same as in event-handlers.ts)
-        const config = this.stateManager.getConfig()
-        if (!(el as HTMLElement).dataset.absmartlyOriginal) {
-          ;(el as HTMLElement).dataset.absmartlyOriginal = JSON.stringify({
-            textContent: el.textContent,
-            innerHTML: el.innerHTML
-            // Store both to support both text and HTML editing modes
-          })
-          ;(el as HTMLElement).dataset.absmartlyExperiment =
-            config.experimentName || "__preview__"
-        }
+        // Original state is captured by PreviewManager when changes apply.
 
         // Get position near the selected element on the page (not the panel)
         const elementRect = el.getBoundingClientRect()

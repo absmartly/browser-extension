@@ -152,7 +152,12 @@ export class UndoRedoManager {
     // Process only the active changes (up to currentIndex)
     for (let i = 0; i <= this.currentIndex; i++) {
       const record = this.changes[i]
-      const key = `${record.change.selector}-${record.change.type}`
+      // 'create' changes each add a distinct new element, so they must not
+      // collapse onto each other — give every one a unique key.
+      const key =
+        record.change.type === "create"
+          ? `create-${i}`
+          : `${record.change.selector}-${record.change.type}`
 
       if (changeMap.has(key)) {
         // Update to latest change value, but keep original oldValue

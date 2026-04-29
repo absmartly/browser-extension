@@ -874,7 +874,8 @@ describe("EditorCoordinator", () => {
       coordinator.handleEditAction(mockElement, originalState)
 
       expect(mockRemoveContextMenu).toHaveBeenCalled()
-      expect(mockElement.dataset.absmartlyModified).toBe("true")
+      // PreviewManager owns data-absmartly-modified — VE no longer writes it
+      // at edit-mode entry.
       expect(mockElement.classList.contains("absmartly-editing")).toBe(true)
       expect(mockElement.classList.contains("absmartly-selected")).toBe(false)
       expect(mockElement.contentEditable).toBe("true")

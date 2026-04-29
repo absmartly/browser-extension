@@ -175,6 +175,67 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   expect(insertedContent).toBe('This is an inserted block!')
   await debugWait()
 
+  // Action 5b: Insert another block, this time BEFORE the heading
+  await page.click('h2', { force: true })
+  await page.locator('.menu-container').waitFor({ state: 'visible' })
+  await debugWait()
+
+  await clickContextMenuItem(page, 'Insert new block')
+
+  await page.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
+  await debugWait()
+
+  // Toggle position to Before — block-inserter exposes <button class="position-btn"
+  // data-position="before|after"> not radios or a select.
+  const beforePositionBtn = page.locator('.position-btn[data-position="before"]')
+  await beforePositionBtn.waitFor({ state: 'visible', timeout: 2000 })
+  await beforePositionBtn.click()
+  await page
+    .locator('.position-btn[data-position="before"].position-btn-selected')
+    .waitFor({ state: 'attached', timeout: 2000 })
+
+  // Replace the default editor content with our before-block markup
+  await page.evaluate(() => {
+    const editor = document.querySelector('.cm-content') as HTMLElement
+    if (editor) editor.focus()
+  })
+  await page.keyboard.press('Meta+A')
+  await page.keyboard.press('Backspace')
+  await debugWait()
+
+  const insertBeforeHTML = '<div class="inserted-block-before">This is a BEFORE block!'
+  await page.keyboard.type(insertBeforeHTML)
+  await debugWait()
+
+  await page.locator('.inserter-button-insert').waitFor({ state: 'visible', timeout: 5000 })
+  await page.evaluate(() => {
+    const btn = document.querySelector('.inserter-button-insert') as HTMLButtonElement
+    btn?.click()
+  })
+
+  try {
+    await page.locator('.cm-editor').waitFor({ state: 'hidden', timeout: 5000 })
+  } catch (err) {
+    // Modal did not close, continuing
+  }
+  await debugWait()
+
+  const beforeBlockExists = await page.evaluate(() => {
+    const h2 = document.querySelector('h2')
+    if (!h2) return false
+    const prevElement = h2.previousElementSibling
+    return prevElement?.classList.contains('inserted-block-before') || false
+  })
+  log(`  ${beforeBlockExists ? '✓' : '✗'} Before-block exists as previousElementSibling of h2`)
+  expect(beforeBlockExists).toBeTruthy()
+
+  const beforeBlockContent = await page.evaluate(() => {
+    return document.querySelector('.inserted-block-before')?.textContent?.trim()
+  })
+  log(`  ${beforeBlockContent === 'This is a BEFORE block!' ? '✓' : '✗'} Before-block content correct`)
+  expect(beforeBlockContent).toBe('This is a BEFORE block!')
+  await debugWait()
+
   // Action 6: Change image source
 
   await page.evaluate(() => {
@@ -260,7 +321,11 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
     return {
       paragraphText: paragraph?.textContent?.trim(),
       button1Display: button1 ? window.getComputedStyle(button1).display : null,
-      button2Display: button2 ? window.getComputedStyle(button2).display : null,
+      // 'delete' changes now actually remove the element via the SDK path
+      // (case 'delete' → element.remove()). Pre-refactor the VE soft-deleted
+      // by setting display:none, so this assertion was 'none'. With the
+      // unified codepath the element is gone — assert the absence instead.
+      button2Removed: button2 === null,
       testContainerHTML: testContainer?.innerHTML?.trim()
     }
   })
@@ -271,8 +336,8 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   expect(appliedChanges.button1Display).toBe('none')
   log('  ✓ Hide change applied')
 
-  expect(appliedChanges.button2Display).toBe('none')
-  log('  ✓ Delete change applied')
+  expect(appliedChanges.button2Removed).toBe(true)
+  log('  ✓ Delete change applied (element removed via SDK)')
 
   expect(appliedChanges.testContainerHTML).toMatch(/<h2[^>]*>HTML Edited!<\/h2>/)
   expect(appliedChanges.testContainerHTML).toContain('<p>New paragraph content</p>')

@@ -15,6 +15,14 @@ export interface ElementState {
   attributes: Record<string, string>
   styles: Record<string, string>
   classList: string[]
+  // Position in the DOM at capture time. Used to reattach an element if a
+  // change like 'delete' or 'move' detaches it before the state is restored.
+  // Held as live Node references — fine because a captured state is short-lived
+  // (stored in PreviewManager.previewStateMap until removePreviewChanges runs).
+  // Optional so legacy callers / test mocks can still construct a state without
+  // capturing structural position.
+  parent?: Node | null
+  nextSibling?: Node | null
 }
 
 export class ElementStateManager {
@@ -29,7 +37,9 @@ export class ElementStateManager {
       innerHTML: element.innerHTML,
       attributes: {},
       styles: {},
-      classList: Array.from(element.classList)
+      classList: Array.from(element.classList),
+      parent: element.parentNode,
+      nextSibling: element.nextSibling
     }
 
     // Capture all attributes
@@ -58,6 +68,24 @@ export class ElementStateManager {
     const htmlElement = element as HTMLElement
 
     try {
+      // Reattach the element if a structural change ('delete' or 'move')
+      // detached it from its original parent. Only do this when the captured
+      // parent still exists in the live document — otherwise we'd be inserting
+      // into a stale subtree.
+      if (
+        originalState.parent &&
+        element.parentNode !== originalState.parent &&
+        document.contains(originalState.parent)
+      ) {
+        const sibling = originalState.nextSibling
+        const siblingStillThere =
+          sibling && sibling.parentNode === originalState.parent
+        originalState.parent.insertBefore(
+          element,
+          siblingStillThere ? sibling : null
+        )
+      }
+
       // CRITICAL: Never restore innerHTML for structural elements (body, html, head)
       // This would wipe out dynamically added elements like the sidebar
       const isStructuralElement =

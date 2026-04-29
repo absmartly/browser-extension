@@ -652,6 +652,25 @@ export class EditModes {
       "[ABSmartly] Creating move change with original position:",
       moveChange
     )
+
+    // Revert the live drop so the SDK can replay the move via PreviewManager.
+    // Without this, PreviewManager would capture the post-drop position as
+    // the canonical original and undo would land at the wrong spot.
+    if (originalParent) {
+      try {
+        if (
+          originalNextSibling &&
+          originalNextSibling.parentNode === originalParent
+        ) {
+          originalParent.insertBefore(element, originalNextSibling)
+        } else {
+          originalParent.appendChild(element)
+        }
+      } catch (err) {
+        debugWarn("[ABSmartly] Failed to revert drop pre-replay:", err)
+      }
+    }
+
     this.addChange(moveChange)
   }
 
@@ -680,6 +699,13 @@ export class EditModes {
         includeParentContext: true,
         maxParentLevels: 3
       })
+
+      // Discard the live width/height we wrote during the drag and let the
+      // SDK reapply via PreviewManager. Without this revert, PreviewManager
+      // would capture the post-drag state as the canonical original and
+      // undo would no longer return the element to its true original size.
+      htmlElement.style.width = originalStyles.width
+      htmlElement.style.height = originalStyles.height
 
       const styleChange: DOMChange = {
         selector: elementSelector,

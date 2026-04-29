@@ -12,6 +12,12 @@ import { EditorCoordinator } from "./editor-coordinator"
 import type { EditorCoordinatorCallbacks } from "./editor-coordinator"
 import { ElementActions } from "./element-actions"
 import EventHandlers from "./event-handlers"
+import {
+  applyChangesViaSDK,
+  clearChangesViaSDK,
+  isProductionPreviewActive,
+  VISUAL_EDITOR_EXPERIMENT_NAME
+} from "./sdk-applier"
 import StateManager from "./state-manager"
 import type { VisualEditorConfig } from "./state-manager"
 import UndoRedoManager from "./undo-redo-manager"
@@ -30,6 +36,12 @@ export class VisualEditor {
   private _isActive = false
   private hasUnsavedChanges = false // Track if there are unsaved changes since last save
   private lastSavedChangesCount = 0 // Track the number of changes at last save
+  // Last persisted change list — used to re-establish production preview on
+  // VE exit if it was active when VE started.
+  private lastSavedChanges: DOMChange[] = []
+  // Whether the active-experiment preview header was on when VE started, so
+  // we can put it back on stop().
+  private wasProductionPreviewActive = false
 
   // Core modules
   private stateManager: StateManager
@@ -55,6 +67,7 @@ export class VisualEditor {
     this.options = options
 
     this.lastSavedChangesCount = options.initialChanges?.length || 0
+    this.lastSavedChanges = options.initialChanges || []
     this.hasUnsavedChanges = false
 
     const config: VisualEditorConfig = {
@@ -69,8 +82,18 @@ export class VisualEditor {
     this.contextMenu = new ContextMenu(this.stateManager, options.useShadowDOM)
     this.undoRedoManager = new UndoRedoManager()
 
+    // Every committed change reapplies the full list through the SDK plugin
+    // (replace mode). This is the SAME apply codepath production preview uses,
+    // so a regression in the SDK surfaces immediately during editing rather
+    // than silently after save.
     this.undoRedoManager.setOnChangeAdded(() => {
       this.hasUnsavedChanges = true
+      if (!this._isActive) return // suppress during constructor seeding
+      applyChangesViaSDK(
+        this.undoRedoManager.squashChanges(),
+        VISUAL_EDITOR_EXPERIMENT_NAME,
+        this.options.variantName
+      )
     })
 
     if (options.initialChanges && options.initialChanges.length > 0) {
@@ -165,6 +188,30 @@ export class VisualEditor {
     // Mark as active
     this._isActive = true
 
+    // Snapshot whether production preview was on, then tear it down so we
+    // start with a clean SDK state. The VE owns the page during editing
+    // under a dedicated experiment name; on stop() we put production
+    // preview back if it was on.
+    this.wasProductionPreviewActive = isProductionPreviewActive()
+    if (this.wasProductionPreviewActive) {
+      debugLog(
+        "[ABSmartly] Production preview was active — clearing before VE takes over",
+        { experimentName: this.options.experimentName }
+      )
+      clearChangesViaSDK(this.options.experimentName)
+    }
+
+    // Apply the current change set under the dedicated VE experiment name.
+    // Every subsequent VE commit will replay the full list under the same
+    // name with updateMode: "replace", keeping PreviewManager state coherent.
+    if (this.lastSavedChanges.length > 0) {
+      applyChangesViaSDK(
+        this.lastSavedChanges,
+        VISUAL_EDITOR_EXPERIMENT_NAME,
+        this.options.variantName
+      )
+    }
+
     // Keep preview header visible when visual editor starts
     // Users should see both the preview header and visual editor UI
     const previewHeader = document.getElementById("absmartly-preview-header")
@@ -213,6 +260,25 @@ export class VisualEditor {
     console.trace("[ABSmartly] Stop called from:")
 
     this._isActive = false
+
+    // Tear down VE-owned preview state. PreviewManager restores all elements
+    // it touched under __visual_editor__ back to their pre-VE state.
+    clearChangesViaSDK(VISUAL_EDITOR_EXPERIMENT_NAME)
+
+    // If production preview was on when we started, put it back. We use
+    // lastSavedChanges (updated by saveChanges) so the user sees the latest
+    // persisted state, not the pre-VE state.
+    if (this.wasProductionPreviewActive && this.lastSavedChanges.length > 0) {
+      debugLog("[ABSmartly] Restoring production preview after VE exit", {
+        experimentName: this.options.experimentName
+      })
+      applyChangesViaSDK(
+        this.lastSavedChanges,
+        this.options.experimentName,
+        this.options.variantName
+      )
+    }
+    this.wasProductionPreviewActive = false
 
     // Only send changes if they haven't been saved already
     const finalChanges = this.stateManager.getState().changes || []
@@ -371,8 +437,13 @@ export class VisualEditor {
     // Group changes by selector and type
     const changeMap = new Map<string, DOMChange>()
 
-    for (const change of changes) {
-      const key = `${change.selector}-${change.type}`
+    changes.forEach((change, i) => {
+      // Each 'create' adds a distinct new element, so they must not collapse
+      // onto each other — give every one a unique key.
+      const key =
+        change.type === "create"
+          ? `create-${i}`
+          : `${change.selector}-${change.type}`
       const existing = changeMap.get(key)
 
       if (existing) {
@@ -393,7 +464,7 @@ export class VisualEditor {
       } else {
         changeMap.set(key, change)
       }
-    }
+    })
 
     const squashed = Array.from(changeMap.values())
     debugLog("[ABSmartly] Squashed to", squashed.length, "changes")
@@ -412,96 +483,6 @@ export class VisualEditor {
     return squashed
   }
 
-  private storeOriginalValuesInDOM(changes: DOMChange[]): void {
-    debugLog(
-      "[ABSmartly] Storing original values in DOM for",
-      changes.length,
-      "changes"
-    )
-
-    for (const change of changes) {
-      try {
-        const elements = document.querySelectorAll(change.selector)
-
-        elements.forEach((element) => {
-          const htmlElement = element as HTMLElement
-
-          // Initialize or get existing original data
-          if (!htmlElement.dataset.absmartlyOriginal) {
-            htmlElement.dataset.absmartlyOriginal = JSON.stringify({})
-          }
-
-          let originalData: any = {}
-          try {
-            originalData = JSON.parse(htmlElement.dataset.absmartlyOriginal)
-          } catch (e) {
-            console.error("[ABSmartly] Failed to parse original data:", e)
-          }
-
-          // Store original values based on change type
-          if (change.type === "text" && !originalData.text) {
-            originalData.text = htmlElement.textContent || ""
-          } else if (change.type === "html" && !originalData.html) {
-            originalData.html = htmlElement.innerHTML
-          } else if (change.type === "style" && !originalData.styles) {
-            // Store original styles
-            const computedStyle = window.getComputedStyle(htmlElement)
-            originalData.styles = {}
-            if (change.value && typeof change.value === "object") {
-              for (const prop in change.value) {
-                originalData.styles[prop] =
-                  htmlElement.style[prop] || computedStyle[prop as any] || ""
-              }
-            }
-          } else if (change.type === "move" && !originalData.move) {
-            // Store original position for move - capture current position before it's moved
-            const parent = htmlElement.parentElement
-            const nextSibling = htmlElement.nextElementSibling
-            if (parent) {
-              originalData.move = {
-                parentId: parent.id || "",
-                parentClass: parent.className || "",
-                nextSiblingId: nextSibling?.id || "",
-                nextSiblingClass: nextSibling?.className || ""
-              }
-            }
-          } else if (change.type === "attribute" && !originalData.attributes) {
-            originalData.attributes = {}
-            if (change.value && typeof change.value === "object") {
-              for (const attrName in change.value) {
-                originalData.attributes[attrName] =
-                  htmlElement.getAttribute(attrName) || ""
-              }
-            }
-          } else if (change.type === "class") {
-            if (!originalData.className) {
-              originalData.className = htmlElement.className || ""
-            }
-          }
-
-          // Mark element as modified and store experiment info
-          htmlElement.dataset.absmartlyModified = "true"
-          htmlElement.dataset.absmartlyExperiment =
-            this.options.experimentName || "__preview__"
-          htmlElement.dataset.absmartlyOriginal = JSON.stringify(originalData)
-
-          debugLog(
-            "[ABSmartly] Stored original data for",
-            change.selector,
-            ":",
-            originalData
-          )
-        })
-      } catch (error) {
-        console.error(
-          "[ABSmartly] Error storing original values for",
-          change.selector,
-          error
-        )
-      }
-    }
-  }
-
   private saveChanges(): void {
     // Get the latest changes from undo/redo manager
     const currentChanges = this.undoRedoManager.squashChanges()
@@ -511,8 +492,9 @@ export class VisualEditor {
     const squashedChanges = this.squashChanges(currentChanges)
     debugLog("[ABSmartly] Squashed changes count:", squashedChanges.length)
 
-    // Store original values in DOM for preview toggle functionality
-    this.storeOriginalValuesInDOM(squashedChanges)
+    // Original element state is captured by PreviewManager.previewStateMap
+    // when changes are applied via the SDK path; no need for the legacy
+    // data-absmartly-original sidecar.
 
     // Log what we're sending to sidebar
     debugLog("[ABSmartly] Sending squashed changes to sidebar:")
@@ -535,6 +517,7 @@ export class VisualEditor {
     // Mark changes as saved
     this.hasUnsavedChanges = false
     this.lastSavedChangesCount = squashedChanges.length
+    this.lastSavedChanges = squashedChanges
 
     this.notifications.show(
       `${squashedChanges.length} changes saved`,
@@ -555,77 +538,15 @@ export class VisualEditor {
       return
     }
 
-    const { change, oldValue } = record
+    // With every commit going through the SDK in replace mode, undo is
+    // simply: pop the change list, replay the remainder. PreviewManager
+    // does the heavy lifting of reverting any element it touched (including
+    // re-attaching deleted elements via the captured parent/nextSibling and
+    // removing 'create'-inserted nodes from createdElementsMap).
+    const variantName = this.options.variantName
+    const remaining = this.undoRedoManager.squashChanges()
+    applyChangesViaSDK(remaining, VISUAL_EDITOR_EXPERIMENT_NAME, variantName)
 
-    // Apply the undo by reverting to old value
-    const elements = document.querySelectorAll(change.selector)
-    elements.forEach((element) => {
-      const htmlElement = element as HTMLElement
-
-      if (change.type === "text" && oldValue !== null) {
-        htmlElement.textContent = oldValue
-      } else if (change.type === "html" && oldValue !== null) {
-        htmlElement.innerHTML = DOMPurify.sanitize(oldValue)
-      } else if (change.type === "style" && oldValue) {
-        Object.assign(htmlElement.style, oldValue)
-      } else if (change.type === "remove") {
-        // Undo remove: show the element again (it was hidden with display: none)
-        // The element was not actually removed, just hidden
-        if (element && htmlElement.style.display === "none") {
-          // Restore the original display value from stored data
-          const storedData = htmlElement.dataset.absmartlyOriginal
-          if (storedData) {
-            try {
-              const originalData = JSON.parse(storedData)
-              const originalDisplay = originalData.styles?.display || ""
-              htmlElement.style.display = originalDisplay
-            } catch (e) {
-              // If parsing fails, just show the element
-              htmlElement.style.display = ""
-            }
-          } else {
-            htmlElement.style.display = ""
-          }
-        }
-      } else if (change.type === "insert") {
-        // Undo insert: remove the inserted element
-        if (oldValue && oldValue.insertedSelector) {
-          const insertedElements = document.querySelectorAll(
-            oldValue.insertedSelector
-          )
-          insertedElements.forEach((el) => el.remove())
-        }
-      } else if (change.type === "move") {
-        // Undo move: restore to original position
-        if (oldValue && oldValue.parent && element) {
-          const parent = document.querySelector(oldValue.parent)
-          if (parent) {
-            if (oldValue.nextSibling) {
-              const nextSibling = parent.querySelector(
-                `:scope > *:nth-child(${oldValue.nextSibling})`
-              )
-              parent.insertBefore(element, nextSibling)
-            } else {
-              parent.appendChild(element)
-            }
-          }
-        }
-      } else if (change.type === "class" && oldValue) {
-        // Restore original classes
-        htmlElement.className = oldValue
-      } else if (change.type === "attribute" && oldValue) {
-        // Restore original attributes
-        Object.keys(oldValue).forEach((attr) => {
-          if (oldValue[attr] === null) {
-            htmlElement.removeAttribute(attr)
-          } else {
-            htmlElement.setAttribute(attr, oldValue[attr])
-          }
-        })
-      }
-    })
-
-    // Update UI
     this.updateBannerState()
     this.notifications.show("Change undone", "", "success")
   }
@@ -637,85 +558,10 @@ export class VisualEditor {
       return
     }
 
-    const { change } = record
+    const variantName = this.options.variantName
+    const next = this.undoRedoManager.squashChanges()
+    applyChangesViaSDK(next, VISUAL_EDITOR_EXPERIMENT_NAME, variantName)
 
-    // Re-apply the change
-    const elements = document.querySelectorAll(change.selector)
-    elements.forEach((element) => {
-      const htmlElement = element as HTMLElement
-
-      if (change.type === "text" && change.value !== undefined) {
-        htmlElement.textContent = change.value
-      } else if (change.type === "html" && change.value !== undefined) {
-        htmlElement.innerHTML = DOMPurify.sanitize(change.value)
-      } else if (change.type === "style" && change.value) {
-        Object.assign(htmlElement.style, change.value)
-      } else if (change.type === "remove") {
-        // Redo remove: hide the element again (set display: none)
-        if (element && htmlElement) {
-          htmlElement.style.display = "none"
-        }
-      } else if (change.type === "insert") {
-        // Redo insert: insert the element again
-        const insertChange = change as any
-        if (insertChange.html && insertChange.position) {
-          const tempContainer = document.createElement("div")
-          tempContainer.innerHTML = DOMPurify.sanitize(insertChange.html)
-          const newElement = tempContainer.firstElementChild
-          if (newElement && element) {
-            if (insertChange.position === "before") {
-              element.parentElement?.insertBefore(newElement, element)
-            } else if (insertChange.position === "after") {
-              element.parentElement?.insertBefore(
-                newElement,
-                element.nextSibling
-              )
-            } else if (insertChange.position === "firstChild") {
-              element.insertBefore(newElement, element.firstChild)
-            } else if (insertChange.position === "lastChild") {
-              element.appendChild(newElement)
-            }
-          }
-        }
-      } else if (change.type === "move") {
-        // Redo move: move to new position
-        const moveChange = change as any
-        if (moveChange.targetSelector && moveChange.position && element) {
-          const target = document.querySelector(moveChange.targetSelector)
-          if (target) {
-            if (moveChange.position === "before") {
-              target.parentElement?.insertBefore(element, target)
-            } else if (moveChange.position === "after") {
-              target.parentElement?.insertBefore(element, target.nextSibling)
-            } else if (moveChange.position === "firstChild") {
-              target.insertBefore(element, target.firstChild)
-            } else if (moveChange.position === "lastChild") {
-              target.appendChild(element)
-            }
-          }
-        }
-      } else if (change.type === "class") {
-        // Redo class change
-        const classChange = change as any
-        if (classChange.add) {
-          classChange.add.forEach((cls: string) =>
-            htmlElement.classList.add(cls)
-          )
-        }
-        if (classChange.remove) {
-          classChange.remove.forEach((cls: string) =>
-            htmlElement.classList.remove(cls)
-          )
-        }
-      } else if (change.type === "attribute" && change.value) {
-        // Redo attribute change
-        Object.keys(change.value).forEach((attr) => {
-          htmlElement.setAttribute(attr, (change.value as any)[attr])
-        })
-      }
-    })
-
-    // Update UI
     this.updateBannerState()
     this.notifications.show("Change redone", "", "success")
   }

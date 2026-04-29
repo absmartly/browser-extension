@@ -970,7 +970,7 @@ export function initializeBackgroundScript() {
             ) {
               mockChanges.push({
                 selector: "#button-2",
-                type: "remove"
+                type: "delete"
               })
             } else if (
               normalizedPrompt.includes("item-2") &&

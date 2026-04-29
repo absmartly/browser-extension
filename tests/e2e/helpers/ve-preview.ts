@@ -133,15 +133,27 @@ export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Prom
   const enabledStates = await page.evaluate(() => {
     const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
     const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]')
+    const insertedAfter = document.querySelector('.inserted-block')
+    const insertedBefore = document.querySelector('.inserted-block-before')
     return {
       modifiedCount: modifiedElements.length,
-      experimentMarkersCount: experimentMarkers.length
+      experimentMarkersCount: experimentMarkers.length,
+      insertedAfterPresent: insertedAfter !== null,
+      insertedBeforePresent: insertedBefore !== null
     }
   })
 
   log(`  ✓ DOM changes applied (modified=${enabledStates.modifiedCount}, markers=${enabledStates.experimentMarkersCount})`)
+  log(`  Inserted blocks after preview re-enable: after=${enabledStates.insertedAfterPresent}, before=${enabledStates.insertedBeforePresent}`)
 
   expect(enabledStates.modifiedCount).toBeGreaterThan(0)
+  // Round-trip guard: inserted blocks must survive a preview-off / preview-on
+  // cycle. With direct-DOM in the VE this trivially passed (the elements were
+  // already in the DOM). With the new SDK path it actually exercises the
+  // create→remove→re-create flow through PreviewManager — the regression that
+  // hid the original 'insert' vs 'create' bug.
+  expect(enabledStates.insertedAfterPresent).toBe(true)
+  expect(enabledStates.insertedBeforePresent).toBe(true)
   expect(enabledStates.experimentMarkersCount).toBeGreaterThan(0)
 
   await previewToggle.click()
@@ -160,17 +172,26 @@ export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Prom
   const disabledStates = await page.evaluate(() => {
     const modifiedElements = document.querySelectorAll('[data-absmartly-modified]')
     const experimentMarkers = document.querySelectorAll('[data-absmartly-experiment]')
+    const insertedAfter = document.querySelector('.inserted-block')
+    const insertedBefore = document.querySelector('.inserted-block-before')
     return {
       modifiedCount: modifiedElements.length,
-      experimentMarkersCount: experimentMarkers.length
+      experimentMarkersCount: experimentMarkers.length,
+      insertedAfterPresent: insertedAfter !== null,
+      insertedBeforePresent: insertedBefore !== null
     }
   })
 
   const changesReverted = disabledStates.modifiedCount === 0 && disabledStates.experimentMarkersCount === 0
   log(`  ${changesReverted ? '✓' : '✗'} DOM changes reverted`)
+  log(`  Inserted blocks after preview disable: after=${disabledStates.insertedAfterPresent}, before=${disabledStates.insertedBeforePresent}`)
 
   expect(disabledStates.modifiedCount).toBe(0)
   expect(disabledStates.experimentMarkersCount).toBe(0)
+  // Round-trip guard: created elements must be torn down when preview is
+  // disabled. Without PreviewManager.createdElementsMap they would linger.
+  expect(disabledStates.insertedAfterPresent).toBe(false)
+  expect(disabledStates.insertedBeforePresent).toBe(false)
 
   log('\n✅ Preview toggle test completed')
   await debugWait()
