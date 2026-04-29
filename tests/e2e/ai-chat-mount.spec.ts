@@ -458,7 +458,7 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
 
     // Navigate to AI page
     const firstExperiment = sidebar.locator('.experiment-item').first()
-    await firstExperiment.waitFor({ state: 'visible', timeout: 30000 })
+    await firstExperiment.waitFor({ state: 'visible', timeout: 60000 })
     await firstExperiment.click()
     await page.waitForFunction(() => true, { timeout: 2000 }).catch(() => {})
 

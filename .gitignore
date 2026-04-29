@@ -85,3 +85,4 @@ test-html-compression.js
 
 # Pre-fetched editor resources cache (written by tests/global-setup.ts)
 .editor-resources-cache.json
+.experiments-cache.json

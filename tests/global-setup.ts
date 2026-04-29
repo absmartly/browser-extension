@@ -228,6 +228,52 @@ async function globalSetup(config: FullConfig) {
       JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, timestamp: Date.now() })
     )
     console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}) → ${cachePath}`)
+
+    // Pre-fetch the experiments list too. Several tests
+    // (ai-chat-mount, ai-chat-fix-test) navigate to a page and click on
+    // the first .experiment-item, which requires /v1/experiments to
+    // return — under workers=4 + 4 CI shards = 16 concurrent fetches that
+    // call can take 60s+. Seeding chrome.storage.local's
+    // experiments-cache lets the sidebar render the list immediately
+    // from cache while the fresh fetch happens in the background.
+    const experimentsCachePath = path.join(rootDir, '.experiments-cache.json')
+    try {
+      const res = await fetch(
+        `${baseEndpoint}/v1/experiments?items=20&page=1`,
+        {
+          headers: {
+            Authorization: `Api-Key ${apiKey}`,
+            Accept: 'application/json'
+          }
+        }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const experiments = (data?.experiments as unknown[]) ?? []
+        // Strip aggressively to fit chrome.storage.sync's 8KB per-item
+        // quota. Tests just need .experiment-item to render — they don't
+        // touch variants or any other heavy field. The validation schema
+        // (CachedExperimentSchema) requires id, name, state.
+        const minimal = (Array.isArray(experiments) ? experiments : []).map(
+          (exp: any) => ({
+            id: exp.id,
+            name: exp.name,
+            display_name: exp.display_name ?? exp.name,
+            state: exp.state ?? 'ready',
+            variants: []
+          })
+        )
+        fs.writeFileSync(
+          experimentsCachePath,
+          JSON.stringify({ version: 1, experiments: minimal, timestamp: Date.now() })
+        )
+        console.log(`✅ Pre-fetched experiments (count:${minimal.length}) → ${experimentsCachePath}`)
+      } else {
+        console.warn(`[globalSetup] Pre-fetch experiments failed: ${res.status}`)
+      }
+    } catch (err) {
+      console.warn(`[globalSetup] Pre-fetch experiments threw:`, (err as Error).message)
+    }
   }
 
   console.log('✅ Global setup completed successfully')

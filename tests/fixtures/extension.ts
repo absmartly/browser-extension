@@ -151,6 +151,21 @@ export const test = base.extend<ExtFixtures>({
       seedData['plasmo:ai-apikey'] = anthropicApiKey
     }
 
+    // Pre-fetched experiments cache (from globalSetup) — same rationale as
+    // the editor-resources cache: tests that wait for .experiment-item
+    // would otherwise block on /v1/experiments completing under workers=4
+    // contention.
+    const experimentsCachePath = path.join(__dirname, '..', '..', '.experiments-cache.json')
+    if (fs.existsSync(experimentsCachePath)) {
+      try {
+        const cached = JSON.parse(fs.readFileSync(experimentsCachePath, 'utf-8'))
+        seedData['experiments-cache'] = cached
+        seedData['plasmo:experiments-cache'] = cached
+      } catch {
+        // Pre-fetch unavailable; tests will hit the live API.
+      }
+    }
+
     await seedPage.evaluate((data) => (window as any).seed(data), seedData)
 
     // Editor resources cache is too large for chrome.storage.sync (8KB
