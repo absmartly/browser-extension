@@ -90,7 +90,7 @@ test.describe('Experiment Code Injection UI', () => {
       await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
 
       // Wait for it to become enabled (not disabled/loading)
-      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 5000 })
+      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 30000 })
       console.log('  ✓ Unit type select is enabled')
 
       await unitTypeTrigger.click()

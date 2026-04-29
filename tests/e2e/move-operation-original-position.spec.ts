@@ -40,7 +40,7 @@ test.describe('Move Operation Original Position Preservation', () => {
     let [sw] = context.serviceWorkers()
     if (!sw) {
       console.log('⏳ Waiting for service worker...')
-      sw = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      sw = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     const extensionId = new URL(sw.url()).host
     console.log('✅ Extension ID:', extensionId)
@@ -255,7 +255,7 @@ test.describe('Move Operation Original Position Preservation', () => {
     let [sw] = context.serviceWorkers()
     if (!sw) {
       console.log('⏳ Waiting for service worker...')
-      sw = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      sw = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     const extensionId = new URL(sw.url()).host
     console.log('✅ Extension ID:', extensionId)

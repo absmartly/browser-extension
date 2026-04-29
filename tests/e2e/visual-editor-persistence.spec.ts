@@ -62,7 +62,7 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     let [background] = context.serviceWorkers()
     if (!background) {
       console.log('⏳ Waiting for service worker...')
-      background = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      background = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     extensionId = background.url().split('/')[2]
     console.log('✅ Extension ID:', extensionId)

@@ -23,7 +23,7 @@ const test = base.extend<{
     // Get extension ID
     let [sw] = context.serviceWorkers()
     if (!sw) {
-      sw = await context.waitForEvent('serviceworker')
+      sw = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     const extensionId = new URL(sw.url()).host
 
@@ -69,7 +69,7 @@ test.describe('Visual Editor Test', () => {
     let [sw] = context.serviceWorkers()
     if (!sw) {
       console.log('⏳ No service worker yet, waiting for serviceworker event...')
-      sw = await context.waitForEvent('serviceworker', { timeout: 10000 })
+      sw = await context.waitForEvent('serviceworker', { timeout: 30000 })
     }
     const extensionId = new URL(sw.url()).host
     console.log('✅ Extension ID:', extensionId)

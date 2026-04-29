@@ -21,7 +21,20 @@ async function openSettings(sidebar: FrameLocator): Promise<void> {
 }
 
 test.describe('Claude API Key Authentication', () => {
-  test('should display AI API Key input in settings', async ({ context, extensionUrl }) => {
+  test('should display AI API Key input in settings', async ({ context, extensionUrl, seedStorage }) => {
+    // Same explicit seed as the other two tests so vibeStudioEnabled is
+    // present and the AI section renders deterministically under workers=4.
+    await seedStorage({
+      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+      'absmartly-config': {
+        apiKey: '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+        authMethod: 'apikey',
+        vibeStudioEnabled: true,
+        domChangesFieldName: '__dom_changes'
+      }
+    })
+
     const page = await context.newPage()
 
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
@@ -42,7 +55,23 @@ test.describe('Claude API Key Authentication', () => {
     await page.close()
   })
 
-  test('should allow entering and saving Claude API Key', async ({ context, extensionUrl }) => {
+  test('should allow entering and saving Claude API Key', async ({ context, extensionUrl, seedStorage }) => {
+    // Same rationale as test #69 below: seed the new-format config
+    // explicitly so vibeStudioEnabled is set and the SettingsView "API key
+    // required" validator has a value. The shared fixture seeds these too,
+    // but Plasmo Storage's prod-build serialization can race the test
+    // setup under workers=4 — be explicit.
+    await seedStorage({
+      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
+      'absmartly-config': {
+        apiKey: '',
+        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
+        authMethod: 'apikey',
+        vibeStudioEnabled: true,
+        domChangesFieldName: '__dom_changes'
+      }
+    })
+
     const page = await context.newPage()
 
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
