@@ -18,12 +18,34 @@ import type { DOMChange } from "../types/visual-editor"
 export const VISUAL_EDITOR_EXPERIMENT_NAME = "__visual_editor__"
 
 /**
+ * postMessage uses targetOrigin to gate which window can receive the
+ * payload — passing `window.location.origin` is the secure default. But
+ * for `file://` pages and pages whose origin serializes as the opaque
+ * `"null"` string, that origin string never matches the receiver's own
+ * origin and the message is silently dropped. visual-editor.ts already
+ * falls back to "*" for those two cases; mirror it here so preview
+ * apply / clear still reach the orchestrator on local-file experiments.
+ */
+function targetOriginFor(): string {
+  const origin = window.location.origin
+  if (origin === "null" || window.location.protocol === "file:") return "*"
+  return origin
+}
+
+/**
  * Apply the full current change list under the given experiment name.
  *
  * Always uses updateMode: "replace" — the orchestrator first calls
  * PreviewManager.removePreviewChanges(experimentName) then applies the new
  * set. That matches the VE's edit-history semantics: every commit is a fresh
  * snapshot of the world, not a delta.
+ *
+ * postMessage can throw synchronously on the rare DataCloneError path
+ * (uncloneable change payload, e.g. one carrying an Element ref). Catch
+ * and log so a single bad change doesn't tear down the surrounding flow
+ * (start/stop/undo/redo) — the orchestrator-side path already has its
+ * own try/catch around applyPreviewChange, so async errors are handled
+ * there.
  */
 export function applyChangesViaSDK(
   changes: DOMChange[],
@@ -31,19 +53,27 @@ export function applyChangesViaSDK(
   variantName?: string
 ): void {
   if (typeof window === "undefined") return
-  window.postMessage(
-    {
-      source: "absmartly-extension",
-      type: "PREVIEW_CHANGES",
-      payload: {
-        changes,
-        experimentName,
-        variantName,
-        updateMode: "replace"
-      }
-    },
-    window.location.origin
-  )
+  try {
+    window.postMessage(
+      {
+        source: "absmartly-extension",
+        type: "PREVIEW_CHANGES",
+        payload: {
+          changes,
+          experimentName,
+          variantName,
+          updateMode: "replace"
+        }
+      },
+      targetOriginFor()
+    )
+  } catch (err) {
+    console.error(
+      "[VE/sdk-applier] applyChangesViaSDK failed",
+      { experimentName, variantName, count: changes.length },
+      err
+    )
+  }
 }
 
 /**
@@ -52,16 +82,24 @@ export function applyChangesViaSDK(
  */
 export function clearChangesViaSDK(experimentName: string): void {
   if (typeof window === "undefined") return
-  window.postMessage(
-    {
-      source: "absmartly-extension",
-      type: "REMOVE_PREVIEW",
-      payload: {
-        experimentName
-      }
-    },
-    window.location.origin
-  )
+  try {
+    window.postMessage(
+      {
+        source: "absmartly-extension",
+        type: "REMOVE_PREVIEW",
+        payload: {
+          experimentName
+        }
+      },
+      targetOriginFor()
+    )
+  } catch (err) {
+    console.error(
+      "[VE/sdk-applier] clearChangesViaSDK failed",
+      { experimentName },
+      err
+    )
+  }
 }
 
 /**

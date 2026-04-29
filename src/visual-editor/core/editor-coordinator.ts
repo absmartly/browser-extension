@@ -451,7 +451,12 @@ export class EditorCoordinator {
       // PreviewManager captures the pre-edit state as the canonical original.
       const selector = this.callbacks.getSelector(element as HTMLElement)
       if (hasHtmlChildren) {
-        const newValue = element.innerHTML
+        // Sanitize before persisting — the value is replayed verbatim into
+        // innerHTML by the SDK plugin every time the change is applied
+        // (preview, save, undo/redo). DOMPurify strips <script>, inline
+        // event handlers, javascript: URLs, etc, so a malicious edit
+        // can't escape into the host page on later replays.
+        const newValue = DOMPurify.sanitize(element.innerHTML)
         element.innerHTML = originalState.innerHTML
         this.undoRedoManager.addChange(
           {
@@ -517,14 +522,16 @@ export class EditorCoordinator {
     if (newHtml !== null && newHtml !== currentHtml) {
       // The HTML editor used direct innerHTML writes for live preview during
       // typing. Discard those by restoring the pre-edit innerHTML; the SDK
-      // will repaint via PreviewManager when the change lands.
+      // will repaint via PreviewManager when the change lands. Sanitize
+      // the persisted value — same reasoning as in handleEditAction:
+      // type: "html" payloads are replayed into innerHTML on every apply.
       element.innerHTML = currentHtml
       const selector = this.callbacks.getSelector(element as HTMLElement)
       this.undoRedoManager.addChange(
         {
           selector,
           type: "html",
-          value: newHtml
+          value: DOMPurify.sanitize(newHtml)
         },
         null
       )

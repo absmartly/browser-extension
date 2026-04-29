@@ -212,13 +212,14 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   await page.locator('.cm-editor').waitFor({ state: 'visible', timeout: 5000 })
   await debugWait()
 
-  // Toggle position to Before — block-inserter exposes <button class="position-btn"
-  // data-position="before|after"> not radios or a select.
-  const beforePositionBtn = page.locator('.position-btn[data-position="before"]')
+  // Toggle position to Before — block-inserter exposes
+  // #block-inserter-position-before / #block-inserter-position-after with
+  // a class-based selected indicator (position-btn-selected).
+  const beforePositionBtn = page.locator('#block-inserter-position-before')
   await beforePositionBtn.waitFor({ state: 'visible', timeout: 2000 })
   await beforePositionBtn.click()
   await page
-    .locator('.position-btn[data-position="before"].position-btn-selected')
+    .locator('#block-inserter-position-before.position-btn-selected')
     .waitFor({ state: 'attached', timeout: 2000 })
 
   // Replace the default editor content with our before-block markup

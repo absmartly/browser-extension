@@ -337,11 +337,19 @@ describe("ElementActions", () => {
 
     it("should hide selected element", () => {
       mockGenerateRobustSelector.mockReturnValue("#test-div")
-      const postSpy = window.postMessage as jest.Mock
-      postSpy.mockClear()
 
       elementActions.hideElement()
 
+      // hideElement's contract is to push a `style: {display: "none"}`
+      // change into the undo/redo manager. Replaying that change to the
+      // SDK plugin is owned by VisualEditor's setOnChangeAdded callback
+      // (see src/visual-editor/core/visual-editor.ts) — under that
+      // single-owner replay design the action methods MUST NOT also
+      // postMessage, otherwise every edit ships two PREVIEW_CHANGES
+      // replace cycles. In this unit test mockUndoRedoManager.addChange
+      // is a plain jest.fn() so the replay callback never fires; we
+      // assert the addChange contract here and let the e2e suite cover
+      // the wired-up postMessage path.
       expect(mockUndoRedoManager.addChange).toHaveBeenCalledWith(
         expect.objectContaining({
           selector: "#test-div",
@@ -349,16 +357,6 @@ describe("ElementActions", () => {
           value: { display: "none" }
         }),
         null
-      )
-      // Hide is applied via the SDK path (window.postMessage → orchestrator →
-      // PreviewManager → DOMManipulator). The unit test asserts we sent the
-      // PREVIEW_CHANGES message; full DOM verification happens in the e2e suite.
-      expect(postSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: "absmartly-extension",
-          type: "PREVIEW_CHANGES"
-        }),
-        expect.anything()
       )
       expect(mockStateManager.setSelectedElement).toHaveBeenCalledWith(null)
     })

@@ -58,27 +58,41 @@ export function useVisualEditorCoordination({
 
             const currentChanges = changesRef.current || []
 
-            const changesMap = new Map()
-            // 'create' changes each add a distinct new element, so they must
-            // not collapse onto each other — give every one a unique key.
-            const keyFor = (change: DOMChange, index: number): string =>
-              change.type === "create"
-                ? `create-${change.selector}-${index}`
-                : `${change.selector}-${change.type}`
+            const changesMap = new Map<
+              string,
+              DOMChange & { originalIndex?: number }
+            >()
+            // Merge key for 'create' changes must be content-stable: a
+            // re-delivery of the same payload (storage rebroadcast,
+            // VISUAL_EDITOR_CHANGES_COMPLETE following an earlier
+            // VISUAL_EDITOR_CHANGES with the same payload, etc.) would
+            // otherwise produce a fresh index each pass and silently
+            // duplicate the create. Hash the targetSelector + position +
+            // element so identical creates collapse, while two distinct
+            // inserts (different anchor or different markup) stay
+            // separate. Non-create types still key by selector+type.
+            const keyFor = (change: DOMChange): string => {
+              if (change.type !== "create") {
+                return `${change.selector}-${change.type}`
+              }
+              const c = change as DOMChange & {
+                targetSelector?: string
+                position?: string
+                element?: string
+              }
+              return `create-${c.targetSelector ?? c.selector}-${c.position ?? "after"}-${c.element ?? ""}`
+            }
 
             currentChanges.forEach((change, index) => {
-              changesMap.set(keyFor(change, index), {
+              changesMap.set(keyFor(change), {
                 ...change,
                 originalIndex: index
               })
             })
 
-            message.changes.forEach((change, index) => {
+            message.changes.forEach((change) => {
               const changeObj = change as DOMChange
-              changesMap.set(
-                keyFor(changeObj, currentChanges.length + index),
-                changeObj
-              )
+              changesMap.set(keyFor(changeObj), changeObj)
             })
 
             const mergedChanges = Array.from(changesMap.values()) as DOMChange[]

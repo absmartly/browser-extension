@@ -113,7 +113,6 @@ export class ElementActions {
       } as DOMChange
 
       this.undoRedoManager.addChange(change, null)
-      this.applyCurrentChangesViaSDK()
       this.deselectElement()
     } catch (error) {
       console.error("Failed to hide element:", error)
@@ -122,10 +121,16 @@ export class ElementActions {
   }
 
   /**
-   * Build the current change list and route it through the SDK plugin's
-   * PreviewManager (same path as production preview). PreviewManager runs
-   * removePreviewChanges first (replace mode), so undo / reorder / toggle all
-   * naturally fall out of pushing a new full list.
+   * Force a full SDK replay of the current change list. Call sites that
+   * mutate the undo/redo state without going through addChange() (the
+   * "Clear all changes" path being the only one) need this; every other
+   * action goes through addChange(), and the visual-editor's
+   * setOnChangeAdded callback already replays the squashed list to the
+   * SDK plugin under VISUAL_EDITOR_EXPERIMENT_NAME. Don't call this
+   * after addChange() — that produces two PREVIEW_CHANGES replace
+   * cycles per edit, which under CI contention turns each VE action
+   * into multi-second SDK round-trips and visibly flickers create
+   * inserts.
    */
   private applyCurrentChangesViaSDK(): void {
     const variantName = this.stateManager.getConfig().variantName
@@ -170,7 +175,6 @@ export class ElementActions {
         this.undoRedoManager.addChange(change, null)
       }
 
-      this.applyCurrentChangesViaSDK()
       this.notifications.show("Image source updated", "", "success")
     } catch (error) {
       console.error("Failed to change image source:", error)
@@ -184,7 +188,6 @@ export class ElementActions {
     const selector = this.getSelector(this.selectedElement)
     const change: DOMChange = { selector, type: "delete" }
     this.undoRedoManager.addChange(change, null)
-    this.applyCurrentChangesViaSDK()
     this.deselectElement()
   }
 
@@ -279,7 +282,6 @@ export class ElementActions {
       position
     }
     this.undoRedoManager.addChange(change, null)
-    this.applyCurrentChangesViaSDK()
   }
 
   public async insertNewBlock(): Promise<void> {
@@ -312,18 +314,18 @@ export class ElementActions {
         position: options.position
       }
 
-      this.undoRedoManager.addChange(change, null)
-      this.applyCurrentChangesViaSDK()
+      // Snapshot the reference element's siblings *before* the change is
+      // committed. addChange() triggers an SDK postMessage round-trip via
+      // the visual-editor's setOnChangeAdded callback, so reading
+      // referenceElement.previous/nextElementSibling synchronously after
+      // would catch the pre-insert DOM. Diff the parent's children once
+      // the new node lands and select whichever child wasn't there before.
+      const parent = referenceElement.parentElement
+      const preChildren = parent
+        ? new Set<Element>(Array.from(parent.children))
+        : null
 
-      // After the round-trip, find the freshly-inserted element so we can
-      // select it. PreviewManager tagged it with data-absmartly-experiment
-      // (set inside applyPreviewChange's create branch), but the marker is
-      // applied asynchronously via postMessage — we look it up by sibling
-      // relationship instead.
-      const insertedElement =
-        options.position === "before"
-          ? referenceElement.previousElementSibling
-          : referenceElement.nextElementSibling
+      this.undoRedoManager.addChange(change, null)
 
       this.notifications.show(
         `HTML block inserted ${options.position} selected element`,
@@ -331,8 +333,22 @@ export class ElementActions {
         "success"
       )
 
-      if (insertedElement) {
-        this.selectElement(insertedElement as HTMLElement)
+      if (parent && preChildren) {
+        const findInserted = (): Element | null =>
+          Array.from(parent.children).find((c) => !preChildren.has(c)) ?? null
+        let inserted = findInserted()
+        if (!inserted) {
+          // The SDK round-trip is async — wait one frame and re-check
+          // before giving up. Tests confirm the apply lands within a
+          // couple of frames in the common case; if not, the user can
+          // click the block manually.
+          inserted = await new Promise<Element | null>((resolve) => {
+            requestAnimationFrame(() => resolve(findInserted()))
+          })
+        }
+        if (inserted) {
+          this.selectElement(inserted as HTMLElement)
+        }
       }
     } catch (error) {
       console.error("[ElementActions] Failed to insert new block:", error)

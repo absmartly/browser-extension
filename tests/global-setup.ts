@@ -209,12 +209,20 @@ async function globalSetup(config: FullConfig) {
 
       let lastErr = ""
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const controller = new AbortController()
+        // Per-attempt 8s socket timeout. Without it a half-open
+        // connection (TCP RST never delivered, server stalled) blocks
+        // forever and the surrounding retry loop never gets a chance
+        // to run, hanging the entire suite at globalSetup before
+        // Playwright's per-test timer can fire.
+        const timer = setTimeout(() => controller.abort(), 8000)
         try {
           const res = await fetch(`${baseEndpoint}/v1/${resource}?items=200`, {
             headers: {
               Authorization: `Api-Key ${apiKey}`,
               Accept: 'application/json'
-            }
+            },
+            signal: controller.signal
           })
           if (res.ok) {
             const data = await res.json()
@@ -228,9 +236,14 @@ async function globalSetup(config: FullConfig) {
           }
         } catch (err) {
           lastErr = (err as Error).message
+        } finally {
+          clearTimeout(timer)
         }
         if (attempt < maxAttempts) {
-          // Exponential backoff with full jitter — 250ms, 500ms, 1s, 2s.
+          // Jittered exponential backoff: random delay in [base/2, 1.5*base]
+          // for base = 250ms · 2^(attempt-1). Spreads concurrent retries
+          // so multiple workers don't synchronously re-burst at the
+          // endpoint.
           const base = 250 * 2 ** (attempt - 1)
           const delay = Math.floor(Math.random() * base) + base / 2
           await new Promise((r) => setTimeout(r, delay))

@@ -69,21 +69,27 @@ export class ElementStateManager {
 
     try {
       // Reattach the element if a structural change ('delete' or 'move')
-      // detached it from its original parent. Only do this when the captured
-      // parent still exists in the live document — otherwise we'd be inserting
-      // into a stale subtree.
-      if (
-        originalState.parent &&
-        element.parentNode !== originalState.parent &&
-        document.contains(originalState.parent)
-      ) {
+      // detached it from its original parent OR moved it within the same
+      // parent. We have to handle both cases:
+      //   - Different parent: classic delete/move-across-tree restore.
+      //   - Same parent, different sibling: a move within siblings still
+      //     needs the element put back in front of its original
+      //     nextSibling.
+      // `parent.isConnected` (rather than document.contains) recognises
+      // shadow DOM hosts as valid restore targets — the latter returns
+      // false for nodes that live inside a shadow root, which would skip
+      // perfectly legitimate restorations.
+      const parent = originalState.parent
+      if (parent && parent.isConnected) {
         const sibling = originalState.nextSibling
         const siblingStillThere =
-          sibling && sibling.parentNode === originalState.parent
-        originalState.parent.insertBefore(
-          element,
-          siblingStillThere ? sibling : null
-        )
+          sibling && sibling !== element && sibling.parentNode === parent
+        const targetSibling: Node | null = siblingStillThere ? sibling : null
+        const needsReposition =
+          element.parentNode !== parent || element.nextSibling !== targetSibling
+        if (needsReposition) {
+          parent.insertBefore(element, targetSibling)
+        }
       }
 
       // CRITICAL: Never restore innerHTML for structural elements (body, html, head)

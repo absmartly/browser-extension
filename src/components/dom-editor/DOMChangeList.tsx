@@ -257,7 +257,7 @@ export function DOMChangeList({
         )
       case "delete":
         return <span className="text-red-600">Delete element</span>
-      case "create":
+      case "create": {
         const createChange = change as any
         return (
           <span className="text-green-600">
@@ -265,6 +265,7 @@ export function DOMChangeList({
             element
           </span>
         )
+      }
       default:
         return (
           <span className="text-gray-500">

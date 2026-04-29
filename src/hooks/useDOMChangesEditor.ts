@@ -243,6 +243,12 @@ export function useDOMChangesEditor({
           }
           break
         case "create":
+          // 'create' changes insert a brand new element, so triggerOnView
+          // doesn't apply — the change itself is what brings the element
+          // into existence; there's nothing to defer until intersection.
+          // Other change types target an element that already exists in
+          // the page, hence the per-type triggerOnView serialization
+          // above.
           domChange = {
             selector: changeToSave.selector,
             type: "create",

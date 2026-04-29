@@ -43,24 +43,25 @@ export class EditModes {
       (c) => c.selector === elementSelector && c.type === "move"
     )
 
-    // Store original parent info - use existing if available
-    let originalParent: Element | null
-    let originalNextSibling: Element | null
+    // Always capture the LIVE pre-drag position as the rollback anchor.
+    // For repeat drags, that's where the previous move landed, and we
+    // need it so trackMoveChange can revert the drop before the SDK
+    // replays — otherwise PreviewManager would capture the post-drop
+    // DOM as 'original' and undo would land in the wrong place. The
+    // historical first-move anchor (used for the move change's
+    // `originalTargetSelector` metadata) is preserved separately on the
+    // existing move change.
+    const originalParent: Element | null = smartElement.parentElement
+    const originalNextSibling: Element | null = smartElement.nextElementSibling
 
     if (
       existingMoveChange &&
       (existingMoveChange as any).value?.originalTargetSelector
     ) {
-      // This element was already moved, preserve its TRUE original position
       debugLog(
-        "[ABSmartly] Element already has move change, preserving original position"
+        "[ABSmartly] Element already has move change; rollback anchor is the live (post-previous-drop) position, true-original survives in the existing move change"
       )
-      originalParent = null // Will be handled by trackMoveChange
-      originalNextSibling = null // Will be handled by trackMoveChange
     } else {
-      // First time moving this element, capture current position as original
-      originalParent = smartElement.parentElement
-      originalNextSibling = smartElement.nextElementSibling
       debugLog("[ABSmartly] First move of element, capturing original position")
     }
 
