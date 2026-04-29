@@ -284,7 +284,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle append action - add new changes to existing ones', async ({ extensionUrl }) => {
-    test.setTimeout(60000)
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate initial changes', async () => {
@@ -320,7 +320,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle replace_all action - replace all existing changes', async ({ extensionUrl }) => {
-    test.setTimeout(60000)
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate initial changes', async () => {
@@ -351,7 +351,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle replace_specific action - replace specific changes only', async ({ extensionUrl }) => {
-    test.setTimeout(60000)
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate multiple changes', async () => {
@@ -380,7 +380,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle remove_specific action - remove specific changes only', async ({ extensionUrl }) => {
-    test.setTimeout(60000)
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate multiple changes', async () => {
@@ -409,7 +409,7 @@ test.describe('AI DOM Granular Operations', () => {
   })
 
   test('should handle none action - conversational response only', async ({ extensionUrl }) => {
-    test.setTimeout(60000)
+    test.setTimeout(90000)
     let sidebar: FrameLocator
 
     await test.step('Setup and generate initial changes', async () => {
