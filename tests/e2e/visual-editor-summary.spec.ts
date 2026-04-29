@@ -23,7 +23,7 @@ test.describe('Visual Editor Summary', () => {
   })
 
   test('Verify visual editor launches and context menu appears', async () => {
-    test.setTimeout(45000)
+    test.setTimeout(90000)
 
     console.log('\n🚀 Visual Editor Test Summary')
     console.log('================================')

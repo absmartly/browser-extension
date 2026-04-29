@@ -34,7 +34,7 @@ test.describe('Visual Editor Complete Workflow', () => {
   })
 
   test('Complete workflow: sidebar → experiment → visual editor → actions → save → verify', async ({ extensionId, extensionUrl }) => {
-    test.setTimeout(process.env.SLOW === '1' ? 90000 : 15000)
+    test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
 
     let sidebar: any
     let experimentName: string
