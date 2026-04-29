@@ -145,7 +145,7 @@ test.describe('AI Provider Settings', () => {
 
     const saveButton = sidebar.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.evaluate((el: HTMLElement) => el.click())
+    await saveButton.click()
 
     await openSettings(sidebar)
 

@@ -82,3 +82,6 @@ PRPs/
 # Temporary test files
 TEST_SUMMARY.md
 test-html-compression.js
+
+# Pre-fetched editor resources cache (written by tests/global-setup.ts)
+.editor-resources-cache.json

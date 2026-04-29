@@ -113,6 +113,23 @@ export const test = base.extend<ExtFixtures>({
       'plasmo:absmartly-config': defaultConfig
     }
 
+    // Seed editor resources cache from globalSetup pre-fetch (one real
+    // /v1/* call per resource at suite start, not per sidebar mount).
+    // Without this, every sidebar mount fires 6 concurrent /v1/* calls and
+    // under workers=4 + 4 CI shards = 16 sidebars in flight the API
+    // saturates; the unit-type dropdown stays disabled for 30-90s. With
+    // pre-fetch the dropdown enables in <100ms from cache.
+    const editorResourcesPath = path.join(__dirname, '..', '..', '.editor-resources-cache.json')
+    if (fs.existsSync(editorResourcesPath)) {
+      try {
+        const cached = JSON.parse(fs.readFileSync(editorResourcesPath, 'utf-8'))
+        seedData['editor-resources-cache'] = cached
+        seedData['plasmo:editor-resources-cache'] = cached
+      } catch {
+        // Pre-fetch unavailable; fall back to live API calls per sidebar.
+      }
+    }
+
     // The ABsmartly API key lives in the local-area secret store (not in
     // sync alongside the rest of the config) — getConfig overrides
     // config.apiKey with whatever's at `absmartly-apikey` in local. If the

@@ -116,9 +116,7 @@ test.describe('Settings Authentication Tests', () => {
 
     const saveButton = sidebar.locator('#save-settings-button')
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
-    await saveButton.evaluate((btn: HTMLElement) =>
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    )
+    await saveButton.click()
 
     const authStatusSection = sidebar.locator('#authentication-status-heading')
     await expect(authStatusSection).toBeVisible({ timeout: 5000 })

@@ -19,7 +19,8 @@ export const sessionStorage = new Storage({ area: "session" })
 export const STORAGE_KEYS = {
   CONFIG: "absmartly-config",
   RECENT_EXPERIMENTS: "recent-experiments",
-  EXPERIMENTS_CACHE: "experiments-cache"
+  EXPERIMENTS_CACHE: "experiments-cache",
+  EDITOR_RESOURCES_CACHE: "editor-resources-cache"
 } as const
 
 const CHUNK_SIZE = 5000
@@ -65,6 +66,45 @@ export async function setConfig(config: ABsmartlyConfig): Promise<void> {
 
 export async function getRecentExperiments(): Promise<number[]> {
   return (await storage.get(STORAGE_KEYS.RECENT_EXPERIMENTS)) || []
+}
+
+export interface EditorResourcesCache {
+  applications?: any[]
+  unitTypes?: any[]
+  metrics?: any[]
+  tags?: any[]
+  owners?: any[]
+  teams?: any[]
+  timestamp: number
+}
+
+// Cache the slow Promise.all of /v1/applications + /v1/unit-types +
+// /v1/metrics + /v1/experiment-tags + /v1/owners + /v1/teams that fires on
+// every sidebar mount. Under workers=4 + 4 CI shards = 16 sidebars in
+// flight, those six concurrent fetches per sidebar saturate the API and
+// the unit-type-select dropdown stays disabled for 30-90s. With a cache
+// the dropdown enables in <100ms from prior data and the network refresh
+// happens behind the user.
+export async function getEditorResourcesCache(): Promise<EditorResourcesCache | null> {
+  try {
+    const data = await storage.get(STORAGE_KEYS.EDITOR_RESOURCES_CACHE)
+    return (data as unknown as EditorResourcesCache | undefined) ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function setEditorResourcesCache(
+  cache: Omit<EditorResourcesCache, "timestamp">
+): Promise<void> {
+  try {
+    await storage.set(STORAGE_KEYS.EDITOR_RESOURCES_CACHE, {
+      ...cache,
+      timestamp: Date.now()
+    })
+  } catch (err) {
+    debugWarn("Failed to cache editor resources:", err)
+  }
 }
 
 export async function addRecentExperiment(experimentId: number): Promise<void> {

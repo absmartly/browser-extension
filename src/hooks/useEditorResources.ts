@@ -11,6 +11,10 @@ import type {
 } from "~src/types/absmartly"
 import { APIError } from "~src/types/errors"
 import { debugError, debugLog } from "~src/utils/debug"
+import {
+  getEditorResourcesCache,
+  setEditorResourcesCache
+} from "~src/utils/storage"
 
 interface UseEditorResourcesParams {
   config: ABsmartlyConfig | null
@@ -69,6 +73,18 @@ export function useEditorResources({
       setTags(tagsData || [])
       setOwners(ownersData || [])
       setTeams(teamsData || [])
+
+      // Persist for next sidebar mount — under workers=4 + 4 CI shards
+      // the six concurrent /v1/* calls take 30-90s; reading from cache
+      // unblocks the dropdowns immediately.
+      await setEditorResourcesCache({
+        applications: apps,
+        unitTypes: units,
+        metrics: metricsData,
+        tags: tagsData,
+        owners: ownersData,
+        teams: teamsData
+      })
     } catch (err: unknown) {
       const error = APIError.fromError(err)
       if (error.isAuthError || error.message === "AUTH_EXPIRED") {
@@ -92,6 +108,25 @@ export function useEditorResources({
     getOwners,
     getTeams
   ])
+
+  // Synchronously hydrate from cache so dropdowns open as soon as the
+  // form mounts. The fresh-fetch effect below still runs and overwrites
+  // when newer data arrives.
+  useEffect(() => {
+    let cancelled = false
+    void getEditorResourcesCache().then((cached) => {
+      if (cancelled || !cached) return
+      if (cached.applications) setApplications(cached.applications)
+      if (cached.unitTypes) setUnitTypes(cached.unitTypes)
+      if (cached.metrics) setMetrics(cached.metrics)
+      if (cached.tags) setTags(cached.tags)
+      if (cached.owners) setOwners(cached.owners)
+      if (cached.teams) setTeams(cached.teams)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (config && isAuthenticated && unitTypes.length === 0) {
