@@ -191,43 +191,43 @@ async function globalSetup(config: FullConfig) {
   // shard at suite start.
   if (apiKey && apiEndpoint) {
     const cachePath = path.join(rootDir, '.editor-resources-cache.json')
-    const normalizedEndpoint = apiEndpoint.replace(/\/$/, '')
-    const fetchOne = async (path: string): Promise<unknown[]> => {
+    // Endpoint env var sometimes ends in /v1 and sometimes doesn't, depending
+    // on which environment the workflow points at. Strip the trailing slash
+    // and the optional /v1 so we can append /v1/<resource> deterministically.
+    const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
+    const fetchOne = async (resource: string): Promise<unknown[]> => {
       try {
-        const res = await fetch(`${normalizedEndpoint}${path}`, {
+        const res = await fetch(`${baseEndpoint}/v1/${resource}?items=200`, {
           headers: {
             Authorization: `Api-Key ${apiKey}`,
             Accept: 'application/json'
           }
         })
-        if (!res.ok) return []
+        if (!res.ok) {
+          console.warn(`[globalSetup] Pre-fetch ${resource} failed: ${res.status}`)
+          return []
+        }
         const data = await res.json()
-        const arr =
-          (data?.applications as unknown[]) ??
-          (data?.unit_types as unknown[]) ??
-          (data?.metrics as unknown[]) ??
-          (data?.experiment_tags as unknown[]) ??
-          (data?.experiment_users as unknown[]) ??
-          (data?.experiment_teams as unknown[]) ??
-          (Array.isArray(data) ? data : [])
+        const arr = data?.[resource] ?? (Array.isArray(data) ? data : [])
         return Array.isArray(arr) ? arr : []
-      } catch {
+      } catch (err) {
+        console.warn(`[globalSetup] Pre-fetch ${resource} threw:`, (err as Error).message)
         return []
       }
     }
     const [applications, unitTypes, metrics, tags, owners, teams] = await Promise.all([
-      fetchOne('/applications?items=200'),
-      fetchOne('/unit_types?items=200'),
-      fetchOne('/metrics?items=200'),
-      fetchOne('/experiment_tags?items=200'),
-      fetchOne('/users?items=200'),
-      fetchOne('/teams?items=200')
+      fetchOne('applications'),
+      fetchOne('unit_types'),
+      fetchOne('metrics'),
+      fetchOne('experiment_tags'),
+      fetchOne('users'),
+      fetchOne('teams')
     ])
     fs.writeFileSync(
       cachePath,
       JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, timestamp: Date.now() })
     )
-    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}) → ${cachePath}`)
+    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}) → ${cachePath}`)
   }
 
   console.log('✅ Global setup completed successfully')

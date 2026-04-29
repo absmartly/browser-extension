@@ -118,9 +118,13 @@ test.describe('Settings Authentication Tests', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
-    const authStatusSection = sidebar.locator('#authentication-status-heading')
-    await expect(authStatusSection).toBeVisible({ timeout: 5000 })
-    console.log('Auth status section visible after save')
+    // Save navigates back to list view; the previous assertion that
+    // #authentication-status-heading is still visible relied on save
+    // being silently blocked by validateEndpointReachable. With save
+    // now non-blocking, verify navigation succeeded — that proves the
+    // auth-method radio toggling didn't break the form's validity.
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 30000 })
+    console.log('Settings saved; navigated to list view')
 
     await page.close()
   })
