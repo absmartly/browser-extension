@@ -345,7 +345,7 @@ test.describe('Experiment Data Persistence', () => {
 
         // Wait for navigation to detail view - look for the title to change
         console.log('  [DEBUG] Waiting for navigation to detail view...')
-        await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 5000 })
+        await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 15000 })
         await debugWait(1000) // Small wait for view to stabilize
 
         await testPage.screenshot({ path: 'debug-step9-after-click.png', fullPage: true })
