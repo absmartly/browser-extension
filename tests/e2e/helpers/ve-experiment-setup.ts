@@ -27,14 +27,13 @@ export async function createExperiment(
 
   const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
   await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
-  // The trigger is disabled (cursor-not-allowed) until unit types load from
-  // the API. Under workers=4 + prod-bundle CI, the editor resources hook
-  // fires SIX concurrent API calls per sidebar mount. Across 4 shards × 4
-  // workers = 16 sidebars in flight, the ABsmartly API rate-limits and
-  // these calls queue. Observed worst case: 60-80s. 90s ceiling buys us
-  // headroom without making genuinely-stuck tests sit forever (the outer
-  // playwright test timeout is 180s).
-  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
+  // The trigger is disabled (cursor-not-allowed) until unitTypes is populated.
+  // useEditorResources hydrates this from chrome.storage.local on mount —
+  // tests fixture seeds that cache from a globalSetup pre-fetch — so the
+  // dropdown enables in well under a second. The 10s ceiling is just slack
+  // for first-mount React batching under workers=4 contention; if it
+  // genuinely times out, the cache plumbing is broken and we want to know.
+  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
   await unitTypeTrigger.click()
   await debugWait(500)
 

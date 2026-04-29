@@ -280,7 +280,7 @@ test.describe('AI Chat Blank Screen Diagnostics', () => {
       console.log(`  ✓ Experiment name: ${experimentName}`)
 
       const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
-      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
+      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
       await unitTypeTrigger.click()
       console.log('  ✓ Clicked Unit Type dropdown')
 

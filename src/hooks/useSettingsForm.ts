@@ -236,6 +236,18 @@ export function useSettingsForm() {
             }
           } catch (err) {
             debugError("[useSettingsForm] Auth check failed:", err)
+            // Make the auth probe failure user-visible too (the outer
+            // try/catch on loadConfig used to do this when the probe was
+            // synchronous). Set a low-severity field error rather than the
+            // hard configLoadError state — the form is already rendered
+            // and the user can still save / retry.
+            setErrors((prev) => ({
+              ...prev,
+              auth:
+                err instanceof Error
+                  ? `Authentication probe failed: ${err.message}`
+                  : "Authentication probe failed"
+            }))
           }
         })()
       }

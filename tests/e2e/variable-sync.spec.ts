@@ -77,7 +77,7 @@ test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () =
       console.log('  Selecting Unit Type...')
       const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
       await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
-      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
+      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
       await unitTypeTrigger.click()
       await debugWait(500)
 

@@ -99,7 +99,7 @@ test.describe('Experiment Data Persistence', () => {
         console.log('  [DEBUG] Unit Type trigger visible')
 
         // Wait for it to become enabled (not disabled/loading)
-        await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
+        await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
         console.log('  [DEBUG] Unit Type enabled')
 
         await testPage.screenshot({ path: 'debug-step4-before-unit-type-click.png', fullPage: true })
@@ -140,7 +140,7 @@ test.describe('Experiment Data Persistence', () => {
         console.log('  [DEBUG] Applications trigger visible')
 
         // Wait for it to become enabled
-        await sidebar.locator('#applications-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
+        await sidebar.locator('#applications-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 10000 })
         console.log('  [DEBUG] Applications enabled')
 
         await testPage.screenshot({ path: 'debug-step5-before-app-click.png', fullPage: true })

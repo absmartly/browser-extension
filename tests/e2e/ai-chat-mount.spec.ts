@@ -297,12 +297,12 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     const sidebar = await injectSidebar(page, extensionUrl)
     console.log('[Test] Extension initialized')
 
-    // Wait for sidebar to load - wait for experiment list or empty state.
-    // Under workers=4 + 4 CI shards = 16 sidebars in flight, the
+    // Wait for sidebar to load - wait for experiment list or the empty-state
+    // marker. Under workers=4 + 4 CI shards = 16 sidebars in flight, the
     // /v1/experiments fetch can take 30-50s. Generous ceiling.
     await Promise.race([
       sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 60000 }),
-      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 60000 })
+      sidebar.locator('#no-experiments-message').waitFor({ state: 'visible', timeout: 60000 })
     ]).catch(() => {})
     console.log('[Test] Sidebar visible')
 
@@ -411,12 +411,12 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     const sidebar = await injectSidebar(page, extensionUrl)
     console.log('[Test] Extension initialized')
 
-    // Wait for sidebar to load - wait for experiment list or empty state.
-    // Under workers=4 + 4 CI shards = 16 sidebars in flight, the
+    // Wait for sidebar to load - wait for experiment list or the empty-state
+    // marker. Under workers=4 + 4 CI shards = 16 sidebars in flight, the
     // /v1/experiments fetch can take 30-50s. Generous ceiling.
     await Promise.race([
       sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 60000 }),
-      sidebar.locator('text=/No experiments/i').waitFor({ state: 'visible', timeout: 60000 })
+      sidebar.locator('#no-experiments-message').waitFor({ state: 'visible', timeout: 60000 })
     ]).catch(() => {})
     console.log('[Test] Sidebar loaded')
 

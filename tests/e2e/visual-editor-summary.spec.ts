@@ -36,9 +36,12 @@ test.describe('Visual Editor Summary', () => {
 
     console.log('✅ Step 2: Launching Visual Editor')
     await activateVisualEditor(sidebarFrame, page)
-    const hasVisualEditor = await page.locator('text=/Visual Editor/').count() > 0
-    expect(hasVisualEditor).toBe(true)
-    console.log('   Visual Editor header visible')
+    // activateVisualEditor already waits for #absmartly-visual-editor-banner-host
+    // (the banner shadow-host the VE injects on activation), so reaching this
+    // line is the signal the editor mounted. Assert against the id rather than
+    // text content to follow the project's id-selector rule.
+    await expect(page.locator('#absmartly-visual-editor-banner-host')).toBeVisible({ timeout: 5000 })
+    console.log('   Visual Editor banner visible')
 
     console.log('\n✅ Step 3: Testing context menu')
     const heading = page.locator('#hero-title').first()
