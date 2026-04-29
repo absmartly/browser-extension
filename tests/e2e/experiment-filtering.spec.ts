@@ -80,6 +80,22 @@ test.describe('Experiment List Filters', () => {
       await debugWait()
     }
 
+    // The initial render has experimentsLoading=false and experiments=[], which
+    // satisfies waitForResults' selectors immediately (#no-experiments-message
+    // is visible). That lets the test charge ahead before loadExperiments has
+    // even fired, and a late-arriving API response then re-renders mid-test —
+    // detaching elements out from under in-flight clicks. Block on a real
+    // load cycle instead: refresh-experiments-button is disabled while
+    // experimentsLoading=true, so wait for it to flip true→false.
+    const waitForInitialLoad = async (): Promise<void> => {
+      const refreshBtn = sidebar.locator('#refresh-experiments-button')
+      await refreshBtn.waitFor({ state: 'visible', timeout: 10000 })
+      // Catch the disabled phase if we can; if the load completes before we
+      // observe it, the next assertion still confirms no in-flight load.
+      await expect(refreshBtn).toBeDisabled({ timeout: 10000 }).catch(() => {})
+      await expect(refreshBtn).not.toBeDisabled({ timeout: 30000 })
+    }
+
     const clickFilter = async (selector: string): Promise<void> => {
       await click(sidebar, selector)
       await debugWait()
@@ -122,7 +138,7 @@ test.describe('Experiment List Filters', () => {
 
       await sidebar.locator('#experiments-heading').waitFor({ state: 'visible', timeout: 10000 })
       await debugWait()
-      await waitForResults()
+      await waitForInitialLoad()
       log(`Initial experiment count: ${await experimentCount()}`)
       await debugWait()
     })
