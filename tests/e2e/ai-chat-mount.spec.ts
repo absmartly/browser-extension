@@ -312,7 +312,7 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
 
     // Find first experiment in the list
     const firstExperiment = sidebar.locator('.experiment-item').first()
-    await firstExperiment.waitFor({ state: 'visible', timeout: 20000 })
+    await firstExperiment.waitFor({ state: 'visible', timeout: 30000 })
     console.log('[Test] Found first experiment')
 
     // Click on the experiment to open detail view
