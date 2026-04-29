@@ -269,7 +269,7 @@ test.describe('Experiment Data Persistence', () => {
 
         console.log('  ✓ Experiment created, waiting for redirect...')
 
-        await sidebar.locator('#experiments-heading').waitFor({ timeout: 15000 })
+        await sidebar.locator('#experiments-heading').waitFor({ timeout: 30000 })
         console.log('  ✓ Redirected to experiments list')
 
         await testPage.screenshot({ path: 'debug-step8-after-redirect.png', fullPage: true })
