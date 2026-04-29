@@ -28,10 +28,13 @@ export async function createExperiment(
   const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
   await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
   // The trigger is disabled (cursor-not-allowed) until unit types load from
-  // the API. Under workers=4 + prod-bundle CI, contention with sibling
-  // workers' /v1/* calls + background-SW fetch queueing pushes this wait
-  // past 30s; observed worst-case 35-40s. Keep a 60s ceiling.
-  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 60000 })
+  // the API. Under workers=4 + prod-bundle CI, the editor resources hook
+  // fires SIX concurrent API calls per sidebar mount. Across 4 shards × 4
+  // workers = 16 sidebars in flight, the ABsmartly API rate-limits and
+  // these calls queue. Observed worst case: 60-80s. 90s ceiling buys us
+  // headroom without making genuinely-stuck tests sit forever (the outer
+  // playwright test timeout is 180s).
+  await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
   await unitTypeTrigger.click()
   await debugWait(500)
 

@@ -91,8 +91,10 @@ test.describe('Claude API Key Authentication', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
-    // Save navigates back to list view; wait for it before re-opening settings.
-    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 10000 })
+    // Save runs validateForm + validateEndpointReachable (which round-trips
+    // through the background SW and can take 5-15s under workers=4). Only
+    // after that does it navigate back to list view. Generous ceiling here.
+    await sidebar.locator('#nav-settings').waitFor({ state: 'visible', timeout: 30000 })
 
     await openSettings(sidebar)
 
@@ -140,8 +142,9 @@ test.describe('Claude API Key Authentication', () => {
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
     await saveButton.click()
 
-    // Wait for save to complete - save navigates away from settings page
-    await sidebar.locator('#experiments-heading, [data-testid="experiment-list"], #configure-settings-button').first().waitFor({ state: 'visible', timeout: 15000 })
+    // Wait for save to complete - same logic as test #58: validateEndpointReachable
+    // can take 10s+ under workers=4. After that, view goes to list/welcome.
+    await sidebar.locator('#experiments-heading, [data-testid="experiment-list"], #configure-settings-button').first().waitFor({ state: 'visible', timeout: 30000 })
 
     await page.reload({ waitUntil: 'domcontentloaded' })
 

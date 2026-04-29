@@ -33,7 +33,9 @@ test.describe('Settings Authentication Tests', () => {
     await expect(sidebar.locator('#absmartly-endpoint')).toBeVisible({ timeout: 5000 })
 
     const refreshButton = sidebar.locator('#auth-refresh-button')
-    await refreshButton.waitFor({ state: 'visible', timeout: 5000 })
+    // The button is hidden while checkingAuth=true. The probe takes 5-15s
+    // on workers=4 + GH-hosted CI. Generous ceiling.
+    await refreshButton.waitFor({ state: 'visible', timeout: 20000 })
     await refreshButton.evaluate((btn: HTMLElement) => {
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })

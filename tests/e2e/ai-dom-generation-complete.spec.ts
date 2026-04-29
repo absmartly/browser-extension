@@ -149,7 +149,7 @@ test.describe('AI DOM Changes Generation - Complete Workflow', () => {
       // Select Unit Type (using SearchableSelect component)
       const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
       await unitTypeTrigger.waitFor({ state: 'visible', timeout: 15000 })
-      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 60000 })
+      await sidebar.locator('#unit-type-select-trigger:not([class*="cursor-not-allowed"])').waitFor({ timeout: 90000 })
       await unitTypeTrigger.click()
       await debugWait(500)
 
