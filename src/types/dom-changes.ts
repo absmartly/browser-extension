@@ -136,6 +136,16 @@ export interface DOMChangeCreate {
   disabled?: boolean
   waitForElement?: boolean
   observerRoot?: string
+  // Same exposure-tracking semantic as every other change type: when true,
+  // the SDK plugin's ExposureTracker watches the change's selector for
+  // viewport intersection and only fires the experiment exposure once the
+  // tracked element is visible. For 'create' the SDK plugin's else branch
+  // in ExposureTracker.ts tracks `change.selector` directly (move/delete
+  // get special placeholder handling because those elements may be absent
+  // in some variants — for create the inserted element exists once the
+  // change applies and the anchor selector is a fine proxy in the
+  // meantime).
+  triggerOnView?: boolean
 }
 
 export type DOMChange =
