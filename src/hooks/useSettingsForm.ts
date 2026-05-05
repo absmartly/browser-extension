@@ -45,6 +45,15 @@ export function useSettingsForm() {
   const [htmlInjectionEnabled, setHtmlInjectionEnabled] = useState(false)
   const [configLoadError, setConfigLoadError] = useState<string | null>(null)
   const initialFormSnapshotRef = useRef<string | null>(null)
+  // Tracks the most recent checkAuthStatus invocation. When several auth
+  // checks are in flight (for example: loadConfig auto-runs a check with the
+  // stored endpoint, the user changes the endpoint and clicks Refresh before
+  // the first response lands), only the latest call should be allowed to
+  // write its result back to React state. Without this guard the slower
+  // response wins and the UI shows auth for the wrong endpoint — the symptom
+  // being "click Refresh after changing the endpoint, but the user info
+  // still reflects the previous endpoint."
+  const authCheckCallIdRef = useRef(0)
 
   const buildFormSnapshot = (): string =>
     JSON.stringify({
@@ -266,6 +275,8 @@ export function useSettingsForm() {
     endpoint: string,
     configOverride?: { apiKey: string; authMethod: "jwt" | "apikey" }
   ) => {
+    const myCallId = ++authCheckCallIdRef.current
+    const isLatest = () => myCallId === authCheckCallIdRef.current
     try {
       setCheckingAuth(true)
 
@@ -293,6 +304,8 @@ export function useSettingsForm() {
         configJson: JSON.stringify(configForCheck)
       })
 
+      if (!isLatest()) return
+
       const data = response.data as Record<string, unknown> | undefined
       if (response.success && data?.user) {
         const user = data.user as ABsmartlyUser
@@ -305,11 +318,14 @@ export function useSettingsForm() {
         setAvatarUrl(null)
       }
     } catch (error) {
+      if (!isLatest()) return
       debugError("[useSettingsForm] Auth check failed:", error)
       setUser(null)
       setAvatarUrl(null)
     } finally {
-      setCheckingAuth(false)
+      if (isLatest()) {
+        setCheckingAuth(false)
+      }
     }
   }
 

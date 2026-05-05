@@ -37,6 +37,16 @@ export const AuthenticationStatusSection = React.memo(
       setAvatarFailed(false)
     }, [avatarUrl])
 
+    // Give the avatar another chance whenever a new auth check starts.
+    // Without this, a stale `avatarFailed=true` from a prior failed load
+    // sticks around when Refresh re-fetches the same proxy URL — the
+    // useEffect on [avatarUrl] doesn't fire because the string is unchanged.
+    useEffect(() => {
+      if (checkingAuth) {
+        setAvatarFailed(false)
+      }
+    }, [checkingAuth])
+
     const showAvatar = avatarUrl && !avatarFailed
 
     return (
