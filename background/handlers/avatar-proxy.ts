@@ -28,25 +28,44 @@ export async function handleAvatarFetch(
       return cached
     }
 
-    const config = await getConfig()
-    if (!config?.apiEndpoint) {
-      return new Response('No endpoint configured', { status: 500 })
-    }
-
     const normalizedAuthMethod = authMethod as 'jwt' | 'apikey'
-    const { apiKey: _, ...configWithoutApiKey } = config
-    const avatarConfig: ABsmartlyConfig = normalizedAuthMethod === 'jwt'
-      ? { ...configWithoutApiKey, authMethod: 'jwt' }
-      : { ...config, authMethod: 'apikey', apiKey: config.apiKey || '' }
+    // The avatar URL already carries the endpoint domain, so derive the
+    // origin from it instead of relying on stored config. This way the
+    // avatar still loads when the user clicks Refresh in Settings before
+    // saving — stored config can be empty (fresh install with only an
+    // env-provided endpoint) or still pointed at a different endpoint.
+    const avatarOrigin = new URL(avatarUrl).origin
 
+    let avatarConfig: ABsmartlyConfig
     let jwtToken: string | null = null
-    if (avatarConfig.authMethod === 'jwt') {
-      jwtToken = await getJWTCookie(config.apiEndpoint)
-      debugLog('[AvatarProxy] JWT token for avatar:', jwtToken ? 'found' : 'NOT FOUND', 'endpoint:', config.apiEndpoint)
+
+    if (normalizedAuthMethod === 'jwt') {
+      // JWT auth uses credentials:include — cookies are scoped to the
+      // request URL's domain, so we don't need stored config at all. We
+      // still fetch the JWT here for the Strategy-2 fallback below.
+      jwtToken = await getJWTCookie(avatarOrigin)
+      debugLog('[AvatarProxy] JWT token for avatar:', jwtToken ? 'found' : 'NOT FOUND', 'origin:', avatarOrigin)
+      avatarConfig = {
+        apiEndpoint: avatarOrigin,
+        authMethod: 'jwt'
+      } as ABsmartlyConfig
+    } else {
+      // apikey auth needs the secret. The form's value isn't reachable
+      // from the SW, so we read it from storage; the user must save before
+      // an unsaved key change takes effect for the avatar.
+      const config = await getConfig()
+      if (!config) {
+        return new Response('No API key configured', { status: 500 })
+      }
+      avatarConfig = {
+        apiEndpoint: avatarOrigin,
+        authMethod: 'apikey',
+        apiKey: config.apiKey || ''
+      } as ABsmartlyConfig
     }
 
-    const useAuthHeader = avatarConfig.authMethod === 'apikey'
-    const fetchOptions = buildAuthFetchOptions(avatarConfig.authMethod, avatarConfig, jwtToken, useAuthHeader)
+    const useAuthHeader = normalizedAuthMethod === 'apikey'
+    const fetchOptions = buildAuthFetchOptions(normalizedAuthMethod, avatarConfig, jwtToken, useAuthHeader)
 
     fetchOptions.headers = {
       ...fetchOptions.headers,
@@ -56,14 +75,29 @@ export async function handleAvatarFetch(
     // SECURITY: Never log API keys, tokens, or auth headers, even partially
     debugLog('[AvatarProxy] Fetching avatar with options:', {
       url: avatarUrl,
-      authMethod: avatarConfig.authMethod,
+      authMethod: normalizedAuthMethod,
       authHeader: fetchOptions.headers?.['Authorization'] ? 'present' : 'MISSING',
       credentials: fetchOptions.credentials
     })
 
-    const response = await fetch(avatarUrl, fetchOptions)
+    let response = await fetch(avatarUrl, fetchOptions)
 
     debugLog('[AvatarProxy] Avatar fetch response:', response.status, response.statusText)
+
+    // Mirror checkAuthentication's Strategy-2 fallback: if credentials:include
+    // came back 401 but we have a JWT, retry with an explicit Authorization
+    // header. SW fetch contexts occasionally drop cookies even when the user
+    // is logged in, so the explicit header is the reliable path.
+    if (response.status === 401 && normalizedAuthMethod === 'jwt' && jwtToken) {
+      debugLog('[AvatarProxy] credentials:include returned 401, retrying with Authorization header')
+      const fallbackOptions = buildAuthFetchOptions('jwt', avatarConfig, jwtToken, true)
+      fallbackOptions.headers = {
+        ...fallbackOptions.headers,
+        'Accept': 'image/*'
+      }
+      response = await fetch(avatarUrl, fallbackOptions)
+      debugLog('[AvatarProxy] Fallback fetch response:', response.status, response.statusText)
+    }
 
     if (!response.ok) {
       console.error('[AvatarProxy] Avatar fetch failed with status:', response.status)

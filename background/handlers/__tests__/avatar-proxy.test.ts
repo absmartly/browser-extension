@@ -275,17 +275,95 @@ describe('AvatarProxy', () => {
       expect(text).toBe('Avatar fetch failed')
     })
 
-    it('should handle missing endpoint configuration', async () => {
+    it('should fetch avatar via JWT even when stored config is missing', async () => {
+      // Simulates the "Refresh before saving" case: the user has typed an
+      // endpoint into the form but never hit Save, so storage returns null.
+      // For JWT we should still proceed using the avatar URL's origin and
+      // the browser's cookies.
+      mockStorageInstances.regular.get.mockResolvedValue(null)
+      ;(getJWTCookie as jest.Mock).mockResolvedValue('test-jwt-token')
+
+      const mockBlob = new Blob(['avatar-data'])
+      const mockFetchResponse = new MockResponse(mockBlob, {
+        status: 200,
+        headers: { 'content-type': 'image/png' }
+      })
+      mockFetch.mockResolvedValue(mockFetchResponse)
+
+      const response = await handleAvatarFetch(
+        'https://test-1.absmartly.com/v1/avatars/abc/avatar.png',
+        'jwt'
+      )
+
+      expect(response.status).toBe(200)
+      expect(getJWTCookie).toHaveBeenCalledWith('https://test-1.absmartly.com')
+    })
+
+    it('should reject apikey requests when no API key is configured', async () => {
       mockStorageInstances.regular.get.mockResolvedValue(null)
 
       const response = await handleAvatarFetch(
         'https://cdn.example.com/avatar.png',
-        'jwt'
+        'apikey'
       )
 
       expect(response.status).toBe(500)
       const text = await response.text()
-      expect(text).toBe('No endpoint configured')
+      expect(text).toBe('No API key configured')
+    })
+
+    it('should look up JWT cookie by avatar URL origin, not stored endpoint', async () => {
+      // Stored endpoint differs from the avatar URL's domain — e.g. user
+      // changed the endpoint in the form without saving. The cookie lookup
+      // must follow the avatar URL so we get the cookie for the domain we
+      // are actually fetching from.
+      mockStorageInstances.regular.get.mockResolvedValue({
+        apiEndpoint: 'https://prod.absmartly.com',
+        authMethod: 'jwt'
+      })
+      mockStorageInstances.secure.get.mockResolvedValue(null)
+      ;(getJWTCookie as jest.Mock).mockResolvedValue('test-jwt-token')
+
+      const mockBlob = new Blob(['avatar-data'])
+      mockFetch.mockResolvedValue(new MockResponse(mockBlob, {
+        status: 200,
+        headers: { 'content-type': 'image/png' }
+      }))
+
+      await handleAvatarFetch(
+        'https://test-1.absmartly.com/v1/avatars/abc/avatar.png',
+        'jwt'
+      )
+
+      expect(getJWTCookie).toHaveBeenCalledWith('https://test-1.absmartly.com')
+      expect(getJWTCookie).not.toHaveBeenCalledWith('https://prod.absmartly.com')
+    })
+
+    it('should retry JWT with Authorization header when credentials:include returns 401', async () => {
+      // Mirrors the Strategy-2 fallback in checkAuthentication so the avatar
+      // can still load when SW credentials:include drops cookies.
+      mockStorageInstances.regular.get.mockResolvedValue(null)
+      ;(getJWTCookie as jest.Mock).mockResolvedValue('test-jwt-token')
+
+      const unauthorizedResponse = new MockResponse('Unauthorized', { status: 401 })
+      const successBlob = new Blob(['avatar-data'])
+      const successResponse = new MockResponse(successBlob, {
+        status: 200,
+        headers: { 'content-type': 'image/png' }
+      })
+      mockFetch
+        .mockResolvedValueOnce(unauthorizedResponse)
+        .mockResolvedValueOnce(successResponse)
+
+      const response = await handleAvatarFetch(
+        'https://test-1.absmartly.com/v1/avatars/abc/avatar.png',
+        'jwt'
+      )
+
+      expect(response.status).toBe(200)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      const fallbackCall = mockFetch.mock.calls[1]
+      expect(fallbackCall[1].headers['Authorization']).toBe('JWT test-jwt-token')
     })
 
     it('should handle exceptions during fetch', async () => {
