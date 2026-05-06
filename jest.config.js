@@ -2,7 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
-  roots: ['<rootDir>/src', '<rootDir>/background'],
+  roots: ['<rootDir>/src', '<rootDir>/background', '<rootDir>/tests/unit'],
   testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)', '**/?(*.)+(spec|test).(ts|tsx|js)'],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
@@ -36,7 +36,7 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/tests/', // Ignore Playwright tests
+    '<rootDir>/tests/(?!unit/experiment-fill-schema)', // Ignore Playwright tests; allow specific Jest tests under tests/unit
   ],
   transformIgnorePatterns: [
     'node_modules/(?!(@plasmohq/storage|@absmartly/cli|pify|marked))',
