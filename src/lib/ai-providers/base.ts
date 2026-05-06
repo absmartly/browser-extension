@@ -83,6 +83,14 @@ export interface GenerateOptions {
   domStructure?: string
 }
 
+export interface GenerateStructuredOptions<TSchema = unknown> {
+  systemPrompt: string
+  userMessage: string
+  schema: ToolDefinition & { name: string; input_schema: TSchema }
+  images?: string[]
+  pageUrl?: string
+}
+
 export interface AIProvider {
   generate(
     html: string,
@@ -95,6 +103,11 @@ export interface AIProvider {
   getToolDefinition(): ToolDefinition
 
   getChunkRetrievalPrompt(): string
+
+  /** Optional: generic structured-generation entry point. Bridge provider implements it. */
+  generateStructured?<TResult = unknown>(
+    opts: GenerateStructuredOptions
+  ): Promise<TResult>
 }
 
 export function isAnthropicConfig(
