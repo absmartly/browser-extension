@@ -36,7 +36,10 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/tests/(?!unit/experiment-fill-schema)', // Ignore Playwright tests; allow specific Jest tests under tests/unit
+    // Allow Jest tests under tests/unit/, but ignore everything else under tests/ (Playwright e2e, etc).
+    '<rootDir>/tests/(?!unit/)',
+    // Existing Playwright-style files inside tests/unit/ that import @playwright/test or hit a live bridge.
+    '<rootDir>/tests/unit/(claude-bridge|ExperimentCodeInjection|ExperimentDetail|ExperimentEditor|ExperimentMetadata|VariantList)\\.test\\.tsx?$',
   ],
   transformIgnorePatterns: [
     'node_modules/(?!(@plasmohq/storage|@absmartly/cli|pify|marked))',
