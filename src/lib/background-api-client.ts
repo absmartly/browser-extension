@@ -402,4 +402,14 @@ export class BackgroundAPIClient {
       throw error
     }
   }
+
+  async captureVisibleTab(): Promise<string> {
+    const res = await chrome.runtime.sendMessage({
+      type: "ABSMARTLY_CAPTURE_VISIBLE_TAB"
+    })
+    if (!res?.ok || !res.dataUrl) {
+      throw new Error(res?.error || "Failed to capture visible tab")
+    }
+    return res.dataUrl
+  }
 }

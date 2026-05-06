@@ -1282,6 +1282,30 @@ export function initializeBackgroundScript() {
         }
       })()
       return true
+    } else if (message.type === "ABSMARTLY_CAPTURE_VISIBLE_TAB") {
+      ;(async () => {
+        try {
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true
+          })
+          const windowId = tabs[0]?.windowId
+          if (windowId === undefined) {
+            sendResponse({ ok: false, error: "no active tab" })
+            return
+          }
+          const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+            format: "png"
+          })
+          sendResponse({ ok: true, dataUrl })
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err)
+          })
+        }
+      })()
+      return true // keep the message channel open
     } else if (message.type === "PING") {
       debugLog("[Background] PONG! Message system is working")
       sendResponse({ pong: true })
