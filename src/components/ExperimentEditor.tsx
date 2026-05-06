@@ -1,4 +1,8 @@
-import { LockClosedIcon, LockOpenIcon } from "@heroicons/react/24/outline"
+import {
+  ArrowsPointingOutIcon,
+  LockClosedIcon,
+  LockOpenIcon
+} from "@heroicons/react/24/outline"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { useExperimentSave } from "~src/hooks/useExperimentSave"
@@ -9,10 +13,12 @@ import {
   setDOMChangesInConfig
 } from "~src/hooks/useVariantConfig"
 import type { AIDOMGenerationResult } from "~src/lib/ai-dom-generator"
+import { BackgroundAPIClient } from "~src/lib/background-api-client"
 import { sendToContent } from "~src/lib/messaging"
 import type {
   DOMChangesData,
   Experiment,
+  ExperimentCustomSectionField,
   ExperimentInjectionCode,
   URLFilter
 } from "~src/types/absmartly"
@@ -23,6 +29,11 @@ import { getConfig, localAreaStorage } from "~src/utils/storage"
 import { ExperimentCodeInjection } from "./ExperimentCodeInjection"
 import { ExperimentMetadata } from "./ExperimentMetadata"
 import type { ExperimentMetadataData } from "./ExperimentMetadata"
+import { openFullScreenModal } from "./fullscreen/openFullScreenModal"
+import {
+  FullScreenExperimentModal,
+  type FullScreenDraft
+} from "./FullScreenExperimentModal"
 import { Header } from "./Header"
 import { Button } from "./ui/Button"
 import { Input } from "./ui/Input"
@@ -229,6 +240,127 @@ export function ExperimentEditor({
     applyAIDomChanges()
   }, [currentVariants, domFieldName, experiment?.id, handleVariantsChange])
 
+  // Full-screen modal: load custom fields and page context
+  const [customFields, setCustomFields] = useState<
+    ExperimentCustomSectionField[]
+  >([])
+  const [pageContext, setPageContext] = useState({
+    url: "",
+    title: "",
+    visibleText: ""
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const client = new BackgroundAPIClient()
+        const fields = await client.getCustomSectionFields()
+        if (!cancelled) setCustomFields(fields)
+      } catch (err) {
+        debugWarn("[FullScreen] failed to load custom fields", err)
+      }
+      try {
+        const ctx = (await sendToContent({ type: "GET_PAGE_CONTEXT" })) as
+          | {
+              url?: string
+              title?: string
+              visibleText?: string
+            }
+          | undefined
+        if (!cancelled)
+          setPageContext({
+            url: ctx?.url || "",
+            title: ctx?.title || "",
+            visibleText: ctx?.visibleText || ""
+          })
+      } catch (err) {
+        debugWarn("[FullScreen] failed to fetch page context", err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleOpenFullScreen = useCallback(async () => {
+    const initialDraft: FullScreenDraft = {
+      ...formData,
+      customFieldValues: {}
+    }
+    const result = await openFullScreenModal<{
+      draft: FullScreenDraft
+      variants?: typeof currentVariants
+    }>({
+      render: ({ close }) => (
+        <FullScreenExperimentModal
+          mode={experiment?.id ? "edit" : "create"}
+          draft={initialDraft}
+          variants={currentVariants as any[]}
+          customFields={customFields}
+          applications={applications as any}
+          unitTypes={unitTypes as any}
+          owners={owners as any}
+          teams={teams as any}
+          tags={tags as any}
+          pageUrl={pageContext.url}
+          pageTitle={pageContext.title}
+          pageVisibleText={pageContext.visibleText}
+          variantDomChanges={currentVariants
+            .map((v, i) => ({
+              variantIndex: i,
+              variantName: v.name,
+              changes: getChangesConfig(
+                getDOMChangesFromConfig(v.config, domFieldName)
+              ).changes
+            }))
+            .filter((v) => v.changes.length > 0)}
+          onPreviewToggle={(enabled) => {
+            sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
+          }}
+          onPreviewWithChanges={(enabled, changes) => {
+            sendToContent({
+              type: "PREVIEW_WITH_CHANGES",
+              enabled,
+              changes
+            }).catch(() => {})
+          }}
+          aiProviderConfig={{ aiProvider: "claude-subscription" }}
+          onSave={() =>
+            close({ draft: initialDraft, variants: currentVariants })
+          }
+          onClose={() => close()}
+          onDraftChange={(next) => {
+            Object.assign(initialDraft, next)
+          }}
+          onVariantsChange={(variants) => {
+            ;(currentVariants as any).length = 0
+            ;(currentVariants as any).push(...variants)
+          }}
+        />
+      )
+    })
+
+    if (result?.draft) {
+      setFormData((prev) => ({
+        ...prev,
+        ...result.draft
+      }))
+    }
+  }, [
+    formData,
+    currentVariants,
+    customFields,
+    applications,
+    unitTypes,
+    owners,
+    teams,
+    tags,
+    pageContext,
+    experiment?.id,
+    domFieldName
+  ])
+
   // Stable onChange handler for ExperimentMetadata using functional state update
   const handleMetadataChange = useCallback(
     (metadata: ExperimentMetadataData) => {
@@ -370,6 +502,18 @@ export function ExperimentEditor({
         onBack={handleCancel}
       />
 
+      <div className="flex justify-end mb-2">
+        <Button
+          id="open-fullscreen-button"
+          data-testid="open-fullscreen-button"
+          type="button"
+          variant="secondary"
+          onClick={handleOpenFullScreen}>
+          <ArrowsPointingOutIcon className="h-4 w-4 mr-1 inline" />
+          Open in full screen
+        </Button>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
         <div className="space-y-3">
@@ -384,6 +528,7 @@ export function ExperimentEditor({
                 </label>
                 <Input
                   id="display-name-input"
+                  data-testid="display-name-input"
                   value={formData.display_name}
                   onChange={(e) => handleDisplayNameChange(e.target.value)}
                   placeholder="My Experiment"
@@ -398,6 +543,7 @@ export function ExperimentEditor({
                 </label>
                 <Input
                   id="experiment-name-input"
+                  data-testid="experiment-name-input"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="my_experiment_name"

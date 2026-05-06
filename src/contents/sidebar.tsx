@@ -357,6 +357,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true })
     return true
   }
+  if (message.type === "GET_PAGE_CONTEXT") {
+    sendResponse({
+      url: window.location.href,
+      title: document.title,
+      visibleText: document.body?.innerText?.slice(0, 8000) || ""
+    })
+    return true
+  }
 })
 
 if ((module as any).hot) {
