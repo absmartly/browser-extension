@@ -60,6 +60,9 @@ injected-bundles/
 
 # Test files, screenshots, and artifacts
 tests/
+# …but track the e2e test sources / helpers / fixtures. Without this exception
+# every new file under tests/e2e/ has to be added with `git add -f`.
+!tests/e2e/**
 .test-backups
 test-*.html
 *-test-*.html
