@@ -80,9 +80,42 @@ export async function testURLFilterAndPayload(sidebar: FrameLocator, page: Page)
 
   await page.screenshot({ path: 'test-results/json-editor-opened.png', fullPage: true })
 
-  const jsonContent = await page.evaluate(() => {
-    const cmEditor = document.querySelector('.cm-content')
-    return cmEditor ? cmEditor.textContent : ''
+  // CodeMirror v6 virtualizes — `.cm-content.textContent` only contains the
+  // currently rendered (visible) lines. The variant config can run long
+  // enough to push `urlFilter` below the viewport, in which case
+  // textContent misses it. Reach the EditorView via the cmView property
+  // CodeMirror attaches to the content element and read state.doc for the
+  // full source.
+  // CodeMirror v6 virtualizes — `.cm-content.textContent` only contains the
+  // currently rendered (visible) lines. The variant config can run long
+  // enough to push `urlFilter` below the viewport, in which case
+  // textContent misses it. Scroll cm-scroller through the document and
+  // accumulate the rendered text at each scroll position so we observe
+  // the full doc regardless of viewport size.
+  const jsonContent = await page.evaluate(async () => {
+    const scroller = document.querySelector(".cm-scroller") as HTMLElement | null
+    const content = document.querySelector(".cm-content")
+    if (!scroller || !content) return ""
+
+    const seen = new Set<string>()
+    const collect = () => {
+      content.querySelectorAll(".cm-line").forEach((line) => {
+        seen.add(line.textContent ?? "")
+      })
+    }
+
+    collect()
+    const totalHeight = scroller.scrollHeight
+    const step = scroller.clientHeight || 200
+    for (let y = 0; y <= totalHeight; y += step) {
+      scroller.scrollTop = y
+      // Yield once so CodeMirror's measure pass renders the new viewport.
+      await new Promise(requestAnimationFrame)
+      collect()
+    }
+    scroller.scrollTop = 0
+
+    return Array.from(seen).join("\n")
   })
 
   const hasUrlFilter = jsonContent.includes('urlFilter') || jsonContent.includes('url_filter')

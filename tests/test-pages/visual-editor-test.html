@@ -69,6 +69,18 @@
       <li id="item-2">Second list item</li>
       <li id="item-3">Third list item</li>
     </ul>
+
+    <!-- Rearrange/drag-drop targets. Children are intentionally id-less AND
+         class-less so the visual editor's selector generator falls through
+         to `#rearrange-zone > div:nth-of-type(N)`. That selector is unique
+         at the time it's generated but points to a *different* sibling
+         once positions shift — which is exactly the path that surfaces the
+         post-drop selector mismatch bug. -->
+    <div id="rearrange-zone" class="test-container">
+      <div>Alpha</div>
+      <div>Beta</div>
+      <div>Gamma</div>
+    </div>
   </div>
 </body>
 </html>

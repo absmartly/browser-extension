@@ -3,6 +3,7 @@ import { type Page } from '@playwright/test'
 import { injectSidebar, debugWait, log, initializeTestLogging, setupTestPage } from './utils/test-helpers'
 import { createExperiment, activateVisualEditor, testSecondVEInstance, fillMetadataForSave, saveExperiment } from './helpers/ve-experiment-setup'
 import { testAllVisualEditorActions } from './helpers/ve-actions'
+import { testRearrangeDragDrop } from './helpers/ve-rearrange'
 import { testUndoRedoForAllActions, testUndoRedoButtonStates } from './helpers/ve-undo-redo'
 import { verifyVEProtection, verifySidebarHasChanges, verifyChangesAfterVEExit, clickSaveButton } from './helpers/ve-verification'
 import { testPreviewToggle } from './helpers/ve-preview'
@@ -92,6 +93,11 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Test visual editor actions', async () => {
       step('Testing all VE actions', '🎯')
       await testAllVisualEditorActions(testPage)
+    })
+
+    await test.step('Test rearrange drag-and-drop', async () => {
+      step('Testing rearrange drag-and-drop', '🔀')
+      await testRearrangeDragDrop(testPage)
     })
 
     // ========================================
