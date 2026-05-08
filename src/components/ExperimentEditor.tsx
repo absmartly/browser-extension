@@ -93,26 +93,39 @@ export function ExperimentEditor({
     owner_ids: number[]
     team_ids: number[]
     tag_ids: number[]
-  }>({
-    name: experiment?.name || "",
-    display_name: experiment?.display_name || "",
-    state: experiment?.state || "created",
-    percentage_of_traffic: experiment?.percentage_of_traffic || 100,
-    nr_variants: experiment?.nr_variants || 2,
-    percentages: experiment?.percentages || "50/50",
-    audience_strict: experiment?.audience_strict ?? false,
-    audience: experiment?.audience || '{"filter":[{"and":[]}]}',
-    unit_type_id:
-      experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
-    application_ids:
-      experiment?.applications?.map((a) => Number(a.application_id || a.id)) ||
-      [],
-    owner_ids:
-      experiment?.owners?.map((o) => Number(o.user_id || (o as any).id)) || [],
-    team_ids:
-      experiment?.teams?.map((t) => Number(t.team_id || (t as any).id)) || [],
-    tag_ids:
-      experiment?.experiment_tags?.map((t) => Number(t.experiment_tag_id)) || []
+    customFieldValues: Record<string, unknown>
+  }>(() => {
+    // For an existing experiment we only have IDs in custom_section_field_values
+    // (no field name), so we cannot key the initial map by name here. The
+    // workspace custom-field definitions are loaded asynchronously below; an
+    // effect populates customFieldValues once both are available. Until then
+    // the modal sees `{}`, which means "no overrides".
+    const initial = {
+      name: experiment?.name || "",
+      display_name: experiment?.display_name || "",
+      state: experiment?.state || ("created" as Experiment["state"]),
+      percentage_of_traffic: experiment?.percentage_of_traffic || 100,
+      nr_variants: experiment?.nr_variants || 2,
+      percentages: experiment?.percentages || "50/50",
+      audience_strict: experiment?.audience_strict ?? false,
+      audience: experiment?.audience || '{"filter":[{"and":[]}]}',
+      unit_type_id:
+        experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
+      application_ids:
+        experiment?.applications?.map((a) =>
+          Number(a.application_id || a.id)
+        ) || [],
+      owner_ids:
+        experiment?.owners?.map((o) => Number(o.user_id || (o as any).id)) ||
+        [],
+      team_ids:
+        experiment?.teams?.map((t) => Number(t.team_id || (t as any).id)) || [],
+      tag_ids:
+        experiment?.experiment_tags?.map((t) => Number(t.experiment_tag_id)) ||
+        [],
+      customFieldValues: {} as Record<string, unknown>
+    }
+    return initial
   })
 
   // Use hooks
@@ -250,6 +263,49 @@ export function ExperimentEditor({
     visibleText: ""
   })
 
+  // Once both the workspace custom-field defs and the experiment payload are
+  // available, lift the experiment's id-keyed custom-section values into the
+  // name-keyed `formData.customFieldValues`. This lets the round-trip into the
+  // full-screen modal show the existing values, and lets the save path know
+  // which workspace fields the user expects on the payload.
+  const customFieldsHydratedRef = useRef(false)
+  useEffect(() => {
+    if (customFieldsHydratedRef.current) return
+    if (!experiment || customFields.length === 0) return
+    const raw = experiment.custom_section_field_values
+    if (!raw) {
+      customFieldsHydratedRef.current = true
+      return
+    }
+    const fieldsArray = Array.isArray(raw) ? raw : Object.values(raw)
+    const fieldsById = new Map<number, ExperimentCustomSectionField>()
+    for (const field of customFields) fieldsById.set(field.id, field)
+
+    const next: Record<string, unknown> = {}
+    for (const entry of fieldsArray) {
+      if (typeof entry !== "object" || entry === null) continue
+      const e = entry as {
+        experiment_custom_section_field_id?: number
+        custom_section_field?: { id: number; name?: string }
+        id?: number
+        value: unknown
+      }
+      const id =
+        e.experiment_custom_section_field_id ||
+        e.custom_section_field?.id ||
+        e.id
+      if (id === undefined) continue
+      const def = fieldsById.get(id)
+      const name = def?.name || e.custom_section_field?.name
+      if (!name) continue
+      next[name] = e.value
+    }
+    if (Object.keys(next).length > 0) {
+      setFormData((prev) => ({ ...prev, customFieldValues: next }))
+    }
+    customFieldsHydratedRef.current = true
+  }, [experiment, customFields])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -286,7 +342,7 @@ export function ExperimentEditor({
   const handleOpenFullScreen = useCallback(async () => {
     const initialDraft: FullScreenDraft = {
       ...formData,
-      customFieldValues: {}
+      customFieldValues: formData.customFieldValues
     }
     const result = await openFullScreenModal<{
       draft: FullScreenDraft

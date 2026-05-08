@@ -90,7 +90,13 @@ export function FullScreenExperimentModal(
   ) => {
     setScreenshots(newScreenshots)
     props.onDraftChange(
-      applyAIResultToDraft(props.draft, result, props.customFields)
+      applyAIResultToDraft(
+        props.draft,
+        result,
+        props.customFields,
+        props.applications,
+        props.tags
+      )
     )
   }
 
@@ -316,7 +322,9 @@ function toCustomFieldDescriptors(
 function applyAIResultToDraft(
   draft: FullScreenDraft,
   result: AIFillResponse,
-  customFields: readonly ExperimentCustomSectionField[]
+  customFields: readonly ExperimentCustomSectionField[],
+  applications: readonly Application[],
+  tags: readonly ExperimentTag[]
 ): FullScreenDraft {
   const next: FullScreenDraft = { ...draft }
 
@@ -328,6 +336,41 @@ function applyAIResultToDraft(
   if (result.audience) next.audience = result.audience
   if (typeof result.audience_strict === "boolean")
     next.audience_strict = result.audience_strict
+
+  if (result.applications && Array.isArray(result.applications)) {
+    // Map application names → application_id. Names that don't match any
+    // workspace application are dropped — we never invent ids.
+    const ids: number[] = []
+    const seen = new Set<number>()
+    for (const name of result.applications) {
+      const match = applications.find((a) => a.name === name)
+      const id = match?.application_id ?? match?.id
+      if (typeof id === "number" && !seen.has(id)) {
+        seen.add(id)
+        ids.push(id)
+      }
+    }
+    if (ids.length > 0) next.application_ids = ids
+  }
+
+  if (result.tags && Array.isArray(result.tags)) {
+    const ids: number[] = []
+    const seen = new Set<number>()
+    for (const name of result.tags) {
+      const match = tags.find((t) => t.name === name)
+      const id = match?.experiment_tag_id
+      if (typeof id === "number" && !seen.has(id)) {
+        seen.add(id)
+        ids.push(id)
+      }
+    }
+    if (ids.length > 0) next.tag_ids = ids
+  }
+
+  // TODO(FT-1905 follow-up): apply result.variants[].name / .description back
+  // to the variants list. Variants are managed by VariantList in the modal as
+  // external state so this needs a separate plumbing change — tracked
+  // separately from the customFieldValues / applications / tags fix.
 
   if (result.custom_fields) {
     const allowed = new Set(customFields.map((f) => f.name))

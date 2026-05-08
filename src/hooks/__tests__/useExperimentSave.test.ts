@@ -858,4 +858,314 @@ describe("useExperimentSave - Custom Fields", () => {
       expect(result.current.saveStatus.step).toBe("complete")
     })
   })
+
+  describe("customFieldValues from formData (FT-1905)", () => {
+    it("layers formData.customFieldValues over default_value when creating", async () => {
+      const mockCustomFields = [
+        {
+          id: 7,
+          name: "hypothesis",
+          title: "Hypothesis",
+          type: "text" as const,
+          default_value: "default hypothesis",
+          required: true
+        },
+        {
+          id: 8,
+          name: "purpose",
+          title: "Purpose",
+          type: "string" as const,
+          default_value: "default purpose",
+          required: false
+        }
+      ]
+      mockGetCustomSectionFields.mockResolvedValue(mockCustomFields)
+
+      const mockOnSave = jest.fn().mockResolvedValue(undefined)
+      const formData = {
+        name: "ai-test",
+        unit_type_id: 1,
+        application_ids: [1],
+        owner_ids: [1],
+        team_ids: [],
+        tag_ids: [],
+        customFieldValues: { hypothesis: "AI-filled hypothesis" }
+      }
+      const variants = [{ name: "Control", config: {} }]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({ experiment: null, domFieldName: "__dom_changes" })
+      )
+      await act(async () => {
+        await result.current.save(formData, variants, undefined, mockOnSave)
+      })
+
+      const payload = mockOnSave.mock.calls[0][0]
+      expect(payload.custom_section_field_values["7"]).toEqual({
+        value: "AI-filled hypothesis",
+        type: "text",
+        id: 7
+      })
+      // The non-overridden field still gets its default
+      expect(payload.custom_section_field_values["8"]).toEqual({
+        value: "default purpose",
+        type: "string",
+        id: 8
+      })
+    })
+
+    it("coerces non-string custom-field overrides to strings on create", async () => {
+      const mockCustomFields = [
+        {
+          id: 1,
+          name: "active",
+          title: "Active",
+          type: "boolean" as const,
+          default_value: "false",
+          required: false
+        },
+        {
+          id: 2,
+          name: "count",
+          title: "Count",
+          type: "number" as const,
+          default_value: "0",
+          required: false
+        },
+        {
+          id: 3,
+          name: "data",
+          title: "Data",
+          type: "json" as const,
+          default_value: "{}",
+          required: false
+        }
+      ]
+      mockGetCustomSectionFields.mockResolvedValue(mockCustomFields)
+
+      const mockOnSave = jest.fn().mockResolvedValue(undefined)
+      const formData = {
+        name: "coerce-test",
+        unit_type_id: 1,
+        application_ids: [],
+        owner_ids: [],
+        team_ids: [],
+        tag_ids: [],
+        customFieldValues: {
+          active: true,
+          count: 42,
+          data: { foo: "bar" }
+        }
+      }
+      const variants = [{ name: "Control", config: {} }]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({ experiment: null, domFieldName: "__dom_changes" })
+      )
+      await act(async () => {
+        await result.current.save(formData, variants, undefined, mockOnSave)
+      })
+
+      const payload = mockOnSave.mock.calls[0][0]
+      expect(payload.custom_section_field_values["1"].value).toBe("true")
+      expect(payload.custom_section_field_values["2"].value).toBe("42")
+      expect(payload.custom_section_field_values["3"].value).toBe(
+        '{"foo":"bar"}'
+      )
+    })
+
+    it("layers formData.customFieldValues over server values when updating", async () => {
+      mockGetCustomSectionFields.mockResolvedValue([
+        {
+          id: 7,
+          name: "hypothesis",
+          title: "Hypothesis",
+          type: "text",
+          default_value: "default",
+          required: true
+        }
+      ])
+
+      const existingExperiment: Partial<Experiment> = {
+        id: unsafeExperimentId(1),
+        name: "existing",
+        state: "created"
+      }
+
+      const mockFullExperiment = {
+        ...existingExperiment,
+        iteration: 1,
+        variants: [],
+        percentages: "50/50",
+        audience: "{}",
+        audience_strict: false,
+        custom_section_field_values: [
+          {
+            id: 7,
+            experiment_id: 1,
+            experiment_custom_section_field_id: 7,
+            type: "text",
+            value: "stale server value",
+            updated_at: "2024-01-01T00:00:00Z",
+            custom_section_field: { id: 7 }
+          }
+        ]
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { experiment: mockFullExperiment }
+      })
+
+      const mockOnUpdate = jest.fn()
+      const formData = {
+        display_name: "Updated",
+        unit_type_id: 1,
+        application_ids: [1],
+        owner_ids: [1],
+        team_ids: [],
+        tag_ids: [],
+        customFieldValues: { hypothesis: "Fresh AI hypothesis" }
+      }
+      const variants = [{ name: "Control", config: {} }]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: "__dom_changes"
+        })
+      )
+      await act(async () => {
+        await result.current.save(formData, variants, mockOnUpdate, undefined)
+      })
+
+      const payload = mockOnUpdate.mock.calls[0][1]
+      expect(payload.custom_section_field_values["7"].value).toBe(
+        "Fresh AI hypothesis"
+      )
+      // Other fields on the merged object are preserved
+      expect(payload.custom_section_field_values["7"].type).toBe("text")
+      expect(payload.custom_section_field_values["7"].id).toBe(7)
+    })
+
+    it("adds a custom field on update even when the server has none yet", async () => {
+      mockGetCustomSectionFields.mockResolvedValue([
+        {
+          id: 9,
+          name: "hypothesis",
+          title: "Hypothesis",
+          type: "text",
+          default_value: "",
+          required: true
+        }
+      ])
+
+      const existingExperiment: Partial<Experiment> = {
+        id: unsafeExperimentId(2),
+        name: "existing-no-custom",
+        state: "created"
+      }
+
+      const mockFullExperiment = {
+        ...existingExperiment,
+        iteration: 1,
+        variants: [],
+        percentages: "50/50",
+        audience: "{}",
+        audience_strict: false
+        // No custom_section_field_values on the server.
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { experiment: mockFullExperiment }
+      })
+
+      const mockOnUpdate = jest.fn()
+      const formData = {
+        display_name: "Updated",
+        unit_type_id: 1,
+        application_ids: [],
+        owner_ids: [],
+        team_ids: [],
+        tag_ids: [],
+        customFieldValues: { hypothesis: "First hypothesis ever" }
+      }
+      const variants = [{ name: "Control", config: {} }]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: "__dom_changes"
+        })
+      )
+      await act(async () => {
+        await result.current.save(formData, variants, mockOnUpdate, undefined)
+      })
+
+      const payload = mockOnUpdate.mock.calls[0][1]
+      expect(payload.custom_section_field_values).toBeDefined()
+      expect(payload.custom_section_field_values["9"].value).toBe(
+        "First hypothesis ever"
+      )
+      expect(payload.custom_section_field_values["9"].type).toBe("text")
+    })
+
+    it("drops customFieldValues entries whose name has no matching workspace field on update", async () => {
+      mockGetCustomSectionFields.mockResolvedValue([
+        {
+          id: 9,
+          name: "hypothesis",
+          title: "Hypothesis",
+          type: "text",
+          default_value: "",
+          required: true
+        }
+      ])
+
+      const existingExperiment: Partial<Experiment> = {
+        id: unsafeExperimentId(3),
+        name: "existing-stranger",
+        state: "created"
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: {
+          experiment: {
+            ...existingExperiment,
+            iteration: 1,
+            variants: [],
+            percentages: "50/50",
+            audience: "{}",
+            audience_strict: false
+          }
+        }
+      })
+
+      const mockOnUpdate = jest.fn()
+      const formData = {
+        display_name: "Updated",
+        unit_type_id: 1,
+        application_ids: [],
+        owner_ids: [],
+        team_ids: [],
+        tag_ids: [],
+        customFieldValues: { not_a_real_field: "ignored" }
+      }
+      const variants = [{ name: "Control", config: {} }]
+
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: "__dom_changes"
+        })
+      )
+      await act(async () => {
+        await result.current.save(formData, variants, mockOnUpdate, undefined)
+      })
+
+      const payload = mockOnUpdate.mock.calls[0][1]
+      // No id 9 (because no override was supplied for it) and unknown name
+      // never makes it into the payload.
+      expect(payload.custom_section_field_values).toEqual({})
+    })
+  })
 })
