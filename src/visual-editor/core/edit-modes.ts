@@ -68,6 +68,161 @@ export class EditModes {
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true
 
+    // Inline elements (text spans etc.) default to free / nested placement
+    // — that's the natural inline-flow expectation. Block elements default
+    // to sibling-only placement so dropping over an inner child of a
+    // sibling card lands the dragged element *next to* the card, not
+    // nested inside it. Alt swaps the two modes either way.
+    const draggedDisplay = window.getComputedStyle(smartElement).display
+    const draggedIsInline = draggedDisplay === "inline"
+
+    const isBlockLevel = (el: Element): boolean => {
+      const d = window.getComputedStyle(el).display
+      return d !== "inline" && d !== "contents" && d !== "none"
+    }
+
+    const nearestBlockAncestor = (el: Element): Element | null => {
+      let current: Element | null = el
+      while (current && current !== document.documentElement) {
+        if (current === smartElement) {
+          current = current.parentElement
+          continue
+        }
+        if (smartElement.contains(current)) {
+          current = current.parentElement
+          continue
+        }
+        if (isBlockLevel(current)) return current
+        current = current.parentElement
+      }
+      return null
+    }
+
+    type DropAnchor =
+      | { kind: "sibling"; element: Element; position: "before" | "after" }
+      | { kind: "nested"; element: Element }
+
+    const findDropAnchor = (e: DragEvent): DropAnchor | null => {
+      const cursor = e.target as Element | null
+      if (!cursor) return null
+      if (cursor === smartElement || smartElement.contains(cursor)) return null
+
+      // Alt SWAPS strategy. block default = sibling, inline default = nested.
+      const useFreeMode = draggedIsInline !== e.altKey
+
+      if (useFreeMode) {
+        // Free / nested: nest the dragged element directly into the
+        // cursor's element. This is what makes "drop a span inside
+        // another span" actually nest one inline element inside the
+        // other. For block+Alt the cursor's element will typically be
+        // a block container and behaviour is the same as before.
+        return { kind: "nested", element: cursor }
+      }
+
+      // Sibling-only mode. Two-pass walk up from the cursor:
+      //   1. PREFERRED: an ancestor whose parent IS smartElement's parent
+      //      — that is, a true sibling of the dragged element. We don't
+      //      require block-level here because inline-on-Alt should still
+      //      find inline siblings (e.g., span next to span inside a <p>).
+      //   2. FALLBACK: any block-level ancestor whose parent is also
+      //      block-level. This handles "drag to a different container":
+      //      the dragged element re-parents and lands as a sibling at
+      //      the new container's level instead of nesting into the
+      //      cursor's deepest element. Block-level is required here so
+      //      the fallback never picks an inner text wrapper.
+      // Without the fallback, dropping outside the original parent would
+      // be a silent no-op, which the user explicitly didn't want.
+      let preferredFallback: {
+        element: Element
+        position: "before" | "after"
+      } | null = null
+      let candidate: Element | null = cursor
+      while (candidate && candidate !== document.documentElement) {
+        if (candidate === smartElement || smartElement.contains(candidate)) {
+          candidate = candidate.parentElement
+          continue
+        }
+        const candParent = candidate.parentElement
+        if (!candParent || candidate === document.body) {
+          candidate = candidate.parentElement
+          continue
+        }
+
+        const rect = candidate.getBoundingClientRect()
+        const position: "before" | "after" =
+          e.clientY < rect.top + rect.height / 2 ? "before" : "after"
+
+        // Pass-1 hit: candidate is a sibling of the dragged element.
+        // Same-parent check works for both block and inline siblings.
+        if (candParent === smartElement.parentElement) {
+          return { kind: "sibling", element: candidate, position }
+        }
+
+        // Pass-2 candidate: remember the *innermost* block whose parent
+        // is also block-level (skipping html). First write wins so we
+        // stay at the deepest "card-like" level the cursor traversed.
+        if (
+          !preferredFallback &&
+          candParent !== document.documentElement &&
+          isBlockLevel(candidate) &&
+          isBlockLevel(candParent)
+        ) {
+          preferredFallback = { element: candidate, position }
+        }
+        candidate = candidate.parentElement
+      }
+
+      if (preferredFallback) {
+        return {
+          kind: "sibling",
+          element: preferredFallback.element,
+          position: preferredFallback.position
+        }
+      }
+
+      // Fallback: cursor is over body / html with no block candidate.
+      // Append to the dragged element's own parent so the user always
+      // sees *some* outcome — beats a silent no-op.
+      const parent = smartElement.parentElement
+      if (parent) {
+        const lastSibling = Array.from(parent.children)
+          .filter((c) => c !== smartElement)
+          .pop()
+        if (lastSibling) {
+          return { kind: "sibling", element: lastSibling, position: "after" }
+        }
+      }
+      return null
+    }
+
+    const clearDropIndicators = () => {
+      document
+        .querySelectorAll(
+          ".absmartly-drop-target, .absmartly-drop-before, .absmartly-drop-after, .absmartly-drop-nested"
+        )
+        .forEach((el) => {
+          el.classList.remove(
+            "absmartly-drop-target",
+            "absmartly-drop-before",
+            "absmartly-drop-after",
+            "absmartly-drop-nested"
+          )
+        })
+    }
+
+    const applyDropIndicator = (anchor: DropAnchor) => {
+      anchor.element.classList.add("absmartly-drop-target")
+      if (anchor.kind === "sibling") {
+        anchor.element.classList.add(
+          anchor.position === "before"
+            ? "absmartly-drop-before"
+            : "absmartly-drop-after"
+        )
+      } else {
+        anchor.element.classList.add("absmartly-drop-nested")
+      }
+    }
+
     const handleDragStart = (e: DragEvent) => {
       debugLog("[ABSmartly] Drag start")
       this.stateManager.setDraggedElement(smartElement)
@@ -85,64 +240,62 @@ export class EditModes {
       if (e.dataTransfer) {
         e.dataTransfer.dropEffect = "move"
       }
-      const target = e.target as Element
-      if (target !== smartElement && !smartElement.contains(target)) {
-        target.classList.add("absmartly-drop-target")
-      }
+      clearDropIndicators()
+      const anchor = findDropAnchor(e)
+      if (anchor) applyDropIndicator(anchor)
     }
 
-    const handleDragLeave = (e: DragEvent) => {
-      ;(e.target as Element).classList.remove("absmartly-drop-target")
+    const handleDragLeave = (_e: DragEvent) => {
+      // Indicator state is rebuilt on every dragover, so a leave from any
+      // single child doesn't need to do anything here.
     }
 
     const handleDrop = (e: DragEvent) => {
       e.preventDefault()
-      const target = e.target as Element
-      const dropTarget = target.closest(
-        "*:not(script):not(style):not(link)"
-      ) as Element
+      const anchor = findDropAnchor(e)
+      clearDropIndicators()
+      if (!anchor) return
 
-      if (
-        dropTarget &&
-        dropTarget !== smartElement &&
-        !smartElement.contains(dropTarget)
-      ) {
-        // Remove drop target styling
-        document.querySelectorAll(".absmartly-drop-target").forEach((el) => {
-          el.classList.remove("absmartly-drop-target")
-        })
-
-        // Determine drop position
-        const rect = dropTarget.getBoundingClientRect()
-        const dropY = e.clientY
-        const insertAfter = dropY > rect.top + rect.height / 2
-
-        try {
-          if (insertAfter && dropTarget.nextElementSibling) {
-            dropTarget.parentElement?.insertBefore(
-              smartElement,
-              dropTarget.nextElementSibling
-            )
-          } else if (!insertAfter) {
-            dropTarget.parentElement?.insertBefore(smartElement, dropTarget)
+      try {
+        if (anchor.kind === "sibling") {
+          const parent = anchor.element.parentElement
+          if (!parent) return
+          if (anchor.position === "before") {
+            parent.insertBefore(smartElement, anchor.element)
           } else {
-            dropTarget.parentElement?.appendChild(smartElement)
+            const next = anchor.element.nextElementSibling
+            if (next) {
+              parent.insertBefore(smartElement, next)
+            } else {
+              parent.appendChild(smartElement)
+            }
           }
-
-          // Track the change
-          this.trackMoveChange(
-            smartElement,
-            originalParent,
-            originalNextSibling
-          )
-          debugLog("[ABSmartly] Element moved successfully")
-        } catch (error) {
-          debugWarn("[ABSmartly] Move failed:", error)
+        } else {
+          // Nested / free mode: append to the cursor's nearest block.
+          anchor.element.appendChild(smartElement)
         }
+
+        this.trackMoveChange(smartElement, originalParent, originalNextSibling)
+        debugLog("[ABSmartly] Element moved successfully")
+      } catch (error) {
+        debugWarn("[ABSmartly] Move failed:", error)
       }
     }
 
-    const handleDragEnd = (e: DragEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // Cancel: tear down drag mode without recording a move.
+        // Native dragend fires from browsers on Escape too, but we run
+        // this proactively so behaviour is identical when tests dispatch
+        // synthetic events (where dragend would not auto-fire).
+        debugLog("[ABSmartly] Escape pressed — cancelling drag")
+        e.preventDefault()
+        e.stopPropagation()
+        handleDragEnd(new DragEvent("dragend"))
+      }
+    }
+
+    const handleDragEnd = (_e: DragEvent) => {
       debugLog("[ABSmartly] Drag end")
 
       // Clean up drag state
@@ -152,9 +305,7 @@ export class EditModes {
       this.stateManager.setRearranging(false)
 
       // Remove all drop target indicators
-      document.querySelectorAll(".absmartly-drop-target").forEach((el) => {
-        el.classList.remove("absmartly-drop-target")
-      })
+      clearDropIndicators()
 
       // Remove event listeners
       smartElement.removeEventListener("dragstart", handleDragStart)
@@ -162,6 +313,7 @@ export class EditModes {
       document.removeEventListener("dragleave", handleDragLeave)
       document.removeEventListener("drop", handleDrop)
       smartElement.removeEventListener("dragend", handleDragEnd)
+      document.removeEventListener("keydown", handleKeyDown, true)
 
       smartElement.classList.remove("absmartly-draggable")
     }
@@ -172,13 +324,9 @@ export class EditModes {
     document.addEventListener("dragleave", handleDragLeave)
     document.addEventListener("drop", handleDrop)
     smartElement.addEventListener("dragend", handleDragEnd)
-
-    // Auto-exit after 10 seconds
-    setTimeout(() => {
-      if (this.stateManager.getState().isRearranging) {
-        handleDragEnd(new DragEvent("dragend"))
-      }
-    }, 10000)
+    // Capture-phase keydown so Escape always reaches us before any
+    // page-level handler that might consume it.
+    document.addEventListener("keydown", handleKeyDown, true)
   }
 
   enableResizeMode(element: Element): void {
@@ -329,18 +477,23 @@ export class EditModes {
   }
 
   private getSmartDraggableElement(element: Element): Element | null {
-    // Logic to find the best draggable parent element
+    // Logic to find the best draggable element. Walk up from the user's
+    // click target and return the first element that's a meaningful drag
+    // unit — either a named inline interactive element (a / button /
+    // span) or a block-level container. Accepting named inline elements
+    // directly is what makes "drag a <span> with text and drop it inside
+    // anything" work; without that, the walk skips past spans and the
+    // user ends up dragging the whole containing card.
     let current: Element | null = element
 
     while (current && current !== document.body) {
       const tagName = current.tagName.toLowerCase()
       const computedStyle = window.getComputedStyle(current)
 
-      // Skip inline elements unless they have specific styling
-      if (
-        computedStyle.display === "inline" &&
-        !["a", "button", "span"].includes(tagName)
-      ) {
+      if (computedStyle.display === "inline") {
+        if (["a", "button", "span"].includes(tagName)) {
+          return current
+        }
         current = current.parentElement
         continue
       }
@@ -547,14 +700,23 @@ export class EditModes {
     }
     const anchorElement: Element | null =
       element.nextElementSibling ?? element.previousElementSibling ?? null
+    // Position semantic for the move. The element-sibling checks above
+    // disambiguate the common cases. The only-child case is ambiguous —
+    // the element is both firstElementChild and lastElementChild — but
+    // in that case the drop ran appendChild (free / nested mode always
+    // appends), so prefer "lastChild" to faithfully reproduce that on
+    // SDK replay. Picking "firstChild" here would cause the SDK to call
+    // insertBefore(target.firstChild) and land the element *before* any
+    // pre-existing text content of the container, which doesn't match
+    // what the user just saw.
     const position: "before" | "after" | "firstChild" | "lastChild" =
       element.nextElementSibling
         ? "before"
         : element.previousElementSibling
           ? "after"
-          : currentParent.firstElementChild === element
-            ? "firstChild"
-            : "lastChild"
+          : currentParent.lastElementChild === element
+            ? "lastChild"
+            : "firstChild"
 
     // Revert the live drop BEFORE selector generation. PreviewManager runs
     // removePreviewChanges in replace mode at the start of every replay, so
