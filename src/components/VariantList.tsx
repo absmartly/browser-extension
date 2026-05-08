@@ -505,6 +505,8 @@ export function VariantList({
         <h4 className="text-sm font-medium text-gray-700">Variants</h4>
         {canEdit && canAddRemove && (
           <Button
+            id="add-variant-button"
+            data-testid="add-variant-button"
             type="button"
             onClick={addVariant}
             size="sm"
