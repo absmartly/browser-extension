@@ -390,8 +390,7 @@ export function ExperimentEditor({
             Object.assign(initialDraft, next)
           }}
           onVariantsChange={(variants) => {
-            ;(currentVariants as any).length = 0
-            ;(currentVariants as any).push(...variants)
+            handleVariantsChange(variants, true)
           }}
         />
       )
@@ -414,7 +413,8 @@ export function ExperimentEditor({
     tags,
     pageContext,
     experiment?.id,
-    domFieldName
+    domFieldName,
+    handleVariantsChange
   ])
 
   // Stable onChange handler for ExperimentMetadata using functional state update
