@@ -11,6 +11,43 @@ interface OpenOptions<T> {
 
 const HOST_ID = "absmartly-fullscreen-host"
 
+/**
+ * Clone every <style> and <link rel="stylesheet"> from the current document
+ * (head + any open shadow roots we can find) into `target`. This brings the
+ * sidebar's Tailwind stylesheet into the modal's shadow root so Tailwind
+ * classes inside the modal render correctly.
+ *
+ * The modal lives on `document.body` of the sidebar iframe — Plasmo emits a
+ * hashed CSS file at `tabs/sidebar.<hash>.css` and links it from the iframe's
+ * `<head>` at runtime, so cloning from `document.head` is enough to pull in
+ * Tailwind plus any other globally-registered styles.
+ */
+function cloneDocumentStyles(target: ShadowRoot): void {
+  const seen = new Set<string>()
+
+  const dedupKey = (node: HTMLStyleElement | HTMLLinkElement): string => {
+    if (node.tagName === "LINK") {
+      return `link:${(node as HTMLLinkElement).href}`
+    }
+    // Style tags rarely have a stable identifier — fall back to a hash of the
+    // text content so we don't double-append the same inline block.
+    return `style:${node.textContent || ""}`
+  }
+
+  const appendIfNew = (node: HTMLStyleElement | HTMLLinkElement): void => {
+    const key = dedupKey(node)
+    if (seen.has(key)) return
+    seen.add(key)
+    target.appendChild(node.cloneNode(true))
+  }
+
+  document
+    .querySelectorAll<
+      HTMLStyleElement | HTMLLinkElement
+    >('head style, head link[rel="stylesheet"]')
+    .forEach(appendIfNew)
+}
+
 export function openFullScreenModal<T = unknown>(
   options: OpenOptions<T>
 ): Promise<T | null> {
@@ -24,6 +61,11 @@ export function openFullScreenModal<T = unknown>(
     document.body.appendChild(host)
 
     const shadow = host.attachShadow({ mode: "open" })
+
+    // Pull Tailwind (and any other head-level stylesheets) into the shadow
+    // root so utility classes inside the modal actually render. Without this
+    // the modal renders with UA defaults — see FT-1905.
+    cloneDocumentStyles(shadow)
 
     if (options.styleHref) {
       const link = document.createElement("link")
