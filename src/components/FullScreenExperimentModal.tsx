@@ -83,6 +83,17 @@ export function FullScreenExperimentModal(
   props: FullScreenExperimentModalProps
 ) {
   const [screenshots, setScreenshots] = useState<VariantScreenshot[]>([])
+  // Internal variant state so AI-driven renames re-render VariantList even
+  // though the parent dialog mounts us with a captured snapshot of variants
+  // (the parent's openFullScreenModal closes over `currentVariants` at the
+  // time of opening, so prop updates don't re-flow). We initialize from
+  // props.variants and treat it as the source of truth for the modal session.
+  const [currentVariants, setCurrentVariants] = useState<any[]>(props.variants)
+
+  const handleVariantsChange = (variants: any[], hasChanges: boolean) => {
+    setCurrentVariants(variants)
+    props.onVariantsChange(variants, hasChanges)
+  }
 
   const handleAIResult = (
     result: AIFillResponse,
@@ -98,6 +109,13 @@ export function FullScreenExperimentModal(
         props.tags
       )
     )
+    if (Array.isArray(result.variants) && result.variants.length > 0) {
+      const renamed = applyAIVariantNames(currentVariants, result.variants)
+      if (renamed) {
+        setCurrentVariants(renamed)
+        props.onVariantsChange(renamed, true)
+      }
+    }
   }
 
   return (
@@ -121,7 +139,7 @@ export function FullScreenExperimentModal(
         </h2>
         <div style={{ display: "flex", gap: 8 }}>
           <AIFillButton
-            draft={toAIFillDraft(props.draft, props.variants)}
+            draft={toAIFillDraft(props.draft, currentVariants)}
             customFields={toCustomFieldDescriptors(props.customFields)}
             pageUrl={props.pageUrl}
             pageTitle={props.pageTitle}
@@ -230,10 +248,10 @@ export function FullScreenExperimentModal(
 
         <section className="mt-6">
           <VariantList
-            initialVariants={props.variants}
+            initialVariants={currentVariants}
             experimentId={0}
             experimentName={props.draft.name}
-            onVariantsChange={props.onVariantsChange}
+            onVariantsChange={handleVariantsChange}
             canEdit={true}
             canAddRemove={true}
             domFieldName="__dom_changes"
@@ -246,7 +264,7 @@ export function FullScreenExperimentModal(
           </section>
         )}
 
-        {props.variants.length > 0 && (
+        {currentVariants.length > 0 && (
           <section className="mt-6">
             <ExperimentCodeInjection
               {...({
@@ -367,10 +385,11 @@ function applyAIResultToDraft(
     if (ids.length > 0) next.tag_ids = ids
   }
 
-  // TODO(FT-1905 follow-up): apply result.variants[].name / .description back
-  // to the variants list. Variants are managed by VariantList in the modal as
-  // external state so this needs a separate plumbing change — tracked
-  // separately from the customFieldValues / applications / tags fix.
+  // result.variants is applied separately by handleAIResult via
+  // applyAIVariantNames — variants live outside the draft, so they need to be
+  // routed through onVariantsChange rather than mutating the draft here.
+  // (We intentionally do not surface result.variants[].description: the
+  // VariantList UI has no description field.)
 
   if (result.custom_fields) {
     const allowed = new Set(customFields.map((f) => f.name))
@@ -393,4 +412,29 @@ function applyAIResultToDraft(
   }
 
   return next
+}
+
+/**
+ * Overlay AI-suggested variant names onto the current variants array, by
+ * positional index. Returns null if nothing changed (so callers can skip the
+ * onVariantsChange call). The AI returns variants in order
+ * `[Control, Variant 1, ...]` — we align by index rather than name because the
+ * AI may rename Control. Extras beyond the current variant count are ignored
+ * (variant count is user-controlled). Missing / empty / non-string names are
+ * left as-is.
+ */
+function applyAIVariantNames(
+  currentVariants: any[],
+  aiVariants: { name?: string; description?: string }[]
+): any[] | null {
+  let changed = false
+  const next = currentVariants.map((v, i) => {
+    const aiName = aiVariants[i]?.name
+    if (typeof aiName === "string" && aiName.length > 0 && aiName !== v.name) {
+      changed = true
+      return { ...v, name: aiName }
+    }
+    return v
+  })
+  return changed ? next : null
 }

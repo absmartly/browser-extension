@@ -213,5 +213,169 @@ describe("FullScreenExperimentModal", () => {
       expect(next.application_ids).toEqual([42])
     })
   })
+
+  describe("applyAIVariantNames (via AIFillButton.onResult)", () => {
+    it("calls onVariantsChange with AI-renamed variants when result.variants is present", () => {
+      const onVariantsChange = jest.fn()
+      renderModal({
+        onVariantsChange,
+        variants: [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          {
+            display_name: "X",
+            variants: [{ name: "Original" }, { name: "New CTA Copy" }]
+          },
+          []
+        )
+      })
+
+      expect(onVariantsChange).toHaveBeenCalledWith(
+        [
+          { name: "Original", config: "{}" },
+          { name: "New CTA Copy", config: "{}" }
+        ],
+        true
+      )
+    })
+
+    it("keeps extras when the AI returns fewer variants than exist", () => {
+      const onVariantsChange = jest.fn()
+      renderModal({
+        onVariantsChange,
+        variants: [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" },
+          { name: "Variant 2", config: "{}" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          { variants: [{ name: "Original" }] },
+          []
+        )
+      })
+
+      expect(onVariantsChange).toHaveBeenCalledWith(
+        [
+          { name: "Original", config: "{}" },
+          { name: "Variant 1", config: "{}" },
+          { name: "Variant 2", config: "{}" }
+        ],
+        true
+      )
+    })
+
+    it("ignores extras when the AI returns more variants than exist (count is user-controlled)", () => {
+      const onVariantsChange = jest.fn()
+      renderModal({
+        onVariantsChange,
+        variants: [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          {
+            variants: [
+              { name: "Original" },
+              { name: "New CTA Copy" },
+              { name: "Bonus Variant" }
+            ]
+          },
+          []
+        )
+      })
+
+      expect(onVariantsChange).toHaveBeenCalledWith(
+        [
+          { name: "Original", config: "{}" },
+          { name: "New CTA Copy", config: "{}" }
+        ],
+        true
+      )
+    })
+
+    it("leaves existing names in place when AI provides empty / missing / non-string names", () => {
+      const onVariantsChange = jest.fn()
+      renderModal({
+        onVariantsChange,
+        variants: [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" },
+          { name: "Variant 2", config: "{}" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          {
+            variants: [
+              { name: "" },
+              { description: "no name field" } as any,
+              { name: "Real Rename" }
+            ]
+          },
+          []
+        )
+      })
+
+      expect(onVariantsChange).toHaveBeenCalledWith(
+        [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" },
+          { name: "Real Rename", config: "{}" }
+        ],
+        true
+      )
+    })
+
+    it("does not call onVariantsChange when AI returns no variants", () => {
+      const onVariantsChange = jest.fn()
+      renderModal({
+        onVariantsChange,
+        variants: [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!({ display_name: "Just a rename" }, [])
+      })
+
+      expect(onVariantsChange).not.toHaveBeenCalled()
+    })
+
+    it("does not call onVariantsChange when AI variant names match existing names", () => {
+      const onVariantsChange = jest.fn()
+      renderModal({
+        onVariantsChange,
+        variants: [
+          { name: "Control", config: "{}" },
+          { name: "Variant 1", config: "{}" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          {
+            variants: [{ name: "Control" }, { name: "Variant 1" }]
+          },
+          []
+        )
+      })
+
+      expect(onVariantsChange).not.toHaveBeenCalled()
+    })
+  })
 })
 
