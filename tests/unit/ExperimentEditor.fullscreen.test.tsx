@@ -7,20 +7,24 @@ import { openFullScreenModal } from "~src/components/fullscreen/openFullScreenMo
 
 jest.mock("~src/components/fullscreen/openFullScreenModal")
 
+const capturedModalProps: { current: any } = { current: null }
+
 jest.mock("~src/components/FullScreenExperimentModal", () => ({
-  FullScreenExperimentModal: ({
-    onVariantsChange
-  }: {
+  FullScreenExperimentModal: (props: {
+    aiProviderConfig?: unknown
     onVariantsChange: (variants: { name: string; config: string }[]) => void
-  }) => (
-    <button
-      data-testid="mock-modal-trigger-variants-change"
-      onClick={() =>
-        onVariantsChange([{ name: "X", config: "{}" }])
-      }>
-      change variants
-    </button>
-  )
+  }) => {
+    capturedModalProps.current = props
+    return (
+      <button
+        data-testid="mock-modal-trigger-variants-change"
+        onClick={() =>
+          props.onVariantsChange([{ name: "X", config: "{}" }])
+        }>
+        change variants
+      </button>
+    )
+  }
 }))
 
 jest.mock("~src/lib/messaging", () => ({
@@ -28,11 +32,13 @@ jest.mock("~src/lib/messaging", () => ({
   sendToBackground: jest.fn().mockResolvedValue({ success: true })
 }))
 
+const mockGetConfig = jest.fn().mockResolvedValue({
+  domChangesFieldName: "__dom_changes",
+  htmlInjectionEnabled: true
+})
+
 jest.mock("~src/utils/storage", () => ({
-  getConfig: jest.fn().mockResolvedValue({
-    domChangesFieldName: "__dom_changes",
-    htmlInjectionEnabled: true
-  }),
+  getConfig: (...args: unknown[]) => mockGetConfig(...args),
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
@@ -86,6 +92,12 @@ jest.mock("~src/hooks/useExperimentVariants", () => ({
 describe("ExperimentEditor full-screen button", () => {
   beforeEach(() => {
     mockHandleVariantsChange.mockClear()
+    capturedModalProps.current = null
+    mockGetConfig.mockReset()
+    mockGetConfig.mockResolvedValue({
+      domChangesFieldName: "__dom_changes",
+      htmlInjectionEnabled: true
+    })
   })
 
   it("renders an Open in full screen button", () => {
@@ -158,5 +170,116 @@ describe("ExperimentEditor full-screen button", () => {
       [{ name: "X", config: "{}" }],
       true
     )
+  })
+
+  it("passes aiProviderConfig from user settings to the modal", async () => {
+    mockGetConfig.mockResolvedValue({
+      domChangesFieldName: "__dom_changes",
+      aiProvider: "anthropic-api",
+      aiApiKey: "sk-xxx",
+      llmModel: "claude-sonnet",
+      providerEndpoints: { "anthropic-api": "https://custom" }
+    })
+
+    let capturedRender:
+      | ((args: { close: (val?: unknown) => void }) => React.ReactElement)
+      | null = null
+    ;(openFullScreenModal as jest.Mock).mockImplementation(
+      async ({
+        render: renderFn
+      }: {
+        render: (args: {
+          close: (val?: unknown) => void
+        }) => React.ReactElement
+      }) => {
+        capturedRender = renderFn
+        return undefined
+      }
+    )
+
+    render(
+      <ExperimentEditor
+        onSave={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    )
+
+    // Let the storage-loading effect resolve before opening the modal.
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("open-fullscreen-button"))
+    })
+
+    expect(openFullScreenModal).toHaveBeenCalled()
+    expect(capturedRender).not.toBeNull()
+
+    const modalElement = (
+      capturedRender as unknown as (args: {
+        close: (val?: unknown) => void
+      }) => React.ReactElement
+    )({ close: jest.fn() })
+    render(modalElement)
+
+    expect(capturedModalProps.current).not.toBeNull()
+    expect(capturedModalProps.current.aiProviderConfig).toEqual({
+      aiProvider: "anthropic-api",
+      apiKey: "sk-xxx",
+      llmModel: "claude-sonnet",
+      customEndpoint: "https://custom"
+    })
+  })
+
+  it("falls back to claude-subscription when no AI provider is configured", async () => {
+    let capturedRender:
+      | ((args: { close: (val?: unknown) => void }) => React.ReactElement)
+      | null = null
+    ;(openFullScreenModal as jest.Mock).mockImplementation(
+      async ({
+        render: renderFn
+      }: {
+        render: (args: {
+          close: (val?: unknown) => void
+        }) => React.ReactElement
+      }) => {
+        capturedRender = renderFn
+        return undefined
+      }
+    )
+
+    render(
+      <ExperimentEditor
+        onSave={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("open-fullscreen-button"))
+    })
+
+    expect(capturedRender).not.toBeNull()
+    const modalElement = (
+      capturedRender as unknown as (args: {
+        close: (val?: unknown) => void
+      }) => React.ReactElement
+    )({ close: jest.fn() })
+    render(modalElement)
+
+    expect(capturedModalProps.current).not.toBeNull()
+    expect(capturedModalProps.current.aiProviderConfig).toEqual({
+      aiProvider: "claude-subscription",
+      apiKey: undefined,
+      llmModel: undefined,
+      customEndpoint: undefined
+    })
   })
 })

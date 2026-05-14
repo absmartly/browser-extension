@@ -13,6 +13,7 @@ import {
   setDOMChangesInConfig
 } from "~src/hooks/useVariantConfig"
 import type { AIDOMGenerationResult } from "~src/lib/ai-dom-generator"
+import type { AIProviderType } from "~src/lib/ai-providers"
 import { BackgroundAPIClient } from "~src/lib/background-api-client"
 import { sendToContent } from "~src/lib/messaging"
 import type {
@@ -262,6 +263,12 @@ export function ExperimentEditor({
     title: "",
     visibleText: ""
   })
+  const [aiProviderConfig, setAIProviderConfig] = useState<{
+    aiProvider: AIProviderType
+    apiKey?: string
+    llmModel?: string
+    customEndpoint?: string
+  }>({ aiProvider: "claude-subscription" })
 
   // Once both the workspace custom-field defs and the experiment payload are
   // available, lift the experiment's id-keyed custom-section values into the
@@ -333,6 +340,21 @@ export function ExperimentEditor({
       } catch (err) {
         debugWarn("[FullScreen] failed to fetch page context", err)
       }
+      try {
+        const config = await getConfig()
+        if (!cancelled) {
+          const provider =
+            (config?.aiProvider as AIProviderType) || "claude-subscription"
+          setAIProviderConfig({
+            aiProvider: provider,
+            apiKey: config?.aiApiKey || undefined,
+            llmModel: config?.llmModel || undefined,
+            customEndpoint: config?.providerEndpoints?.[provider] || undefined
+          })
+        }
+      } catch (err) {
+        debugWarn("[FullScreen] failed to load AI provider config", err)
+      }
     })()
     return () => {
       cancelled = true
@@ -381,7 +403,7 @@ export function ExperimentEditor({
               changes
             }).catch(() => {})
           }}
-          aiProviderConfig={{ aiProvider: "claude-subscription" }}
+          aiProviderConfig={aiProviderConfig}
           onSave={() =>
             close({ draft: initialDraft, variants: currentVariants })
           }
@@ -412,6 +434,7 @@ export function ExperimentEditor({
     teams,
     tags,
     pageContext,
+    aiProviderConfig,
     experiment?.id,
     domFieldName,
     handleVariantsChange
