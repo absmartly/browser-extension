@@ -11,6 +11,7 @@
 # claude tasks, plans, and session files
 .claude/tasks/
 .claude/plans/
+.claude/worktrees/
 
 public/*.{min,dev}.js
 react.production.min.js
