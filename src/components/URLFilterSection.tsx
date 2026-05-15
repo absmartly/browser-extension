@@ -312,34 +312,36 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 {(simplePatterns.length > 0 ? simplePatterns : [""]).map(
                   (pattern, i) => (
                     <div key={i} className="flex gap-2 mb-2">
-                      <Input
-                        value={pattern}
-                        onChange={(e) => {
-                          const newPatterns = [...simplePatterns]
-                          newPatterns[i] = e.target.value
-                          setSimplePatterns(newPatterns)
-                        }}
-                        onBlur={updateURLFilter}
-                        placeholder={
-                          regexMode
-                            ? matchType === "path"
-                              ? "^/products/.*$"
-                              : matchType === "hash"
-                                ? "^#section-.*$"
-                                : "^https://example\\.com/.*$"
-                            : matchType === "path"
-                              ? "/products/*"
-                              : matchType === "domain"
-                                ? "example.com"
-                                : matchType === "query"
-                                  ? "id=*"
-                                  : matchType === "hash"
-                                    ? "#section-*"
-                                    : "https://example.com/*"
-                        }
-                        disabled={!canEdit}
-                        className="flex-1 text-sm font-mono"
-                      />
+                      <div className="flex-1 min-w-0">
+                        <Input
+                          value={pattern}
+                          onChange={(e) => {
+                            const newPatterns = [...simplePatterns]
+                            newPatterns[i] = e.target.value
+                            setSimplePatterns(newPatterns)
+                          }}
+                          onBlur={updateURLFilter}
+                          placeholder={
+                            regexMode
+                              ? matchType === "path"
+                                ? "^/products/.*$"
+                                : matchType === "hash"
+                                  ? "^#section-.*$"
+                                  : "^https://example\\.com/.*$"
+                              : matchType === "path"
+                                ? "/products/*"
+                                : matchType === "domain"
+                                  ? "example.com"
+                                  : matchType === "query"
+                                    ? "id=*"
+                                    : matchType === "hash"
+                                      ? "#section-*"
+                                      : "https://example.com/*"
+                          }
+                          disabled={!canEdit}
+                          className="text-sm font-mono"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
