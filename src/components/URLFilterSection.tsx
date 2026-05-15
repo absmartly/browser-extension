@@ -233,29 +233,31 @@ const URLFilterSection = React.memo(function URLFilterSection({
               {(simplePatterns.length > 0 ? simplePatterns : [""]).map(
                 (pattern, i) => (
                   <div key={i} className="flex gap-2">
-                    <Input
-                      id={`url-filter-pattern-variant-${variantIndex}-${i}`}
-                      value={pattern}
-                      onChange={(e) => {
-                        const newPatterns = [...simplePatterns]
-                        newPatterns[i] = e.target.value
-                        setSimplePatterns(newPatterns)
-                      }}
-                      onBlur={updateURLFilter}
-                      placeholder={
-                        matchType === "path"
-                          ? "/products/*"
-                          : matchType === "domain"
-                            ? "example.com"
-                            : matchType === "query"
-                              ? "id=*"
-                              : matchType === "hash"
-                                ? "#section-*"
-                                : "https://example.com/products/*"
-                      }
-                      disabled={!canEdit}
-                      className="flex-1 text-sm"
-                    />
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        id={`url-filter-pattern-variant-${variantIndex}-${i}`}
+                        value={pattern}
+                        onChange={(e) => {
+                          const newPatterns = [...simplePatterns]
+                          newPatterns[i] = e.target.value
+                          setSimplePatterns(newPatterns)
+                        }}
+                        onBlur={updateURLFilter}
+                        placeholder={
+                          matchType === "path"
+                            ? "/products/*"
+                            : matchType === "domain"
+                              ? "example.com"
+                              : matchType === "query"
+                                ? "id=*"
+                                : matchType === "hash"
+                                  ? "#section-*"
+                                  : "https://example.com/products/*"
+                        }
+                        disabled={!canEdit}
+                        className="text-sm"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
