@@ -388,34 +388,36 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 )}
                 {excludePatterns.map((pattern, i) => (
                   <div key={i} className="flex gap-2 mb-2">
-                    <Input
-                      value={pattern}
-                      onChange={(e) => {
-                        const newPatterns = [...excludePatterns]
-                        newPatterns[i] = e.target.value
-                        setExcludePatterns(newPatterns)
-                      }}
-                      onBlur={updateURLFilter}
-                      placeholder={
-                        regexMode
-                          ? matchType === "path"
-                            ? "^/admin/.*$"
-                            : matchType === "hash"
-                              ? "^#admin-.*$"
-                              : "^https://example\\.com/admin/.*$"
-                          : matchType === "path"
-                            ? "/admin/*"
-                            : matchType === "domain"
-                              ? "admin.example.com"
-                              : matchType === "query"
-                                ? "preview=*"
-                                : matchType === "hash"
-                                  ? "#admin-*"
-                                  : "https://example.com/admin/*"
-                      }
-                      disabled={!canEdit}
-                      className="flex-1 text-sm font-mono"
-                    />
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        value={pattern}
+                        onChange={(e) => {
+                          const newPatterns = [...excludePatterns]
+                          newPatterns[i] = e.target.value
+                          setExcludePatterns(newPatterns)
+                        }}
+                        onBlur={updateURLFilter}
+                        placeholder={
+                          regexMode
+                            ? matchType === "path"
+                              ? "^/admin/.*$"
+                              : matchType === "hash"
+                                ? "^#admin-.*$"
+                                : "^https://example\\.com/admin/.*$"
+                            : matchType === "path"
+                              ? "/admin/*"
+                              : matchType === "domain"
+                                ? "admin.example.com"
+                                : matchType === "query"
+                                  ? "preview=*"
+                                  : matchType === "hash"
+                                    ? "#admin-*"
+                                    : "https://example.com/admin/*"
+                        }
+                        disabled={!canEdit}
+                        className="text-sm font-mono"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
