@@ -314,6 +314,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                     <div key={i} className="flex gap-2 mb-2">
                       <div className="flex-1 min-w-0">
                         <Input
+                          id={`url-filter-include-pattern-variant-${variantIndex}-${i}`}
                           value={pattern}
                           onChange={(e) => {
                             const newPatterns = [...simplePatterns]
@@ -377,6 +378,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 </label>
                 {excludePatterns.length === 0 && (
                   <Button
+                    id={`url-filter-add-exclude-variant-${variantIndex}`}
                     type="button"
                     onClick={() => setExcludePatterns([""])}
                     size="sm"
@@ -390,6 +392,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                   <div key={i} className="flex gap-2 mb-2">
                     <div className="flex-1 min-w-0">
                       <Input
+                        id={`url-filter-exclude-pattern-variant-${variantIndex}-${i}`}
                         value={pattern}
                         onChange={(e) => {
                           const newPatterns = [...excludePatterns]
@@ -435,6 +438,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 ))}
                 {excludePatterns.length > 0 && (
                   <Button
+                    id={`url-filter-add-exclude-variant-${variantIndex}`}
                     type="button"
                     onClick={() => setExcludePatterns([...excludePatterns, ""])}
                     size="sm"
