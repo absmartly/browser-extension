@@ -80,21 +80,25 @@ export async function testURLFilterAndPayload(sidebar: FrameLocator, page: Page)
 
   await page.screenshot({ path: 'test-results/json-editor-opened.png', fullPage: true })
 
+  // The JSON editor host we own (id="json-codemirror-container") is created by
+  // src/visual-editor/ui/json-editor.ts. Inside it CodeMirror renders its own
+  // DOM (`.cm-scroller`, `.cm-content`, `.cm-line`) — those class names are
+  // CodeMirror v6's stable public API and the only way to traverse the
+  // editor's internal DOM. We can't reach the EditorView object itself from a
+  // Playwright `page.evaluate` because Chrome puts content scripts in an
+  // isolated world: DOM is shared with the page, but JS properties (like a
+  // `__editorView` ref) are not.
+  //
   // CodeMirror v6 virtualizes — `.cm-content.textContent` only contains the
-  // currently rendered (visible) lines. The variant config can run long
-  // enough to push `urlFilter` below the viewport, in which case
-  // textContent misses it. Reach the EditorView via the cmView property
-  // CodeMirror attaches to the content element and read state.doc for the
-  // full source.
-  // CodeMirror v6 virtualizes — `.cm-content.textContent` only contains the
-  // currently rendered (visible) lines. The variant config can run long
-  // enough to push `urlFilter` below the viewport, in which case
-  // textContent misses it. Scroll cm-scroller through the document and
-  // accumulate the rendered text at each scroll position so we observe
-  // the full doc regardless of viewport size.
+  // currently rendered (visible) lines, so the variant config can run long
+  // enough to push `urlFilter` below the viewport. Scope the scroller and
+  // content lookups under our owned `#json-codemirror-container` ID, then
+  // scroll through the document and accumulate the rendered `.cm-line`s.
   const jsonContent = await page.evaluate(async () => {
-    const scroller = document.querySelector(".cm-scroller") as HTMLElement | null
-    const content = document.querySelector(".cm-content")
+    const root = document.getElementById("json-codemirror-container")
+    if (!root) return ""
+    const scroller = root.querySelector(".cm-scroller") as HTMLElement | null
+    const content = root.querySelector(".cm-content")
     if (!scroller || !content) return ""
 
     const seen = new Set<string>()

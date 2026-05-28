@@ -81,23 +81,6 @@ export class EditModes {
       return d !== "inline" && d !== "contents" && d !== "none"
     }
 
-    const nearestBlockAncestor = (el: Element): Element | null => {
-      let current: Element | null = el
-      while (current && current !== document.documentElement) {
-        if (current === smartElement) {
-          current = current.parentElement
-          continue
-        }
-        if (smartElement.contains(current)) {
-          current = current.parentElement
-          continue
-        }
-        if (isBlockLevel(current)) return current
-        current = current.parentElement
-      }
-      return null
-    }
-
     type DropAnchor =
       | { kind: "sibling"; element: Element; position: "before" | "after" }
       | { kind: "nested"; element: Element }
@@ -734,6 +717,9 @@ export class EditModes {
         }
       } catch (err) {
         debugWarn("[ABSmartly] Failed to revert drop pre-replay:", err)
+        // Abort: selectors generated from the post-drop tree would persist a
+        // corrupted move change that the SDK replay can't reproduce.
+        return
       }
     }
 

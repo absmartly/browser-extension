@@ -358,10 +358,6 @@ export async function testEscapeCancelsDrag(page: Page): Promise<void> {
 /**
  * Run every rearrange scenario in sequence. Order matters — each scenario
  * leaves the DOM in a known state that the next one builds on.
- */
-/**
- * Run every rearrange scenario in sequence. Order matters — each scenario
- * leaves the DOM in a known state that the next one builds on.
  *
  * `testBlockAltDropNests` is intentionally NOT in the runner: nesting a
  * block element into another card's <p> via Alt currently leaks one

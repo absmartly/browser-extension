@@ -126,7 +126,10 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     await test.step('Verify changes in sidebar', async () => {
       step('Verifying changes in sidebar', '📝')
-      await verifySidebarHasChanges(sidebar, 4)
+      // 4 visual-editor actions (text/hide/delete/html) + 4 rearrange moves
+      // from testRearrangeAllScenarios (the 5th scenario, Escape-cancel,
+      // intentionally records nothing).
+      await verifySidebarHasChanges(sidebar, 8)
     })
 
     await test.step('Verify changes and markers after VE exit', async () => {
