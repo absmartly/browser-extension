@@ -85,9 +85,11 @@ export async function testURLFilterAndPayload(sidebar: FrameLocator, page: Page)
   // DOM (`.cm-scroller`, `.cm-content`, `.cm-line`) — those class names are
   // CodeMirror v6's stable public API and the only way to traverse the
   // editor's internal DOM. We can't reach the EditorView object itself from a
-  // Playwright `page.evaluate` because Chrome puts content scripts in an
-  // isolated world: DOM is shared with the page, but JS properties (like a
-  // `__editorView` ref) are not.
+  // Playwright `page.evaluate`: the visual editor's content script holds the
+  // EditorView in its own isolated world, and `page.evaluate` runs in the
+  // page's main world. Custom JS properties attached by the content script
+  // (on `window` or on DOM nodes) live in a wrapper the main world can't see;
+  // only the DOM nodes themselves are shared across worlds.
   //
   // CodeMirror v6 virtualizes — `.cm-content.textContent` only contains the
   // currently rendered (visible) lines, so the variant config can run long
