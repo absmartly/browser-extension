@@ -8,6 +8,7 @@ import { verifyVEProtection, verifySidebarHasChanges, verifyChangesAfterVEExit, 
 import { testPreviewToggle } from './helpers/ve-preview'
 import { testIndividualPreviewToggle, testVisibilityHiddenChange, testAttributeChanges } from './helpers/ve-preview-toggle'
 import { testURLFilterAndPayload } from './helpers/ve-url-filter'
+import { verifyURLFilterInputsFullWidth } from './helpers/ve-url-filter-width'
 import { testDiscardChanges } from './helpers/ve-discard'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
@@ -267,6 +268,11 @@ test.describe('Visual Editor Complete Workflow', () => {
     await test.step('Add URL filter and verify JSON payload', async () => {
       step('Testing URL filter and payload', '🔗')
       await testURLFilterAndPayload(sidebar, testPage)
+    })
+
+    await test.step('Verify URL filter inputs fill row width', async () => {
+      step('Verifying URL filter input widths', '📐')
+      await verifyURLFilterInputsFullWidth(sidebar, testPage)
     })
 
     await test.step('Test launching second VE instance', async () => {

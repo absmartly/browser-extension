@@ -233,29 +233,31 @@ const URLFilterSection = React.memo(function URLFilterSection({
               {(simplePatterns.length > 0 ? simplePatterns : [""]).map(
                 (pattern, i) => (
                   <div key={i} className="flex gap-2">
-                    <Input
-                      id={`url-filter-pattern-variant-${variantIndex}-${i}`}
-                      value={pattern}
-                      onChange={(e) => {
-                        const newPatterns = [...simplePatterns]
-                        newPatterns[i] = e.target.value
-                        setSimplePatterns(newPatterns)
-                      }}
-                      onBlur={updateURLFilter}
-                      placeholder={
-                        matchType === "path"
-                          ? "/products/*"
-                          : matchType === "domain"
-                            ? "example.com"
-                            : matchType === "query"
-                              ? "id=*"
-                              : matchType === "hash"
-                                ? "#section-*"
-                                : "https://example.com/products/*"
-                      }
-                      disabled={!canEdit}
-                      className="flex-1 text-sm"
-                    />
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        id={`url-filter-pattern-variant-${variantIndex}-${i}`}
+                        value={pattern}
+                        onChange={(e) => {
+                          const newPatterns = [...simplePatterns]
+                          newPatterns[i] = e.target.value
+                          setSimplePatterns(newPatterns)
+                        }}
+                        onBlur={updateURLFilter}
+                        placeholder={
+                          matchType === "path"
+                            ? "/products/*"
+                            : matchType === "domain"
+                              ? "example.com"
+                              : matchType === "query"
+                                ? "id=*"
+                                : matchType === "hash"
+                                  ? "#section-*"
+                                  : "https://example.com/products/*"
+                        }
+                        disabled={!canEdit}
+                        className="text-sm"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -310,34 +312,37 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 {(simplePatterns.length > 0 ? simplePatterns : [""]).map(
                   (pattern, i) => (
                     <div key={i} className="flex gap-2 mb-2">
-                      <Input
-                        value={pattern}
-                        onChange={(e) => {
-                          const newPatterns = [...simplePatterns]
-                          newPatterns[i] = e.target.value
-                          setSimplePatterns(newPatterns)
-                        }}
-                        onBlur={updateURLFilter}
-                        placeholder={
-                          regexMode
-                            ? matchType === "path"
-                              ? "^/products/.*$"
-                              : matchType === "hash"
-                                ? "^#section-.*$"
-                                : "^https://example\\.com/.*$"
-                            : matchType === "path"
-                              ? "/products/*"
-                              : matchType === "domain"
-                                ? "example.com"
-                                : matchType === "query"
-                                  ? "id=*"
-                                  : matchType === "hash"
-                                    ? "#section-*"
-                                    : "https://example.com/*"
-                        }
-                        disabled={!canEdit}
-                        className="flex-1 text-sm font-mono"
-                      />
+                      <div className="flex-1 min-w-0">
+                        <Input
+                          id={`url-filter-include-pattern-variant-${variantIndex}-${i}`}
+                          value={pattern}
+                          onChange={(e) => {
+                            const newPatterns = [...simplePatterns]
+                            newPatterns[i] = e.target.value
+                            setSimplePatterns(newPatterns)
+                          }}
+                          onBlur={updateURLFilter}
+                          placeholder={
+                            regexMode
+                              ? matchType === "path"
+                                ? "^/products/.*$"
+                                : matchType === "hash"
+                                  ? "^#section-.*$"
+                                  : "^https://example\\.com/.*$"
+                              : matchType === "path"
+                                ? "/products/*"
+                                : matchType === "domain"
+                                  ? "example.com"
+                                  : matchType === "query"
+                                    ? "id=*"
+                                    : matchType === "hash"
+                                      ? "#section-*"
+                                      : "https://example.com/*"
+                          }
+                          disabled={!canEdit}
+                          className="text-sm font-mono"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
@@ -373,6 +378,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 </label>
                 {excludePatterns.length === 0 && (
                   <Button
+                    id={`url-filter-add-exclude-variant-${variantIndex}`}
                     type="button"
                     onClick={() => setExcludePatterns([""])}
                     size="sm"
@@ -384,34 +390,37 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 )}
                 {excludePatterns.map((pattern, i) => (
                   <div key={i} className="flex gap-2 mb-2">
-                    <Input
-                      value={pattern}
-                      onChange={(e) => {
-                        const newPatterns = [...excludePatterns]
-                        newPatterns[i] = e.target.value
-                        setExcludePatterns(newPatterns)
-                      }}
-                      onBlur={updateURLFilter}
-                      placeholder={
-                        regexMode
-                          ? matchType === "path"
-                            ? "^/admin/.*$"
-                            : matchType === "hash"
-                              ? "^#admin-.*$"
-                              : "^https://example\\.com/admin/.*$"
-                          : matchType === "path"
-                            ? "/admin/*"
-                            : matchType === "domain"
-                              ? "admin.example.com"
-                              : matchType === "query"
-                                ? "preview=*"
-                                : matchType === "hash"
-                                  ? "#admin-*"
-                                  : "https://example.com/admin/*"
-                      }
-                      disabled={!canEdit}
-                      className="flex-1 text-sm font-mono"
-                    />
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        id={`url-filter-exclude-pattern-variant-${variantIndex}-${i}`}
+                        value={pattern}
+                        onChange={(e) => {
+                          const newPatterns = [...excludePatterns]
+                          newPatterns[i] = e.target.value
+                          setExcludePatterns(newPatterns)
+                        }}
+                        onBlur={updateURLFilter}
+                        placeholder={
+                          regexMode
+                            ? matchType === "path"
+                              ? "^/admin/.*$"
+                              : matchType === "hash"
+                                ? "^#admin-.*$"
+                                : "^https://example\\.com/admin/.*$"
+                            : matchType === "path"
+                              ? "/admin/*"
+                              : matchType === "domain"
+                                ? "admin.example.com"
+                                : matchType === "query"
+                                  ? "preview=*"
+                                  : matchType === "hash"
+                                    ? "#admin-*"
+                                    : "https://example.com/admin/*"
+                        }
+                        disabled={!canEdit}
+                        className="text-sm font-mono"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -429,6 +438,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 ))}
                 {excludePatterns.length > 0 && (
                   <Button
+                    id={`url-filter-add-exclude-variant-${variantIndex}`}
                     type="button"
                     onClick={() => setExcludePatterns([...excludePatterns, ""])}
                     size="sm"
