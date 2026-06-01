@@ -12,6 +12,20 @@ import StateManager from "./state-manager"
 export class EditModes {
   private stateManager: StateManager
   private addChange: ((change: DOMChange) => void) | null = null
+  // First-seen position per element, captured once per VE session. Subsequent
+  // drags of the same element revert to THIS position (not the live pre-drag
+  // state) so trackMoveChange generates selectors against the pre-VE DOM —
+  // i.e. the same base SDK replay sees after removePreviewChanges. Without
+  // it, repeat-moves of the same element record selectors against the
+  // intermediate post-previous-move DOM, and UndoRedoManager.squashChanges
+  // collapses the moves onto the last record whose targetSelector resolves
+  // to the wrong sibling when replayed from the original. (Symptom Pedro
+  // hit: drag #gamma before Alpha, then drag #gamma before Beta; save →
+  // SDK replays only the final, mis-anchored move → live order is wrong.)
+  private originalPositions = new WeakMap<
+    Element,
+    { parent: Element; nextSibling: Element | null }
+  >()
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
@@ -30,15 +44,27 @@ export class EditModes {
     this.stateManager.setRearranging(true)
     smartElement.classList.add("absmartly-draggable")
 
-    // Capture the LIVE pre-drag position as the rollback anchor.
-    // trackMoveChange reverts the drop to this position before generating
-    // selectors so PreviewManager (which runs removePreviewChanges on every
-    // replace-mode replay) sees the same DOM the selectors describe. For a
-    // repeat drag this is the *post-previous-drop* position, not the
-    // pristine document position — that's intentional: undo works against
-    // the most recent committed state, not the historical original.
-    const originalParent: Element | null = smartElement.parentElement
-    const originalNextSibling: Element | null = smartElement.nextElementSibling
+    // Capture the FIRST-SEEN position of this element this VE session as the
+    // rollback anchor. trackMoveChange reverts the drop to that position
+    // before generating selectors so PreviewManager (which runs
+    // removePreviewChanges in replace mode at the start of every replay)
+    // sees the same DOM the selectors describe. Crucially, this is the
+    // pre-VE position, not the live pre-drag position — see the comment on
+    // `originalPositions` for why repeat-moves of the same element require
+    // it.
+    let cached = this.originalPositions.get(smartElement)
+    if (!cached) {
+      const parent = smartElement.parentElement
+      if (parent) {
+        cached = {
+          parent,
+          nextSibling: smartElement.nextElementSibling
+        }
+        this.originalPositions.set(smartElement, cached)
+      }
+    }
+    const originalParent: Element | null = cached?.parent ?? null
+    const originalNextSibling: Element | null = cached?.nextSibling ?? null
 
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true

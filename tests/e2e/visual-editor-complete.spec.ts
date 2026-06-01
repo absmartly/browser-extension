@@ -126,10 +126,12 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     await test.step('Verify changes in sidebar', async () => {
       step('Verifying changes in sidebar', '📝')
-      // 4 visual-editor actions (text/hide/delete/html) + 4 rearrange moves
-      // from testRearrangeAllScenarios (the 5th scenario, Escape-cancel,
-      // intentionally records nothing).
-      await verifySidebarHasChanges(sidebar, 8)
+      // 4 visual-editor actions (text/hide/delete/html) +
+      // 4 unique-selector rearrange moves +
+      // 1 squashed entry for the repeat-move-of-same-element scenario
+      // (its two drops collapse onto a single #rearrange-repeat-mover/move
+      // record). Escape-cancel intentionally records nothing.
+      await verifySidebarHasChanges(sidebar, 9)
     })
 
     await test.step('Verify changes and markers after VE exit', async () => {

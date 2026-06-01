@@ -217,9 +217,7 @@ export const KeyValueEditor = ({
                   )
                   .slice(0, 8)
                 setSuggestions(filtered)
-                if (filtered.length > 0) {
-                  setShowSuggestions(true)
-                }
+                setShowSuggestions(filtered.length > 0)
               }}
               onBlur={scheduleBlurHide}
               placeholder={config.keyPlaceholder}
@@ -260,9 +258,7 @@ export const KeyValueEditor = ({
                           : true
                       )
                       setSuggestions(filtered)
-                      if (filtered.length > 0) {
-                        setShowSuggestions(true)
-                      }
+                      setShowSuggestions(filtered.length > 0)
                     } else {
                       setShowSuggestions(false)
                     }

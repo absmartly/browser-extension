@@ -292,6 +292,87 @@ export async function testInlineAltSibling(page: Page): Promise<void> {
 }
 
 /**
+ * Repeat-move regression: drag the SAME element twice with different drop
+ * positions. UndoRedoManager.squashChanges collapses both moves onto one
+ * record keyed by `${selector}-${type}`, so the saved/replayed change set
+ * is just the last move. The bug Pedro hit: that last move's
+ * targetSelector was being generated against the live post-first-move DOM
+ * (not the pre-VE DOM), so the SAME positional anchor resolves to a
+ * different element when the SDK replays from the original. Symptom: live
+ * order during VE is correct, but after SDK re-applies the squashed set,
+ * the dragged element snaps to the *first* move's destination instead of
+ * the *latest* one.
+ *
+ * The fix is in EditModes.enableRearrangeMode + trackMoveChange: cache
+ * the FIRST-SEEN parent/nextSibling per element, so subsequent drags
+ * revert all the way back to the pre-VE position before generating
+ * selectors. This test exercises that path against the SDK replay that
+ * fires after every committed move.
+ */
+export async function testRepeatMoveOfSameElement(page: Page): Promise<void> {
+  log("\n🔀 Testing repeat-move of same element (Pedro's regression)...")
+
+  const zone = page.locator("#rearrange-repeat")
+  await zone.waitFor({ state: "visible", timeout: 5000 })
+  expect(
+    await zone.evaluate((el) =>
+      Array.from(el.children).map((c) => c.textContent?.trim() ?? "")
+    )
+  ).toEqual(["R-Alpha", "R-Beta", "R-Gamma"])
+
+  // First move: R-Gamma before R-Alpha → live [R-Gamma, R-Alpha, R-Beta]
+  await enterRearrangeMode(page, "#rearrange-repeat-mover")
+  await dispatchDrag(page, {
+    dragSelector: "#rearrange-repeat-mover",
+    dropOnSelector: "#rearrange-repeat > div:nth-of-type(1)",
+    yHalf: "top"
+  })
+
+  await expect
+    .poll(
+      async () =>
+        await zone.evaluate((el) =>
+          Array.from(el.children).map((c) => c.textContent?.trim() ?? "")
+        ),
+      {
+        message:
+          "after first move, #rearrange-repeat should be [R-Gamma, R-Alpha, R-Beta]",
+        timeout: 5000
+      }
+    )
+    .toEqual(["R-Gamma", "R-Alpha", "R-Beta"])
+
+  // Second move: R-Gamma before R-Beta. R-Beta is now nth-of-type(3) in
+  // the live DOM (after the first move's SDK replay placed R-Gamma first).
+  await enterRearrangeMode(page, "#rearrange-repeat-mover")
+  await dispatchDrag(page, {
+    dragSelector: "#rearrange-repeat-mover",
+    dropOnSelector: "#rearrange-repeat > div:nth-of-type(3)",
+    yHalf: "top"
+  })
+
+  // After the second drop, the SDK replays the squashed change set. The
+  // assertion checks the FINAL post-replay state, which is what surfaces
+  // the bug: a stale targetSelector resolves to R-Gamma itself (no-op) or
+  // to R-Alpha (snap-back to first-move destination), never to R-Beta.
+  await expect
+    .poll(
+      async () =>
+        await zone.evaluate((el) =>
+          Array.from(el.children).map((c) => c.textContent?.trim() ?? "")
+        ),
+      {
+        message:
+          "after second move, #rearrange-repeat should be [R-Alpha, R-Gamma, R-Beta] — the LIVE intent, reproduced through SDK replay of the squashed change set",
+        timeout: 5000
+      }
+    )
+    .toEqual(["R-Alpha", "R-Gamma", "R-Beta"])
+
+  log("  ✓ Repeat-move replays the latest intent (no snap-back to first move)")
+}
+
+/**
  * Pressing Escape during a drag cancels rearrange mode without recording
  * a move. Verifies the listeners are torn down (draggable goes back to
  * false) and the DOM order is unchanged.
@@ -372,5 +453,6 @@ export async function testRearrangeAllScenarios(page: Page): Promise<void> {
   await testBlockDropOnInnerChildSnapsToSibling(page)
   await testInlineDefaultNests(page)
   await testInlineAltSibling(page)
+  await testRepeatMoveOfSameElement(page)
   await testEscapeCancelsDrag(page)
 }

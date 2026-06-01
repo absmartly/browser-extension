@@ -100,6 +100,17 @@
     <p id="rearrange-inline">
       <span>Alpha-i</span><span>Beta-i</span><span>Gamma-i</span>
     </p>
+
+    <!-- Repeat-move regression target. The dragged element has a stable ID
+         so both moves squash onto the same selector key. With positional
+         siblings, the second move's targetSelector must be generated
+         against the pre-VE DOM, not the post-first-move DOM, or the
+         saved-and-replayed change set won't reproduce the final live order. -->
+    <div id="rearrange-repeat" class="test-container">
+      <div>R-Alpha</div>
+      <div>R-Beta</div>
+      <div id="rearrange-repeat-mover">R-Gamma</div>
+    </div>
   </div>
 </body>
 </html>
