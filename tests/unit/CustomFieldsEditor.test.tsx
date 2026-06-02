@@ -5,6 +5,36 @@ import React from "react"
 import { CustomFieldsEditor } from "~src/components/CustomFieldsEditor"
 import type { ExperimentCustomSectionField } from "~src/types/absmartly"
 
+// Mock the Lexical-based RichTextEditor with a textarea stub so this test
+// focuses on the wiring inside CustomFieldsEditor (Lexical itself is covered
+// separately). The stub forwards id/data-testid and emits onChange with the
+// raw string — identical to what the rich editor produces for plain text
+// since `$convertToMarkdownString` of a single text node round-trips
+// verbatim.
+jest.mock("~src/components/ui/RichTextEditor", () => ({
+  RichTextEditor: ({
+    id,
+    value,
+    onChange,
+    placeholder,
+    "data-testid": testid
+  }: {
+    id?: string
+    value: string
+    onChange: (next: string) => void
+    placeholder?: string
+    "data-testid"?: string
+  }) => (
+    <textarea
+      id={id}
+      data-testid={testid}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}))
+
 const fields: ExperimentCustomSectionField[] = [
   {
     id: 1,
@@ -47,10 +77,10 @@ describe("CustomFieldsEditor", () => {
         onChange={jest.fn()}
       />
     )
-    // type: "text" renders as a multi-line textarea (mirrors the main UI's
-    // RichTextEditor; see FT-1905 task notes).
-    const textArea = screen.getByTestId("cfe-input-1")
-    expect(textArea.tagName).toBe("TEXTAREA")
+    // type: "text" renders via the Lexical-based RichTextEditor (mocked here
+    // as a textarea stub — see the jest.mock at the top of this file).
+    const richEditor = screen.getByTestId("cfe-input-1")
+    expect(richEditor.tagName).toBe("TEXTAREA")
     // type: "string" remains a single-line input.
     const stringInput = screen.getByTestId("cfe-input-4")
     expect(stringInput.tagName).toBe("INPUT")

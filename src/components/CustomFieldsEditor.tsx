@@ -2,6 +2,8 @@ import React from "react"
 
 import type { ExperimentCustomSectionField } from "~src/types/absmartly"
 
+import { RichTextEditor } from "./ui/RichTextEditor"
+
 interface CustomFieldsEditorProps {
   fields: readonly ExperimentCustomSectionField[]
   values: Record<string, unknown>
@@ -76,20 +78,17 @@ function renderInput(
   switch (field.type) {
     case "text":
       // The ABsmartly main UI renders `type: "text"` with a Lexical-based
-      // RichTextEditor (see frontend-next-vue2 DescriptionField.vue / FT-1882
-      // RichTextComponents). Pulling Lexical + its plugin ecosystem into the
-      // extension bundle would balloon size, so we use a multi-line resizable
-      // textarea as a stepping stone.
-      // TODO(FT-1905): swap for Lexical RichTextEditor when bundle size allows.
+      // RichTextEditor that emits markdown via `$convertToMarkdownString`.
+      // Use a minimal Lexical wrapper here so values round-trip cleanly when
+      // the same experiment is opened in the main UI.
       return (
-        <textarea
+        <RichTextEditor
           id={id}
           data-testid={id}
-          rows={4}
-          className="w-full border border-gray-300 rounded px-2 py-1 text-sm resize-y min-h-[96px]"
           value={typeof value === "string" ? value : ""}
           placeholder={field.placeholder}
-          onChange={(e) => onChange(field.id, e.target.value)}
+          onChange={(markdown) => onChange(field.id, markdown)}
+          ariaLabelledBy={`cfe-label-${field.id}`}
         />
       )
     case "string":

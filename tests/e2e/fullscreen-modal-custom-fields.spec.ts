@@ -111,10 +111,12 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
       .waitFor({ state: 'visible', timeout: 10_000 })
 
     // The hypothesis input should render — getCustomSectionFields was
-    // intercepted to return our field.
+    // intercepted to return our field. The "text"-type field is a
+    // Lexical contenteditable div, not a real <input>, so we assert via
+    // textContent rather than value.
     const hypothesisInput = sidebar.locator('#cfe-input-7')
     await hypothesisInput.waitFor({ state: 'visible', timeout: 10_000 })
-    await expect(hypothesisInput).toHaveValue('')
+    await expect(hypothesisInput).toHaveText('')
 
     // Run AI Fill → Skip & Fill.
     await sidebar.locator('#ai-fill-button').click()
@@ -123,7 +125,7 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
     await skipButton.click()
 
     // The hypothesis input should be populated by the AI result.
-    await expect(hypothesisInput).toHaveValue(HYPOTHESIS_VALUE, {
+    await expect(hypothesisInput).toHaveText(HYPOTHESIS_VALUE, {
       timeout: 15_000
     })
     await expect(sidebar.locator('#fs-display-name-input')).toHaveValue(
@@ -164,7 +166,7 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
 
     const hypothesisInput2 = sidebar.locator('#cfe-input-7')
     await hypothesisInput2.waitFor({ state: 'visible', timeout: 10_000 })
-    await expect(hypothesisInput2).toHaveValue(HYPOTHESIS_VALUE, {
+    await expect(hypothesisInput2).toHaveText(HYPOTHESIS_VALUE, {
       timeout: 5_000
     })
   })
