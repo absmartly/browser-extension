@@ -17,6 +17,8 @@ describe("EXPERIMENT_FILL_TOOL_SCHEMA", () => {
         "audience_strict",
         "applications",
         "tags",
+        "primary_metrics",
+        "secondary_metrics",
         "variants",
         "custom_fields"
       ])
@@ -41,5 +43,13 @@ describe("EXPERIMENT_FILL_TOOL_SCHEMA", () => {
       expect.arrayContaining(["field_id", "value"])
     )
     expect(cf.items.properties.field_id.type).toBe("integer")
+  })
+
+  it("declares primary_metrics and secondary_metrics as string arrays", () => {
+    const props = EXPERIMENT_FILL_TOOL_SCHEMA.input_schema.properties
+    expect(props.primary_metrics.type).toBe("array")
+    expect(props.primary_metrics.items.type).toBe("string")
+    expect(props.secondary_metrics.type).toBe("array")
+    expect(props.secondary_metrics.items.type).toBe("string")
   })
 })

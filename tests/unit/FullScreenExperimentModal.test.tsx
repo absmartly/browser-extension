@@ -13,6 +13,13 @@ jest.mock("~src/components/VariantList", () => ({
 jest.mock("~src/components/ExperimentCodeInjection", () => ({
   ExperimentCodeInjection: () => <div data-testid="code-injection-mock" />
 }))
+jest.mock("~src/components/MetricsSelector", () => ({
+  MetricsSelector: (props: any) => (
+    <div data-testid="metrics-selector-mock">
+      primary={String(props.primaryMetricId)} secondary={JSON.stringify(props.secondaryMetricIds)}
+    </div>
+  )
+}))
 
 // Capture the most recent onResult callback so tests can drive it directly.
 let capturedOnResult:
@@ -39,6 +46,8 @@ const baseDraft = {
   owner_ids: [],
   team_ids: [],
   tag_ids: [],
+  primary_metric_id: null,
+  secondary_metric_ids: [],
   customFieldValues: {}
 }
 
@@ -53,6 +62,7 @@ const renderModal = (overrides: Partial<React.ComponentProps<typeof FullScreenEx
     owners: [],
     teams: [],
     tags: [],
+    metrics: [],
     pageUrl: "https://example.com",
     pageTitle: "Example",
     pageVisibleText: "Hello",
@@ -79,7 +89,9 @@ describe("FullScreenExperimentModal", () => {
     renderModal()
 
     expect(screen.getByTestId("fullscreen-modal")).toBeInTheDocument()
-    expect(screen.getByTestId("audience-editor-textarea")).toBeInTheDocument()
+    // The visual audience filter editor renders by default; the raw textarea
+    // is only mounted when the user toggles Advanced.
+    expect(screen.getByTestId("audience-filter-editor")).toBeInTheDocument()
     expect(screen.getByTestId("ai-fill-button")).toBeInTheDocument()
     expect(screen.getByTestId("fullscreen-modal-save")).toBeInTheDocument()
     expect(screen.getByTestId("fullscreen-modal-close")).toBeInTheDocument()
@@ -288,6 +300,58 @@ describe("FullScreenExperimentModal", () => {
 
       const next = onDraftChange.mock.calls[0][0]
       expect(next.application_ids).toEqual([42])
+    })
+
+    it("maps AI primary_metrics name to primary_metric_id and drops unknown names", () => {
+      const onDraftChange = jest.fn()
+      renderModal({
+        onDraftChange,
+        metrics: [
+          { metric_id: 11, name: "Conversion Rate" },
+          { metric_id: 22, name: "Revenue per User" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          { primary_metrics: ["Unknown", "Conversion Rate"] },
+          []
+        )
+      })
+
+      const next = onDraftChange.mock.calls[0][0]
+      expect(next.primary_metric_id).toBe(11)
+    })
+
+    it("maps AI secondary_metrics names to secondary_metric_ids and dedupes primary", () => {
+      const onDraftChange = jest.fn()
+      renderModal({
+        onDraftChange,
+        metrics: [
+          { metric_id: 11, name: "Conversion Rate" },
+          { metric_id: 22, name: "Revenue per User" },
+          { metric_id: 33, name: "Bounce Rate" }
+        ] as any
+      })
+
+      act(() => {
+        capturedOnResult!(
+          {
+            primary_metrics: ["Conversion Rate"],
+            secondary_metrics: [
+              "Revenue per User",
+              "Conversion Rate", // duplicate of primary → dropped
+              "Bounce Rate",
+              "Unknown"
+            ]
+          },
+          []
+        )
+      })
+
+      const next = onDraftChange.mock.calls[0][0]
+      expect(next.primary_metric_id).toBe(11)
+      expect(next.secondary_metric_ids).toEqual([22, 33])
     })
   })
 
