@@ -348,7 +348,13 @@ export function ExperimentEditor({
           setAIProviderConfig({
             aiProvider: provider,
             apiKey: config?.aiApiKey || undefined,
-            llmModel: config?.llmModel || undefined,
+            // Mirror DOM-gen (background/main.ts): per-provider model takes
+            // precedence over the top-level llmModel, since each provider can
+            // have its own selected model in settings.
+            llmModel:
+              config?.providerModels?.[provider] ||
+              config?.llmModel ||
+              undefined,
             customEndpoint: config?.providerEndpoints?.[provider] || undefined
           })
         }
@@ -362,6 +368,27 @@ export function ExperimentEditor({
   }, [])
 
   const handleOpenFullScreen = useCallback(async () => {
+    // Re-fetch the AI provider config on every open so changes made in
+    // Settings (provider, model, endpoint, api key) take effect immediately
+    // without remounting the editor. The on-mount fetch above seeds the state
+    // for the first paint; this overwrites with fresh values on each open.
+    let freshAIConfig = aiProviderConfig
+    try {
+      const config = await getConfig()
+      const provider =
+        (config?.aiProvider as AIProviderType) || "claude-subscription"
+      freshAIConfig = {
+        aiProvider: provider,
+        apiKey: config?.aiApiKey || undefined,
+        llmModel:
+          config?.providerModels?.[provider] || config?.llmModel || undefined,
+        customEndpoint: config?.providerEndpoints?.[provider] || undefined
+      }
+      setAIProviderConfig(freshAIConfig)
+    } catch (err) {
+      debugWarn("[FullScreen] failed to refresh AI provider config", err)
+    }
+
     const initialDraft: FullScreenDraft = {
       ...formData,
       customFieldValues: formData.customFieldValues
@@ -415,7 +442,7 @@ export function ExperimentEditor({
                 changes
               }).catch(() => {})
             }}
-            aiProviderConfig={aiProviderConfig}
+            aiProviderConfig={freshAIConfig}
             onSave={() =>
               close({ draft: initialDraft, variants: currentVariants })
             }
