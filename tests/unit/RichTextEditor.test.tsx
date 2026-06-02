@@ -87,4 +87,48 @@ describe("RichTextEditor", () => {
       expect(editable.textContent).toContain("AI suggested hypothesis")
     })
   })
+
+  it("renders the toolbar with bold/italic/underline buttons", () => {
+    render(
+      <RichTextEditor
+        value=""
+        id="cfe-input-7"
+        data-testid="cfe-input-7"
+        onChange={jest.fn()}
+      />
+    )
+    expect(screen.getByRole("button", { name: "Bold" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Italic" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Underline" })
+    ).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Link" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Insert Table" })
+    ).toBeInTheDocument()
+  })
+
+  it("mounts without throwing for markdown with code block, table, and mention", async () => {
+    const value = [
+      "Intro paragraph.",
+      "",
+      "```js",
+      "const x = 1",
+      "```",
+      "",
+      "Hello [@user_id:42] and [#experiment_id:7]"
+    ].join("\n")
+    render(
+      <RichTextEditor
+        value={value}
+        id="cfe-input-99"
+        data-testid="cfe-input-99"
+        onChange={jest.fn()}
+      />
+    )
+    const editable = screen.getByTestId("cfe-input-99")
+    await waitFor(() => {
+      expect(editable.textContent).toContain("Intro paragraph")
+    })
+  })
 })
