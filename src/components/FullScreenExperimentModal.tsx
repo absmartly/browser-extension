@@ -416,22 +416,59 @@ function applyAIResultToDraft(
   // (We intentionally do not surface result.variants[].description: the
   // VariantList UI has no description field.)
 
-  if (result.custom_fields) {
-    const allowed = new Set(customFields.map((f) => f.name))
-    const merged = { ...next.customFieldValues }
-    for (const cf of result.custom_fields) {
-      if (allowed.has(cf.field_name)) merged[cf.field_name] = cf.value
+  // Build a tolerant lookup that maps several canonical forms of each
+  // workspace field to its actual `.name`. The LLM tends to drift between
+  // name / title / lower-case variants; the workspace `.name` is what we
+  // actually store under.
+  const fieldLookup = new Map<string, string>()
+  for (const f of customFields) {
+    const candidates = [
+      f.name,
+      f.title,
+      f.name?.toLowerCase(),
+      f.title?.toLowerCase(),
+      f.title?.toLowerCase().replace(/\s+/g, "_")
+    ].filter((s): s is string => typeof s === "string" && s.length > 0)
+    for (const c of candidates) {
+      if (!fieldLookup.has(c)) fieldLookup.set(c, f.name)
     }
+  }
+  const resolveFieldName = (rawName: unknown): string | undefined => {
+    if (typeof rawName !== "string") return undefined
+    return fieldLookup.get(rawName) ?? fieldLookup.get(rawName.toLowerCase())
+  }
+
+  if (result.custom_fields) {
+    const merged = { ...next.customFieldValues }
+    const matched: string[] = []
+    const unmatched: string[] = []
+    for (const cf of result.custom_fields) {
+      const canonical = resolveFieldName(cf.field_name)
+      if (canonical) {
+        merged[canonical] = cf.value
+        matched.push(`${cf.field_name} → ${canonical}`)
+      } else {
+        unmatched.push(String(cf.field_name))
+      }
+    }
+    debugLog("[FullScreenModal] custom_fields match", {
+      matched,
+      unmatched,
+      workspaceFields: customFields.map((f) => f.name)
+    })
     next.customFieldValues = merged
   }
 
-  // Hypothesis / prediction / description map to custom fields if present
+  // Hypothesis / prediction / description can come back at the top level
+  // (the schema asks for them separately). Map them into customFieldValues
+  // if the workspace has a field with that name/title.
   for (const key of ["hypothesis", "prediction", "description"] as const) {
     const value = result[key]
-    if (typeof value === "string" && customFields.some((f) => f.name === key)) {
+    const canonical = resolveFieldName(key)
+    if (typeof value === "string" && canonical) {
       next.customFieldValues = {
         ...next.customFieldValues,
-        [key]: value
+        [canonical]: value
       }
     }
   }
