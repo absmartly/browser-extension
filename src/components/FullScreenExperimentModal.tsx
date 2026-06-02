@@ -83,6 +83,17 @@ export function FullScreenExperimentModal(
   props: FullScreenExperimentModalProps
 ) {
   const [screenshots, setScreenshots] = useState<VariantScreenshot[]>([])
+  // Internal draft state. The parent's onDraftChange handler mutates its own
+  // reference in place (so the close-result picks up final values), which means
+  // React would never observe a prop change here. Owning the draft locally is
+  // what makes typing in the form actually update the inputs.
+  const [draft, setDraftState] = useState<FullScreenDraft>(props.draft)
+
+  const updateDraft = (next: FullScreenDraft) => {
+    setDraftState(next)
+    props.onDraftChange(next)
+  }
+
   // Internal variant state so AI-driven renames re-render VariantList even
   // though the parent dialog mounts us with a captured snapshot of variants
   // (the parent's openFullScreenModal closes over `currentVariants` at the
@@ -100,9 +111,9 @@ export function FullScreenExperimentModal(
     newScreenshots: VariantScreenshot[]
   ) => {
     setScreenshots(newScreenshots)
-    props.onDraftChange(
+    updateDraft(
       applyAIResultToDraft(
-        props.draft,
+        draft,
         result,
         props.customFields,
         props.applications,
@@ -139,7 +150,7 @@ export function FullScreenExperimentModal(
         </h2>
         <div style={{ display: "flex", gap: 8 }}>
           <AIFillButton
-            draft={toAIFillDraft(props.draft, currentVariants)}
+            draft={toAIFillDraft(draft, currentVariants)}
             customFields={toCustomFieldDescriptors(props.customFields)}
             pageUrl={props.pageUrl}
             pageTitle={props.pageTitle}
@@ -176,10 +187,10 @@ export function FullScreenExperimentModal(
           <Input
             id="fs-display-name-input"
             label="Display Name"
-            value={props.draft.display_name}
+            value={draft.display_name}
             onChange={(e) =>
-              props.onDraftChange({
-                ...props.draft,
+              updateDraft({
+                ...draft,
                 display_name: e.target.value
               })
             }
@@ -187,10 +198,8 @@ export function FullScreenExperimentModal(
           <Input
             id="fs-experiment-name-input"
             label="Experiment Name"
-            value={props.draft.name}
-            onChange={(e) =>
-              props.onDraftChange({ ...props.draft, name: e.target.value })
-            }
+            value={draft.name}
+            onChange={(e) => updateDraft({ ...draft, name: e.target.value })}
             required
           />
         </section>
@@ -198,16 +207,14 @@ export function FullScreenExperimentModal(
         <section className="mt-4">
           <ExperimentMetadata
             data={{
-              percentage_of_traffic: props.draft.percentage_of_traffic,
-              unit_type_id: props.draft.unit_type_id,
-              application_ids: props.draft.application_ids,
-              owner_ids: props.draft.owner_ids,
-              team_ids: props.draft.team_ids,
-              tag_ids: props.draft.tag_ids
+              percentage_of_traffic: draft.percentage_of_traffic,
+              unit_type_id: draft.unit_type_id,
+              application_ids: draft.application_ids,
+              owner_ids: draft.owner_ids,
+              team_ids: draft.team_ids,
+              tag_ids: draft.tag_ids
             }}
-            onChange={(next) =>
-              props.onDraftChange({ ...props.draft, ...next })
-            }
+            onChange={(next) => updateDraft({ ...draft, ...next })}
             canEdit={true}
             applications={props.applications as any}
             unitTypes={props.unitTypes as any}
@@ -219,13 +226,11 @@ export function FullScreenExperimentModal(
 
         <section className="mt-6">
           <AudienceEditor
-            value={props.draft.audience}
-            strict={props.draft.audience_strict}
-            onChange={(v) =>
-              props.onDraftChange({ ...props.draft, audience: v })
-            }
+            value={draft.audience}
+            strict={draft.audience_strict}
+            onChange={(v) => updateDraft({ ...draft, audience: v })}
             onStrictChange={(v) =>
-              props.onDraftChange({ ...props.draft, audience_strict: v })
+              updateDraft({ ...draft, audience_strict: v })
             }
           />
         </section>
@@ -233,12 +238,12 @@ export function FullScreenExperimentModal(
         <section className="mt-6">
           <CustomFieldsEditor
             fields={props.customFields}
-            values={props.draft.customFieldValues}
+            values={draft.customFieldValues}
             onChange={(name, value) =>
-              props.onDraftChange({
-                ...props.draft,
+              updateDraft({
+                ...draft,
                 customFieldValues: {
-                  ...props.draft.customFieldValues,
+                  ...draft.customFieldValues,
                   [name]: value
                 }
               })
@@ -250,7 +255,7 @@ export function FullScreenExperimentModal(
           <VariantList
             initialVariants={currentVariants}
             experimentId={0}
-            experimentName={props.draft.name}
+            experimentName={draft.name}
             onVariantsChange={handleVariantsChange}
             canEdit={true}
             canAddRemove={true}
