@@ -17,7 +17,7 @@ import type {
   VariantScreenshot
 } from "~src/types/ai-fill"
 import type { DOMChange } from "~src/types/dom-changes"
-import { debugLog } from "~src/utils/debug"
+import { debugWarn } from "~src/utils/debug"
 
 import { AIFillButton } from "./AIFillButton"
 import { AudienceEditor } from "./AudienceEditor"
@@ -91,12 +91,6 @@ export function FullScreenExperimentModal(
   const [draft, setDraftState] = useState<FullScreenDraft>(props.draft)
 
   const updateDraft = (next: FullScreenDraft) => {
-    debugLog("[FullScreenModal] updateDraft", {
-      display_name: next.display_name,
-      name: next.name,
-      audience: next.audience?.slice(0, 50),
-      customFieldKeys: Object.keys(next.customFieldValues || {})
-    })
     setDraftState(next)
     props.onDraftChange(next)
   }
@@ -117,29 +111,16 @@ export function FullScreenExperimentModal(
     result: AIFillResponse,
     newScreenshots: VariantScreenshot[]
   ) => {
-    debugLog("[FullScreenModal] handleAIResult received", {
-      resultKeys: Object.keys(result),
-      display_name: result.display_name,
-      name: result.name,
-      hypothesis: result.hypothesis?.slice(0, 60),
-      customFieldsCount: result.custom_fields?.length || 0,
-      variantsCount: result.variants?.length || 0,
-      currentDraftDisplayName: draft.display_name
-    })
     setScreenshots(newScreenshots)
-    const nextDraft = applyAIResultToDraft(
-      draft,
-      result,
-      props.customFields,
-      props.applications,
-      props.tags
+    updateDraft(
+      applyAIResultToDraft(
+        draft,
+        result,
+        props.customFields,
+        props.applications,
+        props.tags
+      )
     )
-    debugLog("[FullScreenModal] applyAIResultToDraft → nextDraft", {
-      display_name: nextDraft.display_name,
-      name: nextDraft.name,
-      customFieldValues: nextDraft.customFieldValues
-    })
-    updateDraft(nextDraft)
     if (Array.isArray(result.variants) && result.variants.length > 0) {
       const renamed = applyAIVariantNames(currentVariants, result.variants)
       if (renamed) {
@@ -416,78 +397,38 @@ function applyAIResultToDraft(
   // (We intentionally do not surface result.variants[].description: the
   // VariantList UI has no description field.)
 
-  // TEMP-DIAG (FT-1905): dump first workspace field's keys so we can see why
-  // .name comes back undefined for the user.
-  if (customFields.length > 0) {
-    debugLog(
-      "[FullScreenModal] sample workspace field shape (keys):",
-      Object.keys(customFields[0] || {})
-    )
-    debugLog(
-      "[FullScreenModal] sample workspace field (raw):",
-      JSON.stringify(customFields[0])
-    )
-  }
-
-  // Build a tolerant lookup that maps several canonical forms of each
-  // workspace field to its actual `.name`. The LLM tends to drift between
-  // name / title / lower-case variants; the workspace `.name` is what we
-  // actually store under.
-  const fieldLookup = new Map<string, string>()
-  for (const f of customFields) {
-    const candidates = [
-      f.name,
-      f.title,
-      f.name?.toLowerCase(),
-      f.title?.toLowerCase(),
-      f.title?.toLowerCase().replace(/\s+/g, "_")
-    ].filter((s): s is string => typeof s === "string" && s.length > 0)
-    for (const c of candidates) {
-      if (!fieldLookup.has(c)) fieldLookup.set(c, f.name)
-    }
-  }
-  const resolveFieldName = (rawName: unknown): string | undefined => {
-    if (typeof rawName !== "string") return undefined
-    return fieldLookup.get(rawName) ?? fieldLookup.get(rawName.toLowerCase())
-  }
-
   if (result.custom_fields) {
+    const allowed = new Set(customFields.map((f) => f.name))
     const merged = { ...next.customFieldValues }
-    const matched: string[] = []
     const unmatched: string[] = []
     for (const cf of result.custom_fields) {
-      const canonical = resolveFieldName(cf.field_name)
-      if (canonical) {
-        merged[canonical] = cf.value
-        matched.push(`${cf.field_name} → ${canonical}`)
+      if (typeof cf.field_name === "string" && allowed.has(cf.field_name)) {
+        merged[cf.field_name] = cf.value
       } else {
         unmatched.push(String(cf.field_name))
       }
     }
-    debugLog(
-      "[FullScreenModal] custom_fields match\n" +
-        `  matched (${matched.length}): ${matched.join(", ") || "(none)"}\n` +
-        `  unmatched (${unmatched.length}): ${unmatched.join(", ") || "(none)"}\n` +
-        `  workspaceFields (${customFields.length}): ${customFields
-          .map(
-            (f) =>
-              `${f.name}${f.title && f.title !== f.name ? ` [${f.title}]` : ""}`
-          )
-          .join(", ")}`
-    )
+    if (unmatched.length > 0) {
+      debugWarn(
+        "[FullScreenModal] AI returned custom_fields not in workspace; dropped:",
+        unmatched.join(", "),
+        "— workspace fields:",
+        [...allowed].join(", ")
+      )
+    }
     next.customFieldValues = merged
   }
 
   // Hypothesis / prediction / description can come back at the top level
   // (the schema asks for them separately). Map them into customFieldValues
-  // if the workspace has a field with that name/title.
+  // if the workspace has a field with that exact .name.
+  const namesSet = new Set(customFields.map((f) => f.name))
   for (const key of ["hypothesis", "prediction", "description"] as const) {
     const value = result[key]
-    const canonical = resolveFieldName(key)
-    if (typeof value === "string" && canonical) {
+    if (typeof value === "string" && namesSet.has(key)) {
       next.customFieldValues = {
         ...next.customFieldValues,
-        [canonical]: value
+        [key]: value
       }
     }
   }
