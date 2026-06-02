@@ -280,18 +280,36 @@ export function RichTextEditor({
         <div className="relative">
           <RichTextPlugin
             contentEditable={
-              <ContentEditable
-                id={id}
-                data-testid={testid}
-                ariaLabelledBy={ariaLabelledBy}
+              <div
+                data-testid={testid ? `${testid}-resize-wrapper` : undefined}
+                id={id ? `${id}-resize-wrapper` : undefined}
                 className={
-                  "ContentEditable__root w-full border border-gray-300 px-2 py-1 text-sm " +
-                  (disabled ? "rounded " : "rounded-b ") +
-                  "min-h-[120px] focus:outline-none focus:ring-2 " +
-                  "focus:ring-blue-500 prose prose-sm max-w-none" +
-                  (disabled ? " bg-slate-100 cursor-not-allowed" : "")
+                  "rte-resize-wrapper " +
+                  (disabled ? "rounded" : "rounded-b") +
+                  " min-h-[120px] " +
+                  (disabled ? "" : "border border-gray-300 ")
                 }
-              />
+                // Chromium honours `resize` on non-contenteditable block
+                // ancestors but not on the contenteditable itself. Wrapping
+                // here gives users a native bottom-right grip while leaving
+                // the ContentEditable free to grow inside it.
+                style={
+                  disabled
+                    ? undefined
+                    : { resize: "vertical", overflow: "auto" }
+                }>
+                <ContentEditable
+                  id={id}
+                  data-testid={testid}
+                  ariaLabelledBy={ariaLabelledBy}
+                  className={
+                    "ContentEditable__root w-full px-2 py-1 text-sm " +
+                    "min-h-[120px] focus:outline-none focus:ring-2 " +
+                    "focus:ring-blue-500 prose prose-sm max-w-none" +
+                    (disabled ? " bg-slate-100 cursor-not-allowed" : "")
+                  }
+                />
+              </div>
             }
             placeholder={
               placeholder ? (

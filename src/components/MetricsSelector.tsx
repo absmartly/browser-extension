@@ -1,7 +1,17 @@
-import { PlusIcon, XMarkIcon } from "@heroicons/react/24/outline"
+import {
+  ArrowTrendingUpIcon,
+  PlusIcon,
+  UserGroupIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline"
 import React, { useMemo, useState } from "react"
 
-import type { Metric } from "~src/types/absmartly"
+import type {
+  Metric,
+  MetricCategoryRef,
+  MetricOwnerRef,
+  MetricTeamRef
+} from "~src/types/absmartly"
 
 import { Button } from "./ui/Button"
 
@@ -29,6 +39,91 @@ function metricId(m: Metric): number {
     return Number(fallback)
   }
   return Number.NaN
+}
+
+/**
+ * Build the comma-separated owners label used on metric cards. Mirrors the
+ * web app's `getOwnersText` (Experiments/Create/Metrics/MetricCard.tsx) —
+ * team names come first, followed by `first_name + " " + last_name`.
+ */
+function getOwnersText(
+  owners: readonly MetricOwnerRef[] | undefined,
+  teams: readonly MetricTeamRef[] | undefined
+): string {
+  const teamNames = (teams ?? [])
+    .map((t) => t.team?.name)
+    .filter((n): n is string => !!n)
+  const ownerNames = (owners ?? [])
+    .map((o) => {
+      const first = o.user?.first_name ?? ""
+      const last = o.user?.last_name ?? ""
+      return `${first} ${last}`.trim()
+    })
+    .filter((n) => n.length > 0)
+  return [...teamNames, ...ownerNames].join(", ")
+}
+
+/**
+ * The API surface for a metric category is unstable: some endpoints embed
+ * it as `metric_category`, others (after the web app's mapping step) under
+ * `metricCategory`. Accept either so callers don't have to normalize.
+ */
+function getCategory(metric: Metric): MetricCategoryRef | null | undefined {
+  return metric.metricCategory ?? metric.metric_category ?? null
+}
+
+/**
+ * Per-card metadata row (owners + usage + category) — mirrors the web app's
+ * MetricCard layout. Each piece is hidden gracefully when the underlying
+ * data is missing, so empty cards stay compact.
+ */
+function MetricMetadata({
+  metric,
+  idPrefix
+}: {
+  metric: Metric
+  idPrefix: string
+}) {
+  const ownersText = getOwnersText(metric.owners, metric.teams)
+  const usage = metric.usage?.last_6_months?.total
+  const category = getCategory(metric)
+
+  if (!ownersText && usage === undefined && !category) return null
+
+  return (
+    <div
+      data-testid={`${idPrefix}-metadata`}
+      className="mt-1 flex flex-row items-center gap-2 text-xs text-gray-500">
+      {ownersText && (
+        <div
+          data-testid={`${idPrefix}-owners`}
+          title={ownersText}
+          className="flex flex-1 min-w-0 items-center gap-1 overflow-hidden">
+          <UserGroupIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{ownersText}</span>
+        </div>
+      )}
+      {usage !== undefined && (
+        <div
+          data-testid={`${idPrefix}-usage`}
+          className="flex shrink-0 items-center gap-1"
+          title={`Used ${usage} times in the last 6 months`}>
+          <ArrowTrendingUpIcon className="h-3.5 w-3.5" />
+          <span>Used {usage} times</span>
+        </div>
+      )}
+      {category && (
+        <span
+          data-testid={`${idPrefix}-category`}
+          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 text-white"
+          style={{
+            backgroundColor: category.color ?? "#6b7280"
+          }}>
+          {category.name}
+        </span>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -90,7 +185,7 @@ export function MetricsSelector({
           <div
             data-testid="metrics-selector-primary-card"
             id={`metrics-selector-primary-${metricId(primaryMetric)}`}
-            className="flex items-center justify-between border border-gray-200 rounded p-2 bg-white">
+            className="flex items-start justify-between border border-gray-200 rounded p-2 bg-white">
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-gray-900 truncate">
                 {primaryMetric.name}
@@ -100,6 +195,10 @@ export function MetricsSelector({
                   {primaryMetric.description}
                 </div>
               )}
+              <MetricMetadata
+                metric={primaryMetric}
+                idPrefix="metrics-selector-primary-card"
+              />
             </div>
             <button
               type="button"
@@ -151,7 +250,7 @@ export function MetricsSelector({
                 key={mid}
                 data-testid={`metrics-selector-secondary-${mid}`}
                 id={`metrics-selector-secondary-${mid}`}
-                className="flex items-center justify-between border border-gray-200 rounded p-2 bg-white">
+                className="flex items-start justify-between border border-gray-200 rounded p-2 bg-white">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">
                     {metric.name}
@@ -161,6 +260,10 @@ export function MetricsSelector({
                       {metric.description}
                     </div>
                   )}
+                  <MetricMetadata
+                    metric={metric}
+                    idPrefix={`metrics-selector-secondary-${mid}`}
+                  />
                 </div>
                 <button
                   type="button"
@@ -291,6 +394,10 @@ function MetricPicker({
                   {metric.description}
                 </div>
               )}
+              <MetricMetadata
+                metric={metric}
+                idPrefix={`${id}-option-${mid}`}
+              />
             </button>
           ))
         )}

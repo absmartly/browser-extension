@@ -312,3 +312,46 @@ describe("RichTextEditor controlled-value behavior", () => {
     expect(convertFromMarkdownCalls).toEqual(["", "AI generated description"])
   })
 })
+
+describe("RichTextEditor resize handle", () => {
+  it("wraps the ContentEditable in a vertical-resize container so Chromium renders a grip", async () => {
+    let result: ReturnType<typeof render> | null = null
+    await act(async () => {
+      result = render(
+        <RichTextEditor
+          value=""
+          onChange={() => {}}
+          id="my-editor"
+          data-testid="my-editor"
+        />
+      )
+    })
+    const wrapper = result!.container.querySelector(
+      '[data-testid="my-editor-resize-wrapper"]'
+    ) as HTMLElement
+    expect(wrapper).not.toBeNull()
+    expect(wrapper.style.resize).toBe("vertical")
+    expect(wrapper.style.overflow).toBe("auto")
+    expect(wrapper.className).toContain("min-h-[120px]")
+  })
+
+  it("does not enable resize on the disabled editor", async () => {
+    let result: ReturnType<typeof render> | null = null
+    await act(async () => {
+      result = render(
+        <RichTextEditor
+          value=""
+          onChange={() => {}}
+          disabled
+          id="my-editor"
+          data-testid="my-editor"
+        />
+      )
+    })
+    const wrapper = result!.container.querySelector(
+      '[data-testid="my-editor-resize-wrapper"]'
+    ) as HTMLElement
+    expect(wrapper).not.toBeNull()
+    expect(wrapper.style.resize).toBe("")
+  })
+})

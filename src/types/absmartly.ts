@@ -80,10 +80,49 @@ export interface UnitType {
   readonly name: string
 }
 
+export interface MetricOwnerUser {
+  readonly id?: number
+  readonly user_id?: number
+  readonly first_name?: string
+  readonly last_name?: string
+}
+
+export interface MetricOwnerRef {
+  readonly user: MetricOwnerUser
+}
+
+export interface MetricTeamRef {
+  readonly team: {
+    readonly id?: number
+    readonly team_id?: number
+    readonly name: string
+  }
+}
+
+export interface MetricUsageCounts {
+  readonly total: number
+}
+
+export interface MetricUsage {
+  readonly last_6_months?: MetricUsageCounts
+}
+
+export interface MetricCategoryRef {
+  readonly id?: number
+  readonly name: string
+  readonly color?: string
+}
+
 export interface Metric {
   readonly metric_id: number
   readonly name: string
   readonly description?: string
+  readonly owners?: readonly MetricOwnerRef[]
+  readonly teams?: readonly MetricTeamRef[]
+  readonly usage?: MetricUsage | null
+  readonly metric_category_id?: number | null
+  readonly metric_category?: MetricCategoryRef | null
+  readonly metricCategory?: MetricCategoryRef | null
 }
 
 export interface ExperimentTag {
