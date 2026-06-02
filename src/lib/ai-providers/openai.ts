@@ -259,10 +259,11 @@ export class OpenAIProvider implements AIProvider {
             { role: "system", content: opts.systemPrompt },
             { role: "user", content: userContent }
           ],
-          tools: [tool]
-          // No tool_choice — some proxies reject the field. With a single tool
-          // and the system prompt explicitly instructing the model to call
-          // fill_experiment_fields, it reliably calls it.
+          tools: [tool],
+          tool_choice: {
+            type: "function",
+            function: { name: opts.schema.name }
+          }
         })
       )
     } catch (error: any) {

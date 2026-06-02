@@ -710,9 +710,10 @@ describe("AnthropicProvider", () => {
       expect(callArgs.tools).toEqual([
         expect.objectContaining({ name: "fill_experiment_fields" })
       ])
-      // No tool_choice in the request — relying on system prompt + single tool
-      // to force the call, for proxy compatibility.
-      expect(callArgs).not.toHaveProperty("tool_choice")
+      expect(callArgs.tool_choice).toEqual({
+        type: "tool",
+        name: "fill_experiment_fields"
+      })
     })
 
     it("uses configured custom endpoint and llmModel", async () => {

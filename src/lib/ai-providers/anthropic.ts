@@ -321,19 +321,24 @@ export class AnthropicProvider implements AIProvider {
       input_schema: opts.schema.input_schema as Anthropic.Tool.InputSchema
     }
 
+    const model = this.config.llmModel || "claude-sonnet-4-5-20250514"
+    debugLog("[Anthropic] generateStructured calling", {
+      model,
+      baseURL: this.config.customEndpoint || "(default api.anthropic.com)",
+      tool: opts.schema.name,
+      images: opts.images?.length || 0
+    })
+
     let message: Anthropic.Message
     try {
       message = await withTimeout(
         anthropic.messages.create({
-          model: this.config.llmModel || "claude-sonnet-4-5-20250514",
+          model,
           max_tokens: 4096,
           system: opts.systemPrompt,
           messages: [{ role: "user", content }],
-          tools: [tool]
-          // No tool_choice — some proxies reject the field and return 404.
-          // With a single tool provided plus the system prompt explicitly
-          // instructing the model to "emit a single call to
-          // fill_experiment_fields", the model reliably calls it.
+          tools: [tool],
+          tool_choice: { type: "tool", name: opts.schema.name }
         })
       )
     } catch (error: unknown) {
@@ -342,15 +347,29 @@ export class AnthropicProvider implements AIProvider {
       throw new Error(formatClassifiedError(classified))
     }
 
+    debugLog("[Anthropic] generateStructured response", {
+      stop_reason: message.stop_reason,
+      content_blocks: message.content.map((b) => b.type)
+    })
+
     const toolUse = message.content.find(
       (b): b is Anthropic.ToolUseBlock =>
         b.type === "tool_use" && b.name === opts.schema.name
     )
     if (!toolUse) {
+      const textBlocks = message.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
       throw new Error(
-        `Anthropic returned no '${opts.schema.name}' tool call. stop_reason=${message.stop_reason}`
+        `Anthropic returned no '${opts.schema.name}' tool call ` +
+          `(stop_reason=${message.stop_reason}). Model said: ${textBlocks.slice(0, 500) || "(empty)"}`
       )
     }
+    debugLog(
+      "[Anthropic] generateStructured tool_use input keys:",
+      Object.keys(toolUse.input as object)
+    )
     return toolUse.input as TResult
   }
 }

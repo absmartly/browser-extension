@@ -323,8 +323,10 @@ export class OpenRouterProvider implements AIProvider {
           }
         }
       ],
-      // No tool_choice — some proxies reject the field. With a single tool and
-      // the system prompt explicitly instructing the model, it reliably calls.
+      tool_choice: {
+        type: "function",
+        function: { name: opts.schema.name }
+      },
       max_tokens: 4096
     }
 

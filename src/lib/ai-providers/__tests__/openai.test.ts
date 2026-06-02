@@ -677,12 +677,12 @@ describe("OpenAIProvider", () => {
                 name: "fill_experiment_fields"
               })
             })
-          ]
-          // No tool_choice — relying on system prompt + single tool for proxy compat.
+          ],
+          tool_choice: {
+            type: "function",
+            function: { name: "fill_experiment_fields" }
+          }
         })
-      )
-      expect(mockChatCompletions.create.mock.calls[0][0]).not.toHaveProperty(
-        "tool_choice"
       )
     })
 
