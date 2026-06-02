@@ -17,6 +17,7 @@ import type {
   VariantScreenshot
 } from "~src/types/ai-fill"
 import type { DOMChange } from "~src/types/dom-changes"
+import { debugLog } from "~src/utils/debug"
 
 import { AIFillButton } from "./AIFillButton"
 import { AudienceEditor } from "./AudienceEditor"
@@ -90,6 +91,12 @@ export function FullScreenExperimentModal(
   const [draft, setDraftState] = useState<FullScreenDraft>(props.draft)
 
   const updateDraft = (next: FullScreenDraft) => {
+    debugLog("[FullScreenModal] updateDraft", {
+      display_name: next.display_name,
+      name: next.name,
+      audience: next.audience?.slice(0, 50),
+      customFieldKeys: Object.keys(next.customFieldValues || {})
+    })
     setDraftState(next)
     props.onDraftChange(next)
   }
@@ -110,16 +117,29 @@ export function FullScreenExperimentModal(
     result: AIFillResponse,
     newScreenshots: VariantScreenshot[]
   ) => {
+    debugLog("[FullScreenModal] handleAIResult received", {
+      resultKeys: Object.keys(result),
+      display_name: result.display_name,
+      name: result.name,
+      hypothesis: result.hypothesis?.slice(0, 60),
+      customFieldsCount: result.custom_fields?.length || 0,
+      variantsCount: result.variants?.length || 0,
+      currentDraftDisplayName: draft.display_name
+    })
     setScreenshots(newScreenshots)
-    updateDraft(
-      applyAIResultToDraft(
-        draft,
-        result,
-        props.customFields,
-        props.applications,
-        props.tags
-      )
+    const nextDraft = applyAIResultToDraft(
+      draft,
+      result,
+      props.customFields,
+      props.applications,
+      props.tags
     )
+    debugLog("[FullScreenModal] applyAIResultToDraft → nextDraft", {
+      display_name: nextDraft.display_name,
+      name: nextDraft.name,
+      customFieldValues: nextDraft.customFieldValues
+    })
+    updateDraft(nextDraft)
     if (Array.isArray(result.variants) && result.variants.length > 0) {
       const renamed = applyAIVariantNames(currentVariants, result.variants)
       if (renamed) {
