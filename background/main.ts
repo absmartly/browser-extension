@@ -195,6 +195,53 @@ export function detectPluginStatusInPage() {
 }
 
 /**
+ * Resize the sidebar container in the host page so the sidebar iframe fills
+ * the viewport. Used by the full-screen experiment modal (FT-1905): the modal
+ * lives inside the sidebar iframe, so the iframe itself needs to grow before
+ * the modal can render at viewport width.
+ *
+ * This runs via chrome.scripting.executeScript in the page context, so it
+ * must be a top-level, self-contained function with no closure captures.
+ */
+function resizeAbsmartlySidebar(mode: "fullscreen" | "restore"): void {
+  const container = document.getElementById(
+    "absmartly-sidebar-root"
+  ) as HTMLElement | null
+  if (!container) return
+
+  const SAVE_KEY = "absmartlyPreFullscreenWidth"
+
+  if (mode === "fullscreen") {
+    if (!container.dataset[SAVE_KEY]) {
+      container.dataset[SAVE_KEY] = container.style.width || "384px"
+    }
+    container.style.transition = "width 0.2s ease-in-out"
+    container.style.width = "100vw"
+    // Pause page padding-right shift so the page underneath isn't squeezed.
+    const previousPadding = document.body.style.paddingRight || ""
+    document.body.setAttribute(
+      "data-absmartly-pre-fullscreen-padding",
+      previousPadding
+    )
+    document.body.style.transition = "padding-right 0.2s ease-in-out"
+    document.body.style.paddingRight = "0px"
+  } else {
+    const saved = container.dataset[SAVE_KEY] || "384px"
+    container.style.transition = "width 0.2s ease-in-out"
+    container.style.width = saved
+    delete container.dataset[SAVE_KEY]
+    const previousPadding = document.body.getAttribute(
+      "data-absmartly-pre-fullscreen-padding"
+    )
+    if (previousPadding !== null) {
+      document.body.style.transition = "padding-right 0.2s ease-in-out"
+      document.body.style.paddingRight = previousPadding
+      document.body.removeAttribute("data-absmartly-pre-fullscreen-padding")
+    }
+  }
+}
+
+/**
  * Initialize the background script
  * Sets up all Chrome event listeners and initializes modules
  */
@@ -1306,6 +1353,34 @@ export function initializeBackgroundScript() {
         }
       })()
       return true // keep the message channel open
+    } else if (message.type === "ABSMARTLY_SIDEBAR_RESIZE") {
+      ;(async () => {
+        try {
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true
+          })
+          const tabId = tabs[0]?.id
+          if (tabId === undefined) {
+            sendResponse({ ok: false, error: "no active tab" })
+            return
+          }
+          const mode =
+            message.mode === "fullscreen" ? "fullscreen" : "restore"
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            func: resizeAbsmartlySidebar,
+            args: [mode]
+          })
+          sendResponse({ ok: true })
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err)
+          })
+        }
+      })()
+      return true
     } else if (message.type === "PING") {
       debugLog("[Background] PONG! Message system is working")
       sendResponse({ pong: true })

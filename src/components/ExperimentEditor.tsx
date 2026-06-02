@@ -366,63 +366,87 @@ export function ExperimentEditor({
       ...formData,
       customFieldValues: formData.customFieldValues
     }
-    const result = await openFullScreenModal<{
-      draft: FullScreenDraft
-      variants?: typeof currentVariants
-    }>({
-      render: ({ close }) => (
-        <FullScreenExperimentModal
-          mode={experiment?.id ? "edit" : "create"}
-          draft={initialDraft}
-          variants={currentVariants as any[]}
-          customFields={customFields}
-          applications={applications as any}
-          unitTypes={unitTypes as any}
-          owners={owners as any}
-          teams={teams as any}
-          tags={tags as any}
-          pageUrl={pageContext.url}
-          pageTitle={pageContext.title}
-          pageVisibleText={pageContext.visibleText}
-          variantDomChanges={currentVariants
-            .map((v, i) => ({
-              variantIndex: i,
-              variantName: v.name,
-              changes: getChangesConfig(
-                getDOMChangesFromConfig(v.config, domFieldName)
-              ).changes
-            }))
-            .filter((v) => v.changes.length > 0)}
-          onPreviewToggle={(enabled) => {
-            sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
-          }}
-          onPreviewWithChanges={(enabled, changes) => {
-            sendToContent({
-              type: "PREVIEW_WITH_CHANGES",
-              enabled,
-              changes
-            }).catch(() => {})
-          }}
-          aiProviderConfig={aiProviderConfig}
-          onSave={() =>
-            close({ draft: initialDraft, variants: currentVariants })
-          }
-          onClose={() => close()}
-          onDraftChange={(next) => {
-            Object.assign(initialDraft, next)
-          }}
-          onVariantsChange={(variants) => {
-            handleVariantsChange(variants, true)
-          }}
-        />
-      )
-    })
 
-    if (result?.draft) {
-      setFormData((prev) => ({
-        ...prev,
-        ...result.draft
-      }))
+    // Expand the sidebar iframe to fill the viewport before mounting the
+    // modal — the modal lives inside the iframe, so without this it would be
+    // clipped to the sidebar's 384px width.
+    const apiClient = new BackgroundAPIClient()
+    try {
+      await apiClient.resizeSidebar("fullscreen")
+    } catch (err) {
+      debugWarn("[FullScreen] resize sidebar failed", err)
+    }
+
+    try {
+      const result = await openFullScreenModal<{
+        draft: FullScreenDraft
+        variants?: typeof currentVariants
+      }>({
+        render: ({ close }) => (
+          <FullScreenExperimentModal
+            mode={experiment?.id ? "edit" : "create"}
+            draft={initialDraft}
+            variants={currentVariants as any[]}
+            customFields={customFields}
+            applications={applications as any}
+            unitTypes={unitTypes as any}
+            owners={owners as any}
+            teams={teams as any}
+            tags={tags as any}
+            pageUrl={pageContext.url}
+            pageTitle={pageContext.title}
+            pageVisibleText={pageContext.visibleText}
+            variantDomChanges={currentVariants
+              .map((v, i) => ({
+                variantIndex: i,
+                variantName: v.name,
+                changes: getChangesConfig(
+                  getDOMChangesFromConfig(v.config, domFieldName)
+                ).changes
+              }))
+              .filter((v) => v.changes.length > 0)}
+            onPreviewToggle={(enabled) => {
+              sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
+            }}
+            onPreviewWithChanges={(enabled, changes) => {
+              sendToContent({
+                type: "PREVIEW_WITH_CHANGES",
+                enabled,
+                changes
+              }).catch(() => {})
+            }}
+            aiProviderConfig={aiProviderConfig}
+            onSave={() =>
+              close({ draft: initialDraft, variants: currentVariants })
+            }
+            onClose={() => close()}
+            onDraftChange={(next) => {
+              Object.assign(initialDraft, next)
+            }}
+            onVariantsChange={(variants) => {
+              handleVariantsChange(variants, true)
+            }}
+          />
+        )
+      })
+
+      if (result?.draft) {
+        setFormData((prev) => ({
+          ...prev,
+          ...result.draft
+        }))
+      }
+    } catch (err) {
+      // Don't surface modal-mount errors to the host page — the editor
+      // continues to work even if the modal failed.
+      debugWarn("[FullScreen] modal failed", err)
+    } finally {
+      // Always restore — even on close-via-Escape or unexpected error.
+      try {
+        await apiClient.resizeSidebar("restore")
+      } catch (err) {
+        debugWarn("[FullScreen] restore sidebar failed", err)
+      }
     }
   }, [
     formData,

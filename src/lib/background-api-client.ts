@@ -412,4 +412,14 @@ export class BackgroundAPIClient {
     }
     return res.dataUrl
   }
+
+  async resizeSidebar(mode: "fullscreen" | "restore"): Promise<void> {
+    const res = await chrome.runtime.sendMessage({
+      type: "ABSMARTLY_SIDEBAR_RESIZE",
+      mode
+    })
+    if (!res?.ok) {
+      throw new Error(res?.error || "Failed to resize sidebar")
+    }
+  }
 }

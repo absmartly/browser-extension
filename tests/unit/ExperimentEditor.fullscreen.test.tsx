@@ -89,10 +89,41 @@ jest.mock("~src/hooks/useExperimentVariants", () => ({
   })
 }))
 
+// chrome.runtime.sendMessage is invoked by BackgroundAPIClient.resizeSidebar
+// (FT-1905) — the editor sends ABSMARTLY_SIDEBAR_RESIZE before opening the
+// modal and again on close to grow/shrink the sidebar iframe.
+const sendMessageMock = jest.fn(async (message: { type?: string }) => {
+  if (message?.type === "ABSMARTLY_SIDEBAR_RESIZE") {
+    return { ok: true }
+  }
+  // ExperimentEditor's mount effect also fires API_OPERATION calls via the
+  // BackgroundAPIClient. Return a generic success shape so those don't blow
+  // up the editor render.
+  return { success: true, data: [] }
+})
+
+const resizeCalls = (): string[] =>
+  sendMessageMock.mock.calls
+    .map((c) => c[0] as { type?: string; mode?: string })
+    .filter((msg) => msg?.type === "ABSMARTLY_SIDEBAR_RESIZE")
+    .map((msg) => msg.mode || "")
+
+beforeAll(() => {
+  const existingChrome = (globalThis as any).chrome || {}
+  ;(globalThis as any).chrome = {
+    ...existingChrome,
+    runtime: {
+      ...(existingChrome.runtime || {}),
+      sendMessage: sendMessageMock
+    }
+  }
+})
+
 describe("ExperimentEditor full-screen button", () => {
   beforeEach(() => {
     mockHandleVariantsChange.mockClear()
     capturedModalProps.current = null
+    sendMessageMock.mockClear()
     mockGetConfig.mockReset()
     mockGetConfig.mockResolvedValue({
       domChangesFieldName: "__dom_changes",
@@ -170,6 +201,50 @@ describe("ExperimentEditor full-screen button", () => {
       [{ name: "X", config: "{}" }],
       true
     )
+  })
+
+  it("sends fullscreen-then-restore sidebar resize messages around the modal", async () => {
+    ;(openFullScreenModal as jest.Mock).mockImplementation(async () => {
+      // At the moment the modal "would be open" we should already have
+      // exactly one resize call (fullscreen) — the restore happens after
+      // this promise resolves.
+      expect(resizeCalls()).toEqual(["fullscreen"])
+      return undefined
+    })
+
+    render(
+      <ExperimentEditor
+        onSave={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("open-fullscreen-button"))
+    })
+
+    expect(resizeCalls()).toEqual(["fullscreen", "restore"])
+  })
+
+  it("still restores the sidebar when the modal flow throws", async () => {
+    ;(openFullScreenModal as jest.Mock).mockImplementation(async () => {
+      throw new Error("boom")
+    })
+
+    render(
+      <ExperimentEditor
+        onSave={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("open-fullscreen-button"))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(resizeCalls()).toEqual(["fullscreen", "restore"])
   })
 
   it("passes aiProviderConfig from user settings to the modal", async () => {
