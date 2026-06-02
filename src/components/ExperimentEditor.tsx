@@ -21,6 +21,7 @@ import type {
   Experiment,
   ExperimentCustomSectionField,
   ExperimentInjectionCode,
+  Metric,
   URLFilter
 } from "~src/types/absmartly"
 import type { DOMChange } from "~src/types/dom-changes"
@@ -275,6 +276,13 @@ export function ExperimentEditor({
   const [customFields, setCustomFields] = useState<
     ExperimentCustomSectionField[]
   >([])
+  // Some flows (e.g. opening straight into the editor without first visiting
+  // the experiment list) may not have populated the shared `metrics` prop yet.
+  // Fall back to a local fetch so the metrics picker is always populated by
+  // the time the user opens the full-screen modal.
+  const [fetchedMetrics, setFetchedMetrics] = useState<Metric[] | null>(null)
+  const effectiveMetrics =
+    metrics && metrics.length > 0 ? metrics : fetchedMetrics ?? []
   const [pageContext, setPageContext] = useState({
     url: "",
     title: "",
@@ -334,6 +342,19 @@ export function ExperimentEditor({
         if (!cancelled) setCustomFields(fields)
       } catch (err) {
         debugWarn("[FullScreen] failed to load custom fields", err)
+      }
+      // Fetch metrics locally if the parent didn't pass them in. Keeps the
+      // metrics picker populated when the editor is mounted in isolation
+      // (e.g. straight into the create flow before the list view loaded
+      // editor resources).
+      if (!metrics || metrics.length === 0) {
+        try {
+          const client = new BackgroundAPIClient()
+          const list = await client.getMetrics()
+          if (!cancelled) setFetchedMetrics(list)
+        } catch (err) {
+          debugWarn("[FullScreen] failed to load metrics", err)
+        }
       }
       try {
         const ctx = (await sendToContent({ type: "GET_PAGE_CONTEXT" })) as
@@ -432,7 +453,7 @@ export function ExperimentEditor({
             owners={owners as any}
             teams={teams as any}
             tags={tags as any}
-            metrics={metrics as any}
+            metrics={effectiveMetrics as any}
             pageUrl={pageContext.url}
             pageTitle={pageContext.title}
             pageVisibleText={pageContext.visibleText}
@@ -497,6 +518,8 @@ export function ExperimentEditor({
     owners,
     teams,
     tags,
+    metrics,
+    fetchedMetrics,
     pageContext,
     aiProviderConfig,
     experiment?.id,

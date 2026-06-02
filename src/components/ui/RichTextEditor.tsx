@@ -26,7 +26,12 @@ import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin
 import { TablePlugin } from "@lexical/react/LexicalTablePlugin"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table"
-import { $getRoot, type EditorThemeClasses, type LexicalEditor } from "lexical"
+import {
+  $getRoot,
+  $setSelection,
+  type EditorThemeClasses,
+  type LexicalEditor
+} from "lexical"
 import React, { useEffect, useRef } from "react"
 
 import { ImageNode } from "./rich-text/nodes/ImageNode"
@@ -186,6 +191,12 @@ function InitialValuePlugin({
       const root = $getRoot()
       root.clear()
       $convertFromMarkdownString(value || "", TRANSFORMERS)
+      // Without this, Lexical can keep stale internal selection state from
+      // before the re-seed — and when the user later focuses the editor, the
+      // first keystroke targets the wrong (or no) node, so input is silently
+      // dropped. Clearing selection here forces Lexical to (re)establish a
+      // fresh selection from the focus event.
+      $setSelection(null)
     })
   }, [editor, value, externalChangeRef])
 
@@ -297,8 +308,8 @@ export function RichTextEditor({
           />
           {!disabled && (
             <>
-              <MentionsPlugin value={value} />
-              <ExperimentMentionsPlugin value={value} />
+              <MentionsPlugin />
+              <ExperimentMentionsPlugin />
               <NodeEventPlugin
                 nodeType={LinkNodeClass}
                 eventType="click"

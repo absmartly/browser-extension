@@ -15,23 +15,35 @@ export function CustomFieldsEditor({
   values,
   onChange
 }: CustomFieldsEditorProps) {
+  // Some `listCustomSectionFields` payloads return the same field once per
+  // workspace section it belongs to. Deduplicate by `id` so each field is
+  // rendered exactly once, regardless of how many sections reference it.
+  const uniqueFields = React.useMemo(() => {
+    const seen = new Set<number>()
+    const out: ExperimentCustomSectionField[] = []
+    for (const f of fields) {
+      if (f.archived) continue
+      if (seen.has(f.id)) continue
+      seen.add(f.id)
+      out.push(f)
+    }
+    out.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    return out
+  }, [fields])
+
   return (
     <div id="custom-fields-editor" className="space-y-4">
       <h3 id="custom-fields-editor-heading" className="text-sm font-semibold">
         Custom fields
       </h3>
-      {fields
-        .filter((f) => !f.archived)
-        .slice()
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((f) => (
-          <FieldRow
-            key={f.id}
-            field={f}
-            value={values[String(f.id)]}
-            onChange={onChange}
-          />
-        ))}
+      {uniqueFields.map((f) => (
+        <FieldRow
+          key={f.id}
+          field={f}
+          value={values[String(f.id)]}
+          onChange={onChange}
+        />
+      ))}
     </div>
   )
 }

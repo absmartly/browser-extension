@@ -14,6 +14,24 @@ export interface MetricsSelectorProps {
 }
 
 /**
+ * The ABsmartly API returns metric objects with their primary identifier
+ * under `id` (per the OpenAPI schema). Older fixtures and internal types
+ * sometimes use `metric_id` instead — accept either so the picker works in
+ * both production and the existing test fixtures.
+ */
+function metricId(m: Metric): number {
+  const raw = (m as unknown as { metric_id?: unknown; id?: unknown }).metric_id
+  if (typeof raw === "number") return raw
+  const fallback = (m as unknown as { id?: unknown }).id
+  if (typeof fallback === "number") return fallback
+  if (typeof raw === "string" && /^\d+$/.test(raw)) return Number(raw)
+  if (typeof fallback === "string" && /^\d+$/.test(fallback)) {
+    return Number(fallback)
+  }
+  return Number.NaN
+}
+
+/**
  * Compact metrics picker for the fullscreen experiment modal.
  *
  * Exposes two sections — Primary metric (single) and Secondary metrics
@@ -38,7 +56,10 @@ export function MetricsSelector({
 
   const metricsById = useMemo(() => {
     const m = new Map<number, Metric>()
-    for (const metric of metrics) m.set(metric.metric_id, metric)
+    for (const metric of metrics) {
+      const id = metricId(metric)
+      if (Number.isFinite(id)) m.set(id, metric)
+    }
     return m
   }, [metrics])
 
@@ -68,7 +89,7 @@ export function MetricsSelector({
         {primaryMetric ? (
           <div
             data-testid="metrics-selector-primary-card"
-            id={`metrics-selector-primary-${primaryMetric.metric_id}`}
+            id={`metrics-selector-primary-${metricId(primaryMetric)}`}
             className="flex items-center justify-between border border-gray-200 rounded p-2 bg-white">
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-gray-900 truncate">
@@ -123,37 +144,40 @@ export function MetricsSelector({
         <div
           className="space-y-1"
           data-testid="metrics-selector-secondary-list">
-          {secondaryMetrics.map((metric) => (
-            <div
-              key={metric.metric_id}
-              data-testid={`metrics-selector-secondary-${metric.metric_id}`}
-              id={`metrics-selector-secondary-${metric.metric_id}`}
-              className="flex items-center justify-between border border-gray-200 rounded p-2 bg-white">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 truncate">
-                  {metric.name}
-                </div>
-                {metric.description && (
-                  <div className="text-xs text-gray-500 truncate">
-                    {metric.description}
+          {secondaryMetrics.map((metric) => {
+            const mid = metricId(metric)
+            return (
+              <div
+                key={mid}
+                data-testid={`metrics-selector-secondary-${mid}`}
+                id={`metrics-selector-secondary-${mid}`}
+                className="flex items-center justify-between border border-gray-200 rounded p-2 bg-white">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {metric.name}
                   </div>
-                )}
+                  {metric.description && (
+                    <div className="text-xs text-gray-500 truncate">
+                      {metric.description}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  id={`metrics-selector-secondary-remove-${mid}`}
+                  data-testid={`metrics-selector-secondary-remove-${mid}`}
+                  aria-label={`Remove ${metric.name}`}
+                  onClick={() =>
+                    onSecondaryChange(
+                      secondaryMetricIds.filter((id) => id !== mid)
+                    )
+                  }
+                  className="ml-2 p-1 text-gray-400 hover:text-red-600">
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                id={`metrics-selector-secondary-remove-${metric.metric_id}`}
-                data-testid={`metrics-selector-secondary-remove-${metric.metric_id}`}
-                aria-label={`Remove ${metric.name}`}
-                onClick={() =>
-                  onSecondaryChange(
-                    secondaryMetricIds.filter((id) => id !== metric.metric_id)
-                  )
-                }
-                className="ml-2 p-1 text-gray-400 hover:text-red-600">
-                <XMarkIcon className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
         {showAddSecondary ? (
           <div className="mt-2">
@@ -209,8 +233,11 @@ function MetricPicker({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return metrics
-      .filter((m) => !excludeIds.has(m.metric_id))
-      .filter((m) => (q ? m.name.toLowerCase().includes(q) : true))
+      .map((m) => ({ metric: m, id: metricId(m) }))
+      .filter(({ id }) => Number.isFinite(id) && !excludeIds.has(id))
+      .filter(({ metric }) =>
+        q ? metric.name.toLowerCase().includes(q) : true
+      )
       .slice(0, 50)
   }, [metrics, excludeIds, search])
 
@@ -248,13 +275,13 @@ function MetricPicker({
             No metrics match.
           </div>
         ) : (
-          filtered.map((metric) => (
+          filtered.map(({ metric, id: mid }) => (
             <button
-              key={metric.metric_id}
+              key={mid}
               type="button"
-              data-testid={`${id}-option-${metric.metric_id}`}
-              id={`${id}-option-${metric.metric_id}`}
-              onClick={() => onSelect(metric.metric_id)}
+              data-testid={`${id}-option-${mid}`}
+              id={`${id}-option-${mid}`}
+              onClick={() => onSelect(mid)}
               className="w-full text-left px-2 py-1 hover:bg-blue-50 text-sm">
               <div className="font-medium text-gray-900 truncate">
                 {metric.name}

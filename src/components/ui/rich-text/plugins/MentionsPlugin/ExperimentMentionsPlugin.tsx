@@ -1,4 +1,3 @@
-import { $convertFromMarkdownString } from "@lexical/markdown"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import {
   LexicalTypeaheadMenuPlugin,
@@ -7,7 +6,7 @@ import {
 import {
   $createTextNode,
   $getRoot,
-  $setSelection,
+  type LexicalNode,
   type TextNode
 } from "lexical"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -20,7 +19,7 @@ import {
   type ExperimentMention
 } from "../../nodes/MentionNode/ExperimentMentionNode"
 import { mentionStore } from "../../nodes/mentionStore"
-import { experimentMentionIds, TRANSFORMERS } from "../MarkdownTransformers"
+import { experimentMentionIds } from "../MarkdownTransformers"
 import { checkForMentionTrigger } from "./checkForMentionTrigger"
 import {
   fetchExperimentMentionsPage,
@@ -108,12 +107,10 @@ function MentionsTypeaheadMenuItem({
 }
 
 export default function ExperimentMentionsPlugin({
-  value,
   convertMentionsOnly = false
 }: {
-  value: string
   convertMentionsOnly?: boolean
-}): JSX.Element | null {
+} = {}): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
 
   const [results, setResults] = useState<ExperimentMention[]>([])
@@ -124,27 +121,58 @@ export default function ExperimentMentionsPlugin({
   const debouncedQuery = useDebounce(queryString, DEBOUNCE_MS)
 
   // 1. Hydrate placeholder experiment mentions referenced in the markdown.
-  const mentionIds = [...new Set(experimentMentionIds)].map(Number)
-  const referencedIdsKey = mentionIds.sort((a, b) => a - b).join(",")
+  //    Runs ONCE on mount — re-seeding on every value change destroys the
+  //    user's cursor between keystrokes. The initial parse done by
+  //    InitialValuePlugin (in `RichTextEditor.tsx`) already produced
+  //    placeholder ExperimentMentionNodes; once we resolve the experiment
+  //    data into `mentionStore`, Lexical re-renders the placeholders
+  //    automatically via `decorate()`/`createDOM()` on next update.
   useEffect(() => {
-    if (!mentionIds.length) return
+    if (!editor.hasNodes([ExperimentMentionNode])) return
+    const idsAtMount = [...new Set(experimentMentionIds)].map(Number)
+    if (!idsAtMount.length) return
     let alive = true
-    loadExperimentMentionsByIds(mentionIds).then((experiments) => {
+    loadExperimentMentionsByIds(idsAtMount).then((experiments) => {
       if (!alive) return
       mentionStore.setExperiments(experiments)
-      if (!editor.hasNodes([ExperimentMentionNode])) return
+      // Touch the editor so any placeholder node refreshes its DOM from
+      // the now-populated mentionStore, WITHOUT clearing the root and
+      // re-parsing the markdown (that would race with active typing).
       editor.update(() => {
         const root = $getRoot()
-        root.clear()
-        $convertFromMarkdownString(value, TRANSFORMERS)
-        $setSelection(null)
+        const stack: LexicalNode[] = [root]
+        while (stack.length) {
+          const node = stack.pop()
+          if (!node) continue
+          if (
+            (node as LexicalNode).getType &&
+            (node as LexicalNode).getType() === "experiment-mention"
+          ) {
+            const expNode = node as unknown as {
+              __id: string
+              setTextContent: (text: string) => void
+            }
+            const exp = experiments.find(
+              (e) => e.id.toString() === expNode.__id
+            )
+            if (exp) {
+              expNode.setTextContent(`#${exp.display_name ?? exp.name}`)
+            }
+          }
+          const children = (
+            node as unknown as { getChildren?: () => LexicalNode[] }
+          ).getChildren?.()
+          if (children) {
+            for (const child of children) stack.push(child)
+          }
+        }
       })
     })
     return () => {
       alive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [referencedIdsKey])
+  }, [])
 
   // 2. Search experiments for the typeahead.
   useEffect(() => {

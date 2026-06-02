@@ -1,16 +1,10 @@
-import { $convertFromMarkdownString } from "@lexical/markdown"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import {
   LexicalTypeaheadMenuPlugin,
   MenuOption
 } from "@lexical/react/LexicalTypeaheadMenuPlugin"
-import {
-  $createTextNode,
-  $getRoot,
-  $setSelection,
-  type TextNode
-} from "lexical"
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { $createTextNode, type TextNode } from "lexical"
+import React, { useCallback, useMemo, useState } from "react"
 import * as ReactDOM from "react-dom"
 
 import {
@@ -22,7 +16,6 @@ import {
   UserMentionNode
 } from "../../nodes/MentionNode/UserMentionNode"
 import type { MentionTeam, MentionUser } from "../../nodes/mentionStore"
-import { TRANSFORMERS } from "../MarkdownTransformers"
 import { checkForMentionTrigger } from "./checkForMentionTrigger"
 import { useMentionUsersAndTeams } from "./mentionData"
 
@@ -159,31 +152,16 @@ function MentionsTypeaheadMenuItem({
   )
 }
 
-export default function MentionsPlugin({
-  value
-}: {
-  value: string
-}): JSX.Element | null {
+export default function MentionsPlugin(): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
   const { data, isLoading } = useMentionUsersAndTeams()
   const [queryString, setQueryString] = useState<string>("")
 
-  useEffect(() => {
-    if (!data) return
-    if (!editor.hasNodes([UserMentionNode, TeamMentionNode])) {
-      throw new Error(
-        "MentionsPlugin: UserMentionNode or TeamMentionNode not registered on editor"
-      )
-    }
-    editor.update(() => {
-      const root = $getRoot()
-      root.clear()
-      $convertFromMarkdownString(value, TRANSFORMERS)
-      $setSelection(null)
-    })
-    // re-resolve placeholders once the user/team data arrives.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data])
+  if (data && !editor.hasNodes([UserMentionNode, TeamMentionNode])) {
+    throw new Error(
+      "MentionsPlugin: UserMentionNode or TeamMentionNode not registered on editor"
+    )
+  }
 
   const results = mentionLookupService({
     users: data?.users ?? [],

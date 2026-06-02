@@ -85,33 +85,33 @@ jest.mock("@lexical/react/LexicalRichTextPlugin", () => ({
   )
 }))
 
-const noopPlugin = () => null
+const noopPluginFn = () => null
 jest.mock("@lexical/react/LexicalAutoLinkPlugin", () => ({
-  AutoLinkPlugin: noopPlugin
+  AutoLinkPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalHistoryPlugin", () => ({
-  HistoryPlugin: noopPlugin
+  HistoryPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalHorizontalRuleNode", () => ({
   HorizontalRuleNode: class {}
 }))
 jest.mock("@lexical/react/LexicalLinkPlugin", () => ({
-  LinkPlugin: noopPlugin
+  LinkPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalListPlugin", () => ({
-  ListPlugin: noopPlugin
+  ListPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalMarkdownShortcutPlugin", () => ({
-  MarkdownShortcutPlugin: noopPlugin
+  MarkdownShortcutPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalNodeEventPlugin", () => ({
-  NodeEventPlugin: noopPlugin
+  NodeEventPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalTabIndentationPlugin", () => ({
-  TabIndentationPlugin: noopPlugin
+  TabIndentationPlugin: () => null
 }))
 jest.mock("@lexical/react/LexicalTablePlugin", () => ({
-  TablePlugin: noopPlugin
+  TablePlugin: () => null
 }))
 
 // Heavy custom plugins/nodes — replace with stubs so the module loads.
@@ -128,15 +128,15 @@ jest.mock("../rich-text/nodes/MentionNode/UserMentionNode", () => ({
   UserMentionNode: class {}
 }))
 jest.mock("../rich-text/plugins/CodeHighlightPlugin", () => ({
-  CodeHighlightPlugin: noopPlugin
+  CodeHighlightPlugin: () => null
 }))
 jest.mock("../rich-text/plugins/DragDropPastePlugin", () => ({
   __esModule: true,
-  default: noopPlugin
+  default: () => null
 }))
 jest.mock("../rich-text/plugins/ImagesPlugin", () => ({
   __esModule: true,
-  default: noopPlugin
+  default: () => null
 }))
 jest.mock("../rich-text/plugins/MarkdownTransformers", () => ({
   resetExperimentMentionIds: jest.fn(),
@@ -146,26 +146,27 @@ jest.mock(
   "../rich-text/plugins/MentionsPlugin/ExperimentMentionsPlugin",
   () => ({
     __esModule: true,
-    default: noopPlugin
+    default: () => null
   })
 )
 jest.mock("../rich-text/plugins/MentionsPlugin/MentionsPlugin", () => ({
   __esModule: true,
-  default: noopPlugin
+  default: () => null
 }))
 jest.mock(
   "../rich-text/toolbar/plugins/FloatingMenuPlugin/FloatingMenuPlugin",
   () => ({
-    FloatingMenuPlugin: noopPlugin
+    FloatingMenuPlugin: () => null
   })
 )
 jest.mock("../rich-text/toolbar/Toolbar", () => ({
-  ToolbarPlugin: noopPlugin
+  ToolbarPlugin: () => null
 }))
 
 // lexical core — we never call any real DOM logic. Provide minimal stubs.
 jest.mock("lexical", () => ({
-  $getRoot: () => ({ clear: jest.fn() })
+  $getRoot: () => ({ clear: jest.fn() }),
+  $setSelection: jest.fn()
 }))
 
 // link / list / code / rich-text node classes — referenced by the editor's
@@ -256,6 +257,30 @@ describe("RichTextEditor controlled-value behavior", () => {
 
     // 4) Confirm the parent's state reflects the typed value.
     expect(api.getValue()).toBe("He")
+  })
+
+  it("does not re-seed across ten consecutive keystrokes (Bug 1 regression)", async () => {
+    // This covers the FT-1905 regression where mentions plugins re-seeded the
+    // editor between keystrokes, resetting the cursor. We simulate ten editor
+    // emits in sequence and assert the only `$convertFromMarkdownString` call
+    // remains the initial mount seed.
+    let api: any = null
+    await act(async () => {
+      render(<ControlledHarness initialValue="" capture={(a) => (api = a)} />)
+    })
+    expect(convertFromMarkdownCalls).toEqual([""])
+
+    const word = "hello rich"
+    let acc = ""
+    for (const ch of word) {
+      acc += ch
+      await act(async () => {
+        nextMarkdownToEmit = acc
+        capturedOnChange?.({}, fakeEditor)
+      })
+    }
+    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(api.getValue()).toBe("hello rich")
   })
 
   it("re-seeds when value is changed externally (e.g. AI Fill)", async () => {
