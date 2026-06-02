@@ -94,6 +94,8 @@ export function ExperimentEditor({
     owner_ids: number[]
     team_ids: number[]
     tag_ids: number[]
+    primary_metric_id: number | null
+    secondary_metric_ids: number[]
     customFieldValues: Record<string, unknown>
   }>(() => {
     // For an existing experiment custom_section_field_values arrives keyed by
@@ -123,6 +125,22 @@ export function ExperimentEditor({
       tag_ids:
         experiment?.experiment_tags?.map((t) => Number(t.experiment_tag_id)) ||
         [],
+      primary_metric_id:
+        experiment?.primary_metric?.metric_id ??
+        (experiment as any)?.primary_metric_id ??
+        null,
+      secondary_metric_ids:
+        (
+          (experiment as any)?.secondary_metrics as
+            | Array<{
+                metric_id?: number
+                metric?: { id?: number }
+                id?: number
+              }>
+            | undefined
+        )
+          ?.map((m) => Number(m.metric_id ?? m.metric?.id ?? m.id ?? 0))
+          .filter((n) => Number.isFinite(n) && n > 0) || [],
       customFieldValues: {} as Record<string, unknown>
     }
     return initial
@@ -414,6 +432,7 @@ export function ExperimentEditor({
             owners={owners as any}
             teams={teams as any}
             tags={tags as any}
+            metrics={metrics as any}
             pageUrl={pageContext.url}
             pageTitle={pageContext.title}
             pageVisibleText={pageContext.visibleText}

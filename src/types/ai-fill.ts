@@ -45,6 +45,12 @@ export interface AIFillRequest {
   draft: AIFillDraft
   /** Available custom field definitions for the workspace. */
   customFields: readonly CustomFieldDescriptor[]
+  /** Available applications (id + name) for the workspace. */
+  applications?: readonly { id: number; name: string }[]
+  /** Available experiment tags (id + name) for the workspace. */
+  tags?: readonly { id: number; name: string }[]
+  /** Available metrics (id + name + description) for the workspace. */
+  metrics?: readonly { id: number; name: string; description?: string }[]
   /** Page context. */
   pageUrl: string
   pageTitle: string
@@ -89,6 +95,10 @@ export interface AIFillResponse {
   audience_strict?: boolean
   applications?: string[]
   tags?: string[]
+  /** Single primary metric name (first match wins; extras are ignored). */
+  primary_metrics?: string[]
+  /** Names of secondary metrics — must match metricDefinitions entries. */
+  secondary_metrics?: string[]
   variants?: { name: string; description?: string }[]
   custom_fields?: { field_id: number; value: unknown }[]
 }

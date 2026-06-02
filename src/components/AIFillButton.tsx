@@ -18,6 +18,12 @@ import { AIFillPromptDialog } from "./AIFillPromptDialog"
 interface AIFillButtonProps {
   draft: AIFillDraft
   customFields: readonly CustomFieldDescriptor[]
+  /** Optional: workspace applications surfaced to the LLM so it picks valid names. */
+  applications?: readonly { id: number; name: string }[]
+  /** Optional: workspace tags. */
+  tags?: readonly { id: number; name: string }[]
+  /** Optional: workspace metrics (id + name + description). */
+  metrics?: readonly { id: number; name: string; description?: string }[]
   pageUrl: string
   pageTitle: string
   pageVisibleText: string
@@ -40,6 +46,9 @@ interface AIFillButtonProps {
 export function AIFillButton({
   draft,
   customFields,
+  applications,
+  tags,
+  metrics,
   pageUrl,
   pageTitle,
   pageVisibleText,
@@ -69,6 +78,9 @@ export function AIFillButton({
         {
           draft,
           customFields,
+          applications,
+          tags,
+          metrics,
           pageUrl,
           pageTitle,
           pageVisibleText,

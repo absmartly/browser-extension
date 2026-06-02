@@ -188,7 +188,7 @@ test.describe('Full-screen experiment modal (FT-1905)', () => {
       .locator('#fullscreen-experiment-modal')
       .waitFor({ state: 'visible', timeout: 10_000 })
     await sidebar
-      .locator('#audience-editor-textarea')
+      .locator('#audience-filter-editor')
       .waitFor({ state: 'visible', timeout: 5_000 })
     await sidebar
       .locator('#ai-fill-button')

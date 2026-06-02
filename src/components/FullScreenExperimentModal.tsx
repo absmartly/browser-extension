@@ -13,6 +13,7 @@ import type {
   ExperimentTag,
   ExperimentTeam,
   ExperimentUser,
+  Metric,
   UnitType
 } from "~src/types/absmartly"
 import type {
@@ -28,6 +29,7 @@ import { AudienceEditor } from "./AudienceEditor"
 import { CustomFieldsEditor } from "./CustomFieldsEditor"
 import { ExperimentCodeInjection } from "./ExperimentCodeInjection"
 import { ExperimentMetadata } from "./ExperimentMetadata"
+import { MetricsSelector } from "./MetricsSelector"
 import { Button } from "./ui/Button"
 import { Input } from "./ui/Input"
 import { VariantList } from "./VariantList"
@@ -49,6 +51,8 @@ export interface FullScreenDraft {
   owner_ids: number[]
   team_ids: number[]
   tag_ids: number[]
+  primary_metric_id: number | null
+  secondary_metric_ids: number[]
   customFieldValues: Record<string, unknown>
 }
 
@@ -62,6 +66,7 @@ interface FullScreenExperimentModalProps {
   owners: readonly ExperimentUser[]
   teams: readonly ExperimentTeam[]
   tags: readonly ExperimentTag[]
+  metrics: readonly Metric[]
   pageUrl: string
   pageTitle: string
   pageVisibleText: string
@@ -144,7 +149,8 @@ export function FullScreenExperimentModal(
         result,
         props.customFields,
         props.applications,
-        props.tags
+        props.tags,
+        props.metrics
       )
     )
     if (Array.isArray(result.variants) && result.variants.length > 0) {
@@ -195,6 +201,19 @@ export function FullScreenExperimentModal(
           <AIFillButton
             draft={toAIFillDraft(draft, currentVariants)}
             customFields={toCustomFieldDescriptors(props.customFields)}
+            applications={props.applications.map((a) => ({
+              id: Number(a.application_id || a.id),
+              name: a.name
+            }))}
+            tags={props.tags.map((t) => ({
+              id: t.experiment_tag_id,
+              name: t.name
+            }))}
+            metrics={props.metrics.map((m) => ({
+              id: m.metric_id,
+              name: m.name,
+              description: m.description
+            }))}
             pageUrl={props.pageUrl}
             pageTitle={props.pageTitle}
             pageVisibleText={props.pageVisibleText}
@@ -361,6 +380,20 @@ export function FullScreenExperimentModal(
         </section>
 
         <section className="mt-6">
+          <MetricsSelector
+            metrics={props.metrics}
+            primaryMetricId={draft.primary_metric_id}
+            secondaryMetricIds={draft.secondary_metric_ids}
+            onPrimaryChange={(id) =>
+              updateDraft({ ...draft, primary_metric_id: id })
+            }
+            onSecondaryChange={(ids) =>
+              updateDraft({ ...draft, secondary_metric_ids: ids })
+            }
+          />
+        </section>
+
+        <section className="mt-6">
           <CustomFieldsEditor
             fields={props.customFields}
             values={draft.customFieldValues}
@@ -494,7 +527,8 @@ function applyAIResultToDraft(
   result: AIFillResponse,
   customFields: readonly ExperimentCustomSectionField[],
   applications: readonly Application[],
-  tags: readonly ExperimentTag[]
+  tags: readonly ExperimentTag[],
+  metrics: readonly Metric[]
 ): FullScreenDraft {
   const next: FullScreenDraft = { ...draft }
 
@@ -535,6 +569,36 @@ function applyAIResultToDraft(
       }
     }
     if (ids.length > 0) next.tag_ids = ids
+  }
+
+  // Map metric names → metric_id. The AI gets the workspace metric list as
+  // metricDefinitions in the user message and is told to use the exact names;
+  // anything we can't match is silently dropped (we never invent ids).
+  if (result.primary_metrics && Array.isArray(result.primary_metrics)) {
+    for (const name of result.primary_metrics) {
+      const match = metrics.find((m) => m.name === name)
+      if (match) {
+        next.primary_metric_id = match.metric_id
+        break // primary is single-valued; first match wins
+      }
+    }
+  }
+  if (result.secondary_metrics && Array.isArray(result.secondary_metrics)) {
+    const ids: number[] = []
+    const seen = new Set<number>()
+    for (const name of result.secondary_metrics) {
+      const match = metrics.find((m) => m.name === name)
+      const id = match?.metric_id
+      if (
+        typeof id === "number" &&
+        !seen.has(id) &&
+        id !== next.primary_metric_id
+      ) {
+        seen.add(id)
+        ids.push(id)
+      }
+    }
+    if (ids.length > 0) next.secondary_metric_ids = ids
   }
 
   // result.variants is applied separately by handleAIResult via

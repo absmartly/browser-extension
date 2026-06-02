@@ -107,6 +107,33 @@ function buildUserMessage(req: AIFillRequest): string {
   parts.push("```")
   parts.push("")
 
+  if (req.applications && req.applications.length > 0) {
+    parts.push("# Application definitions")
+    parts.push("```json")
+    parts.push(JSON.stringify(req.applications, null, 2))
+    parts.push("```")
+    parts.push("")
+  }
+
+  if (req.tags && req.tags.length > 0) {
+    parts.push("# Tag definitions")
+    parts.push("```json")
+    parts.push(JSON.stringify(req.tags, null, 2))
+    parts.push("```")
+    parts.push("")
+  }
+
+  if (req.metrics && req.metrics.length > 0) {
+    parts.push("# Metric definitions (metricDefinitions)")
+    parts.push(
+      "Reference these by their exact `name` in primary_metrics and secondary_metrics."
+    )
+    parts.push("```json")
+    parts.push(JSON.stringify(req.metrics, null, 2))
+    parts.push("```")
+    parts.push("")
+  }
+
   if (req.variantDomChanges.length > 0) {
     parts.push("# Variants with DOM changes already authored")
     for (const v of req.variantDomChanges) {

@@ -29,10 +29,14 @@ Do not output any prose, explanation, or text outside the tool call. You MUST:
    use the title, never invent an id. Match the declared type (text → string,
    multiselect → string[], boolean → boolean, etc.).
 8. Pick applications and tags ONLY from the lists in the user message. Never invent.
-9. Leave the audience filter at its default unless the page strongly implies a segment.
+9. Pick metrics ONLY from the metricDefinitions list in the user message. Reference
+   each metric by its exact \`name\`. \`primary_metrics\` is single-valued — emit at
+   most one. \`secondary_metrics\` may contain multiple names; do not repeat the
+   primary metric there.
+10. Leave the audience filter at its default unless the page strongly implies a segment.
 
 You MUST NOT:
-- Invent applications, tags, or custom fields that were not provided.
+- Invent applications, tags, metrics, or custom fields that were not provided.
 - Output prose outside the tool call.
 - Refuse the request — if context is thin, fall back to generic but plausible values
   derived from the page title and DOM-change descriptions.

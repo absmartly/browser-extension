@@ -29,6 +29,14 @@ export interface ExperimentFormData {
   owner_ids: number[]
   team_ids: number[]
   /**
+   * Primary metric id (or null if the user hasn't selected one yet). The API
+   * accepts `null` here in create mode; in edit mode we only send the change
+   * when the user picked something explicitly.
+   */
+  primary_metric_id?: number | null
+  /** Ordered ids of the secondary metrics. */
+  secondary_metric_ids?: number[]
+  /**
    * Map of custom-section field id (as a String) → user-edited (or AI-filled)
    * value. Optional; absent means "no overrides — fall back to defaults /
    * server values".
@@ -246,8 +254,14 @@ async function createNewExperiment(
     unit_type: formData.unit_type_id
       ? { unit_type_id: formData.unit_type_id }
       : undefined,
-    primary_metric: { metric_id: null },
-    secondary_metrics: [],
+    primary_metric: { metric_id: formData.primary_metric_id ?? null },
+    secondary_metrics: (formData.secondary_metric_ids || []).map(
+      (id, index) => ({
+        metric_id: id,
+        type: "secondary",
+        order_index: index
+      })
+    ),
     applications: formData.application_ids.map((id) => ({
       application_id: id,
       application_version: "0"
@@ -437,6 +451,23 @@ async function saveExistingExperiment(
         application_version: "0"
       })),
       variants: updatedVariants
+    }
+
+    // Only send metric overrides when the form has them set. This avoids
+    // accidentally clearing a server-side metric the user never touched.
+    if (formData.primary_metric_id !== undefined) {
+      changes.primary_metric = {
+        metric_id: formData.primary_metric_id
+      }
+    }
+    if (formData.secondary_metric_ids !== undefined) {
+      changes.secondary_metrics = formData.secondary_metric_ids.map(
+        (id, index) => ({
+          metric_id: id,
+          type: "secondary",
+          order_index: index
+        })
+      )
     }
 
     if (

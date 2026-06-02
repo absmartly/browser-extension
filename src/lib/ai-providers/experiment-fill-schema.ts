@@ -77,6 +77,18 @@ export const EXPERIMENT_FILL_TOOL_SCHEMA: ToolDefinition & {
         description:
           "Tag names that classify this experiment. Pick only from the list provided in the user message."
       },
+      primary_metrics: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Name of the primary metric for this experiment. Pick exactly ONE name from the metricDefinitions section of the user message. The first matched name wins; any additional entries are ignored."
+      },
+      secondary_metrics: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Names of secondary metrics that provide insight into the broader impact of the experiment. Pick only from the metricDefinitions section of the user message; ignore unknown names."
+      },
       variants: {
         type: "array",
         items: {

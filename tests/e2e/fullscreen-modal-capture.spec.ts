@@ -249,8 +249,8 @@ test.describe('FT-1905 capture — full-screen modal walkthrough', () => {
     // -------------------------------------------------------------------
     // 3) Scroll the modal body to show the audience editor + a custom field.
     // -------------------------------------------------------------------
-    const audienceTextarea = sidebar.locator('#audience-editor-textarea')
-    await audienceTextarea.waitFor({ state: 'visible', timeout: 5_000 })
+    const audienceFilter = sidebar.locator('#audience-filter-editor')
+    await audienceFilter.waitFor({ state: 'visible', timeout: 5_000 })
     const hypothesisInput = sidebar.locator('#cfe-input-7')
     await hypothesisInput.waitFor({ state: 'visible', timeout: 5_000 })
 
@@ -266,7 +266,7 @@ test.describe('FT-1905 capture — full-screen modal walkthrough', () => {
     })
 
     // Give scroll a frame to commit before screenshotting.
-    await audienceTextarea.waitFor({ state: 'visible' })
+    await audienceFilter.waitFor({ state: 'visible' })
 
     await testPage.screenshot({
       path: `${SCREENSHOT_DIR}/03-modal-audience-and-custom-fields.png`,
