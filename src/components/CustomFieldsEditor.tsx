@@ -75,6 +75,23 @@ function renderInput(
   const id = `cfe-input-${field.id}`
   switch (field.type) {
     case "text":
+      // The ABsmartly main UI renders `type: "text"` with a Lexical-based
+      // RichTextEditor (see frontend-next-vue2 DescriptionField.vue / FT-1882
+      // RichTextComponents). Pulling Lexical + its plugin ecosystem into the
+      // extension bundle would balloon size, so we use a multi-line resizable
+      // textarea as a stepping stone.
+      // TODO(FT-1905): swap for Lexical RichTextEditor when bundle size allows.
+      return (
+        <textarea
+          id={id}
+          data-testid={id}
+          rows={4}
+          className="w-full border border-gray-300 rounded px-2 py-1 text-sm resize-y min-h-[96px]"
+          value={typeof value === "string" ? value : ""}
+          placeholder={field.placeholder}
+          onChange={(e) => onChange(field.id, e.target.value)}
+        />
+      )
     case "string":
       return (
         <input
@@ -114,6 +131,7 @@ function renderInput(
         />
       )
     case "select":
+    case "single_select":
       return (
         <select
           id={`cfe-select-${field.id}`}
@@ -129,7 +147,8 @@ function renderInput(
           ))}
         </select>
       )
-    case "multiselect": {
+    case "multiselect":
+    case "multi_select": {
       const selected = Array.isArray(value) ? (value as string[]) : []
       return (
         <select

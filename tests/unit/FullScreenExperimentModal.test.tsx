@@ -85,11 +85,88 @@ describe("FullScreenExperimentModal", () => {
     expect(screen.getByTestId("fullscreen-modal-close")).toBeInTheDocument()
   })
 
-  it("calls onClose when the close button is clicked", () => {
+  it("calls onSave when the X close button is clicked (FT-1905: X preserves draft)", () => {
+    const onSave = jest.fn()
     const onClose = jest.fn()
-    renderModal({ onClose })
+    renderModal({ onSave, onClose })
     fireEvent.click(screen.getByTestId("fullscreen-modal-close"))
-    expect(onClose).toHaveBeenCalled()
+    // X is wired to onSave (close-with-save) so typed values survive.
+    expect(onSave).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it("Discard button calls onClose only after window.confirm() approves", () => {
+    const onClose = jest.fn()
+    const onSave = jest.fn()
+    const confirmSpy = jest
+      .spyOn(window, "confirm")
+      .mockImplementationOnce(() => false)
+      .mockImplementationOnce(() => true)
+
+    try {
+      renderModal({ onClose, onSave })
+      // First click: user cancels the confirm → nothing happens.
+      fireEvent.click(screen.getByTestId("fullscreen-modal-discard"))
+      expect(onClose).not.toHaveBeenCalled()
+      // Second click: user confirms → onClose fires (which discards in parent).
+      fireEvent.click(screen.getByTestId("fullscreen-modal-discard"))
+      expect(onClose).toHaveBeenCalledTimes(1)
+      expect(onSave).not.toHaveBeenCalled()
+      expect(confirmSpy).toHaveBeenCalledTimes(2)
+    } finally {
+      confirmSpy.mockRestore()
+    }
+  })
+
+  describe("display_name ↔ name lock+sync", () => {
+    it("auto-syncs display_name → snake_case name when locked (create mode)", () => {
+      const onDraftChange = jest.fn()
+      renderModal({
+        mode: "create",
+        draft: { ...baseDraft, display_name: "", name: "" },
+        onDraftChange
+      })
+      const display = screen.getByTestId("fs-display-name-input")
+      fireEvent.change(display, { target: { value: "My Cool Test" } })
+      const last = onDraftChange.mock.calls.at(-1)![0]
+      expect(last.display_name).toBe("My Cool Test")
+      expect(last.name).toBe("my_cool_test")
+    })
+
+    it("auto-syncs name → Title Case display_name when locked", () => {
+      const onDraftChange = jest.fn()
+      renderModal({ mode: "create", onDraftChange })
+      const nameInput = screen.getByTestId("fs-experiment-name-input")
+      fireEvent.change(nameInput, { target: { value: "checkout_promo_v2" } })
+      const last = onDraftChange.mock.calls.at(-1)![0]
+      expect(last.name).toBe("checkout_promo_v2")
+      expect(last.display_name).toBe("Checkout Promo V2")
+    })
+
+    it("stops syncing once the lock is toggled off", () => {
+      const onDraftChange = jest.fn()
+      renderModal({ mode: "create", onDraftChange })
+      // Click the lock to unsync.
+      fireEvent.click(screen.getByTestId("fs-names-sync-lock"))
+      fireEvent.change(screen.getByTestId("fs-display-name-input"), {
+        target: { value: "Independent Display" }
+      })
+      const last = onDraftChange.mock.calls.at(-1)![0]
+      expect(last.display_name).toBe("Independent Display")
+      // name field was not auto-updated.
+      expect(last.name).toBe(baseDraft.name)
+    })
+
+    it("starts unsynced for existing experiments (edit mode)", () => {
+      const onDraftChange = jest.fn()
+      renderModal({ mode: "edit", onDraftChange })
+      fireEvent.change(screen.getByTestId("fs-display-name-input"), {
+        target: { value: "Renamed Just The Display" }
+      })
+      const last = onDraftChange.mock.calls.at(-1)![0]
+      expect(last.display_name).toBe("Renamed Just The Display")
+      expect(last.name).toBe(baseDraft.name)
+    })
   })
 
   describe("applyAIResultToDraft (via AIFillButton.onResult)", () => {

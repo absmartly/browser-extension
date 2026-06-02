@@ -135,10 +135,13 @@ export interface ExperimentCustomSectionField {
     | "text"
     | "select"
     | "multiselect"
+    | "single_select"
+    | "multi_select"
     | "string"
     | "json"
     | "boolean"
     | "number"
+    | "user"
   readonly required: boolean
   readonly options?: readonly string[]
   readonly default_value?: string

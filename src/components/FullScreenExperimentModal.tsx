@@ -1,4 +1,8 @@
-import { XMarkIcon } from "@heroicons/react/24/outline"
+import {
+  LockClosedIcon,
+  LockOpenIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline"
 import React, { useState } from "react"
 
 import type { AIProviderType } from "~src/lib/ai-providers"
@@ -90,9 +94,31 @@ export function FullScreenExperimentModal(
   // what makes typing in the form actually update the inputs.
   const [draft, setDraftState] = useState<FullScreenDraft>(props.draft)
 
+  // Mirror the inline ExperimentEditor's lock+sync UX: when locked, typing in
+  // either Display Name or Experiment Name converts to/from snake_case so the
+  // two stay aligned. Start synced for fresh experiments (create mode), and
+  // unsynced for existing ones (edit mode) so we don't clobber user-set names.
+  const [namesSynced, setNamesSynced] = useState(props.mode === "create")
+
   const updateDraft = (next: FullScreenDraft) => {
     setDraftState(next)
     props.onDraftChange(next)
+  }
+
+  const handleDisplayNameChange = (value: string) => {
+    updateDraft({
+      ...draft,
+      display_name: value,
+      ...(namesSynced ? { name: titleToSnake(value) } : {})
+    })
+  }
+
+  const handleNameChange = (value: string) => {
+    updateDraft({
+      ...draft,
+      name: value,
+      ...(namesSynced ? { display_name: snakeToTitle(value) } : {})
+    })
   }
 
   // Internal variant state so AI-driven renames re-render VariantList even
@@ -128,6 +154,22 @@ export function FullScreenExperimentModal(
         props.onVariantsChange(renamed, true)
       }
     }
+  }
+
+  // FT-1905 close-preserves-data:
+  //  - The X button and the Save button both close-with-save. This mirrors
+  //    how the inline editor's "back" button preserves formData — closing
+  //    must never silently throw away typing.
+  //  - "Discard" is the only path that abandons the draft, and we gate it
+  //    behind a window.confirm so the user can change their mind.
+  const handleDiscard = () => {
+    if (typeof window !== "undefined" && typeof window.confirm === "function") {
+      const ok = window.confirm(
+        "Discard changes? Anything you typed in this modal will be lost."
+      )
+      if (!ok) return
+    }
+    props.onClose()
   }
 
   return (
@@ -168,7 +210,7 @@ export function FullScreenExperimentModal(
             type="button"
             aria-label="Close"
             style={{ padding: 4 }}
-            onClick={props.onClose}>
+            onClick={props.onSave}>
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
@@ -185,24 +227,106 @@ export function FullScreenExperimentModal(
           margin: "0 auto"
         }}>
         <section className="space-y-3">
-          <Input
-            id="fs-display-name-input"
-            label="Display Name"
-            value={draft.display_name}
-            onChange={(e) =>
-              updateDraft({
-                ...draft,
-                display_name: e.target.value
-              })
-            }
-          />
-          <Input
-            id="fs-experiment-name-input"
-            label="Experiment Name"
-            value={draft.name}
-            onChange={(e) => updateDraft({ ...draft, name: e.target.value })}
-            required
-          />
+          {/* Name fields with sync lock (mirrors inline ExperimentEditor) */}
+          <div className="flex items-start">
+            <div className="flex-1 space-y-3" style={{ paddingRight: "24px" }}>
+              <div>
+                <label
+                  id="fs-display-name-label"
+                  htmlFor="fs-display-name-input"
+                  className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Name
+                </label>
+                <Input
+                  id="fs-display-name-input"
+                  data-testid="fs-display-name-input"
+                  value={draft.display_name}
+                  onChange={(e) => handleDisplayNameChange(e.target.value)}
+                  placeholder="My Experiment"
+                />
+              </div>
+
+              <div>
+                <label
+                  id="fs-experiment-name-label"
+                  htmlFor="fs-experiment-name-input"
+                  className="block text-sm font-medium text-gray-700 mb-1">
+                  Experiment Name
+                </label>
+                <Input
+                  id="fs-experiment-name-input"
+                  data-testid="fs-experiment-name-input"
+                  value={draft.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="my_experiment_name"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Lock icon with bracket */}
+            <div
+              className="relative"
+              style={{
+                width: "24px",
+                paddingTop: "28px",
+                marginLeft: "-24px"
+              }}>
+              {namesSynced && (
+                <svg
+                  className="absolute"
+                  width="24"
+                  height="108"
+                  style={{
+                    left: "0",
+                    top: "28px"
+                  }}>
+                  <path
+                    d="M 0 20 L 12 20"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  <path
+                    d="M 0 88 L 12 88"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  <path
+                    d="M 12 20 L 12 88"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                </svg>
+              )}
+
+              <button
+                id="fs-names-sync-lock"
+                data-testid="fs-names-sync-lock"
+                type="button"
+                onClick={() => setNamesSynced(!namesSynced)}
+                className="absolute z-10 p-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                style={{
+                  left: "12px",
+                  top: "82px",
+                  transform: "translate(-50%, -50%)"
+                }}
+                title={
+                  namesSynced
+                    ? "Names are synced. Click to unlock"
+                    : "Names are not synced. Click to lock"
+                }
+                aria-pressed={namesSynced}>
+                {namesSynced ? (
+                  <LockClosedIcon className="h-4 w-4 text-blue-600" />
+                ) : (
+                  <LockOpenIcon className="h-4 w-4 text-gray-400" />
+                )}
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="mt-4">
@@ -305,8 +429,13 @@ export function FullScreenExperimentModal(
             ? "Update Experiment"
             : "Create Experiment Draft"}
         </Button>
-        <Button type="button" variant="secondary" onClick={props.onClose}>
-          Cancel
+        <Button
+          id="fullscreen-modal-discard"
+          data-testid="fullscreen-modal-discard"
+          type="button"
+          variant="secondary"
+          onClick={handleDiscard}>
+          Discard
         </Button>
       </footer>
     </div>
@@ -326,6 +455,23 @@ function toAIFillDraft(draft: FullScreenDraft, variants: { name: string }[]) {
     variantNames: variants.map((v) => v.name),
     customFieldValues: draft.customFieldValues
   }
+}
+
+// Display Name ↔ Experiment Name converters. Mirror ExperimentEditor.tsx so the
+// same input produces the same output in both editors.
+function snakeToTitle(snake: string): string {
+  return snake
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function titleToSnake(title: string): string {
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
 }
 
 function toCustomFieldDescriptors(

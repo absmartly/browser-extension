@@ -27,10 +27,13 @@ export interface CustomFieldDescriptor {
     | "text"
     | "select"
     | "multiselect"
+    | "single_select"
+    | "multi_select"
     | "string"
     | "json"
     | "boolean"
     | "number"
+    | "user"
   options?: readonly string[]
   helpText?: string
   required: boolean

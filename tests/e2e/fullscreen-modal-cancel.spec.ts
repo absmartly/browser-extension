@@ -2,19 +2,23 @@ import { test, expect } from '../fixtures/extension'
 import { setupTestPage } from './utils/test-helpers'
 
 /**
- * E2E test for the full-screen experiment modal Cancel flow (FT-1905).
+ * E2E test for the full-screen experiment modal Discard flow (FT-1905).
  *
  * Verifies that:
  *  1. Opening the modal, modifying the modal-side draft (via AI Fill), then
- *     clicking Cancel discards the modal-side changes.
+ *     clicking Discard (and confirming the prompt) throws away the modal-side
+ *     changes.
  *  2. The inline editor display_name remains whatever it was BEFORE the modal
  *     opened (i.e. the empty string for a fresh "from scratch" experiment).
+ *  3. The X button no longer discards — it routes to Save (the close-preserves
+ *     -data fix in FT-1905). Only the explicit Discard button + confirm
+ *     abandons the draft.
  *
  * Reuses the bridge stub pattern from fullscreen-experiment-modal.spec.ts so
- * we can deterministically populate the modal draft, then exercise Cancel.
+ * we can deterministically populate the modal draft, then exercise Discard.
  */
-test.describe('Full-screen experiment modal — Cancel (FT-1905)', () => {
-  test('clicking Cancel discards modal-side draft', async ({
+test.describe('Full-screen experiment modal — Discard (FT-1905)', () => {
+  test('clicking Discard (after confirm) discards modal-side draft', async ({
     context,
     extensionUrl
   }) => {
@@ -168,25 +172,28 @@ test.describe('Full-screen experiment modal — Cancel (FT-1905)', () => {
       timeout: 15_000
     })
 
-    // Click Cancel. Same shadow-rooted-host pattern as Save: dispatch
-    // synthetic MouseEvent on the shadow root's button.
-    const cancelClicked = await sidebar.locator('body').evaluate(() => {
+    // Click Discard. Discard prompts a window.confirm — auto-accept any
+    // native dialog that bubbles up, but also stub `window.confirm` inside the
+    // iframe so React's synchronous handler can proceed without blocking.
+    testPage.on('dialog', (dialog) => {
+      dialog.accept().catch(() => {})
+    })
+
+    const discardClicked = await sidebar.locator('body').evaluate(() => {
+      ;(window as any).confirm = () => true
       const host = document.getElementById('absmartly-fullscreen-host')
       const root = host?.shadowRoot
       if (!root) return false
-      // The Cancel button is the second button in the footer (Save is first).
-      const footer = root.getElementById('fullscreen-modal-footer')
-      const buttons = footer?.querySelectorAll('button') || []
-      const cancelBtn = Array.from(buttons).find(
-        (b) => (b as HTMLButtonElement).textContent?.trim() === 'Cancel'
-      ) as HTMLButtonElement | undefined
-      if (!cancelBtn) return false
-      cancelBtn.dispatchEvent(
+      const btn = root.getElementById(
+        'fullscreen-modal-discard'
+      ) as HTMLButtonElement | null
+      if (!btn) return false
+      btn.dispatchEvent(
         new MouseEvent('click', { bubbles: true, cancelable: true })
       )
       return true
     })
-    expect(cancelClicked).toBe(true)
+    expect(discardClicked).toBe(true)
 
     // Host should detach.
     await modalHost.waitFor({ state: 'detached', timeout: 10_000 })

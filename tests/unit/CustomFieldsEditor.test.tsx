@@ -28,6 +28,13 @@ const fields: ExperimentCustomSectionField[] = [
     title: "Go live",
     type: "boolean",
     required: false
+  },
+  {
+    id: 4,
+    custom_section_field_id: 4,
+    title: "Short Name",
+    type: "string",
+    required: false
   }
 ]
 
@@ -40,7 +47,14 @@ describe("CustomFieldsEditor", () => {
         onChange={jest.fn()}
       />
     )
-    expect(screen.getByTestId("cfe-input-1")).toHaveAttribute("type", "text")
+    // type: "text" renders as a multi-line textarea (mirrors the main UI's
+    // RichTextEditor; see FT-1905 task notes).
+    const textArea = screen.getByTestId("cfe-input-1")
+    expect(textArea.tagName).toBe("TEXTAREA")
+    // type: "string" remains a single-line input.
+    const stringInput = screen.getByTestId("cfe-input-4")
+    expect(stringInput.tagName).toBe("INPUT")
+    expect(stringInput).toHaveAttribute("type", "text")
     expect(screen.getByTestId("cfe-select-2")).toBeInTheDocument()
     expect(screen.getByTestId("cfe-checkbox-3")).toHaveAttribute(
       "type",
@@ -87,7 +101,36 @@ describe("CustomFieldsEditor", () => {
       />
     )
     expect(
-      (screen.getByTestId("cfe-input-1") as HTMLInputElement).value
+      (screen.getByTestId("cfe-input-1") as HTMLTextAreaElement).value
     ).toBe("existing hypothesis")
+  })
+
+  it("treats single_select and multi_select as aliases for select / multiselect", () => {
+    render(
+      <CustomFieldsEditor
+        fields={[
+          {
+            id: 10,
+            custom_section_field_id: 10,
+            title: "Phase",
+            type: "single_select",
+            required: false,
+            options: ["alpha", "beta"]
+          },
+          {
+            id: 11,
+            custom_section_field_id: 11,
+            title: "Channels",
+            type: "multi_select",
+            required: false,
+            options: ["email", "push"]
+          }
+        ]}
+        values={{}}
+        onChange={jest.fn()}
+      />
+    )
+    expect(screen.getByTestId("cfe-select-10")).toBeInTheDocument()
+    expect(screen.getByTestId("cfe-multiselect-11")).toBeInTheDocument()
   })
 })
