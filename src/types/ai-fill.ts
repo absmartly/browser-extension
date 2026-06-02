@@ -14,9 +14,14 @@ export interface VariantScreenshot {
   height: number
 }
 
-/** Custom field definition trimmed down to what the LLM needs. */
+/** Custom field definition trimmed down to what the LLM needs. The key
+ *  intentionally mirrors the tool-schema's response property name
+ *  (`field_name`) so the LLM has no ambiguity about which value to echo back.
+ *  `title` is included for context only (so the LLM understands what the
+ *  field means) but must NOT be reused in the response.
+ */
 export interface CustomFieldDescriptor {
-  fieldName: string
+  field_name: string
   title: string
   type:
     | "text"

@@ -24,7 +24,11 @@ Do not output any prose, explanation, or text outside the tool call. You MUST:
 6. For each variant, give a short descriptive name (keep the first one called
    "Control" unless the user has clearly named it otherwise) and a one-line description.
 7. Fill custom fields ONLY when the field is listed in the customFieldDefinitions
-   section. Match the declared type (text → string, multiselect → string[], etc.).
+   section. For each custom field you fill, the \`field_name\` you emit MUST be
+   copied verbatim from the \`field_name\` property of the corresponding
+   customFieldDefinitions entry — never use the \`title\`, never invent or
+   reformat it. Match the declared type (text → string, multiselect → string[],
+   boolean → boolean, etc.).
 8. Pick applications and tags ONLY from the lists in the user message. Never invent.
 9. Leave the audience filter at its default unless the page strongly implies a segment.
 

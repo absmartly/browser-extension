@@ -353,7 +353,7 @@ function toCustomFieldDescriptors(
   return fields
     .filter((f) => !f.archived)
     .map((f) => ({
-      fieldName: f.name,
+      field_name: f.name,
       title: f.title || f.name,
       type: f.type,
       options: f.options,
