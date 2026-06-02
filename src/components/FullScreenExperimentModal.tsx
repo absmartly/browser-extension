@@ -416,6 +416,19 @@ function applyAIResultToDraft(
   // (We intentionally do not surface result.variants[].description: the
   // VariantList UI has no description field.)
 
+  // TEMP-DIAG (FT-1905): dump first workspace field's keys so we can see why
+  // .name comes back undefined for the user.
+  if (customFields.length > 0) {
+    debugLog(
+      "[FullScreenModal] sample workspace field shape (keys):",
+      Object.keys(customFields[0] || {})
+    )
+    debugLog(
+      "[FullScreenModal] sample workspace field (raw):",
+      JSON.stringify(customFields[0])
+    )
+  }
+
   // Build a tolerant lookup that maps several canonical forms of each
   // workspace field to its actual `.name`. The LLM tends to drift between
   // name / title / lower-case variants; the workspace `.name` is what we
@@ -451,11 +464,17 @@ function applyAIResultToDraft(
         unmatched.push(String(cf.field_name))
       }
     }
-    debugLog("[FullScreenModal] custom_fields match", {
-      matched,
-      unmatched,
-      workspaceFields: customFields.map((f) => f.name)
-    })
+    debugLog(
+      "[FullScreenModal] custom_fields match\n" +
+        `  matched (${matched.length}): ${matched.join(", ") || "(none)"}\n` +
+        `  unmatched (${unmatched.length}): ${unmatched.join(", ") || "(none)"}\n` +
+        `  workspaceFields (${customFields.length}): ${customFields
+          .map(
+            (f) =>
+              `${f.name}${f.title && f.title !== f.name ? ` [${f.title}]` : ""}`
+          )
+          .join(", ")}`
+    )
     next.customFieldValues = merged
   }
 
