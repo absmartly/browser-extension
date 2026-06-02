@@ -59,7 +59,21 @@ tsconfig.tsbuildinfo
 injected-bundles/
 
 # Test files, screenshots, and artifacts
-tests/
+tests/*
+# …but track the e2e test sources / helpers / fixtures. `tests/*` (not `tests/`)
+# is required so Git descends into `tests/` and honours these negations —
+# otherwise every new file under tests/<subdir>/ has to be added with `git
+# add -f`. Mirror this list whenever a new tracked subdirectory is added
+# under tests/.
+!tests/base/
+!tests/components/
+!tests/e2e/
+!tests/fixtures/
+!tests/helpers/
+!tests/mocks/
+!tests/setup/
+!tests/test-pages/
+!tests/unit/
 .test-backups
 test-*.html
 *-test-*.html

@@ -3,6 +3,7 @@ import { type Page } from '@playwright/test'
 import { injectSidebar, debugWait, log, initializeTestLogging, setupTestPage } from './utils/test-helpers'
 import { createExperiment, activateVisualEditor, testSecondVEInstance, fillMetadataForSave, saveExperiment } from './helpers/ve-experiment-setup'
 import { testAllVisualEditorActions } from './helpers/ve-actions'
+import { testRearrangeAllScenarios } from './helpers/ve-rearrange'
 import { testUndoRedoForAllActions, testUndoRedoButtonStates } from './helpers/ve-undo-redo'
 import { verifyVEProtection, verifySidebarHasChanges, verifyChangesAfterVEExit, clickSaveButton } from './helpers/ve-verification'
 import { testPreviewToggle } from './helpers/ve-preview'
@@ -94,6 +95,11 @@ test.describe('Visual Editor Complete Workflow', () => {
       await testAllVisualEditorActions(testPage)
     })
 
+    await test.step('Test rearrange drag-and-drop', async () => {
+      step('Testing rearrange drag-and-drop', '🔀')
+      await testRearrangeAllScenarios(testPage)
+    })
+
     // ========================================
     // UNDO/REDO TESTING
     // ========================================
@@ -120,7 +126,12 @@ test.describe('Visual Editor Complete Workflow', () => {
 
     await test.step('Verify changes in sidebar', async () => {
       step('Verifying changes in sidebar', '📝')
-      await verifySidebarHasChanges(sidebar, 4)
+      // 4 visual-editor actions (text/hide/delete/html) +
+      // 4 unique-selector rearrange moves +
+      // 1 squashed entry for the repeat-move-of-same-element scenario
+      // (its two drops collapse onto a single #rearrange-repeat-mover/move
+      // record). Escape-cancel intentionally records nothing.
+      await verifySidebarHasChanges(sidebar, 9)
     })
 
     await test.step('Verify changes and markers after VE exit', async () => {

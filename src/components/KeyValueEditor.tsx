@@ -35,6 +35,31 @@ export const KeyValueEditor = ({
   const [selectedSuggestion, setSelectedSuggestion] = useState(0)
   const [focusNewProperty, setFocusNewProperty] = useState(false)
   const propertyRefs = useRef<(HTMLInputElement | null)[]>([])
+  // The blur handlers delay setShowSuggestions(false) by 200ms so a click on
+  // a dropdown suggestion still registers before the dropdown unmounts. If
+  // focus moves to another input in the same editor (e.g. Tab key → value,
+  // or clicking key after editing value), the next onFocus must cancel that
+  // pending timeout — otherwise it fires later and hides a dropdown that the
+  // new focus just re-opened. Symptom: dropdown flickers then disappears
+  // ~200ms after focus moves between fields.
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const cancelBlurTimeout = () => {
+    if (blurTimeoutRef.current !== null) {
+      clearTimeout(blurTimeoutRef.current)
+      blurTimeoutRef.current = null
+    }
+  }
+
+  const scheduleBlurHide = () => {
+    cancelBlurTimeout()
+    blurTimeoutRef.current = setTimeout(() => {
+      setShowSuggestions(false)
+      blurTimeoutRef.current = null
+    }, 200)
+  }
+
+  useEffect(() => cancelBlurTimeout, [])
 
   const handlePropertyChange = (
     index: number,
@@ -177,6 +202,7 @@ export const KeyValueEditor = ({
               }
               onKeyDown={(e) => handleKeyDown(e, index, "key")}
               onFocus={() => {
+                cancelBlurTimeout()
                 setActiveIndex(index)
                 setActiveField("key")
                 setSelectedSuggestion(0)
@@ -191,15 +217,9 @@ export const KeyValueEditor = ({
                   )
                   .slice(0, 8)
                 setSuggestions(filtered)
-                if (filtered.length > 0) {
-                  setShowSuggestions(true)
-                }
+                setShowSuggestions(filtered.length > 0)
               }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setShowSuggestions(false)
-                }, 200)
-              }}
+              onBlur={scheduleBlurHide}
               placeholder={config.keyPlaceholder}
               className={
                 config.keyClassName ||
@@ -223,6 +243,7 @@ export const KeyValueEditor = ({
                 }
                 onKeyDown={(e) => handleKeyDown(e, index, "value")}
                 onFocus={() => {
+                  cancelBlurTimeout()
                   setActiveIndex(index)
                   setActiveField("value")
                   if (config.valueSuggestions) {
@@ -237,9 +258,7 @@ export const KeyValueEditor = ({
                           : true
                       )
                       setSuggestions(filtered)
-                      if (filtered.length > 0) {
-                        setShowSuggestions(true)
-                      }
+                      setShowSuggestions(filtered.length > 0)
                     } else {
                       setShowSuggestions(false)
                     }
@@ -247,11 +266,7 @@ export const KeyValueEditor = ({
                     setShowSuggestions(false)
                   }
                 }}
-                onBlur={() => {
-                  setTimeout(() => {
-                    setShowSuggestions(false)
-                  }, 200)
-                }}
+                onBlur={scheduleBlurHide}
                 placeholder={config.valuePlaceholder}
                 className={
                   config.valueClassName ||

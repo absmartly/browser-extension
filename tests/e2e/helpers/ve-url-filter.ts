@@ -80,9 +80,48 @@ export async function testURLFilterAndPayload(sidebar: FrameLocator, page: Page)
 
   await page.screenshot({ path: 'test-results/json-editor-opened.png', fullPage: true })
 
-  const jsonContent = await page.evaluate(() => {
-    const cmEditor = document.querySelector('.cm-content')
-    return cmEditor ? cmEditor.textContent : ''
+  // The JSON editor host we own (id="json-codemirror-container") is created by
+  // src/visual-editor/ui/json-editor.ts. Inside it CodeMirror renders its own
+  // DOM (`.cm-scroller`, `.cm-content`, `.cm-line`) — those class names are
+  // CodeMirror v6's stable public API and the only way to traverse the
+  // editor's internal DOM. We can't reach the EditorView object itself from a
+  // Playwright `page.evaluate`: the visual editor's content script holds the
+  // EditorView in its own isolated world, and `page.evaluate` runs in the
+  // page's main world. Custom JS properties attached by the content script
+  // (on `window` or on DOM nodes) live in a wrapper the main world can't see;
+  // only the DOM nodes themselves are shared across worlds.
+  //
+  // CodeMirror v6 virtualizes — `.cm-content.textContent` only contains the
+  // currently rendered (visible) lines, so the variant config can run long
+  // enough to push `urlFilter` below the viewport. Scope the scroller and
+  // content lookups under our owned `#json-codemirror-container` ID, then
+  // scroll through the document and accumulate the rendered `.cm-line`s.
+  const jsonContent = await page.evaluate(async () => {
+    const root = document.getElementById("json-codemirror-container")
+    if (!root) return ""
+    const scroller = root.querySelector(".cm-scroller") as HTMLElement | null
+    const content = root.querySelector(".cm-content")
+    if (!scroller || !content) return ""
+
+    const seen = new Set<string>()
+    const collect = () => {
+      content.querySelectorAll(".cm-line").forEach((line) => {
+        seen.add(line.textContent ?? "")
+      })
+    }
+
+    collect()
+    const totalHeight = scroller.scrollHeight
+    const step = scroller.clientHeight || 200
+    for (let y = 0; y <= totalHeight; y += step) {
+      scroller.scrollTop = y
+      // Yield once so CodeMirror's measure pass renders the new viewport.
+      await new Promise(requestAnimationFrame)
+      collect()
+    }
+    scroller.scrollTop = 0
+
+    return Array.from(seen).join("\n")
   })
 
   const hasUrlFilter = jsonContent.includes('urlFilter') || jsonContent.includes('url_filter')

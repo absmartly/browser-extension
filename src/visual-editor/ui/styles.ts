@@ -60,6 +60,32 @@ export class Styles {
         background: rgba(16, 185, 129, 0.1) !important;
       }
 
+      /* Sibling-mode drop indicators: a thick line on the top or bottom
+         edge of the candidate sibling, replacing the fill so the user
+         sees a clear *insertion point* between cards instead of "land
+         inside this card". */
+      .absmartly-drop-target.absmartly-drop-before {
+        background: transparent !important;
+        outline: none !important;
+        box-shadow: 0 -3px 0 0 #3b82f6 !important;
+      }
+
+      .absmartly-drop-target.absmartly-drop-after {
+        background: transparent !important;
+        outline: none !important;
+        box-shadow: 0 3px 0 0 #3b82f6 !important;
+      }
+
+      /* Free / nested mode (Alt-on-block, or default on inline): solid
+         dashed outline on the container the dragged element will nest
+         into. Different colour from the green sibling-mode indicator
+         so the user can tell which mode is active at a glance. */
+      .absmartly-drop-target.absmartly-drop-nested {
+        background: rgba(59, 130, 246, 0.08) !important;
+        outline: 2px dashed #3b82f6 !important;
+        outline-offset: -2px !important;
+      }
+
       /* Resize mode */
       .absmartly-resize-active {
         outline: 3px solid #8b5cf6 !important;

@@ -69,6 +69,48 @@
       <li id="item-2">Second list item</li>
       <li id="item-3">Third list item</li>
     </ul>
+
+    <!-- Rearrange/drag-drop targets. Children are intentionally id-less AND
+         class-less so the visual editor's selector generator falls through
+         to `#rearrange-zone > div:nth-of-type(N)`. That selector is unique
+         at the time it's generated but points to a *different* sibling
+         once positions shift — which is exactly the path that surfaces the
+         post-drop selector mismatch bug. -->
+    <div id="rearrange-zone" class="test-container">
+      <div>Alpha</div>
+      <div>Beta</div>
+      <div>Gamma</div>
+    </div>
+
+    <!-- Each sibling has inner content (h3 + p) so we can drop with the
+         cursor over an *inner* element of a sibling and verify the drag
+         settles BETWEEN the siblings rather than nesting into one of them.
+         That's the precision case the rearrange UX has to handle: cards
+         in a grid where the user wants to swap whole cards but the cursor
+         naturally lands over inner text. -->
+    <div id="rearrange-zone-deep" class="test-container">
+      <div><h3>Alpha card</h3><p>desc A</p></div>
+      <div><h3>Beta card</h3><p>desc B</p></div>
+      <div><h3>Gamma card</h3><p>desc C</p></div>
+    </div>
+
+    <!-- Inline rearrange target. <span> defaults to display:inline so the
+         drag should default to free / nested placement (drop *into* the
+         element under the cursor), and Alt should swap to sibling-only. -->
+    <p id="rearrange-inline">
+      <span>Alpha-i</span><span>Beta-i</span><span>Gamma-i</span>
+    </p>
+
+    <!-- Repeat-move regression target. The dragged element has a stable ID
+         so both moves squash onto the same selector key. With positional
+         siblings, the second move's targetSelector must be generated
+         against the pre-VE DOM, not the post-first-move DOM, or the
+         saved-and-replayed change set won't reproduce the final live order. -->
+    <div id="rearrange-repeat" class="test-container">
+      <div>R-Alpha</div>
+      <div>R-Beta</div>
+      <div id="rearrange-repeat-mover">R-Gamma</div>
+    </div>
   </div>
 </body>
 </html>
