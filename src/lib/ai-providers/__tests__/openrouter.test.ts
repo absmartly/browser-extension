@@ -557,7 +557,8 @@ describe("OpenRouterProvider", () => {
       )
       const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string)
       expect(body.model).toBe("openai/gpt-4o")
-      expect(body.tool_choice).toEqual("required")
+      // No tool_choice — relying on system prompt + single tool for proxy compat.
+      expect(body).not.toHaveProperty("tool_choice")
       expect(body.tools[0].function.name).toBe("fill_experiment_fields")
       expect(body.messages[0]).toEqual({ role: "system", content: "system" })
     })

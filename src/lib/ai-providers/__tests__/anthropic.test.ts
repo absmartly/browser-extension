@@ -704,14 +704,15 @@ describe("AnthropicProvider", () => {
       })
 
       expect(result).toEqual({ display_name: "Hero CTA test" })
-      expect(mockMessages.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: "claude-sonnet-4-5-20250514",
-          system: "system",
-          tools: [expect.objectContaining({ name: "fill_experiment_fields" })],
-          tool_choice: { type: "any" }
-        })
-      )
+      const callArgs = mockMessages.create.mock.calls[0][0]
+      expect(callArgs.model).toBe("claude-sonnet-4-5-20250514")
+      expect(callArgs.system).toBe("system")
+      expect(callArgs.tools).toEqual([
+        expect.objectContaining({ name: "fill_experiment_fields" })
+      ])
+      // No tool_choice in the request — relying on system prompt + single tool
+      // to force the call, for proxy compatibility.
+      expect(callArgs).not.toHaveProperty("tool_choice")
     })
 
     it("uses configured custom endpoint and llmModel", async () => {

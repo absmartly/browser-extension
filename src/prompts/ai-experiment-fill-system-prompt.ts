@@ -10,7 +10,8 @@ The user is creating or editing an experiment. They have given you:
 - an optional free-text prompt from the user
 
 Your job: emit a single call to the \`fill_experiment_fields\` tool that fills every
-field for which you can produce high-quality output. You MUST:
+field for which you can produce high-quality output. RESPOND ONLY VIA THE TOOL CALL.
+Do not output any prose, explanation, or text outside the tool call. You MUST:
 
 1. Write a strong hypothesis using the form
    "We believe that <change> will cause <metric> to <direction> for <audience>

@@ -329,11 +329,11 @@ export class AnthropicProvider implements AIProvider {
           max_tokens: 4096,
           system: opts.systemPrompt,
           messages: [{ role: "user", content }],
-          tools: [tool],
-          // tool_choice: "any" (call some tool) rather than {type:"tool", name}
-          // (call this specific tool) — both produce the same result when we only
-          // provide one tool, but "any" is accepted by more API proxies.
-          tool_choice: { type: "any" }
+          tools: [tool]
+          // No tool_choice — some proxies reject the field and return 404.
+          // With a single tool provided plus the system prompt explicitly
+          // instructing the model to "emit a single call to
+          // fill_experiment_fields", the model reliably calls it.
         })
       )
     } catch (error: unknown) {
