@@ -425,6 +425,55 @@ export class BackgroundAPIClient {
     }
   }
 
+  /**
+   * Fetch suggested JSON layout keys (attribute paths) seen in recent events.
+   * Mirrors the web app's `AbsJSONLayoutTextField` autocomplete — passes
+   * `prefix` for typeahead filtering and lets the API decide the recency
+   * window. Response shape is the standard query response
+   * `{columnNames, rows}` that callers zip into objects.
+   */
+  async getEventJsonLayouts(body: {
+    source: "unit_attribute" | "unit_goal_property"
+    phase: "before_enrichment" | "after_enrichment"
+    prefix?: string
+    source_id?: number
+    from?: number
+    to?: number
+    take?: number
+    skip?: number
+    sort?: string
+  }): Promise<unknown> {
+    try {
+      return await this.sendOperation({ op: "getEventJsonLayouts", body })
+    } catch (error) {
+      debugError("Failed to fetch event JSON layouts:", error)
+      throw error
+    }
+  }
+
+  /**
+   * Fetch observed values for a given JSON layout path. Mirrors the web app's
+   * `AbsJSONValueSelect` autocomplete. Same `{columnNames, rows}` shape.
+   */
+  async getEventJsonValues(body: {
+    event_type: "exposure" | "goal" | "attribute"
+    path: string
+    from?: number
+    to?: number
+    experiment_id?: number
+    goal_id?: number
+    take?: number
+    skip?: number
+    sort?: string
+  }): Promise<unknown> {
+    try {
+      return await this.sendOperation({ op: "getEventJsonValues", body })
+    } catch (error) {
+      debugError("Failed to fetch event JSON values:", error)
+      throw error
+    }
+  }
+
   async captureVisibleTab(): Promise<string> {
     const res = await chrome.runtime.sendMessage({
       type: "ABSMARTLY_CAPTURE_VISIBLE_TAB"

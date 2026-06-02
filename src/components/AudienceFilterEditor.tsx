@@ -11,6 +11,11 @@ import {
 
 interface AudienceFilterEditorProps {
   value: string
+  /**
+   * Experiment unit_type_id passed down to {@link AudienceRule} for the
+   * attribute-path autocomplete. Falls back to 0 at the API call site.
+   */
+  unitTypeId?: number | null
   onChange: (next: string) => void
 }
 
@@ -25,6 +30,7 @@ interface AudienceFilterEditorProps {
  */
 export function AudienceFilterEditor({
   value,
+  unitTypeId,
   onChange
 }: AudienceFilterEditorProps) {
   const [data, setData] = useState<AudienceFiltersData>(() =>
@@ -118,6 +124,7 @@ export function AudienceFilterEditor({
             <AudienceGroupView
               group={group}
               groupIndex={index}
+              unitTypeId={unitTypeId}
               onChange={(next) => handleGroupChange(index, next)}
               onRemove={() => handleGroupRemove(index)}
               canRemove={true}

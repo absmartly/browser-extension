@@ -372,6 +372,7 @@ export function FullScreenExperimentModal(
           <AudienceEditor
             value={draft.audience}
             strict={draft.audience_strict}
+            unitTypeId={draft.unit_type_id}
             onChange={(v) => updateDraft({ ...draft, audience: v })}
             onStrictChange={(v) =>
               updateDraft({ ...draft, audience_strict: v })

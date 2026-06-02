@@ -216,4 +216,61 @@ describe("BackgroundAPIClient", () => {
       expect(result).toEqual(mockApps)
     })
   })
+
+  describe("getEventJsonLayouts", () => {
+    it("should send the operation with the full body and return the raw response", async () => {
+      const layoutResponse = {
+        columnNames: ["key", "value_type", "last_event_at"],
+        rows: [["country", "string", 1700000000000]]
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: layoutResponse
+      })
+
+      const body = {
+        source: "unit_attribute" as const,
+        phase: "before_enrichment" as const,
+        prefix: "cou",
+        source_id: 7,
+        take: 20
+      }
+      const result = await client.getEventJsonLayouts(body)
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "getEventJsonLayouts", body }
+      })
+      expect(result).toEqual(layoutResponse)
+    })
+  })
+
+  describe("getEventJsonValues", () => {
+    it("should send the operation with the full body and return the raw response", async () => {
+      const valueResponse = {
+        columnNames: ["value", "last_event_at"],
+        rows: [
+          ["US", 1700000000000],
+          ["CA", 1699999000000]
+        ]
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: valueResponse
+      })
+
+      const body = {
+        event_type: "exposure" as const,
+        path: "country",
+        take: 20
+      }
+      const result = await client.getEventJsonValues(body)
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "getEventJsonValues", body }
+      })
+      expect(result).toEqual(valueResponse)
+    })
+  })
 })

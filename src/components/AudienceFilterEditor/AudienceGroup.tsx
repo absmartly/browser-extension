@@ -8,6 +8,7 @@ import { newExpression } from "./utils"
 interface AudienceGroupProps {
   group: AudienceGroupModel
   groupIndex: number
+  unitTypeId?: number | null
   onChange: (next: AudienceGroupModel) => void
   onRemove: () => void
   canRemove: boolean
@@ -23,6 +24,7 @@ interface AudienceGroupProps {
 export function AudienceGroup({
   group,
   groupIndex,
+  unitTypeId,
   onChange,
   onRemove,
   canRemove
@@ -93,6 +95,7 @@ export function AudienceGroup({
               rule={rule}
               groupKey={groupIndex}
               ruleIndex={ruleIndex}
+              unitTypeId={unitTypeId}
               onChange={(next) => handleRuleChange(ruleIndex, next)}
               onRemove={() => handleRuleRemove(ruleIndex)}
             />

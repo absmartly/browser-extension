@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import React from "react"
 
 import { AudienceFilterEditor } from "~src/components/AudienceFilterEditor"
@@ -196,6 +196,42 @@ describe("AudienceFilterEditor component", () => {
     expect(
       (screen.getByTestId("audience-rule-0-0-value") as HTMLInputElement).value
     ).toBe("US")
+    // The path and value inputs are autocomplete combobox elements now, not
+    // plain text inputs. They still keep their stable data-testid so other
+    // tests in this suite continue to work.
+    expect(screen.getByTestId("audience-rule-0-0-path")).toHaveAttribute(
+      "role",
+      "combobox"
+    )
+    expect(screen.getByTestId("audience-rule-0-0-value")).toHaveAttribute(
+      "role",
+      "combobox"
+    )
+  })
+
+  it("does not render the value autocomplete for unary operators", () => {
+    const initial = audienceFiltersToJSON({
+      operator: "and",
+      groups: [
+        {
+          key: 1,
+          operator: "and",
+          expression: [
+            {
+              path: "email",
+              lowPrecedenceOperator: "null",
+              value: "",
+              highPrecedenceOperator: null
+            }
+          ]
+        }
+      ]
+    })
+    render(<AudienceFilterEditor value={initial} onChange={jest.fn()} />)
+    expect(
+      screen.queryByTestId("audience-rule-0-0-value")
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId("audience-rule-0-0-path")).toBeInTheDocument()
   })
 
   it("emits a JSON with the new path when a rule path is typed", () => {

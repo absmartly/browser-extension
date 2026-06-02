@@ -5,6 +5,12 @@ import { AudienceFilterEditor } from "./AudienceFilterEditor"
 interface AudienceEditorProps {
   value: string
   strict: boolean
+  /**
+   * Drives the `source_id` for the JSON layout autocomplete in
+   * {@link AudienceFilterEditor} — should be the experiment's unit_type_id.
+   * Falls back to 0 (the API treats 0 as "all unit types") when null.
+   */
+  unitTypeId?: number | null
   onChange: (next: string) => void
   onStrictChange: (next: boolean) => void
 }
@@ -17,6 +23,7 @@ interface AudienceEditorProps {
 export function AudienceEditor({
   value,
   strict,
+  unitTypeId,
   onChange,
   onStrictChange
 }: AudienceEditorProps) {
@@ -70,6 +77,7 @@ export function AudienceEditor({
       {!advanced && (
         <AudienceFilterEditor
           value={localValue}
+          unitTypeId={unitTypeId}
           onChange={handleVisualChange}
         />
       )}
