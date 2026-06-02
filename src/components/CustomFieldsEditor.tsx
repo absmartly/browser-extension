@@ -175,7 +175,8 @@ function renderInput(
         <textarea
           id={`cfe-json-${field.id}`}
           data-testid={`cfe-json-${field.id}`}
-          className="w-full font-mono text-xs border border-gray-300 rounded p-2 min-h-[80px]"
+          className="w-full font-mono text-xs border border-gray-300 rounded p-2 min-h-[80px] resize-y"
+          style={{ resize: "vertical" }}
           value={
             typeof value === "string"
               ? value

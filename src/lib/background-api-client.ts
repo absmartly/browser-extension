@@ -435,6 +435,38 @@ export class BackgroundAPIClient {
     return res.dataUrl
   }
 
+  /**
+   * Upload a file (e.g. an image dropped into a custom field's rich-text
+   * editor) through the ABsmartly file_uploads API. The web app uses the
+   * same `/v1/file_uploads/{usage}` endpoint so URLs round-trip when the
+   * same experiment is opened in the main UI.
+   *
+   * `usage` defaults to `"attachments"` for inline rich-text images, matching
+   * the web app's RichTextEditor convention.
+   */
+  async uploadFile(
+    file: File,
+    usage: string = "attachments"
+  ): Promise<{
+    file?: { url?: string; [key: string]: unknown }
+    url?: string
+    [key: string]: unknown
+  }> {
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = arrayBufferToBase64(arrayBuffer)
+    const result = await chrome.runtime.sendMessage({
+      type: "ABSMARTLY_UPLOAD_FILE",
+      usage,
+      filename: file.name,
+      mimeType: file.type,
+      base64
+    })
+    if (!result?.ok) {
+      throw new Error(result?.error || "Upload failed")
+    }
+    return result.data || {}
+  }
+
   async resizeSidebar(mode: "fullscreen" | "restore"): Promise<void> {
     const res = await chrome.runtime.sendMessage({
       type: "ABSMARTLY_SIDEBAR_RESIZE",
@@ -444,4 +476,21 @@ export class BackgroundAPIClient {
       throw new Error(res?.error || "Failed to resize sidebar")
     }
   }
+}
+
+/**
+ * Encode an ArrayBuffer as a base64 string. Used by `uploadFile` to ship file
+ * bytes across the chrome.runtime.sendMessage boundary (which doesn't support
+ * `File`/`Blob`/`FormData`). Process in 8KB chunks so we don't blow the
+ * argument-limit on large images.
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ""
+  const CHUNK = 8192
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length))
+    binary += String.fromCharCode.apply(null, Array.from(slice))
+  }
+  return btoa(binary)
 }

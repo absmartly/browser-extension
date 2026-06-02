@@ -48,7 +48,8 @@ export function AudienceEditor({
       <textarea
         id="audience-editor-textarea"
         data-testid="audience-editor-textarea"
-        className="w-full font-mono text-xs border border-gray-300 rounded p-2 min-h-[120px]"
+        className="w-full font-mono text-xs border border-gray-300 rounded p-2 min-h-[120px] resize-y"
+        style={{ resize: "vertical" }}
         value={localValue}
         onChange={(e) => handleChange(e.target.value)}
         spellCheck={false}

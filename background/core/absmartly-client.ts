@@ -31,10 +31,19 @@ export class ExtensionHttpClient implements HttpClient {
   async request<T = unknown>(
     config: HttpRequestConfig
   ): Promise<HttpResponse<T>> {
+    // FormData bodies must NOT be JSON-stringified and must NOT have a
+    // Content-Type header set explicitly — the browser sets it with the
+    // multipart boundary. This path is used by file uploads (e.g.
+    // POST /v1/file_uploads/{usage} for inline images in custom fields).
+    const isFormData =
+      typeof FormData !== "undefined" && config.data instanceof FormData
+
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
       Accept: "application/json",
       ...config.headers,
+    }
+    if (!isFormData) {
+      headers["Content-Type"] = "application/json"
     }
 
     const authMethod = this.config.authMethod || "jwt"
@@ -70,7 +79,11 @@ export class ExtensionHttpClient implements HttpClient {
       const fetchResponse = await fetch(url, {
         method: config.method,
         headers,
-        body: config.data ? JSON.stringify(config.data) : undefined,
+        body: isFormData
+          ? (config.data as FormData)
+          : config.data
+            ? JSON.stringify(config.data)
+            : undefined,
         credentials: "include",
       })
 

@@ -55,6 +55,11 @@ import { ToolbarPlugin } from "./rich-text/toolbar/Toolbar"
 const URL_MATCHER =
   /((https?:\/\/(www\.)?)|(www\.))[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/
 
+// Sentinel for `externalChangeRef`. The ref starts at this value so the first
+// effect run of InitialValuePlugin always seeds the editor (the seeded value
+// could legitimately be the empty string, so we can't use "" as a sentinel).
+const EDITOR_UNSEEDED = "__rte_unseeded_sentinel__"
+
 const MATCHERS = [
   (text: string) => {
     const match = URL_MATCHER.exec(text)
@@ -156,14 +161,24 @@ const editorNodes = [
  * Seeds the editor with the supplied markdown value on mount. Re-seeds if the
  * `value` prop changes externally (e.g. AI Fill writes to the parent state)
  * but ignores changes that originated from the editor itself.
+ *
+ * `externalChangeRef` is the editor's last emitted markdown — when the parent
+ * passes back that exact value as the controlled `value` prop, we know it's
+ * just our own echo, so we must NOT clear and re-parse (which would destroy
+ * the user's selection and reset the cursor to position 0 on every keystroke).
  */
-function InitialValuePlugin({ value }: { value: string }): null {
+function InitialValuePlugin({
+  value,
+  externalChangeRef
+}: {
+  value: string
+  externalChangeRef: React.MutableRefObject<string>
+}): null {
   const [editor] = useLexicalComposerContext()
-  const lastValueRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (lastValueRef.current === value) return
-    lastValueRef.current = value
+    if (externalChangeRef.current === value) return
+    externalChangeRef.current = value
     // Reset experiment mention id tracker before re-parsing so the
     // ExperimentMentionsPlugin only refetches what's actually referenced.
     resetExperimentMentionIds()
@@ -172,7 +187,7 @@ function InitialValuePlugin({ value }: { value: string }): null {
       root.clear()
       $convertFromMarkdownString(value || "", TRANSFORMERS)
     })
-  }, [editor, value])
+  }, [editor, value, externalChangeRef])
 
   return null
 }
@@ -199,6 +214,16 @@ export function RichTextEditor({
   ariaLabelledBy
 }: RichTextEditorProps) {
   const lastEmittedRef = useRef<string>(value || "")
+  // Tracks the markdown the editor currently contains. We update it whenever
+  // we emit a change ourselves AND whenever we accept an external value (in
+  // InitialValuePlugin). When the parent re-renders with the same value we
+  // just emitted, externalChangeRef.current === value and we skip re-seeding,
+  // which preserves the user's cursor/selection across keystrokes.
+  //
+  // Initialized to a sentinel object (cast to string) so the first effect run
+  // always re-seeds the editor — even when the initial value is the same
+  // string we'd otherwise treat as already-applied.
+  const externalChangeRef = useRef<string>(EDITOR_UNSEEDED)
   const linkRef = useRef<HTMLAnchorElement | null>(null)
   const [showFloatingMenu, setShowFloatingMenu] = React.useState(false)
   const delayHandlerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -219,6 +244,10 @@ export function RichTextEditor({
       const markdown = $convertToMarkdownString(TRANSFORMERS)
       if (markdown === lastEmittedRef.current) return
       lastEmittedRef.current = markdown
+      // Record that the editor's current content is this markdown. When the
+      // parent passes it back via the `value` prop, InitialValuePlugin will
+      // skip re-seeding instead of clobbering the user's selection.
+      externalChangeRef.current = markdown
       onChange(markdown)
     })
   }
@@ -297,7 +326,10 @@ export function RichTextEditor({
           <AutoLinkPlugin matchers={MATCHERS} />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
-          <InitialValuePlugin value={value} />
+          <InitialValuePlugin
+            value={value}
+            externalChangeRef={externalChangeRef}
+          />
         </div>
       </LexicalComposer>
     </div>

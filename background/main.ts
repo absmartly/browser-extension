@@ -1329,6 +1329,64 @@ export function initializeBackgroundScript() {
         }
       })()
       return true
+    } else if (message.type === "ABSMARTLY_UPLOAD_FILE") {
+      // Upload a file (typically an image embedded in a rich-text custom field)
+      // through the ABsmartly file_uploads API. The sidebar can't pass a
+      // File/Blob directly across chrome.runtime.sendMessage, so it serializes
+      // the bytes as base64 and we reconstruct a Blob here.
+      ;(async () => {
+        try {
+          const usage = String(message.usage || "attachments")
+          const filename = String(message.filename || "upload")
+          const mimeType = String(message.mimeType || "application/octet-stream")
+          const base64 = String(message.base64 || "")
+
+          if (!base64) {
+            sendResponse({ ok: false, error: "Missing file bytes" })
+            return
+          }
+
+          const config = await getConfig(storage, secureStorage)
+          if (!config) {
+            sendResponse({ ok: false, error: "No configuration available" })
+            return
+          }
+
+          // Decode base64 once to learn the actual size; the CLI's
+          // APIClient.uploadFile is structured (data+metadata), not multipart.
+          const binary = atob(base64)
+          const client = createExtensionClient(config)
+
+          // width/height/crop_* are required by the API contract but for
+          // generic attachments (not avatars) they're informational; we
+          // pass 0 — the backend accepts that for non-image usages and for
+          // images we don't have decoded dimensions available at the SW.
+          const response = await client.uploadFile(
+            usage as "attachments" | "variant_screenshots" | "avatars",
+            {
+              data: base64,
+              file_name: filename,
+              file_size: binary.length,
+              content_type: mimeType,
+              width: 0,
+              height: 0,
+              crop_left: 0,
+              crop_top: 0,
+              crop_width: 0,
+              crop_height: 0
+            }
+          )
+
+          sendResponse({ ok: true, data: response })
+        } catch (err) {
+          debugError("[Background] ABSMARTLY_UPLOAD_FILE error:", err)
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err)
+          })
+        }
+      })()
+      return true
     } else if (message.type === "ABSMARTLY_CAPTURE_VISIBLE_TAB") {
       ;(async () => {
         try {
