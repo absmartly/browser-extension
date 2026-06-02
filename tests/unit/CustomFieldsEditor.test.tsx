@@ -9,7 +9,6 @@ const fields: ExperimentCustomSectionField[] = [
   {
     id: 1,
     custom_section_field_id: 1,
-    name: "hypothesis",
     title: "Hypothesis",
     type: "text",
     required: true,
@@ -18,7 +17,6 @@ const fields: ExperimentCustomSectionField[] = [
   {
     id: 2,
     custom_section_field_id: 2,
-    name: "category",
     title: "Category",
     type: "select",
     required: false,
@@ -27,7 +25,6 @@ const fields: ExperimentCustomSectionField[] = [
   {
     id: 3,
     custom_section_field_id: 3,
-    name: "go_live",
     title: "Go live",
     type: "boolean",
     required: false
@@ -43,18 +40,15 @@ describe("CustomFieldsEditor", () => {
         onChange={jest.fn()}
       />
     )
-    expect(screen.getByTestId("cfe-input-hypothesis")).toHaveAttribute(
-      "type",
-      "text"
-    )
-    expect(screen.getByTestId("cfe-select-category")).toBeInTheDocument()
-    expect(screen.getByTestId("cfe-checkbox-go_live")).toHaveAttribute(
+    expect(screen.getByTestId("cfe-input-1")).toHaveAttribute("type", "text")
+    expect(screen.getByTestId("cfe-select-2")).toBeInTheDocument()
+    expect(screen.getByTestId("cfe-checkbox-3")).toHaveAttribute(
       "type",
       "checkbox"
     )
   })
 
-  it("emits onChange with the field name and new value", () => {
+  it("emits onChange with the numeric field id and new value", () => {
     const onChange = jest.fn()
     render(
       <CustomFieldsEditor
@@ -63,13 +57,13 @@ describe("CustomFieldsEditor", () => {
         onChange={onChange}
       />
     )
-    fireEvent.change(screen.getByTestId("cfe-input-hypothesis"), {
+    fireEvent.change(screen.getByTestId("cfe-input-1"), {
       target: { value: "We believe..." }
     })
-    expect(onChange).toHaveBeenLastCalledWith("hypothesis", "We believe...")
+    expect(onChange).toHaveBeenLastCalledWith(1, "We believe...")
 
-    fireEvent.click(screen.getByTestId("cfe-checkbox-go_live"))
-    expect(onChange).toHaveBeenLastCalledWith("go_live", true)
+    fireEvent.click(screen.getByTestId("cfe-checkbox-3"))
+    expect(onChange).toHaveBeenLastCalledWith(3, true)
   })
 
   it("renders the help text and a required marker", () => {
@@ -81,6 +75,19 @@ describe("CustomFieldsEditor", () => {
       />
     )
     expect(screen.getByText("What do you expect to learn?")).toBeInTheDocument()
-    expect(screen.getByTestId("cfe-required-hypothesis")).toBeInTheDocument()
+    expect(screen.getByTestId("cfe-required-1")).toBeInTheDocument()
+  })
+
+  it("reads values keyed by String(field.id)", () => {
+    render(
+      <CustomFieldsEditor
+        fields={fields}
+        values={{ "1": "existing hypothesis" }}
+        onChange={jest.fn()}
+      />
+    )
+    expect(
+      (screen.getByTestId("cfe-input-1") as HTMLInputElement).value
+    ).toBe("existing hypothesis")
   })
 })

@@ -129,7 +129,7 @@ export interface ExperimentCustomSectionFieldValue {
 export interface ExperimentCustomSectionField {
   readonly id: number
   readonly custom_section_field_id: number
-  readonly name: string
+  readonly name?: string
   readonly title?: string
   readonly type:
     | "text"

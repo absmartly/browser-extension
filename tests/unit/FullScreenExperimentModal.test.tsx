@@ -93,7 +93,7 @@ describe("FullScreenExperimentModal", () => {
   })
 
   describe("applyAIResultToDraft (via AIFillButton.onResult)", () => {
-    it("merges AI custom_fields into customFieldValues by name", () => {
+    it("merges AI custom_fields into customFieldValues keyed by id", () => {
       const onDraftChange = jest.fn()
       renderModal({
         onDraftChange,
@@ -101,7 +101,7 @@ describe("FullScreenExperimentModal", () => {
           {
             id: 7,
             custom_section_field_id: 7,
-            name: "hypothesis",
+            title: "Hypothesis",
             type: "text",
             required: true
           }
@@ -113,7 +113,7 @@ describe("FullScreenExperimentModal", () => {
         capturedOnResult!(
           {
             custom_fields: [
-              { field_name: "hypothesis", value: "Bigger CTAs help conversion" }
+              { field_id: 7, value: "Bigger CTAs help conversion" }
             ]
           },
           []
@@ -123,11 +123,11 @@ describe("FullScreenExperimentModal", () => {
       expect(onDraftChange).toHaveBeenCalled()
       const next = onDraftChange.mock.calls[0][0]
       expect(next.customFieldValues).toEqual({
-        hypothesis: "Bigger CTAs help conversion"
+        "7": "Bigger CTAs help conversion"
       })
     })
 
-    it("ignores AI custom_fields whose name is not in the workspace defs", () => {
+    it("ignores AI custom_fields whose id is not in the workspace defs", () => {
       const onDraftChange = jest.fn()
       renderModal({
         onDraftChange,
@@ -135,7 +135,7 @@ describe("FullScreenExperimentModal", () => {
           {
             id: 7,
             custom_section_field_id: 7,
-            name: "hypothesis",
+            title: "Hypothesis",
             type: "text",
             required: true
           }
@@ -146,7 +146,7 @@ describe("FullScreenExperimentModal", () => {
         capturedOnResult!(
           {
             custom_fields: [
-              { field_name: "unknown_field", value: "should be dropped" }
+              { field_id: 999, value: "should be dropped" }
             ]
           },
           []

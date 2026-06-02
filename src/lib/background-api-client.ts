@@ -41,61 +41,24 @@ interface UpdateExperimentData {
 }
 
 /**
- * Derive a machine-friendly identifier from a custom field's display title.
- * Lowercases, replaces non-alphanumerics with underscores, trims leading /
- * trailing underscores. Used when the API returns a field without
- * `sdk_field_name` set; the rest of the codebase indexes `customFieldValues`
- * by this string.
- */
-function slugifyFieldName(input: string): string {
-  return String(input)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-}
-
-/**
  * Coerce the raw API shape for a custom-section field into the
- * `ExperimentCustomSectionField` contract the rest of the codebase relies on.
- * The ABsmartly API does NOT include a `.name` property — the machine
- * identifier (when set) lives under `sdk_field_name`, otherwise we derive a
- * slug from `title`. Any time we have to derive, log so a future shape change
- * is visible.
+ * `ExperimentCustomSectionField` contract. The canonical identifier is the
+ * numeric `id`; we don't synthesize a `.name` slug — callers index by id.
+ * We still warn on missing `id`/`title`/`type` as a data-quality sanity check.
  */
-function normalizeCustomSectionField(
-  raw: any,
-  index: number
-): ExperimentCustomSectionField {
+function warnIfCustomFieldShapeBad(raw: any, index: number): void {
   const missing: string[] = []
   if (typeof raw?.id !== "number") missing.push("id")
   if (typeof raw?.title !== "string" || !raw.title) missing.push("title")
   if (typeof raw?.type !== "string" || !raw.type) missing.push("type")
   if (missing.length > 0) {
     debugWarn(
-      `[BackgroundAPIClient] custom field [${index}] missing required fields:`,
+      `[BackgroundAPIClient] custom field [${index}] missing:`,
       missing.join(", "),
       "— raw:",
       JSON.stringify(raw)
     )
   }
-
-  let name: string
-  if (typeof raw?.name === "string" && raw.name.length > 0) {
-    name = raw.name
-  } else if (
-    typeof raw?.sdk_field_name === "string" &&
-    raw.sdk_field_name.length > 0
-  ) {
-    name = raw.sdk_field_name
-  } else {
-    name = slugifyFieldName(raw?.title || `field_${raw?.id ?? index}`)
-    debugWarn(
-      `[BackgroundAPIClient] custom field [${index}] "${raw?.title || raw?.id}": ` +
-        `no .name or .sdk_field_name from API, derived "${name}" from title`
-    )
-  }
-
-  return { ...raw, name } as ExperimentCustomSectionField
 }
 
 export class BackgroundAPIClient {
@@ -454,9 +417,8 @@ export class BackgroundAPIClient {
         )
         return []
       }
-      return fields.map((raw: any, i: number) =>
-        normalizeCustomSectionField(raw, i)
-      )
+      fields.forEach((raw: any, i: number) => warnIfCustomFieldShapeBad(raw, i))
+      return fields as ExperimentCustomSectionField[]
     } catch (error) {
       debugError("Failed to fetch custom section fields:", error)
       throw error

@@ -34,11 +34,12 @@ describe("EXPERIMENT_FILL_TOOL_SCHEMA", () => {
     expect(variants.items.properties).toHaveProperty("description")
   })
 
-  it("declares custom_fields as an array of {field_name,value}", () => {
+  it("declares custom_fields as an array of {field_id,value}", () => {
     const cf = EXPERIMENT_FILL_TOOL_SCHEMA.input_schema.properties.custom_fields
     expect(cf.type).toBe("array")
     expect(cf.items.required).toEqual(
-      expect.arrayContaining(["field_name", "value"])
+      expect.arrayContaining(["field_id", "value"])
     )
+    expect(cf.items.properties.field_id.type).toBe("integer")
   })
 })

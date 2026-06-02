@@ -96,11 +96,10 @@ export function ExperimentEditor({
     tag_ids: number[]
     customFieldValues: Record<string, unknown>
   }>(() => {
-    // For an existing experiment we only have IDs in custom_section_field_values
-    // (no field name), so we cannot key the initial map by name here. The
-    // workspace custom-field definitions are loaded asynchronously below; an
-    // effect populates customFieldValues once both are available. Until then
-    // the modal sees `{}`, which means "no overrides".
+    // For an existing experiment custom_section_field_values arrives keyed by
+    // numeric field id. We hydrate `customFieldValues` (also id-keyed, as
+    // strings) in an effect below once the experiment payload is available.
+    // Until then the modal sees `{}`, which means "no overrides".
     const initial = {
       name: experiment?.name || "",
       display_name: experiment?.display_name || "",
@@ -272,9 +271,9 @@ export function ExperimentEditor({
 
   // Once both the workspace custom-field defs and the experiment payload are
   // available, lift the experiment's id-keyed custom-section values into the
-  // name-keyed `formData.customFieldValues`. This lets the round-trip into the
-  // full-screen modal show the existing values, and lets the save path know
-  // which workspace fields the user expects on the payload.
+  // id-keyed (as strings) `formData.customFieldValues`. This lets the
+  // round-trip into the full-screen modal show the existing values, and lets
+  // the save path know which workspace fields the user expects on the payload.
   const customFieldsHydratedRef = useRef(false)
   useEffect(() => {
     if (customFieldsHydratedRef.current) return
@@ -285,27 +284,22 @@ export function ExperimentEditor({
       return
     }
     const fieldsArray = Array.isArray(raw) ? raw : Object.values(raw)
-    const fieldsById = new Map<number, ExperimentCustomSectionField>()
-    for (const field of customFields) fieldsById.set(field.id, field)
 
     const next: Record<string, unknown> = {}
     for (const entry of fieldsArray) {
       if (typeof entry !== "object" || entry === null) continue
       const e = entry as {
         experiment_custom_section_field_id?: number
-        custom_section_field?: { id: number; name?: string }
+        custom_section_field?: { id?: number }
         id?: number
         value: unknown
       }
       const id =
-        e.experiment_custom_section_field_id ||
-        e.custom_section_field?.id ||
+        e.experiment_custom_section_field_id ??
+        e.custom_section_field?.id ??
         e.id
-      if (id === undefined) continue
-      const def = fieldsById.get(id)
-      const name = def?.name || e.custom_section_field?.name
-      if (!name) continue
-      next[name] = e.value
+      if (typeof id !== "number") continue
+      next[String(id)] = e.value
     }
     if (Object.keys(next).length > 0) {
       setFormData((prev) => ({ ...prev, customFieldValues: next }))

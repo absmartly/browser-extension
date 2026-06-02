@@ -22,7 +22,7 @@ const baseRequest: AIFillRequest = {
   },
   customFields: [
     {
-      field_name: "hypothesis",
+      id: 7,
       title: "Hypothesis",
       type: "text",
       required: false

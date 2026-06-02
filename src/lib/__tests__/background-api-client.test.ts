@@ -124,7 +124,7 @@ describe("BackgroundAPIClient", () => {
   })
 
   describe("getCustomSectionFields", () => {
-    it("should fetch custom section fields and derive .name from title when API omits it", async () => {
+    it("should fetch and return raw API entries without name synthesis", async () => {
       const mockFields = [
         { id: 1, title: "Hypothesis", type: "text" },
         { id: 2, title: "Purpose", type: "string" }
@@ -141,47 +141,51 @@ describe("BackgroundAPIClient", () => {
         type: "API_OPERATION",
         operation: { op: "listCustomSectionFields" }
       })
-      expect(result).toEqual([
-        { id: 1, title: "Hypothesis", type: "text", name: "hypothesis" },
-        { id: 2, title: "Purpose", type: "string", name: "purpose" }
-      ])
+      // Raw entries — no derived `.name` is added.
+      expect(result).toEqual(mockFields)
     })
 
-    it("prefers sdk_field_name over a derived slug when present", async () => {
-      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
-        success: true,
-        data: [
-          {
-            id: 7,
-            title: "Action Points",
-            type: "text",
-            sdk_field_name: "action_items_v2"
-          }
-        ]
-      })
-
-      const result = await client.getCustomSectionFields()
-      expect(result[0].name).toBe("action_items_v2")
-    })
-
-    it("passes through .name unchanged when the API provides it", async () => {
+    it("preserves any .name the API does set", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
         data: [{ id: 9, title: "Custom", type: "text", name: "explicit_name" }]
       })
 
       const result = await client.getCustomSectionFields()
-      expect(result[0].name).toBe("explicit_name")
+      expect(result[0]).toEqual({
+        id: 9,
+        title: "Custom",
+        type: "text",
+        name: "explicit_name"
+      })
     })
 
-    it("derives a slug for fields with whitespace and non-alphanumerics in the title", async () => {
+    it("warns when entries are missing id/title/type but still passes them through", async () => {
+      const debugUtils = await import("~src/utils/debug")
+      const warnSpy = jest.spyOn(debugUtils, "debugWarn").mockImplementation()
+
+      const malformed = [
+        { id: 1, title: "OK", type: "text" },
+        { title: "no id", type: "text" },
+        { id: 2, type: "text" },
+        { id: 3, title: "no type" }
+      ]
+
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
         success: true,
-        data: [{ id: 1, title: "  KPI / Metric (primary)!", type: "text" }]
+        data: malformed
       })
 
       const result = await client.getCustomSectionFields()
-      expect(result[0].name).toBe("kpi_metric_primary")
+
+      expect(result).toEqual(malformed)
+      // Three of the four entries should have triggered a warn.
+      const warnCalls = warnSpy.mock.calls.filter((c) =>
+        String(c[0]).includes("custom field [")
+      )
+      expect(warnCalls).toHaveLength(3)
+
+      warnSpy.mockRestore()
     })
 
     it("should return empty array when data is not an array", async () => {

@@ -240,12 +240,12 @@ export function FullScreenExperimentModal(
           <CustomFieldsEditor
             fields={props.customFields}
             values={draft.customFieldValues}
-            onChange={(name, value) =>
+            onChange={(fieldId, value) =>
               updateDraft({
                 ...draft,
                 customFieldValues: {
                   ...draft.customFieldValues,
-                  [name]: value
+                  [String(fieldId)]: value
                 }
               })
             }
@@ -334,8 +334,8 @@ function toCustomFieldDescriptors(
   return fields
     .filter((f) => !f.archived)
     .map((f) => ({
-      field_name: f.name,
-      title: f.title || f.name,
+      id: f.id,
+      title: f.title || `Field ${f.id}`,
       type: f.type,
       options: f.options,
       helpText: f.help_text,
@@ -398,22 +398,22 @@ function applyAIResultToDraft(
   // VariantList UI has no description field.)
 
   if (result.custom_fields) {
-    const allowed = new Set(customFields.map((f) => f.name))
+    const allowedIds = new Set(customFields.map((f) => f.id))
     const merged = { ...next.customFieldValues }
-    const unmatched: string[] = []
+    const unknown: number[] = []
     for (const cf of result.custom_fields) {
-      if (typeof cf.field_name === "string" && allowed.has(cf.field_name)) {
-        merged[cf.field_name] = cf.value
-      } else {
-        unmatched.push(String(cf.field_name))
+      if (typeof cf.field_id === "number" && allowedIds.has(cf.field_id)) {
+        merged[String(cf.field_id)] = cf.value
+      } else if (typeof cf.field_id === "number") {
+        unknown.push(cf.field_id)
       }
     }
-    if (unmatched.length > 0) {
+    if (unknown.length > 0) {
       debugWarn(
-        "[FullScreenModal] AI returned custom_fields not in workspace; dropped:",
-        unmatched.join(", "),
-        "— workspace fields:",
-        [...allowed].join(", ")
+        "[FullScreenModal] AI returned custom_fields with unknown ids:",
+        unknown.join(", "),
+        "— workspace ids:",
+        [...allowedIds].join(", ")
       )
     }
     next.customFieldValues = merged
@@ -421,14 +421,22 @@ function applyAIResultToDraft(
 
   // Hypothesis / prediction / description can come back at the top level
   // (the schema asks for them separately). Map them into customFieldValues
-  // if the workspace has a field with that exact .name.
-  const namesSet = new Set(customFields.map((f) => f.name))
+  // under the id of the workspace field whose title (case-insensitively)
+  // matches the key — title is the only reliable display name the API gives
+  // us, and workspaces are free to name those fields anything.
+  const titleToId = new Map<string, number>()
+  for (const f of customFields) {
+    if (typeof f.title === "string") {
+      titleToId.set(f.title.toLowerCase(), f.id)
+    }
+  }
   for (const key of ["hypothesis", "prediction", "description"] as const) {
     const value = result[key]
-    if (typeof value === "string" && namesSet.has(key)) {
+    const id = titleToId.get(key)
+    if (typeof value === "string" && typeof id === "number") {
       next.customFieldValues = {
         ...next.customFieldValues,
-        [key]: value
+        [String(id)]: value
       }
     }
   }

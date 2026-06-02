@@ -14,14 +14,14 @@ export interface VariantScreenshot {
   height: number
 }
 
-/** Custom field definition trimmed down to what the LLM needs. The key
- *  intentionally mirrors the tool-schema's response property name
- *  (`field_name`) so the LLM has no ambiguity about which value to echo back.
+/** Custom field definition trimmed down to what the LLM needs. The numeric
+ *  `id` is the canonical identifier we ask the LLM to echo back — it's the
+ *  one stable, unambiguous handle the ABsmartly API exposes for a field.
  *  `title` is included for context only (so the LLM understands what the
  *  field means) but must NOT be reused in the response.
  */
 export interface CustomFieldDescriptor {
-  field_name: string
+  id: number
   title: string
   type:
     | "text"
@@ -87,5 +87,5 @@ export interface AIFillResponse {
   applications?: string[]
   tags?: string[]
   variants?: { name: string; description?: string }[]
-  custom_fields?: { field_name: string; value: unknown }[]
+  custom_fields?: { field_id: number; value: unknown }[]
 }

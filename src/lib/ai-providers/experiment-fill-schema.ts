@@ -102,7 +102,12 @@ export const EXPERIMENT_FILL_TOOL_SCHEMA: ToolDefinition & {
         items: {
           type: "object",
           properties: {
-            field_name: { type: "string" },
+            field_id: {
+              type: "integer",
+              description:
+                "MUST be the numeric `id` of one of the entries in customFieldDefinitions " +
+                "from the user message. Do NOT use the title. Do NOT invent ids."
+            },
             value: {
               description:
                 "Value matching the field's declared type: string for text/select/string, " +
@@ -110,7 +115,7 @@ export const EXPERIMENT_FILL_TOOL_SCHEMA: ToolDefinition & {
                 "JSON-string for json."
             }
           },
-          required: ["field_name", "value"]
+          required: ["field_id", "value"]
         },
         description:
           "Values for the workspace's custom section fields. Only include fields " +

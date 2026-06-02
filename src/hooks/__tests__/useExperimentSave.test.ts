@@ -864,7 +864,6 @@ describe("useExperimentSave - Custom Fields", () => {
       const mockCustomFields = [
         {
           id: 7,
-          name: "hypothesis",
           title: "Hypothesis",
           type: "text" as const,
           default_value: "default hypothesis",
@@ -872,7 +871,6 @@ describe("useExperimentSave - Custom Fields", () => {
         },
         {
           id: 8,
-          name: "purpose",
           title: "Purpose",
           type: "string" as const,
           default_value: "default purpose",
@@ -889,7 +887,7 @@ describe("useExperimentSave - Custom Fields", () => {
         owner_ids: [1],
         team_ids: [],
         tag_ids: [],
-        customFieldValues: { hypothesis: "AI-filled hypothesis" }
+        customFieldValues: { "7": "AI-filled hypothesis" }
       }
       const variants = [{ name: "Control", config: {} }]
 
@@ -918,7 +916,6 @@ describe("useExperimentSave - Custom Fields", () => {
       const mockCustomFields = [
         {
           id: 1,
-          name: "active",
           title: "Active",
           type: "boolean" as const,
           default_value: "false",
@@ -926,7 +923,6 @@ describe("useExperimentSave - Custom Fields", () => {
         },
         {
           id: 2,
-          name: "count",
           title: "Count",
           type: "number" as const,
           default_value: "0",
@@ -934,7 +930,6 @@ describe("useExperimentSave - Custom Fields", () => {
         },
         {
           id: 3,
-          name: "data",
           title: "Data",
           type: "json" as const,
           default_value: "{}",
@@ -952,9 +947,9 @@ describe("useExperimentSave - Custom Fields", () => {
         team_ids: [],
         tag_ids: [],
         customFieldValues: {
-          active: true,
-          count: 42,
-          data: { foo: "bar" }
+          "1": true,
+          "2": 42,
+          "3": { foo: "bar" }
         }
       }
       const variants = [{ name: "Control", config: {} }]
@@ -978,7 +973,6 @@ describe("useExperimentSave - Custom Fields", () => {
       mockGetCustomSectionFields.mockResolvedValue([
         {
           id: 7,
-          name: "hypothesis",
           title: "Hypothesis",
           type: "text",
           default_value: "default",
@@ -1024,7 +1018,7 @@ describe("useExperimentSave - Custom Fields", () => {
         owner_ids: [1],
         team_ids: [],
         tag_ids: [],
-        customFieldValues: { hypothesis: "Fresh AI hypothesis" }
+        customFieldValues: { "7": "Fresh AI hypothesis" }
       }
       const variants = [{ name: "Control", config: {} }]
 
@@ -1051,7 +1045,6 @@ describe("useExperimentSave - Custom Fields", () => {
       mockGetCustomSectionFields.mockResolvedValue([
         {
           id: 9,
-          name: "hypothesis",
           title: "Hypothesis",
           type: "text",
           default_value: "",
@@ -1087,7 +1080,7 @@ describe("useExperimentSave - Custom Fields", () => {
         owner_ids: [],
         team_ids: [],
         tag_ids: [],
-        customFieldValues: { hypothesis: "First hypothesis ever" }
+        customFieldValues: { "9": "First hypothesis ever" }
       }
       const variants = [{ name: "Control", config: {} }]
 
@@ -1109,11 +1102,10 @@ describe("useExperimentSave - Custom Fields", () => {
       expect(payload.custom_section_field_values["9"].type).toBe("text")
     })
 
-    it("drops customFieldValues entries whose name has no matching workspace field on update", async () => {
+    it("drops customFieldValues entries whose id has no matching workspace field on update", async () => {
       mockGetCustomSectionFields.mockResolvedValue([
         {
           id: 9,
-          name: "hypothesis",
           title: "Hypothesis",
           type: "text",
           default_value: "",
@@ -1148,7 +1140,8 @@ describe("useExperimentSave - Custom Fields", () => {
         owner_ids: [],
         team_ids: [],
         tag_ids: [],
-        customFieldValues: { not_a_real_field: "ignored" }
+        // 999 is not in the workspace; "not_a_number" doesn't parse as a number.
+        customFieldValues: { "999": "ignored", not_a_number: "also ignored" }
       }
       const variants = [{ name: "Control", config: {} }]
 
@@ -1163,8 +1156,8 @@ describe("useExperimentSave - Custom Fields", () => {
       })
 
       const payload = mockOnUpdate.mock.calls[0][1]
-      // No id 9 (because no override was supplied for it) and unknown name
-      // never makes it into the payload.
+      // No id 9 (because no override was supplied for it) and unknown ids
+      // never make it into the payload.
       expect(payload.custom_section_field_values).toEqual({})
     })
   })

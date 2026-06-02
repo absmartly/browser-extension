@@ -29,8 +29,9 @@ export interface ExperimentFormData {
   owner_ids: number[]
   team_ids: number[]
   /**
-   * Map of custom-section field NAME → user-edited (or AI-filled) value.
-   * Optional; absent means "no overrides — fall back to defaults / server values".
+   * Map of custom-section field id (as a String) → user-edited (or AI-filled)
+   * value. Optional; absent means "no overrides — fall back to defaults /
+   * server values".
    */
   customFieldValues?: Record<string, unknown>
 }
@@ -175,14 +176,12 @@ async function createNewExperiment(
   > = {}
 
   for (const field of customFields) {
-    const override = formData.customFieldValues?.[field.name]
+    const key = String(field.id)
+    const override = formData.customFieldValues?.[key]
     const hasOverride =
       formData.customFieldValues !== undefined &&
-      Object.prototype.hasOwnProperty.call(
-        formData.customFieldValues,
-        field.name
-      )
-    custom_section_field_values[String(field.id)] = {
+      Object.prototype.hasOwnProperty.call(formData.customFieldValues, key)
+    custom_section_field_values[key] = {
       value: hasOverride
         ? coerceCustomFieldValue(override, field.type)
         : field.default_value || "",
@@ -385,10 +384,10 @@ async function saveExistingExperiment(
     const fullExperiment: FullExperiment =
       fullExperimentResponse.data.experiment || fullExperimentResponse.data
 
-    // Fetch workspace custom-field definitions so we can map name → id when
-    // applying user/AI overrides from formData.customFieldValues. We tolerate
-    // failure here — without the workspace map we just can't apply overrides
-    // for fields that aren't already present on the experiment.
+    // Fetch workspace custom-field definitions so we can look up the type and
+    // default value when applying overrides for fields that aren't already on
+    // the experiment. We tolerate failure here — without the workspace defs we
+    // just can't add brand-new field entries.
     let workspaceCustomFields: ExperimentCustomSectionField[] = []
     try {
       const client = new BackgroundAPIClient()
@@ -400,9 +399,9 @@ async function saveExistingExperiment(
         error
       )
     }
-    const fieldsByName = new Map<string, ExperimentCustomSectionField>()
+    const workspaceFieldsById = new Map<number, ExperimentCustomSectionField>()
     for (const field of workspaceCustomFields) {
-      fieldsByName.set(field.name, field)
+      workspaceFieldsById.set(field.id, field)
     }
 
     setSaveStatus?.({
@@ -501,27 +500,33 @@ async function saveExistingExperiment(
         }
       }
 
-      // Layer user / AI overrides keyed by field name on top of the server
-      // values. Names are matched against the workspace custom-field
-      // definitions; unknown names are dropped (we never invent ids).
+      // Layer user / AI overrides keyed by field id (as String) on top of the
+      // server values. Keys that don't parse as numbers or that name a field
+      // unknown to the workspace are dropped (we never invent ids). For ids
+      // already on the experiment we update value/type in place; for ids the
+      // experiment didn't have yet, we use the workspace defs to fill in the
+      // type / default_value.
       if (formData.customFieldValues) {
-        for (const [name, value] of Object.entries(
-          formData.customFieldValues
-        )) {
-          const def = fieldsByName.get(name)
-          if (!def) continue
-          const existing = customFieldsObj[def.id]
-          customFieldsObj[def.id] = {
-            experiment_id: fullExperiment.id,
-            experiment_custom_section_field_id: def.id,
-            type: existing?.type || def.type,
-            value: coerceCustomFieldValue(value, def.type),
-            updated_at: existing?.updated_at,
-            updated_by_user_id:
-              existing?.updated_by_user_id || fullExperiment.updated_by_user_id,
-            custom_section_field: existing?.custom_section_field,
-            id: def.id,
-            default_value: existing?.default_value || def.default_value || ""
+        for (const [key, value] of Object.entries(formData.customFieldValues)) {
+          const id = Number(key)
+          if (!Number.isFinite(id)) continue
+          const existing = customFieldsObj[id]
+          if (existing) {
+            existing.value = coerceCustomFieldValue(value, existing.type)
+          } else {
+            const def = workspaceFieldsById.get(id)
+            if (!def) continue
+            customFieldsObj[id] = {
+              experiment_id: fullExperiment.id,
+              experiment_custom_section_field_id: id,
+              type: def.type,
+              value: coerceCustomFieldValue(value, def.type),
+              updated_at: undefined,
+              updated_by_user_id: fullExperiment.updated_by_user_id,
+              custom_section_field: undefined,
+              id,
+              default_value: def.default_value || ""
+            }
           }
         }
       }

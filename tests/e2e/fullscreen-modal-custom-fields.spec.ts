@@ -10,10 +10,10 @@ import {
  * E2E test for the custom-fields AI fill round-trip in the FT-1905 modal.
  *
  * 1. Mock the workspace `listCustomSectionFields` API to return one
- *    "hypothesis" custom field.
+ *    "Hypothesis" custom field with id 7.
  * 2. Open the modal and verify the field input renders with id
- *    `cfe-input-hypothesis`.
- * 3. AI Fill returns `custom_fields: [{ field_name: "hypothesis", value: ... }]`.
+ *    `cfe-input-7`.
+ * 3. AI Fill returns `custom_fields: [{ field_id: 7, value: ... }]`.
  *    Verify the input now shows that value.
  * 4. Save the modal — this writes back into the inline editor's formData.
  *    Re-open the modal and verify the hypothesis input still shows the
@@ -37,7 +37,6 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
 
     const HYPOTHESIS_FIELD = {
       id: 7,
-      name: 'hypothesis',
       title: 'Hypothesis',
       type: 'text',
       required: false,
@@ -81,7 +80,7 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
           percentage_of_traffic: 100,
           percentages: '50/50',
           custom_fields: [
-            { field_name: 'hypothesis', value: HYPOTHESIS_VALUE }
+            { field_id: 7, value: HYPOTHESIS_VALUE }
           ]
         }
       }
@@ -113,7 +112,7 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
 
     // The hypothesis input should render — getCustomSectionFields was
     // intercepted to return our field.
-    const hypothesisInput = sidebar.locator('#cfe-input-hypothesis')
+    const hypothesisInput = sidebar.locator('#cfe-input-7')
     await hypothesisInput.waitFor({ state: 'visible', timeout: 10_000 })
     await expect(hypothesisInput).toHaveValue('')
 
@@ -163,7 +162,7 @@ test.describe('Full-screen experiment modal — custom fields (FT-1905)', () => 
       .locator('#fullscreen-experiment-modal')
       .waitFor({ state: 'visible', timeout: 10_000 })
 
-    const hypothesisInput2 = sidebar.locator('#cfe-input-hypothesis')
+    const hypothesisInput2 = sidebar.locator('#cfe-input-7')
     await hypothesisInput2.waitFor({ state: 'visible', timeout: 10_000 })
     await expect(hypothesisInput2).toHaveValue(HYPOTHESIS_VALUE, {
       timeout: 5_000
