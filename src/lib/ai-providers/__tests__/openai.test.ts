@@ -678,10 +678,7 @@ describe("OpenAIProvider", () => {
               })
             })
           ],
-          tool_choice: {
-            type: "function",
-            function: { name: "fill_experiment_fields" }
-          }
+          tool_choice: "required"
         })
       )
     })

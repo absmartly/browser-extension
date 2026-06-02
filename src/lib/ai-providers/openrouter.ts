@@ -323,10 +323,10 @@ export class OpenRouterProvider implements AIProvider {
           }
         }
       ],
-      tool_choice: {
-        type: "function",
-        function: { name: opts.schema.name }
-      },
+      // "required" (call some tool) rather than {type:"function", function:{name}}
+      // (call this specific function) — same effect with a single tool, more
+      // broadly accepted by API proxies.
+      tool_choice: "required",
       max_tokens: 4096
     }
 

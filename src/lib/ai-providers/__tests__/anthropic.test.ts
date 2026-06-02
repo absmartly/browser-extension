@@ -709,7 +709,7 @@ describe("AnthropicProvider", () => {
           model: "claude-sonnet-4-5-20250514",
           system: "system",
           tools: [expect.objectContaining({ name: "fill_experiment_fields" })],
-          tool_choice: { type: "tool", name: "fill_experiment_fields" }
+          tool_choice: { type: "any" }
         })
       )
     })

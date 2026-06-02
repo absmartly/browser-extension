@@ -330,7 +330,10 @@ export class AnthropicProvider implements AIProvider {
           system: opts.systemPrompt,
           messages: [{ role: "user", content }],
           tools: [tool],
-          tool_choice: { type: "tool", name: opts.schema.name }
+          // tool_choice: "any" (call some tool) rather than {type:"tool", name}
+          // (call this specific tool) — both produce the same result when we only
+          // provide one tool, but "any" is accepted by more API proxies.
+          tool_choice: { type: "any" }
         })
       )
     } catch (error: unknown) {
