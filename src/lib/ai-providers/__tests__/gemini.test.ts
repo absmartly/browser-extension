@@ -565,4 +565,213 @@ describe("GeminiProvider", () => {
       expect(firstUserMessage.parts[0].text).toContain("Page DOM Structure")
     })
   })
+
+  describe("generateStructured", () => {
+    const schema = {
+      name: "fill_experiment_fields",
+      description: "Test fill",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          display_name: { type: "string" },
+          percentages: { type: "string", pattern: "^\\d+(/\\d+)+$" }
+        },
+        required: ["display_name"],
+        additionalProperties: false
+      }
+    }
+
+    const makeOkResponse = (fnName: string, args: Record<string, unknown>) =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [{ functionCall: { name: fnName, args } }]
+              },
+              finishReason: "STOP"
+            }
+          ]
+        })
+      }) as Response
+
+    it("returns parsed function-call args and posts the right body", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "AIza-test-key",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "Hero CTA" })
+      )
+
+      const result = await provider.generateStructured!({
+        systemPrompt: "system",
+        userMessage: "user",
+        schema
+      })
+
+      expect(result).toEqual({ display_name: "Hero CTA" })
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "/models/gemini-1.5-pro:generateContent?key=AIza-test-key"
+        ),
+        expect.objectContaining({ method: "POST" })
+      )
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string)
+      expect(body.system_instruction.parts[0].text).toBe("system")
+      expect(body.tool_config).toEqual({
+        function_calling_config: {
+          mode: "ANY",
+          allowed_function_names: ["fill_experiment_fields"]
+        }
+      })
+      expect(body.tools[0].function_declarations[0].name).toBe(
+        "fill_experiment_fields"
+      )
+    })
+
+    it("strips additionalProperties and pattern from the schema for Gemini", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "AIza-test-key",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "X" })
+      )
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema
+      })
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string)
+      const params = body.tools[0].function_declarations[0].parameters
+      expect(params).not.toHaveProperty("additionalProperties")
+      expect(params.properties.percentages).not.toHaveProperty("pattern")
+      // Make sure normal fields are preserved
+      expect(params.properties.display_name.type).toBe("string")
+      expect(params.required).toEqual(["display_name"])
+    })
+
+    it("attaches images as inline_data parts", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "AIza-test-key",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "X" })
+      )
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema,
+        images: ["data:image/png;base64,ABC"]
+      })
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string)
+      expect(body.contents[0].parts).toEqual(
+        expect.arrayContaining([
+          { text: "u" },
+          {
+            inline_data: { mime_type: "image/png", data: "ABC" }
+          }
+        ])
+      )
+    })
+
+    it("uses customEndpoint when provided", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "AIza-test-key",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro",
+        customEndpoint: "https://custom.gemini/v1beta"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "X" })
+      )
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema
+      })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("https://custom.gemini/v1beta/models/"),
+        expect.any(Object)
+      )
+    })
+
+    it("throws when no function call is returned", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "AIza-test-key",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro"
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [
+            {
+              content: { parts: [{ text: "no call here" }] },
+              finishReason: "STOP"
+            }
+          ]
+        })
+      } as Response)
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/no 'fill_experiment_fields' function call/)
+    })
+
+    it("throws on HTTP 5xx", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "AIza-test-key",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro"
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => "internal error"
+      } as Response)
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/Gemini API error: 500/)
+    })
+
+    it("throws when API key is missing", async () => {
+      const provider = new GeminiProvider({
+        apiKey: "",
+        aiProvider: "gemini-api",
+        llmModel: "gemini-1.5-pro"
+      })
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/API key is required/)
+    })
+  })
 })

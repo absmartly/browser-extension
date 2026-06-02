@@ -7,21 +7,20 @@ import { setupTestPage } from './utils/test-helpers'
  * Verifies that the modal reads `aiProvider` from the user's stored
  * ABsmartly config rather than being hard-coded to `claude-subscription`.
  *
- * We seed `aiProvider: "anthropic-api"` into chrome.storage so that
- * fillExperimentFromAI() spins up the AnthropicProvider, which does NOT
- * implement `generateStructured`. The orchestrator throws a message of the
- * form:
- *   Provider "anthropic-api" does not implement structured generation. ...
+ * We seed `aiProvider: "anthropic-api"` into chrome.storage and stub
+ * `window.fetch` so that any POST to `api.anthropic.com/v1/messages`
+ * returns a synthetic Anthropic `tool_use` block calling
+ * `fill_experiment_fields`. With both pieces in place:
+ *   - The modal's AI Fill must route through `AnthropicProvider.generateStructured`
+ *     (i.e. it must hit `api.anthropic.com/v1/messages`).
+ *   - The form fields must populate with the values returned by the stub.
  *
- * This message surfaces in #ai-fill-error inside the modal — the cleanest
- * end-to-end signal that the provider config flowed through from settings.
- *
- * If the editor were still hard-coding `aiProvider: "claude-subscription"`,
- * the BridgeProvider's `generateStructured` would run, and we would hit a
- * bridge-connection error instead (not containing "anthropic-api").
+ * The Anthropic endpoint capture proves the provider config flowed from
+ * settings through to the API call. The field population proves the
+ * tool_use response was parsed correctly.
  */
 test.describe('Full-screen experiment modal — provider config from settings (FT-1905)', () => {
-  test('uses aiProvider from user settings (anthropic-api surfaces in #ai-fill-error)', async ({
+  test('uses aiProvider from user settings (anthropic-api hits api.anthropic.com and populates fields)', async ({
     context,
     extensionUrl,
     seedStorage
@@ -51,6 +50,65 @@ test.describe('Full-screen experiment modal — provider config from settings (F
       'plasmo:ai-apikey': 'sk-test'
     })
 
+    // Stub `window.fetch` so any POST to api.anthropic.com/v1/messages
+    // returns a synthetic Anthropic `tool_use` response calling
+    // `fill_experiment_fields`. Tracks every Anthropic call so we can assert
+    // the provider actually reached the Anthropic API.
+    await context.addInitScript(() => {
+      const realFetch = window.fetch.bind(window)
+      ;(window as any).__anthropicCalls = [] as string[]
+
+      function jsonResponse(body: unknown, status = 200): Response {
+        return new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const urlStr =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url
+
+        // Capture and stub Anthropic messages endpoint.
+        if (/api\.anthropic\.com\/v1\/messages$/.test(urlStr)) {
+          ;(window as any).__anthropicCalls.push(
+            `${(init?.method || 'GET').toUpperCase()} ${urlStr}`
+          )
+          return jsonResponse({
+            id: 'msg_stub_1',
+            type: 'message',
+            role: 'assistant',
+            model: 'claude-sonnet-4-5',
+            stop_reason: 'tool_use',
+            content: [
+              {
+                type: 'tool_use',
+                id: 'toolu_stub_1',
+                name: 'fill_experiment_fields',
+                input: {
+                  display_name: 'AI-Generated Test',
+                  name: 'ai_generated_test',
+                  hypothesis:
+                    'We believe the new layout improves engagement.',
+                  prediction: '+3% conversion lift',
+                  description: 'Filled by the AI end-to-end test.',
+                  audience: '{"filter":[{"and":[]}]}',
+                  audience_strict: false,
+                  percentage_of_traffic: 100,
+                  percentages: '50/50'
+                }
+              }
+            ]
+          })
+        }
+        return realFetch(input as any, init as any)
+      }) as typeof window.fetch
+    })
+
     const testPage = await context.newPage()
     const { sidebar } = await setupTestPage(
       testPage,
@@ -78,19 +136,31 @@ test.describe('Full-screen experiment modal — provider config from settings (F
       .waitFor({ state: 'visible', timeout: 10_000 })
 
     // Click AI Fill → Skip & Fill. With aiProvider=anthropic-api, the
-    // AnthropicProvider has no generateStructured() and the orchestrator
-    // throws "Provider \"anthropic-api\" does not implement structured
-    // generation." That message lands in #ai-fill-error.
+    // AnthropicProvider.generateStructured() now runs, posts to
+    // api.anthropic.com/v1/messages (captured by our fetch stub above),
+    // and the tool_use response populates the form fields.
     await sidebar.locator('#ai-fill-button').click()
     const skipButton = sidebar.locator('#ai-fill-prompt-skip')
     await skipButton.waitFor({ state: 'visible', timeout: 5_000 })
     await skipButton.click()
 
-    const errorEl = sidebar.locator('#ai-fill-error')
-    await errorEl.waitFor({ state: 'visible', timeout: 10_000 })
-    const errorText = (await errorEl.textContent())?.trim() || ''
-    expect(errorText.length).toBeGreaterThan(0)
-    expect(errorText).toContain('anthropic-api')
-    expect(errorText).toContain('does not implement structured generation')
+    // Wait for the AI fill to populate the modal fields. This proves the
+    // tool_use response from api.anthropic.com flowed back through the form.
+    const fsDisplay = sidebar.locator('#fs-display-name-input')
+    const fsName = sidebar.locator('#fs-experiment-name-input')
+    await expect(fsDisplay).toHaveValue('AI-Generated Test', {
+      timeout: 15_000
+    })
+    await expect(fsName).toHaveValue('ai_generated_test', { timeout: 15_000 })
+
+    // Confirm the AnthropicProvider actually hit the Anthropic API endpoint —
+    // this proves the provider config from settings flowed all the way to
+    // the underlying HTTP call (and not to the Claude Subscription bridge).
+    const anthropicCalls = await sidebar
+      .locator('body')
+      .evaluate(() => (window as any).__anthropicCalls as string[])
+    expect(anthropicCalls.length).toBeGreaterThan(0)
+    expect(anthropicCalls[0]).toContain('POST')
+    expect(anthropicCalls[0]).toContain('api.anthropic.com/v1/messages')
   })
 })

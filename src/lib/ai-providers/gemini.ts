@@ -25,6 +25,7 @@ import type {
   AIProvider,
   AIProviderConfig,
   GenerateOptions,
+  GenerateStructuredOptions,
   ModelConfig,
   ModelInfo
 } from "./base"
@@ -257,4 +258,103 @@ export class GeminiProvider implements AIProvider {
       `Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`
     )
   }
+
+  async generateStructured<TResult = unknown>(
+    opts: GenerateStructuredOptions
+  ): Promise<TResult> {
+    if (!this.config.apiKey) {
+      throw new Error("Gemini API key is required")
+    }
+
+    const model = this.config.llmModel || "gemini-1.5-pro"
+    const modelName = model.includes("models/") ? model : `models/${model}`
+    const endpoint =
+      `${this.config.customEndpoint || GEMINI_API_BASE}/${modelName}:generateContent` +
+      `?key=${this.config.apiKey}`
+
+    const parts: any[] = [{ text: opts.userMessage }]
+    for (const img of opts.images || []) {
+      const match = img.match(/^data:(image\/\w+);base64,(.+)$/)
+      if (match) {
+        const [, mimeType, data] = match
+        parts.push({ inline_data: { mime_type: mimeType, data } })
+      }
+    }
+
+    const body = {
+      contents: [{ role: "user", parts }],
+      system_instruction: { parts: [{ text: opts.systemPrompt }] },
+      tools: [
+        {
+          function_declarations: [
+            {
+              name: opts.schema.name,
+              description: opts.schema.description || "",
+              parameters: stripJsonSchemaForGemini(opts.schema.input_schema)
+            }
+          ]
+        }
+      ],
+      tool_config: {
+        function_calling_config: {
+          mode: "ANY",
+          allowed_function_names: [opts.schema.name]
+        }
+      }
+    }
+
+    let response: Response
+    try {
+      response = await withTimeout(
+        fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        })
+      )
+    } catch (fetchError: any) {
+      const baseError = new Error(
+        `Network error: ${fetchError?.message || "Failed to fetch"}`
+      )
+      const classified = classifyAIError(baseError)
+      throw new Error(formatClassifiedError(classified))
+    }
+
+    if (!response.ok) {
+      const errBody = await response.text()
+      throw new Error(
+        `Gemini API error: ${response.status} ${errBody.slice(0, 500)}`
+      )
+    }
+
+    const data = await response.json()
+    const candidate = data.candidates?.[0]
+    const fnCall = candidate?.content?.parts?.find(
+      (p: any) => p.functionCall?.name === opts.schema.name
+    )?.functionCall
+    if (!fnCall) {
+      throw new Error(
+        `Gemini returned no '${opts.schema.name}' function call. finish_reason=${candidate?.finishReason}`
+      )
+    }
+    return fnCall.args as TResult
+  }
+}
+
+function stripJsonSchemaForGemini(schema: unknown): unknown {
+  // Gemini rejects a handful of JSON Schema extensions (notably
+  // `additionalProperties` and `pattern`). Walk the schema and drop them so
+  // the function declaration passes Gemini's strict validation.
+  if (Array.isArray(schema)) return schema.map(stripJsonSchemaForGemini)
+  if (schema && typeof schema === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+      if (k === "additionalProperties" || k === "$schema" || k === "pattern") {
+        continue
+      }
+      out[k] = stripJsonSchemaForGemini(v)
+    }
+    return out
+  }
+  return schema
 }

@@ -85,9 +85,16 @@ describe("fillExperimentFromAI", () => {
   })
 
   it("throws a clear error if the provider does not implement generateStructured", async () => {
+    // Guard for future providers being added to the registry without
+    // implementing structured generation. All four direct API providers
+    // (Anthropic, OpenAI, OpenRouter, Gemini) plus the Claude Subscription
+    // bridge implement it as of FT-1905, so we simulate a synthetic provider
+    // by mocking createAIProvider to return a bare object.
     ;(createAIProvider as jest.Mock).mockReturnValue({})
     await expect(
-      fillExperimentFromAI(baseRequest, { aiProvider: "openai-api" })
+      fillExperimentFromAI(baseRequest, {
+        aiProvider: "future-provider-without-structured" as never
+      })
     ).rejects.toThrow(/structured generation/i)
   })
 })

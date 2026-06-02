@@ -671,4 +671,162 @@ describe("AnthropicProvider", () => {
       )
     })
   })
+
+  describe("generateStructured", () => {
+    const schema = {
+      name: "fill_experiment_fields",
+      description: "Test fill",
+      input_schema: {
+        type: "object" as const,
+        properties: { display_name: { type: "string" } },
+        required: ["display_name"]
+      }
+    }
+
+    it("returns parsed tool input on success and forces tool_choice", async () => {
+      const provider = new AnthropicProvider(createConfig())
+      mockMessages.create.mockResolvedValue({
+        content: [
+          {
+            type: "tool_use",
+            name: "fill_experiment_fields",
+            id: "tool_1",
+            input: { display_name: "Hero CTA test" }
+          }
+        ],
+        stop_reason: "tool_use"
+      })
+
+      const result = await provider.generateStructured!({
+        systemPrompt: "system",
+        userMessage: "user",
+        schema
+      })
+
+      expect(result).toEqual({ display_name: "Hero CTA test" })
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "claude-sonnet-4-5-20250514",
+          system: "system",
+          tools: [expect.objectContaining({ name: "fill_experiment_fields" })],
+          tool_choice: { type: "tool", name: "fill_experiment_fields" }
+        })
+      )
+    })
+
+    it("uses configured custom endpoint and llmModel", async () => {
+      const provider = new AnthropicProvider(
+        createConfig({
+          llmModel: "claude-opus-4-20250514",
+          customEndpoint: "https://custom.anthropic/v1"
+        })
+      )
+      mockMessages.create.mockResolvedValue({
+        content: [
+          {
+            type: "tool_use",
+            name: "fill_experiment_fields",
+            id: "tool_1",
+            input: { display_name: "X" }
+          }
+        ],
+        stop_reason: "tool_use"
+      })
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema
+      })
+
+      expect(Anthropic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: "sk-ant-test-key",
+          baseURL: "https://custom.anthropic/v1"
+        })
+      )
+      expect(mockMessages.create).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "claude-opus-4-20250514" })
+      )
+    })
+
+    it("attaches images as base64 blocks", async () => {
+      const provider = new AnthropicProvider(createConfig())
+      mockMessages.create.mockResolvedValue({
+        content: [
+          {
+            type: "tool_use",
+            name: "fill_experiment_fields",
+            id: "tool_1",
+            input: { display_name: "X" }
+          }
+        ],
+        stop_reason: "tool_use"
+      })
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema,
+        images: ["data:image/png;base64,ABC"]
+      })
+
+      const callArgs = mockMessages.create.mock.calls[0][0]
+      const userContent = callArgs.messages[0].content
+      expect(userContent).toEqual(
+        expect.arrayContaining([
+          { type: "text", text: "u" },
+          expect.objectContaining({
+            type: "image",
+            source: expect.objectContaining({
+              type: "base64",
+              media_type: "image/png",
+              data: "ABC"
+            })
+          })
+        ])
+      )
+    })
+
+    it("throws when API returns no matching tool call", async () => {
+      const provider = new AnthropicProvider(createConfig())
+      mockMessages.create.mockResolvedValue({
+        content: [{ type: "text", text: "no tool call here" }],
+        stop_reason: "end_turn"
+      })
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/no 'fill_experiment_fields' tool call/)
+    })
+
+    it("throws when API call rejects", async () => {
+      const provider = new AnthropicProvider(createConfig())
+      mockMessages.create.mockRejectedValue(new Error("HTTP 500 server error"))
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow()
+    })
+
+    it("throws clear error when API key is missing", async () => {
+      const provider = new AnthropicProvider(createConfig({ apiKey: "" }))
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/API key is required/)
+    })
+  })
 })
