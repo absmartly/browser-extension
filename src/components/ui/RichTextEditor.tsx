@@ -27,8 +27,8 @@ import { TablePlugin } from "@lexical/react/LexicalTablePlugin"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table"
 import {
+  $createParagraphNode,
   $getRoot,
-  $setSelection,
   type EditorThemeClasses,
   type LexicalEditor
 } from "lexical"
@@ -190,16 +190,112 @@ function InitialValuePlugin({
     editor.update(() => {
       const root = $getRoot()
       root.clear()
-      $convertFromMarkdownString(value || "", TRANSFORMERS)
-      // Without this, Lexical can keep stale internal selection state from
-      // before the re-seed — and when the user later focuses the editor, the
-      // first keystroke targets the wrong (or no) node, so input is silently
-      // dropped. Clearing selection here forces Lexical to (re)establish a
-      // fresh selection from the focus event.
-      $setSelection(null)
+      if (value) {
+        $convertFromMarkdownString(value, TRANSFORMERS)
+      }
+      // CRITICAL: $convertFromMarkdownString strips empty paragraphs from
+      // the parsed output, so seeding with "" leaves the root with zero
+      // children. A Lexical contenteditable with no children can be focused
+      // and even reports a Selection, but beforeinput events have no node
+      // to insert into — every keystroke is silently dropped. Guarantee at
+      // least one empty paragraph here so the first keystroke after a
+      // real-user click always lands.
+      if (root.getChildrenSize() === 0) {
+        root.append($createParagraphNode())
+      }
     })
   }, [editor, value, externalChangeRef])
 
+  return null
+}
+
+/**
+ * Shadow-DOM focus fix for Lexical.
+ *
+ * Lexical reads the active DOM selection via `window.getSelection()` in
+ * `internalCreateRangeSelection`, `onBeforeInput`, `onClick`, etc. In
+ * Chromium, when content lives inside an open shadow root (which this modal
+ * uses for style isolation), the shadow root owns its own Selection;
+ * the document-level `window.getSelection()` returns a range scoped to the
+ * iframe document (anchor at <body>) — never the shadow content. Result:
+ * every Lexical update inside a shadow root resets the editor's Selection
+ * to `null`, `beforeinput` handlers bail out with
+ * `!$isRangeSelection(selection)`, and every keystroke is silently dropped.
+ * Pre-fix E2E tests passed only because they manually set the document
+ * Selection via JS — something a real user can't do.
+ *
+ * The fix patches the iframe window's `getSelection` to forward to the
+ * shadow root's own `getSelection()` whenever the document's active element
+ * lives under the shadow host. The patch is installed once per window
+ * (idempotent) and is a no-op when the active element isn't in a registered
+ * shadow root, so non-shadow editors and the rest of the document are
+ * unaffected. We also bridge `selectionchange` events from the shadow root
+ * up to the document so Lexical's onDocumentSelectionChange handler fires.
+ */
+function ShadowFocusFixPlugin(): null {
+  const [editor] = useLexicalComposerContext()
+  useEffect(() => {
+    const rootEl = editor.getRootElement()
+    if (!rootEl) return
+    const root = rootEl.getRootNode()
+    if (!(root instanceof ShadowRoot)) return
+    const win = rootEl.ownerDocument.defaultView
+    if (!win) return
+
+    type PatchedWindow = Window & {
+      __absmartlyShadowGetSelectionPatched?: boolean
+      __absmartlyShadowRoots?: Set<ShadowRoot>
+    }
+    const patched = win as PatchedWindow
+
+    const shadowRoots: Set<ShadowRoot> =
+      patched.__absmartlyShadowRoots || new Set<ShadowRoot>()
+    patched.__absmartlyShadowRoots = shadowRoots
+    shadowRoots.add(root)
+
+    if (!patched.__absmartlyShadowGetSelectionPatched) {
+      patched.__absmartlyShadowGetSelectionPatched = true
+      const orig = win.getSelection.bind(win)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(win as any).getSelection = function (): Selection | null {
+        const active = win.document.activeElement
+        if (active) {
+          for (const sr of shadowRoots) {
+            if (sr.host === active || sr.host.contains(active)) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const fn = (sr as any).getSelection
+              if (typeof fn === "function") {
+                const sel = fn.call(sr) as Selection | null
+                if (sel) return sel
+              }
+            }
+          }
+        }
+        return orig()
+      }
+    }
+
+    // Bridge `selectionchange` events fired on the shadow root up to the
+    // owner document. Lexical's `onDocumentSelectionChange` listens on the
+    // document, so without this it never fires for shadow-DOM edits.
+    const onShadowSelChange = () => {
+      try {
+        win.document.dispatchEvent(new Event("selectionchange"))
+      } catch {
+        // best-effort
+      }
+    }
+    root.addEventListener("selectionchange", onShadowSelChange)
+
+    return () => {
+      shadowRoots.delete(root)
+      root.removeEventListener("selectionchange", onShadowSelChange)
+      // Intentionally do NOT undo the window.getSelection patch: another
+      // editor may still rely on it, and once removed there's no way to
+      // re-apply atomically. The patch is a no-op when the active element
+      // isn't a shadow host, so it's safe to leave installed.
+    }
+  }, [editor])
   return null
 }
 
@@ -395,6 +491,7 @@ export function RichTextEditor({
             value={value}
             externalChangeRef={externalChangeRef}
           />
+          {!disabled && <ShadowFocusFixPlugin />}
         </div>
       </LexicalComposer>
     </div>

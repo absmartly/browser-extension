@@ -198,4 +198,76 @@ test.describe('Full-screen modal — new sections (FT-1905)', () => {
     await testPage.keyboard.type('after click', { delay: 5 })
     await expect(richInput).toContainText('after click', { timeout: 5_000 })
   })
+
+  test('real user click + keystrokes into RichTextEditor — no JS focus/selection pre-seed', async ({
+    context,
+    extensionUrl
+  }) => {
+    // Reproduce the user's actual experience: open the modal, click the
+    // RichTextEditor contenteditable like a real user would (no JS focus(),
+    // no manual Selection.addRange) and type. The characters must appear.
+    //
+    // Pre-fix this test failed: the modal lives inside an open shadow root,
+    // and Lexical's `internalCreateRangeSelection` reads the active selection
+    // via `window.getSelection()`. In Chromium that returns a range scoped
+    // to the iframe document (anchor at <body>) instead of the shadow root's
+    // own selection, so Lexical concluded "no RangeSelection" and the
+    // beforeinput handler silently dropped every keystroke. The fix patches
+    // the iframe window's getSelection() to forward to the shadow root's
+    // Selection whenever the active element is inside the shadow host.
+    test.setTimeout(60_000)
+
+    await installAuthStub(context)
+    await installAPIOperationStub(context, {
+      listApplications: { data: [] },
+      listUnitTypes: { data: [{ unit_type_id: 1, name: 'user_id' }] },
+      listMetrics: { data: FAKE_METRICS },
+      listExperimentTags: { data: [] },
+      listUsers: { data: [] },
+      listTeams: { data: [] },
+      listCustomSectionFields: { data: [FAKE_HYPOTHESIS_FIELD] }
+    })
+
+    const testPage = await context.newPage()
+    const { sidebar } = await setupTestPage(
+      testPage,
+      extensionUrl,
+      '/visual-editor-test.html'
+    )
+
+    await sidebar.locator('button[title="Create New Experiment"]').click()
+    const fromScratch = sidebar.locator('#from-scratch-button')
+    await fromScratch.waitFor({ state: 'visible', timeout: 10_000 })
+    await fromScratch.click()
+    await sidebar
+      .locator('#create-experiment-header')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    await sidebar
+      .locator('#open-fullscreen-button')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    await sidebar.locator('#open-fullscreen-button').click()
+    await sidebar
+      .locator('#absmartly-fullscreen-host')
+      .waitFor({ state: 'attached', timeout: 10_000 })
+    await sidebar
+      .locator('#fullscreen-experiment-modal')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+
+    const richInput = sidebar.locator('#cfe-input-7')
+    await richInput.waitFor({ state: 'visible', timeout: 5_000 })
+
+    // Real-user click: scroll the editor into view, then drive Playwright's
+    // .click() directly on the contenteditable. No JS focus(), no manual
+    // Selection range. This is what mouse-clicking the editor in real Chrome
+    // would do.
+    await richInput.scrollIntoViewIfNeeded()
+    await richInput.click()
+
+    // Type via the OS-level keyboard. If the editor lost focus / Lexical
+    // can't find the selection, the keystrokes will go nowhere and the
+    // assertion below will fail — that's the bug we're guarding against.
+    await testPage.keyboard.type('hello world', { delay: 10 })
+
+    await expect(richInput).toContainText('hello world', { timeout: 5_000 })
+  })
 })

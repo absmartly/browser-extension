@@ -56,7 +56,11 @@ jest.mock("@lexical/react/LexicalOnChangePlugin", () => ({
 const fakeEditor = {
   update: (cb: () => void) => cb(),
   hasNodes: () => true,
-  registerCommand: () => () => {}
+  registerCommand: () => () => {},
+  // ShadowFocusFixPlugin reads getRootElement() and bails out when the
+  // returned element isn't inside a ShadowRoot, so jsdom doesn't need to do
+  // anything special — returning null short-circuits the plugin.
+  getRootElement: () => null
 }
 
 jest.mock("@lexical/react/LexicalComposer", () => ({
@@ -165,7 +169,12 @@ jest.mock("../rich-text/toolbar/Toolbar", () => ({
 
 // lexical core — we never call any real DOM logic. Provide minimal stubs.
 jest.mock("lexical", () => ({
-  $getRoot: () => ({ clear: jest.fn() }),
+  $getRoot: () => ({
+    clear: jest.fn(),
+    getChildrenSize: () => 1,
+    append: jest.fn()
+  }),
+  $createParagraphNode: jest.fn(() => ({})),
   $setSelection: jest.fn()
 }))
 
@@ -235,8 +244,11 @@ describe("RichTextEditor controlled-value behavior", () => {
     await act(async () => {
       render(<ControlledHarness initialValue="" capture={(a) => (api = a)} />)
     })
-    // 1) Initial seed with empty string
-    expect(convertFromMarkdownCalls).toEqual([""])
+    // 1) Initial mount with empty string — InitialValuePlugin skips the
+    // markdown parse for "" (the parser strips empty paragraphs, leaving the
+    // root with zero children which silently breaks beforeinput). Instead it
+    // appends a single empty paragraph directly.
+    expect(convertFromMarkdownCalls).toEqual([])
 
     // 2) Editor emits "H" — handleChange will call onChange("H"), parent
     // updates state, RichTextEditor re-renders with value="H". With the fix,
@@ -246,14 +258,14 @@ describe("RichTextEditor controlled-value behavior", () => {
       nextMarkdownToEmit = "H"
       capturedOnChange?.({}, fakeEditor)
     })
-    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(convertFromMarkdownCalls).toEqual([])
 
     // 3) Editor emits "He" — same flow, must still not re-seed.
     await act(async () => {
       nextMarkdownToEmit = "He"
       capturedOnChange?.({}, fakeEditor)
     })
-    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(convertFromMarkdownCalls).toEqual([])
 
     // 4) Confirm the parent's state reflects the typed value.
     expect(api.getValue()).toBe("He")
@@ -262,13 +274,13 @@ describe("RichTextEditor controlled-value behavior", () => {
   it("does not re-seed across ten consecutive keystrokes (Bug 1 regression)", async () => {
     // This covers the FT-1905 regression where mentions plugins re-seeded the
     // editor between keystrokes, resetting the cursor. We simulate ten editor
-    // emits in sequence and assert the only `$convertFromMarkdownString` call
-    // remains the initial mount seed.
+    // emits in sequence and assert no `$convertFromMarkdownString` call ever
+    // fires after the initial mount (which itself skips the call for "").
     let api: any = null
     await act(async () => {
       render(<ControlledHarness initialValue="" capture={(a) => (api = a)} />)
     })
-    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(convertFromMarkdownCalls).toEqual([])
 
     const word = "hello rich"
     let acc = ""
@@ -279,7 +291,7 @@ describe("RichTextEditor controlled-value behavior", () => {
         capturedOnChange?.({}, fakeEditor)
       })
     }
-    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(convertFromMarkdownCalls).toEqual([])
     expect(api.getValue()).toBe("hello rich")
   })
 
@@ -288,28 +300,28 @@ describe("RichTextEditor controlled-value behavior", () => {
     await act(async () => {
       render(<ControlledHarness initialValue="" capture={(a) => (api = a)} />)
     })
-    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(convertFromMarkdownCalls).toEqual([])
 
     // Editor emits "H" — no re-seed.
     await act(async () => {
       nextMarkdownToEmit = "H"
       capturedOnChange?.({}, fakeEditor)
     })
-    expect(convertFromMarkdownCalls).toEqual([""])
+    expect(convertFromMarkdownCalls).toEqual([])
 
     // Parent sets value externally (e.g. AI Fill overwrites the field) —
     // must re-seed because externalChangeRef.current === "H" !== new value.
     await act(async () => {
       api.setValue("AI generated description")
     })
-    expect(convertFromMarkdownCalls).toEqual(["", "AI generated description"])
+    expect(convertFromMarkdownCalls).toEqual(["AI generated description"])
 
     // Parent passes the same external value again (idempotent re-render) —
     // must NOT re-seed, externalChangeRef now tracks it.
     await act(async () => {
       api.setValue("AI generated description")
     })
-    expect(convertFromMarkdownCalls).toEqual(["", "AI generated description"])
+    expect(convertFromMarkdownCalls).toEqual(["AI generated description"])
   })
 })
 
