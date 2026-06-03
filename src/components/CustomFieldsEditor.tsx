@@ -15,6 +15,10 @@ export function CustomFieldsEditor({
   values,
   onChange
 }: CustomFieldsEditorProps) {
+  // TEMP-DIAG (FT-1905): log what we received so we can see why "no fields
+  // are showing up" in production. Will remove once the user reports back.
+  // eslint-disable-next-line no-console
+  console.log("[CustomFieldsEditor] received fields:", fields?.length, fields)
   // Some `listCustomSectionFields` payloads return the same field once per
   // workspace section it belongs to. Deduplicate by `id` so each field is
   // rendered exactly once, regardless of how many sections reference it.
@@ -28,6 +32,12 @@ export function CustomFieldsEditor({
       out.push(f)
     }
     out.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    // eslint-disable-next-line no-console
+    console.log(
+      "[CustomFieldsEditor] after dedupe/archived filter:",
+      out.length,
+      out.map((f) => ({ id: f.id, title: f.title, archived: f.archived }))
+    )
     return out
   }, [fields])
 
