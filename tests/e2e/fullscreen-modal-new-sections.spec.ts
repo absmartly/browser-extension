@@ -167,5 +167,35 @@ test.describe('Full-screen modal — new sections (FT-1905)', () => {
     await testPage.keyboard.type('hello rich text', { delay: 5 })
     // The Lexical editor renders the typed text inside the contenteditable.
     await expect(richInput).toContainText('hello rich text', { timeout: 10_000 })
+
+    // --- Real-user click pattern: clicking the bordered wrapper (NOT the
+    // contenteditable directly) must also focus the editor. This regression
+    // failed in the wild after the resize wrapper was added — clicks on the
+    // border area landed on the non-editable wrapper and the editor stayed
+    // unfocused, so users typed and "nothing happened".
+    await richInput.evaluate((el) => {
+      // Clear so we can verify the next chunk starts from empty.
+      el.textContent = ''
+    })
+    await sidebar.locator('body').evaluate(() => {
+      const host = document.getElementById('absmartly-fullscreen-host')
+      const wrapper = host?.shadowRoot?.getElementById(
+        'cfe-input-7-resize-wrapper'
+      ) as HTMLElement | null
+      if (!wrapper) throw new Error('resize wrapper not found')
+      // Dispatch a synthetic mousedown on the wrapper itself (not bubbling
+      // up from the contenteditable). This mirrors a click on the border /
+      // padding area outside the contenteditable's content box.
+      const rect = wrapper.getBoundingClientRect()
+      wrapper.dispatchEvent(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          clientX: rect.left + 1,
+          clientY: rect.top + 1,
+        })
+      )
+    })
+    await testPage.keyboard.type('after click', { delay: 5 })
+    await expect(richInput).toContainText('after click', { timeout: 5_000 })
   })
 })

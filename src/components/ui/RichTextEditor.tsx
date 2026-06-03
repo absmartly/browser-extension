@@ -297,7 +297,43 @@ export function RichTextEditor({
                   disabled
                     ? undefined
                     : { resize: "vertical", overflow: "auto" }
-                }>
+                }
+                // The border lives on the wrapper, so users intuitively click
+                // anywhere in the bordered box expecting to focus the editor.
+                // The contenteditable inside fills the area but click events
+                // on the border / scroll-padding land on the wrapper itself.
+                // Delegate the focus down so typing always works on click.
+                onMouseDown={(e) => {
+                  if (disabled) return
+                  // Ignore the bottom-right grip area (~16x16) so dragging the
+                  // resize handle still works.
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  if (
+                    rect.right - e.clientX < 18 &&
+                    rect.bottom - e.clientY < 18
+                  ) {
+                    return
+                  }
+                  // Only delegate when the user clicked the wrapper itself
+                  // (not bubbled from the contenteditable interior).
+                  if (e.target !== e.currentTarget) return
+                  e.preventDefault()
+                  const ce = e.currentTarget.querySelector<HTMLElement>(
+                    '[contenteditable="true"]'
+                  )
+                  if (!ce) return
+                  ce.focus()
+                  // Place the caret at the end of the editor so the next
+                  // keystroke lands somewhere visible.
+                  const sel = ce.ownerDocument.getSelection()
+                  if (sel) {
+                    sel.removeAllRanges()
+                    const range = ce.ownerDocument.createRange()
+                    range.selectNodeContents(ce)
+                    range.collapse(false)
+                    sel.addRange(range)
+                  }
+                }}>
                 <ContentEditable
                   id={id}
                   data-testid={testid}
