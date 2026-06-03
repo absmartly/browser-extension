@@ -273,4 +273,99 @@ describe("BackgroundAPIClient", () => {
       expect(result).toEqual(valueResponse)
     })
   })
+
+  describe("getMetricUsages", () => {
+    it("sends the listMetricUsages operation and returns an unwrapped array as-is", async () => {
+      const usages = [
+        {
+          id: 1,
+          metric_category_id: 7,
+          usage: { last_6_months: { total: 5 } }
+        }
+      ]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: usages
+      })
+
+      const result = await client.getMetricUsages()
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "listMetricUsages" }
+      })
+      expect(result).toEqual(usages)
+    })
+
+    it("unwraps the `metricUsages` envelope (web-app shape)", async () => {
+      const usages = [{ id: 2, usage: { last_6_months: { total: 1 } } }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { metricUsages: usages }
+      })
+
+      const result = await client.getMetricUsages()
+      expect(result).toEqual(usages)
+    })
+
+    it("unwraps the `metric_usages` snake_case envelope", async () => {
+      const usages = [{ id: 3 }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { metric_usages: usages }
+      })
+
+      const result = await client.getMetricUsages()
+      expect(result).toEqual(usages)
+    })
+
+    it("returns an empty array when the response shape is unrecognised", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { unexpectedKey: "nope" }
+      })
+
+      const result = await client.getMetricUsages()
+      expect(result).toEqual([])
+    })
+  })
+
+  describe("getMetricCategories", () => {
+    it("sends the listMetricCategories operation and returns an unwrapped array as-is", async () => {
+      const categories = [{ id: 1, name: "Growth", color: "#ff8800" }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: categories
+      })
+
+      const result = await client.getMetricCategories()
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "listMetricCategories" }
+      })
+      expect(result).toEqual(categories)
+    })
+
+    it("unwraps the `metric_categories` envelope", async () => {
+      const categories = [{ id: 2, name: "Quality", color: "#00aa00" }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { metric_categories: categories }
+      })
+
+      const result = await client.getMetricCategories()
+      expect(result).toEqual(categories)
+    })
+
+    it("returns an empty array when the data is null", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: null
+      })
+
+      const result = await client.getMetricCategories()
+      expect(result).toEqual([])
+    })
+  })
 })

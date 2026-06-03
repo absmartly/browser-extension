@@ -9,6 +9,8 @@ import type {
   ExperimentTeam,
   ExperimentUser,
   Metric,
+  MetricCategory,
+  MetricUsageRecord,
   UnitType
 } from "~src/types/absmartly"
 import { APIError } from "~src/types/errors"
@@ -290,6 +292,68 @@ export class BackgroundAPIClient {
     }
   }
 
+  /**
+   * Fetch the per-metric usage rollups powering the metric cards in the
+   * fullscreen experiment modal. Routes through the CLI's
+   * `listMetricUsages` (hits `GET /v1/metrics/usages`).
+   *
+   * The endpoint returns either an unwrapped array or one of a handful of
+   * wrapping keys (`metricUsages` per the web app, `metric_usages`, or
+   * `metrics` per the CLI). We accept all three so callers don't have to
+   * normalize across API versions; if we can't find any of them we
+   * downgrade to `[]` rather than throwing, since the merge in
+   * ExperimentEditor is best-effort.
+   */
+  async getMetricUsages(): Promise<MetricUsageRecord[]> {
+    try {
+      const raw = await this.sendOperation({ op: "listMetricUsages" })
+      const list = unwrapListResponse(raw, [
+        "metricUsages",
+        "metric_usages",
+        "metrics"
+      ])
+      if (!Array.isArray(list)) {
+        debugWarn(
+          "[BackgroundAPIClient] listMetricUsages returned non-array shape:",
+          typeof raw
+        )
+        return []
+      }
+      return list as MetricUsageRecord[]
+    } catch (error) {
+      debugError("Failed to fetch metric usages:", error)
+      throw error
+    }
+  }
+
+  /**
+   * Fetch metric categories so the modal can colour-code the metric cards
+   * (mirrors the web app's `useMetricCategoriesListQuery`). Routes through
+   * the CLI's `listMetricCategories`, which hits
+   * `GET /v1/metric_categories`.
+   *
+   * Accepts both the unwrapped array (CLI's normalized shape) and the
+   * wrapped `metric_categories` payload for defensive parity with
+   * `getMetricUsages`.
+   */
+  async getMetricCategories(): Promise<MetricCategory[]> {
+    try {
+      const raw = await this.sendOperation({ op: "listMetricCategories" })
+      const list = unwrapListResponse(raw, ["metric_categories", "categories"])
+      if (!Array.isArray(list)) {
+        debugWarn(
+          "[BackgroundAPIClient] listMetricCategories returned non-array shape:",
+          typeof raw
+        )
+        return []
+      }
+      return list as MetricCategory[]
+    } catch (error) {
+      debugError("Failed to fetch metric categories:", error)
+      throw error
+    }
+  }
+
   async getExperimentTags(): Promise<ExperimentTag[]> {
     try {
       const tags = await this.sendOperation({ op: "listExperimentTags" })
@@ -542,4 +606,22 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode.apply(null, Array.from(slice))
   }
   return btoa(binary)
+}
+
+/**
+ * Defensive unwrap for list-shaped API responses. The web app, CLI, and
+ * direct REST surface each pick a slightly different envelope key for the
+ * same payload (`metricUsages` vs `metric_usages` vs `metrics`), so callers
+ * pass the candidate keys in priority order and we return the first match.
+ * If the value is already an array we hand it back unchanged.
+ */
+function unwrapListResponse(raw: unknown, keys: readonly string[]): unknown {
+  if (Array.isArray(raw)) return raw
+  if (raw && typeof raw === "object") {
+    for (const key of keys) {
+      const value = (raw as Record<string, unknown>)[key]
+      if (Array.isArray(value)) return value
+    }
+  }
+  return null
 }

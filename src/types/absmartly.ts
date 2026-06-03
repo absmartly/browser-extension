@@ -101,10 +101,39 @@ export interface MetricTeamRef {
 
 export interface MetricUsageCounts {
   readonly total: number
+  readonly primary?: number
+  readonly secondary?: number
+  readonly guardrail?: number
 }
 
 export interface MetricUsage {
+  readonly all_time?: MetricUsageCounts
+  readonly last_month?: MetricUsageCounts
   readonly last_6_months?: MetricUsageCounts
+  readonly last_year?: MetricUsageCounts
+}
+
+/**
+ * Record returned by the `/v1/metrics/usages` endpoint. Mirrors the web
+ * app's `FetchMetricUsagesResponse["metricUsages"][number]` shape — every
+ * field is optional here so we tolerate older API versions; only `id`,
+ * `metric_category_id`, and `usage` matter for the merge that backs the
+ * fullscreen modal's metric cards.
+ */
+export interface MetricUsageRecord {
+  readonly id: number
+  readonly metric_category_id?: number | null
+  readonly usage?: MetricUsage | null
+  readonly [key: string]: unknown
+}
+
+export interface MetricCategory {
+  readonly id: number
+  readonly name: string
+  readonly color?: string
+  readonly description?: string
+  readonly archived?: boolean
+  readonly [key: string]: unknown
 }
 
 export interface MetricCategoryRef {

@@ -22,10 +22,13 @@ import type {
   ExperimentCustomSectionField,
   ExperimentInjectionCode,
   Metric,
+  MetricCategory,
+  MetricUsageRecord,
   URLFilter
 } from "~src/types/absmartly"
 import type { DOMChange } from "~src/types/dom-changes"
 import { debugWarn } from "~src/utils/debug"
+import { mergeMetricMetadata } from "~src/utils/metrics"
 import { getConfig, localAreaStorage } from "~src/utils/storage"
 
 import { ExperimentCodeInjection } from "./ExperimentCodeInjection"
@@ -281,8 +284,24 @@ export function ExperimentEditor({
   // Fall back to a local fetch so the metrics picker is always populated by
   // the time the user opens the full-screen modal.
   const [fetchedMetrics, setFetchedMetrics] = useState<Metric[] | null>(null)
-  const effectiveMetrics =
-    metrics && metrics.length > 0 ? metrics : fetchedMetrics ?? []
+  // Usage rollups + category metadata from the dedicated endpoints, fetched
+  // alongside the metric list so the modal's metric cards render the same
+  // owner / "Used N times" / category badge that the web app's
+  // `MetricsSelect` shows. Both default to empty arrays so the merge is a
+  // no-op when these fetches fail or arrive empty.
+  const [metricUsages, setMetricUsages] = useState<MetricUsageRecord[]>([])
+  const [metricCategories, setMetricCategories] = useState<MetricCategory[]>([])
+  const baseMetrics =
+    metrics && metrics.length > 0 ? (metrics as Metric[]) : fetchedMetrics ?? []
+  // Apply the `mapMetricUsage` projection from the web app
+  // (Experiments/Create/Metrics/MetricsSelect.tsx) so every metric carries
+  // its `usage` rollup and `metricCategory` ref. The merge is best-effort:
+  // metrics whose usage/category data didn't arrive in time pass through
+  // unchanged so the picker still renders.
+  const effectiveMetrics = useMemo(
+    () => mergeMetricMetadata(baseMetrics, metricUsages, metricCategories),
+    [baseMetrics, metricUsages, metricCategories]
+  )
   const [pageContext, setPageContext] = useState({
     url: "",
     title: "",
@@ -355,6 +374,24 @@ export function ExperimentEditor({
         } catch (err) {
           debugWarn("[FullScreen] failed to load metrics", err)
         }
+      }
+      // Usage + categories enrich the metric cards in the fullscreen modal
+      // (matching the web app's `MetricsSelect`). Both are best-effort —
+      // failures degrade gracefully to an unenriched picker, so we never
+      // block the rest of the editor load on them.
+      try {
+        const client = new BackgroundAPIClient()
+        const usages = await client.getMetricUsages()
+        if (!cancelled) setMetricUsages(usages)
+      } catch (err) {
+        debugWarn("[FullScreen] failed to load metric usages", err)
+      }
+      try {
+        const client = new BackgroundAPIClient()
+        const categories = await client.getMetricCategories()
+        if (!cancelled) setMetricCategories(categories)
+      } catch (err) {
+        debugWarn("[FullScreen] failed to load metric categories", err)
       }
       try {
         const ctx = (await sendToContent({ type: "GET_PAGE_CONTEXT" })) as
@@ -520,6 +557,8 @@ export function ExperimentEditor({
     tags,
     metrics,
     fetchedMetrics,
+    metricUsages,
+    metricCategories,
     pageContext,
     aiProviderConfig,
     experiment?.id,

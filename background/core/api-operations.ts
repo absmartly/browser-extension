@@ -51,6 +51,8 @@ export type APIOperation =
   | { op: "listApplications" }
   | { op: "listUnitTypes" }
   | { op: "listMetrics"; params?: ListMetricsParams }
+  | { op: "listMetricUsages" }
+  | { op: "listMetricCategories"; items?: number; page?: number }
   | { op: "listExperimentTags" }
   | { op: "listUsers"; params?: { includeArchived?: boolean; items?: number; page?: number } }
   | { op: "listTeams" }
@@ -108,6 +110,14 @@ export async function routeAPIOperation(
 
     case "listMetrics": {
       return await client.listMetrics(operation.params)
+    }
+
+    case "listMetricUsages": {
+      return await client.listMetricUsages()
+    }
+
+    case "listMetricCategories": {
+      return await client.listMetricCategories(operation.items, operation.page)
     }
 
     case "listExperimentTags": {
