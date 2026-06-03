@@ -358,14 +358,6 @@ export function ExperimentEditor({
       try {
         const client = new BackgroundAPIClient()
         const fields = await client.getCustomSectionFields()
-        // TEMP-DIAG (FT-1905): log so we can see what the API returns when
-        // the user reports "no custom fields showing".
-        // eslint-disable-next-line no-console
-        console.log(
-          "[ExperimentEditor] getCustomSectionFields →",
-          Array.isArray(fields) ? fields.length : typeof fields,
-          fields
-        )
         if (!cancelled) setCustomFields(fields)
       } catch (err) {
         debugWarn("[FullScreen] failed to load custom fields", err)

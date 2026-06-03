@@ -23,11 +23,18 @@ Do not output any prose, explanation, or text outside the tool call. You MUST:
 5. Suggest reasonable percentages and traffic %.
 6. For each variant, give a short descriptive name (keep the first one called
    "Control" unless the user has clearly named it otherwise) and a one-line description.
-7. Fill custom fields ONLY when the field is listed in the customFieldDefinitions
-   section. For each custom field you fill, the \`field_id\` you emit MUST be the
-   numeric \`id\` value of the corresponding customFieldDefinitions entry — never
-   use the title, never invent an id. Match the declared type (text → string,
-   multiselect → string[], boolean → boolean, etc.).
+7. Fill EVERY custom field listed in customFieldDefinitions — do not skip
+   any. For each one, the \`field_id\` you emit MUST be the numeric \`id\` value
+   of the corresponding customFieldDefinitions entry — never use the title,
+   never invent an id. Match the declared type (text → string, multiselect
+   → string[], boolean → boolean, number → number, json → JSON-string,
+   user → email or full name from the workspace user list if provided,
+   otherwise the suggested assignee's name as a plain string). When you
+   genuinely lack context for a field (e.g. a JIRA URL with no ticket
+   created yet, an assignee not yet decided), emit a plausible placeholder
+   value or a brief "TBD: <what would go here>" — never leave it out.
+   Use the field's \`title\` and \`help_text\` (when present) to decide the
+   right content.
 8. Pick applications and tags ONLY from the lists in the user message. Never invent.
 9. Pick metrics ONLY from the metricDefinitions list in the user message. Reference
    each metric by its exact \`name\`. \`primary_metrics\` is single-valued — emit at

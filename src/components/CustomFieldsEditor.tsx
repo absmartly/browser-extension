@@ -15,37 +15,29 @@ export function CustomFieldsEditor({
   values,
   onChange
 }: CustomFieldsEditorProps) {
-  // TEMP-DIAG (FT-1905): log what we received so we can see why "no fields
-  // are showing up" in production. Will remove once the user reports back.
-  // eslint-disable-next-line no-console
-  console.log("[CustomFieldsEditor] received fields:", fields?.length, fields)
   // Some `listCustomSectionFields` payloads return the same field once per
-  // workspace section it belongs to. Deduplicate by `id` so each field is
-  // rendered exactly once, regardless of how many sections reference it.
+  // workspace section it belongs to — the same title/type appears with
+  // different ids. Deduplicate by id AND by the (title, type) pair so
+  // duplicates collapse to a single row regardless of which key collides.
   const uniqueFields = React.useMemo(() => {
-    const seen = new Set<number>()
+    const seenIds = new Set<number>()
+    const seenKeys = new Set<string>()
     const out: ExperimentCustomSectionField[] = []
     for (const f of fields) {
       if (f.archived) continue
-      if (seen.has(f.id)) continue
-      seen.add(f.id)
+      if (seenIds.has(f.id)) continue
+      const key = `${f.title || ""}|${f.type || ""}`
+      if (seenKeys.has(key)) continue
+      seenIds.add(f.id)
+      seenKeys.add(key)
       out.push(f)
     }
     out.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    // eslint-disable-next-line no-console
-    console.log(
-      "[CustomFieldsEditor] after dedupe/archived filter:",
-      out.length,
-      out.map((f) => ({ id: f.id, title: f.title, archived: f.archived }))
-    )
     return out
   }, [fields])
 
   return (
     <div id="custom-fields-editor" className="space-y-4">
-      <h3 id="custom-fields-editor-heading" className="text-sm font-semibold">
-        Custom fields
-      </h3>
       {uniqueFields.map((f) => (
         <FieldRow
           key={f.id}
