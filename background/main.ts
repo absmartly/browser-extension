@@ -203,7 +203,10 @@ export function detectPluginStatusInPage() {
  * This runs via chrome.scripting.executeScript in the page context, so it
  * must be a top-level, self-contained function with no closure captures.
  */
-function resizeAbsmartlySidebar(mode: "fullscreen" | "restore"): void {
+function resizeAbsmartlySidebar(
+  mode: "fullscreen" | "expand_form" | "custom" | "restore",
+  width?: string
+): void {
   const container = document.getElementById(
     "absmartly-sidebar-root"
   ) as HTMLElement | null
@@ -211,21 +214,7 @@ function resizeAbsmartlySidebar(mode: "fullscreen" | "restore"): void {
 
   const SAVE_KEY = "absmartlyPreFullscreenWidth"
 
-  if (mode === "fullscreen") {
-    if (!container.dataset[SAVE_KEY]) {
-      container.dataset[SAVE_KEY] = container.style.width || "384px"
-    }
-    container.style.transition = "width 0.2s ease-in-out"
-    container.style.width = "100vw"
-    // Pause page padding-right shift so the page underneath isn't squeezed.
-    const previousPadding = document.body.style.paddingRight || ""
-    document.body.setAttribute(
-      "data-absmartly-pre-fullscreen-padding",
-      previousPadding
-    )
-    document.body.style.transition = "padding-right 0.2s ease-in-out"
-    document.body.style.paddingRight = "0px"
-  } else {
+  if (mode === "restore") {
     const saved = container.dataset[SAVE_KEY] || "384px"
     container.style.transition = "width 0.2s ease-in-out"
     container.style.width = saved
@@ -238,6 +227,39 @@ function resizeAbsmartlySidebar(mode: "fullscreen" | "restore"): void {
       document.body.style.paddingRight = previousPadding
       document.body.removeAttribute("data-absmartly-pre-fullscreen-padding")
     }
+    return
+  }
+
+  // Save the original width on the first non-restore resize so a later
+  // restore returns to the user's actual sidebar width rather than 384px.
+  if (!container.dataset[SAVE_KEY]) {
+    container.dataset[SAVE_KEY] = container.style.width || "384px"
+  }
+
+  let targetWidth: string
+  if (mode === "fullscreen") {
+    targetWidth = "100vw"
+  } else if (mode === "expand_form") {
+    targetWidth = "50vw"
+  } else {
+    // "custom" — use the explicit width, fall back to 50vw if missing.
+    targetWidth = typeof width === "string" && width.length > 0 ? width : "50vw"
+  }
+
+  // Drag updates fire often; killing the transition during "custom" avoids
+  // a stuttery half-frame catch-up animation on every mousemove.
+  container.style.transition = mode === "custom" ? "none" : "width 0.2s ease-in-out"
+  container.style.width = targetWidth
+
+  // Pause page padding-right shift so the page underneath isn't squeezed.
+  if (document.body.getAttribute("data-absmartly-pre-fullscreen-padding") === null) {
+    const previousPadding = document.body.style.paddingRight || ""
+    document.body.setAttribute(
+      "data-absmartly-pre-fullscreen-padding",
+      previousPadding
+    )
+    document.body.style.transition = "padding-right 0.2s ease-in-out"
+    document.body.style.paddingRight = "0px"
   }
 }
 
@@ -1423,12 +1445,18 @@ export function initializeBackgroundScript() {
             sendResponse({ ok: false, error: "no active tab" })
             return
           }
-          const mode =
-            message.mode === "fullscreen" ? "fullscreen" : "restore"
+          const rawMode = (message as { mode?: unknown }).mode
+          const mode: "fullscreen" | "expand_form" | "custom" | "restore" =
+            rawMode === "fullscreen" ||
+            rawMode === "expand_form" ||
+            rawMode === "custom"
+              ? rawMode
+              : "restore"
+          const width = (message as { width?: unknown }).width
           await chrome.scripting.executeScript({
             target: { tabId },
             func: resizeAbsmartlySidebar,
-            args: [mode]
+            args: [mode, typeof width === "string" ? width : undefined]
           })
           sendResponse({ ok: true })
         } catch (err) {

@@ -580,11 +580,25 @@ export class BackgroundAPIClient {
     return result.data || {}
   }
 
-  async resizeSidebar(mode: "fullscreen" | "restore"): Promise<void> {
-    const res = await chrome.runtime.sendMessage({
+  /**
+   * Resize the sidebar host element in the active tab.
+   *
+   * - `fullscreen` — legacy 100vw, kept for any callers still around.
+   * - `expand_form` — snap to 50vw (the FT-1905 "Expand form" affordance).
+   * - `custom` — set an arbitrary CSS width (e.g. "640px"). Used by the
+   *   drag-handle on the sidebar's left edge so the user can fine-tune.
+   * - `restore` — back to the saved pre-resize width (defaults to 384px).
+   */
+  async resizeSidebar(
+    mode: "fullscreen" | "expand_form" | "custom" | "restore",
+    width?: string
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {
       type: "ABSMARTLY_SIDEBAR_RESIZE",
       mode
-    })
+    }
+    if (typeof width === "string" && width.length > 0) payload.width = width
+    const res = await chrome.runtime.sendMessage(payload)
     if (!res?.ok) {
       throw new Error(res?.error || "Failed to resize sidebar")
     }

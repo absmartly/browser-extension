@@ -1,5 +1,5 @@
 import {
-  ArrowsPointingOutIcon,
+  ArrowsRightLeftIcon,
   LockClosedIcon,
   LockOpenIcon
 } from "@heroicons/react/24/outline"
@@ -26,24 +26,34 @@ import type {
   MetricUsageRecord,
   URLFilter
 } from "~src/types/absmartly"
+import type {
+  AIFillResponse,
+  CustomFieldDescriptor,
+  VariantScreenshot
+} from "~src/types/ai-fill"
 import type { DOMChange } from "~src/types/dom-changes"
+import {
+  applyAIResultToDraft,
+  applyAIVariantNames,
+  type AIApplyDraft
+} from "~src/utils/ai-fill-apply"
 import { debugWarn } from "~src/utils/debug"
 import { mergeMetricMetadata } from "~src/utils/metrics"
 import { getConfig, localAreaStorage } from "~src/utils/storage"
 
+import { AIFillButton } from "./AIFillButton"
+import { AudienceEditor } from "./AudienceEditor"
+import { CustomFieldsEditor } from "./CustomFieldsEditor"
 import { ExperimentCodeInjection } from "./ExperimentCodeInjection"
 import { ExperimentMetadata } from "./ExperimentMetadata"
 import type { ExperimentMetadataData } from "./ExperimentMetadata"
-import { openFullScreenModal } from "./fullscreen/openFullScreenModal"
-import {
-  FullScreenExperimentModal,
-  type FullScreenDraft
-} from "./FullScreenExperimentModal"
 import { Header } from "./Header"
+import { MetricsSelector } from "./MetricsSelector"
 import { Button } from "./ui/Button"
 import { Input } from "./ui/Input"
 import { VariantList } from "./VariantList"
 import type { Variant } from "./VariantList"
+import { VariantScreenshots } from "./VariantScreenshots"
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -105,7 +115,6 @@ export function ExperimentEditor({
     // For an existing experiment custom_section_field_values arrives keyed by
     // numeric field id. We hydrate `customFieldValues` (also id-keyed, as
     // strings) in an effect below once the experiment payload is available.
-    // Until then the modal sees `{}`, which means "no overrides".
     const initial = {
       name: experiment?.name || "",
       display_name: experiment?.display_name || "",
@@ -275,29 +284,18 @@ export function ExperimentEditor({
     applyAIDomChanges()
   }, [currentVariants, domFieldName, experiment?.id, handleVariantsChange])
 
-  // Full-screen modal: load custom fields and page context
+  // Inline AI Fill: load custom fields, metric usage/category, page context,
+  // and AI provider config. Previously these powered the now-removed
+  // fullscreen modal; with the modal gone (FT-1905) they feed the inline
+  // sections directly.
   const [customFields, setCustomFields] = useState<
     ExperimentCustomSectionField[]
   >([])
-  // Some flows (e.g. opening straight into the editor without first visiting
-  // the experiment list) may not have populated the shared `metrics` prop yet.
-  // Fall back to a local fetch so the metrics picker is always populated by
-  // the time the user opens the full-screen modal.
   const [fetchedMetrics, setFetchedMetrics] = useState<Metric[] | null>(null)
-  // Usage rollups + category metadata from the dedicated endpoints, fetched
-  // alongside the metric list so the modal's metric cards render the same
-  // owner / "Used N times" / category badge that the web app's
-  // `MetricsSelect` shows. Both default to empty arrays so the merge is a
-  // no-op when these fetches fail or arrive empty.
   const [metricUsages, setMetricUsages] = useState<MetricUsageRecord[]>([])
   const [metricCategories, setMetricCategories] = useState<MetricCategory[]>([])
   const baseMetrics =
     metrics && metrics.length > 0 ? (metrics as Metric[]) : fetchedMetrics ?? []
-  // Apply the `mapMetricUsage` projection from the web app
-  // (Experiments/Create/Metrics/MetricsSelect.tsx) so every metric carries
-  // its `usage` rollup and `metricCategory` ref. The merge is best-effort:
-  // metrics whose usage/category data didn't arrive in time pass through
-  // unchanged so the picker still renders.
   const effectiveMetrics = useMemo(
     () => mergeMetricMetadata(baseMetrics, metricUsages, metricCategories),
     [baseMetrics, metricUsages, metricCategories]
@@ -313,12 +311,13 @@ export function ExperimentEditor({
     llmModel?: string
     customEndpoint?: string
   }>({ aiProvider: "claude-subscription" })
+  // Variant screenshots produced by the most recent AI fill run — used by
+  // the inline VariantScreenshots section. Empty until an AI fill completes.
+  const [aiScreenshots, setAIScreenshots] = useState<VariantScreenshot[]>([])
 
   // Once both the workspace custom-field defs and the experiment payload are
   // available, lift the experiment's id-keyed custom-section values into the
-  // id-keyed (as strings) `formData.customFieldValues`. This lets the
-  // round-trip into the full-screen modal show the existing values, and lets
-  // the save path know which workspace fields the user expects on the payload.
+  // id-keyed (as strings) `formData.customFieldValues`.
   const customFieldsHydratedRef = useRef(false)
   useEffect(() => {
     if (customFieldsHydratedRef.current) return
@@ -360,38 +359,30 @@ export function ExperimentEditor({
         const fields = await client.getCustomSectionFields()
         if (!cancelled) setCustomFields(fields)
       } catch (err) {
-        debugWarn("[FullScreen] failed to load custom fields", err)
+        debugWarn("[ExperimentEditor] failed to load custom fields", err)
       }
-      // Fetch metrics locally if the parent didn't pass them in. Keeps the
-      // metrics picker populated when the editor is mounted in isolation
-      // (e.g. straight into the create flow before the list view loaded
-      // editor resources).
       if (!metrics || metrics.length === 0) {
         try {
           const client = new BackgroundAPIClient()
           const list = await client.getMetrics()
           if (!cancelled) setFetchedMetrics(list)
         } catch (err) {
-          debugWarn("[FullScreen] failed to load metrics", err)
+          debugWarn("[ExperimentEditor] failed to load metrics", err)
         }
       }
-      // Usage + categories enrich the metric cards in the fullscreen modal
-      // (matching the web app's `MetricsSelect`). Both are best-effort —
-      // failures degrade gracefully to an unenriched picker, so we never
-      // block the rest of the editor load on them.
       try {
         const client = new BackgroundAPIClient()
         const usages = await client.getMetricUsages()
         if (!cancelled) setMetricUsages(usages)
       } catch (err) {
-        debugWarn("[FullScreen] failed to load metric usages", err)
+        debugWarn("[ExperimentEditor] failed to load metric usages", err)
       }
       try {
         const client = new BackgroundAPIClient()
         const categories = await client.getMetricCategories()
         if (!cancelled) setMetricCategories(categories)
       } catch (err) {
-        debugWarn("[FullScreen] failed to load metric categories", err)
+        debugWarn("[ExperimentEditor] failed to load metric categories", err)
       }
       try {
         const ctx = (await sendToContent({ type: "GET_PAGE_CONTEXT" })) as
@@ -408,7 +399,7 @@ export function ExperimentEditor({
             visibleText: ctx?.visibleText || ""
           })
       } catch (err) {
-        debugWarn("[FullScreen] failed to fetch page context", err)
+        debugWarn("[ExperimentEditor] failed to fetch page context", err)
       }
       try {
         const config = await getConfig()
@@ -418,9 +409,6 @@ export function ExperimentEditor({
           setAIProviderConfig({
             aiProvider: provider,
             apiKey: config?.aiApiKey || undefined,
-            // Mirror DOM-gen (background/main.ts): per-provider model takes
-            // precedence over the top-level llmModel, since each provider can
-            // have its own selected model in settings.
             llmModel:
               config?.providerModels?.[provider] ||
               config?.llmModel ||
@@ -429,7 +417,7 @@ export function ExperimentEditor({
           })
         }
       } catch (err) {
-        debugWarn("[FullScreen] failed to load AI provider config", err)
+        debugWarn("[ExperimentEditor] failed to load AI provider config", err)
       }
     })()
     return () => {
@@ -437,134 +425,42 @@ export function ExperimentEditor({
     }
   }, [])
 
-  const handleOpenFullScreen = useCallback(async () => {
-    // Re-fetch the AI provider config on every open so changes made in
-    // Settings (provider, model, endpoint, api key) take effect immediately
-    // without remounting the editor. The on-mount fetch above seeds the state
-    // for the first paint; this overwrites with fresh values on each open.
-    let freshAIConfig = aiProviderConfig
+  // Expand-form toggle: snap the sidebar between the user's saved width and
+  // 50vw, plus a drag handle on the left edge for fine-tuning. The sidebar
+  // host element lives in the host page (content script), so the resize
+  // round-trip goes through chrome.runtime → background → executeScript.
+  const [expanded, setExpanded] = useState(false)
+  const expandedRef = useRef(expanded)
+  useEffect(() => {
+    expandedRef.current = expanded
+  }, [expanded])
+
+  const handleExpandToggle = useCallback(async () => {
+    const next = !expandedRef.current
+    setExpanded(next)
     try {
-      const config = await getConfig()
-      const provider =
-        (config?.aiProvider as AIProviderType) || "claude-subscription"
-      freshAIConfig = {
-        aiProvider: provider,
-        apiKey: config?.aiApiKey || undefined,
-        llmModel:
-          config?.providerModels?.[provider] || config?.llmModel || undefined,
-        customEndpoint: config?.providerEndpoints?.[provider] || undefined
-      }
-      setAIProviderConfig(freshAIConfig)
+      const client = new BackgroundAPIClient()
+      await client.resizeSidebar(next ? "expand_form" : "restore")
     } catch (err) {
-      debugWarn("[FullScreen] failed to refresh AI provider config", err)
+      debugWarn("[ExperimentEditor] expand toggle resize failed", err)
     }
+  }, [])
 
-    const initialDraft: FullScreenDraft = {
-      ...formData,
-      customFieldValues: formData.customFieldValues
+  // Always restore the sidebar width when the editor unmounts so the user
+  // isn't stuck in an expanded sidebar on the experiment list view.
+  useEffect(() => {
+    return () => {
+      if (!expandedRef.current) return
+      ;(async () => {
+        try {
+          const client = new BackgroundAPIClient()
+          await client.resizeSidebar("restore")
+        } catch (err) {
+          debugWarn("[ExperimentEditor] unmount restore failed", err)
+        }
+      })()
     }
-
-    // Expand the sidebar iframe to fill the viewport before mounting the
-    // modal — the modal lives inside the iframe, so without this it would be
-    // clipped to the sidebar's 384px width.
-    const apiClient = new BackgroundAPIClient()
-    try {
-      await apiClient.resizeSidebar("fullscreen")
-    } catch (err) {
-      debugWarn("[FullScreen] resize sidebar failed", err)
-    }
-
-    try {
-      const result = await openFullScreenModal<{
-        draft: FullScreenDraft
-        variants?: typeof currentVariants
-      }>({
-        render: ({ close }) => (
-          <FullScreenExperimentModal
-            mode={experiment?.id ? "edit" : "create"}
-            draft={initialDraft}
-            variants={currentVariants as any[]}
-            customFields={customFields}
-            applications={applications as any}
-            unitTypes={unitTypes as any}
-            owners={owners as any}
-            teams={teams as any}
-            tags={tags as any}
-            metrics={effectiveMetrics as any}
-            pageUrl={pageContext.url}
-            pageTitle={pageContext.title}
-            pageVisibleText={pageContext.visibleText}
-            variantDomChanges={currentVariants
-              .map((v, i) => ({
-                variantIndex: i,
-                variantName: v.name,
-                changes: getChangesConfig(
-                  getDOMChangesFromConfig(v.config, domFieldName)
-                ).changes
-              }))
-              .filter((v) => v.changes.length > 0)}
-            onPreviewToggle={(enabled) => {
-              sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
-            }}
-            onPreviewWithChanges={(enabled, changes) => {
-              sendToContent({
-                type: "PREVIEW_WITH_CHANGES",
-                enabled,
-                changes
-              }).catch(() => {})
-            }}
-            aiProviderConfig={freshAIConfig}
-            onSave={() =>
-              close({ draft: initialDraft, variants: currentVariants })
-            }
-            onClose={() => close()}
-            onDraftChange={(next) => {
-              Object.assign(initialDraft, next)
-            }}
-            onVariantsChange={(variants) => {
-              handleVariantsChange(variants, true)
-            }}
-          />
-        )
-      })
-
-      if (result?.draft) {
-        setFormData((prev) => ({
-          ...prev,
-          ...result.draft
-        }))
-      }
-    } catch (err) {
-      // Don't surface modal-mount errors to the host page — the editor
-      // continues to work even if the modal failed.
-      debugWarn("[FullScreen] modal failed", err)
-    } finally {
-      // Always restore — even on close-via-Escape or unexpected error.
-      try {
-        await apiClient.resizeSidebar("restore")
-      } catch (err) {
-        debugWarn("[FullScreen] restore sidebar failed", err)
-      }
-    }
-  }, [
-    formData,
-    currentVariants,
-    customFields,
-    applications,
-    unitTypes,
-    owners,
-    teams,
-    tags,
-    metrics,
-    fetchedMetrics,
-    metricUsages,
-    metricCategories,
-    pageContext,
-    aiProviderConfig,
-    experiment?.id,
-    domFieldName,
-    handleVariantsChange
-  ])
+  }, [])
 
   // Stable onChange handler for ExperimentMetadata using functional state update
   const handleMetadataChange = useCallback(
@@ -694,6 +590,146 @@ export function ExperimentEditor({
     onCancel()
   }
 
+  // Wire AIFillButton: receive the structured response, fold it into formData
+  // via the pure ai-fill-apply helpers, and bump variant names if the AI
+  // produced new ones.
+  const handleAIResult = useCallback(
+    (result: AIFillResponse, screenshots: VariantScreenshot[]) => {
+      setAIScreenshots(screenshots)
+      setFormData((prev) => {
+        // The pure helper only knows about the AI-applicable subset of
+        // fields; merge its output back onto the full formData (preserving
+        // unit_type_id, state, owner/team ids, etc.).
+        const aiSlice: AIApplyDraft = {
+          name: prev.name,
+          display_name: prev.display_name,
+          percentage_of_traffic: prev.percentage_of_traffic,
+          percentages: prev.percentages,
+          audience_strict: prev.audience_strict,
+          audience: prev.audience,
+          application_ids: prev.application_ids,
+          tag_ids: prev.tag_ids,
+          primary_metric_id: prev.primary_metric_id,
+          secondary_metric_ids: prev.secondary_metric_ids,
+          customFieldValues: prev.customFieldValues
+        }
+        const merged = applyAIResultToDraft(
+          aiSlice,
+          result,
+          customFields,
+          applications,
+          tags,
+          effectiveMetrics
+        )
+        return { ...prev, ...merged }
+      })
+      if (Array.isArray(result.variants) && result.variants.length > 0) {
+        const renamed = applyAIVariantNames(currentVariants, result.variants)
+        if (renamed) {
+          handleVariantsChange(renamed, true)
+        }
+      }
+    },
+    [
+      currentVariants,
+      customFields,
+      applications,
+      tags,
+      effectiveMetrics,
+      handleVariantsChange
+    ]
+  )
+
+  // Build the variant-DOM-changes summary the AI fill flow ships to the LLM.
+  // Skips empty variants so the prompt stays focused on the actual changes.
+  const variantDomChanges = useMemo(
+    () =>
+      currentVariants
+        .map((v, i) => ({
+          variantIndex: i,
+          variantName: v.name,
+          changes: getChangesConfig(
+            getDOMChangesFromConfig(v.config, domFieldName)
+          ).changes
+        }))
+        .filter((v) => v.changes.length > 0),
+    [currentVariants, domFieldName]
+  )
+
+  // Shape the AI Fill button's draft view of the form. It only needs the
+  // human-author-facing fields; secrets and IDs the LLM can't reason about
+  // (state, owners, teams) stay out.
+  const aiFillDraft = useMemo(
+    () => ({
+      name: formData.name,
+      display_name: formData.display_name,
+      percentage_of_traffic: formData.percentage_of_traffic,
+      percentages: formData.percentages,
+      audience: formData.audience,
+      audience_strict: formData.audience_strict,
+      application_ids: formData.application_ids,
+      tag_ids: formData.tag_ids,
+      variantNames: currentVariants.map((v) => v.name),
+      customFieldValues: formData.customFieldValues
+    }),
+    [
+      formData.name,
+      formData.display_name,
+      formData.percentage_of_traffic,
+      formData.percentages,
+      formData.audience,
+      formData.audience_strict,
+      formData.application_ids,
+      formData.tag_ids,
+      formData.customFieldValues,
+      currentVariants
+    ]
+  )
+
+  // Adapt workspace custom-field defs to the descriptor shape the AI prompt
+  // expects (id + title + type + options + helpText + required). Filtering
+  // out archived fields matches what CustomFieldsEditor renders.
+  const aiCustomFieldDescriptors = useMemo<CustomFieldDescriptor[]>(
+    () =>
+      customFields
+        .filter((f) => !f.archived)
+        .map((f) => ({
+          id: f.id,
+          title: f.title || `Field ${f.id}`,
+          type: f.type,
+          options: f.options,
+          helpText: f.help_text,
+          required: f.required
+        })),
+    [customFields]
+  )
+
+  const aiApplicationOptions = useMemo(
+    () =>
+      (applications as any[]).map((a) => ({
+        id: Number(a.application_id || a.id),
+        name: a.name
+      })),
+    [applications]
+  )
+  const aiTagOptions = useMemo(
+    () =>
+      (tags as any[]).map((t) => ({
+        id: t.experiment_tag_id,
+        name: t.name
+      })),
+    [tags]
+  )
+  const aiMetricOptions = useMemo(
+    () =>
+      effectiveMetrics.map((m) => ({
+        id: m.metric_id,
+        name: m.name,
+        description: m.description
+      })),
+    [effectiveMetrics]
+  )
+
   return (
     <div className="p-4">
       <Header
@@ -707,15 +743,38 @@ export function ExperimentEditor({
         onBack={handleCancel}
       />
 
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end items-center gap-2 mb-2">
+        <AIFillButton
+          draft={aiFillDraft}
+          customFields={aiCustomFieldDescriptors}
+          applications={aiApplicationOptions}
+          tags={aiTagOptions}
+          metrics={aiMetricOptions}
+          pageUrl={pageContext.url}
+          pageTitle={pageContext.title}
+          pageVisibleText={pageContext.visibleText}
+          variantDomChanges={variantDomChanges}
+          onPreviewToggle={(enabled) => {
+            sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
+          }}
+          onPreviewWithChanges={(enabled, changes) => {
+            sendToContent({
+              type: "PREVIEW_WITH_CHANGES",
+              enabled,
+              changes
+            }).catch(() => {})
+          }}
+          aiProviderConfig={aiProviderConfig}
+          onResult={handleAIResult}
+        />
         <Button
-          id="open-fullscreen-button"
-          data-testid="open-fullscreen-button"
+          id="expand-form-button"
+          data-testid="expand-form-button"
           type="button"
           variant="secondary"
-          onClick={handleOpenFullScreen}>
-          <ArrowsPointingOutIcon className="h-4 w-4 mr-1 inline" />
-          Open in full screen
+          onClick={handleExpandToggle}>
+          <ArrowsRightLeftIcon className="h-4 w-4 mr-1 inline" />
+          {expanded ? "Collapse form" : "Expand form"}
         </Button>
       </div>
 
@@ -835,6 +894,53 @@ export function ExperimentEditor({
           />
         </div>
 
+        {/* Audience filter (visual builder + advanced raw JSON) */}
+        <section id="experiment-audience-section">
+          <AudienceEditor
+            value={formData.audience}
+            strict={formData.audience_strict}
+            unitTypeId={formData.unit_type_id}
+            onChange={(v) => setFormData((prev) => ({ ...prev, audience: v }))}
+            onStrictChange={(v) =>
+              setFormData((prev) => ({ ...prev, audience_strict: v }))
+            }
+          />
+        </section>
+
+        {/* Metrics picker (primary + secondary) */}
+        <section id="experiment-metrics-section">
+          <MetricsSelector
+            metrics={effectiveMetrics}
+            primaryMetricId={formData.primary_metric_id}
+            secondaryMetricIds={formData.secondary_metric_ids}
+            onPrimaryChange={(id) =>
+              setFormData((prev) => ({ ...prev, primary_metric_id: id }))
+            }
+            onSecondaryChange={(ids) =>
+              setFormData((prev) => ({ ...prev, secondary_metric_ids: ids }))
+            }
+          />
+        </section>
+
+        {/* Workspace custom fields (hypothesis, prediction, …) */}
+        {customFields.length > 0 && (
+          <section id="experiment-custom-fields-section">
+            <CustomFieldsEditor
+              fields={customFields}
+              values={formData.customFieldValues}
+              onChange={(fieldId, value) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  customFieldValues: {
+                    ...prev.customFieldValues,
+                    [String(fieldId)]: value
+                  }
+                }))
+              }
+            />
+          </section>
+        )}
+
         {/* Variants */}
         <VariantList
           initialVariants={currentVariants}
@@ -859,6 +965,13 @@ export function ExperimentEditor({
           domFieldName={domFieldName}
           onNavigateToAI={onNavigateToAI}
         />
+
+        {/* Screenshots from the most recent AI fill — only when present */}
+        {aiScreenshots.length > 0 && (
+          <section id="experiment-variant-screenshots-section">
+            <VariantScreenshots screenshots={aiScreenshots} />
+          </section>
+        )}
 
         {/* Code Injection Section - Only for control variant */}
         {currentVariants.length > 0 && currentVariants[0] && (

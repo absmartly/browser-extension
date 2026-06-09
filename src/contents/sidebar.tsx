@@ -233,6 +233,37 @@ export const injectSidebar = () => {
       width: 100%;
       height: 100%;
     }
+    /*
+     * Left-edge drag handle for fine-tuning the sidebar width (FT-1905).
+     * A thin 6px strip with an ew-resize cursor, positioned absolutely on
+     * the left of the host so the user can grab it without overlapping form
+     * controls. ::after gives it a subtle visual indicator on hover.
+     */
+    .sidebar-resize-handle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 6px;
+      height: 100%;
+      cursor: ew-resize;
+      z-index: 2147483647;
+      background: transparent;
+      user-select: none;
+    }
+    .sidebar-resize-handle::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 2px;
+      width: 2px;
+      height: 100%;
+      background: transparent;
+      transition: background 0.15s;
+    }
+    .sidebar-resize-handle:hover::after,
+    .sidebar-resize-handle.dragging::after {
+      background: #3b82f6;
+    }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -327,7 +358,85 @@ export const injectSidebar = () => {
 
   container.appendChild(header)
   container.appendChild(body)
+
+  // Left-edge drag handle for fine-tuning sidebar width (FT-1905).
+  // Lives inside the shadow root so it scrolls/positions with the sidebar.
+  // We update the host container's `width` directly during the drag (using
+  // rAF batching), then post one ABSMARTLY_SIDEBAR_RESIZE message at the end
+  // so the saved/preFullscreen state stays consistent across reopens.
+  const resizeHandle = document.createElement("div")
+  resizeHandle.className = "sidebar-resize-handle"
+  resizeHandle.setAttribute("data-testid", "sidebar-resize-handle")
+  resizeHandle.id = "sidebar-resize-handle"
+  resizeHandle.title = "Drag to resize sidebar"
+
+  let dragRafId: number | null = null
+  let pendingWidth: number | null = null
+  const clampWidth = (px: number): number => {
+    const min = 240
+    const max = Math.max(min, window.innerWidth - 24)
+    return Math.max(min, Math.min(max, px))
+  }
+  const flushDrag = () => {
+    dragRafId = null
+    if (pendingWidth === null || !sidebarContainer) return
+    sidebarContainer.style.transition = "none"
+    sidebarContainer.style.width = `${pendingWidth}px`
+    pendingWidth = null
+  }
+
+  resizeHandle.addEventListener("mousedown", (e) => {
+    if (!sidebarContainer) return
+    e.preventDefault()
+    e.stopPropagation()
+    resizeHandle.classList.add("dragging")
+    document.body.style.userSelect = "none"
+
+    const onMove = (ev: MouseEvent) => {
+      if (!sidebarContainer) return
+      // Sidebar is anchored to the right of the viewport, so the new width
+      // is `viewportWidth - mouseX`. clamp to keep the form usable.
+      const next = clampWidth(window.innerWidth - ev.clientX)
+      pendingWidth = next
+      if (dragRafId === null) {
+        dragRafId = window.requestAnimationFrame(flushDrag)
+      }
+    }
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+      resizeHandle.classList.remove("dragging")
+      document.body.style.userSelect = ""
+      if (dragRafId !== null) {
+        cancelAnimationFrame(dragRafId)
+        dragRafId = null
+      }
+      if (pendingWidth !== null && sidebarContainer) {
+        sidebarContainer.style.width = `${pendingWidth}px`
+        pendingWidth = null
+      }
+      // Sync the saved pre-resize width with the background helper so the
+      // next Expand-form / restore cycle starts from the right baseline.
+      const finalWidth = sidebarContainer?.style.width || "384px"
+      try {
+        chrome.runtime
+          .sendMessage({
+            type: "ABSMARTLY_SIDEBAR_RESIZE",
+            mode: "custom",
+            width: finalWidth
+          })
+          .catch?.(() => {})
+      } catch {
+        // best-effort: drag still updated the DOM directly
+      }
+    }
+
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp, { once: true })
+  })
+
   shadowRoot.appendChild(container)
+  shadowRoot.appendChild(resizeHandle)
 
   document.body.appendChild(sidebarContainer)
 
