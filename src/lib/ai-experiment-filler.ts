@@ -5,6 +5,22 @@ import { EXPERIMENT_FILL_TOOL_SCHEMA } from "~src/lib/ai-providers/experiment-fi
 import { AI_EXPERIMENT_FILL_SYSTEM_PROMPT } from "~src/prompts/ai-experiment-fill-system-prompt"
 import type { AIFillRequest, AIFillResponse } from "~src/types/ai-fill"
 import { debugLog } from "~src/utils/debug"
+import { getMetadata } from "~src/utils/indexeddb-storage"
+
+const AI_FILL_PROMPT_OVERRIDE_KEY = "ai-fill-prompt-override"
+
+async function resolveSystemPrompt(): Promise<string> {
+  try {
+    const override = await getMetadata(AI_FILL_PROMPT_OVERRIDE_KEY)
+    if (typeof override === "string" && override.trim().length > 0) {
+      debugLog("[AI Fill] using custom system prompt override")
+      return override
+    }
+  } catch (error) {
+    debugLog("[AI Fill] failed to read prompt override, using default", error)
+  }
+  return AI_EXPERIMENT_FILL_SYSTEM_PROMPT
+}
 
 interface FillerOptions {
   aiProvider: AIProviderType
@@ -41,8 +57,9 @@ export async function fillExperimentFromAI(
     s.afterDataUrl
   ])
 
+  const systemPrompt = await resolveSystemPrompt()
   const opts: GenerateStructuredOptions = {
-    systemPrompt: AI_EXPERIMENT_FILL_SYSTEM_PROMPT,
+    systemPrompt,
     userMessage,
     schema: EXPERIMENT_FILL_TOOL_SCHEMA,
     images,

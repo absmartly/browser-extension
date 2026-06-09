@@ -1,11 +1,17 @@
 import { fillExperimentFromAI } from "~src/lib/ai-experiment-filler"
 import { createAIProvider } from "~src/lib/ai-providers"
 import type { AIFillRequest } from "~src/types/ai-fill"
+import { getMetadata } from "~src/utils/indexeddb-storage"
 
 jest.mock("~src/lib/ai-providers", () => {
   const actual = jest.requireActual("~src/lib/ai-providers")
   return { ...actual, createAIProvider: jest.fn() }
 })
+
+jest.mock("~src/utils/indexeddb-storage", () => ({
+  getMetadata: jest.fn(),
+  setMetadata: jest.fn()
+}))
 
 const baseRequest: AIFillRequest = {
   draft: {
@@ -36,6 +42,10 @@ const baseRequest: AIFillRequest = {
 }
 
 describe("fillExperimentFromAI", () => {
+  beforeEach(() => {
+    ;(getMetadata as jest.Mock).mockReset()
+  })
+
   it("builds a structured request from the AIFillRequest and returns the parsed response", async () => {
     const generateStructured = jest
       .fn()
@@ -96,5 +106,61 @@ describe("fillExperimentFromAI", () => {
         aiProvider: "future-provider-without-structured" as never
       })
     ).rejects.toThrow(/structured generation/i)
+  })
+
+  it("uses the custom override system prompt from IndexedDB when present", async () => {
+    const generateStructured = jest.fn().mockResolvedValue({})
+    ;(createAIProvider as jest.Mock).mockReturnValue({ generateStructured })
+    ;(getMetadata as jest.Mock).mockResolvedValue(
+      "CUSTOM_OVERRIDE: keep it brief."
+    )
+
+    await fillExperimentFromAI(baseRequest, {
+      aiProvider: "claude-subscription"
+    })
+
+    expect(getMetadata).toHaveBeenCalledWith("ai-fill-prompt-override")
+    expect(generateStructured.mock.calls[0][0].systemPrompt).toBe(
+      "CUSTOM_OVERRIDE: keep it brief."
+    )
+  })
+
+  it("falls back to the default prompt when no override is stored", async () => {
+    const generateStructured = jest.fn().mockResolvedValue({})
+    ;(createAIProvider as jest.Mock).mockReturnValue({ generateStructured })
+    ;(getMetadata as jest.Mock).mockResolvedValue(null)
+
+    await fillExperimentFromAI(baseRequest, {
+      aiProvider: "claude-subscription"
+    })
+    expect(generateStructured.mock.calls[0][0].systemPrompt).toContain(
+      "ABsmartly"
+    )
+  })
+
+  it("falls back to the default prompt when the stored override is empty/whitespace", async () => {
+    const generateStructured = jest.fn().mockResolvedValue({})
+    ;(createAIProvider as jest.Mock).mockReturnValue({ generateStructured })
+    ;(getMetadata as jest.Mock).mockResolvedValue("   \n  ")
+
+    await fillExperimentFromAI(baseRequest, {
+      aiProvider: "claude-subscription"
+    })
+    expect(generateStructured.mock.calls[0][0].systemPrompt).toContain(
+      "ABsmartly"
+    )
+  })
+
+  it("falls back to the default prompt if IndexedDB throws", async () => {
+    const generateStructured = jest.fn().mockResolvedValue({})
+    ;(createAIProvider as jest.Mock).mockReturnValue({ generateStructured })
+    ;(getMetadata as jest.Mock).mockRejectedValue(new Error("idb unavailable"))
+
+    await fillExperimentFromAI(baseRequest, {
+      aiProvider: "claude-subscription"
+    })
+    expect(generateStructured.mock.calls[0][0].systemPrompt).toContain(
+      "ABsmartly"
+    )
   })
 })

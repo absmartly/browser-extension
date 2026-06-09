@@ -11,6 +11,7 @@ import { setConfig } from "~src/utils/storage"
 
 import { CookieConsentModal } from "./CookieConsentModal"
 import { Header } from "./Header"
+import { AIFillPromptSection } from "./settings/AIFillPromptSection"
 import { AIProviderSection } from "./settings/AIProviderSection"
 import { AuthenticationStatusSection } from "./settings/AuthenticationStatusSection"
 import { DOMChangesStorageSection } from "./settings/DOMChangesStorageSection"
@@ -394,6 +395,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           />
 
           <SystemPromptSection />
+          <AIFillPromptSection />
         </>
       )}
 
