@@ -1456,7 +1456,12 @@ export function initializeBackgroundScript() {
           await chrome.scripting.executeScript({
             target: { tabId },
             func: resizeAbsmartlySidebar,
-            args: [mode, typeof width === "string" ? width : undefined]
+            // chrome.scripting.executeScript rejects `undefined` in args
+            // (it must be JSON-serialisable). Only include `width` when set.
+            args:
+              typeof width === "string" && width.length > 0
+                ? [mode, width]
+                : [mode]
           })
           sendResponse({ ok: true })
         } catch (err) {
