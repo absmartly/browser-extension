@@ -2,7 +2,7 @@ import { PlusIcon } from "@heroicons/react/24/outline"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 
 import { AudienceGroup as AudienceGroupView } from "./AudienceFilterEditor/AudienceGroup"
-import { AudienceFiltersData } from "./AudienceFilterEditor/models"
+import type { AudienceFiltersData } from "./AudienceFilterEditor/models"
 import {
   audienceFiltersFromJSON,
   audienceFiltersToJSON,

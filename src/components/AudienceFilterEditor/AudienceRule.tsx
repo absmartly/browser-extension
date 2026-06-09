@@ -7,10 +7,10 @@ import { debugWarn } from "~src/utils/debug"
 import { AutocompleteInput } from "../ui/AutocompleteInput"
 import {
   defineOperatorType,
-  FilterExpression,
-  LowPrecedenceOperator,
   lowPrecedenceOperatorsWithSemver,
-  operatorDict
+  operatorDict,
+  type FilterExpression,
+  type LowPrecedenceOperator
 } from "./models"
 
 interface AudienceRuleProps {

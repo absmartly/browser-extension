@@ -2,7 +2,7 @@ import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline"
 import React from "react"
 
 import { AudienceRule } from "./AudienceRule"
-import { AudienceGroup as AudienceGroupModel } from "./models"
+import type { AudienceGroup as AudienceGroupModel } from "./models"
 import { newExpression } from "./utils"
 
 interface AudienceGroupProps {

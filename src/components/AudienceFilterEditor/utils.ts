@@ -5,19 +5,19 @@
  */
 
 import {
-  AudienceFiltersData,
-  AudienceFiltersSchema,
-  AudienceGroup,
-  BinaryOperator,
   defineOperatorPrecedence,
   defineOperatorType,
-  ExpressionSchema,
-  FilterExpression,
-  GroupSchema,
-  HighPrecedenceOperator,
   isAndRuleGroup,
   isOrRuleGroup,
-  LowPrecedenceOperator
+  type AudienceFiltersData,
+  type AudienceFiltersSchema,
+  type AudienceGroup,
+  type BinaryOperator,
+  type ExpressionSchema,
+  type FilterExpression,
+  type GroupSchema,
+  type HighPrecedenceOperator,
+  type LowPrecedenceOperator
 } from "./models"
 
 export const getAudienceFiltersInitialState = (): AudienceFiltersData => ({
