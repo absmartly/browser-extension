@@ -39,7 +39,8 @@ jest.mock("~src/lib/messaging", () => ({
 
 jest.mock("~src/utils/storage", () => ({
   getConfig: jest.fn().mockResolvedValue({
-    domChangesFieldName: "__dom_changes"
+    domChangesFieldName: "__dom_changes",
+    vibeStudioEnabled: true
   }),
   localAreaStorage: {
     get: jest.fn().mockResolvedValue(null),
@@ -157,6 +158,13 @@ describe("ExperimentEditor — inline sections (FT-1905)", () => {
     jest.clearAllMocks()
     lastAIFillProps = null
     mockGetCustomSectionFields.mockResolvedValue([])
+    // Re-apply the default getConfig mock — tests that flip
+    // `vibeStudioEnabled` mutate the shared mock implementation.
+    const { getConfig } = require("~src/utils/storage")
+    ;(getConfig as jest.Mock).mockResolvedValue({
+      domChangesFieldName: "__dom_changes",
+      vibeStudioEnabled: true
+    })
   })
 
   it("renders AudienceEditor, MetricsSelector and AIFillButton inline", async () => {
@@ -166,7 +174,29 @@ describe("ExperimentEditor — inline sections (FT-1905)", () => {
       await screen.findByTestId("audience-editor-mock")
     ).toBeInTheDocument()
     expect(screen.getByTestId("metrics-selector-mock")).toBeInTheDocument()
-    expect(screen.getByTestId("ai-fill-button-mock")).toBeInTheDocument()
+    expect(await screen.findByTestId("ai-fill-button-mock")).toBeInTheDocument()
+  })
+
+  it("hides the AI Fill button when Vibe Studio / AI features is off", async () => {
+    const { getConfig } = require("~src/utils/storage")
+    // getConfig is called twice during mount (once for domChangesFieldName,
+    // once for the AI provider config) — both must return vibeStudioEnabled
+    // false for the gate to surface, so override mockResolvedValue rather
+    // than just the next call.
+    ;(getConfig as jest.Mock).mockResolvedValue({
+      domChangesFieldName: "__dom_changes",
+      vibeStudioEnabled: false
+    })
+
+    render(<ExperimentEditor {...defaultProps} />)
+
+    // Wait for the editor to settle before asserting absence.
+    await screen.findByTestId("audience-editor-mock")
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("ai-fill-button-mock")
+      ).not.toBeInTheDocument()
+    )
   })
 
   it("renders CustomFieldsEditor only when there are workspace custom fields", async () => {

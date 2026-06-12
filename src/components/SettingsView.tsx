@@ -344,14 +344,16 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
           <label
             htmlFor="vibe-studio-toggle"
             className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-            Vibe Studio
+            Vibe Studio &amp; AI features
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
               Beta
             </span>
           </label>
         </div>
         <p className="text-xs text-gray-500 ml-8">
-          Enable AI-powered visual editing features. This feature is in beta.
+          Enable AI-powered features across the extension: Vibe Studio for
+          visual DOM editing and the &quot;Fill with AI&quot; button in the
+          experiment editor. This feature is in beta.
         </p>
       </div>
 

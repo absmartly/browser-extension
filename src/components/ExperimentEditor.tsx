@@ -307,6 +307,10 @@ export function ExperimentEditor({
     llmModel?: string
     customEndpoint?: string
   }>({ aiProvider: "claude-subscription" })
+  // Gates the inline "Fill with AI" button. Mirrors the Vibe Studio toggle in
+  // Settings — when off, the entire AI surface (Vibe Studio + Fill with AI)
+  // stays hidden so users opting out aren't shown LLM-powered affordances.
+  const [aiFeaturesEnabled, setAiFeaturesEnabled] = useState(false)
   // Variant screenshots produced by the most recent AI fill run — used by
   // the inline VariantScreenshots section. Empty until an AI fill completes.
   const [aiScreenshots, setAIScreenshots] = useState<VariantScreenshot[]>([])
@@ -411,6 +415,7 @@ export function ExperimentEditor({
               undefined,
             customEndpoint: config?.providerEndpoints?.[provider] || undefined
           })
+          setAiFeaturesEnabled(!!config?.vibeStudioEnabled)
         }
       } catch (err) {
         debugWarn("[ExperimentEditor] failed to load AI provider config", err)
@@ -702,30 +707,34 @@ export function ExperimentEditor({
         onBack={handleCancel}
       />
 
-      <div className="flex justify-end items-center gap-2 mb-2">
-        <AIFillButton
-          draft={aiFillDraft}
-          customFields={aiCustomFieldDescriptors}
-          applications={aiApplicationOptions}
-          tags={aiTagOptions}
-          metrics={aiMetricOptions}
-          pageUrl={pageContext.url}
-          pageTitle={pageContext.title}
-          pageVisibleText={pageContext.visibleText}
-          variantDomChanges={variantDomChanges}
-          onPreviewToggle={(enabled) => {
-            sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
-          }}
-          onPreviewWithChanges={(enabled, changes) => {
-            sendToContent({
-              type: "PREVIEW_WITH_CHANGES",
-              enabled,
-              changes
-            }).catch(() => {})
-          }}
-          aiProviderConfig={aiProviderConfig}
-          onResult={handleAIResult}
-        />
+      <div
+        id="experiment-editor-actions"
+        className="flex justify-end items-center gap-2 mb-2">
+        {aiFeaturesEnabled && (
+          <AIFillButton
+            draft={aiFillDraft}
+            customFields={aiCustomFieldDescriptors}
+            applications={aiApplicationOptions}
+            tags={aiTagOptions}
+            metrics={aiMetricOptions}
+            pageUrl={pageContext.url}
+            pageTitle={pageContext.title}
+            pageVisibleText={pageContext.visibleText}
+            variantDomChanges={variantDomChanges}
+            onPreviewToggle={(enabled) => {
+              sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
+            }}
+            onPreviewWithChanges={(enabled, changes) => {
+              sendToContent({
+                type: "PREVIEW_WITH_CHANGES",
+                enabled,
+                changes
+              }).catch(() => {})
+            }}
+            aiProviderConfig={aiProviderConfig}
+            onResult={handleAIResult}
+          />
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
