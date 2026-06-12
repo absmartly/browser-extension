@@ -1,8 +1,4 @@
-import {
-  ArrowsRightLeftIcon,
-  LockClosedIcon,
-  LockOpenIcon
-} from "@heroicons/react/24/outline"
+import { LockClosedIcon, LockOpenIcon } from "@heroicons/react/24/outline"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { useExperimentSave } from "~src/hooks/useExperimentSave"
@@ -425,43 +421,6 @@ export function ExperimentEditor({
     }
   }, [])
 
-  // Expand-form toggle: snap the sidebar between the user's saved width and
-  // 50vw, plus a drag handle on the left edge for fine-tuning. The sidebar
-  // host element lives in the host page (content script), so the resize
-  // round-trip goes through chrome.runtime → background → executeScript.
-  const [expanded, setExpanded] = useState(false)
-  const expandedRef = useRef(expanded)
-  useEffect(() => {
-    expandedRef.current = expanded
-  }, [expanded])
-
-  const handleExpandToggle = useCallback(async () => {
-    const next = !expandedRef.current
-    setExpanded(next)
-    try {
-      const client = new BackgroundAPIClient()
-      await client.resizeSidebar(next ? "expand_form" : "restore")
-    } catch (err) {
-      debugWarn("[ExperimentEditor] expand toggle resize failed", err)
-    }
-  }, [])
-
-  // Always restore the sidebar width when the editor unmounts so the user
-  // isn't stuck in an expanded sidebar on the experiment list view.
-  useEffect(() => {
-    return () => {
-      if (!expandedRef.current) return
-      ;(async () => {
-        try {
-          const client = new BackgroundAPIClient()
-          await client.resizeSidebar("restore")
-        } catch (err) {
-          debugWarn("[ExperimentEditor] unmount restore failed", err)
-        }
-      })()
-    }
-  }, [])
-
   // Stable onChange handler for ExperimentMetadata using functional state update
   const handleMetadataChange = useCallback(
     (metadata: ExperimentMetadataData) => {
@@ -767,15 +726,6 @@ export function ExperimentEditor({
           aiProviderConfig={aiProviderConfig}
           onResult={handleAIResult}
         />
-        <Button
-          id="expand-form-button"
-          data-testid="expand-form-button"
-          type="button"
-          variant="secondary"
-          onClick={handleExpandToggle}>
-          <ArrowsRightLeftIcon className="h-4 w-4 mr-1 inline" />
-          {expanded ? "Collapse form" : "Expand form"}
-        </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

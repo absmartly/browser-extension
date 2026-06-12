@@ -9,6 +9,17 @@ import { captureVisibleTab } from "~src/utils/screenshot-capture"
 jest.mock("~src/lib/ai-experiment-filler")
 jest.mock("~src/utils/screenshot-capture")
 
+const mockShowError = jest.fn()
+jest.mock("~src/contexts/NotificationContext", () => ({
+  useNotifications: () => ({
+    showError: mockShowError,
+    showWarning: jest.fn(),
+    showSuccess: jest.fn(),
+    showInfo: jest.fn(),
+    dismissToast: jest.fn()
+  })
+}))
+
 beforeAll(() => {
   // Use a microtask-based polyfill so async flows in the component resolve
   // within `await act(...)` without needing fake timers.
@@ -114,5 +125,25 @@ describe("AIFillButton", () => {
         })
       ]
     )
+  })
+
+  it("shows a friendly toast (and logs raw error to console) when fillExperimentFromAI throws", async () => {
+    mockShowError.mockClear()
+    ;(fillExperimentFromAI as jest.Mock).mockRejectedValueOnce(
+      new Error("404 Not Found — model not available")
+    )
+
+    render(<AIFillButton {...baseProps} />)
+    fireEvent.click(screen.getByTestId("ai-fill-button"))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("ai-fill-prompt-skip"))
+    })
+
+    expect(mockShowError).toHaveBeenCalledTimes(1)
+    const toastMessage = mockShowError.mock.calls[0][0]
+    expect(toastMessage).toMatch(/fill with ai failed/i)
+    expect(toastMessage).not.toContain("404 Not Found")
+    // No inline error banner — the toast is the only surfacing.
+    expect(screen.queryByTestId("ai-fill-error")).not.toBeInTheDocument()
   })
 })

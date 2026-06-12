@@ -1,6 +1,7 @@
 import { SparklesIcon } from "@heroicons/react/24/outline"
 import React, { useState } from "react"
 
+import { useNotifications } from "~src/contexts/NotificationContext"
 import { fillExperimentFromAI } from "~src/lib/ai-experiment-filler"
 import type { AIProviderType } from "~src/lib/ai-providers"
 import type {
@@ -60,12 +61,11 @@ export function AIFillButton({
 }: AIFillButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useNotifications()
 
   const handleConfirm = async (userPrompt: string) => {
     setDialogOpen(false)
     setRunning(true)
-    setError(null)
 
     try {
       const screenshots = await captureScreenshots(
@@ -94,7 +94,9 @@ export function AIFillButton({
       onResult(result, screenshots)
     } catch (err) {
       debugError("[AI Fill] failed", err)
-      setError(err instanceof Error ? err.message : String(err))
+      showError(
+        "Fill with AI failed. Check the console for details, or try again — your AI provider settings may be misconfigured."
+      )
     } finally {
       setRunning(false)
     }
@@ -112,14 +114,6 @@ export function AIFillButton({
         <SparklesIcon className="h-4 w-4" />
         {running ? "Filling…" : "Fill with AI"}
       </button>
-      {error && (
-        <div
-          id="ai-fill-error"
-          data-testid="ai-fill-error"
-          className="mt-2 text-xs text-red-600">
-          {error}
-        </div>
-      )}
       <AIFillPromptDialog
         open={dialogOpen}
         onConfirm={handleConfirm}

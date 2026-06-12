@@ -374,7 +374,10 @@ export const injectSidebar = () => {
   let pendingWidth: number | null = null
   const clampWidth = (px: number): number => {
     const min = 240
-    const max = Math.max(min, window.innerWidth - 24)
+    // Cap drag at 50% of viewport — the only resize affordance left after
+    // the "Expand form" button was removed, so the handle has to be able
+    // to reach the same half-screen layout on its own.
+    const max = Math.max(min, Math.floor(window.innerWidth * 0.5))
     return Math.max(min, Math.min(max, px))
   }
   const flushDrag = () => {

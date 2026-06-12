@@ -2,14 +2,14 @@
  * Inline-sections smoke test for the refactored ExperimentEditor (FT-1905).
  *
  * Verifies that the audience editor, metrics selector, custom-fields editor,
- * variant screenshots wrapper, the AI Fill button and the Expand-form
- * button all render inside the editor itself — no modal involved.
+ * variant screenshots wrapper, and the AI Fill button all render inside the
+ * editor itself — no modal involved.
  *
  * The heavy children (variant list, code injection, metadata, audience filter,
  * metrics selector) are mocked so the assertions stay focused on wiring
  * rather than the children's own behavior.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, render, screen, waitFor } from "@testing-library/react"
 import React from "react"
 
 import "@testing-library/jest-dom"
@@ -20,7 +20,6 @@ const mockGetCustomSectionFields = jest.fn()
 const mockGetMetrics = jest.fn().mockResolvedValue([])
 const mockGetMetricUsages = jest.fn().mockResolvedValue([])
 const mockGetMetricCategories = jest.fn().mockResolvedValue([])
-const mockResizeSidebar = jest.fn().mockResolvedValue(undefined)
 
 jest.mock("~src/lib/background-api-client", () => ({
   BackgroundAPIClient: jest.fn().mockImplementation(() => ({
@@ -29,8 +28,7 @@ jest.mock("~src/lib/background-api-client", () => ({
     getMetrics: (...args: unknown[]) => mockGetMetrics(...args),
     getMetricUsages: (...args: unknown[]) => mockGetMetricUsages(...args),
     getMetricCategories: (...args: unknown[]) =>
-      mockGetMetricCategories(...args),
-    resizeSidebar: (...args: unknown[]) => mockResizeSidebar(...args)
+      mockGetMetricCategories(...args)
   }))
 }))
 
@@ -161,7 +159,7 @@ describe("ExperimentEditor — inline sections (FT-1905)", () => {
     mockGetCustomSectionFields.mockResolvedValue([])
   })
 
-  it("renders AudienceEditor, MetricsSelector, AIFillButton and Expand-form button inline", async () => {
+  it("renders AudienceEditor, MetricsSelector and AIFillButton inline", async () => {
     render(<ExperimentEditor {...defaultProps} />)
 
     expect(
@@ -169,7 +167,6 @@ describe("ExperimentEditor — inline sections (FT-1905)", () => {
     ).toBeInTheDocument()
     expect(screen.getByTestId("metrics-selector-mock")).toBeInTheDocument()
     expect(screen.getByTestId("ai-fill-button-mock")).toBeInTheDocument()
-    expect(screen.getByTestId("expand-form-button")).toBeInTheDocument()
   })
 
   it("renders CustomFieldsEditor only when there are workspace custom fields", async () => {
@@ -205,22 +202,8 @@ describe("ExperimentEditor — inline sections (FT-1905)", () => {
   })
 
   it("Expand-form button toggles label and calls resizeSidebar (expand_form ↔ restore)", async () => {
-    render(<ExperimentEditor {...defaultProps} />)
-
-    const button = await screen.findByTestId("expand-form-button")
-    expect(button).toHaveTextContent(/expand form/i)
-
-    fireEvent.click(button)
-    await waitFor(() =>
-      expect(mockResizeSidebar).toHaveBeenCalledWith("expand_form")
-    )
-    expect(button).toHaveTextContent(/collapse form/i)
-
-    fireEvent.click(button)
-    await waitFor(() =>
-      expect(mockResizeSidebar).toHaveBeenLastCalledWith("restore")
-    )
-    expect(button).toHaveTextContent(/expand form/i)
+    // Removed in FT-1905 follow-up: the Expand-form button was deleted in
+    // favor of the left-edge drag handle (now capped at 50% of viewport).
   })
 
   it("forwards an AI fill result through ai-fill-apply utilities", async () => {

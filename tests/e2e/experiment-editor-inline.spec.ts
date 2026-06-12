@@ -1,12 +1,11 @@
 /**
  * E2E smoke for the FT-1905 inline experiment editor.
  *
- * Replaces the deleted `fullscreen-modal-*` specs. Verifies:
- * 1. Opening the create form shows the inline audience / metrics / custom
- *    fields / AI Fill / Expand-form sections inside the sidebar.
- * 2. The Expand-form button toggles its label between "Expand form" and
- *    "Collapse form" (the actual sidebar width change happens via a host-page
- *    background-script round-trip that the iframe harness doesn't model).
+ * Replaces the deleted `fullscreen-modal-*` specs. Verifies that opening
+ * the create form shows the inline audience / metrics / custom fields /
+ * AI Fill sections inside the sidebar. (Width changes happen via the
+ * left-edge drag handle, capped at 50vw, which the iframe harness doesn't
+ * model — covered by the unit test for `clampWidth`.)
  *
  * No shadow-root indirection is needed any more — the editor lives directly
  * in the sidebar's React tree.
@@ -63,7 +62,7 @@ test.describe("Experiment editor — inline form (FT-1905)", () => {
     if (testPage) await testPage.close()
   })
 
-  test("inline sections render and Expand-form button toggles", async ({
+  test("inline sections render in the sidebar editor", async ({
     extensionUrl
   }) => {
     test.setTimeout(8000)
@@ -94,20 +93,5 @@ test.describe("Experiment editor — inline form (FT-1905)", () => {
     await expect(
       sidebar.locator("#experiment-metrics-section")
     ).toBeVisible({ timeout: 3000 })
-
-    // Expand-form button replaces the old "Open in full screen" affordance.
-    const expandButton = sidebar.locator("#expand-form-button")
-    await expect(expandButton).toBeVisible({ timeout: 3000 })
-    await expect(expandButton).toContainText("Expand form")
-
-    await expandButton.click()
-    await expect(expandButton).toContainText("Collapse form", {
-      timeout: 3000
-    })
-
-    await expandButton.click()
-    await expect(expandButton).toContainText("Expand form", {
-      timeout: 3000
-    })
   })
 })
