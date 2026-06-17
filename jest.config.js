@@ -2,7 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
-  roots: ['<rootDir>/src', '<rootDir>/background'],
+  roots: ['<rootDir>/src', '<rootDir>/background', '<rootDir>/tests/unit'],
   testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)', '**/?(*.)+(spec|test).(ts|tsx|js)'],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
@@ -36,7 +36,10 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/tests/', // Ignore Playwright tests
+    // Allow Jest tests under tests/unit/, but ignore everything else under tests/ (Playwright e2e, etc).
+    '<rootDir>/tests/(?!unit/)',
+    // Existing Playwright-style files inside tests/unit/ that import @playwright/test or hit a live bridge.
+    '<rootDir>/tests/unit/(claude-bridge|ExperimentCodeInjection|ExperimentDetail|ExperimentEditor|ExperimentMetadata|VariantList)\\.test\\.tsx?$',
   ],
   transformIgnorePatterns: [
     'node_modules/(?!(@plasmohq/storage|@absmartly/cli|pify|marked))',

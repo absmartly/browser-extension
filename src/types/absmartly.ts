@@ -80,10 +80,78 @@ export interface UnitType {
   readonly name: string
 }
 
+export interface MetricOwnerUser {
+  readonly id?: number
+  readonly user_id?: number
+  readonly first_name?: string
+  readonly last_name?: string
+}
+
+export interface MetricOwnerRef {
+  readonly user: MetricOwnerUser
+}
+
+export interface MetricTeamRef {
+  readonly team: {
+    readonly id?: number
+    readonly team_id?: number
+    readonly name: string
+  }
+}
+
+export interface MetricUsageCounts {
+  readonly total: number
+  readonly primary?: number
+  readonly secondary?: number
+  readonly guardrail?: number
+}
+
+export interface MetricUsage {
+  readonly all_time?: MetricUsageCounts
+  readonly last_month?: MetricUsageCounts
+  readonly last_6_months?: MetricUsageCounts
+  readonly last_year?: MetricUsageCounts
+}
+
+/**
+ * Record returned by the `/v1/metrics/usages` endpoint. Mirrors the web
+ * app's `FetchMetricUsagesResponse["metricUsages"][number]` shape — every
+ * field is optional here so we tolerate older API versions; only `id`,
+ * `metric_category_id`, and `usage` matter for the merge that backs the
+ * fullscreen modal's metric cards.
+ */
+export interface MetricUsageRecord {
+  readonly id: number
+  readonly metric_category_id?: number | null
+  readonly usage?: MetricUsage | null
+  readonly [key: string]: unknown
+}
+
+export interface MetricCategory {
+  readonly id: number
+  readonly name: string
+  readonly color?: string
+  readonly description?: string
+  readonly archived?: boolean
+  readonly [key: string]: unknown
+}
+
+export interface MetricCategoryRef {
+  readonly id?: number
+  readonly name: string
+  readonly color?: string
+}
+
 export interface Metric {
   readonly metric_id: number
   readonly name: string
   readonly description?: string
+  readonly owners?: readonly MetricOwnerRef[]
+  readonly teams?: readonly MetricTeamRef[]
+  readonly usage?: MetricUsage | null
+  readonly metric_category_id?: number | null
+  readonly metric_category?: MetricCategoryRef | null
+  readonly metricCategory?: MetricCategoryRef | null
 }
 
 export interface ExperimentTag {
@@ -129,16 +197,19 @@ export interface ExperimentCustomSectionFieldValue {
 export interface ExperimentCustomSectionField {
   readonly id: number
   readonly custom_section_field_id: number
-  readonly name: string
+  readonly name?: string
   readonly title?: string
   readonly type:
     | "text"
     | "select"
     | "multiselect"
+    | "single_select"
+    | "multi_select"
     | "string"
     | "json"
     | "boolean"
     | "number"
+    | "user"
   readonly required: boolean
   readonly options?: readonly string[]
   readonly default_value?: string

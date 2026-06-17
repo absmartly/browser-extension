@@ -282,7 +282,8 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
 
       <MultiSelect
         label="Tags (optional)"
-        id="tags-label"
+        id="tags-select"
+        data-testid="tags-select"
         options={tagOptions}
         selectedIds={data.tag_ids}
         onChange={handleTagChange}

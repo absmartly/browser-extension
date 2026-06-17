@@ -28,6 +28,20 @@ export interface ExperimentFormData {
   tag_ids: number[]
   owner_ids: number[]
   team_ids: number[]
+  /**
+   * Primary metric id (or null if the user hasn't selected one yet). The API
+   * accepts `null` here in create mode; in edit mode we only send the change
+   * when the user picked something explicitly.
+   */
+  primary_metric_id?: number | null
+  /** Ordered ids of the secondary metrics. */
+  secondary_metric_ids?: number[]
+  /**
+   * Map of custom-section field id (as a String) → user-edited (or AI-filled)
+   * value. Optional; absent means "no overrides — fall back to defaults /
+   * server values".
+   */
+  customFieldValues?: Record<string, unknown>
 }
 
 interface UseExperimentSaveOptions {
@@ -112,6 +126,28 @@ export function useExperimentSave({
   return { save, saving, saveStatus }
 }
 
+/**
+ * Coerce a JS value into the `value: string` shape the ABsmartly API expects
+ * for custom-section fields. Booleans and numbers are stringified directly so
+ * "false" / "0" round-trip without ambiguity; arrays / objects are JSON-encoded;
+ * null / undefined collapse to the empty string.
+ */
+function coerceCustomFieldValue(value: unknown, type: string): string {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "boolean") return String(value)
+  if (typeof value === "number") return String(value)
+  // multiselect / json / object / array values
+  if (type === "multiselect" || type === "json" || typeof value === "object") {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return ""
+    }
+  }
+  return String(value)
+}
+
 async function createNewExperiment(
   formData: ExperimentFormData,
   currentVariants: VariantData[],
@@ -148,8 +184,15 @@ async function createNewExperiment(
   > = {}
 
   for (const field of customFields) {
-    custom_section_field_values[String(field.id)] = {
-      value: field.default_value || "",
+    const key = String(field.id)
+    const override = formData.customFieldValues?.[key]
+    const hasOverride =
+      formData.customFieldValues !== undefined &&
+      Object.prototype.hasOwnProperty.call(formData.customFieldValues, key)
+    custom_section_field_values[key] = {
+      value: hasOverride
+        ? coerceCustomFieldValue(override, field.type)
+        : field.default_value || "",
       type: field.type,
       id: field.id
     }
@@ -211,8 +254,14 @@ async function createNewExperiment(
     unit_type: formData.unit_type_id
       ? { unit_type_id: formData.unit_type_id }
       : undefined,
-    primary_metric: { metric_id: null },
-    secondary_metrics: [],
+    primary_metric: { metric_id: formData.primary_metric_id ?? null },
+    secondary_metrics: (formData.secondary_metric_ids || []).map(
+      (id, index) => ({
+        metric_id: id,
+        type: "secondary",
+        order_index: index
+      })
+    ),
     applications: formData.application_ids.map((id) => ({
       application_id: id,
       application_version: "0"
@@ -349,6 +398,26 @@ async function saveExistingExperiment(
     const fullExperiment: FullExperiment =
       fullExperimentResponse.data.experiment || fullExperimentResponse.data
 
+    // Fetch workspace custom-field definitions so we can look up the type and
+    // default value when applying overrides for fields that aren't already on
+    // the experiment. We tolerate failure here — without the workspace defs we
+    // just can't add brand-new field entries.
+    let workspaceCustomFields: ExperimentCustomSectionField[] = []
+    try {
+      const client = new BackgroundAPIClient()
+      const fetched = await client.getCustomSectionFields()
+      if (Array.isArray(fetched)) workspaceCustomFields = fetched
+    } catch (error) {
+      debugError(
+        "[saveExistingExperiment] Failed to fetch workspace custom fields:",
+        error
+      )
+    }
+    const workspaceFieldsById = new Map<number, ExperimentCustomSectionField>()
+    for (const field of workspaceCustomFields) {
+      workspaceFieldsById.set(field.id, field)
+    }
+
     setSaveStatus?.({
       step: "validating",
       message: "Validating variant data..."
@@ -384,7 +453,28 @@ async function saveExistingExperiment(
       variants: updatedVariants
     }
 
-    if (fullExperiment.custom_section_field_values) {
+    // Only send metric overrides when the form has them set. This avoids
+    // accidentally clearing a server-side metric the user never touched.
+    if (formData.primary_metric_id !== undefined) {
+      changes.primary_metric = {
+        metric_id: formData.primary_metric_id
+      }
+    }
+    if (formData.secondary_metric_ids !== undefined) {
+      changes.secondary_metrics = formData.secondary_metric_ids.map(
+        (id, index) => ({
+          metric_id: id,
+          type: "secondary",
+          order_index: index
+        })
+      )
+    }
+
+    if (
+      fullExperiment.custom_section_field_values ||
+      (formData.customFieldValues &&
+        Object.keys(formData.customFieldValues).length > 0)
+    ) {
       const customFieldsObj: Record<
         string,
         {
@@ -400,18 +490,18 @@ async function saveExistingExperiment(
         }
       > = {}
 
-      const fieldsArray = Array.isArray(
-        fullExperiment.custom_section_field_values
-      )
-        ? fullExperiment.custom_section_field_values
-        : Object.values(fullExperiment.custom_section_field_values)
+      const fieldsArray = fullExperiment.custom_section_field_values
+        ? Array.isArray(fullExperiment.custom_section_field_values)
+          ? fullExperiment.custom_section_field_values
+          : Object.values(fullExperiment.custom_section_field_values)
+        : []
 
       for (const field of fieldsArray) {
         if (typeof field !== "object" || field === null) continue
 
         const typedField = field as {
           experiment_custom_section_field_id?: number
-          custom_section_field?: { id: number }
+          custom_section_field?: { id: number; name?: string }
           id?: number
           type: string
           value: string
@@ -438,6 +528,37 @@ async function saveExistingExperiment(
           custom_section_field: typedField.custom_section_field,
           id: fieldId,
           default_value: typedField.default_value || typedField.value
+        }
+      }
+
+      // Layer user / AI overrides keyed by field id (as String) on top of the
+      // server values. Keys that don't parse as numbers or that name a field
+      // unknown to the workspace are dropped (we never invent ids). For ids
+      // already on the experiment we update value/type in place; for ids the
+      // experiment didn't have yet, we use the workspace defs to fill in the
+      // type / default_value.
+      if (formData.customFieldValues) {
+        for (const [key, value] of Object.entries(formData.customFieldValues)) {
+          const id = Number(key)
+          if (!Number.isFinite(id)) continue
+          const existing = customFieldsObj[id]
+          if (existing) {
+            existing.value = coerceCustomFieldValue(value, existing.type)
+          } else {
+            const def = workspaceFieldsById.get(id)
+            if (!def) continue
+            customFieldsObj[id] = {
+              experiment_id: fullExperiment.id,
+              experiment_custom_section_field_id: id,
+              type: def.type,
+              value: coerceCustomFieldValue(value, def.type),
+              updated_at: undefined,
+              updated_by_user_id: fullExperiment.updated_by_user_id,
+              custom_section_field: undefined,
+              id,
+              default_value: def.default_value || ""
+            }
+          }
         }
       }
 

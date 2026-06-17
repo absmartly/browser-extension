@@ -27,36 +27,8 @@ export interface ProviderMetadata {
 }
 
 export const PROVIDER_REGISTRY: Record<AIProviderType, ProviderMetadata> = {
-  "claude-subscription": {
-    id: "claude-subscription",
-    label: "Claude Code CLI",
-    defaultEndpoint: "",
-    apiKeyPlaceholder: "",
-    apiKeyHelpLink: "",
-    apiKeyHelpText: "",
-    endpointDescription:
-      "Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).",
-    modelLabel: "Claude Model",
-    modelHelpText:
-      "Default lets the CLI choose the best model. Select a specific model to override.",
-    modelDisplayType: "static",
-    isBridge: true
-  },
-  codex: {
-    id: "codex",
-    label: "Codex CLI",
-    defaultEndpoint: "http://localhost:9000",
-    apiKeyPlaceholder: "",
-    apiKeyHelpLink: "",
-    apiKeyHelpText: "",
-    endpointDescription:
-      "Optional: Specify a custom port for the bridge server.",
-    modelLabel: "Codex Model",
-    modelHelpText:
-      "Default lets the CLI choose the best model. Select a specific model to override.",
-    modelDisplayType: "static",
-    isBridge: true
-  },
+  // API-key providers first — these are the most common path. Anthropic
+  // leads because Claude is the default model family for the extension.
   "anthropic-api": {
     id: "anthropic-api",
     label: "Anthropic API Key",
@@ -145,6 +117,38 @@ export const PROVIDER_REGISTRY: Record<AIProviderType, ProviderMetadata> = {
       ),
     getStaticModels: () => GeminiProvider.modelConfig.staticModels(),
     isBridge: false
+  },
+  // CLI bridges last — these require a local helper process and are the
+  // less common path, so they sit at the bottom of the provider dropdown.
+  "claude-subscription": {
+    id: "claude-subscription",
+    label: "Claude Code CLI",
+    defaultEndpoint: "",
+    apiKeyPlaceholder: "",
+    apiKeyHelpLink: "",
+    apiKeyHelpText: "",
+    endpointDescription:
+      "Optional: Specify a custom API endpoint for the bridge to use (e.g., for self-hosted or custom LLM providers).",
+    modelLabel: "Claude Model",
+    modelHelpText:
+      "Default lets the CLI choose the best model. Select a specific model to override.",
+    modelDisplayType: "static",
+    isBridge: true
+  },
+  codex: {
+    id: "codex",
+    label: "Codex CLI",
+    defaultEndpoint: "http://localhost:9000",
+    apiKeyPlaceholder: "",
+    apiKeyHelpLink: "",
+    apiKeyHelpText: "",
+    endpointDescription:
+      "Optional: Specify a custom port for the bridge server.",
+    modelLabel: "Codex Model",
+    modelHelpText:
+      "Default lets the CLI choose the best model. Select a specific model to override.",
+    modelDisplayType: "static",
+    isBridge: true
   }
 }
 

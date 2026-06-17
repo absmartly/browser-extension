@@ -20,6 +20,7 @@ import type {
   AIProvider,
   AIProviderConfig,
   GenerateOptions,
+  GenerateStructuredOptions,
   ModelConfig,
   ModelInfo
 } from "./base"
@@ -218,5 +219,78 @@ export class OpenAIProvider implements AIProvider {
     throw new Error(
       `Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`
     )
+  }
+
+  async generateStructured<TResult = unknown>(
+    opts: GenerateStructuredOptions
+  ): Promise<TResult> {
+    if (!this.config.apiKey) {
+      throw new Error("OpenAI API key is required")
+    }
+
+    const openai = new OpenAI({
+      apiKey: this.config.apiKey,
+      dangerouslyAllowBrowser: true,
+      ...(this.config.customEndpoint && { baseURL: this.config.customEndpoint })
+    })
+
+    const userContent: OpenAI.ChatCompletionContentPart[] = [
+      { type: "text", text: opts.userMessage }
+    ]
+    for (const img of opts.images || []) {
+      userContent.push({ type: "image_url", image_url: { url: img } })
+    }
+
+    const tool: OpenAI.ChatCompletionTool = {
+      type: "function",
+      function: {
+        name: opts.schema.name,
+        description: opts.schema.description || "",
+        parameters: opts.schema.input_schema as Record<string, unknown>
+      }
+    }
+
+    let completion: OpenAI.ChatCompletion
+    try {
+      completion = await withTimeout(
+        openai.chat.completions.create({
+          model: this.config.llmModel || "gpt-4o",
+          messages: [
+            { role: "system", content: opts.systemPrompt },
+            { role: "user", content: userContent }
+          ],
+          tools: [tool],
+          tool_choice: {
+            type: "function",
+            function: { name: opts.schema.name }
+          }
+        })
+      )
+    } catch (error: any) {
+      const errorMessage =
+        error.message || error.error?.message || "OpenAI API error"
+      const baseError = new Error(errorMessage)
+      const classified = classifyAIError(baseError)
+      throw new Error(formatClassifiedError(classified))
+    }
+
+    const choice = completion.choices?.[0]
+    const toolCall = choice?.message?.tool_calls?.[0]
+    if (
+      !toolCall ||
+      toolCall.type !== "function" ||
+      toolCall.function?.name !== opts.schema.name
+    ) {
+      throw new Error(
+        `OpenAI returned no '${opts.schema.name}' tool call. finish_reason=${choice?.finish_reason}`
+      )
+    }
+    try {
+      return JSON.parse(toolCall.function.arguments) as TResult
+    } catch (err) {
+      throw new Error(
+        `OpenAI tool call arguments are not valid JSON: ${(err as Error).message}`
+      )
+    }
   }
 }

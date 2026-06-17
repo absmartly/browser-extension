@@ -4,7 +4,12 @@ import { unsafeConversationId, unsafeSessionId } from "~src/types/branded"
 import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
 import { debugLog, debugWarn } from "~src/utils/debug"
 
-import type { AIProvider, AIProviderConfig, GenerateOptions } from "./base"
+import type {
+  AIProvider,
+  AIProviderConfig,
+  GenerateOptions,
+  GenerateStructuredOptions
+} from "./base"
 import { getBridgeProviderName } from "./base"
 import { BRIDGE_CHUNK_RETRIEVAL_PROMPT } from "./chunk-retrieval-prompts"
 import { SHARED_TOOL_SCHEMA } from "./shared-schema"
@@ -571,5 +576,77 @@ The response will contain the HTML for each selector. Use this to inspect elemen
     } finally {
       this.bridgeClient.disconnect()
     }
+  }
+
+  async generateStructured<TResult = unknown>(
+    opts: GenerateStructuredOptions
+  ): Promise<TResult> {
+    debugLog("[Bridge] generateStructured() called", {
+      schema: opts.schema.name,
+      images: opts.images?.length || 0
+    })
+
+    await this.bridgeClient.connect()
+
+    const sessionId = `fs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const bridgeProvider = getBridgeProviderName(this.config.aiProvider)
+    const model =
+      this.config.llmModel && this.config.llmModel !== "default"
+        ? this.config.llmModel
+        : undefined
+
+    const { conversationId } = await this.bridgeClient.createConversation(
+      sessionId,
+      "/",
+      "allow",
+      opts.schema,
+      undefined,
+      model,
+      bridgeProvider
+    )
+
+    return await new Promise<TResult>((resolve, reject) => {
+      let stream: EventSource | null = null
+      const handleMessage = (event: {
+        type?: string
+        tool_name?: string
+        input?: unknown
+        error?: string
+      }) => {
+        if (
+          event.type === "tool_result" &&
+          event.tool_name === opts.schema.name
+        ) {
+          stream?.close()
+          resolve(event.input as TResult)
+        } else if (event.type === "error") {
+          stream?.close()
+          reject(new Error(event.error || "Bridge error"))
+        }
+      }
+      const handleError = (err: Error) => {
+        stream?.close()
+        reject(err)
+      }
+
+      stream = this.bridgeClient.streamResponses(
+        conversationId,
+        handleMessage,
+        handleError
+      )
+
+      this.bridgeClient
+        .sendMessage(
+          conversationId,
+          opts.userMessage,
+          opts.images || [],
+          opts.systemPrompt,
+          opts.schema
+        )
+        .catch((err) => {
+          stream?.close()
+          reject(err)
+        })
+    })
   }
 }

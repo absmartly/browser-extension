@@ -214,6 +214,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
     return (
       <div
         key={option.id}
+        data-testid={`searchable-select-option-${option.id}`}
         className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-gray-50 ${
           isSelected ? "bg-blue-50" : ""
         }`}

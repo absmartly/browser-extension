@@ -22,6 +22,7 @@ import type {
   AIProvider,
   AIProviderConfig,
   GenerateOptions,
+  GenerateStructuredOptions,
   ModelConfig,
   ModelInfo
 } from "./base"
@@ -292,5 +293,93 @@ export class OpenRouterProvider implements AIProvider {
     throw new Error(
       `Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`
     )
+  }
+
+  async generateStructured<TResult = unknown>(
+    opts: GenerateStructuredOptions
+  ): Promise<TResult> {
+    if (!this.config.apiKey) {
+      throw new Error("OpenRouter API key is required")
+    }
+
+    const userContent: any[] = [{ type: "text", text: opts.userMessage }]
+    for (const img of opts.images || []) {
+      userContent.push({ type: "image_url", image_url: { url: img } })
+    }
+
+    const body = {
+      model: this.config.llmModel || "openai/gpt-4o",
+      messages: [
+        { role: "system", content: opts.systemPrompt },
+        { role: "user", content: userContent }
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: opts.schema.name,
+            description: opts.schema.description || "",
+            parameters: opts.schema.input_schema
+          }
+        }
+      ],
+      tool_choice: {
+        type: "function",
+        function: { name: opts.schema.name }
+      },
+      max_tokens: 4096
+    }
+
+    let response: Response
+    try {
+      response = await withTimeout(
+        fetch(
+          `${this.config.customEndpoint || OPENROUTER_API_BASE}/chat/completions`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${this.config.apiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": chrome.runtime.getURL(""),
+              "X-Title": "ABsmartly Browser Extension"
+            },
+            body: JSON.stringify(body)
+          }
+        )
+      )
+    } catch (fetchError: any) {
+      const baseError = new Error(
+        `Network error: ${fetchError?.message || "Failed to fetch"}`
+      )
+      const classified = classifyAIError(baseError)
+      throw new Error(formatClassifiedError(classified))
+    }
+
+    if (!response.ok) {
+      const errBody = await response.text()
+      throw new Error(
+        `OpenRouter API error: ${response.status} ${errBody.slice(0, 500)}`
+      )
+    }
+
+    const data = await response.json()
+    const choice = data.choices?.[0]
+    const toolCall = choice?.message?.tool_calls?.[0]
+    if (
+      !toolCall ||
+      toolCall.type !== "function" ||
+      toolCall.function?.name !== opts.schema.name
+    ) {
+      throw new Error(
+        `OpenRouter returned no '${opts.schema.name}' tool call. finish_reason=${choice?.finish_reason}`
+      )
+    }
+    try {
+      return JSON.parse(toolCall.function.arguments) as TResult
+    } catch (err) {
+      throw new Error(
+        `OpenRouter tool call arguments are not valid JSON: ${(err as Error).message}`
+      )
+    }
   }
 }

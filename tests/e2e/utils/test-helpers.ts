@@ -267,3 +267,403 @@ export async function rightClickElement(
   ).waitFor({ state: 'attached', timeout: 2000 }).catch(() => {})
 }
 
+/**
+ * AI Fill bridge stub for full-screen modal e2e tests.
+ *
+ * Installs a fake window.fetch + window.EventSource via addInitScript so
+ * the ClaudeCodeBridgeClient protocol resolves deterministically without a
+ * real bridge process. Two emit modes are supported:
+ *  - emit: { kind: 'tool_result', input } — resolves AI fill with `input`
+ *  - emit: { kind: 'error', error }       — rejects AI fill with `error`
+ *
+ * Applies to all frames in the BrowserContext, including the chrome-extension
+ * sidebar iframe where AI fill code actually runs.
+ */
+export interface InstallAIFillBridgeOptions {
+  conversationId?: string
+  toolName?: string
+  emit:
+    | { kind: 'tool_result'; input: Record<string, unknown> }
+    | { kind: 'error'; error: string }
+  /** Delay before emitting (ms). Default 30. */
+  emitDelayMs?: number
+}
+
+export async function installAIFillBridgeStub(
+  context: { addInitScript: (fn: any, arg?: any) => Promise<void> },
+  options: InstallAIFillBridgeOptions
+): Promise<void> {
+  const conversationId = options.conversationId || 'stub-conv-1'
+  const toolName = options.toolName || 'fill_experiment_fields'
+  const delay = options.emitDelayMs ?? 30
+  await context.addInitScript(
+    ({
+      conversationId,
+      toolName,
+      emit,
+      delay
+    }: {
+      conversationId: string
+      toolName: string
+      emit:
+        | { kind: 'tool_result'; input: Record<string, unknown> }
+        | { kind: 'error'; error: string }
+      delay: number
+    }) => {
+      const realFetch = window.fetch.bind(window)
+
+      function jsonResponse(body: unknown, status = 200): Response {
+        return new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+
+      window.fetch = (async (
+        input: RequestInfo | URL,
+        init?: RequestInit
+      ) => {
+        const urlStr =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url
+
+        if (/\/health$/.test(urlStr)) {
+          return jsonResponse({
+            ok: true,
+            authenticated: true,
+            subscriptionType: 'pro',
+            claudeProcess: 'stub'
+          })
+        }
+        if (/\/conversations\/?$/.test(urlStr)) {
+          return jsonResponse({ conversationId })
+        }
+        if (/\/conversations\/[^/]+\/messages$/.test(urlStr)) {
+          return jsonResponse({})
+        }
+        if (/\/conversations\/[^/]+\/(refresh|chunks|xpath)$/.test(urlStr)) {
+          return jsonResponse({})
+        }
+        return realFetch(input as any, init as any)
+      }) as typeof window.fetch
+
+      const FakeEventSource: any = function (this: any, url: string) {
+        const target = new EventTarget() as any
+        target.url = url
+        target.readyState = 1
+        target.close = () => {
+          target.readyState = 2
+        }
+        Object.defineProperty(target, 'onmessage', {
+          configurable: true,
+          set(fn: ((ev: MessageEvent) => void) | null) {
+            this._onmessage = fn
+            target.addEventListener(
+              'message',
+              (ev: Event) => fn?.(ev as MessageEvent),
+              { once: false }
+            )
+          },
+          get() {
+            return (this as any)._onmessage || null
+          }
+        })
+        Object.defineProperty(target, 'onerror', {
+          configurable: true,
+          set(fn: any) {
+            ;(this as any)._onerror = fn
+          },
+          get() {
+            return (this as any)._onerror || null
+          }
+        })
+        Object.defineProperty(target, 'onopen', {
+          configurable: true,
+          set(fn: any) {
+            ;(this as any)._onopen = fn
+          },
+          get() {
+            return (this as any)._onopen || null
+          }
+        })
+        setTimeout(() => {
+          const payload =
+            emit.kind === 'tool_result'
+              ? {
+                  type: 'tool_result',
+                  tool_name: toolName,
+                  input: emit.input
+                }
+              : { type: 'error', error: emit.error }
+          target.dispatchEvent(
+            new MessageEvent('message', { data: JSON.stringify(payload) })
+          )
+        }, delay)
+        return target
+      }
+      FakeEventSource.CONNECTING = 0
+      FakeEventSource.OPEN = 1
+      FakeEventSource.CLOSED = 2
+      ;(window as any).EventSource = FakeEventSource
+    },
+    { conversationId, toolName, emit: options.emit, delay }
+  )
+}
+
+/**
+ * Stubs `chrome.runtime.sendMessage` for ABSMARTLY_CAPTURE_VISIBLE_TAB
+ * inside the sidebar iframe. The stub returns `{ok: true, dataUrl: ...}`,
+ * cycling through the supplied data URLs in order so each call returns the
+ * next. The `n`-th call uses `dataUrls[n % dataUrls.length]`.
+ *
+ * Other sendMessage calls fall through to the real implementation.
+ *
+ * Must be installed BEFORE the sidebar iframe loads so the patch is in
+ * place when ExperimentEditor mounts.
+ */
+export async function installCaptureVisibleTabStub(
+  context: { addInitScript: (fn: any, arg?: any) => Promise<void> },
+  dataUrls: string[]
+): Promise<void> {
+  await context.addInitScript((urls: string[]) => {
+    // Wait for chrome.runtime to exist (it's available in chrome-extension://
+    // pages by the time addInitScript runs at documentStart).
+    const tryPatch = () => {
+      const c = (window as any).chrome
+      if (!c?.runtime?.sendMessage) {
+        setTimeout(tryPatch, 1)
+        return
+      }
+      const reg = ((window as any).__absmartlyRuntimeStubs ||= {
+        original: c.runtime.sendMessage.bind(c.runtime),
+        handlers: [] as Array<(msg: any) => any>
+      })
+      // Install (or update) the dispatcher only once.
+      if (!(window as any).__absmartlyRuntimeStubInstalled) {
+        ;(window as any).__absmartlyRuntimeStubInstalled = true
+        try {
+          c.runtime.sendMessage = function (...args: any[]) {
+            const msg = args[0]
+            for (const h of reg.handlers) {
+              const result = h(msg)
+              if (result !== undefined) return result
+            }
+            return reg.original(...args)
+          }
+        } catch (e) {
+          // If chrome.runtime.sendMessage is non-writable in this context,
+          // fall back to defineProperty.
+          try {
+            Object.defineProperty(c.runtime, 'sendMessage', {
+              configurable: true,
+              writable: true,
+              value: function (...args: any[]) {
+                const msg = args[0]
+                for (const h of reg.handlers) {
+                  const result = h(msg)
+                  if (result !== undefined) return result
+                }
+                return reg.original(...args)
+              }
+            })
+          } catch {
+            console.error(
+              '[absmartly-test] failed to patch chrome.runtime.sendMessage',
+              e
+            )
+          }
+        }
+      }
+
+      let nextIndex = 0
+      ;(window as any).__captureCalls = 0
+      reg.handlers.push((msg: any) => {
+        if (
+          msg &&
+          typeof msg === 'object' &&
+          msg.type === 'ABSMARTLY_CAPTURE_VISIBLE_TAB'
+        ) {
+          const dataUrl = urls[nextIndex % urls.length]
+          nextIndex += 1
+          ;(window as any).__captureCalls += 1
+          return Promise.resolve({ ok: true, dataUrl })
+        }
+        return undefined
+      })
+    }
+    tryPatch()
+  }, dataUrls)
+}
+
+/**
+ * Stubs `chrome.runtime.sendMessage` for `type: "API_OPERATION"` calls based
+ * on a map keyed by `operation.op`. Each entry is one of:
+ *  - `{ data: ... }` — return `{success: true, data}` immediately
+ *  - `{ error: ... }` — return `{success: false, error}` immediately
+ * Calls whose op is not in the map fall through to the real implementation.
+ *
+ * The stub also pushes every captured invocation onto `window.__apiOpCalls`
+ * for later inspection in the test (e.g. asserting that `createExperiment`
+ * was called with the expected payload).
+ *
+ * Must be installed BEFORE the sidebar iframe loads.
+ */
+export interface APIOpStub {
+  data?: unknown
+  error?: string
+}
+
+/**
+ * Convenience: install a CHECK_AUTH stub returning a fake authenticated user.
+ * Required for any test that needs `isAuthenticated=true` (e.g. for editor
+ * resources to load) without real API credentials.
+ */
+export async function installAuthStub(
+  context: { addInitScript: (fn: any, arg?: any) => Promise<void> },
+  user: { id?: number; email?: string; first_name?: string } = {}
+): Promise<void> {
+  await context.addInitScript((u: any) => {
+    const tryPatch = () => {
+      const c = (window as any).chrome
+      if (!c?.runtime?.sendMessage) {
+        setTimeout(tryPatch, 1)
+        return
+      }
+      const reg = ((window as any).__absmartlyRuntimeStubs ||= {
+        original: c.runtime.sendMessage.bind(c.runtime),
+        handlers: [] as Array<(msg: any) => any>
+      })
+      if (!(window as any).__absmartlyRuntimeStubInstalled) {
+        ;(window as any).__absmartlyRuntimeStubInstalled = true
+        try {
+          c.runtime.sendMessage = function (...args: any[]) {
+            const msg = args[0]
+            for (const h of reg.handlers) {
+              const result = h(msg)
+              if (result !== undefined) return result
+            }
+            return reg.original(...args)
+          }
+        } catch (e) {
+          try {
+            Object.defineProperty(c.runtime, 'sendMessage', {
+              configurable: true,
+              writable: true,
+              value: function (...args: any[]) {
+                const msg = args[0]
+                for (const h of reg.handlers) {
+                  const result = h(msg)
+                  if (result !== undefined) return result
+                }
+                return reg.original(...args)
+              }
+            })
+          } catch {
+            console.error(
+              '[absmartly-test] failed to patch chrome.runtime.sendMessage',
+              e
+            )
+          }
+        }
+      }
+      reg.handlers.push((msg: any) => {
+        if (msg && typeof msg === 'object' && msg.type === 'CHECK_AUTH') {
+          return Promise.resolve({
+            success: true,
+            data: {
+              user: {
+                id: u.id ?? 1,
+                user_id: u.id ?? 1,
+                email: u.email || 'tester@absmartly.test',
+                first_name: u.first_name || 'Test'
+              }
+            }
+          })
+        }
+        return undefined
+      })
+    }
+    tryPatch()
+  }, user)
+}
+
+export async function installAPIOperationStub(
+  context: { addInitScript: (fn: any, arg?: any) => Promise<void> },
+  ops: Record<string, APIOpStub>
+): Promise<void> {
+  await context.addInitScript((opsMap: Record<string, APIOpStub>) => {
+    const tryPatch = () => {
+      const c = (window as any).chrome
+      if (!c?.runtime?.sendMessage) {
+        setTimeout(tryPatch, 1)
+        return
+      }
+      const reg = ((window as any).__absmartlyRuntimeStubs ||= {
+        original: c.runtime.sendMessage.bind(c.runtime),
+        handlers: [] as Array<(msg: any) => any>
+      })
+      if (!(window as any).__absmartlyRuntimeStubInstalled) {
+        ;(window as any).__absmartlyRuntimeStubInstalled = true
+        try {
+          c.runtime.sendMessage = function (...args: any[]) {
+            const msg = args[0]
+            for (const h of reg.handlers) {
+              const result = h(msg)
+              if (result !== undefined) return result
+            }
+            return reg.original(...args)
+          }
+        } catch (e) {
+          try {
+            Object.defineProperty(c.runtime, 'sendMessage', {
+              configurable: true,
+              writable: true,
+              value: function (...args: any[]) {
+                const msg = args[0]
+                for (const h of reg.handlers) {
+                  const result = h(msg)
+                  if (result !== undefined) return result
+                }
+                return reg.original(...args)
+              }
+            })
+          } catch {
+            console.error(
+              '[absmartly-test] failed to patch chrome.runtime.sendMessage',
+              e
+            )
+          }
+        }
+      }
+
+      ;(window as any).__apiOpCalls = (window as any).__apiOpCalls || []
+      reg.handlers.push((msg: any) => {
+        if (
+          msg &&
+          typeof msg === 'object' &&
+          msg.type === 'API_OPERATION' &&
+          msg.operation
+        ) {
+          const op = msg.operation.op
+          ;(window as any).__apiOpCalls.push({
+            op,
+            params: msg.operation.params
+          })
+          if (op in opsMap) {
+            const stub = opsMap[op]
+            if (stub.error) {
+              return Promise.resolve({ success: false, error: stub.error })
+            }
+            return Promise.resolve({ success: true, data: stub.data })
+          }
+        }
+        return undefined
+      })
+    }
+    tryPatch()
+  }, ops)
+}
+

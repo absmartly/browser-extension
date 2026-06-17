@@ -10,6 +10,24 @@ import * as storage from "~src/utils/storage"
 
 import { ExperimentEditor } from "../ExperimentEditor"
 
+const mockGetCustomSectionFields = jest.fn().mockResolvedValue([])
+const mockGetMetrics = jest.fn().mockResolvedValue([])
+const mockGetMetricUsages = jest.fn().mockResolvedValue([])
+const mockGetMetricCategories = jest.fn().mockResolvedValue([])
+const mockResizeSidebar = jest.fn().mockResolvedValue(undefined)
+
+jest.mock("~src/lib/background-api-client", () => ({
+  BackgroundAPIClient: jest.fn().mockImplementation(() => ({
+    getCustomSectionFields: (...args: unknown[]) =>
+      mockGetCustomSectionFields(...args),
+    getMetrics: (...args: unknown[]) => mockGetMetrics(...args),
+    getMetricUsages: (...args: unknown[]) => mockGetMetricUsages(...args),
+    getMetricCategories: (...args: unknown[]) =>
+      mockGetMetricCategories(...args),
+    resizeSidebar: (...args: unknown[]) => mockResizeSidebar(...args)
+  }))
+}))
+
 jest.mock("~src/lib/messaging", () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
   sendToBackground: jest.fn().mockResolvedValue({ success: true })
@@ -615,6 +633,29 @@ describe("ExperimentEditor", () => {
       await waitFor(() => {
         expect(mockOnSave).toHaveBeenCalled()
       })
+    })
+  })
+
+  describe("Metric data loading", () => {
+    it("fetches metric usages and categories on mount so the modal can enrich metric cards", async () => {
+      render(<ExperimentEditor {...defaultProps} />)
+      await waitFor(() => {
+        expect(mockGetMetricUsages).toHaveBeenCalled()
+        expect(mockGetMetricCategories).toHaveBeenCalled()
+      })
+    })
+
+    it("continues rendering when getMetricUsages and getMetricCategories fail (best-effort merge)", async () => {
+      mockGetMetricUsages.mockRejectedValueOnce(new Error("usages down"))
+      mockGetMetricCategories.mockRejectedValueOnce(
+        new Error("categories down")
+      )
+
+      render(<ExperimentEditor {...defaultProps} />)
+      // The editor must still render even when the supplementary fetches fail.
+      await waitFor(() =>
+        expect(screen.getByText("Create New Experiment")).toBeInTheDocument()
+      )
     })
   })
 })

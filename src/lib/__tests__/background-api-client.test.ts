@@ -124,7 +124,7 @@ describe("BackgroundAPIClient", () => {
   })
 
   describe("getCustomSectionFields", () => {
-    it("should fetch custom section fields successfully", async () => {
+    it("should fetch and return raw API entries without name synthesis", async () => {
       const mockFields = [
         { id: 1, title: "Hypothesis", type: "text" },
         { id: 2, title: "Purpose", type: "string" }
@@ -141,7 +141,51 @@ describe("BackgroundAPIClient", () => {
         type: "API_OPERATION",
         operation: { op: "listCustomSectionFields" }
       })
+      // Raw entries — no derived `.name` is added.
       expect(result).toEqual(mockFields)
+    })
+
+    it("preserves any .name the API does set", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: [{ id: 9, title: "Custom", type: "text", name: "explicit_name" }]
+      })
+
+      const result = await client.getCustomSectionFields()
+      expect(result[0]).toEqual({
+        id: 9,
+        title: "Custom",
+        type: "text",
+        name: "explicit_name"
+      })
+    })
+
+    it("warns when entries are missing id/title/type but still passes them through", async () => {
+      const debugUtils = await import("~src/utils/debug")
+      const warnSpy = jest.spyOn(debugUtils, "debugWarn").mockImplementation()
+
+      const malformed = [
+        { id: 1, title: "OK", type: "text" },
+        { title: "no id", type: "text" },
+        { id: 2, type: "text" },
+        { id: 3, title: "no type" }
+      ]
+
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: malformed
+      })
+
+      const result = await client.getCustomSectionFields()
+
+      expect(result).toEqual(malformed)
+      // Three of the four entries should have triggered a warn.
+      const warnCalls = warnSpy.mock.calls.filter((c) =>
+        String(c[0]).includes("custom field [")
+      )
+      expect(warnCalls).toHaveLength(3)
+
+      warnSpy.mockRestore()
     })
 
     it("should return empty array when data is not an array", async () => {
@@ -170,6 +214,158 @@ describe("BackgroundAPIClient", () => {
         operation: { op: "listApplications" }
       })
       expect(result).toEqual(mockApps)
+    })
+  })
+
+  describe("getEventJsonLayouts", () => {
+    it("should send the operation with the full body and return the raw response", async () => {
+      const layoutResponse = {
+        columnNames: ["key", "value_type", "last_event_at"],
+        rows: [["country", "string", 1700000000000]]
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: layoutResponse
+      })
+
+      const body = {
+        source: "unit_attribute" as const,
+        phase: "before_enrichment" as const,
+        prefix: "cou",
+        source_id: 7,
+        take: 20
+      }
+      const result = await client.getEventJsonLayouts(body)
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "getEventJsonLayouts", body }
+      })
+      expect(result).toEqual(layoutResponse)
+    })
+  })
+
+  describe("getEventJsonValues", () => {
+    it("should send the operation with the full body and return the raw response", async () => {
+      const valueResponse = {
+        columnNames: ["value", "last_event_at"],
+        rows: [
+          ["US", 1700000000000],
+          ["CA", 1699999000000]
+        ]
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: valueResponse
+      })
+
+      const body = {
+        event_type: "exposure" as const,
+        path: "country",
+        take: 20
+      }
+      const result = await client.getEventJsonValues(body)
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "getEventJsonValues", body }
+      })
+      expect(result).toEqual(valueResponse)
+    })
+  })
+
+  describe("getMetricUsages", () => {
+    it("sends the listMetricUsages operation and returns an unwrapped array as-is", async () => {
+      const usages = [
+        {
+          id: 1,
+          metric_category_id: 7,
+          usage: { last_6_months: { total: 5 } }
+        }
+      ]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: usages
+      })
+
+      const result = await client.getMetricUsages()
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "listMetricUsages" }
+      })
+      expect(result).toEqual(usages)
+    })
+
+    it("unwraps the `metricUsages` envelope (web-app shape)", async () => {
+      const usages = [{ id: 2, usage: { last_6_months: { total: 1 } } }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { metricUsages: usages }
+      })
+
+      const result = await client.getMetricUsages()
+      expect(result).toEqual(usages)
+    })
+
+    it("unwraps the `metric_usages` snake_case envelope", async () => {
+      const usages = [{ id: 3 }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { metric_usages: usages }
+      })
+
+      const result = await client.getMetricUsages()
+      expect(result).toEqual(usages)
+    })
+
+    it("returns an empty array when the response shape is unrecognised", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { unexpectedKey: "nope" }
+      })
+
+      const result = await client.getMetricUsages()
+      expect(result).toEqual([])
+    })
+  })
+
+  describe("getMetricCategories", () => {
+    it("sends the listMetricCategories operation and returns an unwrapped array as-is", async () => {
+      const categories = [{ id: 1, name: "Growth", color: "#ff8800" }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: categories
+      })
+
+      const result = await client.getMetricCategories()
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_OPERATION",
+        operation: { op: "listMetricCategories" }
+      })
+      expect(result).toEqual(categories)
+    })
+
+    it("unwraps the `metric_categories` envelope", async () => {
+      const categories = [{ id: 2, name: "Quality", color: "#00aa00" }]
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { metric_categories: categories }
+      })
+
+      const result = await client.getMetricCategories()
+      expect(result).toEqual(categories)
+    })
+
+    it("returns an empty array when the data is null", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: null
+      })
+
+      const result = await client.getMetricCategories()
+      expect(result).toEqual([])
     })
   })
 })

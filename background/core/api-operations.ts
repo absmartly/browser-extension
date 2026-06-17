@@ -17,6 +17,30 @@ interface ListMetricsParams {
   review_status?: string
 }
 
+interface GetEventJsonLayoutsParams {
+  source: "unit_attribute" | "unit_goal_property"
+  phase: "before_enrichment" | "after_enrichment"
+  prefix?: string
+  source_id?: number
+  from?: number
+  to?: number
+  take?: number
+  skip?: number
+  sort?: string
+}
+
+interface GetEventJsonValuesParams {
+  event_type: "exposure" | "goal" | "attribute"
+  path: string
+  from?: number
+  to?: number
+  experiment_id?: number
+  goal_id?: number
+  take?: number
+  skip?: number
+  sort?: string
+}
+
 export type APIOperation =
   | { op: "listExperiments"; params?: ListOptions }
   | { op: "getExperiment"; id: number }
@@ -27,6 +51,8 @@ export type APIOperation =
   | { op: "listApplications" }
   | { op: "listUnitTypes" }
   | { op: "listMetrics"; params?: ListMetricsParams }
+  | { op: "listMetricUsages" }
+  | { op: "listMetricCategories"; items?: number; page?: number }
   | { op: "listExperimentTags" }
   | { op: "listUsers"; params?: { includeArchived?: boolean; items?: number; page?: number } }
   | { op: "listTeams" }
@@ -34,6 +60,8 @@ export type APIOperation =
   | { op: "listCustomSectionFields" }
   | { op: "getCurrentUser" }
   | { op: "favoriteExperiment"; id: number; favorite: boolean }
+  | { op: "getEventJsonLayouts"; body: GetEventJsonLayoutsParams }
+  | { op: "getEventJsonValues"; body: GetEventJsonValuesParams }
 
 export async function routeAPIOperation(
   client: APIClient,
@@ -84,6 +112,14 @@ export async function routeAPIOperation(
       return await client.listMetrics(operation.params)
     }
 
+    case "listMetricUsages": {
+      return await client.listMetricUsages()
+    }
+
+    case "listMetricCategories": {
+      return await client.listMetricCategories(operation.items, operation.page)
+    }
+
     case "listExperimentTags": {
       return await client.listExperimentTags()
     }
@@ -113,6 +149,14 @@ export async function routeAPIOperation(
         ExperimentId(operation.id),
         operation.favorite
       )
+    }
+
+    case "getEventJsonLayouts": {
+      return await client.getEventJsonLayouts(operation.body)
+    }
+
+    case "getEventJsonValues": {
+      return await client.getEventJsonValues(operation.body)
     }
 
     default: {

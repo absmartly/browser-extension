@@ -621,4 +621,210 @@ describe("OpenAIProvider", () => {
       ).rejects.toThrow("Tool call validation failed")
     })
   })
+
+  describe("generateStructured", () => {
+    const schema = {
+      name: "fill_experiment_fields",
+      description: "Test fill",
+      input_schema: {
+        type: "object" as const,
+        properties: { display_name: { type: "string" } },
+        required: ["display_name"]
+      }
+    }
+
+    it("returns parsed tool arguments and forces tool_choice", async () => {
+      const provider = new OpenAIProvider({
+        apiKey: "sk-openai-test-key",
+        aiProvider: "openai-api"
+      })
+      mockChatCompletions.create.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  type: "function",
+                  function: {
+                    name: "fill_experiment_fields",
+                    arguments: JSON.stringify({ display_name: "Hero CTA" })
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      })
+
+      const result = await provider.generateStructured!({
+        systemPrompt: "system",
+        userMessage: "user",
+        schema
+      })
+
+      expect(result).toEqual({ display_name: "Hero CTA" })
+      expect(mockChatCompletions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: "system" },
+            expect.objectContaining({ role: "user" })
+          ],
+          tools: [
+            expect.objectContaining({
+              type: "function",
+              function: expect.objectContaining({
+                name: "fill_experiment_fields"
+              })
+            })
+          ],
+          tool_choice: {
+            type: "function",
+            function: { name: "fill_experiment_fields" }
+          }
+        })
+      )
+    })
+
+    it("attaches images as image_url content parts", async () => {
+      const provider = new OpenAIProvider({
+        apiKey: "sk-openai-test-key",
+        aiProvider: "openai-api"
+      })
+      mockChatCompletions.create.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  type: "function",
+                  function: {
+                    name: "fill_experiment_fields",
+                    arguments: JSON.stringify({ display_name: "X" })
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      })
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema,
+        images: ["data:image/png;base64,ABC"]
+      })
+
+      const callArgs = mockChatCompletions.create.mock.calls[0][0]
+      const userMessage = callArgs.messages[1]
+      expect(userMessage.content).toEqual(
+        expect.arrayContaining([
+          { type: "text", text: "u" },
+          {
+            type: "image_url",
+            image_url: { url: "data:image/png;base64,ABC" }
+          }
+        ])
+      )
+    })
+
+    it("uses configured llmModel and custom endpoint", async () => {
+      const provider = new OpenAIProvider({
+        apiKey: "sk-openai-test-key",
+        aiProvider: "openai-api",
+        llmModel: "gpt-4-turbo",
+        customEndpoint: "https://custom.openai/v1"
+      })
+      mockChatCompletions.create.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  type: "function",
+                  function: {
+                    name: "fill_experiment_fields",
+                    arguments: JSON.stringify({ display_name: "X" })
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      })
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema
+      })
+
+      expect(OpenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: "sk-openai-test-key",
+          baseURL: "https://custom.openai/v1"
+        })
+      )
+      expect(mockChatCompletions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4-turbo" })
+      )
+    })
+
+    it("throws when no matching tool call is returned", async () => {
+      const provider = new OpenAIProvider({
+        apiKey: "sk-openai-test-key",
+        aiProvider: "openai-api"
+      })
+      mockChatCompletions.create.mockResolvedValue({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { content: "no tool call here" }
+          }
+        ]
+      })
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/no 'fill_experiment_fields' tool call/)
+    })
+
+    it("throws when the API call fails", async () => {
+      const provider = new OpenAIProvider({
+        apiKey: "sk-openai-test-key",
+        aiProvider: "openai-api"
+      })
+      mockChatCompletions.create.mockRejectedValue(
+        new Error("HTTP 500 server error")
+      )
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow()
+    })
+
+    it("throws when API key is missing", async () => {
+      const provider = new OpenAIProvider({
+        apiKey: "",
+        aiProvider: "openai-api"
+      })
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/API key is required/)
+    })
+  })
 })

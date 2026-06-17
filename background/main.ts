@@ -195,6 +195,75 @@ export function detectPluginStatusInPage() {
 }
 
 /**
+ * Resize the sidebar container in the host page so the sidebar iframe fills
+ * the viewport. Used by the full-screen experiment modal (FT-1905): the modal
+ * lives inside the sidebar iframe, so the iframe itself needs to grow before
+ * the modal can render at viewport width.
+ *
+ * This runs via chrome.scripting.executeScript in the page context, so it
+ * must be a top-level, self-contained function with no closure captures.
+ */
+function resizeAbsmartlySidebar(
+  mode: "fullscreen" | "expand_form" | "custom" | "restore",
+  width?: string
+): void {
+  const container = document.getElementById(
+    "absmartly-sidebar-root"
+  ) as HTMLElement | null
+  if (!container) return
+
+  const SAVE_KEY = "absmartlyPreFullscreenWidth"
+
+  if (mode === "restore") {
+    const saved = container.dataset[SAVE_KEY] || "384px"
+    container.style.transition = "width 0.2s ease-in-out"
+    container.style.width = saved
+    delete container.dataset[SAVE_KEY]
+    const previousPadding = document.body.getAttribute(
+      "data-absmartly-pre-fullscreen-padding"
+    )
+    if (previousPadding !== null) {
+      document.body.style.transition = "padding-right 0.2s ease-in-out"
+      document.body.style.paddingRight = previousPadding
+      document.body.removeAttribute("data-absmartly-pre-fullscreen-padding")
+    }
+    return
+  }
+
+  // Save the original width on the first non-restore resize so a later
+  // restore returns to the user's actual sidebar width rather than 384px.
+  if (!container.dataset[SAVE_KEY]) {
+    container.dataset[SAVE_KEY] = container.style.width || "384px"
+  }
+
+  let targetWidth: string
+  if (mode === "fullscreen") {
+    targetWidth = "100vw"
+  } else if (mode === "expand_form") {
+    targetWidth = "50vw"
+  } else {
+    // "custom" — use the explicit width, fall back to 50vw if missing.
+    targetWidth = typeof width === "string" && width.length > 0 ? width : "50vw"
+  }
+
+  // Drag updates fire often; killing the transition during "custom" avoids
+  // a stuttery half-frame catch-up animation on every mousemove.
+  container.style.transition = mode === "custom" ? "none" : "width 0.2s ease-in-out"
+  container.style.width = targetWidth
+
+  // Pause page padding-right shift so the page underneath isn't squeezed.
+  if (document.body.getAttribute("data-absmartly-pre-fullscreen-padding") === null) {
+    const previousPadding = document.body.style.paddingRight || ""
+    document.body.setAttribute(
+      "data-absmartly-pre-fullscreen-padding",
+      previousPadding
+    )
+    document.body.style.transition = "padding-right 0.2s ease-in-out"
+    document.body.style.paddingRight = "0px"
+  }
+}
+
+/**
  * Initialize the background script
  * Sets up all Chrome event listeners and initializes modules
  */
@@ -1278,6 +1347,127 @@ export function initializeBackgroundScript() {
             success: false,
             error:
               error instanceof Error ? error.message : "Failed to refresh HTML"
+          })
+        }
+      })()
+      return true
+    } else if (message.type === "ABSMARTLY_UPLOAD_FILE") {
+      // Upload a file (typically an image embedded in a rich-text custom field)
+      // through the ABsmartly file_uploads API. The sidebar can't pass a
+      // File/Blob directly across chrome.runtime.sendMessage, so it serializes
+      // the bytes as base64 and we reconstruct a Blob here.
+      ;(async () => {
+        try {
+          const usage = String(message.usage || "attachments")
+          const filename = String(message.filename || "upload")
+          const mimeType = String(message.mimeType || "application/octet-stream")
+          const base64 = String(message.base64 || "")
+
+          if (!base64) {
+            sendResponse({ ok: false, error: "Missing file bytes" })
+            return
+          }
+
+          const config = await getConfig(storage, secureStorage)
+          if (!config) {
+            sendResponse({ ok: false, error: "No configuration available" })
+            return
+          }
+
+          // Decode base64 once to learn the actual size; the CLI's
+          // APIClient.uploadFile is structured (data+metadata), not multipart.
+          const binary = atob(base64)
+          const client = createExtensionClient(config)
+
+          // width/height/crop_* are required by the API contract but for
+          // generic attachments (not avatars) they're informational; we
+          // pass 0 — the backend accepts that for non-image usages and for
+          // images we don't have decoded dimensions available at the SW.
+          const response = await client.uploadFile(
+            usage as "attachments" | "variant_screenshots" | "avatars",
+            {
+              data: base64,
+              file_name: filename,
+              file_size: binary.length,
+              content_type: mimeType,
+              width: 0,
+              height: 0,
+              crop_left: 0,
+              crop_top: 0,
+              crop_width: 0,
+              crop_height: 0
+            }
+          )
+
+          sendResponse({ ok: true, data: response })
+        } catch (err) {
+          debugError("[Background] ABSMARTLY_UPLOAD_FILE error:", err)
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err)
+          })
+        }
+      })()
+      return true
+    } else if (message.type === "ABSMARTLY_CAPTURE_VISIBLE_TAB") {
+      ;(async () => {
+        try {
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true
+          })
+          const windowId = tabs[0]?.windowId
+          if (windowId === undefined) {
+            sendResponse({ ok: false, error: "no active tab" })
+            return
+          }
+          const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+            format: "png"
+          })
+          sendResponse({ ok: true, dataUrl })
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err)
+          })
+        }
+      })()
+      return true // keep the message channel open
+    } else if (message.type === "ABSMARTLY_SIDEBAR_RESIZE") {
+      ;(async () => {
+        try {
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true
+          })
+          const tabId = tabs[0]?.id
+          if (tabId === undefined) {
+            sendResponse({ ok: false, error: "no active tab" })
+            return
+          }
+          const rawMode = (message as { mode?: unknown }).mode
+          const mode: "fullscreen" | "expand_form" | "custom" | "restore" =
+            rawMode === "fullscreen" ||
+            rawMode === "expand_form" ||
+            rawMode === "custom"
+              ? rawMode
+              : "restore"
+          const width = (message as { width?: unknown }).width
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            func: resizeAbsmartlySidebar,
+            // chrome.scripting.executeScript rejects `undefined` in args
+            // (it must be JSON-serialisable). Only include `width` when set.
+            args:
+              typeof width === "string" && width.length > 0
+                ? [mode, width]
+                : [mode]
+          })
+          sendResponse({ ok: true })
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err)
           })
         }
       })()

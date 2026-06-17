@@ -9,25 +9,47 @@ import {
   setDOMChangesInConfig
 } from "~src/hooks/useVariantConfig"
 import type { AIDOMGenerationResult } from "~src/lib/ai-dom-generator"
+import type { AIProviderType } from "~src/lib/ai-providers"
+import { BackgroundAPIClient } from "~src/lib/background-api-client"
 import { sendToContent } from "~src/lib/messaging"
 import type {
   DOMChangesData,
   Experiment,
+  ExperimentCustomSectionField,
   ExperimentInjectionCode,
+  Metric,
+  MetricCategory,
+  MetricUsageRecord,
   URLFilter
 } from "~src/types/absmartly"
+import type {
+  AIFillResponse,
+  CustomFieldDescriptor,
+  VariantScreenshot
+} from "~src/types/ai-fill"
 import type { DOMChange } from "~src/types/dom-changes"
+import {
+  applyAIResultToDraft,
+  applyAIVariantNames,
+  type AIApplyDraft
+} from "~src/utils/ai-fill-apply"
 import { debugWarn } from "~src/utils/debug"
+import { mergeMetricMetadata } from "~src/utils/metrics"
 import { getConfig, localAreaStorage } from "~src/utils/storage"
 
+import { AIFillButton } from "./AIFillButton"
+import { AudienceEditor } from "./AudienceEditor"
+import { CustomFieldsEditor } from "./CustomFieldsEditor"
 import { ExperimentCodeInjection } from "./ExperimentCodeInjection"
 import { ExperimentMetadata } from "./ExperimentMetadata"
 import type { ExperimentMetadataData } from "./ExperimentMetadata"
 import { Header } from "./Header"
+import { MetricsSelector } from "./MetricsSelector"
 import { Button } from "./ui/Button"
 import { Input } from "./ui/Input"
 import { VariantList } from "./VariantList"
 import type { Variant } from "./VariantList"
+import { VariantScreenshots } from "./VariantScreenshots"
 
 interface ExperimentEditorProps {
   experiment?: Experiment | null
@@ -82,26 +104,55 @@ export function ExperimentEditor({
     owner_ids: number[]
     team_ids: number[]
     tag_ids: number[]
-  }>({
-    name: experiment?.name || "",
-    display_name: experiment?.display_name || "",
-    state: experiment?.state || "created",
-    percentage_of_traffic: experiment?.percentage_of_traffic || 100,
-    nr_variants: experiment?.nr_variants || 2,
-    percentages: experiment?.percentages || "50/50",
-    audience_strict: experiment?.audience_strict ?? false,
-    audience: experiment?.audience || '{"filter":[{"and":[]}]}',
-    unit_type_id:
-      experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
-    application_ids:
-      experiment?.applications?.map((a) => Number(a.application_id || a.id)) ||
-      [],
-    owner_ids:
-      experiment?.owners?.map((o) => Number(o.user_id || (o as any).id)) || [],
-    team_ids:
-      experiment?.teams?.map((t) => Number(t.team_id || (t as any).id)) || [],
-    tag_ids:
-      experiment?.experiment_tags?.map((t) => Number(t.experiment_tag_id)) || []
+    primary_metric_id: number | null
+    secondary_metric_ids: number[]
+    customFieldValues: Record<string, unknown>
+  }>(() => {
+    // For an existing experiment custom_section_field_values arrives keyed by
+    // numeric field id. We hydrate `customFieldValues` (also id-keyed, as
+    // strings) in an effect below once the experiment payload is available.
+    const initial = {
+      name: experiment?.name || "",
+      display_name: experiment?.display_name || "",
+      state: experiment?.state || ("created" as Experiment["state"]),
+      percentage_of_traffic: experiment?.percentage_of_traffic || 100,
+      nr_variants: experiment?.nr_variants || 2,
+      percentages: experiment?.percentages || "50/50",
+      audience_strict: experiment?.audience_strict ?? false,
+      audience: experiment?.audience || '{"filter":[{"and":[]}]}',
+      unit_type_id:
+        experiment?.unit_type?.unit_type_id || experiment?.unit_type_id || null,
+      application_ids:
+        experiment?.applications?.map((a) =>
+          Number(a.application_id || a.id)
+        ) || [],
+      owner_ids:
+        experiment?.owners?.map((o) => Number(o.user_id || (o as any).id)) ||
+        [],
+      team_ids:
+        experiment?.teams?.map((t) => Number(t.team_id || (t as any).id)) || [],
+      tag_ids:
+        experiment?.experiment_tags?.map((t) => Number(t.experiment_tag_id)) ||
+        [],
+      primary_metric_id:
+        experiment?.primary_metric?.metric_id ??
+        (experiment as any)?.primary_metric_id ??
+        null,
+      secondary_metric_ids:
+        (
+          (experiment as any)?.secondary_metrics as
+            | Array<{
+                metric_id?: number
+                metric?: { id?: number }
+                id?: number
+              }>
+            | undefined
+        )
+          ?.map((m) => Number(m.metric_id ?? m.metric?.id ?? m.id ?? 0))
+          .filter((n) => Number.isFinite(n) && n > 0) || [],
+      customFieldValues: {} as Record<string, unknown>
+    }
+    return initial
   })
 
   // Use hooks
@@ -228,6 +279,152 @@ export function ExperimentEditor({
 
     applyAIDomChanges()
   }, [currentVariants, domFieldName, experiment?.id, handleVariantsChange])
+
+  // Inline AI Fill: load custom fields, metric usage/category, page context,
+  // and AI provider config. Previously these powered the now-removed
+  // fullscreen modal; with the modal gone (FT-1905) they feed the inline
+  // sections directly.
+  const [customFields, setCustomFields] = useState<
+    ExperimentCustomSectionField[]
+  >([])
+  const [fetchedMetrics, setFetchedMetrics] = useState<Metric[] | null>(null)
+  const [metricUsages, setMetricUsages] = useState<MetricUsageRecord[]>([])
+  const [metricCategories, setMetricCategories] = useState<MetricCategory[]>([])
+  const baseMetrics =
+    metrics && metrics.length > 0 ? (metrics as Metric[]) : fetchedMetrics ?? []
+  const effectiveMetrics = useMemo(
+    () => mergeMetricMetadata(baseMetrics, metricUsages, metricCategories),
+    [baseMetrics, metricUsages, metricCategories]
+  )
+  const [pageContext, setPageContext] = useState({
+    url: "",
+    title: "",
+    visibleText: ""
+  })
+  const [aiProviderConfig, setAIProviderConfig] = useState<{
+    aiProvider: AIProviderType
+    apiKey?: string
+    llmModel?: string
+    customEndpoint?: string
+  }>({ aiProvider: "claude-subscription" })
+  // Gates the inline "Fill with AI" button. Mirrors the Vibe Studio toggle in
+  // Settings — when off, the entire AI surface (Vibe Studio + Fill with AI)
+  // stays hidden so users opting out aren't shown LLM-powered affordances.
+  const [aiFeaturesEnabled, setAiFeaturesEnabled] = useState(false)
+  // Variant screenshots produced by the most recent AI fill run — used by
+  // the inline VariantScreenshots section. Empty until an AI fill completes.
+  const [aiScreenshots, setAIScreenshots] = useState<VariantScreenshot[]>([])
+
+  // Once both the workspace custom-field defs and the experiment payload are
+  // available, lift the experiment's id-keyed custom-section values into the
+  // id-keyed (as strings) `formData.customFieldValues`.
+  const customFieldsHydratedRef = useRef(false)
+  useEffect(() => {
+    if (customFieldsHydratedRef.current) return
+    if (!experiment || customFields.length === 0) return
+    const raw = experiment.custom_section_field_values
+    if (!raw) {
+      customFieldsHydratedRef.current = true
+      return
+    }
+    const fieldsArray = Array.isArray(raw) ? raw : Object.values(raw)
+
+    const next: Record<string, unknown> = {}
+    for (const entry of fieldsArray) {
+      if (typeof entry !== "object" || entry === null) continue
+      const e = entry as {
+        experiment_custom_section_field_id?: number
+        custom_section_field?: { id?: number }
+        id?: number
+        value: unknown
+      }
+      const id =
+        e.experiment_custom_section_field_id ??
+        e.custom_section_field?.id ??
+        e.id
+      if (typeof id !== "number") continue
+      next[String(id)] = e.value
+    }
+    if (Object.keys(next).length > 0) {
+      setFormData((prev) => ({ ...prev, customFieldValues: next }))
+    }
+    customFieldsHydratedRef.current = true
+  }, [experiment, customFields])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const client = new BackgroundAPIClient()
+        const fields = await client.getCustomSectionFields()
+        if (!cancelled) setCustomFields(fields)
+      } catch (err) {
+        debugWarn("[ExperimentEditor] failed to load custom fields", err)
+      }
+      if (!metrics || metrics.length === 0) {
+        try {
+          const client = new BackgroundAPIClient()
+          const list = await client.getMetrics()
+          if (!cancelled) setFetchedMetrics(list)
+        } catch (err) {
+          debugWarn("[ExperimentEditor] failed to load metrics", err)
+        }
+      }
+      try {
+        const client = new BackgroundAPIClient()
+        const usages = await client.getMetricUsages()
+        if (!cancelled) setMetricUsages(usages)
+      } catch (err) {
+        debugWarn("[ExperimentEditor] failed to load metric usages", err)
+      }
+      try {
+        const client = new BackgroundAPIClient()
+        const categories = await client.getMetricCategories()
+        if (!cancelled) setMetricCategories(categories)
+      } catch (err) {
+        debugWarn("[ExperimentEditor] failed to load metric categories", err)
+      }
+      try {
+        const ctx = (await sendToContent({ type: "GET_PAGE_CONTEXT" })) as
+          | {
+              url?: string
+              title?: string
+              visibleText?: string
+            }
+          | undefined
+        if (!cancelled)
+          setPageContext({
+            url: ctx?.url || "",
+            title: ctx?.title || "",
+            visibleText: ctx?.visibleText || ""
+          })
+      } catch (err) {
+        debugWarn("[ExperimentEditor] failed to fetch page context", err)
+      }
+      try {
+        const config = await getConfig()
+        if (!cancelled) {
+          const provider =
+            (config?.aiProvider as AIProviderType) || "claude-subscription"
+          setAIProviderConfig({
+            aiProvider: provider,
+            apiKey: config?.aiApiKey || undefined,
+            llmModel:
+              config?.providerModels?.[provider] ||
+              config?.llmModel ||
+              undefined,
+            customEndpoint: config?.providerEndpoints?.[provider] || undefined
+          })
+          setAiFeaturesEnabled(!!config?.vibeStudioEnabled)
+        }
+      } catch (err) {
+        debugWarn("[ExperimentEditor] failed to load AI provider config", err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Stable onChange handler for ExperimentMetadata using functional state update
   const handleMetadataChange = useCallback(
@@ -357,6 +554,146 @@ export function ExperimentEditor({
     onCancel()
   }
 
+  // Wire AIFillButton: receive the structured response, fold it into formData
+  // via the pure ai-fill-apply helpers, and bump variant names if the AI
+  // produced new ones.
+  const handleAIResult = useCallback(
+    (result: AIFillResponse, screenshots: VariantScreenshot[]) => {
+      setAIScreenshots(screenshots)
+      setFormData((prev) => {
+        // The pure helper only knows about the AI-applicable subset of
+        // fields; merge its output back onto the full formData (preserving
+        // unit_type_id, state, owner/team ids, etc.).
+        const aiSlice: AIApplyDraft = {
+          name: prev.name,
+          display_name: prev.display_name,
+          percentage_of_traffic: prev.percentage_of_traffic,
+          percentages: prev.percentages,
+          audience_strict: prev.audience_strict,
+          audience: prev.audience,
+          application_ids: prev.application_ids,
+          tag_ids: prev.tag_ids,
+          primary_metric_id: prev.primary_metric_id,
+          secondary_metric_ids: prev.secondary_metric_ids,
+          customFieldValues: prev.customFieldValues
+        }
+        const merged = applyAIResultToDraft(
+          aiSlice,
+          result,
+          customFields,
+          applications,
+          tags,
+          effectiveMetrics
+        )
+        return { ...prev, ...merged }
+      })
+      if (Array.isArray(result.variants) && result.variants.length > 0) {
+        const renamed = applyAIVariantNames(currentVariants, result.variants)
+        if (renamed) {
+          handleVariantsChange(renamed, true)
+        }
+      }
+    },
+    [
+      currentVariants,
+      customFields,
+      applications,
+      tags,
+      effectiveMetrics,
+      handleVariantsChange
+    ]
+  )
+
+  // Build the variant-DOM-changes summary the AI fill flow ships to the LLM.
+  // Skips empty variants so the prompt stays focused on the actual changes.
+  const variantDomChanges = useMemo(
+    () =>
+      currentVariants
+        .map((v, i) => ({
+          variantIndex: i,
+          variantName: v.name,
+          changes: getChangesConfig(
+            getDOMChangesFromConfig(v.config, domFieldName)
+          ).changes
+        }))
+        .filter((v) => v.changes.length > 0),
+    [currentVariants, domFieldName]
+  )
+
+  // Shape the AI Fill button's draft view of the form. It only needs the
+  // human-author-facing fields; secrets and IDs the LLM can't reason about
+  // (state, owners, teams) stay out.
+  const aiFillDraft = useMemo(
+    () => ({
+      name: formData.name,
+      display_name: formData.display_name,
+      percentage_of_traffic: formData.percentage_of_traffic,
+      percentages: formData.percentages,
+      audience: formData.audience,
+      audience_strict: formData.audience_strict,
+      application_ids: formData.application_ids,
+      tag_ids: formData.tag_ids,
+      variantNames: currentVariants.map((v) => v.name),
+      customFieldValues: formData.customFieldValues
+    }),
+    [
+      formData.name,
+      formData.display_name,
+      formData.percentage_of_traffic,
+      formData.percentages,
+      formData.audience,
+      formData.audience_strict,
+      formData.application_ids,
+      formData.tag_ids,
+      formData.customFieldValues,
+      currentVariants
+    ]
+  )
+
+  // Adapt workspace custom-field defs to the descriptor shape the AI prompt
+  // expects (id + title + type + options + helpText + required). Filtering
+  // out archived fields matches what CustomFieldsEditor renders.
+  const aiCustomFieldDescriptors = useMemo<CustomFieldDescriptor[]>(
+    () =>
+      customFields
+        .filter((f) => !f.archived)
+        .map((f) => ({
+          id: f.id,
+          title: f.title || `Field ${f.id}`,
+          type: f.type,
+          options: f.options,
+          helpText: f.help_text,
+          required: f.required
+        })),
+    [customFields]
+  )
+
+  const aiApplicationOptions = useMemo(
+    () =>
+      (applications as any[]).map((a) => ({
+        id: Number(a.application_id || a.id),
+        name: a.name
+      })),
+    [applications]
+  )
+  const aiTagOptions = useMemo(
+    () =>
+      (tags as any[]).map((t) => ({
+        id: t.experiment_tag_id,
+        name: t.name
+      })),
+    [tags]
+  )
+  const aiMetricOptions = useMemo(
+    () =>
+      effectiveMetrics.map((m) => ({
+        id: m.metric_id,
+        name: m.name,
+        description: m.description
+      })),
+    [effectiveMetrics]
+  )
+
   return (
     <div className="p-4">
       <Header
@@ -369,6 +706,36 @@ export function ExperimentEditor({
         }
         onBack={handleCancel}
       />
+
+      <div
+        id="experiment-editor-actions"
+        className="flex justify-end items-center gap-2 mb-2">
+        {aiFeaturesEnabled && (
+          <AIFillButton
+            draft={aiFillDraft}
+            customFields={aiCustomFieldDescriptors}
+            applications={aiApplicationOptions}
+            tags={aiTagOptions}
+            metrics={aiMetricOptions}
+            pageUrl={pageContext.url}
+            pageTitle={pageContext.title}
+            pageVisibleText={pageContext.visibleText}
+            variantDomChanges={variantDomChanges}
+            onPreviewToggle={(enabled) => {
+              sendToContent({ type: "PREVIEW_TOGGLE", enabled }).catch(() => {})
+            }}
+            onPreviewWithChanges={(enabled, changes) => {
+              sendToContent({
+                type: "PREVIEW_WITH_CHANGES",
+                enabled,
+                changes
+              }).catch(() => {})
+            }}
+            aiProviderConfig={aiProviderConfig}
+            onResult={handleAIResult}
+          />
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
@@ -384,6 +751,7 @@ export function ExperimentEditor({
                 </label>
                 <Input
                   id="display-name-input"
+                  data-testid="display-name-input"
                   value={formData.display_name}
                   onChange={(e) => handleDisplayNameChange(e.target.value)}
                   placeholder="My Experiment"
@@ -398,6 +766,7 @@ export function ExperimentEditor({
                 </label>
                 <Input
                   id="experiment-name-input"
+                  data-testid="experiment-name-input"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="my_experiment_name"
@@ -484,6 +853,53 @@ export function ExperimentEditor({
           />
         </div>
 
+        {/* Audience filter (visual builder + advanced raw JSON) */}
+        <section id="experiment-audience-section">
+          <AudienceEditor
+            value={formData.audience}
+            strict={formData.audience_strict}
+            unitTypeId={formData.unit_type_id}
+            onChange={(v) => setFormData((prev) => ({ ...prev, audience: v }))}
+            onStrictChange={(v) =>
+              setFormData((prev) => ({ ...prev, audience_strict: v }))
+            }
+          />
+        </section>
+
+        {/* Metrics picker (primary + secondary) */}
+        <section id="experiment-metrics-section">
+          <MetricsSelector
+            metrics={effectiveMetrics}
+            primaryMetricId={formData.primary_metric_id}
+            secondaryMetricIds={formData.secondary_metric_ids}
+            onPrimaryChange={(id) =>
+              setFormData((prev) => ({ ...prev, primary_metric_id: id }))
+            }
+            onSecondaryChange={(ids) =>
+              setFormData((prev) => ({ ...prev, secondary_metric_ids: ids }))
+            }
+          />
+        </section>
+
+        {/* Workspace custom fields (hypothesis, prediction, …) */}
+        {customFields.length > 0 && (
+          <section id="experiment-custom-fields-section">
+            <CustomFieldsEditor
+              fields={customFields}
+              values={formData.customFieldValues}
+              onChange={(fieldId, value) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  customFieldValues: {
+                    ...prev.customFieldValues,
+                    [String(fieldId)]: value
+                  }
+                }))
+              }
+            />
+          </section>
+        )}
+
         {/* Variants */}
         <VariantList
           initialVariants={currentVariants}
@@ -508,6 +924,13 @@ export function ExperimentEditor({
           domFieldName={domFieldName}
           onNavigateToAI={onNavigateToAI}
         />
+
+        {/* Screenshots from the most recent AI fill — only when present */}
+        {aiScreenshots.length > 0 && (
+          <section id="experiment-variant-screenshots-section">
+            <VariantScreenshots screenshots={aiScreenshots} />
+          </section>
+        )}
 
         {/* Code Injection Section - Only for control variant */}
         {currentVariants.length > 0 && currentVariants[0] && (

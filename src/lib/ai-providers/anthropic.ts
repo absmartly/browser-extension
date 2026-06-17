@@ -20,6 +20,7 @@ import type {
   AIProvider,
   AIProviderConfig,
   GenerateOptions,
+  GenerateStructuredOptions,
   ModelConfig,
   ModelInfo
 } from "./base"
@@ -272,5 +273,103 @@ export class AnthropicProvider implements AIProvider {
     throw new Error(
       `Agentic loop exceeded maximum iterations (${MAX_TOOL_ITERATIONS})`
     )
+  }
+
+  async generateStructured<TResult = unknown>(
+    opts: GenerateStructuredOptions
+  ): Promise<TResult> {
+    if (!this.config.apiKey) {
+      throw new Error("Anthropic API key is required")
+    }
+
+    const authConfig: any = {
+      apiKey: this.config.apiKey,
+      dangerouslyAllowBrowser: true
+    }
+    if (this.config.customEndpoint) {
+      authConfig.baseURL = this.config.customEndpoint
+    }
+
+    const anthropic = new Anthropic(authConfig)
+
+    const content: Anthropic.MessageParam["content"] = [
+      { type: "text", text: opts.userMessage }
+    ]
+
+    for (const img of opts.images || []) {
+      const match = img.match(/^data:(image\/\w+);base64,(.+)$/)
+      if (match) {
+        const [, mediaType, base64Data] = match
+        content.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType as
+              | "image/jpeg"
+              | "image/png"
+              | "image/gif"
+              | "image/webp",
+            data: base64Data
+          }
+        })
+      }
+    }
+
+    const tool: Anthropic.Tool = {
+      name: opts.schema.name,
+      description: opts.schema.description || "",
+      input_schema: opts.schema.input_schema as Anthropic.Tool.InputSchema
+    }
+
+    const model = this.config.llmModel || "claude-sonnet-4-5-20250514"
+    debugLog("[Anthropic] generateStructured calling", {
+      model,
+      baseURL: this.config.customEndpoint || "(default api.anthropic.com)",
+      tool: opts.schema.name,
+      images: opts.images?.length || 0
+    })
+
+    let message: Anthropic.Message
+    try {
+      message = await withTimeout(
+        anthropic.messages.create({
+          model,
+          max_tokens: 4096,
+          system: opts.systemPrompt,
+          messages: [{ role: "user", content }],
+          tools: [tool],
+          tool_choice: { type: "tool", name: opts.schema.name }
+        })
+      )
+    } catch (error: unknown) {
+      const baseError = new Error(parseAPIError(error, "Anthropic API error"))
+      const classified = classifyAIError(baseError)
+      throw new Error(formatClassifiedError(classified))
+    }
+
+    debugLog("[Anthropic] generateStructured response", {
+      stop_reason: message.stop_reason,
+      content_blocks: message.content.map((b) => b.type)
+    })
+
+    const toolUse = message.content.find(
+      (b): b is Anthropic.ToolUseBlock =>
+        b.type === "tool_use" && b.name === opts.schema.name
+    )
+    if (!toolUse) {
+      const textBlocks = message.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+      throw new Error(
+        `Anthropic returned no '${opts.schema.name}' tool call ` +
+          `(stop_reason=${message.stop_reason}). Model said: ${textBlocks.slice(0, 500) || "(empty)"}`
+      )
+    }
+    debugLog(
+      "[Anthropic] generateStructured tool_use input keys:",
+      Object.keys(toolUse.input as object)
+    )
+    return toolUse.input as TResult
   }
 }

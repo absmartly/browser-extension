@@ -491,4 +491,192 @@ describe("OpenRouterProvider", () => {
       expect(requestBody.max_tokens).toBe(4096)
     })
   })
+
+  describe("generateStructured", () => {
+    const schema = {
+      name: "fill_experiment_fields",
+      description: "Test fill",
+      input_schema: {
+        type: "object" as const,
+        properties: { display_name: { type: "string" } },
+        required: ["display_name"]
+      }
+    }
+
+    const makeOkResponse = (toolName: string, args: Record<string, unknown>) =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                tool_calls: [
+                  {
+                    type: "function",
+                    id: "call-123",
+                    function: {
+                      name: toolName,
+                      arguments: JSON.stringify(args)
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      }) as Response
+
+    it("returns parsed tool arguments and posts the right body", async () => {
+      const provider = new OpenRouterProvider({
+        apiKey: "sk-or-test-key",
+        aiProvider: "openrouter-api",
+        llmModel: "openai/gpt-4o"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "Hero CTA" })
+      )
+
+      const result = await provider.generateStructured!({
+        systemPrompt: "system",
+        userMessage: "user",
+        schema
+      })
+
+      expect(result).toEqual({ display_name: "Hero CTA" })
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://openrouter.ai/api/v1/chat/completions",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            Authorization: "Bearer sk-or-test-key",
+            "HTTP-Referer": "chrome-extension://test/",
+            "X-Title": "ABsmartly Browser Extension"
+          })
+        })
+      )
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string)
+      expect(body.model).toBe("openai/gpt-4o")
+      expect(body.tool_choice).toEqual({
+        type: "function",
+        function: { name: "fill_experiment_fields" }
+      })
+      expect(body.tools[0].function.name).toBe("fill_experiment_fields")
+      expect(body.messages[0]).toEqual({ role: "system", content: "system" })
+    })
+
+    it("attaches images as image_url content parts", async () => {
+      const provider = new OpenRouterProvider({
+        apiKey: "sk-or-test-key",
+        aiProvider: "openrouter-api",
+        llmModel: "openai/gpt-4o"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "X" })
+      )
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema,
+        images: ["data:image/png;base64,ABC"]
+      })
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string)
+      expect(body.messages[1].content).toEqual(
+        expect.arrayContaining([
+          { type: "text", text: "u" },
+          {
+            type: "image_url",
+            image_url: { url: "data:image/png;base64,ABC" }
+          }
+        ])
+      )
+    })
+
+    it("uses customEndpoint when provided", async () => {
+      const provider = new OpenRouterProvider({
+        apiKey: "sk-or-test-key",
+        aiProvider: "openrouter-api",
+        llmModel: "openai/gpt-4o",
+        customEndpoint: "https://custom.openrouter/v1"
+      })
+      mockFetch.mockResolvedValueOnce(
+        makeOkResponse("fill_experiment_fields", { display_name: "X" })
+      )
+
+      await provider.generateStructured!({
+        systemPrompt: "s",
+        userMessage: "u",
+        schema
+      })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://custom.openrouter/v1/chat/completions",
+        expect.any(Object)
+      )
+    })
+
+    it("throws when no matching tool call is returned", async () => {
+      const provider = new OpenRouterProvider({
+        apiKey: "sk-or-test-key",
+        aiProvider: "openrouter-api",
+        llmModel: "openai/gpt-4o"
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            { finish_reason: "stop", message: { content: "no tool call" } }
+          ]
+        })
+      } as Response)
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/no 'fill_experiment_fields' tool call/)
+    })
+
+    it("throws on HTTP 5xx", async () => {
+      const provider = new OpenRouterProvider({
+        apiKey: "sk-or-test-key",
+        aiProvider: "openrouter-api",
+        llmModel: "openai/gpt-4o"
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => "internal error"
+      } as Response)
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/OpenRouter API error: 500/)
+    })
+
+    it("throws when API key is missing", async () => {
+      const provider = new OpenRouterProvider({
+        apiKey: "",
+        aiProvider: "openrouter-api",
+        llmModel: "openai/gpt-4o"
+      })
+
+      await expect(
+        provider.generateStructured!({
+          systemPrompt: "s",
+          userMessage: "u",
+          schema
+        })
+      ).rejects.toThrow(/API key is required/)
+    })
+  })
 })

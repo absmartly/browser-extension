@@ -157,6 +157,8 @@ export const VariantCard = React.memo(function VariantCard({
           </span>
         )}
         <Input
+          id={`variant-name-input-${index}`}
+          data-testid={`variant-name-input-${index}`}
           className="flex-1 font-medium"
           value={variant.name}
           onChange={(e) => onUpdateName(e.target.value)}
