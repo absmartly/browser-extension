@@ -195,7 +195,7 @@ async function globalSetup(config: FullConfig) {
     // on which environment the workflow points at. Strip the trailing slash
     // and the optional /v1 so we can append /v1/<resource> deterministically.
     const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-    const fetchOne = async (resource: string): Promise<unknown[]> => {
+    const fetchOne = async (resource: string, items = 200): Promise<unknown[]> => {
       // Retry transient errors. 525 = Cloudflare "SSL handshake failed" —
       // we've observed bursts of these from this endpoint at suite start
       // (likely warm-up of the CDN edge), and they evaporate within a few
@@ -217,7 +217,7 @@ async function globalSetup(config: FullConfig) {
         // Playwright's per-test timer can fire.
         const timer = setTimeout(() => controller.abort(), 8000)
         try {
-          const res = await fetch(`${baseEndpoint}/v1/${resource}?items=200`, {
+          const res = await fetch(`${baseEndpoint}/v1/${resource}?items=${items}`, {
             headers: {
               Authorization: `Api-Key ${apiKey}`,
               Accept: 'application/json'
@@ -252,19 +252,27 @@ async function globalSetup(config: FullConfig) {
       console.warn(`[globalSetup] Pre-fetch ${resource} failed after ${maxAttempts} attempts: ${lastErr}`)
       return []
     }
-    const [applications, unitTypes, metrics, tags, owners, teams] = await Promise.all([
+    const [applications, unitTypes, metrics, tags, owners, teams, experiments] = await Promise.all([
       fetchOne('applications'),
       fetchOne('unit_types'),
       fetchOne('metrics'),
       fetchOne('experiment_tags'),
       fetchOne('users'),
-      fetchOne('teams')
+      fetchOne('teams'),
+      // Capped at 25 because the cache is written to chrome.storage.sync,
+      // which has an 8KB per-item limit. 25 experiments × ~200 bytes
+      // (after minimization in seedData) safely fits a single non-chunked
+      // sync record. Larger items=N would force the cache into chunked
+      // mode, which adds branches the fixture would need to mirror — not
+      // worth it for what is a "list is non-empty so selectors resolve"
+      // pre-warm. Specs that need >25 experiments fall back to live API.
+      fetchOne('experiments', 25)
     ])
     fs.writeFileSync(
       cachePath,
-      JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, timestamp: Date.now() })
+      JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, experiments, timestamp: Date.now() })
     )
-    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}) → ${cachePath}`)
+    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}, experiments:${experiments.length}) → ${cachePath}`)
   }
 
   console.log('✅ Global setup completed successfully')

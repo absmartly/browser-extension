@@ -4,7 +4,13 @@ import { createExperiment, fillMetadataForSave, saveExperiment } from './helpers
 
 test.describe('Extension AI Integration (Anthropic API)', () => {
   test('extension generates DOM changes via Anthropic API', async ({ context, extensionUrl, seedStorage }) => {
-    test.setTimeout(180000)
+    // The full happy path is: setup test page (~3s) + load experiments list
+    // (~10s under shard concurrency) + create experiment (~3s) + save + open AI
+    // chat + real model call (~30-60s through llmproxy, but Claude can take up
+    // to 90s on a cold model + image-grounded prompt). Previously this was
+    // 180s, which under shard contention left almost no headroom for the
+    // model call itself; bump to 240s.
+    test.setTimeout(240000)
 
     // Prefer the proxy-specific key when the endpoint is the internal proxy;
     // otherwise use the direct Anthropic key.
@@ -64,7 +70,10 @@ test.describe('Extension AI Integration (Anthropic API)', () => {
     await click(sidebar, '#ai-generate-button')
 
     const assistantMessage = sidebar.locator('[data-message-index]').last()
-    await assistantMessage.waitFor({ state: 'visible', timeout: 60000 })
+    // 90s, not 60s — Claude through llmproxy on a fresh worker can take that
+    // long for a vision-grounded prompt. The outer test.setTimeout(240000)
+    // covers the longer ceiling.
+    await assistantMessage.waitFor({ state: 'visible', timeout: 90000 })
 
     const responseText = await assistantMessage.textContent()
     expect(responseText).toBeTruthy()
