@@ -165,6 +165,61 @@ export const test = base.extend<ExtFixtures>({
           }),
         editorResourcesCache
       )
+
+      // The experiments list slice of the cache lands in chrome.storage.sync
+      // under `experiments-cache` — that's where useExperimentLoading's
+      // `loadCachedExperiments()` reads from. The Storage instance routes
+      // sync by default, so we mirror that path here. Without this seed
+      // every sidebar mount fires a live `/v1/experiments` call and under
+      // shard concurrency (4 shards × 4 workers = 16 sidebars) the API
+      // throttles, and `.experiment-item` stays hidden for 5-60s.
+      //
+      // Schema: { version: 1, experiments: [...], timestamp: number } per
+      // src/lib/validation-schemas.ts:ExperimentsCacheSchema. We minimize
+      // each experiment to the fields CachedExperimentSchema requires so
+      // the payload fits a single non-chunked sync record (~25 items ≈ 5KB).
+      const cacheBundle = editorResourcesCache as { experiments?: unknown[] }
+      const rawExperiments = Array.isArray(cacheBundle.experiments)
+        ? cacheBundle.experiments
+        : []
+      if (rawExperiments.length > 0) {
+        const minimal = rawExperiments
+          .map((raw: any) => ({
+            id: raw?.id,
+            name: raw?.name,
+            display_name: raw?.display_name,
+            state: raw?.state,
+            status: raw?.status,
+            percentage_of_traffic: raw?.percentage_of_traffic,
+            traffic_split: raw?.traffic_split,
+            variants: raw?.variants?.map((v: any) => ({
+              variant: v?.variant,
+              name: v?.name,
+              is_control: v?.is_control
+            })),
+            applications: raw?.applications?.map((a: any) => ({
+              application_id: a?.application_id,
+              id: a?.id,
+              name: a?.name
+            }))
+          }))
+          // Drop anything that doesn't have the required (id, name) pair —
+          // the schema rejects the whole array if any entry is invalid.
+          .filter((e: any) => typeof e.id === 'number' && typeof e.name === 'string')
+        const experimentsCache = {
+          version: 1,
+          experiments: minimal,
+          timestamp: Date.now()
+        }
+        await seedPage.evaluate(
+          (payload) =>
+            chrome.storage.sync.set({
+              'experiments-cache': JSON.stringify(payload),
+              'plasmo:experiments-cache': JSON.stringify(payload)
+            }),
+          experimentsCache
+        )
+      }
     }
 
     await seedPage.close()

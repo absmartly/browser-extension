@@ -1,148 +1,27 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { log, initializeTestLogging, injectSidebar } from './utils/test-helpers'
-import { spawn, ChildProcess } from 'child_process'
 import path from 'path'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
-const BRIDGE_PORTS = [3000, 3001, 3002, 3003, 3004]
-
-let bridgeProcess: ChildProcess | null = null
-let bridgeWasStarted = false
-let activeBridgePort: number | null = null
-
-// Bridge process is spawned once per file and shared across tests; running
-// these in parallel would race the port-discovery + spawn logic.
-test.describe.configure({ mode: 'serial' })
-
-async function isBridgeRunning(port: number): Promise<boolean> {
-  try {
-    const response = await fetch(`http://localhost:${port}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(2000)
-    })
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
-async function findAvailablePort(): Promise<number | null> {
-  log('Checking for available bridge ports...')
-  for (const port of BRIDGE_PORTS) {
-    const isRunning = await isBridgeRunning(port)
-    if (isRunning) {
-      log(`✓ Bridge already running on port ${port}`)
-      activeBridgePort = port
-      return port
-    }
-  }
-  return null
-}
-
-async function startBridge(): Promise<number> {
-  log('Starting Claude Code Bridge server (will auto-select port)...')
-
-  return new Promise((resolve, reject) => {
-    bridgeProcess = spawn('claude-code-bridge', [], {
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe']
-    })
-
-    let portDetected = false
-
-    bridgeProcess.stdout?.on('data', (data) => {
-      const output = data.toString()
-      log(`[Bridge] ${output.trim()}`)
-
-      const portMatch = output.match(/localhost:(\d+)/)
-      if (portMatch && !portDetected) {
-        const port = parseInt(portMatch[1])
-        activeBridgePort = port
-        portDetected = true
-        bridgeWasStarted = true
-        log(`✓ Bridge started successfully on port ${port}`)
-        resolve(port)
-      }
-    })
-
-    bridgeProcess.stderr?.on('data', (data) => {
-      log(`[Bridge Error] ${data.toString().trim()}`)
-    })
-
-    bridgeProcess.on('error', (err) => {
-      log(`Bridge process error: ${err.message}`)
-      reject(err)
-    })
-
-    bridgeProcess.on('exit', (code) => {
-      if (code !== 0 && !bridgeWasStarted) {
-        reject(new Error(`Bridge exited with code ${code}`))
-      }
-    })
-
-    setTimeout(() => {
-      if (!portDetected) {
-        bridgeProcess?.kill('SIGTERM')
-        reject(new Error('Bridge startup timeout after 10 seconds'))
-      }
-    }, 10000)
-  })
-}
-
-async function stopBridge(): Promise<void> {
-  if (bridgeProcess && bridgeWasStarted) {
-    log('Stopping Claude Code Bridge server...')
-    bridgeProcess.kill('SIGTERM')
-    bridgeProcess = null
-    bridgeWasStarted = false
-  }
-}
 
 test.describe('AI Page Persistence and HTML Capture', () => {
   let testPage: Page
   let sidebar: FrameLocator
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeAll(async () => {
-    log('Checking if Claude Code Bridge is running...')
-    const existingPort = await findAvailablePort()
-
-    if (existingPort) {
-      log(`✓ Using existing bridge on port ${existingPort}`)
-    } else {
-      log('Bridge not running, starting it...')
-      try {
-        const port = await startBridge()
-        log(`✓ Bridge started on port ${port}`)
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      } catch (error) {
-        log(`Failed to start bridge: ${error.message}`)
-        log('AI generation will be skipped in this test')
-      }
-    }
-  })
-
-  test.afterAll(async () => {
-    await stopBridge()
-  })
-
-  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
+  test.beforeEach(async ({ context, extensionUrl }) => {
     initializeTestLogging()
 
-    log('Configuring extension (bridge client will auto-detect ports 3000-3004)')
+    log('Configuring extension (anthropic-api via llmproxy, seeded by fixture)')
 
-    await seedStorage({
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: 'apikey',
-        domChangesFieldName: '__dom_changes',
-        aiProvider: 'claude-subscription',
-        vibeStudioEnabled: true
-      }
-    })
-
+    // The fixture's default seed (tests/fixtures/extension.ts:80-115) already
+    // wires up `aiProvider: 'anthropic-api'` with the llmproxy endpoint when
+    // PLASMO_PUBLIC_ANTHROPIC_API_KEY is present in env. No per-test seed is
+    // needed — the old `aiProvider: 'claude-subscription'` override was
+    // tied to a `spawn('claude-code-bridge')` block in beforeAll that has
+    // been removed; on CI runners the binary doesn't exist, the spawn
+    // ENOENTed, and downstream tests just observed a dead bridge.
     testPage = await context.newPage()
 
     allConsoleMessages = []

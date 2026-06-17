@@ -177,32 +177,11 @@ test.describe('AI DOM Changes Persistence', () => {
       log('Note: Actual DOM changes persistence requires AI generation - see ai-dom-generation-complete.spec.ts')
     })
 
-    await test.step('Verify preview mode is enabled', async () => {
-      log('Checking if preview mode toggle is ON...')
-
-      const previewToggle = testPage.locator('input[type="checkbox"]').filter({
-        has: testPage.locator('.. .. :has-text("Preview")')
-      })
-
-      const toggleCount = await previewToggle.count()
-      log(`Preview toggle elements found: ${toggleCount}`)
-
-      if (toggleCount > 0) {
-        const isChecked = await previewToggle.first().isChecked()
-        log(`Preview toggle checked: ${isChecked}`)
-
-        expect(isChecked).toBe(true)
-        log('✅ Preview mode is enabled')
-      } else {
-        log('⚠️ Could not find preview toggle - may have different structure')
-
-        const pageText = await testPage.locator('body').textContent()
-        const hasPreviewText = pageText?.toLowerCase().includes('preview')
-        log(`Page contains "preview" text: ${hasPreviewText}`)
-      }
-
-      await testPage.screenshot({ path: 'test-results/ai-persistence-10-preview-check.png', fullPage: true })
-      log('Screenshot saved: ai-persistence-10-preview-check.png')
-    })
+    // The original spec had a "Verify preview mode is enabled" step here that
+    // used an invalid XPath (`'.. .. :has-text("Preview")'`) AND asserted the
+    // toggle was `true` even though this test never generates DOM changes and
+    // never enables preview. The step has been removed: it has never asserted
+    // anything meaningful — its only effect was to crash with a SyntaxError
+    // because the test was never reaching the assertion.
   })
 })
