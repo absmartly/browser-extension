@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -42,10 +46,52 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - uses: actions/upload-artifact@v4
+        id: upload-extension
         with:
           name: extension-build
           path: build/chrome-mv3-prod/
           retention-days: 7
+
+      - name: Comment on PR with download link
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- extension-build-comment -->';
+            const artifactUrl = '${{ steps.upload-extension.outputs.artifact-url }}';
+            const body = [
+              marker,
+              '### Extension build ready for testing',
+              '',
+              'Download the build, unzip it, then load it as an unpacked extension at `chrome://extensions` (enable Developer Mode first).',
+              '',
+              `**[Download extension-build](${artifactUrl})**`,
+              '',
+              `Built from ${context.sha.slice(0, 7)} — [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
   e2e-tests:
     runs-on: ubuntu-latest
