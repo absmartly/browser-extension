@@ -168,7 +168,24 @@ export class AnthropicProvider implements AIProvider {
       sanitizeHtml
     )
 
-    const systemPrompt = sanitizeHtml(rawSystemPrompt)
+    // The shared prompt also serves JSON/text transports. For Anthropic,
+    // mutation results must arrive through a native tool call: text blocks
+    // are intentionally conversational and must not silently apply changes.
+    const systemPrompt = `${sanitizeHtml(rawSystemPrompt)
+      .replace(
+        "You must return a JSON object with the following structure:",
+        "For DOM modifications, call dom_changes_generator with arguments matching this structure:"
+      )
+      .replace(
+        "Always prioritize returning valid JSON.",
+        "Always prioritize valid dom_changes_generator tool arguments."
+      )}
+
+# Native Anthropic response protocol
+JSON examples above describe tool arguments, not text responses.
+To apply or update DOM changes, call dom_changes_generator. Do not return mutation payloads as JSON code blocks or claim changes in text without calling the tool.
+Questions and clarifications without changes may use normal text. Do not invent DOM changes for conversational requests.
+Use css_query or xpath_query when page inspection is needed before deciding on changes.`
     debugLog("[Anthropic] System prompt length:", systemPrompt.length)
 
     const contentParts: Anthropic.MessageParam["content"] = [

@@ -301,6 +301,7 @@ test.describe('AI DOM Granular Operations', () => {
     await test.step('Verify initial changes exist', async () => {
       const changes = await getLatestChanges(testPage)
       log(`Initial changes count: ${changes.length}`)
+      await testPage.screenshot({path:test.info().outputPath('append-initial-result.png')})
       expect(changes.length).toBeGreaterThan(0)
       expect(changesContain(changes, 'button') || changesContain(changes, 'orange')).toBe(true)
       log('✅ Initial changes verified')
@@ -319,6 +320,7 @@ test.describe('AI DOM Granular Operations', () => {
 
       log(`Has button changes: ${hasButtonChanges}`)
       log(`Has heading changes: ${hasHeadingChanges}`)
+      await testPage.screenshot({path:test.info().outputPath('append-combined-result.png')})
 
       expect(changes.length).toBeGreaterThanOrEqual(2)
       expect(hasButtonChanges).toBe(true)
