@@ -395,6 +395,10 @@ test.describe('Experiment List Filters', () => {
       await waitForResults()
       await debugWait()
 
+      // The previous no-results state can satisfy waitForResults before the
+      // debounced clear-search request starts. Await the restored result
+      // contract itself, using the existing assertion budget.
+      await expect.poll(experimentCount).toBeGreaterThanOrEqual(countBefore)
       const countRestored = await experimentCount()
       log(`Experiments after clearing search: ${countRestored}`)
       expect(countRestored).toBeGreaterThanOrEqual(countBefore)
