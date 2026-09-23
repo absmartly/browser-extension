@@ -3,6 +3,8 @@ import { type Page, type FrameLocator } from '@playwright/test'
 import { log, initializeTestLogging, debugWait } from './utils/test-helpers'
 import { spawn, ChildProcess } from 'child_process'
 import path from 'path'
+import { createServer, type Server } from 'node:http'
+import { readFileSync } from 'node:fs'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -11,6 +13,8 @@ const BRIDGE_PORTS = [3000, 3001, 3002, 3003, 3004]
 let bridgeProcess: ChildProcess | null = null
 let bridgeWasStarted = false
 let activeBridgePort: number | null = null
+let fixtureServer: Server
+let fixtureUrl: string
 
 // Bridge process is spawned once per file and shared across tests; running
 // these in parallel would race the port-discovery + spawn logic. Default
@@ -202,6 +206,13 @@ test.describe('AI DOM Granular Operations', () => {
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
   test.beforeAll(async () => {
+    const html = readFileSync(TEST_PAGE_PATH)
+    fixtureServer = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' })
+      res.end(html)
+    })
+    await new Promise<void>(resolve => fixtureServer.listen(0, '127.0.0.1', resolve))
+    fixtureUrl = `http://127.0.0.1:${(fixtureServer.address() as { port: number }).port}`
     log('Checking if Claude Code Bridge is running...')
     const existingPort = await findAvailablePort()
 
@@ -221,6 +232,8 @@ test.describe('AI DOM Granular Operations', () => {
 
   test.afterAll(async () => {
     await stopBridge()
+    fixtureServer?.closeAllConnections()
+    if (fixtureServer) await new Promise<void>(resolve => fixtureServer.close(() => resolve()))
   })
 
   test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
@@ -270,7 +283,7 @@ test.describe('AI DOM Granular Operations', () => {
       allConsoleMessages.push({ type: msg.type(), text: msg.text() })
     })
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=1`)
+    await testPage.goto(`${fixtureUrl}/?use_shadow_dom_for_visual_editor_context_menu=1`)
     await testPage.setViewportSize({ width: 1920, height: 1080 })
     await testPage.waitForLoadState('networkidle')
 
@@ -291,6 +304,7 @@ test.describe('AI DOM Granular Operations', () => {
 
     await test.step('Setup and generate initial changes', async () => {
       sidebar = await setupExperimentAndAI(testPage, extensionUrl)
+      await expect(testPage.locator('.btn')).toHaveCount(3)
       // Phrase the prompt as a direct instruction to apply specific CSS so
       // the model emits DOM changes rather than asking a clarifying
       // question (the latter has been observed under load and is what
@@ -301,6 +315,7 @@ test.describe('AI DOM Granular Operations', () => {
     await test.step('Verify initial changes exist', async () => {
       const changes = await getLatestChanges(testPage)
       log(`Initial changes count: ${changes.length}`)
+      await expect(testPage.locator('.btn').first()).toHaveCSS('background-color', 'rgb(255, 165, 0)')
       await testPage.screenshot({path:test.info().outputPath('append-initial-result.png')})
       expect(changes.length).toBeGreaterThan(0)
       expect(changesContain(changes, 'button') || changesContain(changes, 'orange')).toBe(true)
@@ -320,6 +335,8 @@ test.describe('AI DOM Granular Operations', () => {
 
       log(`Has button changes: ${hasButtonChanges}`)
       log(`Has heading changes: ${hasHeadingChanges}`)
+      await expect(testPage.locator('.btn').first()).toHaveCSS('background-color', 'rgb(255, 165, 0)')
+      await expect(testPage.locator('h1')).toHaveCSS('color', 'rgb(0, 0, 255)')
       await testPage.screenshot({path:test.info().outputPath('append-combined-result.png')})
 
       expect(changes.length).toBeGreaterThanOrEqual(2)

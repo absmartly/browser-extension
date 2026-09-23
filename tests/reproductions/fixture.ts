@@ -16,7 +16,7 @@ export const test = base.extend<Fixture>({
     const script = readFileSync(path.join(__dirname, 'offline.js'))
     const server = createServer((req, res) => {
       const resource = req.url?.split('?')[0]
-      const data = resource === '/' ? html : resource === '/sdk.js' ? sdk : resource === '/offline.js' ? script : null
+      const data = resource === '/' ? html : resource === '/visual-editor-test.html' ? readFileSync(path.join(repo, 'tests/test-pages/visual-editor-test.html')) : resource === '/sdk.js' ? sdk : resource === '/offline.js' ? script : null
       res.writeHead(data ? 200 : 404, { 'Content-Type': resource?.endsWith('.js') ? 'application/javascript' : 'text/html', 'Cache-Control': 'no-store' })
       res.end(data || 'No management API in this fixture')
     })

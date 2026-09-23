@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test'
 // Deliberately independent of the default suite's credentials/global setup.
 export default defineConfig({
   testDir: __dirname,
-  testMatch: ['launchpad.spec.ts', 'expanded.spec.ts'],
+  testMatch: ['launchpad.spec.ts', 'expanded.spec.ts', 'preview.spec.ts'],
   timeout: 45000,
   expect: { timeout: 5000 },
   workers: 1,
