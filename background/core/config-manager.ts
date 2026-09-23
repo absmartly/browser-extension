@@ -158,6 +158,14 @@ export async function initializeConfig(
   }
 
   if (updated) {
+    // Initialization crosses asynchronous storage reads. A settings save (or
+    // fixture seed) may have replaced the original snapshot in the meantime.
+    // Never restore startup defaults over that newer configuration.
+    const currentConfig = await storage.get("absmartly-config") as ABsmartlyConfig | null
+    if (JSON.stringify(currentConfig) !== JSON.stringify(storedConfig)) {
+      debugLog('[Config] Configuration changed during initialization; preserving newer settings')
+      return
+    }
     const configToStore = {
       ...storedConfig,
       ...newConfig,

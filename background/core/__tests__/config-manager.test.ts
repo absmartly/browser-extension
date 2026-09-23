@@ -210,6 +210,25 @@ describe('config-manager', () => {
       process.env = originalEnv
     })
 
+    it('does not overwrite configuration saved while environment initialization is pending', async () => {
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
+      delete process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
+      let current: any = null
+      let release!: (value: string) => void
+      jest.spyOn(storage, 'get').mockImplementation(async () => current)
+      jest.spyOn(storage, 'set').mockImplementation(async (_key, value) => {current = value; return null})
+      jest.spyOn(secureStorage, 'get').mockImplementationOnce(() => new Promise(resolve => {release = resolve})).mockResolvedValue(null)
+      const init = initializeConfig(storage, secureStorage)
+      await Promise.resolve()
+      const saved = {apiEndpoint:'https://fixture.absmartly.com',authMethod:'apikey',vibeStudioEnabled:true}
+      current = saved
+      release('synthetic-key')
+      await init
+      expect(current).toEqual(saved)
+      const config = await getConfig(storage, secureStorage)
+      expect(config?.authMethod).toBe('apikey')
+    })
+
     it('should initialize config from environment variables when storage is empty', async () => {
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY = 'env-api-key'
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://api.absmartly.com'
