@@ -54,6 +54,15 @@ export function useSettingsForm() {
   // being "click Refresh after changing the endpoint, but the user info
   // still reflects the previous endpoint."
   const authCheckCallIdRef = useRef(0)
+  const endpointValidationIdRef = useRef(0)
+
+  useEffect(() => {
+    // Invalidate probes when the user edits the form or leaves Settings.
+    endpointValidationIdRef.current++
+    return () => {
+      endpointValidationIdRef.current++
+    }
+  }, [apiEndpoint, authMethod, apiKey])
 
   const buildFormSnapshot = (): string =>
     JSON.stringify({
@@ -331,6 +340,12 @@ export function useSettingsForm() {
 
   const normalizeEndpoint = (endpoint: string): string => {
     let normalized = endpoint.trim()
+    if (
+      /^https?:/i.test(normalized) &&
+      !/^https?:\/\/[^/\\]/i.test(normalized)
+    ) {
+      throw new Error("Malformed HTTP endpoint")
+    }
     if (normalized && !/^[a-z][a-z\d+.-]*:\/\//i.test(normalized)) {
       normalized = `https://${normalized}`
     }
@@ -373,6 +388,7 @@ export function useSettingsForm() {
   }
 
   const validateForm = async (): Promise<boolean> => {
+    const validationId = ++endpointValidationIdRef.current
     const newErrors: Record<string, string> = {}
 
     if (!apiEndpoint.trim()) {
@@ -398,7 +414,7 @@ export function useSettingsForm() {
     // an inline reachability error if it fails) but don't gate save on it.
     if (apiEndpoint.trim() && !newErrors.apiEndpoint) {
       void validateEndpointReachable(apiEndpoint).then((isReachable) => {
-        if (!isReachable) {
+        if (!isReachable && validationId === endpointValidationIdRef.current) {
           setErrors((prev) => ({
             ...prev,
             apiEndpoint: `Cannot reach endpoint. Please check the URL and your network connection.`
