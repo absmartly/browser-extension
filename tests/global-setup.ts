@@ -199,7 +199,10 @@ async function globalSetup(config: FullConfig) {
     const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
     const fetchOne = async (resource: string, items = 200): Promise<unknown[]> => fetchResource(resource, async () => {
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 8000)
+      // Keep the existing 40s request budget, but avoid repeatedly aborting
+      // healthy calls: CI traces contain successful apps/unit-types reads at
+      // 9.3s/10.0s. Two 20s attempts replace five 8s attempts (less backoff).
+      const timer = setTimeout(() => controller.abort(), 20000)
       try {
         const response = await fetch(`${baseEndpoint}/v1/${resource}?items=${items}`, {
           headers: { Authorization: `Api-Key ${apiKey}`, Accept: 'application/json' },
@@ -209,7 +212,7 @@ async function globalSetup(config: FullConfig) {
         const body = response.ok ? await response.json() : undefined
         return { ok: response.ok, status: response.status, json: async () => body }
       } finally { clearTimeout(timer) }
-    })
+    }, undefined, 2)
     // Serialize startup requests: four shards must not burst seven requests
     // each at the live backend. Never cache failed requests as empty arrays.
     const applications = await fetchOne('applications')

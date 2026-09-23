@@ -1,5 +1,24 @@
 import { type Page, type FrameLocator, type Locator, expect } from '@playwright/test'
 
+/** Await the real detail request before asserting rendered metadata. The
+ * enclosing test's existing deadline bounds this operation; a cached list
+ * row alone does not mean its full detail payload has arrived. */
+export async function openLiveExperimentDetails(page: Page, row: Locator): Promise<void> {
+  const nameTarget = row.locator('[data-experiment-name]')
+  const name = await nameTarget.getAttribute('data-experiment-name')
+  expect(name).toBeTruthy()
+  const responsePromise = page.context().waitForEvent('response', {
+    predicate: async response => {
+      if (response.request().method() !== 'GET' || !/\/v1\/experiments\/\d+$/.test(new URL(response.url()).pathname)) return false
+      if (!response.ok()) return true
+      const body = await response.json()
+      return body.experiment?.name === name
+    }
+  })
+  const [response] = await Promise.all([responsePromise, nameTarget.click({ timeout: 10000 })])
+  expect(response.status(), 'Selected experiment detail API response').toBe(200)
+}
+
 /**
  * Injects the extension sidebar into a test page
  * The sidebar iframe gets proper extension context because it's loaded via chrome.runtime.getURL()
@@ -666,4 +685,3 @@ export async function installAPIOperationStub(
     tryPatch()
   }, ops)
 }
-

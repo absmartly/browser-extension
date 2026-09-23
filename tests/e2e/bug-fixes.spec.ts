@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
-import { setupTestPage } from './utils/test-helpers'
+import { setupTestPage, openLiveExperimentDetails } from './utils/test-helpers'
 
 /**
  * E2E Tests for Bug Fixes
@@ -44,14 +44,14 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Start VE mode
       await sidebar.locator('#visual-editor-button').first().click()
-      await expect(testPage.locator('.absmartly-toolbar')).toBeVisible()
+      await expect(testPage.locator('#absmartly-visual-editor-banner-host')).toBeVisible()
 
       // Click back button
       await sidebar.locator('#header-back-button').click()
 
       // Verify we're back at experiment list
       await expect(sidebar.locator('#experiments-heading')).toBeVisible()
-      await expect(testPage.locator('.absmartly-toolbar')).toHaveCount(0)
+      await expect(testPage.locator('#absmartly-visual-editor-banner-host')).toHaveCount(0)
     })
 
     test('should stop Preview mode when navigating away', async ({ seedStorage }) => {
@@ -107,7 +107,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       await expect(sidebar.getByRole('button', { name: 'Clear All', exact: true })).toBeVisible()
     })
 
-    test('should clear all overrides when clicked', async ({ getStorage }) => {
+    test('should clear all overrides when clicked', async ({ context }) => {
       // Wait for loading spinner to disappear
       await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
         .waitFor({ state: 'hidden', timeout: 30000 })
@@ -131,8 +131,12 @@ test.describe('Bug Fixes E2E Tests', () => {
       const reloadBanner = sidebar.locator('text=Reload to apply changes')
       await expect(reloadBanner).toBeVisible()
       const readOverrides = async () => {
-        const value = (await getStorage())['experiment_overrides']
-        return typeof value === 'string' ? JSON.parse(value) : (value || {})
+        // Read only the test's override key without opening/focusing another
+        // tab: the sidebar follows active-tab changes.
+        return context.serviceWorkers()[0].evaluate(async () => {
+          const value = (await chrome.storage.sync.get('experiment_overrides'))['experiment_overrides']
+          return typeof value === 'string' ? JSON.parse(value) : (value || {})
+        })
       }
       await expect.poll(async () => Object.keys(await readOverrides()).length).toBeGreaterThan(0)
       testPage.once('dialog', dialog => dialog.accept())
@@ -199,7 +203,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       await expect(experimentItems.first()).toBeVisible()
 
       // Click on first experiment
-      await experimentItems.first().locator('[data-experiment-name]').click()
+      await openLiveExperimentDetails(testPage, experimentItems.first())
       await sidebar.locator('#header-back-button').waitFor({ state: 'visible', timeout: 5000 })
 
       const unitDropdown = sidebar.locator('#unit-type-select-trigger')
