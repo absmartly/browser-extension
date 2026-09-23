@@ -178,14 +178,19 @@ export default function ExperimentMentionsPlugin({
 
   // 2. Search experiments for the typeahead.
   useEffect(() => {
-    if (convertMentionsOnly || debouncedQuery === null) return
+    if (convertMentionsOnly || queryString === null) return
     setIsLoading(true)
     setPageNumber(1)
     setResults([])
-  }, [debouncedQuery, convertMentionsOnly])
+  }, [queryString, convertMentionsOnly])
 
   useEffect(() => {
-    if (convertMentionsOnly || debouncedQuery === null) return
+    if (
+      convertMentionsOnly ||
+      debouncedQuery === null ||
+      queryString !== debouncedQuery
+    )
+      return
     let alive = true
     setIsLoading(true)
     fetchExperimentMentionsPage({
@@ -210,7 +215,7 @@ export default function ExperimentMentionsPlugin({
     return () => {
       alive = false
     }
-  }, [debouncedQuery, pageNumber, convertMentionsOnly])
+  }, [debouncedQuery, queryString, pageNumber, convertMentionsOnly])
 
   // Infinite scroll
   const observer = useRef<IntersectionObserver | null>(null)
@@ -229,8 +234,11 @@ export default function ExperimentMentionsPlugin({
   )
 
   const options = useMemo(
-    () => results.map((r) => new MentionTypeaheadOption(r)),
-    [results]
+    () =>
+      queryString !== null && queryString === debouncedQuery
+        ? results.map((r) => new MentionTypeaheadOption(r))
+        : [],
+    [results, queryString, debouncedQuery]
   )
 
   const onSelectOption = useCallback(

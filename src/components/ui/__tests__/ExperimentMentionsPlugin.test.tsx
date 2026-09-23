@@ -104,6 +104,40 @@ describe("experiment mention request lifecycle", () => {
     editor.unmount()
   })
 
+  it("removes selectable stale results immediately while the next query is debouncing", async () => {
+    let resolveOld!: (value: any) => void
+    ;(fetchExperimentMentionsPage as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve
+        })
+    )
+    render(<ExperimentMentionsPlugin />)
+    await act(async () => {
+      mockOnQueryChange("Alpha")
+    })
+    await act(async () => {
+      jest.advanceTimersByTime(300)
+    })
+    await act(async () => {
+      mockOnQueryChange("Beta")
+    })
+    // Old transport completes before Beta's debounce. It must not become
+    // an option that Lexical can select with Enter for the new query.
+    await act(async () => {
+      resolveOld({ experiments: [{ id: 101, name: "Alpha" }], total: 1 })
+    })
+    expect(mockOptions).toEqual([])
+    await act(async () => {
+      jest.advanceTimersByTime(300)
+    })
+    expect(fetchExperimentMentionsPage).toHaveBeenLastCalledWith({
+      search: "Beta",
+      page: 1,
+      items: 15
+    })
+  })
+
   it("fetches for an active empty # query and search, but not when the menu closes", async () => {
     render(<ExperimentMentionsPlugin />)
     await act(async () => {
