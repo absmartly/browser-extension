@@ -165,7 +165,11 @@ export function ExperimentEditor({
     experiment,
     domFieldName
   })
-  const { save: saveExperiment } = useExperimentSave({
+  const {
+    save: saveExperiment,
+    saving,
+    saveStatus
+  } = useExperimentSave({
     experiment,
     domFieldName
   })
@@ -738,6 +742,14 @@ export function ExperimentEditor({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {saveStatus.step !== "idle" && (
+          <p
+            role="status"
+            data-testid="experiment-save-status"
+            data-step={saveStatus.step}>
+            {saveStatus.message}
+          </p>
+        )}
         {/* Basic Information */}
         <div className="space-y-3">
           {/* Name fields with sync lock */}
@@ -959,7 +971,7 @@ export function ExperimentEditor({
               id="create-experiment-button"
               type="submit"
               variant="primary"
-              disabled={loading}>
+              disabled={loading || saving}>
               {experiment?.id ? "Update Experiment" : "Create Experiment Draft"}
             </Button>
             <Button

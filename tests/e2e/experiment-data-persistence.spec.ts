@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { setupTestPage, debugWait, setupConsoleLogging, click } from './utils/test-helpers'
+import { assertNativeFormValid } from './helpers/ve-experiment-setup'
 
 const TEST_PAGE_URL = '/persistence-test.html'
 
@@ -44,6 +45,7 @@ test.describe('Experiment Data Persistence', () => {
   test('should persist and reload all experiment metadata including unit type', async () => {
     test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
     let createdExperimentName: string
+    const expectedSelections = new Map<string, string>()
 
     await test.step('Verify sidebar is ready', async () => {
       console.log('\n📂 STEP 1: Sidebar already injected by setupTestPage')
@@ -265,6 +267,15 @@ test.describe('Experiment Data Persistence', () => {
 
         await expect(sidebar.locator('#experiment-name-input')).toHaveValue(createdExperimentName)
         await expect(createButton).toBeEnabled()
+        for (const id of ['unit-type-select', 'applications-select', 'owners-label', 'tags-select']) {
+          const trigger = sidebar.locator(`#${id}-trigger`)
+          await expect(trigger).toBeVisible()
+          const selection = (await trigger.innerText()).trim()
+          expect(selection, `${id} must have a selected test value`).not.toMatch(/^\s*(Select|Loading)/i)
+          expect(selection).not.toBe('')
+          expectedSelections.set(id, selection)
+        }
+        await assertNativeFormValid(sidebar)
         await createButton.click({ timeout: 10000 })
 
         console.log('  ✓ Experiment created, waiting for redirect...')
@@ -287,6 +298,7 @@ test.describe('Experiment Data Persistence', () => {
         await debugWait()
       } catch (error) {
         console.error('  [ERROR] Failed in Create experiment step:', error)
+        console.log('Save stage:', await sidebar.locator('[data-testid="experiment-save-status"]').getAttribute('data-step', { timeout: 1000 }).catch(() => 'not-started'))
         await testPage.screenshot({ path: 'debug-step8-error.png', fullPage: true })
         throw error
       }
@@ -385,41 +397,13 @@ test.describe('Experiment Data Persistence', () => {
         const trafficInput = sidebar.locator('#traffic-label').locator('..').locator('input')
         await trafficInput.waitFor({ state: 'visible', timeout: 2000 })
         const trafficValue = await trafficInput.inputValue()
-        expect(parseInt(trafficValue)).toBeGreaterThan(0)
-        expect(parseInt(trafficValue)).toBeLessThanOrEqual(100)
+        expect(trafficValue).toBe('75')
         console.log(`  ✓ Traffic percentage persisted: ${trafficValue}%`)
 
-        console.log('  [DEBUG] Checking unit type...')
-        const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
-        const hasUnitType = await unitTypeTrigger.isVisible({ timeout: 2000 }).catch(() => false)
-
-        if (hasUnitType) {
-          const unitTypeText = await unitTypeTrigger.textContent()
-          expect(unitTypeText).not.toBe('')
-          expect(unitTypeText).not.toContain('Select a unit type')
-          console.log(`  ✅ Unit Type persisted and loaded: ${unitTypeText}`)
-        } else {
-          console.log('  ⚠️  Unit type field not visible (non-critical for persistence test)')
-        }
-
         await expect(sidebar.locator('#experiment-name-input')).toHaveValue(createdExperimentName)
-        const appContainer = sidebar.locator('#applications-select').locator('..')
-        const appBadges = appContainer.locator('span[class*="badge"], div[class*="badge"]')
-        const appCount = await appBadges.count()
-        expect(appCount).toBeGreaterThanOrEqual(0)
-        console.log(`  ✓ Applications: ${appCount} app(s) ${appCount > 0 ? 'selected' : '(none)'}`)
-
-        const ownersContainer = sidebar.locator('#owners-label').locator('..')
-        const ownerBadges = ownersContainer.locator('span[class*="badge"], div[class*="badge"]')
-        const ownerCount = await ownerBadges.count()
-        expect(ownerCount).toBeGreaterThanOrEqual(0)
-        console.log(`  ✓ Owners: ${ownerCount} owner(s) ${ownerCount > 0 ? 'selected' : '(none)'}`)
-
-        const tagsContainer = sidebar.locator('#tags-select').locator('..')
-        const tagBadges = tagsContainer.locator('span[class*="badge"], div[class*="badge"]')
-        const tagCount = await tagBadges.count()
-        expect(tagCount).toBeGreaterThanOrEqual(0)
-        console.log(`  ✓ Tags: ${tagCount} tag(s) ${tagCount > 0 ? 'selected' : '(none)'}`)
+        for (const [id, selection] of expectedSelections) {
+          await expect(sidebar.locator(`#${id}-trigger`)).toHaveText(selection)
+        }
 
         await debugWait()
       } catch (error) {

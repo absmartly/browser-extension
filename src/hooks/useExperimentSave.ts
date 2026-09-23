@@ -54,6 +54,7 @@ export interface SaveStatus {
   step:
     | "idle"
     | "validating"
+    | "loading-custom-fields"
     | "saving"
     | "updating-cache"
     | "complete"
@@ -160,7 +161,7 @@ async function createNewExperiment(
 
   try {
     setSaveStatus?.({
-      step: "validating",
+      step: "loading-custom-fields",
       message: "Fetching custom fields..."
     })
     debugLog("[createNewExperiment] Fetching custom section fields...")

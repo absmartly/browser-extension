@@ -3,6 +3,7 @@ import React from "react"
 
 import "@testing-library/jest-dom"
 
+import { useExperimentSave } from "~src/hooks/useExperimentSave"
 import * as messaging from "~src/lib/messaging"
 import type { Experiment } from "~src/types/absmartly"
 import { unsafeExperimentId, unsafeVariantName } from "~src/types/branded"
@@ -126,6 +127,8 @@ jest.mock("~src/hooks/useExperimentVariants", () => ({
 
 jest.mock("~src/hooks/useExperimentSave", () => ({
   useExperimentSave: jest.fn(() => ({
+    saving: false,
+    saveStatus: { step: "idle" },
     save: jest.fn(async (formData, currentVariants, onUpdate, onSave) => {
       if (onSave) {
         try {
@@ -330,6 +333,40 @@ describe("ExperimentEditor", () => {
   })
 
   describe("Save Functionality", () => {
+    it("passes its save callback through the real save hook after custom fields load", async () => {
+      const realHook = jest.requireActual(
+        "~src/hooks/useExperimentSave"
+      ).useExperimentSave
+      const mockedHook = useExperimentSave as jest.Mock
+      const previousImplementation = mockedHook.getMockImplementation()
+      mockedHook.mockImplementation(realHook)
+      try {
+        const onSave = jest.fn().mockResolvedValue(undefined)
+        const { container } = render(
+          <ExperimentEditor {...defaultProps} onSave={onSave} />
+        )
+        fireEvent.change(container.querySelector("#display-name-input")!, {
+          target: { value: "Callback Wiring Draft" }
+        })
+        fireEvent.change(screen.getByTestId("unit-type-select"), {
+          target: { value: "1" }
+        })
+        fireEvent.click(container.querySelector("#create-experiment-button")!)
+        await waitFor(() =>
+          expect(onSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+              name: "callback_wiring_draft",
+              state: "created"
+            })
+          )
+        )
+        expect(mockGetCustomSectionFields).toHaveBeenCalled()
+        expect(onSave).toHaveBeenCalledTimes(1)
+      } finally {
+        mockedHook.mockImplementation(previousImplementation!)
+      }
+    })
+
     it("should save experiment with all form data", async () => {
       const { container } = render(<ExperimentEditor {...defaultProps} />)
 
