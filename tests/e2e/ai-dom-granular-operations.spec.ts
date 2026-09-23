@@ -212,7 +212,9 @@ test.describe('AI DOM Granular Operations', () => {
       res.end(html)
     })
     await new Promise<void>(resolve => fixtureServer.listen(0, '127.0.0.1', resolve))
-    fixtureUrl = `http://127.0.0.1:${(fixtureServer.address() as { port: number }).port}`
+    // The packaged manifest already grants localhost for script-based page
+    // capture. 127.0.0.1 is a different host and yields empty AI context.
+    fixtureUrl = `http://localhost:${(fixtureServer.address() as { port: number }).port}`
     log('Checking if Claude Code Bridge is running...')
     const existingPort = await findAvailablePort()
 

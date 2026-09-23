@@ -4,6 +4,16 @@ test('packaged HTTP preview applies camelCase styles and restores them', async (
   await page.goto(`${origin}/visual-editor-test.html`)
   await expect(page.locator('.test-button')).toHaveCount(3)
   const worker = page.context().serviceWorkers()[0] || await page.context().waitForEvent('serviceworker')
+  const capturedTargets = await worker.evaluate(async () => {
+    const tabs = await chrome.tabs.query({})
+    const tab = tabs.find(tab => tab.url?.includes('/visual-editor-test.html'))!
+    const result = await chrome.scripting.executeScript({
+      target: { tabId: tab.id! },
+      func: () => document.querySelectorAll('.test-button').length
+    })
+    return result[0].result
+  })
+  expect(capturedTargets).toBe(3)
   const send = (action: string) => worker.evaluate(async ({ action }) => {
     const tabs = await chrome.tabs.query({})
     const tab = tabs.find(tab => tab.url?.includes('/visual-editor-test.html'))!
