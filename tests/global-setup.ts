@@ -2,6 +2,7 @@ import type { FullConfig } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
+import { fetchResource, requireEditorResources } from './helpers/resource-prefetch'
 
 const getLatestMtimeMs = (targetPath: string): number => {
   if (!fs.existsSync(targetPath)) return 0
@@ -191,83 +192,34 @@ async function globalSetup(config: FullConfig) {
   // shard at suite start.
   if (apiKey && apiEndpoint) {
     const cachePath = path.join(rootDir, '.editor-resources-cache.json')
+    fs.rmSync(cachePath, { force: true })
     // Endpoint env var sometimes ends in /v1 and sometimes doesn't, depending
     // on which environment the workflow points at. Strip the trailing slash
     // and the optional /v1 so we can append /v1/<resource> deterministically.
     const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-    const fetchOne = async (resource: string, items = 200): Promise<unknown[]> => {
-      // Retry transient errors. 525 = Cloudflare "SSL handshake failed" —
-      // we've observed bursts of these from this endpoint at suite start
-      // (likely warm-up of the CDN edge), and they evaporate within a few
-      // seconds. Without retries the cache lands empty, every sidebar
-      // mount falls through to a live /v1/* call, and the
-      // unit-type-select-trigger waitFor (10s) times out under workers=2-4
-      // contention. 5xx and 429 are also transient by definition.
-      const maxAttempts = 5
-      const isRetriable = (status: number) =>
-        status === 429 || status === 525 || (status >= 500 && status < 600)
-
-      let lastErr = ""
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const controller = new AbortController()
-        // Per-attempt 8s socket timeout. Without it a half-open
-        // connection (TCP RST never delivered, server stalled) blocks
-        // forever and the surrounding retry loop never gets a chance
-        // to run, hanging the entire suite at globalSetup before
-        // Playwright's per-test timer can fire.
-        const timer = setTimeout(() => controller.abort(), 8000)
-        try {
-          const res = await fetch(`${baseEndpoint}/v1/${resource}?items=${items}`, {
-            headers: {
-              Authorization: `Api-Key ${apiKey}`,
-              Accept: 'application/json'
-            },
-            signal: controller.signal
-          })
-          if (res.ok) {
-            const data = await res.json()
-            const arr = data?.[resource] ?? (Array.isArray(data) ? data : [])
-            return Array.isArray(arr) ? arr : []
-          }
-          lastErr = `HTTP ${res.status}`
-          if (!isRetriable(res.status)) {
-            console.warn(`[globalSetup] Pre-fetch ${resource} failed: ${lastErr} (non-retriable)`)
-            return []
-          }
-        } catch (err) {
-          lastErr = (err as Error).message
-        } finally {
-          clearTimeout(timer)
-        }
-        if (attempt < maxAttempts) {
-          // Jittered exponential backoff: random delay in [base/2, 1.5*base]
-          // for base = 250ms · 2^(attempt-1). Spreads concurrent retries
-          // so multiple workers don't synchronously re-burst at the
-          // endpoint.
-          const base = 250 * 2 ** (attempt - 1)
-          const delay = Math.floor(Math.random() * base) + base / 2
-          await new Promise((r) => setTimeout(r, delay))
-        }
-      }
-      console.warn(`[globalSetup] Pre-fetch ${resource} failed after ${maxAttempts} attempts: ${lastErr}`)
-      return []
-    }
-    const [applications, unitTypes, metrics, tags, owners, teams, experiments] = await Promise.all([
-      fetchOne('applications'),
-      fetchOne('unit_types'),
-      fetchOne('metrics'),
-      fetchOne('experiment_tags'),
-      fetchOne('users'),
-      fetchOne('teams'),
-      // Capped at 25 because the cache is written to chrome.storage.sync,
-      // which has an 8KB per-item limit. 25 experiments × ~200 bytes
-      // (after minimization in seedData) safely fits a single non-chunked
-      // sync record. Larger items=N would force the cache into chunked
-      // mode, which adds branches the fixture would need to mirror — not
-      // worth it for what is a "list is non-empty so selectors resolve"
-      // pre-warm. Specs that need >25 experiments fall back to live API.
-      fetchOne('experiments', 25)
-    ])
+    const fetchOne = async (resource: string, items = 200): Promise<unknown[]> => fetchResource(resource, async () => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 8000)
+      try {
+        const response = await fetch(`${baseEndpoint}/v1/${resource}?items=${items}`, {
+          headers: { Authorization: `Api-Key ${apiKey}`, Accept: 'application/json' },
+          signal: controller.signal
+        })
+        // Consume the body inside the bounded request deadline as well.
+        const body = response.ok ? await response.json() : undefined
+        return { ok: response.ok, status: response.status, json: async () => body }
+      } finally { clearTimeout(timer) }
+    })
+    // Serialize startup requests: four shards must not burst seven requests
+    // each at the live backend. Never cache failed requests as empty arrays.
+    const applications = await fetchOne('applications')
+    const unitTypes = await fetchOne('unit_types')
+    requireEditorResources({ applications, unitTypes })
+    const metrics = await fetchOne('metrics')
+    const tags = await fetchOne('experiment_tags')
+    const owners = await fetchOne('users')
+    const teams = await fetchOne('teams')
+    const experiments = await fetchOne('experiments', 25)
     fs.writeFileSync(
       cachePath,
       JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, experiments, timestamp: Date.now() })

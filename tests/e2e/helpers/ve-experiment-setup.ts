@@ -125,7 +125,7 @@ async function fillMetadataFields(
   }
 
   if (options.fillTags) {
-    const tagsContainer = sidebar.locator('#tags-label').locator('..')
+    const tagsContainer = sidebar.locator('#tags-select').locator('..')
     const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
 
     const tagsDisabled = await tagsClickArea.evaluate(el => {
@@ -297,12 +297,13 @@ export async function fillMetadataForSave(sidebar: FrameLocator, page: Page): Pr
 
   await ownersDropdown.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
 
-  const tagsTrigger = sidebar.locator('#tags-label-trigger')
-  await tagsTrigger.scrollIntoViewIfNeeded()
+  const tagsTrigger = sidebar.locator('#tags-select-trigger')
+  await tagsTrigger.waitFor({ state: 'visible', timeout: 10000 })
+  await tagsTrigger.scrollIntoViewIfNeeded({ timeout: 10000 })
   await tagsTrigger.click({ timeout: 3000 })
   log('  Opened tags dropdown')
 
-  const tagsDropdown = sidebar.locator('#tags-label-dropdown')
+  const tagsDropdown = sidebar.locator('#tags-select-dropdown')
   await tagsDropdown.waitFor({ state: 'visible', timeout: 3000 })
 
   const firstTagOption = tagsDropdown.locator('.max-h-60 > div').first()
