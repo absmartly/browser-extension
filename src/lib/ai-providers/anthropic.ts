@@ -25,6 +25,7 @@ import type {
   ModelInfo
 } from "./base"
 import { parseAPIError, withTimeout } from "./constants"
+import { respectRateLimitCooldown } from "./rate-limit-fetch"
 import {
   CSS_QUERY_DESCRIPTION,
   CSS_QUERY_SCHEMA,
@@ -149,7 +150,10 @@ export class AnthropicProvider implements AIProvider {
       authConfig.baseURL = this.config.customEndpoint
     }
 
-    const anthropic = new Anthropic(authConfig)
+    const anthropic = new Anthropic({
+      ...authConfig,
+      fetch: respectRateLimitCooldown()
+    })
 
     const {
       session,
@@ -290,7 +294,10 @@ export class AnthropicProvider implements AIProvider {
       authConfig.baseURL = this.config.customEndpoint
     }
 
-    const anthropic = new Anthropic(authConfig)
+    const anthropic = new Anthropic({
+      ...authConfig,
+      fetch: respectRateLimitCooldown()
+    })
 
     const content: Anthropic.MessageParam["content"] = [
       { type: "text", text: opts.userMessage }

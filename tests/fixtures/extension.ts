@@ -84,7 +84,12 @@ export const test = base.extend<ExtFixtures>({
     })
     context.on('response', response => {
       const index = requests.get(response.request())
-      if (index !== undefined) Object.assign(network[index], {status: response.status(), headersMs: Date.now() - startedAt})
+      if (index !== undefined) {
+        const headers = response.headers()
+        const rateLimit = Object.fromEntries(Object.entries(headers).filter(([name]) =>
+          /^(retry-after(-ms)?|anthropic-ratelimit-unified-[a-z0-9-]+)$/.test(name)))
+        Object.assign(network[index], {status: response.status(), headersMs: Date.now() - startedAt, rateLimit})
+      }
     })
     context.on('requestfinished', request => {
       const index = requests.get(request)

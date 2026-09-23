@@ -13,8 +13,10 @@ let bridgeWasStarted = false
 let activeBridgePort: number | null = null
 
 // Bridge process is spawned once per file and shared across tests; running
-// these in parallel would race the port-discovery + spawn logic.
-test.describe.configure({ mode: 'serial' })
+// these in parallel would race the port-discovery + spawn logic. Default
+// mode keeps this file sequential, but unlike serial it still runs each
+// independent test after a failure instead of suppressing five assertions.
+test.describe.configure({ mode: 'default' })
 
 async function isBridgeRunning(port: number): Promise<boolean> {
   try {
