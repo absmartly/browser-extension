@@ -2,7 +2,8 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # No branch filter: stacked PRs targeting a feature branch must be
+    # tested on their actual merged head, not only PRs into main.
 
 concurrency:
   group: ci-${{ github.ref }}
