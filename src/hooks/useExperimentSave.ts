@@ -6,11 +6,7 @@ import type {
   ExperimentCustomSectionField
 } from "~src/types/absmartly"
 import { debugError, debugLog } from "~src/utils/debug"
-import {
-  notifyError,
-  notifySuccess,
-  notifyWarning
-} from "~src/utils/notifications"
+import { notifyError, notifySuccess } from "~src/utils/notifications"
 import { getConfig } from "~src/utils/storage"
 
 import type { VariantData } from "./useExperimentVariants"
@@ -178,7 +174,9 @@ async function createNewExperiment(
     )
   } catch (error) {
     debugError("[createNewExperiment] Failed to fetch custom fields:", error)
-    await notifyWarning("Failed to fetch custom fields. Using defaults.")
+    // Without definitions we cannot construct defaults or preserve overrides.
+    // Keep the draft retryable instead of creating with an incomplete payload.
+    throw new Error("Unable to load custom fields. Please try saving again.")
   }
 
   const custom_section_field_values: Record<

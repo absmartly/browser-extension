@@ -335,6 +335,68 @@ describe("ExperimentEditor", () => {
   })
 
   describe("Save Functionality", () => {
+    it("does not create with missing definitions after repeated load failure and retains a retryable draft", async () => {
+      const mockedHook = useExperimentSave as jest.Mock
+      const previousImplementation = mockedHook.getMockImplementation()
+      mockedHook.mockImplementation(
+        jest.requireActual("~src/hooks/useExperimentSave").useExperimentSave
+      )
+      mockGetCustomSectionFields.mockRejectedValue(
+        new Error("Definition service unavailable")
+      )
+      try {
+        const onSave = jest.fn().mockResolvedValue(undefined)
+        const { container } = render(
+          <ExperimentEditor {...defaultProps} onSave={onSave} />
+        )
+        await act(async () => {})
+        fireEvent.change(container.querySelector("#display-name-input")!, {
+          target: { value: "Preserve Definition Draft" }
+        })
+        fireEvent.change(screen.getByTestId("unit-type-select"), {
+          target: { value: "1" }
+        })
+        fireEvent.click(container.querySelector("#create-experiment-button")!)
+        await waitFor(() =>
+          expect(screen.getByTestId("experiment-save-status")).toHaveAttribute(
+            "data-step",
+            "error"
+          )
+        )
+        expect(onSave).not.toHaveBeenCalled()
+        expect(container.querySelector("#experiment-name-input")).toHaveValue(
+          "preserve_definition_draft"
+        )
+        expect(
+          container.querySelector("#create-experiment-button")
+        ).toBeEnabled()
+        mockGetCustomSectionFields.mockResolvedValue([
+          { id: 91, type: "text", default_value: "Recovered hypothesis" }
+        ])
+        fireEvent.click(container.querySelector("#create-experiment-button")!)
+        await waitFor(() =>
+          expect(onSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+              name: "preserve_definition_draft",
+              custom_section_field_values: {
+                "91": { id: 91, type: "text", value: "Recovered hypothesis" }
+              }
+            })
+          )
+        )
+        expect(onSave).toHaveBeenCalledTimes(1)
+        await waitFor(() =>
+          expect(screen.getByTestId("experiment-save-status")).toHaveAttribute(
+            "data-step",
+            "complete"
+          )
+        )
+      } finally {
+        mockGetCustomSectionFields.mockResolvedValue([])
+        mockedHook.mockImplementation(previousImplementation!)
+      }
+    })
+
     it("contains a rejected save at the UI boundary and allows retry without losing the draft", async () => {
       const mockedHook = useExperimentSave as jest.Mock
       const previousImplementation = mockedHook.getMockImplementation()
