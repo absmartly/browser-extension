@@ -275,7 +275,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
 
       // Check Unit Type dropdown
-      const unitTypeDropdown = sidebar.locator('#unit-type-label').locator('..').locator('[class*="cursor-pointer"]').first()
+      const unitTypeDropdown = sidebar.locator('#unit-type-select-trigger')
       const unitTypeText = await unitTypeDropdown.textContent()
       const isUnitTypeLoading = unitTypeText?.includes('Loading...')
 
@@ -301,7 +301,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       expect(isOwnersLoading).toBe(false)
 
       // Check Tags dropdown
-      const tagsDropdown = sidebar.locator('#tags-label').locator('..').locator('[class*="cursor-pointer"]').first()
+      const tagsDropdown = sidebar.locator('#tags-select-trigger')
       const tagsText = await tagsDropdown.textContent()
       const isTagsLoading = tagsText?.includes('Loading...')
 

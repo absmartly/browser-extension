@@ -74,7 +74,7 @@ test.describe('Experiment Data Persistence', () => {
     await test.step('Fill in experiment details', async () => {
       console.log('\n📝 STEP 3: Filling experiment details')
 
-      createdExperimentName = `E2E Persistence Test ${Date.now()}`
+      createdExperimentName = `e2e_persistence_${Date.now()}`
 
       const nameInput = sidebar.locator('input#experiment-name-input')
       await nameInput.waitFor({ state: 'visible', timeout: 3000 })
@@ -221,9 +221,9 @@ test.describe('Experiment Data Persistence', () => {
       console.log('\n🏷️  STEP 7: Selecting Tags (optional)')
 
       try {
-        const tagsContainer = sidebar.locator('#tags-label').locator('..')
+        const tagsContainer = sidebar.locator('#tags-select').locator('..')
 
-        await sidebar.locator('#tags-label').locator('..').locator('span:not(:has-text("Loading..."))').first().waitFor({ timeout: 2000 })
+        await sidebar.locator('#tags-select-trigger:not(.cursor-not-allowed)').waitFor({ timeout: 10000 })
 
         const tagsClickArea = tagsContainer.locator('div[class*="cursor-pointer"], div[class*="border"]').first()
         await tagsClickArea.click({ force: true })
@@ -263,9 +263,9 @@ test.describe('Experiment Data Persistence', () => {
 
         await testPage.screenshot({ path: 'debug-step8-before-create.png', fullPage: true })
 
-        await createButton.evaluate((btn: HTMLElement) => {
-          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        })
+        await expect(sidebar.locator('#experiment-name-input')).toHaveValue(createdExperimentName)
+        await expect(createButton).toBeEnabled()
+        await createButton.click({ timeout: 10000 })
 
         console.log('  ✓ Experiment created, waiting for redirect...')
 
@@ -324,10 +324,7 @@ test.describe('Experiment Data Persistence', () => {
           }
         }
 
-        if (!experimentRow) {
-          console.log(`  ⚠️  Could not find created experiment "${createdExperimentName}", using first available experiment`)
-          experimentRow = allRows.first()
-        }
+        expect(experimentRow, `Created experiment ${createdExperimentName} must be present`).not.toBeNull()
 
         await experimentRow.waitFor({ state: 'visible', timeout: 2000 })
         const selectedExpName = await experimentRow.textContent()
@@ -405,7 +402,8 @@ test.describe('Experiment Data Persistence', () => {
           console.log('  ⚠️  Unit type field not visible (non-critical for persistence test)')
         }
 
-        const appContainer = sidebar.locator('#applications-label').locator('..')
+        await expect(sidebar.locator('#experiment-name-input')).toHaveValue(createdExperimentName)
+        const appContainer = sidebar.locator('#applications-select').locator('..')
         const appBadges = appContainer.locator('span[class*="badge"], div[class*="badge"]')
         const appCount = await appBadges.count()
         expect(appCount).toBeGreaterThanOrEqual(0)
@@ -417,7 +415,7 @@ test.describe('Experiment Data Persistence', () => {
         expect(ownerCount).toBeGreaterThanOrEqual(0)
         console.log(`  ✓ Owners: ${ownerCount} owner(s) ${ownerCount > 0 ? 'selected' : '(none)'}`)
 
-        const tagsContainer = sidebar.locator('#tags-label').locator('..')
+        const tagsContainer = sidebar.locator('#tags-select').locator('..')
         const tagBadges = tagsContainer.locator('span[class*="badge"], div[class*="badge"]')
         const tagCount = await tagBadges.count()
         expect(tagCount).toBeGreaterThanOrEqual(0)
