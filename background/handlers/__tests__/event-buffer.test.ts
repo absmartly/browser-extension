@@ -43,6 +43,17 @@ describe("event-buffer", () => {
   })
 
   describe("bufferSDKEvent", () => {
+    it("preserves separate events with identical payloads and timestamps", async () => {
+      let stored: SDKEvent[] = []
+      mockSessionStorage.get.mockImplementation(async () => stored)
+      mockSessionStorage.set.mockImplementation(async (_key, value) => { stored = value })
+      const event = { eventName: "goal", data: { name: "same" }, timestamp: 1234 }
+      await bufferSDKEvent(event)
+      await bufferSDKEvent(event)
+      expect(stored).toHaveLength(2)
+      expect(mockSendMessage).toHaveBeenCalledTimes(2)
+      expect(stored[0].id).not.toBe(stored[1].id)
+    })
     it("should buffer a new event", async () => {
       mockSessionStorage.get.mockResolvedValue([])
       mockSessionStorage.set.mockResolvedValue(undefined)

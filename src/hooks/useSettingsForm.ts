@@ -331,11 +331,7 @@ export function useSettingsForm() {
 
   const normalizeEndpoint = (endpoint: string): string => {
     let normalized = endpoint.trim()
-    if (
-      normalized &&
-      !normalized.startsWith("http://") &&
-      !normalized.startsWith("https://")
-    ) {
+    if (normalized && !/^[a-z][a-z\d+.-]*:\/\//i.test(normalized)) {
       normalized = `https://${normalized}`
     }
     if (normalized.endsWith("/")) {
@@ -381,6 +377,16 @@ export function useSettingsForm() {
 
     if (!apiEndpoint.trim()) {
       newErrors.apiEndpoint = "API Endpoint is required"
+    } else {
+      try {
+        const url = new URL(normalizeEndpoint(apiEndpoint))
+        if (!["http:", "https:"].includes(url.protocol) || !url.hostname) {
+          throw new Error("Invalid endpoint")
+        }
+      } catch {
+        newErrors.apiEndpoint =
+          "Invalid endpoint URL. Use a valid HTTP or HTTPS URL."
+      }
     }
 
     // Endpoint reachability used to be a blocking check here, but it
@@ -390,7 +396,7 @@ export function useSettingsForm() {
     // stuck waiting for a navigation that never came. Move the probe out
     // of the validation pipeline — fire it for the side-effect (will set
     // an inline reachability error if it fails) but don't gate save on it.
-    if (apiEndpoint.trim()) {
+    if (apiEndpoint.trim() && !newErrors.apiEndpoint) {
       void validateEndpointReachable(apiEndpoint).then((isReachable) => {
         if (!isReachable) {
           setErrors((prev) => ({
@@ -406,6 +412,19 @@ export function useSettingsForm() {
     }
 
     setErrors(newErrors)
+    const firstInvalidId = newErrors.apiEndpoint
+      ? "absmartly-endpoint"
+      : newErrors.apiKey
+        ? "api-key-input"
+        : null
+    if (firstInvalidId) {
+      // Wait for the inline error to render before centering its field.
+      requestAnimationFrame(() => {
+        const field = document.getElementById(firstInvalidId)
+        field?.focus({ preventScroll: true })
+        field?.scrollIntoView({ block: "center" })
+      })
+    }
     return Object.keys(newErrors).length === 0
   }
 
