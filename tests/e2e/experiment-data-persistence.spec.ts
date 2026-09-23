@@ -313,40 +313,15 @@ test.describe('Experiment Data Persistence', () => {
 
         await testPage.screenshot({ path: 'debug-step9-before-search.png', fullPage: true })
 
-        // First try to find experiment list items using correct selector
-        const allRows = sidebar.locator('.experiment-item')
-
-        console.log('  [DEBUG] Waiting for first experiment item...')
-        await allRows.first().waitFor({ state: 'visible', timeout: 5000 })
-
-        let experimentRow = null
-        const rowCount = await allRows.count()
-        console.log(`  Found ${rowCount} experiment(s)`)
-
-        // Search for our created experiment by name
-        for (let i = 0; i < rowCount; i++) {
-          const row = allRows.nth(i)
-          const text = await row.textContent()
-          console.log(`  [DEBUG] Row ${i+1}: ${text?.substring(0, 60)}...`)
-          // Look for the experiment name we created
-          if (text && text.includes(createdExperimentName)) {
-            experimentRow = row
-            console.log(`  ✓ Found our experiment at position ${i+1}`)
-            break
-          }
-        }
-
-        expect(experimentRow, `Created experiment ${createdExperimentName} must be present`).not.toBeNull()
-
-        await experimentRow.waitFor({ state: 'visible', timeout: 2000 })
-        const selectedExpName = await experimentRow.textContent()
-        console.log(`  ✓ Found experiment: ${selectedExpName?.substring(0, 80)}...`)
+        const experimentRow = sidebar.locator(`.experiment-item:has([data-experiment-name="${createdExperimentName}"])`)
+        await expect(experimentRow, 'The exact test-owned experiment must be present').toHaveCount(1)
+        await expect(experimentRow).toBeVisible()
 
         await testPage.screenshot({ path: 'debug-step9-before-click.png', fullPage: true })
 
         // Click on the inner div that has the actual onClick handler
         // The .experiment-item div doesn't have a click handler, but the nested div with cursor-pointer does
-        const clickableArea = experimentRow.locator('.cursor-pointer').first()
+        const clickableArea = experimentRow.locator('[data-experiment-name]')
         await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
         console.log('  [DEBUG] Clicking on clickable area inside experiment row...')
         await clickableArea.click()
@@ -400,7 +375,7 @@ test.describe('Experiment Data Persistence', () => {
         expect(trafficValue).toBe('75')
         console.log(`  ✓ Traffic percentage persisted: ${trafficValue}%`)
 
-        await expect(sidebar.locator('#experiment-name-input')).toHaveValue(createdExperimentName)
+        await expect(sidebar.locator('p').filter({ hasText: createdExperimentName })).toHaveText(createdExperimentName)
         for (const [id, selection] of expectedSelections) {
           await expect(sidebar.locator(`#${id}-trigger`)).toHaveText(selection)
         }

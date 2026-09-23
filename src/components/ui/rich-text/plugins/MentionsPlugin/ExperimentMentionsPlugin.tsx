@@ -114,7 +114,9 @@ export default function ExperimentMentionsPlugin({
   const [editor] = useLexicalComposerContext()
 
   const [results, setResults] = useState<ExperimentMention[]>([])
-  const [queryString, setQueryString] = useState<string>("")
+  // null means the typeahead is closed; an empty string is an active '#'.
+  // Fetching for every mounted rich-text field starves foreground API work.
+  const [queryString, setQueryString] = useState<string | null>(null)
   const [pageNumber, setPageNumber] = useState<number>(1)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -176,14 +178,14 @@ export default function ExperimentMentionsPlugin({
 
   // 2. Search experiments for the typeahead.
   useEffect(() => {
-    if (convertMentionsOnly) return
+    if (convertMentionsOnly || debouncedQuery === null) return
     setIsLoading(true)
     setPageNumber(1)
     setResults([])
   }, [debouncedQuery, convertMentionsOnly])
 
   useEffect(() => {
-    if (convertMentionsOnly) return
+    if (convertMentionsOnly || debouncedQuery === null) return
     let alive = true
     setIsLoading(true)
     fetchExperimentMentionsPage({
@@ -264,9 +266,7 @@ export default function ExperimentMentionsPlugin({
 
   return (
     <LexicalTypeaheadMenuPlugin<MentionTypeaheadOption>
-      onQueryChange={(value) =>
-        value === null ? setQueryString("") : setQueryString(value)
-      }
+      onQueryChange={setQueryString}
       onSelectOption={onSelectOption}
       triggerFn={checkForMentionMatch}
       options={options}

@@ -265,7 +265,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const experimentRow = sidebar.locator('.experiment-item').first()
       await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
 
-      const clickableArea = experimentRow.locator('.cursor-pointer').first()
+      const clickableArea = experimentRow.locator('[data-experiment-name]')
       await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
       await clickableArea.click()
       console.log('  ✓ Opened existing experiment')
