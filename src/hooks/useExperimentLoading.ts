@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import type { Experiment } from "~src/types/absmartly"
 import type { ExperimentFilters } from "~src/types/storage-state"
 import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
 
-import { buildFilterParams } from "./useExperimentFilters"
+import { getFilteredExperiments } from "./useExperimentFilters"
 
 interface UseExperimentLoadingParams {
   getExperiments: (params: Record<string, unknown>) => Promise<{
@@ -33,13 +33,14 @@ export function useExperimentLoading({
   const [pageSize, setPageSize] = useState(50)
   const [totalExperiments, setTotalExperiments] = useState<number | undefined>()
   const [hasMore, setHasMore] = useState(false)
+  const activeFilters = useRef<ExperimentFilters | null>(null)
 
   const loadExperiments = useCallback(
     async (
       forceRefresh = false,
       page = currentPage,
       size = pageSize,
-      customFilters: ExperimentFilters | null = null
+      customFilters: ExperimentFilters | null = activeFilters.current
     ) => {
       const stack = new Error().stack
       debugLog("=== loadExperiments called ===")
@@ -53,11 +54,15 @@ export function useExperimentLoading({
 
       setExperimentsLoading(true)
       onError(null)
+      activeFilters.current = customFilters
 
       try {
-        const params = buildFilterParams(customFilters, page, size)
-
-        const response = await getExperiments(params)
+        const response = await getFilteredExperiments(
+          getExperiments,
+          customFilters,
+          page,
+          size
+        )
         const experimentsData = response.experiments || []
 
         setExperiments(experimentsData)

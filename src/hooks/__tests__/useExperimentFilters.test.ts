@@ -5,6 +5,8 @@ import { localAreaStorage } from "~src/utils/storage"
 
 import {
   buildFilterParams,
+  buildFilterRequests,
+  getFilteredExperiments,
   useExperimentFilters
 } from "../useExperimentFilters"
 
@@ -247,6 +249,122 @@ describe("useExperimentFilters", () => {
 })
 
 describe("buildFilterParams", () => {
+  it.each(["full_on", "running_not_full_on"])(
+    "preserves Draft/Ready OR %s without a global running type",
+    (state) => {
+      const requests = buildFilterRequests(
+        { state: ["created", "ready", state], search: "owned" },
+        1,
+        50
+      )
+      expect(requests).toHaveLength(2)
+      expect(requests[0]).toMatchObject({
+        state: "created,ready",
+        search: "owned"
+      })
+      expect(requests[0].running_type).toBeUndefined()
+      expect(requests[1]).toMatchObject({
+        state: "running",
+        running_type: state === "full_on" ? "full_on" : "experiment",
+        search: "owned"
+      })
+    }
+  )
+
+  it.each([
+    ["running", "full_on"],
+    ["running", "running_not_full_on"],
+    ["full_on", "running_not_full_on"]
+  ])("keeps the entire running union for %j", (...states) => {
+    const requests = buildFilterRequests(
+      { state: ["created", ...states] },
+      1,
+      50
+    )
+    expect(requests).toHaveLength(1)
+    expect(requests[0].state).toBe("created,running")
+    expect(requests[0].running_type).toBeUndefined()
+  })
+
+  it("merges overlapping sorted partitions without dropping ordinary states or inventing totals", async () => {
+    const row = (id: number) => ({
+      id,
+      created_at: new Date(id * 1000).toISOString()
+    })
+    const ordinary = [9, 7, 5, 3, 1].map(row)
+    const fullOn = [10, 7, 6, 2].map(row)
+    const get = jest.fn(async (params: Record<string, unknown>) => {
+      const rows = params.running_type ? fullOn : ordinary
+      const start = (Number(params.page) - 1) * Number(params.items)
+      return {
+        experiments: rows.slice(start, start + Number(params.items)),
+        total: rows.length
+      }
+    })
+    const filters = { state: ["scheduled", "full_on"] }
+    const first = await getFilteredExperiments(get, filters, 1, 2)
+    expect(first).toEqual({
+      experiments: [row(10), row(9)],
+      total: undefined,
+      hasMore: true
+    })
+    expect(get).toHaveBeenCalledTimes(4)
+    const second = await getFilteredExperiments(get, filters, 2, 2)
+    expect(second.experiments.map((item) => item.id)).toEqual([7, 6])
+    expect(second.total).toBe(8)
+    const last = await getFilteredExperiments(get, filters, 4, 2)
+    expect(last).toEqual({
+      experiments: [row(2), row(1)],
+      total: 8,
+      hasMore: false
+    })
+  })
+
+  it("propagates a failed partition instead of presenting an incomplete successful union", async () => {
+    const get = jest
+      .fn()
+      .mockResolvedValueOnce({ experiments: [], total: 0 })
+      .mockRejectedValueOnce(new Error("HTTP 400"))
+    await expect(
+      getFilteredExperiments(get, { state: ["ready", "full_on"] }, 1, 50)
+    ).rejects.toThrow("HTTP 400")
+  })
+
+  it("maps Full On to the experiment running category, not feature flag on", () => {
+    expect(buildFilterParams({ state: ["full_on"] }, 1, 50)).toMatchObject({
+      state: "running",
+      running_type: "full_on"
+    })
+  })
+
+  it("maps Running Not Full On to running with the documented experiment running type", () => {
+    expect(
+      buildFilterParams({ state: ["running_not_full_on"] }, 1, 50)
+    ).toMatchObject({ state: "running", running_type: "experiment" })
+  })
+
+  it("keeps the broader running/full-on union when both running options are selected", () => {
+    const params = buildFilterParams(
+      { state: ["full_on", "running_not_full_on", "running"] },
+      1,
+      50
+    )
+    expect(params.state).toBe("running")
+    expect(params.running_type).toBeUndefined()
+  })
+
+  it.each([
+    "created",
+    "ready",
+    "running",
+    "development",
+    "stopped",
+    "archived",
+    "scheduled"
+  ])("preserves supported API state %s", (state) => {
+    expect(buildFilterParams({ state: [state] }, 1, 50).state).toBe(state)
+  })
+
   it("omits filter keys entirely when filterState is null", () => {
     const params = buildFilterParams(null, 1, 50)
     expect(params).toEqual({

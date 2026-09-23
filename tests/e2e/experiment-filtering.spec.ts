@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { injectSidebar, click, debugWait, log, initializeTestLogging, setupTestPage } from './utils/test-helpers'
+import { createExperiment, fillMetadataForSave, saveExperiment } from './helpers/ve-experiment-setup'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -39,6 +40,8 @@ test.describe('Experiment List Filters', () => {
     test.setTimeout(process.env.SLOW === '1' ? 120000 : 90000)
 
     let sidebar: any
+    const ownedExperimentName = `FT-2244 filter clear ${Date.now()}-${test.info().parallelIndex}`
+    const ownedExperiment = () => sidebar.locator('[data-testid="experiment-list-item"]').filter({ hasText: ownedExperimentName })
     let stepNumber = 1
 
     const step = (title: string, emoji = '📋') => {
@@ -73,27 +76,28 @@ test.describe('Experiment List Filters', () => {
       return await sidebar.locator('[data-testid="experiment-list-item"]').count()
     }
 
-    const waitForResults = async (): Promise<void> => {
-      await sidebar.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {})
-      await debugWait()
-      await sidebar.locator('[data-testid="experiment-list-item"], #no-experiments-message').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
-      await debugWait()
-    }
-
-    // The initial render has experimentsLoading=false and experiments=[], which
-    // satisfies waitForResults' selectors immediately (#no-experiments-message
-    // is visible). That lets the test charge ahead before loadExperiments has
-    // even fired, and a late-arriving API response then re-renders mid-test —
-    // detaching elements out from under in-flight clicks. Block on a real
-    // load cycle instead: refresh-experiments-button is disabled while
-    // experimentsLoading=true, so wait for it to flip true→false.
+    // This only establishes that the UI can be used. The owned creation and
+    // exact-row assertion below establish meaningful loaded-data readiness.
     const waitForInitialLoad = async (): Promise<void> => {
       const refreshBtn = sidebar.locator('#refresh-experiments-button')
       await refreshBtn.waitFor({ state: 'visible', timeout: 10000 })
-      // Catch the disabled phase if we can; if the load completes before we
-      // observe it, the next assertion still confirms no in-flight load.
-      await expect(refreshBtn).toBeDisabled({ timeout: 10000 }).catch(() => {})
       await expect(refreshBtn).not.toBeDisabled({ timeout: 30000 })
+    }
+
+    const waitForSearchResponse = (search: string) => {
+      const started = Date.now()
+      const pending = testPage.context().waitForEvent('response', {
+        timeout: 10000,
+        predicate: response => {
+          const url = new URL(response.url())
+          return response.request().method() === 'GET' && url.pathname === '/v1/experiments' &&
+            (url.searchParams.get('search') || '') === search &&
+            url.searchParams.get('state') === 'created,ready' &&
+            response.request().timing().startTime >= started
+        }
+      })
+      pending.catch(() => {})
+      return pending
     }
 
     const clickFilter = async (selector: string): Promise<void> => {
@@ -102,6 +106,22 @@ test.describe('Experiment List Filters', () => {
     }
 
     const selectOnlyState = async (targetState: string): Promise<void> => {
+      const apiState = targetState === 'full_on' || targetState === 'running_not_full_on' ? 'running' : targetState
+      const runningType = targetState === 'full_on' ? 'full_on' : targetState === 'running_not_full_on' ? 'experiment' : null
+      const started = Date.now()
+      const responsePromise = testPage.context().waitForEvent('response', {
+        timeout: 10000,
+        predicate: response => {
+          const url = new URL(response.url())
+          return response.request().method() === 'GET' && url.pathname === '/v1/experiments' &&
+            url.searchParams.get('state') === apiState &&
+            url.searchParams.get('running_type') === runningType &&
+            response.request().timing().startTime >= started
+        }
+      })
+      // Attach a rejection handler while interacting, then await the original
+      // promise below so a rejected live response still fails the assertion.
+      responsePromise.catch(() => {})
       const allStates = ['created', 'ready', 'running', 'development', 'full_on', 'running_not_full_on', 'stopped', 'archived', 'scheduled']
       // First deactivate all states
       for (const s of allStates) {
@@ -111,11 +131,19 @@ test.describe('Experiment List Filters', () => {
       }
       // Now activate only the target
       await clickFilter(`#filter-state-${targetState}`)
-      // Wait for debounced filter to apply and list to update
-      // The filter uses a 250ms debounce, so wait for old items to disappear
-      await sidebar.locator('[data-testid="experiment-list-item"]').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-      await sidebar.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {})
-      await waitForResults()
+      const response = await responsePromise
+      expect(response.status()).toBe(200)
+      const { experiments } = await response.json()
+      expect(Array.isArray(experiments)).toBe(true)
+      await expect.poll(() => sidebar.locator('[data-testid="experiment-list-item"] [data-experiment-name]').evaluateAll((nodes: Element[]) => nodes.map(node => node.getAttribute('data-experiment-name')))).toEqual(experiments.map((experiment: any) => experiment.name))
+      if (targetState === 'full_on' || targetState === 'running_not_full_on') {
+        expect(experiments.length).toBeGreaterThan(0)
+        for (const experiment of experiments) {
+          expect(experiment.full_on_at != null).toBe(targetState === 'full_on')
+          if (targetState === 'running_not_full_on') expect(experiment.state).toBe('running')
+        }
+        await test.info().attach(`state-contract-${targetState}`, { body: JSON.stringify({ state: apiState, runningType, status: response.status(), matchingResults: experiments.length }), contentType: 'application/json' })
+      }
     }
 
     // ========================================
@@ -139,6 +167,11 @@ test.describe('Experiment List Filters', () => {
       await sidebar.locator('#experiments-heading').waitFor({ state: 'visible', timeout: 10000 })
       await debugWait()
       await waitForInitialLoad()
+      await createExperiment(sidebar)
+      await sidebar.locator('#display-name-input').fill(ownedExperimentName)
+      await fillMetadataForSave(sidebar, testPage)
+      await saveExperiment(sidebar, testPage, ownedExperimentName)
+      await expect(ownedExperiment()).toHaveCount(1)
       log(`Initial experiment count: ${await experimentCount()}`)
       await debugWait()
     })
@@ -224,6 +257,10 @@ test.describe('Experiment List Filters', () => {
       const states = await getStates()
       log(`Full On filter: ${states.length} experiments, active: ${await isActive('#filter-state-full_on')}`)
       await debugWait()
+    })
+
+    await test.step('Running Not Full On uses the running-type contract', async () => {
+      await selectOnlyState('running_not_full_on')
     })
 
     await test.step('Archived filter can be selected', async () => {
@@ -362,46 +399,60 @@ test.describe('Experiment List Filters', () => {
         await clickFilter('#filter-state-development')
         await debugWait()
       }
-      await waitForResults()
+      await expect(ownedExperiment()).toHaveCount(1)
       await debugWait()
     })
 
+    // Readiness must include the experiment this test actually created, not
+    // an old empty state or unrelated workspace rows.
+    await expect(ownedExperiment()).toHaveCount(1)
     const countBefore = await experimentCount()
+    expect(countBefore).toBeGreaterThan(0)
     log(`Experiments before search: ${countBefore}`)
     await debugWait()
 
     await test.step('Search narrows results', async () => {
       step('Testing search filter', '🔎')
       const searchInput = sidebar.locator('#filter-search-input')
+      const pending = waitForSearchResponse('zzz_nonexistent_experiment_xyz')
       await searchInput.fill('zzz_nonexistent_experiment_xyz')
       await debugWait()
-      await waitForResults()
+      const response = await pending
+      expect(response.status()).toBe(200)
+      expect((await response.json()).experiments).toEqual([])
+      await expect(sidebar.locator('#no-experiments-message')).toBeVisible()
+      await expect(ownedExperiment()).toHaveCount(0)
+      await expect.poll(experimentCount).toBe(0)
       await debugWait()
 
       const countAfter = await experimentCount()
       log(`Experiments after nonsense search: ${countAfter} (before: ${countBefore})`)
-      // Search should reduce or show no results; if client-side search isn't applied yet, just log
-      if (countAfter >= countBefore && countBefore > 0) {
-        log('Note: search did not reduce results - may be a timing issue with client-side filtering')
-      }
+      expect(countAfter).toBe(0)
       await debugWait()
     })
 
     await test.step('Clearing search restores results', async () => {
       step('Clearing search', '🧹')
       const searchInput = sidebar.locator('#filter-search-input')
+      const pending = waitForSearchResponse('')
       await searchInput.fill('')
       await debugWait()
-      await waitForResults()
+      const response = await pending
+      expect(response.status()).toBe(200)
+      expect((await response.json()).experiments.length).toBeGreaterThan(0)
       await debugWait()
 
-      // The previous no-results state can satisfy waitForResults before the
-      // debounced clear-search request starts. Await the restored result
-      // contract itself, using the existing assertion budget.
+      // Await rendered restoration as well as the real response, using the
+      // original count threshold and existing assertion budget.
       await expect.poll(experimentCount).toBeGreaterThanOrEqual(countBefore)
+      await expect(ownedExperiment()).toHaveCount(1)
       const countRestored = await experimentCount()
       log(`Experiments after clearing search: ${countRestored}`)
       expect(countRestored).toBeGreaterThanOrEqual(countBefore)
+      await test.info().attach('owned-filter-transition', {
+        body: JSON.stringify({ ownedExperimentName, before: countBefore, afterSearch: 0, restored: countRestored, ownedRestored: true }),
+        contentType: 'application/json'
+      })
       await debugWait()
     })
 
@@ -425,7 +476,7 @@ test.describe('Experiment List Filters', () => {
 
       await click(sidebar, '#filter-clear-all')
       await debugWait()
-      await waitForResults()
+      await expect(ownedExperiment()).toHaveCount(1)
       await debugWait()
 
       // Verify defaults restored
@@ -441,7 +492,9 @@ test.describe('Experiment List Filters', () => {
       await debugWait()
 
       // Verify experiments match defaults
+      await expect(ownedExperiment()).toHaveCount(1)
       const states = await getStates()
+      expect(states.length).toBeGreaterThan(0)
       for (const s of states) {
         expect(['created', 'ready']).toContain(s)
       }
