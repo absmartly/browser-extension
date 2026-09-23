@@ -10,6 +10,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  live-flake-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CI: true
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+      PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
+      PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run build
+      - name: Three bounded repetitions of the five observed flaky paths, without retries
+        run: >-
+          bunx playwright test
+          --grep 'should handle append action|extension generates DOM changes via Anthropic API|checkAuthentication with API Key|should persist and reload all experiment metadata including unit type|Test API_REQUEST message'
+          --repeat-each=3 --retries=0 --workers=4
+      - name: Redact credentials from retained evidence
+        if: always()
+        run: python3 tests/sanitize-artifacts.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-flake-regression-results
+          path: test-results/
+          retention-days: 7
+
   launchpad-regressions:
     runs-on: ubuntu-latest
     steps:
@@ -105,11 +141,17 @@ jobs:
           PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
           PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
+      - name: Redact credentials from retained evidence
+        if: always()
+        run: python3 tests/sanitize-artifacts.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
       - uses: actions/upload-artifact@v4
-        if: failure()
+        # Successful shards can contain failed attempts; retain their evidence.
+        if: always()
         with:
           name: playwright-report-shard-${{ strategy.job-index }}
-          path: |
-            playwright-report/
-            test-results/
+          path: test-results/
           retention-days: 7

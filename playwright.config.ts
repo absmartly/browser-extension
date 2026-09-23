@@ -16,7 +16,7 @@ export default defineConfig({
   reporter: [['html', { open: process.env.SLOW === '1' ? 'always' : 'never' }], ['list']],
   use: {
     actionTimeout: 0,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     video: 'retain-on-failure',
     baseURL: 'http://localhost:3456'
   },
