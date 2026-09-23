@@ -33,10 +33,10 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx playwright install chromium --with-deps
       - run: bun run build
-      - name: Three bounded repetitions of the five observed flaky paths, without retries
+      - name: Three bounded repetitions of the six observed flaky paths, without retries
         run: >-
           bunx playwright test
-          --grep 'should handle append action|extension generates DOM changes via Anthropic API|checkAuthentication with API Key|should persist and reload all experiment metadata including unit type|Test API_REQUEST message'
+          --grep 'should handle append action|extension generates DOM changes via Anthropic API|checkAuthentication with API Key|should persist and reload all experiment metadata including unit type|Test API_REQUEST message|Complete filter workflow: toggle panel, state filters, significance, alerts, search, clear'
           --repeat-each=3 --retries=0 --workers=4
       - name: Redact credentials from retained evidence
         id: redact
