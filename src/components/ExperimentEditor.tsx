@@ -165,13 +165,30 @@ export function ExperimentEditor({
     experiment,
     domFieldName
   })
+  // Rendering and saving share definitions even when Save is clicked while
+  // the initial request is pending. Failed loads remain retryable.
+  const customFieldsRequest = useRef<Promise<
+    ExperimentCustomSectionField[]
+  > | null>(null)
+  const loadCustomFields = useCallback(() => {
+    if (!customFieldsRequest.current) {
+      customFieldsRequest.current = new BackgroundAPIClient()
+        .getCustomSectionFields()
+        .catch((error) => {
+          customFieldsRequest.current = null
+          throw error
+        })
+    }
+    return customFieldsRequest.current
+  }, [])
   const {
     save: saveExperiment,
     saving,
     saveStatus
   } = useExperimentSave({
     experiment,
-    domFieldName
+    domFieldName,
+    loadCustomFields
   })
 
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
@@ -359,8 +376,7 @@ export function ExperimentEditor({
     let cancelled = false
     ;(async () => {
       try {
-        const client = new BackgroundAPIClient()
-        const fields = await client.getCustomSectionFields()
+        const fields = await loadCustomFields()
         if (!cancelled) setCustomFields(fields)
       } catch (err) {
         debugWarn("[ExperimentEditor] failed to load custom fields", err)

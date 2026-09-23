@@ -34,21 +34,10 @@ test.describe('Bug Fixes E2E Tests', () => {
   })
 
   test.describe('1. Exit VE and Preview cleanup', () => {
-    test('should stop VE when navigating back from experiment detail', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      // Wait for experiments to load
-      const experimentItems = sidebar.locator('.experiment-item')
-      await expect(experimentItems.first()).toBeVisible()
-
-      // Click first experiment
-      await experimentItems.first().locator('[data-experiment-name]').click()
-
-      // Wait for experiment detail
-      await sidebar.locator('#header-back-button').waitFor({ state: 'visible', timeout: 5000 })
+    test('should stop VE when navigating back from a test-owned draft', async () => {
+      await sidebar.locator('button[title="Create New Experiment"]').click({ timeout: 10000 })
+      await sidebar.locator('#from-scratch-button').click({ timeout: 10000 })
+      await expect(sidebar.locator('#experiment-name-input')).toBeVisible()
 
       // Wait for VE button to appear
       await sidebar.locator('#visual-editor-button').first().waitFor({ state: 'visible', timeout: 5000 })
@@ -61,7 +50,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       await sidebar.locator('#header-back-button').click()
 
       // Verify we're back at experiment list
-      await sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 3000 })
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
       await expect(testPage.locator('.absmartly-toolbar')).toHaveCount(0)
     })
 
@@ -142,7 +131,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       const reloadBanner = sidebar.locator('text=Reload to apply changes')
       await expect(reloadBanner).toBeVisible()
       const readOverrides = async () => {
-        const value = (await getStorage())['absmartly-overrides']
+        const value = (await getStorage())['experiment_overrides']
         return typeof value === 'string' ? JSON.parse(value) : (value || {})
       }
       await expect.poll(async () => Object.keys(await readOverrides()).length).toBeGreaterThan(0)

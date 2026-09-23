@@ -377,7 +377,7 @@ test.describe('Experiment Data Persistence', () => {
 
         await expect(sidebar.locator('p').filter({ hasText: createdExperimentName })).toHaveText(createdExperimentName)
         for (const [id, selection] of expectedSelections) {
-          await expect(sidebar.locator(`#${id}-trigger`)).toHaveText(selection)
+          await expect(sidebar.locator(`#${id}-trigger`)).toHaveText(selection, { useInnerText: true })
         }
 
         await debugWait()

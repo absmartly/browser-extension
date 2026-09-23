@@ -48,6 +48,7 @@ interface UseExperimentSaveOptions {
   experiment?: Experiment | null
   domFieldName: string
   onError?: (message: string) => void
+  loadCustomFields?: () => Promise<ExperimentCustomSectionField[]>
 }
 
 export interface SaveStatus {
@@ -65,7 +66,8 @@ export interface SaveStatus {
 export function useExperimentSave({
   experiment,
   domFieldName,
-  onError
+  onError,
+  loadCustomFields
 }: UseExperimentSaveOptions) {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -108,7 +110,8 @@ export function useExperimentSave({
           currentVariants,
           fieldName,
           onSave,
-          setSaveStatus
+          setSaveStatus,
+          loadCustomFields
         )
       }
 
@@ -154,7 +157,8 @@ async function createNewExperiment(
   currentVariants: VariantData[],
   domFieldName: string,
   onSave: (experiment: Partial<Experiment>) => Promise<void>,
-  setSaveStatus?: (status: SaveStatus) => void
+  setSaveStatus?: (status: SaveStatus) => void,
+  loadCustomFields?: () => Promise<ExperimentCustomSectionField[]>
 ) {
   const client = new BackgroundAPIClient()
   let customFields: ExperimentCustomSectionField[] = []
@@ -165,7 +169,9 @@ async function createNewExperiment(
       message: "Fetching custom fields..."
     })
     debugLog("[createNewExperiment] Fetching custom section fields...")
-    customFields = await client.getCustomSectionFields()
+    customFields = await (loadCustomFields
+      ? loadCustomFields()
+      : client.getCustomSectionFields())
     debugLog(
       "[createNewExperiment] Fetched custom section fields:",
       customFields

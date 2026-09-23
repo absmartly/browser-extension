@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import React from "react"
 
 import "@testing-library/jest-dom"
@@ -22,6 +22,8 @@ jest.mock("~src/lib/background-api-client", () => ({
     getCustomSectionFields: (...args: unknown[]) =>
       mockGetCustomSectionFields(...args),
     getMetrics: (...args: unknown[]) => mockGetMetrics(...args),
+    getOwners: jest.fn().mockResolvedValue([]),
+    getTeams: jest.fn().mockResolvedValue([]),
     getMetricUsages: (...args: unknown[]) => mockGetMetricUsages(...args),
     getMetricCategories: (...args: unknown[]) =>
       mockGetMetricCategories(...args),
@@ -333,13 +335,19 @@ describe("ExperimentEditor", () => {
   })
 
   describe("Save Functionality", () => {
-    it("passes its save callback through the real save hook after custom fields load", async () => {
+    it("shares pending custom-field definitions with the real save hook before invoking its callback", async () => {
       const realHook = jest.requireActual(
         "~src/hooks/useExperimentSave"
       ).useExperimentSave
       const mockedHook = useExperimentSave as jest.Mock
       const previousImplementation = mockedHook.getMockImplementation()
       mockedHook.mockImplementation(realHook)
+      let resolveFields!: (fields: unknown[]) => void
+      mockGetCustomSectionFields.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFields = resolve
+        })
+      )
       try {
         const onSave = jest.fn().mockResolvedValue(undefined)
         const { container } = render(
@@ -353,16 +361,39 @@ describe("ExperimentEditor", () => {
         })
         fireEvent.click(container.querySelector("#create-experiment-button")!)
         await waitFor(() =>
+          expect(screen.getByTestId("experiment-save-status")).toHaveAttribute(
+            "data-step",
+            "loading-custom-fields"
+          )
+        )
+        expect(onSave).not.toHaveBeenCalled()
+        expect(mockGetCustomSectionFields).toHaveBeenCalledTimes(1)
+        await act(async () =>
+          resolveFields([
+            {
+              id: 701,
+              title: "Test-owned field",
+              type: "text",
+              default_value: "owned"
+            }
+          ])
+        )
+        await waitFor(() =>
           expect(onSave).toHaveBeenCalledWith(
             expect.objectContaining({
               name: "callback_wiring_draft",
-              state: "created"
+              state: "created",
+              custom_section_field_values: {
+                "701": { id: 701, type: "text", value: "owned" }
+              }
             })
           )
         )
         expect(mockGetCustomSectionFields).toHaveBeenCalled()
         expect(onSave).toHaveBeenCalledTimes(1)
       } finally {
+        await act(async () => resolveFields([]))
+        mockGetCustomSectionFields.mockResolvedValue([])
         mockedHook.mockImplementation(previousImplementation!)
       }
     })
