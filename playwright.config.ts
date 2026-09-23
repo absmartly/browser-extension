@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  // These isolated fixtures own their browser, tracing and production setup.
+  testIgnore: ['**/reproductions/**'],
   globalSetup: require.resolve('./tests/global-setup.ts'),
   timeout: 180 * 1000, // 180 seconds (3 minutes)
   expect: {

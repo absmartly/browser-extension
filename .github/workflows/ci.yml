@@ -9,6 +9,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  launchpad-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run build
+      - run: bunx playwright test -c tests/reproductions/playwright.config.ts
+        env:
+          REPRO_OUTPUT_DIR: ${{ runner.temp }}/launchpad-regressions
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: launchpad-regression-results
+          path: ${{ runner.temp }}/launchpad-regressions/
+          retention-days: 7
+
   typecheck:
     runs-on: ubuntu-latest
     steps:

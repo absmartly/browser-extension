@@ -21,6 +21,11 @@ profile, and closes/removes them in teardown. Traces, final screenshots and
 diagnostic attachments are retained even for failing assertions. One worker,
 zero retries. `HEADED=1` optionally enables headed execution.
 
+CI runs this config once in the credential-free `launchpad-regressions` job,
+with a fresh production build and Chromium. The default sharded suite excludes
+this directory explicitly. Failed dedicated runs upload traces, screenshots
+and JSON results as `launchpad-regression-results` (seven-day retention).
+
 Coverage:
 
 - Packaged production **iframe** readiness/persistence and reload/remount.
