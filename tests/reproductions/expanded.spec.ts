@@ -114,8 +114,14 @@ test('real mention keyboard input ignores old query results and survives Escape/
   await expect(sidebar.getByRole('option').filter({hasText:'Fixture Beta'})).toBeVisible()
   await editor.press('Escape')
   await expect(sidebar.locator('li[role="option"]')).toHaveCount(0)
-  await editor.fill('')
+  // Lexical owns the selection. Playwright's contenteditable fill('') can
+  // race selection reconciliation and delete only the last character.
+  // Clear through the real keyboard path and verify the reopen precondition.
+  await editor.press('ControlOrMeta+a')
+  await editor.press('Backspace')
+  await expect(editor).toHaveText('')
   await editor.pressSequentially('#Beta')
+  await expect(editor).toHaveText('#Beta')
   await expect(sidebar.getByRole('option').filter({hasText:'Fixture Beta'})).toBeVisible()
   await editor.press('ArrowDown')
   await editor.press('Enter')
