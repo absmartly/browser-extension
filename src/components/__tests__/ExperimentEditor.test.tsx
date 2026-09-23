@@ -335,6 +335,110 @@ describe("ExperimentEditor", () => {
   })
 
   describe("Save Functionality", () => {
+    it("contains a rejected save at the UI boundary and allows retry without losing the draft", async () => {
+      const mockedHook = useExperimentSave as jest.Mock
+      const previousImplementation = mockedHook.getMockImplementation()
+      mockedHook.mockImplementation(
+        jest.requireActual("~src/hooks/useExperimentSave").useExperimentSave
+      )
+      try {
+        const onSave = jest
+          .fn()
+          .mockRejectedValueOnce(new Error("Test-owned rejection"))
+          .mockResolvedValue(undefined)
+        const { container } = render(
+          <ExperimentEditor {...defaultProps} onSave={onSave} />
+        )
+        fireEvent.change(container.querySelector("#display-name-input")!, {
+          target: { value: "Retry Draft" }
+        })
+        fireEvent.change(screen.getByTestId("unit-type-select"), {
+          target: { value: "1" }
+        })
+        fireEvent.click(container.querySelector("#create-experiment-button")!)
+        await waitFor(() =>
+          expect(screen.getByTestId("experiment-save-status")).toHaveAttribute(
+            "data-step",
+            "error"
+          )
+        )
+        expect(screen.getByTestId("experiment-save-status")).toHaveTextContent(
+          "Test-owned rejection"
+        )
+        expect(container.querySelector("#experiment-name-input")).toHaveValue(
+          "retry_draft"
+        )
+        expect(
+          container.querySelector("#create-experiment-button")
+        ).toBeEnabled()
+        fireEvent.click(container.querySelector("#create-experiment-button")!)
+        await waitFor(() =>
+          expect(screen.getByTestId("experiment-save-status")).toHaveAttribute(
+            "data-step",
+            "complete"
+          )
+        )
+        expect(onSave).toHaveBeenCalledTimes(2)
+      } finally {
+        mockedHook.mockImplementation(previousImplementation!)
+      }
+    })
+
+    it("retries failed definition loading on save and does not retain definitions across editor mounts", async () => {
+      const mockedHook = useExperimentSave as jest.Mock
+      const previousImplementation = mockedHook.getMockImplementation()
+      mockedHook.mockImplementation(
+        jest.requireActual("~src/hooks/useExperimentSave").useExperimentSave
+      )
+      const fields = [
+        {
+          id: 702,
+          title: "Retry field",
+          type: "text",
+          default_value: "retry-owned"
+        }
+      ]
+      mockGetCustomSectionFields
+        .mockRejectedValueOnce(new Error("Test-owned load failure"))
+        .mockResolvedValueOnce(fields)
+        .mockResolvedValueOnce([])
+      try {
+        const onSave = jest.fn().mockResolvedValue(undefined)
+        const editor = render(
+          <ExperimentEditor {...defaultProps} onSave={onSave} />
+        )
+        await act(async () => {})
+        fireEvent.change(
+          editor.container.querySelector("#display-name-input")!,
+          { target: { value: "Definition Retry" } }
+        )
+        fireEvent.change(screen.getByTestId("unit-type-select"), {
+          target: { value: "1" }
+        })
+        fireEvent.click(
+          editor.container.querySelector("#create-experiment-button")!
+        )
+        await waitFor(() =>
+          expect(onSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+              custom_section_field_values: {
+                "702": { id: 702, type: "text", value: "retry-owned" }
+              }
+            })
+          )
+        )
+        expect(mockGetCustomSectionFields).toHaveBeenCalledTimes(2)
+        editor.unmount()
+        render(<ExperimentEditor {...defaultProps} />)
+        await waitFor(() =>
+          expect(mockGetCustomSectionFields).toHaveBeenCalledTimes(3)
+        )
+      } finally {
+        mockGetCustomSectionFields.mockResolvedValue([])
+        mockedHook.mockImplementation(previousImplementation!)
+      }
+    })
+
     it("shares pending custom-field definitions with the real save hook before invoking its callback", async () => {
       const realHook = jest.requireActual(
         "~src/hooks/useExperimentSave"

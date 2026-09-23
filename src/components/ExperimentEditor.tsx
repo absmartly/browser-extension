@@ -548,7 +548,13 @@ export function ExperimentEditor({
       return
     }
 
-    await saveExperiment(formData, currentVariants, undefined, onSave)
+    try {
+      await saveExperiment(formData, currentVariants, undefined, onSave)
+    } catch {
+      // The hook retains the error in saveStatus and re-enables Save. React
+      // does not consume rejected async event handlers; keep the draft here
+      // for correction/retry instead of leaking an unhandled rejection.
+    }
   }
 
   const handleCancel = async () => {
