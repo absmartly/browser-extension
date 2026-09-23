@@ -11,6 +11,8 @@ concurrency:
 
 jobs:
   live-flake-regressions:
+    needs: e2e-tests
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -37,10 +39,11 @@ jobs:
           --grep 'should handle append action|extension generates DOM changes via Anthropic API|checkAuthentication with API Key|should persist and reload all experiment metadata including unit type|Test API_REQUEST message'
           --repeat-each=3 --retries=0 --workers=4
       - name: Redact credentials from retained evidence
+        id: redact
         if: always()
         run: python3 tests/sanitize-artifacts.py
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.redact.outcome == 'success'
         with:
           name: live-flake-regression-results
           path: test-results/
@@ -142,6 +145,7 @@ jobs:
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
           PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
       - name: Redact credentials from retained evidence
+        id: redact
         if: always()
         run: python3 tests/sanitize-artifacts.py
         env:
@@ -150,7 +154,7 @@ jobs:
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
       - uses: actions/upload-artifact@v4
         # Successful shards can contain failed attempts; retain their evidence.
-        if: always()
+        if: always() && steps.redact.outcome == 'success'
         with:
           name: playwright-report-shard-${{ strategy.job-index }}
           path: test-results/

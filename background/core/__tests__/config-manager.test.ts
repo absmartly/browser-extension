@@ -251,6 +251,18 @@ describe('config-manager', () => {
       }))
     })
 
+    it('does not write stale defaults when the final config read fails and allows initialization retry', async () => {
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
+      const get = jest.spyOn(storage, 'get').mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('fixture read failure')).mockResolvedValue(null)
+      jest.spyOn(secureStorage, 'get').mockResolvedValue('synthetic-key')
+      const set = jest.spyOn(storage, 'set').mockResolvedValue(null)
+      await expect(initializeConfig(storage, secureStorage)).rejects.toThrow('fixture read failure')
+      expect(set).not.toHaveBeenCalled()
+      await initializeConfig(storage, secureStorage)
+      expect(set).toHaveBeenCalledTimes(1)
+      expect(get).toHaveBeenCalledTimes(4)
+    })
+
     it('should not override existing config values', async () => {
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY = 'env-api-key'
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://api.absmartly.com'

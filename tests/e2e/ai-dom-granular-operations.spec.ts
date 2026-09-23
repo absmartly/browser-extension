@@ -305,7 +305,7 @@ test.describe('AI DOM Granular Operations', () => {
     })
 
     await test.step('Generate additional changes (append)', async () => {
-      await generateAndWait(sidebar!, 'Also make all headings blue and bold')
+      await generateAndWait(sidebar!, 'Append a DOM change setting color: blue and font-weight: bold on h1, h2, h3, h4, h5, h6. Keep the existing orange .btn change. Generate the DOM changes now using the DOM changes tool.')
     })
 
     await test.step('Verify both initial and new changes exist', async () => {
@@ -319,6 +319,8 @@ test.describe('AI DOM Granular Operations', () => {
       log(`Has heading changes: ${hasHeadingChanges}`)
 
       expect(changes.length).toBeGreaterThanOrEqual(2)
+      expect(hasButtonChanges).toBe(true)
+      expect(hasHeadingChanges).toBe(true)
       log('✅ Append action verified - multiple changes present')
     })
   })

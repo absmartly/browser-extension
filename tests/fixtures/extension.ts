@@ -252,7 +252,10 @@ export const test = base.extend<ExtFixtures>({
     try {
       await use(context)
     } finally {
-      await testInfo.attach('request-timings', {body: JSON.stringify(network, null, 2), contentType: 'application/json'})
+      const timingPath = testInfo.outputPath('request-timings.json')
+      fs.mkdirSync(path.dirname(timingPath), {recursive: true})
+      fs.writeFileSync(timingPath, JSON.stringify(network, null, 2))
+      await testInfo.attach('request-timings', {path: timingPath, contentType: 'application/json'})
     }
     await Promise.race([
       context.close(),
