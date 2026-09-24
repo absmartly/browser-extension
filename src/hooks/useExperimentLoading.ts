@@ -34,6 +34,9 @@ export function useExperimentLoading({
   const [totalExperiments, setTotalExperiments] = useState<number | undefined>()
   const [hasMore, setHasMore] = useState(false)
   const activeFilters = useRef<ExperimentFilters | null>(null)
+  // Responses can complete out of order (a slower earlier request finishing
+  // after a newer one). Only the newest load may publish results or errors.
+  const loadSequence = useRef(0)
 
   const loadExperiments = useCallback(
     async (
@@ -55,6 +58,8 @@ export function useExperimentLoading({
       setExperimentsLoading(true)
       onError(null)
       activeFilters.current = customFilters
+      const sequence = ++loadSequence.current
+      const isCurrent = () => sequence === loadSequence.current
 
       try {
         const response = await getFilteredExperiments(
@@ -63,6 +68,7 @@ export function useExperimentLoading({
           page,
           size
         )
+        if (!isCurrent()) return
         const experimentsData = response.experiments || []
 
         setExperiments(experimentsData)
@@ -81,19 +87,20 @@ export function useExperimentLoading({
           }
         }
       } catch (err: unknown) {
+        if (!isCurrent()) return
         const error = err as { isAuthError?: boolean; message?: string }
         if (error.isAuthError || error.message === "AUTH_EXPIRED") {
           debugLog("[loadExperiments] AUTH_EXPIRED error detected")
           onAuthExpired(true)
 
           const permissionsGranted = await requestPermissionsIfNeeded(true)
+          if (!isCurrent()) return
 
           if (permissionsGranted) {
             debugLog("[loadExperiments] Retrying after permissions granted...")
-            setTimeout(
-              () => loadExperiments(true, page, size, customFilters),
-              500
-            )
+            setTimeout(() => {
+              if (isCurrent()) loadExperiments(true, page, size, customFilters)
+            }, 500)
           } else {
             onError("Your session has expired. Please log in again.")
           }
@@ -104,7 +111,7 @@ export function useExperimentLoading({
         setExperiments([])
         setFilteredExperiments([])
       } finally {
-        setExperimentsLoading(false)
+        if (isCurrent()) setExperimentsLoading(false)
       }
     },
     [

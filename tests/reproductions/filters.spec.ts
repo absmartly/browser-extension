@@ -30,7 +30,7 @@ test('packaged Full On and Running Not Full On use accepted API filters and matc
   await sidebar.locator('#absmartly-endpoint').fill(endpoint)
   await sidebar.locator('#auth-method-apikey').check()
   await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
-  await sidebar.getByRole('button', { name: 'Save Settings', exact: true }).click()
+  await sidebar.locator('#save-settings-button').click()
   await expect(sidebar.locator('[data-experiment-name="ft_2244_draft"]')).toBeVisible()
   await sidebar.getByLabel('Toggle filters').click()
   await sidebar.locator('#filter-state-created').click()
@@ -82,7 +82,7 @@ test('packaged pending search preserves newer filters and Clear All cancels pend
   await sidebar.locator('#absmartly-endpoint').fill(endpoint)
   await sidebar.locator('#auth-method-apikey').check()
   await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
-  await sidebar.getByRole('button', { name: 'Save Settings', exact: true }).click()
+  await sidebar.locator('#save-settings-button').click()
   await expect(sidebar.locator('#experiments-heading')).toBeVisible()
   await sidebar.getByLabel('Toggle filters').click()
 
@@ -125,4 +125,63 @@ test('packaged pending search preserves newer filters and Clear All cancels pend
   await expect(sidebar.locator('#filter-state-running')).toHaveCSS('background-color', 'rgb(243, 244, 246)')
   await expect(sidebar.locator('#filter-significance-positive')).toHaveCSS('background-color', 'rgb(243, 244, 246)')
   await page.screenshot({ path: testInfo.outputPath('filter-clear-all-no-resurrection.png') })
+})
+
+test('packaged older filter response arriving after Clear All cannot replace the restored default rows', async ({ page, sidebar }, testInfo) => {
+  const endpoint = 'https://fixture.absmartly.com'
+  const owned = { id: 301, name: 'ft_2244_owned_draft', display_name: 'FT-2244 owned draft', state: 'created', full_on_at: null, created_at: '2026-09-23T00:00:00Z', variants: [], applications: [], owners: [], teams: [], feature_state: null }
+  const base = { applications: [], unit_types: [], users: [], teams: [], tags: [], favorites: [], user: { id: 1, user_id: 1, first_name: 'Synthetic', last_name: 'Fixture', email: 'fixture@example.invalid' } }
+  const requests: Array<{ state: string | null; significance: string | null }> = []
+  let releaseOld!: () => Promise<void>
+  await page.context().route(`${endpoint}/**`, route => {
+    const url = new URL(route.request().url())
+    if (url.pathname !== '/v1/experiments') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(base) })
+    const state = url.searchParams.get('state')
+    const significance = url.searchParams.get('significance')
+    requests.push({ state, significance })
+    const reply = (experiments: unknown[]) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...base, experiments, total: experiments.length }) })
+    // The narrowed Running + Positive query is slow; hold it until released.
+    if (state === 'running' && significance === 'positive') {
+      releaseOld = () => reply([])
+      return
+    }
+    return reply(state?.split(',').includes('created') ? [owned] : [])
+  })
+  await sidebar.locator('#configure-settings-button').click()
+  await sidebar.locator('#absmartly-endpoint').fill(endpoint)
+  await sidebar.locator('#auth-method-apikey').check()
+  await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
+  await sidebar.locator('#save-settings-button').click()
+  const ownedRow = sidebar.locator('[data-testid="experiment-list-item"]:has([data-experiment-name="ft_2244_owned_draft"])')
+  await expect(ownedRow).toHaveCount(1)
+  await sidebar.getByLabel('Toggle filters').click()
+  // Select only Running, then Positive: the last query is Running + Positive.
+  await sidebar.locator('#filter-state-created').click()
+  await sidebar.locator('#filter-state-ready').click()
+  await sidebar.locator('#filter-state-running').click()
+  await sidebar.locator('#filter-significance-positive').click()
+  await expect.poll(() => !!releaseOld).toBe(true)
+  await expect(sidebar.locator('#filter-clear-all')).toBeVisible()
+  // Clear All while the older query is still in flight; the defaults query
+  // completes first and restores the owned Draft row.
+  await sidebar.locator('#filter-clear-all').click()
+  await expect.poll(() => requests.at(-1)?.state).toBe('created,ready')
+  await expect(ownedRow).toHaveCount(1)
+  await expect(sidebar.locator('#filter-clear-all')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('clear-all-restored-before-stale-response.png') })
+  // Now the older Running + Positive response (empty) arrives last.
+  await releaseOld()
+  // Let the background reply round-trip and any resulting render commit.
+  await sidebar.locator('body').evaluate(async () => {
+    await chrome.runtime.sendMessage({ type: 'GET_CONFIG' })
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+  try {
+    await expect(ownedRow).toHaveCount(1)
+    await expect(sidebar.locator('#no-experiments-message')).toHaveCount(0)
+    await expect(sidebar.locator('#filter-state-created')).toHaveClass(/bg-blue-100/)
+  } finally {
+    await page.screenshot({ path: testInfo.outputPath('clear-all-after-stale-response.png') })
+    await testInfo.attach('experiment-requests', { body: JSON.stringify(requests), contentType: 'application/json' })
+  }
 })
