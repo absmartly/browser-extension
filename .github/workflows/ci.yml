@@ -12,7 +12,9 @@ concurrency:
 jobs:
   live-flake-regressions:
     needs: e2e-tests
-    if: always()
+    # Run after e2e failures too, but not for runs cancelled by a newer push:
+    # the live repetitions consume shared provider/API quota.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -51,6 +53,8 @@ jobs:
 
   launchpad-regressions:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -155,6 +159,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
       - uses: actions/upload-artifact@v4
         # Successful shards can contain failed attempts; retain their evidence.

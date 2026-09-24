@@ -159,6 +159,9 @@ export function buildFilterRequests(
 
 type FilterResult<T> = { experiments: T[]; total?: number; hasMore?: boolean }
 
+// The experiments endpoint clamps `items` to 1500 per request.
+export const MAX_EXPERIMENTS_PER_REQUEST = 1500
+
 export async function getFilteredExperiments<
   T extends { id: number; created_at?: string }
 >(
@@ -171,8 +174,11 @@ export async function getFilteredExperiments<
   if (requests.length === 1) return getExperiments(requests[0])
 
   // Each sorted partition contributes at most the first page*size+1 rows to
-  // this page and its next-page indicator. Do not fetch an entire workspace.
+  // this page and its next-page indicator. One request covers that prefix
+  // whenever it fits under the endpoint's per-request cap; deeper pages
+  // continue in cap-sized chunks. Do not fetch an entire workspace.
   const needed = page * size + 1
+  const chunk = Math.min(needed, MAX_EXPERIMENTS_PER_REQUEST)
   const partitions: Array<{ rows: T[]; exhausted: boolean }> = []
   for (const params of requests) {
     const rows: T[] = []
@@ -181,11 +187,11 @@ export async function getFilteredExperiments<
       const response = await getExperiments({
         ...params,
         page: sourcePage,
-        items: size
+        items: chunk
       })
       rows.push(...response.experiments)
       exhausted =
-        response.experiments.length < size ||
+        response.experiments.length < chunk ||
         (response.total !== undefined && rows.length >= response.total) ||
         response.hasMore === false
     }

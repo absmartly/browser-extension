@@ -41,7 +41,10 @@ test.describe('Experiment List Filters', () => {
 
     let sidebar: any
     const ownedExperimentName = `FT-2244 filter clear ${Date.now()}-${test.info().parallelIndex}`
-    const ownedExperiment = () => sidebar.locator('[data-testid="experiment-list-item"]').filter({ hasText: ownedExperimentName })
+    // The editor derives the unique experiment name from the display name;
+    // the list row exposes it as a stable attribute.
+    let ownedExperimentSlug = ''
+    const ownedExperiment = () => sidebar.locator(`[data-testid="experiment-list-item"]:has([data-experiment-name="${ownedExperimentSlug}"])`)
     let stepNumber = 1
 
     const step = (title: string, emoji = '📋') => {
@@ -169,6 +172,8 @@ test.describe('Experiment List Filters', () => {
       await waitForInitialLoad()
       await createExperiment(sidebar)
       await sidebar.locator('#display-name-input').fill(ownedExperimentName)
+      ownedExperimentSlug = await sidebar.locator('#experiment-name-input').inputValue()
+      expect(ownedExperimentSlug, 'Display name must derive a unique experiment name').not.toBe('')
       await fillMetadataForSave(sidebar, testPage)
       await saveExperiment(sidebar, testPage, ownedExperimentName)
       await expect(ownedExperiment()).toHaveCount(1)

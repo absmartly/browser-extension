@@ -18,7 +18,10 @@
     window.sdk = sdk
   }
   context.ready().then(() => { document.getElementById('sdk-status').textContent = 'Offline SDK ready' })
+  // Each queued goal carries a sequence number so a test can identify the
+  // latest row and assert a settled count rather than a transient one.
+  let seq = 0
   document.getElementById('goal').addEventListener('click', () => {
-    context.track('fixture_goal', { source: 'local-only' })
+    context.track('fixture_goal', { source: 'local-only', seq: ++seq })
   })
 })()

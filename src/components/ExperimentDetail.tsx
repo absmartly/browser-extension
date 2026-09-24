@@ -349,7 +349,9 @@ export function ExperimentDetail({
 
           {displayName !== experiment.name && (
             <div className="relative group">
-              <p className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap cursor-help">
+              <p
+                id="experiment-detail-name"
+                className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap cursor-help">
                 {experiment.name}
               </p>
 

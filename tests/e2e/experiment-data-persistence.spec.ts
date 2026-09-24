@@ -375,7 +375,7 @@ test.describe('Experiment Data Persistence', () => {
         expect(trafficValue).toBe('75')
         console.log(`  ✓ Traffic percentage persisted: ${trafficValue}%`)
 
-        await expect(sidebar.locator('p').filter({ hasText: createdExperimentName })).toHaveText(createdExperimentName)
+        await expect(sidebar.locator('#experiment-detail-name')).toHaveText(createdExperimentName)
         for (const [id, selection] of expectedSelections) {
           await expect(sidebar.locator(`#${id}-trigger`)).toHaveText(selection, { useInnerText: true })
         }

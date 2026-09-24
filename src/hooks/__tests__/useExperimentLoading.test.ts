@@ -37,6 +37,7 @@ it("retains the active mixed selection on page navigation and page-size changes"
   ])
   getExperiments.mockClear()
   await act(async () => result.current.handlePageSizeChange(20))
+  // Each partition fetches its page*size+1 sorted prefix in one request.
   expect(
     getExperiments.mock.calls.map(([params]) => [
       params.state,
@@ -44,7 +45,7 @@ it("retains the active mixed selection on page navigation and page-size changes"
       params.items
     ])
   ).toEqual([
-    ["created", undefined, 20],
-    ["running", "full_on", 20]
+    ["created", undefined, 21],
+    ["running", "full_on", 21]
   ])
 })

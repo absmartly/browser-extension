@@ -23,7 +23,7 @@ def redact(data, secrets):
 if __name__ == "__main__":
     values = [os.environ.get(name, "") for name in (
         "ANTHROPIC_API_KEY", "PLASMO_PUBLIC_ANTHROPIC_API_KEY",
-        "PLASMO_PUBLIC_ABSMARTLY_API_KEY",
+        "PLASMO_PUBLIC_ABSMARTLY_API_KEY", "PLASMO_PUBLIC_ANTHROPIC_ENDPOINT",
     )]
     secrets = set()
     for value in values:

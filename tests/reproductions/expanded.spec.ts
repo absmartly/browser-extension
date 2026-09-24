@@ -34,12 +34,12 @@ for (const empty of [false, true]) {
     await sidebar.locator('#absmartly-endpoint').fill(endpoint)
     await sidebar.locator('#auth-method-apikey').check()
     await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
-    await sidebar.getByRole('button', {name:'Save Settings', exact:true}).click()
+    await sidebar.locator('#save-settings-button').click()
     await sidebar.locator('button[title="Create New Experiment"]').click()
     await sidebar.locator('#from-scratch-button').click()
     await sidebar.locator('#experiment-name-input').fill('ft_2244_owned_draft')
     await sidebar.locator('#unit-type-select-trigger').click()
-    await sidebar.locator('#unit-type-select-dropdown').getByText('fixture_unit', {exact:true}).click()
+    await sidebar.locator('[data-testid="searchable-select-option-1"]').click()
     await sidebar.locator('#create-experiment-button').click()
     if (!empty) {
       await expect(sidebar.locator('[data-testid="experiment-save-status"]')).toHaveAttribute('data-step','error')
@@ -58,8 +58,8 @@ for (const empty of [false, true]) {
 test('malformed HTTP prefix is rejected without persisting it', async ({ sidebar }) => {
   await sidebar.locator('#configure-settings-button').click()
   await sidebar.locator('#absmartly-endpoint').fill('http:/fixture.absmartly.com')
-  await sidebar.getByRole('button', {name:'Save Settings',exact:true}).click()
-  await expect(sidebar.getByText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.',{exact:true})).toBeVisible()
+  await sidebar.locator('#save-settings-button').click()
+  await expect(sidebar.locator('#absmartly-endpoint-error')).toHaveText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.')
   await expect(sidebar.locator('#absmartly-endpoint')).toBeFocused()
   await expect(sidebar.locator('#nav-settings')).toHaveCount(0)
 })
@@ -72,11 +72,11 @@ test('older reachability failure cannot replace current syntax feedback', async 
   await sidebar.locator('#configure-settings-button').click()
   await sidebar.locator('#auth-method-apikey').check()
   await sidebar.locator('#absmartly-endpoint').fill(endpoint)
-  await sidebar.getByRole('button', {name:'Save Settings',exact:true}).click()
+  await sidebar.locator('#save-settings-button').click()
   await expect.poll(() => !!release).toBe(true)
   await sidebar.locator('#absmartly-endpoint').fill('http://[')
-  await sidebar.getByRole('button', {name:'Save Settings',exact:true}).click()
-  await expect(sidebar.getByText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.',{exact:true})).toBeVisible()
+  await sidebar.locator('#save-settings-button').click()
+  await expect(sidebar.locator('#absmartly-endpoint-error')).toHaveText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.')
   await release()
   // A message round trip drains the resolved background probe; an animation
   // frame then lets React commit any stale feedback that would overwrite it.
@@ -84,7 +84,7 @@ test('older reachability failure cannot replace current syntax feedback', async 
     await chrome.runtime.sendMessage({type:'GET_CONFIG'})
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   })
-  await expect(sidebar.getByText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.',{exact:true})).toBeVisible()
+  await expect(sidebar.locator('#absmartly-endpoint-error')).toHaveText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.')
 })
 
 test('real mention keyboard input ignores old query results and survives Escape/reopen', async ({ page, sidebar }) => {
@@ -102,7 +102,7 @@ test('real mention keyboard input ignores old query results and survives Escape/
   await sidebar.locator('#absmartly-endpoint').fill(endpoint)
   await sidebar.locator('#auth-method-apikey').check()
   await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
-  await sidebar.getByRole('button',{name:'Save Settings',exact:true}).click()
+  await sidebar.locator('#save-settings-button').click()
   await sidebar.locator('button[title="Create New Experiment"]').click()
   await sidebar.locator('#from-scratch-button').click()
   const editor = sidebar.locator('#cfe-input-91')
