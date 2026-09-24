@@ -74,7 +74,13 @@ test('older reachability failure cannot replace current syntax feedback', async 
   await sidebar.locator('#absmartly-endpoint').fill(endpoint)
   await sidebar.locator('#save-settings-button').click()
   await expect.poll(() => !!release).toBe(true)
+  // This Save fails on the empty API key and moves focus to that field on
+  // the next animation frame. Wait for that outcome before editing the
+  // endpoint, so the keystrokes cannot land in the API key input.
+  await expect(sidebar.locator('#api-key-input-error')).toBeVisible()
+  await expect(sidebar.locator('#api-key-input')).toBeFocused()
   await sidebar.locator('#absmartly-endpoint').fill('http://[')
+  await expect(sidebar.locator('#absmartly-endpoint')).toHaveValue('http://[')
   await sidebar.locator('#save-settings-button').click()
   await expect(sidebar.locator('#absmartly-endpoint-error')).toHaveText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.')
   await release()
