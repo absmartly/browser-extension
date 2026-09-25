@@ -171,6 +171,34 @@ describe("UnsavedChangesModal", () => {
       expect(defaultProps.onCancel).toHaveBeenCalledTimes(1)
     })
 
+    it("lets a modal dialog opened on top keep keyboard focus", () => {
+      function Layered({ promptOpen }: { promptOpen: boolean }) {
+        return (
+          <>
+            <UnsavedChangesModal {...defaultProps} />
+            {promptOpen && (
+              <div role="dialog" aria-modal="true" id="prompt">
+                <button id="prompt-grant">Grant Access</button>
+                <button id="prompt-cancel">Cancel prompt</button>
+              </div>
+            )}
+          </>
+        )
+      }
+      const { rerender } = render(<Layered promptOpen={false} />)
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+      rerender(<Layered promptOpen={true} />)
+      const grant = screen.getByRole("button", { name: "Grant Access" })
+      const promptCancel = screen.getByRole("button", { name: "Cancel prompt" })
+      grant.focus()
+      expect(grant).toHaveFocus()
+      promptCancel.focus()
+      expect(promptCancel).toHaveFocus()
+      // Tabbing out of the prompt into the covered dialog wraps back into it.
+      screen.getByRole("button", { name: "Save" }).focus()
+      expect(grant).toHaveFocus()
+    })
+
     it("restores focus to the element that opened it after closing", () => {
       function Harness() {
         const [open, setOpen] = React.useState(false)

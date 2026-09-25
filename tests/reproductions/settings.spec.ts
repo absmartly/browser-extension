@@ -177,6 +177,61 @@ for (const [label, width] of Object.entries(WIDTHS)) {
       await expect(field).toHaveValue(endpoint)
     })
 
+    test('SET-4 permission prompt opened over the unsaved dialog keeps keyboard focus', async ({ page }) => {
+      const context = page.context()
+      const worker = context.serviceWorkers()[0]
+      // Withhold site access as a user can in chrome://extensions ("On click").
+      const extensions = await context.newPage()
+      await extensions.goto(`chrome://extensions/?id=${new URL(worker.url()).host}`)
+      await extensions.locator('select#hostAccess').selectOption('ON_CLICK')
+      await expect.poll(() => worker.evaluate(() => chrome.permissions.contains({ origins: ['https://*.absmartly.com/*'] }))).toBe(false)
+      await extensions.close()
+      // The list request stays pending until released, then fails with 401.
+      let release!: () => void
+      const held = new Promise<void>(resolve => { release = resolve })
+      let hold = false
+      await context.route(`${endpoint}/v1/experiments**`, async route => {
+        if (!hold) return route.fallback()
+        await held
+        return route.fulfill({ status: 401, contentType: 'application/json', body: '{"errors":["unauthorized"]}' })
+      })
+      await page.locator('#configure-settings-button').click()
+      await page.locator('#absmartly-endpoint').fill(endpoint)
+      await page.locator('#auth-method-jwt').check()
+      await page.locator('#save-settings-button').click()
+      await expect(page.locator('#experiments-heading')).toBeVisible()
+      hold = true
+      await page.locator('#refresh-experiments-button').click()
+      await page.locator('#nav-settings').click()
+      await page.locator('#application-name-input').fill('ft-2252-layered')
+      await page.locator('#header-back-button').focus()
+      await page.keyboard.press('Enter')
+      await expect(page.locator('#unsaved-changes-cancel')).toBeFocused()
+      release()
+      const prompt = page.locator('#cookie-consent-modal, :has(> div > div > h3:text("ABsmartly Access Required"))').first()
+      await expect(page.getByRole('button', { name: 'Grant Access' })).toBeVisible()
+      const inPrompt = () => page.evaluate(() => {
+        const h = [...document.querySelectorAll('h3')].find(e => /Access Required/.test(e.textContent || ''))
+        return !!h?.closest('.fixed')?.contains(document.activeElement)
+      })
+      await expect.poll(inPrompt).toBe(true)
+      const trail = [await inPrompt()]
+      for (const key of ['Tab', 'Tab', 'Shift+Tab']) {
+        await page.keyboard.press(key)
+        trail.push(await inPrompt())
+      }
+      await shot(page, 'set4-07-permission-prompt-focus')
+      expect(trail, 'focus stays in the permission prompt').toEqual([true, true, true, true])
+      await page.locator('#cookie-consent-cancel').focus()
+      await page.keyboard.press('Enter')
+      await expect(prompt).toHaveCount(0)
+      // Back in the unsaved-changes dialog, which still traps and cancels.
+      await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('#unsaved-changes-modal'))).toBe(true)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#unsaved-changes-modal')).toHaveCount(0)
+      await expect(page.locator('#application-name-input')).toHaveValue('ft-2252-layered')
+    })
+
     test('SET-4 focus stays in the dialog while its Save is in flight', async ({ page }) => {
       await page.locator('#configure-settings-button').click()
       await saveConfig(page, GOOD_KEY)
