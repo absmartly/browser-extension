@@ -134,9 +134,11 @@ describe("event-buffer", () => {
       const timestamp = Date.now()
       await bufferSDKEvent({ eventName: "exposure", data: { experiment: "test" }, timestamp })
 
+      const storedId = mockSessionStorage.set.mock.calls[0][1][0].id
       expect(mockSendMessage).toHaveBeenCalledWith({
         type: "SDK_EVENT_BROADCAST",
         payload: {
+          id: storedId,
           eventName: "exposure",
           data: { experiment: "test" },
           timestamp

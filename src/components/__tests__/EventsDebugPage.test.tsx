@@ -320,6 +320,90 @@ describe("EventsDebugPage", () => {
     })
   })
 
+  describe("Clear while events are arriving", () => {
+    const openClearDialog = async () => {
+      fireEvent.click(screen.getByTitle("Clear all events"))
+      await waitFor(() => {
+        expect(screen.getByText("Clear All Events?")).toBeInTheDocument()
+      })
+    }
+
+    const dispatchWithId = (id: string, eventName = "goal") => {
+      act(() => {
+        messageListeners.forEach((listener) =>
+          listener({
+            type: "SDK_EVENT_BROADCAST",
+            payload: {
+              id,
+              eventName,
+              data: { id },
+              timestamp: new Date().toISOString()
+            }
+          })
+        )
+      })
+    }
+
+    it("does not show events whose broadcasts arrive before the clear completes, and matches the buffer afterwards", async () => {
+      let finishClear: (value: unknown) => void = () => {}
+      let buffered: any[] = []
+      const previous = mockSendMessage.getMockImplementation()
+      mockSendMessage.mockImplementation((message: any) => {
+        if (message.type === "CLEAR_BUFFERED_EVENTS") {
+          return new Promise((resolve) => {
+            finishClear = resolve
+          })
+        }
+        if (message.type === "GET_BUFFERED_EVENTS") {
+          return Promise.resolve({ success: true, events: buffered })
+        }
+        return undefined
+      })
+
+      try {
+        render(<EventsDebugPage onBack={() => {}} />)
+        dispatchWithId("before-1")
+        await waitFor(() => {
+          expect(screen.getByText("1 event captured")).toBeInTheDocument()
+        })
+
+        await openClearDialog()
+        fireEvent.click(screen.getByText("Clear All"))
+
+        // Writes queued ahead of the clear still broadcast; the clear removes them.
+        dispatchWithId("queued-1")
+        dispatchWithId("queued-2")
+        expect(screen.getByText("0 events captured")).toBeInTheDocument()
+
+        // One event was buffered after the clear.
+        buffered = [
+          {
+            id: "after-1",
+            eventName: "goal",
+            data: { id: "after-1" },
+            timestamp: new Date().toISOString()
+          }
+        ]
+        await act(async () => {
+          finishClear({ success: true })
+        })
+
+        await waitFor(() => {
+          expect(screen.getByText("1 event captured")).toBeInTheDocument()
+        })
+        // Its own broadcast arriving later does not duplicate it.
+        dispatchWithId("after-1")
+        dispatchWithId("after-2")
+        await waitFor(() => {
+          expect(screen.getByText("2 events captured")).toBeInTheDocument()
+        })
+        expect(screen.queryByText(/queued-/)).not.toBeInTheDocument()
+      } finally {
+        mockSendMessage.mockImplementation(previous)
+      }
+    })
+  })
+
   describe("Event Selection and Event Viewer", () => {
     it("opens event viewer when event is clicked", async () => {
       render(<EventsDebugPage onBack={() => {}} />)

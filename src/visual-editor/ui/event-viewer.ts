@@ -150,6 +150,8 @@ export class EventViewer {
     this.keydownHandler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         this.close()
+      } else if (e.key === "Tab") {
+        this.keepTabInside(e, container)
       }
     }
     document.addEventListener("keydown", this.keydownHandler)
@@ -214,6 +216,32 @@ export class EventViewer {
         }
       })
     }, 0)
+  }
+
+  // The dialog is modal: cycle Tab and Shift+Tab through its own controls
+  // instead of letting focus reach the page behind it.
+  private keepTabInside(e: KeyboardEvent, container: HTMLElement): void {
+    if (!this.shadowRoot) return
+    const focusable = Array.from(
+      this.shadowRoot.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    )
+    e.preventDefault()
+    if (focusable.length === 0) {
+      container.focus({ preventScroll: true })
+      return
+    }
+    const active = this.shadowRoot.activeElement as HTMLElement | null
+    const index = active ? focusable.indexOf(active) : -1
+    const next = e.shiftKey
+      ? index <= 0
+        ? focusable.length - 1
+        : index - 1
+      : index === -1 || index === focusable.length - 1
+        ? 0
+        : index + 1
+    focusable[next].focus({ preventScroll: true })
   }
 
   close(): void {
