@@ -8,7 +8,7 @@ import { unsafeExperimentId, unsafeVariantName } from "~src/types/branded"
 
 import { ExperimentDetail } from "../ExperimentDetail"
 
-const mockSave = jest.fn().mockResolvedValue(undefined)
+const mockSave = jest.fn().mockResolvedValue(true)
 
 jest.mock("~src/lib/messaging", () => ({
   sendToContent: jest.fn().mockResolvedValue(undefined),
@@ -81,6 +81,7 @@ const saveButton = () => screen.getByRole("button", { name: /Save Changes/ })
 describe("ExperimentDetail metadata edits (FT-2251)", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockSave.mockResolvedValue(true)
     window.confirm = jest.fn(() => false)
   })
 
@@ -141,5 +142,42 @@ describe("ExperimentDetail metadata edits (FT-2251)", () => {
       props.onUpdate
     )
     expect(saveButton()).toHaveTextContent(/^Save Changes$/)
+  })
+
+  it("keeps edits unsaved when the save reports a failure", async () => {
+    mockSave.mockResolvedValue(false)
+    render(<ExperimentDetail {...props} />)
+    fireEvent.change(trafficInput(), { target: { value: "42" } })
+
+    await act(async () => {
+      fireEvent.click(saveButton())
+    })
+    expect(mockSave).toHaveBeenCalled()
+    expect(saveButton()).toHaveTextContent("• Save Changes")
+
+    fireEvent.click(document.getElementById("header-back-button")!)
+    expect(window.confirm).toHaveBeenCalled()
+    expect(props.onBack).not.toHaveBeenCalled()
+    expect(trafficInput()).toHaveValue(42)
+  })
+
+  it("opens a stored traffic of 0 as 0 without marking it unsaved", async () => {
+    render(
+      <ExperimentDetail
+        {...props}
+        experiment={{ ...experiment, percentage_of_traffic: 0 }}
+      />
+    )
+    expect(trafficInput()).toHaveValue(0)
+    expect(saveButton()).toHaveTextContent(/^Save Changes$/)
+
+    await act(async () => {
+      fireEvent.click(saveButton())
+    })
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({ percentage_of_traffic: 0 }),
+      expect.anything(),
+      props.onUpdate
+    )
   })
 })

@@ -397,7 +397,7 @@ async function saveExistingExperiment(
       if (onError) {
         onError(errorMessage)
       }
-      return
+      return false
     }
 
     const fullExperiment: FullExperiment =
@@ -578,6 +578,7 @@ async function saveExistingExperiment(
         message: "Experiment saved successfully"
       })
       await notifySuccess("Experiment saved successfully")
+      return true
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error"

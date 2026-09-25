@@ -124,7 +124,7 @@ export function ExperimentDetail({
     onError
   })
   const [metadata, setMetadata] = useState({
-    percentage_of_traffic: experiment.percentage_of_traffic || 100,
+    percentage_of_traffic: experiment.percentage_of_traffic ?? 100,
     unit_type_id:
       experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
     application_ids:
@@ -192,7 +192,8 @@ export function ExperimentDetail({
         tag_ids: metadata.tag_ids
       }
 
-      await save(formData, currentVariants, onUpdate)
+      const saved = await save(formData, currentVariants, onUpdate)
+      if (saved === false) return
 
       try {
         await clearAllExperimentStorage(experiment.id)
