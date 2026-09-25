@@ -56,7 +56,7 @@ async function appendEvent(payload: {
 
     chrome.runtime.sendMessage({
       type: "SDK_EVENT_BROADCAST",
-      payload: { eventName, data, timestamp }
+      payload: { id: newEvent.id, eventName, data, timestamp }
     }).catch((error) => {
       if (!error?.message?.includes('Receiving end does not exist') &&
           !error?.message?.includes('message port closed')) {
