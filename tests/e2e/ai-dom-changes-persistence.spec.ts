@@ -176,12 +176,5 @@ test.describe('AI DOM Changes Persistence', () => {
       log('✅ Navigation back to variant editor successful')
       log('Note: Actual DOM changes persistence requires AI generation - see ai-dom-generation-complete.spec.ts')
     })
-
-    // The original spec had a "Verify preview mode is enabled" step here that
-    // used an invalid XPath (`'.. .. :has-text("Preview")'`) AND asserted the
-    // toggle was `true` even though this test never generates DOM changes and
-    // never enables preview. The step has been removed: it has never asserted
-    // anything meaningful — its only effect was to crash with a SyntaxError
-    // because the test was never reaching the assertion.
   })
 })

@@ -20,13 +20,6 @@ test.describe('AI Page Persistence and HTML Capture', () => {
       throw new Error('AI page persistence requires PLASMO_PUBLIC_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY (anthropic-api provider)')
     }
 
-    // The fixture's default seed (tests/fixtures/extension.ts:80-115) already
-    // wires up `aiProvider: 'anthropic-api'` with the llmproxy endpoint when
-    // PLASMO_PUBLIC_ANTHROPIC_API_KEY is present in env. No per-test seed is
-    // needed — the old `aiProvider: 'claude-subscription'` override was
-    // tied to a `spawn('claude-code-bridge')` block in beforeAll that has
-    // been removed; on CI runners the binary doesn't exist, the spawn
-    // ENOENTed, and downstream tests just observed a dead bridge.
     testPage = await context.newPage()
 
     allConsoleMessages = []
