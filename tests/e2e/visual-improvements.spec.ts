@@ -134,7 +134,7 @@ test.describe('Visual Improvements Tests', () => {
       await backButton.click()
       await debugWait()
 
-      await sidebar.locator('#experiments-header, h1:has-text("Experiments")').waitFor({ state: 'visible', timeout: 5000 })
+      await sidebar.locator('#experiments-heading').waitFor({ state: 'visible', timeout: 5000 })
       console.log('Back button works - returned to experiments list')
       await debugWait()
     })
