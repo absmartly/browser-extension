@@ -265,7 +265,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const experimentRow = sidebar.locator('.experiment-item').first()
       await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
 
-      const clickableArea = experimentRow.locator('.cursor-pointer').first()
+      const clickableArea = experimentRow.locator('[data-experiment-name]')
       await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
       await clickableArea.click()
       console.log('  ✓ Opened existing experiment')
@@ -319,6 +319,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
     // Continue testing with the experiments list that's already loaded
     await test.step('Verify state labels in existing experiments list', async () => {
       console.log('\n🏷️  Verifying state labels in experiment list')
+      await sidebar.locator('#header-back-button').click({ timeout: 10000 })
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
 
       // Get all experiment cards with state badges
       const experimentCards = sidebar.locator('.experiment-item')
