@@ -1,4 +1,4 @@
-import { buildExperimentsCacheSeed } from '../helpers/experiments-cache-seed'
+import { buildExperimentsCacheSeed, SYNC_QUOTA_BYTES_PER_ITEM } from '../helpers/experiments-cache-seed'
 
 jest.mock('../../src/utils/notifications', () => ({
   notifyUser: jest.fn().mockResolvedValue(undefined)
@@ -68,4 +68,19 @@ test('an unserialized object seed is not readable by Plasmo Storage', async () =
   const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
   expect(await readThroughExtension({ 'experiments-cache': seed })).toBeNull()
   errors.mockRestore()
+})
+
+test('seed is trimmed to fit one chrome.storage.sync item', () => {
+  const long = Array.from({ length: 25 }, (_, i) => ({
+    id: i + 1,
+    name: `exp_${i}_${'x'.repeat(200)}`,
+    display_name: 'y'.repeat(200),
+    state: 'created'
+  }))
+  const seed = buildExperimentsCacheSeed(long, 1000)!
+  const stored = 'plasmo:experiments-cache' + JSON.stringify(JSON.stringify(seed))
+  expect(new TextEncoder().encode(stored).length).toBeLessThanOrEqual(SYNC_QUOTA_BYTES_PER_ITEM)
+  expect(seed.experiments.length).toBeGreaterThan(0)
+  expect(seed.experiments.length).toBeLessThan(25)
+  expect(seed.experiments.map((e) => e.id)).toEqual(long.slice(0, seed.experiments.length).map((e) => e.id))
 })

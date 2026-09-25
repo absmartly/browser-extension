@@ -6,6 +6,13 @@ type RawRecord = Record<string, unknown>
 
 const cachedExperimentSchema = ExperimentsCacheSchema.shape.experiments.element
 
+// chrome.storage.sync rejects any item whose key + JSON value exceeds 8192 bytes.
+export const SYNC_QUOTA_BYTES_PER_ITEM = 8192
+const EXPERIMENTS_CACHE_KEY = 'plasmo:experiments-cache'
+
+const storedItemBytes = (value: unknown) =>
+  new TextEncoder().encode(EXPERIMENTS_CACHE_KEY + JSON.stringify(JSON.stringify(value))).length
+
 const asRecords = (value: unknown): RawRecord[] | undefined =>
   Array.isArray(value)
     ? value.map((item) => (item && typeof item === 'object' ? (item as RawRecord) : {}))
@@ -13,6 +20,7 @@ const asRecords = (value: unknown): RawRecord[] | undefined =>
 
 // Mirrors setExperimentsCache's minimisation, then keeps only the entries the
 // extension's reader accepts: one invalid entry would reject the whole cache.
+// Trailing entries are dropped until the stored item fits one sync record.
 export function buildExperimentsCacheSeed(
   rawExperiments: unknown[],
   timestamp = Date.now()
@@ -41,5 +49,9 @@ export function buildExperimentsCacheSeed(
     })
     return parsed.success ? [parsed.data] : []
   })
-  return experiments.length > 0 ? { version: 1, experiments, timestamp } : null
+  const seed: ExperimentsCache = { version: 1, experiments, timestamp }
+  while (seed.experiments.length > 0 && storedItemBytes(seed) > SYNC_QUOTA_BYTES_PER_ITEM) {
+    seed.experiments.pop()
+  }
+  return seed.experiments.length > 0 ? seed : null
 }
