@@ -10,6 +10,37 @@ const DEFAULT_CONFIG: RateLimitConfig = {
   windowMs: 60000
 }
 
+// SDK events are page telemetry forwarded by the content script. A busy page
+// can emit many of them, so they get their own bucket sized to the event
+// buffer instead of sharing (and exhausting) the tab's UI request budget.
+export const SDK_EVENT_RATE_LIMIT: RateLimitConfig = {
+  maxRequests: 1000,
+  windowMs: 60000
+}
+
+export interface RateLimitBucket {
+  key: string
+  config: Partial<RateLimitConfig>
+}
+
+// Separates rate-limit buckets per tab by traffic source: SDK event forwards,
+// other content-script messages, and the extension's own pages (for example
+// the sidebar iframe). Each keeps its own limit and block, so one source
+// cannot lock out another.
+export function getRateLimitBucket(
+  sender: { tab?: { id?: number }; id?: string; url?: string },
+  messageType: string | undefined,
+  extensionOrigin: string
+): RateLimitBucket {
+  const base = sender.tab?.id?.toString() || sender.id || "unknown"
+  if (messageType === "SDK_EVENT") {
+    return { key: `${base}:sdk-events`, config: SDK_EVENT_RATE_LIMIT }
+  }
+  const fromExtensionPage =
+    !!sender.url && !!extensionOrigin && sender.url.startsWith(extensionOrigin)
+  return { key: `${base}:${fromExtensionPage ? "extension" : "page"}`, config: {} }
+}
+
 const requestTimestamps = new Map<string, number[]>()
 
 let violationCount = new Map<string, number>()
