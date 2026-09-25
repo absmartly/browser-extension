@@ -431,10 +431,17 @@ describe("useExperimentSave - Custom Fields", () => {
         })
       )
 
+      let saved: unknown
       await act(async () => {
-        await result.current.save(formData, variants, mockOnUpdate, undefined)
+        saved = await result.current.save(
+          formData,
+          variants,
+          mockOnUpdate,
+          undefined
+        )
       })
 
+      expect(saved).toBe(true)
       expect(mockOnUpdate).toHaveBeenCalled()
       const updatePayload = mockOnUpdate.mock.calls[0][1]
 
@@ -650,10 +657,18 @@ describe("useExperimentSave - Custom Fields", () => {
         })
       )
 
+      let saved: unknown
       await act(async () => {
-        await result.current.save(formData, variants, mockOnUpdate, undefined)
+        saved = await result.current.save(
+          formData,
+          variants,
+          mockOnUpdate,
+          undefined
+        )
       })
 
+      expect(saved).toBe(false)
+      expect(mockOnUpdate).not.toHaveBeenCalled()
       expect(notifyError).toHaveBeenCalledWith(
         "Failed to load experiment: Experiment not found"
       )
