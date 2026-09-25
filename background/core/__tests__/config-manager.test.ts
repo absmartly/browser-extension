@@ -2,8 +2,11 @@ import { Storage } from '@plasmohq/storage'
 import {
   validateConfig,
   getConfig,
-  initializeConfig
+  initializeConfig,
+  startConfigInitialization
 } from '../config-manager'
+import { CONFIG_INITIALIZATION_KEY } from '../config-initialization-key'
+import { createExtensionHttpClient } from '../absmartly-client'
 import { validateAPIEndpoint } from '../../utils/security'
 import type { ABsmartlyConfig } from '~src/types/absmartly'
 import { unsafeAPIEndpoint, unsafeApplicationId } from '~src/types/branded'
@@ -298,6 +301,114 @@ describe('config-manager', () => {
       await initializeConfig(storage, secureStorage)
 
       expect(setStorageSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  // CI flake FT-2267: the worker's startup defaults write (authMethod jwt)
+  // landed after the e2e fixture seeded authMethod apikey, so API requests
+  // went out without Authorization and failed with AUTH_EXPIRED.
+  describe('startConfigInitialization readiness', () => {
+    const originalEnv = process.env
+    const originalFetch = global.fetch
+
+    afterEach(() => {
+      process.env = originalEnv
+      global.fetch = originalFetch
+      delete (globalThis as any)[CONFIG_INITIALIZATION_KEY]
+    })
+
+    function setup() {
+      process.env = { ...originalEnv,
+        PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: 'https://fixture.absmartly.com',
+        PLASMO_PUBLIC_ABSMARTLY_API_KEY: 'synthetic-build-key' }
+      delete process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
+      const storage = new Storage()
+      const secureStorage = new Storage({ area: 'local', secretKeyring: true } as any)
+      const state: { config: any; key: string | null } = { config: null, key: null }
+      let beforeDefaultsWrite: (() => void) | undefined
+      jest.spyOn(storage, 'get').mockImplementation(async () => state.config)
+      jest.spyOn(storage, 'set').mockImplementation(async (_name, value) => {
+        // The seed arrives after init's last read, just before its write lands.
+        // chrome.storage writes are asynchronous IPC, so the write lands a
+        // macrotask later; a seeder that merely yields still wins the race.
+        const hook = beforeDefaultsWrite
+        beforeDefaultsWrite = undefined
+        hook?.()
+        await new Promise(resolve => setTimeout(resolve, 0))
+        state.config = value
+        return null
+      })
+      jest.spyOn(secureStorage, 'get').mockImplementation(async name => name === 'absmartly-apikey' ? state.key : null)
+      jest.spyOn(secureStorage, 'set').mockImplementation(async (_name, value) => { state.key = value as string; return null })
+      // Mirrors tests/fixtures/extension.ts seedData for the config/key pair.
+      const seed = () => {
+        state.config = { apiEndpoint: 'https://fixture.absmartly.com', authMethod: 'apikey' }
+        state.key = 'synthetic-seeded-key'
+      }
+      return { storage, secureStorage, seed, armBeforeDefaultsWrite: (hook: () => void) => { beforeDefaultsWrite = hook } }
+    }
+
+    async function authorizationSent(config: any): Promise<boolean> {
+      const fetchMock = jest.fn().mockResolvedValue({ status: 200, ok: true, json: async () => ({}), headers: new Map() })
+      global.fetch = fetchMock as any
+      await createExtensionHttpClient(config).request({ method: 'GET', url: '/experiments' })
+      return 'Authorization' in fetchMock.mock.calls[0][1].headers
+    }
+
+    it('old ordering: a seed written during startup initialization is overwritten and requests go out unauthenticated', async () => {
+      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
+      armBeforeDefaultsWrite(seed)
+      await startConfigInitialization(storage, secureStorage, jest.fn())
+      const config = await getConfig(storage, secureStorage)
+      expect(config?.authMethod).toBe('jwt')
+      expect(config?.apiKey).toBe('synthetic-seeded-key')
+      expect(await authorizationSent(config)).toBe(false)
+    })
+
+    it('new ordering: a seeder that awaits the readiness promise keeps the seeded API-key auth', async () => {
+      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
+      let seeding: Promise<void> | undefined
+      armBeforeDefaultsWrite(() => {
+        // Same interleave point; the fixture-equivalent seeder waits first.
+        seeding = (async () => {
+          await (globalThis as any)[CONFIG_INITIALIZATION_KEY]
+          seed()
+        })()
+      })
+      const initialization = startConfigInitialization(storage, secureStorage, jest.fn())
+      expect((globalThis as any)[CONFIG_INITIALIZATION_KEY]).toBe(initialization)
+      await initialization
+      expect(seeding).toBeDefined()
+      await seeding
+      const config = await getConfig(storage, secureStorage)
+      expect(config?.authMethod).toBe('apikey')
+      expect(config?.apiKey).toBe('synthetic-seeded-key')
+      expect(await authorizationSent(config)).toBe(true)
+    })
+
+    it('control: a seeder that only yields without awaiting readiness is still overwritten', async () => {
+      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
+      let seeding: Promise<void> | undefined
+      armBeforeDefaultsWrite(() => {
+        seeding = (async () => {
+          await undefined
+          seed()
+        })()
+      })
+      await startConfigInitialization(storage, secureStorage, jest.fn())
+      await seeding
+      const config = await getConfig(storage, secureStorage)
+      expect(config?.authMethod).toBe('jwt')
+      expect(await authorizationSent(config)).toBe(false)
+    })
+
+    it('settles and reports initialization errors instead of rejecting the readiness promise', async () => {
+      const { storage, secureStorage } = setup()
+      jest.spyOn(storage, 'get').mockRejectedValue(new Error('storage unavailable'))
+      const onError = jest.fn()
+      await expect(startConfigInitialization(storage, secureStorage, onError)).resolves.toBeUndefined()
+      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'storage unavailable' }))
+      await expect((globalThis as any)[CONFIG_INITIALIZATION_KEY]).resolves.toBeUndefined()
     })
   })
 })

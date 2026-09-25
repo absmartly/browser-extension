@@ -2,6 +2,8 @@ import { test as base, chromium, type BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { ensureExtensionBuilt } from './setup'
+import { buildExperimentsCacheSeed } from '../helpers/experiments-cache-seed'
+import { waitForConfigInitialization } from '../helpers/config-readiness'
 
 // In CI we run e2e against the production bundle (chrome-mv3-prod) so any
 // Plasmo/Parcel bundling regression surfaces before reaching Chrome Web Store.
@@ -75,6 +77,7 @@ export const test = base.extend<ExtFixtures>({
     if (!sw) {
       sw = await context.waitForEvent('serviceworker')
     }
+    await waitForConfigInitialization(sw)
     const seedExtId = new URL(sw.url()).host
     const seedPage = await context.newPage()
     const seedUrl = `chrome-extension://${seedExtId}/tests/seed.html`
@@ -165,6 +168,34 @@ export const test = base.extend<ExtFixtures>({
           }),
         editorResourcesCache
       )
+
+      // The experiments list slice of the cache lands in chrome.storage.sync
+      // under `experiments-cache` — that's where useExperimentLoading's
+      // `loadCachedExperiments()` reads from. The Storage instance routes
+      // sync by default, so we mirror that path here. Without this seed
+      // every sidebar mount fires a live `/v1/experiments` call and under
+      // shard concurrency (4 shards × 4 workers = 16 sidebars) the API
+      // throttles, and `.experiment-item` stays hidden for 5-60s.
+      //
+      // Schema: { version: 1, experiments: [...], timestamp: number } per
+      // src/lib/validation-schemas.ts:ExperimentsCacheSchema. Each experiment
+      // is minimized like setExperimentsCache so the payload fits a single
+      // non-chunked sync record (~25 items ≈ 5KB). Plasmo Storage stores
+      // JSON strings in chrome.storage, so the value is serialized here too.
+      const cacheBundle = editorResourcesCache as { experiments?: unknown[] }
+      const experimentsCache = buildExperimentsCacheSeed(
+        Array.isArray(cacheBundle.experiments) ? cacheBundle.experiments : []
+      )
+      if (experimentsCache) {
+        await seedPage.evaluate(
+          (payload) =>
+            chrome.storage.sync.set({
+              'experiments-cache': JSON.stringify(payload),
+              'plasmo:experiments-cache': JSON.stringify(payload)
+            }),
+          experimentsCache
+        )
+      }
     }
 
     await seedPage.close()

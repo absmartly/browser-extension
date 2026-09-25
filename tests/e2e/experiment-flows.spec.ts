@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
-import { injectSidebar, debugWait, setupConsoleLogging, waitForExperiments } from './utils/test-helpers'
+import { injectSidebar, debugWait, setupConsoleLogging, waitForExperiments, openLiveExperimentDetails } from './utils/test-helpers'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -265,9 +265,9 @@ test.describe('Experiment Creation and Editing Flows', () => {
       const experimentRow = sidebar.locator('.experiment-item').first()
       await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
 
-      const clickableArea = experimentRow.locator('.cursor-pointer').first()
+      const clickableArea = experimentRow.locator('[data-experiment-name]')
       await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
-      await clickableArea.click()
+      await openLiveExperimentDetails(testPage, experimentRow)
       console.log('  ✓ Opened existing experiment')
 
       // Wait for detail view title to change
@@ -275,7 +275,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await debugWait()
 
       // Check Unit Type dropdown
-      const unitTypeDropdown = sidebar.locator('#unit-type-label').locator('..').locator('[class*="cursor-pointer"]').first()
+      const unitTypeDropdown = sidebar.locator('#unit-type-select-trigger')
       const unitTypeText = await unitTypeDropdown.textContent()
       const isUnitTypeLoading = unitTypeText?.includes('Loading...')
 
@@ -301,7 +301,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       expect(isOwnersLoading).toBe(false)
 
       // Check Tags dropdown
-      const tagsDropdown = sidebar.locator('#tags-label').locator('..').locator('[class*="cursor-pointer"]').first()
+      const tagsDropdown = sidebar.locator('#tags-select-trigger')
       const tagsText = await tagsDropdown.textContent()
       const isTagsLoading = tagsText?.includes('Loading...')
 
@@ -319,6 +319,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
     // Continue testing with the experiments list that's already loaded
     await test.step('Verify state labels in existing experiments list', async () => {
       console.log('\n🏷️  Verifying state labels in experiment list')
+      await sidebar.locator('#header-back-button').click({ timeout: 10000 })
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
 
       // Get all experiment cards with state badges
       const experimentCards = sidebar.locator('.experiment-item')
