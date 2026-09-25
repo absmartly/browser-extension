@@ -155,6 +155,22 @@ describe("UnsavedChangesModal", () => {
       expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
     })
 
+    it("takes back focus moved behind the overlay while open", () => {
+      render(
+        <>
+          <input id="invalid-field" />
+          <UnsavedChangesModal {...defaultProps} />
+        </>
+      )
+      const field = document.getElementById("invalid-field") as HTMLElement
+      // e.g. failed Save validation focusing the invalid field a frame later
+      field.focus()
+      const dialog = screen.getByRole("dialog")
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Escape" })
+      expect(defaultProps.onCancel).toHaveBeenCalledTimes(1)
+    })
+
     it("restores focus to the element that opened it after closing", () => {
       function Harness() {
         const [open, setOpen] = React.useState(false)

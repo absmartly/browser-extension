@@ -53,6 +53,21 @@ export function UnsavedChangesModal({
     }
   }, [isOpen, saving])
 
+  // Anything that focuses an element behind the overlay while the dialog is
+  // open (e.g. failed Save validation focusing the invalid field on the next
+  // frame) would bypass the Tab/Escape handling, so take focus back.
+  useEffect(() => {
+    if (!isOpen) return
+    const handleFocusIn = (event: FocusEvent) => {
+      const dialog = dialogRef.current
+      if (dialog && !dialog.contains(event.target as Node)) {
+        dialog.focus()
+      }
+    }
+    document.addEventListener("focusin", handleFocusIn)
+    return () => document.removeEventListener("focusin", handleFocusIn)
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
