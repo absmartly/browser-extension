@@ -13,6 +13,54 @@ jest.mock("~src/utils/storage", () => ({
 }))
 
 describe("endpoint syntax independent of reachability", () => {
+  describe("with Chromium's lenient URL parser", () => {
+    // Chromium's URL parser percent-encodes spaces in the host
+    // (new URL("http://a b").href === "http://a%20b/") where jsdom throws.
+    // Emulate that result so the packaged behaviour is covered too.
+    const NativeURL = global.URL
+    beforeEach(() => {
+      global.URL = class extends NativeURL {
+        constructor(input: string | URL, base?: string | URL) {
+          const raw = String(input)
+          const match = /^(https?:\/\/)([^/?#]*\s[^/?#]*)(.*)$/i.exec(raw)
+          super(match ? `${match[1]}placeholder.invalid${match[3]}` : raw, base)
+          if (match) {
+            const host = match[2].replace(/\s/g, "%20")
+            Object.defineProperty(this, "hostname", { value: host })
+            Object.defineProperty(this, "host", { value: host })
+          }
+        }
+      } as typeof URL
+    })
+    afterEach(() => {
+      global.URL = NativeURL
+    })
+
+    it("emulates Chromium accepting a space in the host", () => {
+      expect(new URL("http://a b").hostname).toBe("a%20b")
+    })
+
+    it.each(["not a url", "http://a b", "https://exa mple.com"])(
+      "rejects %s",
+      async (endpoint) => {
+        const { result } = renderHook(() => useSettingsForm())
+        act(() => result.current.setApiEndpoint(endpoint))
+        await act(async () => {
+          expect(await result.current.validateForm()).toBe(false)
+        })
+        expect(result.current.errors.apiEndpoint).toMatch(/Invalid endpoint/)
+      }
+    )
+
+    it("still accepts a valid endpoint", async () => {
+      const { result } = renderHook(() => useSettingsForm())
+      act(() => result.current.setApiEndpoint("https://example.com/v1"))
+      await act(async () => {
+        expect(await result.current.validateForm()).toBe(true)
+      })
+    })
+  })
+
   it.each([
     "http://[",
     "https://",
