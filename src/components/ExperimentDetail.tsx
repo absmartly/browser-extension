@@ -5,7 +5,10 @@ import {
 } from "@heroicons/react/24/outline"
 import React, { useEffect, useState } from "react"
 
-import { useExperimentSave } from "~src/hooks/useExperimentSave"
+import {
+  useExperimentSave,
+  type ExperimentUpdateHandler
+} from "~src/hooks/useExperimentSave"
 import { useExperimentVariants } from "~src/hooks/useExperimentVariants"
 import { sendToContent } from "~src/lib/messaging"
 import type { Experiment, ExperimentInjectionCode } from "~src/types/absmartly"
@@ -37,7 +40,7 @@ interface ExperimentDetailProps {
   onBack: () => void
   onStart: (id: number) => void
   onStop: (id: number) => void
-  onUpdate?: (id: number, updates: Partial<Experiment>) => void
+  onUpdate?: ExperimentUpdateHandler
   loading?: boolean
   applications?: any[]
   unitTypes?: any[]

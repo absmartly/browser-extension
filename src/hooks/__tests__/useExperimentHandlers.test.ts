@@ -35,3 +35,55 @@ describe("experiment save error propagation", () => {
     expect(props.loadExperiments).not.toHaveBeenCalled()
   })
 })
+
+describe("experiment update result", () => {
+  const makeProps = (updateExperiment: jest.Mock) => ({
+    getExperiment: jest.fn().mockResolvedValue({ id: 7, name: "exp" }),
+    startExperiment: jest.fn(),
+    stopExperiment: jest.fn(),
+    createExperiment: jest.fn(),
+    updateExperiment,
+    loadExperiments: jest.fn(),
+    onAuthExpired: jest.fn(),
+    onError: jest.fn(),
+    onSuccess: jest.fn(),
+    setView: jest.fn(),
+    pageSize: 20
+  })
+
+  it("reports a failed update once and resolves false", async () => {
+    const props = makeProps(
+      jest.fn().mockRejectedValue(new Error("Test-owned update rejected"))
+    )
+    const { result } = renderHook(() => useExperimentHandlers(props))
+
+    let persisted: unknown
+    await act(async () => {
+      persisted = await result.current.handleUpdateExperiment(7, {
+        percentage_of_traffic: 42
+      })
+    })
+    expect(persisted).toBe(false)
+    expect(props.onError).toHaveBeenCalledTimes(1)
+    expect(props.onError).toHaveBeenCalledWith("Test-owned update rejected")
+    expect(props.onSuccess).not.toHaveBeenCalled()
+    expect(props.loadExperiments).not.toHaveBeenCalled()
+  })
+
+  it("resolves true after a successful update", async () => {
+    const props = makeProps(jest.fn().mockResolvedValue({}))
+    const { result } = renderHook(() => useExperimentHandlers(props))
+
+    let persisted: unknown
+    await act(async () => {
+      persisted = await result.current.handleUpdateExperiment(7, {
+        percentage_of_traffic: 42
+      })
+    })
+    expect(persisted).toBe(true)
+    expect(props.onError).not.toHaveBeenCalled()
+    expect(props.onSuccess).toHaveBeenCalledWith(
+      "Experiment saved successfully!"
+    )
+  })
+})
