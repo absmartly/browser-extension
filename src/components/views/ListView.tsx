@@ -101,7 +101,7 @@ export function ListView({
         {/* Wraps the actions onto their own row when the sidebar is resized
             narrower than the title plus all actions, instead of clipping. */}
         <div
-          id="experiments-header"
+          id="experiments-list-header"
           className="relative flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <Logo config={config} />
@@ -112,7 +112,7 @@ export function ListView({
             </h1>
           </div>
           <div
-            id="experiments-header-actions"
+            id="experiments-list-header-actions"
             className="flex items-center gap-2 ml-auto">
             <button
               id="refresh-experiments-button"
