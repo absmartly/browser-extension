@@ -77,3 +77,56 @@ test('packaged experiment detail tracks and validates traffic and keeps a Simple
   await expect(sidebar.locator('#url-filter-pattern-variant-1-0')).toHaveValue('/products/*')
   await page.screenshot({ path: testInfo.outputPath('detail-reopened.png') })
 })
+
+test('packaged experiment detail keeps a traffic edit unsaved when the update request fails', async ({ page, sidebar }) => {
+  const draft = { ...experiment, id: 502, name: 'ft_2251_put_fail', display_name: 'FT-2251 put failure', percentage_of_traffic: 100 }
+  let failPut = true
+  const puts: any[] = []
+  let failedPuts = 0
+  await page.context().route(`${endpoint}/**`, route => {
+    const url = new URL(route.request().url())
+    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+    if (url.pathname === '/v1/experiments/502') {
+      if (route.request().method() === 'PUT') {
+        if (failPut) { failedPuts++; return json({ errors: ['synthetic update failure'] }, 500) }
+        const body = route.request().postDataJSON()
+        const data = body.data || body
+        puts.push(data)
+        Object.assign(draft, data)
+      }
+      return json({ experiment: draft })
+    }
+    return json({ experiments: [draft], total: 1, applications: [{ id: 1, application_id: 1, name: 'Fixture web' }], unit_types: [{ id: 1, unit_type_id: 1, name: 'fixture_unit' }], users: [user], teams: [], experiment_tags: [], favorites: [], user })
+  })
+  await sidebar.locator('#configure-settings-button').click()
+  await sidebar.locator('#absmartly-endpoint').fill(endpoint)
+  await sidebar.locator('#auth-method-apikey').check()
+  await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
+  await sidebar.locator('#save-settings-button').click()
+  await sidebar.locator('[data-experiment-name="ft_2251_put_fail"]').click()
+
+  const traffic = sidebar.locator('#traffic-label + div input')
+  const save = sidebar.getByRole('button', { name: /Save Changes/ })
+  await traffic.fill('42')
+  await expect(save).toHaveText('• Save Changes')
+  await save.click()
+  // The API client retries 5xx responses with backoff before reporting the failure.
+  await expect(sidebar.locator('#toast-container')).toContainText('API request failed with status 500', { timeout: 20000 })
+  await expect(sidebar.locator('#toast-container [id^="toast-close-"]')).toHaveCount(1)
+  await expect(save).toHaveText('• Save Changes')
+  expect(failedPuts).toBeGreaterThan(0)
+  expect(puts).toHaveLength(0)
+
+  await sidebar.locator('[id^="toast-close-"]').first().click()
+  const dialogs: string[] = []
+  page.once('dialog', dialog => { dialogs.push(dialog.message()); void dialog.dismiss() })
+  await sidebar.locator('#header-back-button').click()
+  await expect.poll(() => dialogs).toEqual([expect.stringContaining('unsaved changes')])
+  await expect(traffic).toHaveValue('42')
+
+  failPut = false
+  await save.click()
+  await expect.poll(() => puts.length).toBe(1)
+  expect(puts[0].percentage_of_traffic).toBe(42)
+  await expect(save).toHaveText('Save Changes')
+})
