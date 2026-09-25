@@ -177,3 +177,25 @@ describe("out-of-order responses", () => {
     }
   })
 })
+
+describe("reloads before the first filtered load", () => {
+  it("uses the loaded filters instead of an unfiltered request", async () => {
+    const getExperiments = jest
+      .fn()
+      .mockResolvedValue({ experiments: [], total: 0 })
+    const { result } = renderHook(() =>
+      useExperimentLoading({
+        getExperiments,
+        requestPermissionsIfNeeded: jest.fn(),
+        onAuthExpired: jest.fn(),
+        onError: jest.fn(),
+        filters: { state: ["created", "ready"] }
+      })
+    )
+    // Post-save/refresh reloads pass no filters and can run before the
+    // one-time initialization load has established the active filters.
+    await act(async () => result.current.loadExperiments(true, 1, 50))
+    expect(getExperiments).toHaveBeenCalledTimes(1)
+    expect(getExperiments.mock.calls[0][0].state).toBe("created,ready")
+  })
+})
