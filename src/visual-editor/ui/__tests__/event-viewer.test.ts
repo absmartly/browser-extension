@@ -142,3 +142,90 @@ describe("EventViewer focus containment", () => {
     expect(press("Tab").defaultPrevented).toBe(false)
   })
 })
+
+describe("EventViewer deferred editor lifecycle", () => {
+  let viewer: EventViewer
+
+  const editor = () =>
+    (viewer as any).editorView as {
+      destroyed?: boolean
+      dom: HTMLElement
+    } | null
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    document.body.innerHTML = ""
+    ;(global as any).chrome = { runtime: { sendMessage: jest.fn() } }
+    viewer = new EventViewer()
+  })
+
+  afterEach(() => {
+    viewer.close()
+    jest.useRealTimers()
+  })
+
+  it("does not create an editor when closed by Escape before initialization", () => {
+    viewer.show("goal", "now", '{"a":1}')
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    expect(host()).toBeNull()
+
+    jest.runOnlyPendingTimers()
+    expect(editor()).toBeNull()
+  })
+
+  it("does not build an editor for a viewer closed before a new one opens", () => {
+    // Content script path: closeEventViewer() then a new EventViewer().show()
+    viewer.show("goal", "first", '{"first":1}')
+    viewer.close()
+    const next = new EventViewer()
+    next.show("exposure", "second", '{"second":2}')
+    jest.runOnlyPendingTimers()
+
+    expect(editor()).toBeNull()
+    const current = (next as any).editorView
+    expect(current).not.toBeNull()
+    expect(host()!.shadowRoot!.contains(current.dom)).toBe(true)
+    next.close()
+    expect(current.destroyed).toBe(true)
+  })
+
+  it("keeps only the current editor when reopened before initialization", () => {
+    viewer.show("goal", "first", '{"first":1}')
+    viewer.show("exposure", "second", '{"second":2}')
+    jest.runOnlyPendingTimers()
+
+    const hosts = document.querySelectorAll("#absmartly-event-viewer-host")
+    expect(hosts).toHaveLength(1)
+    const current = editor()
+    expect(current).not.toBeNull()
+    expect(hosts[0].shadowRoot!.contains(current!.dom)).toBe(true)
+    expect(current!.dom.textContent).toContain("second")
+
+    viewer.close()
+    expect(current!.destroyed).toBe(true)
+    expect(
+      document.querySelectorAll("#absmartly-event-viewer-host")
+    ).toHaveLength(0)
+  })
+
+  it("wires Copy and Close after initialization and still closes by Escape", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    viewer.show("goal", "now", '{"a":1}')
+    jest.runOnlyPendingTimers()
+
+    const root = host()!.shadowRoot!
+    ;(root.querySelector(".event-viewer-button-copy") as HTMLElement).click()
+    expect(writeText).toHaveBeenCalledWith('{"a":1}')
+    const current = editor()
+    ;(root.querySelector(".event-viewer-button-close") as HTMLElement).click()
+    expect(host()).toBeNull()
+    expect(current!.destroyed).toBe(true)
+
+    viewer.show("goal", "again", "{}")
+    jest.runOnlyPendingTimers()
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    expect(host()).toBeNull()
+    expect(editor()).toBeNull()
+  })
+})

@@ -23,10 +23,7 @@ export interface RateLimitBucket {
   config: Partial<RateLimitConfig>
 }
 
-// Separates rate-limit buckets per tab by traffic source: SDK event forwards,
-// other content-script messages, and the extension's own pages (for example
-// the sidebar iframe). Each keeps its own limit and block, so one source
-// cannot lock out another.
+// Separate buckets per source so a page cannot lock the sidebar out.
 export function getRateLimitBucket(
   sender: { tab?: { id?: number }; id?: string; url?: string },
   messageType: string | undefined,
