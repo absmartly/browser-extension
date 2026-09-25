@@ -5,7 +5,10 @@ import {
 } from "@heroicons/react/24/outline"
 import React, { useEffect, useState } from "react"
 
-import { useExperimentSave } from "~src/hooks/useExperimentSave"
+import {
+  useExperimentSave,
+  type ExperimentUpdateHandler
+} from "~src/hooks/useExperimentSave"
 import { useExperimentVariants } from "~src/hooks/useExperimentVariants"
 import { sendToContent } from "~src/lib/messaging"
 import type { Experiment, ExperimentInjectionCode } from "~src/types/absmartly"
@@ -37,7 +40,7 @@ interface ExperimentDetailProps {
   onBack: () => void
   onStart: (id: number) => void
   onStop: (id: number) => void
-  onUpdate?: (id: number, updates: Partial<Experiment>) => void
+  onUpdate?: ExperimentUpdateHandler
   loading?: boolean
   applications?: any[]
   unitTypes?: any[]
@@ -124,7 +127,7 @@ export function ExperimentDetail({
     onError
   })
   const [metadata, setMetadata] = useState({
-    percentage_of_traffic: experiment.percentage_of_traffic || 100,
+    percentage_of_traffic: experiment.percentage_of_traffic ?? 100,
     unit_type_id:
       experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
     application_ids:
@@ -136,6 +139,15 @@ export function ExperimentDetail({
         ?.map((t) => t.experiment_tag_id)
         .filter((id): id is number => id !== undefined) || []
   })
+  const [savedMetadata, setSavedMetadata] = useState(metadata)
+  const metadataChanged =
+    JSON.stringify(metadata) !== JSON.stringify(savedMetadata)
+  const isDirty = hasUnsavedChanges || metadataChanged
+  const traffic = metadata.percentage_of_traffic
+  const trafficError =
+    Number.isFinite(traffic) && traffic >= 0 && traffic <= 100
+      ? undefined
+      : "Traffic percentage must be between 0 and 100"
 
   debugLog("🔍 ExperimentDetail state - displayName:", displayName)
   debugLog(
@@ -168,6 +180,10 @@ export function ExperimentDetail({
   }
 
   const handleSaveChanges = async () => {
+    if (trafficError) {
+      document.getElementById("traffic-percentage-input")?.focus()
+      return
+    }
     try {
       const formData = {
         display_name: displayName,
@@ -179,7 +195,8 @@ export function ExperimentDetail({
         tag_ids: metadata.tag_ids
       }
 
-      await save(formData, currentVariants, onUpdate)
+      const saved = await save(formData, currentVariants, onUpdate)
+      if (saved === false) return
 
       try {
         await clearAllExperimentStorage(experiment.id)
@@ -192,6 +209,7 @@ export function ExperimentDetail({
       }
 
       setHasUnsavedChanges(false)
+      setSavedMetadata(metadata)
     } catch (error) {
       debugError("Failed to save experiment:", error)
       if (onError) {
@@ -267,7 +285,7 @@ export function ExperimentDetail({
       }
     }
 
-    if (hasUnsavedChanges) {
+    if (isDirty) {
       if (
         window.confirm("You have unsaved changes. Do you want to discard them?")
       ) {
@@ -403,6 +421,7 @@ export function ExperimentDetail({
       <div className="space-y-4">
         <ExperimentMetadata
           data={metadata}
+          trafficError={trafficError}
           onChange={(newMetadata) => {
             setMetadata(newMetadata)
           }}
@@ -473,22 +492,18 @@ export function ExperimentDetail({
               experiment.state === "running" ||
               experiment.state === "development"
             }
-            className={hasUnsavedChanges ? "ring-2 ring-yellow-400" : ""}
+            className={isDirty ? "ring-2 ring-yellow-400" : ""}
             title={
               experiment.state === "running" ||
               experiment.state === "development"
                 ? "Stop the experiment to save changes"
                 : saving
                   ? "Saving..."
-                  : hasUnsavedChanges
+                  : isDirty
                     ? "Save your changes"
                     : "No changes to save"
             }>
-            {saving
-              ? "Saving..."
-              : hasUnsavedChanges
-                ? "• Save Changes"
-                : "Save Changes"}
+            {saving ? "Saving..." : isDirty ? "• Save Changes" : "Save Changes"}
           </Button>
         </div>
       </div>

@@ -22,6 +22,7 @@ interface ExperimentMetadataProps {
   owners?: any[]
   teams?: any[]
   tags?: any[]
+  trafficError?: string
 }
 
 // Separate memoized component for Owners field - only re-renders when owners/teams/IDs change
@@ -138,7 +139,8 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
   unitTypes = [],
   owners = [],
   teams = [],
-  tags = []
+  tags = [],
+  trafficError
 }: ExperimentMetadataProps) {
   const loading = applications.length === 0 || unitTypes.length === 0
   const handleTrafficChange = (value: number) => {
@@ -222,12 +224,15 @@ export const ExperimentMetadata = React.memo(function ExperimentMetadata({
           Traffic Percentage
         </label>
         <Input
+          id="traffic-percentage-input"
+          aria-labelledby="traffic-label"
           type="number"
           min="0"
           max="100"
           value={data.percentage_of_traffic}
           onChange={(e) => handleTrafficChange(parseInt(e.target.value) || 0)}
           disabled={!canEdit}
+          error={trafficError}
         />
       </div>
 

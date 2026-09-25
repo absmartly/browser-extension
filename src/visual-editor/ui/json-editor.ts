@@ -211,7 +211,17 @@ export class JSONEditor {
 
         // Validate before saving
         try {
-          JSON.parse(newJSON)
+          const parsed = JSON.parse(newJSON)
+          if (
+            parsed === null ||
+            typeof parsed !== "object" ||
+            Array.isArray(parsed)
+          ) {
+            statusEl.textContent =
+              "✕ Cannot save: variant config must be a JSON object"
+            statusEl.style.color = "#f87171"
+            return
+          }
           this.cleanup()
           resolve(newJSON)
         } catch (e) {
