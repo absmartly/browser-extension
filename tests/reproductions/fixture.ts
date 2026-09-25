@@ -35,6 +35,8 @@ export const test = base.extend<Fixture>({
       channel: 'chromium', headless: process.env.HEADED !== '1',
       viewport: { width: 1440, height: 1000 },
       args: [`--disable-extensions-except=${build}`, `--load-extension=${build}`],
+      // Opt-in proof recording; off by default so CI output stays small.
+      ...(process.env.REPRO_VIDEO === '1' ? { recordVideo: { dir: testInfo.outputPath('video'), size: { width: 1440, height: 1000 } } } : {}),
     })
     const events: unknown[] = []
     await context.route('**/*', route => {
