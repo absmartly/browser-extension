@@ -105,3 +105,43 @@ test('SDK error events keep the error message', async ({ page, origin, mount }) 
   await error.click()
   await expect(viewerHost(page).locator('.cm-content')).toContainText('fixture publish failure')
 })
+
+test('Tab and Shift+Tab stay inside Event Details and Escape returns focus to the sidebar', async ({ page, origin, mount }) => {
+  const sidebar = await openSdkEvents(page, origin, mount)
+  await sidebar.locator('#nav-events').click()
+  await page.locator('#goal').click()
+  const goal = rows(sidebar).and(sidebar.locator('[data-event-name="goal"]'))
+  await goal.click()
+  await expect(viewerHost(page)).toHaveCount(1)
+  const focusInViewer = () => page.evaluate(() => {
+    const host = document.getElementById('absmartly-event-viewer-host')
+    return !!host && document.activeElement === host && !!host.shadowRoot?.activeElement
+  })
+  for (const key of ['Tab', 'Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
+    await page.keyboard.press(key)
+    expect(await focusInViewer(), `focus after ${key}`).toBe(true)
+  }
+  await page.keyboard.press('Escape')
+  await expect(viewerHost(page)).toHaveCount(0)
+  await expect(page.locator('#absmartly-sidebar-iframe')).toBeFocused()
+})
+
+test('Clear All during a burst leaves the live list matching the buffer', async ({ page, origin, mount }) => {
+  const sidebar = await openSdkEvents(page, origin, mount)
+  await sidebar.locator('#nav-events').click()
+  await sidebar.locator('#events-debug-clear-button').click()
+  await page.evaluate(() => {
+    const context = (window as any).ABsmartlyContext
+    for (let i = 0; i < 150; i++) context.track('burst_goal', { i })
+  })
+  await sidebar.locator('#clear-all-button').click()
+  await expect(sidebar.locator('#clear-all-button')).toHaveCount(0)
+  // A goal sent after the clear is broadcast last, so once it is shown every
+  // earlier broadcast has been handled.
+  await page.locator('#goal').click()
+  await expect(rows(sidebar).filter({ hasText: 'clicked_goal' })).toHaveCount(1)
+  const live = await rows(sidebar).count()
+  await reopenSdkEvents(sidebar)
+  await expect(rows(sidebar).filter({ hasText: 'clicked_goal' })).toHaveCount(1)
+  await expect(rows(sidebar)).toHaveCount(live)
+})
