@@ -98,14 +98,22 @@ export function ListView({
   return (
     <>
       <div className="border-b px-4 py-3 flex-shrink-0 relative">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+        {/* Wraps the actions onto their own row when the sidebar is resized
+            narrower than the title plus all actions, instead of clipping. */}
+        <div
+          id="experiments-header"
+          className="relative flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
             <Logo config={config} />
-            <h1 id="experiments-heading" className="text-lg font-semibold">
+            <h1
+              id="experiments-heading"
+              className="text-lg font-semibold truncate">
               Experiments
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div
+            id="experiments-header-actions"
+            className="flex items-center gap-2 ml-auto">
             <button
               id="refresh-experiments-button"
               onClick={onRefresh}
@@ -138,6 +146,23 @@ export function ListView({
               <CogIcon className="h-5 w-5 text-gray-600" />
             </button>
           </div>
+          <CreateExperimentDropdownPanel
+            isOpen={createPanelOpen}
+            templates={templates}
+            loading={templatesLoading}
+            searchQuery={templateSearchQuery}
+            onSearchChange={setTemplateSearchQuery}
+            onCreateFromScratch={() => {
+              setCreatePanelOpen(false)
+              onCreateFromScratch()
+            }}
+            onTemplateSelect={(templateId) => {
+              setCreatePanelOpen(false)
+              onCreateFromTemplate(templateId)
+            }}
+            config={config}
+            positionClassName="-left-4 -right-4 top-[calc(100%+8px)]"
+          />
         </div>
         {filters && (
           <ExperimentFilter
@@ -151,23 +176,6 @@ export function ListView({
             applications={applications}
           />
         )}
-
-        <CreateExperimentDropdownPanel
-          isOpen={createPanelOpen}
-          templates={templates}
-          loading={templatesLoading}
-          searchQuery={templateSearchQuery}
-          onSearchChange={setTemplateSearchQuery}
-          onCreateFromScratch={() => {
-            setCreatePanelOpen(false)
-            onCreateFromScratch()
-          }}
-          onTemplateSelect={(templateId) => {
-            setCreatePanelOpen(false)
-            onCreateFromTemplate(templateId)
-          }}
-          config={config}
-        />
       </div>
       {!isAuthenticated && (
         <div

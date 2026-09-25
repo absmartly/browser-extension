@@ -236,12 +236,6 @@ function SidebarContent() {
   }, [view, aiDomContext])
 
   useEffect(() => {
-    if (view === "list" && currentPage !== 1) {
-      setCurrentPage(1)
-    }
-  }, [view, currentPage, setCurrentPage])
-
-  useEffect(() => {
     const handleAIDispatch = () => {
       const ctx = (window as any).__absmartlyAIContext
       if (!ctx) return
