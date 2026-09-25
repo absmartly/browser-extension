@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
-import { setupTestPage } from './utils/test-helpers'
+import { setupTestPage, openLiveExperimentDetails } from './utils/test-helpers'
 
 /**
  * E2E Tests for Bug Fixes
@@ -34,39 +34,24 @@ test.describe('Bug Fixes E2E Tests', () => {
   })
 
   test.describe('1. Exit VE and Preview cleanup', () => {
-    test('should stop VE when navigating back from experiment detail', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      // Wait for experiments to load
-      const experimentItems = sidebar.locator('.experiment-item')
-      const count = await experimentItems.count()
-
-      if (count === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Click first experiment
-      await experimentItems.first().click()
-
-      // Wait for experiment detail
-      await sidebar.locator('#back-button').waitFor({ state: 'visible', timeout: 5000 })
+    test('should stop VE when navigating back from a test-owned draft', async () => {
+      await sidebar.locator('button[title="Create New Experiment"]').click({ timeout: 10000 })
+      await sidebar.locator('#from-scratch-button').click({ timeout: 10000 })
+      await expect(sidebar.locator('#experiment-name-input')).toBeVisible()
 
       // Wait for VE button to appear
-      await sidebar.locator('#visual-editor-button').waitFor({ state: 'visible', timeout: 5000 })
+      await sidebar.locator('#visual-editor-button').first().waitFor({ state: 'visible', timeout: 5000 })
 
       // Start VE mode
       await sidebar.locator('#visual-editor-button').first().click()
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
+      await expect(testPage.locator('#absmartly-visual-editor-banner-host')).toBeVisible()
 
       // Click back button
-      await sidebar.locator('#back-button').click()
+      await sidebar.locator('#header-back-button').click()
 
       // Verify we're back at experiment list
-      await sidebar.locator('.experiment-item').first().waitFor({ state: 'visible', timeout: 3000 })
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
+      await expect(testPage.locator('#absmartly-visual-editor-banner-host')).toHaveCount(0)
     })
 
     test('should stop Preview mode when navigating away', async ({ seedStorage }) => {
@@ -109,12 +94,7 @@ test.describe('Bug Fixes E2E Tests', () => {
         .catch(() => {})
 
       const experimentItems = sidebar.locator('.experiment-item')
-      const count = await experimentItems.count()
-
-      if (count === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
+      await expect(experimentItems.first()).toBeVisible()
 
       // Click on first variant button to set an override
       const firstVariantButton = experimentItems.first().locator('button[type="button"]').first()
@@ -123,33 +103,19 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Look for reload banner (which contains the Clear All button)
       const reloadBanner = sidebar.locator('text=Reload to apply changes')
-      const bannerCount = await reloadBanner.count()
-
-      if (bannerCount > 0) {
-        await expect(reloadBanner).toBeVisible()
-
-        // Look for "Clear All" button within the banner area
-        const clearAllButton = sidebar.locator('#clear-all-button')
-        await expect(clearAllButton).toBeVisible()
-      } else {
-        // This is a valid test outcome - not all experiments show the reload banner
-        expect(true).toBe(true)
-      }
+      await expect(reloadBanner).toBeVisible()
+      await expect(sidebar.getByRole('button', { name: 'Clear All', exact: true })).toBeVisible()
     })
 
-    test('should clear all overrides when clicked', async ({ getStorage }) => {
+    test('should clear all overrides when clicked', async ({ context }) => {
       // Wait for loading spinner to disappear
       await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
         .waitFor({ state: 'hidden', timeout: 30000 })
         .catch(() => {})
 
       const experimentItems = sidebar.locator('.experiment-item')
+      await expect(experimentItems.first()).toBeVisible()
       const experimentCount = await experimentItems.count()
-
-      if (experimentCount === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
 
       // Set overrides on first 2-3 experiments
       for (let i = 0; i < Math.min(3, experimentCount); i++) {
@@ -163,26 +129,19 @@ test.describe('Bug Fixes E2E Tests', () => {
 
       // Check if reload banner appeared
       const reloadBanner = sidebar.locator('text=Reload to apply changes')
-      const bannerCount = await reloadBanner.count()
-
-      if (bannerCount > 0) {
-        // Set up dialog handler
-        testPage.on('dialog', dialog => dialog.accept())
-
-        // Find and click clear all button
-        const clearAllButton = sidebar.locator('#clear-all-button')
-        await clearAllButton.click()
-        await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-        // Verify overrides are cleared
-        const storage = await getStorage()
-        const overrides = storage['absmartly-overrides']
-
-        expect(overrides === '{}' || overrides === null || overrides === undefined).toBeTruthy()
-      } else {
-        // This is a valid test outcome - not all experiments show the reload banner
-        expect(true).toBe(true)
+      await expect(reloadBanner).toBeVisible()
+      const readOverrides = async () => {
+        // Read only the test's override key without opening/focusing another
+        // tab: the sidebar follows active-tab changes.
+        return context.serviceWorkers()[0].evaluate(async () => {
+          const value = (await chrome.storage.sync.get('experiment_overrides'))['experiment_overrides']
+          return typeof value === 'string' ? JSON.parse(value) : (value || {})
+        })
       }
+      await expect.poll(async () => Object.keys(await readOverrides()).length).toBeGreaterThan(0)
+      testPage.once('dialog', dialog => dialog.accept())
+      await sidebar.getByRole('button', { name: 'Clear All', exact: true }).click({ timeout: 10000 })
+      await expect.poll(readOverrides).toEqual({})
     })
   })
 
@@ -241,31 +200,16 @@ test.describe('Bug Fixes E2E Tests', () => {
         .catch(() => {})
 
       const experimentItems = sidebar.locator('.experiment-item')
-      const count = await experimentItems.count()
-
-      if (count === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
+      await expect(experimentItems.first()).toBeVisible()
 
       // Click on first experiment
-      await experimentItems.first().click()
-      await sidebar.locator('#back-button').waitFor({ state: 'visible', timeout: 5000 })
+      await openLiveExperimentDetails(testPage, experimentItems.first())
+      await sidebar.locator('#header-back-button').waitFor({ state: 'visible', timeout: 5000 })
 
-      // Look for unit type field
-      const unitTypeLabel = sidebar.locator('text=Unit Type')
-      const hasUnitTypeField = await unitTypeLabel.count()
-
-      if (hasUnitTypeField > 0) {
-        // Get the dropdown trigger
-        const unitDropdown = sidebar.locator('[data-testid="unit-type-select-trigger"]')
-
-        // Check the text content (should not be "Select...")
-        const selectedValue = await unitDropdown.textContent()
-
-        // If experiment has units, value should not be placeholder
-        const hasValue = selectedValue && selectedValue.trim() !== 'Select...' && selectedValue.trim().length > 0
-      }
+      const unitDropdown = sidebar.locator('#unit-type-select-trigger')
+      await expect(unitDropdown).toBeVisible()
+      await expect(unitDropdown).not.toHaveText(/^\s*(Select|Loading)/i)
+      await expect(unitDropdown).not.toHaveText('')
     })
   })
 
