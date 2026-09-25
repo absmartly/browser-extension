@@ -98,8 +98,6 @@ export function ListView({
   return (
     <>
       <div className="border-b px-4 py-3 flex-shrink-0 relative">
-        {/* Wraps the actions onto their own row when the sidebar is resized
-            narrower than the title plus all actions, instead of clipping. */}
         <div
           id="experiments-list-header"
           className="relative flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-3">
