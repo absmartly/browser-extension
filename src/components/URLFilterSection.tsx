@@ -26,6 +26,8 @@ const URLFilterSection = React.memo(function URLFilterSection({
     if (!config.urlFilter) return "all"
     if (typeof config.urlFilter === "string" || Array.isArray(config.urlFilter))
       return "simple"
+    if (!config.urlFilter.exclude?.length && config.urlFilter.mode !== "regex")
+      return "simple"
     return "advanced"
   })
 
