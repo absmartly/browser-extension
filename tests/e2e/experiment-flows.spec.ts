@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
-import { injectSidebar, debugWait, setupConsoleLogging, waitForExperiments } from './utils/test-helpers'
+import { injectSidebar, debugWait, setupConsoleLogging, waitForExperiments, openLiveExperimentDetails } from './utils/test-helpers'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -267,7 +267,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
       const clickableArea = experimentRow.locator('[data-experiment-name]')
       await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
-      await clickableArea.click()
+      await openLiveExperimentDetails(testPage, experimentRow)
       console.log('  ✓ Opened existing experiment')
 
       // Wait for detail view title to change
