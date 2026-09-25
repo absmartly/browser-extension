@@ -26,8 +26,13 @@ export class EventViewer {
   private editorView: EditorView | null = null
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null
   private previousFocus: HTMLElement | null = null
+  private initTimer: ReturnType<typeof setTimeout> | null = null
 
   show(eventName: string, timestamp: string, jsonData: string): void {
+    if (this.viewerHost) {
+      this.teardown()
+    }
+
     // Create viewer host with Shadow DOM to avoid CSP issues
     this.viewerHost = document.createElement("div")
     this.viewerHost.id = "absmartly-event-viewer-host"
@@ -158,7 +163,8 @@ export class EventViewer {
     container.focus({ preventScroll: true })
 
     // Create CodeMirror viewer (read-only)
-    setTimeout(() => {
+    this.initTimer = setTimeout(() => {
+      this.initTimer = null
       const startState = EditorState.create({
         doc: jsonData,
         extensions: [
@@ -218,8 +224,7 @@ export class EventViewer {
     }, 0)
   }
 
-  // The dialog is modal: cycle Tab and Shift+Tab through its own controls
-  // instead of letting focus reach the page behind it.
+  // aria-modal: keep keyboard focus out of the page behind the dialog.
   private keepTabInside(e: KeyboardEvent, container: HTMLElement): void {
     if (!this.shadowRoot) return
     const focusable = Array.from(
@@ -245,6 +250,19 @@ export class EventViewer {
   }
 
   close(): void {
+    this.teardown()
+    // Notify extension that viewer was closed
+    chrome.runtime.sendMessage({ type: "EVENT_VIEWER_CLOSE" })
+  }
+
+  private teardown(): void {
+    // Closing before the deferred editor setup runs must not build an editor
+    // into the removed dialog.
+    if (this.initTimer !== null) {
+      clearTimeout(this.initTimer)
+      this.initTimer = null
+    }
+
     if (this.editorView) {
       this.editorView.destroy()
       this.editorView = null
@@ -266,11 +284,6 @@ export class EventViewer {
       }
     }
     this.previousFocus = null
-
-    // No need to remove style from head anymore - it's in shadow root
-
-    // Notify extension that viewer was closed
-    chrome.runtime.sendMessage({ type: "EVENT_VIEWER_CLOSE" })
   }
 
   private getViewerStyles(): string {
