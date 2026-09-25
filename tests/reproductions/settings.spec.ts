@@ -128,6 +128,54 @@ for (const [label, width] of Object.entries(WIDTHS)) {
       await page.keyboard.press('Enter')
       await expect(page.locator('#experiments-heading')).toBeVisible()
     })
+
+    test('SET-4 focus stays in the dialog while its Save is in flight', async ({ page }) => {
+      await page.locator('#configure-settings-button').click()
+      await saveConfig(page, GOOD_KEY)
+      await page.locator('#nav-settings').click()
+      await page.locator('#application-name-input').fill('ft-2252-slow-save')
+      // Synthetic slow save: hold chrome.storage writes until released.
+      await page.evaluate(() => {
+        const w = window as any
+        w.__releaseSave = null
+        const gate = new Promise<void>(resolve => { w.__releaseSave = resolve })
+        for (const area of [chrome.storage.local, chrome.storage.sync] as any[]) {
+          const set = area.set.bind(area)
+          area.set = async (...args: unknown[]) => { await gate; return set(...args) }
+        }
+      })
+      await page.locator('#header-back-button').focus()
+      await page.keyboard.press('Enter')
+      await expect(page.locator('#unsaved-changes-cancel')).toBeFocused()
+      await page.keyboard.press('Tab')
+      await page.keyboard.press('Tab')
+      await expect(page.locator('#unsaved-changes-save')).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(page.locator('#unsaved-changes-save')).toBeDisabled()
+      await expect(page.locator('#unsaved-changes-save')).toHaveText('Saving...')
+      const focus = () => page.evaluate(() => ({
+        inDialog: !!document.activeElement?.closest('#unsaved-changes-modal'),
+        active: document.activeElement?.id || document.activeElement?.tagName,
+      }))
+      // Let the saving state settle, then record focus and each Tab before
+      // asserting, so failures keep the diagnostic trail and screenshot.
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+      const trail = [await focus()]
+      await shot(page, 'set4-03-saving-focus')
+      for (const key of ['Tab', 'Tab', 'Tab', 'Shift+Tab']) {
+        await page.keyboard.press(key)
+        trail.push(await focus())
+      }
+      await shot(page, 'set4-04-saving-after-tabs')
+      await test.info().attach('saving-focus-trail', { body: JSON.stringify(trail, null, 2), contentType: 'application/json' })
+      expect(trail.every(f => f.inDialog), JSON.stringify(trail)).toBe(true)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#unsaved-changes-modal')).toBeVisible()
+      await page.evaluate(() => (window as any).__releaseSave())
+      await expect(page.locator('#experiments-heading')).toBeVisible()
+      await page.locator('#nav-settings').click()
+      await expect(page.locator('#application-name-input')).toHaveValue('ft-2252-slow-save')
+    })
   })
 }
 
