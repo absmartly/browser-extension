@@ -45,7 +45,7 @@ import {
   handleStorageRemove,
   handleStorageSet
 } from "./handlers/storage-handler"
-import { checkRateLimit } from "./utils/rate-limiter"
+import { checkRateLimit, getRateLimitBucket } from "./utils/rate-limiter"
 import { ConfigSchema, safeValidateAPIRequest } from "./utils/validation"
 
 let configInitError: string | null = null
@@ -293,9 +293,13 @@ export function initializeBackgroundScript() {
       return false
     }
 
-    const senderId = sender.tab?.id?.toString() || sender.id || "unknown"
     const messageType = message.type || (message as any).action || "unknown"
-    if (!checkRateLimit(senderId, {}, messageType)) {
+    const { key: senderId, config: rateLimitConfig } = getRateLimitBucket(
+      sender,
+      messageType,
+      chrome.runtime.getURL("")
+    )
+    if (!checkRateLimit(senderId, rateLimitConfig, messageType)) {
       debugWarn(
         `[Background] Rate limit exceeded for sender: ${senderId}, message type: ${messageType}`
       )
