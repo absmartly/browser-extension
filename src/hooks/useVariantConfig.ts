@@ -31,8 +31,11 @@ export function setDOMChangesInConfig(
       delete newConfig[domFieldName]
     }
   } else {
-    if (domChanges.changes && domChanges.changes.length > 0) {
-      newConfig[domFieldName] = domChanges
+    const hasChanges = !!domChanges.changes && domChanges.changes.length > 0
+    if (hasChanges || domChanges.urlFilter) {
+      newConfig[domFieldName] = hasChanges
+        ? domChanges
+        : { ...domChanges, changes: [] }
     } else {
       delete newConfig[domFieldName]
     }
