@@ -402,7 +402,7 @@ test.describe('Experiment Data Persistence', () => {
           console.log('  ⚠️  Unit type field not visible (non-critical for persistence test)')
         }
 
-        await expect(sidebar.locator('#experiment-name-input')).toHaveValue(createdExperimentName)
+        await expect(sidebar.locator('#experiment-detail-name')).toHaveText(createdExperimentName)
         const appContainer = sidebar.locator('#applications-select').locator('..')
         const appBadges = appContainer.locator('span[class*="badge"], div[class*="badge"]')
         const appCount = await appBadges.count()
