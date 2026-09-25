@@ -329,9 +329,12 @@ describe('config-manager', () => {
       jest.spyOn(storage, 'get').mockImplementation(async () => state.config)
       jest.spyOn(storage, 'set').mockImplementation(async (_name, value) => {
         // The seed arrives after init's last read, just before its write lands.
+        // chrome.storage writes are asynchronous IPC, so the write lands a
+        // macrotask later; a seeder that merely yields still wins the race.
         const hook = beforeDefaultsWrite
         beforeDefaultsWrite = undefined
         hook?.()
+        await new Promise(resolve => setTimeout(resolve, 0))
         state.config = value
         return null
       })
@@ -381,6 +384,22 @@ describe('config-manager', () => {
       expect(config?.authMethod).toBe('apikey')
       expect(config?.apiKey).toBe('synthetic-seeded-key')
       expect(await authorizationSent(config)).toBe(true)
+    })
+
+    it('control: a seeder that only yields without awaiting readiness is still overwritten', async () => {
+      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
+      let seeding: Promise<void> | undefined
+      armBeforeDefaultsWrite(() => {
+        seeding = (async () => {
+          await undefined
+          seed()
+        })()
+      })
+      await startConfigInitialization(storage, secureStorage, jest.fn())
+      await seeding
+      const config = await getConfig(storage, secureStorage)
+      expect(config?.authMethod).toBe('jwt')
+      expect(await authorizationSent(config)).toBe(false)
     })
 
     it('settles and reports initialization errors instead of rejecting the readiness promise', async () => {
