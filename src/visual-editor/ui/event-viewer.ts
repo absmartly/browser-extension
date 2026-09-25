@@ -24,6 +24,8 @@ export class EventViewer {
   private viewerHost: HTMLElement | null = null
   private shadowRoot: ShadowRoot | null = null
   private editorView: EditorView | null = null
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null
+  private previousFocus: HTMLElement | null = null
 
   show(eventName: string, timestamp: string, jsonData: string): void {
     // Create viewer host with Shadow DOM to avoid CSP issues
@@ -53,12 +55,17 @@ export class EventViewer {
 
     const container = document.createElement("div")
     container.className = "event-viewer-container"
+    container.setAttribute("role", "dialog")
+    container.setAttribute("aria-modal", "true")
+    container.setAttribute("aria-labelledby", "event-viewer-title")
+    container.tabIndex = -1
 
     const header = document.createElement("div")
     header.className = "event-viewer-header"
 
     const titleEl = document.createElement("h3")
     titleEl.className = "event-viewer-title"
+    titleEl.id = "event-viewer-title"
     titleEl.textContent = "Event Details"
 
     header.appendChild(titleEl)
@@ -134,6 +141,20 @@ export class EventViewer {
     this.shadowRoot.appendChild(backdrop)
     document.body.appendChild(this.viewerHost)
 
+    // The viewer is usually opened from the sidebar iframe, which keeps
+    // keyboard focus. Move focus into the dialog so Escape reaches this
+    // document, and remember where focus was so it can be restored on close.
+    const active = document.activeElement
+    this.previousFocus =
+      active instanceof HTMLElement && active !== document.body ? active : null
+    this.keydownHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        this.close()
+      }
+    }
+    document.addEventListener("keydown", this.keydownHandler)
+    container.focus({ preventScroll: true })
+
     // Create CodeMirror viewer (read-only)
     setTimeout(() => {
       const startState = EditorState.create({
@@ -192,17 +213,6 @@ export class EventViewer {
           this.close()
         }
       })
-
-      // Escape key to close
-      const handleKeydown = (e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          this.close()
-        }
-      }
-      document.addEventListener("keydown", handleKeydown)
-
-      // Store handler for cleanup
-      ;(this.viewerHost as any)._keydownHandler = handleKeydown
     }, 0)
   }
 
@@ -212,17 +222,22 @@ export class EventViewer {
       this.editorView = null
     }
 
-    if (this.viewerHost) {
-      // Remove keydown handler
-      const handler = (this.viewerHost as any)._keydownHandler
-      if (handler) {
-        document.removeEventListener("keydown", handler)
-      }
+    if (this.keydownHandler) {
+      document.removeEventListener("keydown", this.keydownHandler)
+      this.keydownHandler = null
+    }
 
+    if (this.viewerHost) {
+      const hadFocus = this.viewerHost.contains(document.activeElement)
       this.viewerHost.remove()
       this.viewerHost = null
       this.shadowRoot = null // Clear shadow root reference
+
+      if (hadFocus && this.previousFocus?.isConnected) {
+        this.previousFocus.focus({ preventScroll: true })
+      }
     }
+    this.previousFocus = null
 
     // No need to remove style from head anymore - it's in shadow root
 
@@ -246,6 +261,7 @@ export class EventViewer {
       }
 
       .event-viewer-container {
+        outline: none;
         background: #1e1e1e;
         border-radius: 8px;
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
