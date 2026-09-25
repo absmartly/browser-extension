@@ -199,9 +199,8 @@ async function globalSetup(config: FullConfig) {
     const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
     const fetchOne = async (resource: string, items = 200): Promise<unknown[]> => fetchResource(resource, async () => {
       const controller = new AbortController()
-      // Keep the existing 40s request budget, but avoid repeatedly aborting
-      // healthy calls: CI traces contain successful apps/unit-types reads at
-      // 9.3s/10.0s. Two 20s attempts replace five 8s attempts (less backoff).
+      // Two 20s attempts within the 40s budget: healthy apps/unit-types
+      // reads can take ~10s in CI, so shorter attempts abort good calls.
       const timer = setTimeout(() => controller.abort(), 20000)
       try {
         const response = await fetch(`${baseEndpoint}/v1/${resource}?items=${items}`, {

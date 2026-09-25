@@ -2,13 +2,78 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # No branch filter: stacked PRs targeting a feature branch must be
+    # tested on their actual merged head, not only PRs into main.
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  live-flake-regressions:
+    needs: e2e-tests
+    # Run after e2e failures too, but not for runs cancelled by a newer push:
+    # the live repetitions consume shared provider/API quota.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CI: true
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+      PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
+      PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run build
+      - name: Three bounded repetitions of the six observed flaky paths, without retries
+        run: >-
+          bunx playwright test
+          --grep 'should handle append action|extension generates DOM changes via Anthropic API|checkAuthentication with API Key|should persist and reload all experiment metadata including unit type|Test API_REQUEST message|Complete filter workflow: toggle panel, state filters, significance, alerts, search, clear'
+          --repeat-each=3 --retries=0 --workers=4
+      - name: Redact credentials from retained evidence
+        id: redact
+        if: always()
+        run: python3 tests/sanitize-artifacts.py
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.redact.outcome == 'success'
+        with:
+          name: live-flake-regression-results
+          path: test-results/
+          retention-days: 7
+
+  launchpad-regressions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run build
+      - run: bunx playwright test -c tests/reproductions/playwright.config.ts
+        env:
+          REPRO_OUTPUT_DIR: ${{ runner.temp }}/launchpad-regressions
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: launchpad-regression-results
+          path: ${{ runner.temp }}/launchpad-regressions/
+          retention-days: 7
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -87,11 +152,19 @@ jobs:
           PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
           PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
+      - name: Redact credentials from retained evidence
+        id: redact
+        if: always()
+        run: python3 tests/sanitize-artifacts.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+          PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
       - uses: actions/upload-artifact@v4
-        if: failure()
+        # Successful shards can contain failed attempts; retain their evidence.
+        if: always() && steps.redact.outcome == 'success'
         with:
           name: playwright-report-shard-${{ strategy.job-index }}
-          path: |
-            playwright-report/
-            test-results/
+          path: test-results/
           retention-days: 7

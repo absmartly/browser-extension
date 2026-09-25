@@ -42,7 +42,7 @@ type ExtFixtures = {
 }
 
 export const test = base.extend<ExtFixtures>({
-  context: async ({}, use) => {
+  context: async ({}, use, testInfo) => {
     // Extension build is already ensured in global setup
     // Don't rebuild here to avoid multiple rebuilds per test
 
@@ -70,6 +70,36 @@ export const test = base.extend<ExtFixtures>({
       ],
       slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : undefined,
       viewport: { width: 1920, height: 1080 },
+    })
+
+    // Keep timing/status evidence for live flakes without headers, keys,
+    // request bodies or customer response data.
+    const startedAt = Date.now()
+    const requests = new Map<import('@playwright/test').Request, number>()
+    const network: Array<Record<string, unknown>> = []
+    context.on('request', request => {
+      if (!/^https?:/.test(request.url())) return
+      const url = new URL(request.url())
+      requests.set(request, network.length)
+      network.push({ method: request.method(), host: url.host, path: url.pathname,
+        items: url.searchParams.get('items'), startMs: Date.now() - startedAt })
+    })
+    context.on('response', response => {
+      const index = requests.get(response.request())
+      if (index !== undefined) {
+        const headers = response.headers()
+        const rateLimit = Object.fromEntries(Object.entries(headers).filter(([name]) =>
+          /^(retry-after(-ms)?|anthropic-ratelimit-unified-[a-z0-9-]+)$/.test(name)))
+        Object.assign(network[index], {status: response.status(), headersMs: Date.now() - startedAt, rateLimit})
+      }
+    })
+    context.on('requestfinished', request => {
+      const index = requests.get(request)
+      if (index !== undefined) network[index].finishedMs = Date.now() - startedAt
+    })
+    context.on('requestfailed', request => {
+      const index = requests.get(request)
+      if (index !== undefined) Object.assign(network[index], {failedMs: Date.now() - startedAt, error: request.failure()?.errorText})
     })
 
     // Seed vibeStudioEnabled in extension config so AI tests can find the Generate with AI button
@@ -200,7 +230,14 @@ export const test = base.extend<ExtFixtures>({
 
     await seedPage.close()
 
-    await use(context)
+    try {
+      await use(context)
+    } finally {
+      const timingPath = testInfo.outputPath('request-timings.json')
+      fs.mkdirSync(path.dirname(timingPath), {recursive: true})
+      fs.writeFileSync(timingPath, JSON.stringify(network, null, 2))
+      await testInfo.attach('request-timings', {path: timingPath, contentType: 'application/json'})
+    }
     await Promise.race([
       context.close(),
       new Promise<void>(resolve => setTimeout(resolve, 30000))

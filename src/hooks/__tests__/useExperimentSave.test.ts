@@ -143,9 +143,11 @@ describe("useExperimentSave - Custom Fields", () => {
 
       const experimentData = mockOnSave.mock.calls[0][0]
       expect(experimentData.custom_section_field_values).toEqual({})
+      expect(mockOnSave).toHaveBeenCalledTimes(1)
+      expect(result.current.saveStatus.step).toBe("complete")
     })
 
-    it("should handle custom fields fetch error gracefully", async () => {
+    it("should reject creation when custom field definitions cannot be loaded", async () => {
       mockGetCustomSectionFields.mockRejectedValue(new Error("API Error"))
 
       const mockOnSave = jest.fn().mockResolvedValue(undefined)
@@ -164,12 +166,14 @@ describe("useExperimentSave - Custom Fields", () => {
       )
 
       await act(async () => {
-        await result.current.save(formData, variants, undefined, mockOnSave)
+        await expect(
+          result.current.save(formData, variants, undefined, mockOnSave)
+        ).rejects.toThrow("Unable to load custom fields")
       })
 
-      expect(mockOnSave).toHaveBeenCalled()
-      const experimentData = mockOnSave.mock.calls[0][0]
-      expect(experimentData.custom_section_field_values).toEqual({})
+      expect(mockOnSave).not.toHaveBeenCalled()
+      expect(result.current.saveStatus.step).toBe("error")
+      expect(result.current.saving).toBe(false)
     })
 
     it("should use default_value from custom fields", async () => {
@@ -770,7 +774,7 @@ describe("useExperimentSave - Custom Fields", () => {
       expect(mockOnUpdate).toHaveBeenCalled()
     })
 
-    it("should show warning when custom fields fetch fails during creation", async () => {
+    it("should not notify success or claim defaults after definition loading fails", async () => {
       mockGetCustomSectionFields.mockRejectedValue(new Error("API Error"))
 
       const mockOnSave = jest.fn().mockResolvedValue(undefined)
@@ -789,15 +793,14 @@ describe("useExperimentSave - Custom Fields", () => {
       )
 
       await act(async () => {
-        await result.current.save(formData, variants, undefined, mockOnSave)
+        await expect(
+          result.current.save(formData, variants, undefined, mockOnSave)
+        ).rejects.toThrow("Unable to load custom fields")
       })
 
-      expect(notifyWarning).toHaveBeenCalledWith(
-        "Failed to fetch custom fields. Using defaults."
-      )
-      expect(notifySuccess).toHaveBeenCalledWith(
-        "Experiment created successfully"
-      )
+      expect(notifyWarning).not.toHaveBeenCalled()
+      expect(notifySuccess).not.toHaveBeenCalled()
+      expect(mockOnSave).not.toHaveBeenCalled()
     })
 
     it("should show specific error when experiment creation fails", async () => {

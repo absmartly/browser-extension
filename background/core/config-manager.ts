@@ -135,11 +135,22 @@ export async function initializeConfig(
     aiApiKey: storedConfig?.aiApiKey || secureAiApiKey || ''
   } as ABsmartlyConfig
 
+  // Check before any fallback key write as well: settings may have saved a
+  // different key while the initial secure-storage reads were outstanding.
+  const configBeforeDefaults = await storage.get("absmartly-config") as ABsmartlyConfig | null
+  if (JSON.stringify(configBeforeDefaults) !== JSON.stringify(storedConfig)) {
+    debugLog('[Config] Configuration changed during initialization; preserving newer settings and keys')
+    return
+  }
+
   if (!storedConfig?.apiKey && !secureApiKey && envApiKey) {
-    newConfig.apiKey = envApiKey
-    await secureStorage.set("absmartly-apikey", envApiKey)
-    updated = true
-    debugLog('[Config] Using API key from environment and storing securely')
+    // A key-only settings save can leave the config JSON unchanged.
+    if (!await secureStorage.get("absmartly-apikey")) {
+      newConfig.apiKey = envApiKey
+      await secureStorage.set("absmartly-apikey", envApiKey)
+      updated = true
+      debugLog('[Config] Using API key from environment and storing securely')
+    }
   }
 
   if (!storedConfig?.apiEndpoint && envApiEndpoint) {
@@ -159,6 +170,14 @@ export async function initializeConfig(
   }
 
   if (updated) {
+    // Initialization crosses asynchronous storage reads. A settings save (or
+    // fixture seed) may have replaced the original snapshot in the meantime.
+    // Never restore startup defaults over that newer configuration.
+    const currentConfig = await storage.get("absmartly-config") as ABsmartlyConfig | null
+    if (JSON.stringify(currentConfig) !== JSON.stringify(storedConfig)) {
+      debugLog('[Config] Configuration changed during initialization; preserving newer settings')
+      return
+    }
     const configToStore = {
       ...storedConfig,
       ...newConfig,

@@ -71,6 +71,7 @@ tests/*
 !tests/fixtures/
 !tests/helpers/
 !tests/mocks/
+!tests/reproductions/
 !tests/setup/
 !tests/test-pages/
 !tests/unit/

@@ -6,11 +6,7 @@ import type {
   ExperimentCustomSectionField
 } from "~src/types/absmartly"
 import { debugError, debugLog } from "~src/utils/debug"
-import {
-  notifyError,
-  notifySuccess,
-  notifyWarning
-} from "~src/utils/notifications"
+import { notifyError, notifySuccess } from "~src/utils/notifications"
 import { getConfig } from "~src/utils/storage"
 
 import type { VariantData } from "./useExperimentVariants"
@@ -48,12 +44,14 @@ interface UseExperimentSaveOptions {
   experiment?: Experiment | null
   domFieldName: string
   onError?: (message: string) => void
+  loadCustomFields?: () => Promise<ExperimentCustomSectionField[]>
 }
 
 export interface SaveStatus {
   step:
     | "idle"
     | "validating"
+    | "loading-custom-fields"
     | "saving"
     | "updating-cache"
     | "complete"
@@ -64,7 +62,8 @@ export interface SaveStatus {
 export function useExperimentSave({
   experiment,
   domFieldName,
-  onError
+  onError,
+  loadCustomFields
 }: UseExperimentSaveOptions) {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -107,7 +106,8 @@ export function useExperimentSave({
           currentVariants,
           fieldName,
           onSave,
-          setSaveStatus
+          setSaveStatus,
+          loadCustomFields
         )
       }
 
@@ -153,25 +153,30 @@ async function createNewExperiment(
   currentVariants: VariantData[],
   domFieldName: string,
   onSave: (experiment: Partial<Experiment>) => Promise<void>,
-  setSaveStatus?: (status: SaveStatus) => void
+  setSaveStatus?: (status: SaveStatus) => void,
+  loadCustomFields?: () => Promise<ExperimentCustomSectionField[]>
 ) {
   const client = new BackgroundAPIClient()
   let customFields: ExperimentCustomSectionField[] = []
 
   try {
     setSaveStatus?.({
-      step: "validating",
+      step: "loading-custom-fields",
       message: "Fetching custom fields..."
     })
     debugLog("[createNewExperiment] Fetching custom section fields...")
-    customFields = await client.getCustomSectionFields()
+    customFields = await (loadCustomFields
+      ? loadCustomFields()
+      : client.getCustomSectionFields())
     debugLog(
       "[createNewExperiment] Fetched custom section fields:",
       customFields
     )
   } catch (error) {
     debugError("[createNewExperiment] Failed to fetch custom fields:", error)
-    await notifyWarning("Failed to fetch custom fields. Using defaults.")
+    // Without definitions we cannot construct defaults or preserve overrides.
+    // Keep the draft retryable instead of creating with an incomplete payload.
+    throw new Error("Unable to load custom fields. Please try saving again.")
   }
 
   const custom_section_field_values: Record<

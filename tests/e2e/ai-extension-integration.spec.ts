@@ -47,11 +47,12 @@ test.describe('Extension AI Integration (Anthropic API)', () => {
 
     const experimentName = await createExperiment(sidebar)
     await fillMetadataForSave(sidebar, testPage)
+    const createdName = await sidebar.locator('#experiment-name-input').inputValue()
     await saveExperiment(sidebar, testPage, experimentName)
 
-    await sidebar.locator('[data-experiment-name]').first()
-      .waitFor({ state: 'visible', timeout: 10000 })
-    await click(sidebar, sidebar.locator('[data-experiment-name]').first())
+    const createdRow = sidebar.locator(`[data-experiment-name=${JSON.stringify(createdName)}]`)
+    await createdRow.waitFor({ state: 'visible', timeout: 10000 })
+    await click(sidebar, createdRow)
 
     const generateAIButton = sidebar.locator('#generate-with-ai-button').first()
     await generateAIButton.scrollIntoViewIfNeeded()
@@ -60,15 +61,26 @@ test.describe('Extension AI Integration (Anthropic API)', () => {
 
     const aiPrompt = sidebar.locator('#ai-prompt')
     await aiPrompt.waitFor({ state: 'visible', timeout: 10000 })
-    await aiPrompt.fill('Change the h1 text to "Hello from Anthropic!"')
+    await aiPrompt.fill('Use the DOM-change tool to change the h1 text to "Hello from Anthropic!". Apply the change, not just describe it.')
+    const modelResponse = context.waitForEvent('response', {
+      predicate: response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/messages'),
+      timeout: 90000
+    })
     await click(sidebar, '#ai-generate-button')
+    const response = await modelResponse
+    expect(response.status(), 'Live provider response (a quota error is not generation success)').toBe(200)
 
-    const assistantMessage = sidebar.locator('[data-message-index]').last()
+    // The last message immediately after click is the USER prompt. Require
+    // the rendered assistant role and actual generated changes as well.
+    const assistantMessage = sidebar.locator('[data-message-index].justify-start').last()
     await assistantMessage.waitFor({ state: 'visible', timeout: 60000 })
 
     const responseText = await assistantMessage.textContent()
     expect(responseText).toBeTruthy()
     expect(responseText!.length).toBeGreaterThan(10)
+    await expect.poll(async () => sidebar.locator('body').evaluate(() =>
+      JSON.stringify((window as any).__absmartlyLatestDomChanges?.changes || [])
+    )).toContain('Hello from Anthropic!')
 
     await testPage.close()
   })

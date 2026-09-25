@@ -37,6 +37,18 @@ jest.mock("~src/utils/markdown", () => ({
   renderMarkdown: jest.fn((md: string) => md)
 }))
 
+// These preview-toggle tests own no persistent conversation fixtures. Leaving
+// this dependency real leaks one test's IndexedDB session into the next and
+// can finish its async hydration after the Jest environment has been torn down.
+// Conversation persistence is exercised in its dedicated hook/storage suites.
+jest.mock("~src/utils/ai-conversation-storage", () => ({
+  getConversationList: jest.fn().mockResolvedValue([]),
+  loadConversation: jest.fn().mockResolvedValue(null),
+  saveConversation: jest.fn().mockResolvedValue(undefined),
+  setActiveConversation: jest.fn().mockResolvedValue(undefined),
+  deleteConversation: jest.fn().mockResolvedValue(undefined)
+}))
+
 // Mock chrome storage
 global.chrome = {
   storage: {
