@@ -85,4 +85,67 @@ describe("UnsavedChangesModal", () => {
       "Save"
     ])
   })
+
+  describe("keyboard behaviour", () => {
+    it("moves focus into the dialog when it opens", () => {
+      render(<UnsavedChangesModal {...defaultProps} />)
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+    })
+
+    it("keeps Tab and Shift+Tab focus inside the dialog", () => {
+      render(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} />
+        </>
+      )
+      const cancel = screen.getByRole("button", { name: "Cancel" })
+      const save = screen.getByRole("button", { name: "Save" })
+      save.focus()
+      fireEvent.keyDown(save, { key: "Tab" })
+      expect(cancel).toHaveFocus()
+      fireEvent.keyDown(cancel, { key: "Tab", shiftKey: true })
+      expect(save).toHaveFocus()
+    })
+
+    it("cancels on Escape", () => {
+      render(<UnsavedChangesModal {...defaultProps} />)
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+      expect(defaultProps.onCancel).toHaveBeenCalledTimes(1)
+      expect(defaultProps.onDiscard).not.toHaveBeenCalled()
+      expect(defaultProps.onSave).not.toHaveBeenCalled()
+    })
+
+    it("ignores Escape while saving", () => {
+      render(<UnsavedChangesModal {...defaultProps} saving={true} />)
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+      expect(defaultProps.onCancel).not.toHaveBeenCalled()
+    })
+
+    it("restores focus to the element that opened it after closing", () => {
+      function Harness() {
+        const [open, setOpen] = React.useState(false)
+        return (
+          <>
+            <button id="opener" onClick={() => setOpen(true)}>
+              Back
+            </button>
+            <UnsavedChangesModal
+              {...defaultProps}
+              isOpen={open}
+              onCancel={() => setOpen(false)}
+            />
+          </>
+        )
+      }
+      render(<Harness />)
+      const opener = screen.getByRole("button", { name: "Back" })
+      opener.focus()
+      fireEvent.click(opener)
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+      expect(screen.queryByRole("dialog")).toBeNull()
+      expect(opener).toHaveFocus()
+    })
+  })
 })
