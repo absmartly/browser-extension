@@ -309,6 +309,7 @@ export function SettingsView({ onSave, onCancel }: SettingsViewProps) {
       </div>
 
       <Input
+        id="application-name-input"
         label="Application Name (Optional)"
         type="text"
         value={applicationName}
