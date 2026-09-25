@@ -12,6 +12,23 @@ export interface InterceptorCallbacks {
   onSDKEvent?: (eventName: string, data: any) => void
 }
 
+// Error message/stack are non-enumerable, so plain JSON cloning yields {}.
+const serializeErrors = (_key: string, value: any) => {
+  if (value instanceof Error) {
+    return {
+      ...value,
+      name: value.name,
+      message: value.message,
+      ...(value.stack ? { stack: value.stack } : {})
+    }
+  }
+  return value
+}
+
+export function cloneEventData(data: any): any {
+  return data ? JSON.parse(JSON.stringify(data, serializeErrors)) : null
+}
+
 export class SDKInterceptor {
   private callbacks: InterceptorCallbacks
 
@@ -64,10 +81,7 @@ export class SDKInterceptor {
       // Call callback if registered
       if (this.callbacks.onSDKEvent) {
         try {
-          this.callbacks.onSDKEvent(
-            eventName,
-            data ? JSON.parse(JSON.stringify(data)) : null
-          )
+          this.callbacks.onSDKEvent(eventName, cloneEventData(data))
         } catch (error) {
           Logger.error(
             "[ABsmartly Extension] Error in SDK event callback:",

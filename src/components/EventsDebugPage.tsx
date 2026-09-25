@@ -29,6 +29,12 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
 
   // Use a ref for isPaused so the message handlers always see the current value
   const isPausedRef = React.useRef(isPaused)
+  // Clear runs in two steps. Until the background confirms the clear,
+  // broadcasts can belong to events the clear removes, so they are dropped.
+  // While the buffer is reloaded afterwards, broadcasts are held and merged
+  // with the reloaded list so newer events are not lost.
+  const clearPhaseRef = React.useRef<"idle" | "clearing" | "reloading">("idle")
+  const heldDuringReloadRef = React.useRef<SDKEvent[]>([])
   React.useEffect(() => {
     isPausedRef.current = isPaused
   }, [isPaused])
@@ -70,16 +76,23 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
         message
       )
       if (message.type === "SDK_EVENT_BROADCAST") {
+        if (clearPhaseRef.current === "clearing") {
+          return
+        }
         if (!isPausedRef.current) {
           debugLog(
             "[EventsDebugPage] SDK_EVENT_BROADCAST received, adding event:",
             message.payload
           )
           const sdkEvent: SDKEvent = {
-            id: `${Date.now()}-${Math.random()}`,
+            id: message.payload.id || `${Date.now()}-${Math.random()}`,
             eventName: message.payload.eventName,
             data: message.payload.data,
             timestamp: message.payload.timestamp
+          }
+          if (clearPhaseRef.current === "reloading") {
+            heldDuringReloadRef.current.push(sdkEvent)
+            return
           }
           // Events are now stored newest-last, so append to end
           setEvents((prev) => {
@@ -89,6 +102,9 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
               "New count:",
               prev.length + 1
             )
+            if (prev.some((event) => event.id === sdkEvent.id)) {
+              return prev
+            }
             return [...prev, sdkEvent]
           })
         } else {
@@ -113,11 +129,25 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   }
 
   const confirmClearEvents = async () => {
+    clearPhaseRef.current = "clearing"
+    heldDuringReloadRef.current = []
     setEvents([])
     try {
       await sendToBackground({ type: "CLEAR_BUFFERED_EVENTS" })
+      clearPhaseRef.current = "reloading"
+      const response = await sendToBackground({ type: "GET_BUFFERED_EVENTS" })
+      const buffered =
+        (response?.success && (response.events as SDKEvent[])) || []
+      const reloaded = isPausedRef.current ? [] : buffered
+      const held = heldDuringReloadRef.current.filter(
+        (event) => !reloaded.some((known) => known.id === event.id)
+      )
+      setEvents([...reloaded, ...held])
     } catch (error) {
       console.error("[EventsDebugPage] Error clearing buffered events:", error)
+    } finally {
+      clearPhaseRef.current = "idle"
+      heldDuringReloadRef.current = []
     }
     setShowClearConfirm(false)
   }
