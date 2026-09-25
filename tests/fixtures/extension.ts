@@ -2,6 +2,7 @@ import { test as base, chromium, type BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { ensureExtensionBuilt } from './setup'
+import { buildExperimentsCacheSeed } from '../helpers/experiments-cache-seed'
 
 // In CI we run e2e against the production bundle (chrome-mv3-prod) so any
 // Plasmo/Parcel bundling regression surfaces before reaching Chrome Web Store.
@@ -175,42 +176,15 @@ export const test = base.extend<ExtFixtures>({
       // throttles, and `.experiment-item` stays hidden for 5-60s.
       //
       // Schema: { version: 1, experiments: [...], timestamp: number } per
-      // src/lib/validation-schemas.ts:ExperimentsCacheSchema. We minimize
-      // each experiment to the fields CachedExperimentSchema requires so
-      // the payload fits a single non-chunked sync record (~25 items ≈ 5KB).
+      // src/lib/validation-schemas.ts:ExperimentsCacheSchema. Each experiment
+      // is minimized like setExperimentsCache so the payload fits a single
+      // non-chunked sync record (~25 items ≈ 5KB). Plasmo Storage stores
+      // JSON strings in chrome.storage, so the value is serialized here too.
       const cacheBundle = editorResourcesCache as { experiments?: unknown[] }
-      const rawExperiments = Array.isArray(cacheBundle.experiments)
-        ? cacheBundle.experiments
-        : []
-      if (rawExperiments.length > 0) {
-        const minimal = rawExperiments
-          .map((raw: any) => ({
-            id: raw?.id,
-            name: raw?.name,
-            display_name: raw?.display_name,
-            state: raw?.state,
-            status: raw?.status,
-            percentage_of_traffic: raw?.percentage_of_traffic,
-            traffic_split: raw?.traffic_split,
-            variants: raw?.variants?.map((v: any) => ({
-              variant: v?.variant,
-              name: v?.name,
-              is_control: v?.is_control
-            })),
-            applications: raw?.applications?.map((a: any) => ({
-              application_id: a?.application_id,
-              id: a?.id,
-              name: a?.name
-            }))
-          }))
-          // Drop anything that doesn't have the required (id, name) pair —
-          // the schema rejects the whole array if any entry is invalid.
-          .filter((e: any) => typeof e.id === 'number' && typeof e.name === 'string')
-        const experimentsCache = {
-          version: 1,
-          experiments: minimal,
-          timestamp: Date.now()
-        }
+      const experimentsCache = buildExperimentsCacheSeed(
+        Array.isArray(cacheBundle.experiments) ? cacheBundle.experiments : []
+      )
+      if (experimentsCache) {
         await seedPage.evaluate(
           (payload) =>
             chrome.storage.sync.set({
