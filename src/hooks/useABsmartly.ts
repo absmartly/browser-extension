@@ -36,17 +36,41 @@ export function useABsmartly() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const authCheckInFlightRef = useRef(false)
   const lastAuthCheckAtRef = useRef(0)
+  // The throttle and in-flight guard only de-duplicate checks for the same
+  // config (e.g. focus/visibility bursts). A newly saved config must always
+  // be checked, otherwise correcting an invalid API key shortly after saving
+  // it leaves the list stuck on "You are not logged in".
+  const configRef = useRef<ABsmartlyConfig | null>(null)
+  configRef.current = config
+  const inFlightConfigRef = useRef<ABsmartlyConfig | null>(null)
+  const lastCheckedConfigRef = useRef<ABsmartlyConfig | null>(null)
+  const recheckPendingRef = useRef(false)
+  const checkAuthRef = useRef<() => Promise<void>>(async () => {})
 
   const checkAuth = useCallback(async () => {
     if (!config) return
-    if (authCheckInFlightRef.current) return
+    if (authCheckInFlightRef.current) {
+      if (inFlightConfigRef.current !== config) {
+        recheckPendingRef.current = true
+      }
+      return
+    }
     const now = Date.now()
-    if (now - lastAuthCheckAtRef.current < 2000) return
+    if (
+      lastCheckedConfigRef.current === config &&
+      now - lastAuthCheckAtRef.current < 2000
+    )
+      return
     authCheckInFlightRef.current = true
+    inFlightConfigRef.current = config
+    // A result for a config that was replaced while the request was in
+    // flight must not overwrite the state for the current config.
+    const isCurrent = () => configRef.current === config
 
     try {
       debugLog("[useABsmartly] Checking authentication...")
       const result = await chrome.runtime.sendMessage({ type: "CHECK_AUTH" })
+      if (!isCurrent()) return
 
       if (result?.success && result?.data?.user) {
         debugLog("[useABsmartly] ✅ Authenticated as:", result.data.user.email)
@@ -65,6 +89,7 @@ export function useABsmartly() {
         setAuthErrorType("not-authenticated")
       }
     } catch (err) {
+      if (!isCurrent()) return
       debugLog("[useABsmartly] ❌ Auth check failed:", err)
       console.error(
         "[useABsmartly] Authentication check error - extension may be in invalid state:",
@@ -81,9 +106,16 @@ export function useABsmartly() {
       setError("Unable to verify authentication. Please reload the extension.")
     } finally {
       lastAuthCheckAtRef.current = Date.now()
+      lastCheckedConfigRef.current = config
       authCheckInFlightRef.current = false
+      inFlightConfigRef.current = null
+      if (recheckPendingRef.current || !isCurrent()) {
+        recheckPendingRef.current = false
+        void checkAuthRef.current()
+      }
     }
   }, [config])
+  checkAuthRef.current = checkAuth
 
   useEffect(() => {
     loadConfig()
