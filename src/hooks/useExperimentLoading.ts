@@ -16,13 +16,17 @@ interface UseExperimentLoadingParams {
   requestPermissionsIfNeeded: (forceRequest: boolean) => Promise<boolean>
   onAuthExpired: (expired: boolean) => void
   onError: (error: string | null) => void
+  // Loaded list filters. Reloads that run before the first filtered load
+  // (e.g. after saving from the editor) must not fall back to no filters.
+  filters?: ExperimentFilters | null
 }
 
 export function useExperimentLoading({
   getExperiments,
   requestPermissionsIfNeeded,
   onAuthExpired,
-  onError
+  onError,
+  filters = null
 }: UseExperimentLoadingParams) {
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [filteredExperiments, setFilteredExperiments] = useState<Experiment[]>(
@@ -34,6 +38,8 @@ export function useExperimentLoading({
   const [totalExperiments, setTotalExperiments] = useState<number | undefined>()
   const [hasMore, setHasMore] = useState(false)
   const activeFilters = useRef<ExperimentFilters | null>(null)
+  const loadedFilters = useRef(filters)
+  loadedFilters.current = filters
   // Responses can complete out of order (a slower earlier request finishing
   // after a newer one). Only the newest load may publish results or errors.
   const loadSequence = useRef(0)
@@ -43,7 +49,8 @@ export function useExperimentLoading({
       forceRefresh = false,
       page = currentPage,
       size = pageSize,
-      customFilters: ExperimentFilters | null = activeFilters.current
+      customFilters: ExperimentFilters | null = activeFilters.current ??
+        loadedFilters.current
     ) => {
       const stack = new Error().stack
       debugLog("=== loadExperiments called ===")
