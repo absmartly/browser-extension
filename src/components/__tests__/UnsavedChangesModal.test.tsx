@@ -122,6 +122,39 @@ describe("UnsavedChangesModal", () => {
       expect(defaultProps.onCancel).not.toHaveBeenCalled()
     })
 
+    it("keeps focus inside the dialog while Save is in flight", () => {
+      const { rerender } = render(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} />
+        </>
+      )
+      screen.getByRole("button", { name: "Save" }).focus()
+      rerender(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} saving={true} />
+        </>
+      )
+      const dialog = screen.getByRole("dialog")
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Tab" })
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true })
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Escape" })
+      expect(defaultProps.onCancel).not.toHaveBeenCalled()
+
+      rerender(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} saving={false} />
+        </>
+      )
+      fireEvent.keyDown(dialog, { key: "Tab" })
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+    })
+
     it("restores focus to the element that opened it after closing", () => {
       function Harness() {
         const [open, setOpen] = React.useState(false)

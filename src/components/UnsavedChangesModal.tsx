@@ -42,6 +42,17 @@ export function UnsavedChangesModal({
     }
   }, [isOpen])
 
+  // While saving, every action button is disabled and the browser drops focus
+  // from the pressed button to <body>, outside the Tab trap. Keep focus on
+  // the dialog itself until the buttons are usable again.
+  useEffect(() => {
+    if (!isOpen || !saving || !dialogRef.current) return
+    const active = document.activeElement as HTMLButtonElement | null
+    if (!dialogRef.current.contains(active) || active?.disabled) {
+      dialogRef.current.focus()
+    }
+  }, [isOpen, saving])
+
   if (!isOpen) return null
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -71,7 +82,10 @@ export function UnsavedChangesModal({
     ) {
       event.preventDefault()
       last.focus()
-    } else if (!event.shiftKey && (!inside || active === last)) {
+    } else if (
+      !event.shiftKey &&
+      (!inside || active === last || active === dialogRef.current)
+    ) {
       event.preventDefault()
       first.focus()
     }
@@ -86,7 +100,7 @@ export function UnsavedChangesModal({
       aria-labelledby="unsaved-changes-heading"
       tabIndex={-1}
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 focus:outline-none">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h3
           id="unsaved-changes-heading"
