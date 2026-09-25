@@ -566,6 +566,11 @@ describe("SettingsView", () => {
         expect(mockOnCancel).not.toHaveBeenCalled()
         expect(mockOnSave).not.toHaveBeenCalled()
         expect(screen.getByText("Save changes?")).toBeInTheDocument()
+
+        // Validation focuses the invalid field on the next frame; focus must
+        // stay in the still-open dialog.
+        ;(document.querySelector("#absmartly-endpoint") as HTMLElement).focus()
+        expect(screen.getByRole("dialog")).toHaveFocus()
       } finally {
         useSettingsForm.mockImplementation(() => mockUseSettingsFormReturn)
       }

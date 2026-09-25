@@ -129,6 +129,54 @@ for (const [label, width] of Object.entries(WIDTHS)) {
       await expect(page.locator('#experiments-heading')).toBeVisible()
     })
 
+    test('SET-4 failed Save from the dialog keeps focus in the dialog', async ({ page }) => {
+      await page.locator('#configure-settings-button').click()
+      await saveConfig(page, GOOD_KEY)
+      await page.locator('#nav-settings').click()
+      const field = page.locator('#absmartly-endpoint')
+      await field.fill('http://a b')
+      await page.locator('#header-back-button').focus()
+      await page.keyboard.press('Enter')
+      await expect(page.locator('#unsaved-changes-cancel')).toBeFocused()
+      await page.keyboard.press('Tab')
+      await page.keyboard.press('Tab')
+      await expect(page.locator('#unsaved-changes-save')).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(page.locator('#absmartly-endpoint-error')).toHaveText('Invalid endpoint URL. Use a valid HTTP or HTTPS URL.')
+      // Validation focuses the invalid field on the next animation frame.
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+      const state = () => page.evaluate(() => {
+        const dialog = document.querySelector('#unsaved-changes-modal')
+        const active = document.activeElement
+        return { dialogOpen: !!dialog, active: active?.id || active?.tagName, focusBehindOpenDialog: !!dialog && !dialog.contains(active) }
+      })
+      const trail = [await state()]
+      await shot(page, 'set4-05-after-failed-save')
+      await page.keyboard.press('Tab')
+      trail.push(await state())
+      await page.keyboard.press('Shift+Tab')
+      trail.push(await state())
+      await test.info().attach('failed-save-focus-trail', { body: JSON.stringify(trail, null, 2), contentType: 'application/json' })
+      expect(trail.some(s => s.focusBehindOpenDialog), JSON.stringify(trail)).toBe(false)
+      // The dialog stays open after a failed Save (existing behaviour);
+      // Escape closes it and reveals the inline error, nothing was saved.
+      await expect(page.locator('#unsaved-changes-modal')).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#unsaved-changes-modal')).toHaveCount(0)
+      await expect(page.locator('#header-back-button')).toBeFocused()
+      await expect(page.locator('#absmartly-endpoint-error')).toBeVisible()
+      await expect(field).toHaveValue('http://a b')
+      await shot(page, 'set4-06-after-escape')
+      // Restoring the saved endpoint makes the form clean, so Back leaves
+      // directly; the invalid value was never persisted.
+      await field.fill(endpoint)
+      await page.locator('#header-back-button').click()
+      await expect(page.locator('#experiments-heading')).toBeVisible()
+      await page.reload()
+      await page.locator('#nav-settings').click()
+      await expect(field).toHaveValue(endpoint)
+    })
+
     test('SET-4 focus stays in the dialog while its Save is in flight', async ({ page }) => {
       await page.locator('#configure-settings-button').click()
       await saveConfig(page, GOOD_KEY)
