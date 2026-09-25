@@ -55,14 +55,24 @@ export function UnsavedChangesModal({
 
   // Anything that focuses an element behind the overlay while the dialog is
   // open (e.g. failed Save validation focusing the invalid field on the next
-  // frame) would bypass the Tab/Escape handling, so take focus back.
+  // frame) would bypass the Tab/Escape handling, so take focus back. When
+  // another modal dialog is layered above this one (e.g. the permission
+  // prompt), keep focus in that topmost dialog instead.
   useEffect(() => {
     if (!isOpen) return
     const handleFocusIn = (event: FocusEvent) => {
       const dialog = dialogRef.current
-      if (dialog && !dialog.contains(event.target as Node)) {
+      if (!dialog) return
+      const modals = document.querySelectorAll<HTMLElement>(
+        '[aria-modal="true"]'
+      )
+      const topmost = modals[modals.length - 1] ?? dialog
+      if (topmost.contains(event.target as Node)) return
+      if (topmost === dialog) {
         dialog.focus()
+        return
       }
+      topmost.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
     }
     document.addEventListener("focusin", handleFocusIn)
     return () => document.removeEventListener("focusin", handleFocusIn)

@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useEffect, useRef } from "react"
 
 import { Button } from "./ui/Button"
 
@@ -13,10 +13,47 @@ export function CookieConsentModal({
   onGrant,
   onDeny
 }: CookieConsentModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  // It can open on top of another dialog (e.g. unsaved changes), so move
+  // keyboard focus into it and give it back when it closes.
+  useEffect(() => {
+    if (!isOpen) return
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    dialogRef.current?.querySelector<HTMLElement>("button")?.focus()
+    return () => {
+      if (previouslyFocused?.isConnected) previouslyFocused.focus()
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab" || !dialogRef.current) return
+    const buttons = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled])")
+    )
+    if (buttons.length === 0) return
+    const first = buttons[0]
+    const last = buttons[buttons.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div
+      ref={dialogRef}
+      id="cookie-consent-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cookie-consent-heading"
+      onKeyDown={handleKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <div className="mb-4">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mx-auto mb-4">
@@ -33,7 +70,9 @@ export function CookieConsentModal({
               />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+          <h3
+            id="cookie-consent-heading"
+            className="text-lg font-semibold text-gray-900 text-center mb-2">
             ABsmartly Access Required
           </h3>
           <p className="text-sm text-gray-600 text-center">
@@ -66,10 +105,18 @@ export function CookieConsentModal({
         </div>
 
         <div className="flex gap-3">
-          <Button onClick={onGrant} variant="primary" className="flex-1">
+          <Button
+            id="cookie-consent-grant"
+            onClick={onGrant}
+            variant="primary"
+            className="flex-1">
             Grant Access
           </Button>
-          <Button onClick={onDeny} variant="secondary" className="flex-1">
+          <Button
+            id="cookie-consent-cancel"
+            onClick={onDeny}
+            variant="secondary"
+            className="flex-1">
             Cancel
           </Button>
         </div>
