@@ -8,7 +8,9 @@ import {
   resetRateLimit,
   clearAllRateLimits,
   getRateLimitStats,
-  cleanupOldEntries
+  cleanupOldEntries,
+  getRateLimitBucket,
+  SDK_EVENT_RATE_LIMIT
 } from '../rate-limiter'
 
 describe('Rate Limiter', () => {
@@ -640,5 +642,67 @@ describe('Rate Limiter', () => {
       expect(stats.isBlocked).toBe(false)
       expect(stats.violations).toBe(0)
     })
+  })
+})
+
+describe('getRateLimitBucket', () => {
+  const extensionOrigin = 'chrome-extension://abc/'
+  const tab = { id: 7 }
+  const pageSender = { id: 'abc', tab, url: 'https://shop.example/' }
+  const sidebarSender = { id: 'abc', tab, url: 'chrome-extension://abc/tabs/sidebar.html' }
+
+  beforeEach(() => clearAllRateLimits())
+
+  it('separates SDK events, other page messages and extension pages in the same tab', () => {
+    const sdk = getRateLimitBucket(pageSender, 'SDK_EVENT', extensionOrigin)
+    const page = getRateLimitBucket(pageSender, 'GET_CONFIG', extensionOrigin)
+    const sidebar = getRateLimitBucket(sidebarSender, 'API_REQUEST', extensionOrigin)
+    expect(new Set([sdk.key, page.key, sidebar.key]).size).toBe(3)
+    expect(sdk.key).toBe('7:sdk-events')
+    expect(sdk.config).toBe(SDK_EVENT_RATE_LIMIT)
+    expect(page.config).toEqual({})
+    expect(sidebar.config).toEqual({})
+  })
+
+  it('keeps tabs separate', () => {
+    const other = { ...pageSender, tab: { id: 8 } }
+    expect(getRateLimitBucket(pageSender, 'SDK_EVENT', extensionOrigin).key)
+      .not.toBe(getRateLimitBucket(other, 'SDK_EVENT', extensionOrigin).key)
+  })
+
+  it('an SDK event flood does not rate-limit the sidebar in the same tab', () => {
+    const sdk = getRateLimitBucket(pageSender, 'SDK_EVENT', extensionOrigin)
+    for (let i = 0; i < 300; i++) {
+      expect(checkRateLimit(sdk.key, sdk.config, 'SDK_EVENT')).toBe(true)
+    }
+    const sidebar = getRateLimitBucket(sidebarSender, 'GET_BUFFERED_EVENTS', extensionOrigin)
+    expect(checkRateLimit(sidebar.key, sidebar.config, 'GET_BUFFERED_EVENTS')).toBe(true)
+  })
+
+  it('still limits and blocks abusive SDK event floods', () => {
+    const sdk = getRateLimitBucket(pageSender, 'SDK_EVENT', extensionOrigin)
+    for (let i = 0; i < SDK_EVENT_RATE_LIMIT.maxRequests; i++) {
+      checkRateLimit(sdk.key, sdk.config, 'SDK_EVENT')
+    }
+    expect(checkRateLimit(sdk.key, sdk.config, 'SDK_EVENT')).toBe(false)
+    for (let i = 0; i < 4; i++) checkRateLimit(sdk.key, sdk.config, 'SDK_EVENT')
+    expect(getRateLimitStats(sdk.key).isBlocked).toBe(true)
+    const sidebar = getRateLimitBucket(sidebarSender, 'GET_BUFFERED_EVENTS', extensionOrigin)
+    expect(checkRateLimit(sidebar.key, sidebar.config)).toBe(true)
+  })
+
+  it('a flood of non-SDK page messages does not block the sidebar or SDK events', () => {
+    const page = getRateLimitBucket(pageSender, 'GET_CONFIG', extensionOrigin)
+    for (let i = 0; i < 110; i++) checkRateLimit(page.key, page.config)
+    expect(checkRateLimit(page.key, page.config)).toBe(false)
+    const sidebar = getRateLimitBucket(sidebarSender, 'API_REQUEST', extensionOrigin)
+    const sdk = getRateLimitBucket(pageSender, 'SDK_EVENT', extensionOrigin)
+    expect(checkRateLimit(sidebar.key, sidebar.config)).toBe(true)
+    expect(checkRateLimit(sdk.key, sdk.config)).toBe(true)
+  })
+
+  it('does not treat a page URL merely containing the extension id as an extension page', () => {
+    const spoof = { id: 'abc', tab, url: 'https://evil.example/chrome-extension://abc/' }
+    expect(getRateLimitBucket(spoof, 'API_REQUEST', extensionOrigin).key).toBe('7:page')
   })
 })
