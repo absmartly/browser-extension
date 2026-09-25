@@ -82,3 +82,63 @@ describe("EventViewer keyboard handling", () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: "EVENT_VIEWER_CLOSE" })
   })
 })
+
+describe("EventViewer focus containment", () => {
+  let viewer: EventViewer
+
+  const inner = () => host()!.shadowRoot!.activeElement as HTMLElement | null
+  const press = (key: string, shiftKey = false) => {
+    const event = new KeyboardEvent("keydown", {
+      key,
+      shiftKey,
+      bubbles: true,
+      cancelable: true
+    })
+    document.dispatchEvent(event)
+    return event
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    document.body.innerHTML = '<button id="page-button">Page</button>'
+    ;(global as any).chrome = { runtime: { sendMessage: jest.fn() } }
+    viewer = new EventViewer()
+    viewer.show("goal", "now", "{}")
+    jest.runOnlyPendingTimers()
+  })
+
+  afterEach(() => {
+    viewer.close()
+    jest.useRealTimers()
+  })
+
+  it("cycles Tab through the dialog buttons without reaching the page", () => {
+    const [copy, close] = Array.from(
+      host()!.shadowRoot!.querySelectorAll<HTMLElement>(".event-viewer-button")
+    )
+    const seen: Array<HTMLElement | null> = []
+    for (let i = 0; i < 4; i++) {
+      expect(press("Tab").defaultPrevented).toBe(true)
+      seen.push(inner())
+    }
+    expect(seen).toEqual([copy, close, copy, close])
+    expect(document.activeElement).toBe(host())
+  })
+
+  it("cycles Shift+Tab backwards", () => {
+    const [copy, close] = Array.from(
+      host()!.shadowRoot!.querySelectorAll<HTMLElement>(".event-viewer-button")
+    )
+    press("Tab", true)
+    expect(inner()).toBe(close)
+    press("Tab", true)
+    expect(inner()).toBe(copy)
+    press("Tab", true)
+    expect(inner()).toBe(close)
+  })
+
+  it("stops handling Tab after close", () => {
+    viewer.close()
+    expect(press("Tab").defaultPrevented).toBe(false)
+  })
+})
