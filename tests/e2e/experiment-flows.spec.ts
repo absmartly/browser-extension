@@ -426,7 +426,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
 
       // Check for either heading or create button
-      const experimentList = sidebar.locator('#experiments-header, #experiments-heading')
+      const experimentList = sidebar.locator('#experiments-heading')
       const createButton = sidebar.locator('button[title="Create New Experiment"]')
 
       const listVisible = await experimentList.isVisible({ timeout: 2000 }).catch(() => false)
