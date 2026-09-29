@@ -42,19 +42,12 @@ export function useABsmartly() {
   // it leaves the list stuck on "You are not logged in".
   const configRef = useRef<ABsmartlyConfig | null>(null)
   configRef.current = config
-  const inFlightConfigRef = useRef<ABsmartlyConfig | null>(null)
   const lastCheckedConfigRef = useRef<ABsmartlyConfig | null>(null)
-  const recheckPendingRef = useRef(false)
   const checkAuthRef = useRef<() => Promise<void>>(async () => {})
 
   const checkAuth = useCallback(async () => {
     if (!config) return
-    if (authCheckInFlightRef.current) {
-      if (inFlightConfigRef.current !== config) {
-        recheckPendingRef.current = true
-      }
-      return
-    }
+    if (authCheckInFlightRef.current) return
     const now = Date.now()
     if (
       lastCheckedConfigRef.current === config &&
@@ -62,7 +55,6 @@ export function useABsmartly() {
     )
       return
     authCheckInFlightRef.current = true
-    inFlightConfigRef.current = config
     // A result for a config that was replaced while the request was in
     // flight must not overwrite the state for the current config.
     const isCurrent = () => configRef.current === config
@@ -108,9 +100,7 @@ export function useABsmartly() {
       lastAuthCheckAtRef.current = Date.now()
       lastCheckedConfigRef.current = config
       authCheckInFlightRef.current = false
-      inFlightConfigRef.current = null
-      if (recheckPendingRef.current || !isCurrent()) {
-        recheckPendingRef.current = false
+      if (!isCurrent()) {
         void checkAuthRef.current()
       }
     }
