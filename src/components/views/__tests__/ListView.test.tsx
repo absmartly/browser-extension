@@ -78,8 +78,6 @@ describe("ListView header", () => {
     }
   })
 
-  // E2E specs locate the list with "#experiments-header, h1:has-text(...)";
-  // a wrapper reusing that id makes the locator ambiguous (strict mode).
   it("does not reuse the experiments-header id for the header wrapper", () => {
     const { container } = renderListView()
     expect(container.querySelector("#experiments-header")).toBeNull()
